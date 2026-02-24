@@ -24,6 +24,7 @@ import {
     TOOL_WEB_SEARCH,
     TOOL_WRITE_DOCUMENT,
     TOOL_QUERY_PAST_ADVICE,
+    TOOL_QUERY_MARKETPLACE,
     FINANCE_TOOLS,
     ENGINEERING_TOOLS,
     PRODUCT_TOOLS,
@@ -53,6 +54,7 @@ import { handleQueryComplianceStatus, handleQueryContractsOverview } from "./han
 import { handleWriteDocument } from "./handlers/documents"
 import { handleQueryPastAdvice } from "./handlers/memory-search"
 import { handleAskSpecialist } from "./handlers/delegation"
+import { handleQueryMarketplace } from "./handlers/marketplace"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -93,6 +95,9 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     // Delegation tool
     ask_specialist: handleAskSpecialist,
 
+    // Marketplace tool
+    query_marketplace: handleQueryMarketplace,
+
     // Utility tools
     run_calculation: handleRunCalculation,
     web_search: handleWebSearch,
@@ -106,29 +111,29 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
  * domain-specific tools. Data-heavy specialists get run_calculation.
  */
 const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
-    // Strategy — needs strategic goals + calculation + all common
-    strategist: [...COMMON_TOOLS, ...STRATEGY_TOOLS, TOOL_RUN_CALCULATION],
+    // Strategy — needs strategic goals + finance context + calculation
+    strategist: [...COMMON_TOOLS, ...STRATEGY_TOOLS, ...FINANCE_TOOLS, TOOL_RUN_CALCULATION],
 
     // CTO — engineering metrics + product roadmap + calculation
     cto: [...COMMON_TOOLS, ...ENGINEERING_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],
 
-    // VP Engineering — engineering metrics + calculation
-    "vp-engineering": [...COMMON_TOOLS, ...ENGINEERING_TOOLS, TOOL_RUN_CALCULATION],
+    // VP Engineering — engineering metrics + people context + calculation
+    "vp-engineering": [...COMMON_TOOLS, ...ENGINEERING_TOOLS, ...PEOPLE_TOOLS, TOOL_RUN_CALCULATION],
 
     // VP Manufacturing — common tools + calculation
     "vp-manufacturing": [...COMMON_TOOLS, TOOL_RUN_CALCULATION],
 
-    // VP Supply Chain — common tools + calculation
-    "vp-supply-chain": [...COMMON_TOOLS, TOOL_RUN_CALCULATION],
+    // VP Supply Chain — common tools + marketplace + calculation
+    "vp-supply-chain": [...COMMON_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_RUN_CALCULATION],
 
     // Product Lead — product roadmap + common
     "product-lead": [...COMMON_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],
 
-    // Growth Marketing — common + marketing tools + calculation
-    "growth-marketer": [...COMMON_TOOLS, ...MARKETING_TOOLS, TOOL_RUN_CALCULATION],
+    // Growth Marketing — common + marketing tools + marketplace + calculation
+    "growth-marketer": [...COMMON_TOOLS, ...MARKETING_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_RUN_CALCULATION],
 
-    // Sales Lead — common + financial overview (revenue context)
-    "sales-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS],
+    // Sales Lead — common + financial overview + marketplace
+    "sales-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS, TOOL_QUERY_MARKETPLACE],
 
     // Chief of Staff — needs everything for cross-functional coordination
     "chief-of-staff": [

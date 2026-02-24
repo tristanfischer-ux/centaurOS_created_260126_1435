@@ -390,6 +390,25 @@ export const LEGAL_TOOLS: ToolDefinition[] = [
     },
 ]
 
+// ─── Marketplace Tool ────────────────────────────────────────────────
+
+export const TOOL_QUERY_MARKETPLACE: ToolDefinition = {
+    name: "query_marketplace",
+    description:
+        "Query marketplace intelligence based on a specific focus area. Use `sales_pipeline` for revenue indicators, invoices, and deals. Use `market_positioning` for company profile and competitive context. Use `supply_capacity` for team capacity, supply chain tasks, and overdue items.",
+    parameters: {
+        type: "object",
+        properties: {
+            focus: {
+                type: "string",
+                enum: ["sales_pipeline", "market_positioning", "supply_capacity"],
+                description: "The marketplace focus area to query.",
+            },
+        },
+        required: ["focus"],
+    },
+}
+
 // ─── Strategy Tools ──────────────────────────────────────────────────
 
 export const STRATEGY_TOOLS: ToolDefinition[] = [

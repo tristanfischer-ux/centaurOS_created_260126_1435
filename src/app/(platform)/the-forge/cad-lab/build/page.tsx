@@ -232,7 +232,7 @@ export default function CadLabBuildPage(): React.ReactNode {
       {/* ── Section navigation ── */}
       {BUILD_SECTIONS.length > 1 && (
         <nav className="sticky top-12 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-          <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-1">
             {BUILD_SECTIONS.map((section) => (
               <button
                 key={section.id}

@@ -64,7 +64,7 @@ export default function CadLabReviewPage(): React.ReactNode {
       // Diagnostics completion
       const diagTotal = modules.length * 6 // 6 diagnostic categories per module
       const diagCompleted = diagnosticAnswers
-        ? Object.values(diagnosticAnswers).reduce((s, ma) => s + Object.keys(ma).length, 0)
+        ? Object.values(diagnosticAnswers).reduce((s, ma) => s + (ma ? Object.keys(ma).length : 0), 0)
         : 0
       if (diagTotal > 0) parts.push(`Diagnostics: ${diagCompleted}/${diagTotal} completed.`)
       // DFM issues summary
@@ -153,7 +153,7 @@ export default function CadLabReviewPage(): React.ReactNode {
   return (
     <div className="space-y-6">
       {/* Stage header */}
-      <div id="review-header" className="flex items-center justify-between">
+      <div id="review-header" className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-3">
           <ClipboardCheck className="h-5 w-5 text-international-orange" />
           <div>
@@ -163,7 +163,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <AskSpecialistButton
             context={{
               type: "general",
@@ -172,8 +172,8 @@ export default function CadLabReviewPage(): React.ReactNode {
               metadata: {
                 status: `${generatedModuleCount}/${modules.length} modules generated`,
                 notes: [
-                  `${modules.reduce((s, m) => (m.result as CadLabResult | undefined)?.dfm?.issues?.length ? s + (m.result as CadLabResult).dfm!.issues.length : s, 0)} DFM issues`,
-                  diagnosticAnswers && `Diagnostics: ${Object.keys(diagnosticAnswers).length} modules answered`,
+                  `${modules.reduce((s, m) => s + ((m.result as CadLabResult | undefined)?.dfm?.issues?.length ?? 0), 0)} DFM issues`,
+                  Object.keys(diagnosticAnswers ?? {}).length > 0 && `Diagnostics: ${Object.keys(diagnosticAnswers ?? {}).length} modules answered`,
                 ].filter(Boolean).join(". "),
               },
             }}
