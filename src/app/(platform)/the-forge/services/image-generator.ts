@@ -17,7 +17,6 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { isRetryableError } from "@/lib/agents/error-classification"
 
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
 import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
@@ -247,11 +246,12 @@ async function callOpenAIImage(
 /**
  * Generates an image using Gemini with automatic OpenAI fallback.
  *
- * FLOW: callGeminiImage() → [retryable error?] → callOpenAIImage() → result
+ * FLOW: callGeminiImage() → [any error] → callOpenAIImage() → result
  *
- * Only falls back on provider-side errors (503, 429, network).
- * Auth/content filter errors fail immediately.
- * Gracefully skips fallback if OPENAI_API_KEY is not set.
+ * Falls back to OpenAI on ANY Gemini failure (model deprecation, content
+ * filter, API errors, etc.) as long as OPENAI_API_KEY is set. Image
+ * generation providers have different capabilities, so unlike text LLMs
+ * it's worth trying the fallback even for non-retryable errors.
  */
 async function callImageWithFallback(
   model: string,
@@ -264,20 +264,13 @@ async function callImageWithFallback(
   } catch (geminiError) {
     const errorMessage = geminiError instanceof Error ? geminiError.message : String(geminiError)
 
-    // DECISION: Only fallback for provider-side problems (503, 429, network).
-    // Auth errors, content filter blocks, etc. should fail immediately —
-    // they'd likely fail on OpenAI too or indicate a problem with the request.
-    if (!isRetryableError(errorMessage)) {
-      throw geminiError
-    }
-
     if (!process.env.OPENAI_API_KEY) {
-      console.warn("[XRayImageGen] Gemini failed with retryable error but OPENAI_API_KEY is not set — no fallback available")
+      console.warn("[XRayImageGen] Gemini failed and OPENAI_API_KEY is not set — no fallback available")
       throw geminiError
     }
 
     console.warn(
-      "[XRayImageGen] Gemini unavailable, falling back to OpenAI gpt-image-1:",
+      "[XRayImageGen] Gemini failed, falling back to OpenAI gpt-image-1:",
       { error: errorMessage.slice(0, 200) },
     )
 

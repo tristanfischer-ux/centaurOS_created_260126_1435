@@ -149,6 +149,7 @@ export interface CadLabContextValue {
   systemIllustrationUrl: string | null
   systemIllustrationStatus: "idle" | "generating" | "complete" | "failed"
   systemIllustrationError: string | null
+  handleRetryIllustration: () => void
 
   // Integration (combined system assembly)
   integratedAssemblyStlUrl: string | null
@@ -466,13 +467,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url)
                   .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
               } else {
-                // Silent failure — illustration is enhancement, not blocker
-                setSystemIllustrationStatus("idle")
+                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
+                setSystemIllustrationStatus("failed")
+                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
               }
             })
-            .catch(() => {
-              // Silent failure — illustration is enhancement, not blocker
-              setSystemIllustrationStatus("idle")
+            .catch((e) => {
+              console.error("[CAD-LAB] System illustration failed:", e)
+              setSystemIllustrationStatus("failed")
+              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
             })
         }
       }
@@ -965,6 +968,36 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject])
 
+  // ── Retry system illustration ──
+  const handleRetryIllustration = useCallback(() => {
+    if (!activeProjectId) return
+    setSystemIllustrationStatus("generating")
+    setSystemIllustrationError(null)
+    generateCadLabSystemIllustrationAction(
+      activeProjectId,
+      subject,
+      modules.map((m) => m.name),
+      modules.map((m) => m.purpose),
+    )
+      .then((illRes) => {
+        if ("url" in illRes) {
+          setSystemIllustrationUrl(illRes.url)
+          setSystemIllustrationStatus("complete")
+          saveCadLabSystemIllustration(activeProjectId!, illRes.url)
+            .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+        } else {
+          console.error("[CAD-LAB] System illustration retry failed:", "error" in illRes ? illRes.error : "unknown")
+          setSystemIllustrationStatus("failed")
+          setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
+        }
+      })
+      .catch((e) => {
+        console.error("[CAD-LAB] System illustration retry failed:", e)
+        setSystemIllustrationStatus("failed")
+        setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+      })
+  }, [activeProjectId, subject, modules])
+
   // ── Research ──
   const handleResearch = useCallback(async () => {
     setIsResearching(true)
@@ -1026,13 +1059,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 saveCadLabSystemIllustration(projId, illRes.url)
                   .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
               } else {
-                // Silent failure — illustration is enhancement, not blocker
-                setSystemIllustrationStatus("idle")
+                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
+                setSystemIllustrationStatus("failed")
+                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
               }
             })
-            .catch(() => {
-              // Silent failure — illustration is enhancement, not blocker
-              setSystemIllustrationStatus("idle")
+            .catch((e) => {
+              console.error("[CAD-LAB] System illustration failed:", e)
+              setSystemIllustrationStatus("failed")
+              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
             })
         }
       }
@@ -1256,7 +1291,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isBatchRunning, batchProgress,
     isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
-    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,

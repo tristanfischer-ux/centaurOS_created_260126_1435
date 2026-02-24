@@ -77,7 +77,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
     revealedModuleIds,
-    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError,
+    systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
@@ -278,15 +278,25 @@ export default function CadLabResearchPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* ── System illustration failed — soft placeholder ── */}
-          {systemIllustrationStatus === "idle" && !systemIllustrationUrl && modules.length > 0 && (
+          {/* ── System illustration failed — show error with retry ── */}
+          {(systemIllustrationStatus === "failed" ||
+            (systemIllustrationStatus === "idle" && !systemIllustrationUrl)) && (
             <Card className="overflow-hidden border-dashed">
               <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-2">
+                <div className="flex flex-col items-center gap-3">
                   <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
                   <span className="text-xs text-muted-foreground">
-                    Concept illustration unavailable
+                    {systemIllustrationError ?? "Concept illustration unavailable"}
                   </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRetryIllustration}
+                    className="text-xs gap-1.5"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Retry
+                  </Button>
                 </div>
               </div>
             </Card>
