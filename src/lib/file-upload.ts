@@ -42,6 +42,36 @@ export interface UploadResult {
 /**
  * Validate file before upload
  */
+// SECURITY: Allowed file extensions — blocks executable uploads regardless of MIME type
+const ALLOWED_EXTENSIONS = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',        // images
+  'pdf',                                                // documents
+  'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',       // office
+  'txt', 'csv', 'md',                                  // text
+  'zip',                                                // archives
+])
+
+// SECURITY: MIME-to-extension mapping for consistency validation
+const MIME_EXT_MAP: Record<string, string[]> = {
+  'image/jpeg': ['jpg', 'jpeg'],
+  'image/jpg': ['jpg', 'jpeg'],
+  'image/png': ['png'],
+  'image/gif': ['gif'],
+  'image/webp': ['webp'],
+  'image/svg+xml': ['svg'],
+  'application/pdf': ['pdf'],
+  'application/msword': ['doc'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
+  'application/vnd.ms-excel': ['xls'],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx'],
+  'application/vnd.ms-powerpoint': ['ppt'],
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['pptx'],
+  'text/plain': ['txt', 'md', 'csv'],
+  'text/csv': ['csv'],
+  'application/zip': ['zip'],
+  'application/x-zip-compressed': ['zip'],
+}
+
 export function validateFile(file: File): { valid: boolean; error?: string } {
   // Check file size
   if (file.size > MAX_FILE_SIZE) {
@@ -50,7 +80,7 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
       error: `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB`
     }
   }
-  
+
   // Check file type
   if (!ALLOWED_FILE_TYPES.includes(file.type)) {
     return {
@@ -58,7 +88,19 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
       error: 'File type not supported. Allowed: images, PDFs, documents, text, and ZIP files.'
     }
   }
-  
+
+  // SECURITY: Validate file extension
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
+    return { valid: false, error: 'File extension not allowed.' }
+  }
+
+  // SECURITY: Verify extension matches MIME type to catch spoofed content types
+  const expectedExts = MIME_EXT_MAP[file.type]
+  if (expectedExts && !expectedExts.includes(ext)) {
+    return { valid: false, error: 'File extension does not match file type.' }
+  }
+
   return { valid: true }
 }
 

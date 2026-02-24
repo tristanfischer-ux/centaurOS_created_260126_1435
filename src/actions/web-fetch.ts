@@ -11,7 +11,7 @@
  * - Validates URL format and blocks private/internal IPs
  * - Rate limited per user (30 requests/minute)
  * - Content truncated to prevent excessive token usage
- * - HTML sanitized with DOMPurify before returning
+ * - HTML sanitized with isomorphic-dompurify before returning
  *
  * @related
  * - Browse page: src/app/(platform)/browse/page.tsx
@@ -19,6 +19,7 @@
  */
 
 import { Readability } from "@mozilla/readability"
+import DOMPurify from "isomorphic-dompurify"
 import { JSDOM } from "jsdom"
 import { createClient } from "@/lib/supabase/server"
 
@@ -162,7 +163,7 @@ function validateUrl(urlString: string): URL | null {
 
 // ─── HTML Sanitization ──────────────────────────────────────────────────────
 
-const ALLOWED_TAGS = new Set([
+const ALLOWED_TAGS = [
   "h1", "h2", "h3", "h4", "h5", "h6",
   "p", "br", "hr",
   "ul", "ol", "li",
@@ -171,58 +172,21 @@ const ALLOWED_TAGS = new Set([
   "table", "thead", "tbody", "tr", "th", "td",
   "img", "figure", "figcaption",
   "div", "span", "section", "article",
-])
-
-const ALLOWED_ATTRS = new Set(["href", "src", "alt", "title", "class", "id"])
+]
 
 /**
- * Sanitizes HTML by removing dangerous elements and attributes.
- *
- * Accepts either a raw HTML string or a pre-parsed JSDOM Document to avoid
- * the cost of creating a second JSDOM instance (saves ~40% parse time on
- * large pages like Alibaba).
+ * Sanitizes HTML using DOMPurify — a battle-tested, well-maintained sanitizer.
  *
  * @security Strips script, style, iframe, object, embed, form elements
  * and removes event handler attributes (onclick, onerror, etc.)
  */
-function sanitizeHtml(html: string, existingDoc?: Document): string {
-  let doc: Document
-  let container: Element | null
-
-  if (existingDoc) {
-    container = existingDoc.createElement("div")
-    container.innerHTML = html
-  } else {
-    const dom = new JSDOM(`<div id="__sanitize__">${html}</div>`)
-    doc = dom.window.document
-    container = doc.getElementById("__sanitize__")
-  }
-  if (!container) return ""
-
-  doc = container.ownerDocument
-
-  const allElements = container.querySelectorAll("*")
-  for (const el of allElements) {
-    const tagName = el.tagName.toLowerCase()
-    if (!ALLOWED_TAGS.has(tagName)) {
-      const text = doc.createTextNode(el.textContent || "")
-      el.parentNode?.replaceChild(text, el)
-      continue
-    }
-
-    const attrs = Array.from(el.attributes)
-    for (const attr of attrs) {
-      if (!ALLOWED_ATTRS.has(attr.name.toLowerCase())) {
-        el.removeAttribute(attr.name)
-      }
-      // SECURITY: Block javascript: URLs in href/src
-      if ((attr.name === "href" || attr.name === "src") && /^\s*javascript:/i.test(attr.value)) {
-        el.removeAttribute(attr.name)
-      }
-    }
-  }
-
-  return container.innerHTML
+function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR: ["href", "src", "alt", "title", "class", "id"],
+    ALLOW_DATA_ATTR: false,
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form"],
+  })
 }
 
 // ─── Content Extraction ─────────────────────────────────────────────────────
@@ -425,8 +389,8 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
       return result
     }
 
-    // Reuse the JSDOM document for sanitization — avoids a second JSDOM parse
-    const sanitizedHtml = sanitizeHtml(article.content ?? "", dom.window.document)
+    // SECURITY: Sanitize extracted HTML with DOMPurify before returning to client
+    const sanitizedHtml = sanitizeHtml(article.content ?? "")
 
     const textContent = (article.textContent ?? "").trim()
     const truncatedContent =
