@@ -198,9 +198,10 @@ export type ExecutionStatus = "idle" | "running" | "review" | "approved" | "erro
 // ─── Attached Files ──────────────────────────────────────────────────
 export interface AttachedFile {
     name: string
-    content: string // text content read client-side
+    content: string // text or base64-encoded content
     type: string // MIME type
     size: number // bytes
+    encoding?: "text" | "base64" // defaults to "text" for backwards compatibility
 }
 
 // ─── Prompt Template ─────────────────────────────────────────────────

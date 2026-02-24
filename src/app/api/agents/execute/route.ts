@@ -469,6 +469,69 @@ export async function POST(request: Request) {
                     if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
                     continue
                 }
+                // Word (.docx) — extract raw text via mammoth
+                if (mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) {
+                    const buf = await res.arrayBuffer()
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const mammoth = require("mammoth") as { extractRawText: (opts: { buffer: Buffer }) => Promise<{ value: string }> }
+                    const result = await mammoth.extractRawText({ buffer: Buffer.from(buf) })
+                    const text = (result.value ?? "").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                    if (text.length > 0) {
+                        parts.push(`### Contents of "${name}" (Word)\n\n${text}`)
+                        totalChars += text.length
+                    }
+                    if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
+                    continue
+                }
+                // Excel (.xlsx) — convert each sheet to CSV via xlsx
+                if (mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || name.endsWith(".xlsx") || name.endsWith(".xls")) {
+                    const buf = await res.arrayBuffer()
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const XLSX = require("xlsx") as { read: (data: ArrayBuffer, opts?: Record<string, unknown>) => { SheetNames: string[]; Sheets: Record<string, unknown> }; utils: { sheet_to_csv: (sheet: unknown) => string } }
+                    const workbook = XLSX.read(buf, { type: "array" })
+                    const sheetTexts: string[] = []
+                    for (const sheetName of workbook.SheetNames) {
+                        const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName])
+                        if (csv.trim()) {
+                            sheetTexts.push(`#### Sheet: ${sheetName}\n\n${csv}`)
+                        }
+                    }
+                    const text = sheetTexts.join("\n\n").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                    if (text.length > 0) {
+                        parts.push(`### Contents of "${name}" (Excel)\n\n${text}`)
+                        totalChars += text.length
+                    }
+                    if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
+                    continue
+                }
+                // PowerPoint (.pptx) — extract text from slides
+                if (mime === "application/vnd.openxmlformats-officedocument.presentationml.presentation" || name.endsWith(".pptx")) {
+                    const buf = await res.arrayBuffer()
+                    // eslint-disable-next-line @typescript-eslint/no-require-imports
+                    const XLSX = require("xlsx") as { read: (data: ArrayBuffer, opts?: Record<string, unknown>) => { SheetNames: string[]; Sheets: Record<string, unknown> }; utils: { sheet_to_csv: (sheet: unknown) => string } }
+                    // PPTX files can be partially read by xlsx for embedded data; fall back to raw text extraction
+                    try {
+                        const workbook = XLSX.read(buf, { type: "array" })
+                        const slideTexts: string[] = []
+                        for (const sheetName of workbook.SheetNames) {
+                            const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[sheetName])
+                            if (csv.trim()) {
+                                slideTexts.push(`#### ${sheetName}\n\n${csv}`)
+                            }
+                        }
+                        if (slideTexts.length > 0) {
+                            const text = slideTexts.join("\n\n").slice(0, MAX_ATTACHMENT_CONTEXT_CHARS - totalChars)
+                            parts.push(`### Contents of "${name}" (PowerPoint)\n\n${text}`)
+                            totalChars += text.length
+                        } else {
+                            parts.push(`[User attached PowerPoint: ${name} — text extraction limited]`)
+                        }
+                    } catch {
+                        parts.push(`[User attached PowerPoint: ${name} — could not extract text]`)
+                    }
+                    if (totalChars >= MAX_ATTACHMENT_CONTEXT_CHARS) break
+                    continue
+                }
                 parts.push(`[User attached file: ${name}]`)
             } catch (err) {
                 console.warn("[agents/execute] Attachment fetch failed:", name, err)

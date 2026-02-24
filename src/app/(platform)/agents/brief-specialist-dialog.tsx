@@ -31,6 +31,8 @@ import {
     ImageIcon,
     MoreVertical,
     Scale,
+    Maximize2,
+    Minimize2,
 } from "lucide-react"
 import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
@@ -751,6 +753,9 @@ export function BriefSpecialistDialog({
     const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([])
     const [isDraggingOver, setIsDraggingOver] = useState(false)
     const [isUploadingFile, setIsUploadingFile] = useState(false)
+
+    /** Fullscreen dialog mode for larger workspace */
+    const [isFullscreen, setIsFullscreen] = useState(false)
 
     // Multi-step execution plan state
     const [activePlan, setActivePlan] = useState<ExecutionPlan | null>(null)
@@ -3315,7 +3320,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+            <DialogContent size={isFullscreen ? "full" : "lg"} className={`flex flex-col ${isFullscreen ? "max-h-[95vh]" : "max-h-[90vh]"}`}>
                 {/* Header */}
                 <DialogHeader>
                     <div className="flex items-start gap-4">
@@ -3372,6 +3377,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     Remembers you
                                 </Badge>
                             )}
+                            {/* Fullscreen toggle */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setIsFullscreen((f) => !f)}
+                                className="h-7 w-7 p-0"
+                                aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                            >
+                                {isFullscreen ? (
+                                    <Minimize2 className="h-3.5 w-3.5" />
+                                ) : (
+                                    <Maximize2 className="h-3.5 w-3.5" />
+                                )}
+                            </Button>
                             {/* Voice output toggle */}
                             <Button
                                 variant="ghost"

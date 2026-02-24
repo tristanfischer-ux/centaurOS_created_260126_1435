@@ -12,11 +12,24 @@ const ACCEPTED_TYPES = [
     "text/html",
     "text/xml",
     "application/xml",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/msword",
+    "application/vnd.ms-excel",
+    "application/vnd.ms-powerpoint",
 ]
 
-const ACCEPTED_EXTENSIONS = [".txt", ".md", ".csv", ".json", ".html", ".xml", ".yml", ".yaml", ".tsv"]
+const ACCEPTED_EXTENSIONS = [
+    ".txt", ".md", ".csv", ".json", ".html", ".xml", ".yml", ".yaml", ".tsv",
+    ".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt",
+]
 
-const MAX_FILE_SIZE = 2 * 1024 * 1024 // 2MB
+/** Extensions that must be read as base64 (binary formats). */
+const BINARY_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx", ".doc", ".xls", ".ppt"]
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
 
 interface FileDropZoneProps {
     onFilesAdded: (files: AttachedFile[]) => void
@@ -30,21 +43,51 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
     const [error, setError] = useState<string | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const readFileAsText = useCallback((file: File): Promise<AttachedFile> => {
+    const isBinaryFile = useCallback((filename: string): boolean => {
+        const ext = "." + filename.split(".").pop()?.toLowerCase()
+        return BINARY_EXTENSIONS.includes(ext)
+    }, [])
+
+    const readFile = useCallback((file: File): Promise<AttachedFile> => {
         return new Promise((resolve, reject) => {
             const reader = new FileReader()
+            const binary = isBinaryFile(file.name)
+
             reader.onload = () => {
-                resolve({
-                    name: file.name,
-                    content: reader.result as string,
-                    type: file.type || "text/plain",
-                    size: file.size,
-                })
+                if (binary) {
+                    // ArrayBuffer → base64
+                    const arrayBuffer = reader.result as ArrayBuffer
+                    const bytes = new Uint8Array(arrayBuffer)
+                    let binaryStr = ""
+                    for (let i = 0; i < bytes.length; i++) {
+                        binaryStr += String.fromCharCode(bytes[i])
+                    }
+                    resolve({
+                        name: file.name,
+                        content: btoa(binaryStr),
+                        type: file.type || "application/octet-stream",
+                        size: file.size,
+                        encoding: "base64",
+                    })
+                } else {
+                    resolve({
+                        name: file.name,
+                        content: reader.result as string,
+                        type: file.type || "text/plain",
+                        size: file.size,
+                        encoding: "text",
+                    })
+                }
             }
             reader.onerror = () => reject(new Error(`Failed to read ${file.name}`))
-            reader.readAsText(file)
+
+            if (binary) {
+                reader.readAsArrayBuffer(file)
+            } else {
+                reader.readAsText(file)
+            }
         })
-    }, [])
+    }, [isBinaryFile])
 
     const validateAndRead = useCallback(
         async (files: FileList | File[]) => {
@@ -53,7 +96,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
 
             for (const file of Array.from(files)) {
                 if (file.size > MAX_FILE_SIZE) {
-                    setError(`${file.name} is too large (max 2MB)`)
+                    setError(`${file.name} is too large (max 10MB)`)
                     continue
                 }
 
@@ -61,7 +104,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                 const isValidType = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext)
 
                 if (!isValidType) {
-                    setError(`${file.name} is not a supported text file`)
+                    setError(`${file.name} is not a supported file type`)
                     continue
                 }
 
@@ -71,13 +114,13 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
             if (validFiles.length === 0) return
 
             try {
-                const results = await Promise.all(validFiles.map(readFileAsText))
+                const results = await Promise.all(validFiles.map(readFile))
                 onFilesAdded(results)
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to read files")
             }
         },
-        [onFilesAdded, readFileAsText]
+        [onFilesAdded, readFile]
     )
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -153,11 +196,11 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                     )}
                     <div>
                         <p className={`font-medium text-muted-foreground ${compact ? "text-[11px]" : "text-xs"}`}>
-                            {compact ? "Attach files" : "Drop files here or click to browse"}
+                            {compact ? "Attach files" : "Drop spreadsheets, docs, PDFs, or text files"}
                         </p>
                         {!compact && (
                             <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-                                .txt, .md, .csv, .json, .html, .xml (max 2MB)
+                                Excel, Word, PowerPoint, PDF, CSV, JSON, Markdown (max 10MB)
                             </p>
                         )}
                     </div>
