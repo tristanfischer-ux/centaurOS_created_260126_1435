@@ -33,6 +33,8 @@ import {
     Scale,
     Maximize2,
     Minimize2,
+    ThumbsUp,
+    ThumbsDown,
 } from "lucide-react"
 import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
@@ -62,6 +64,7 @@ import type { ArtifactContentType } from "@/actions/agent-artifacts"
 import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
 import type { SpecialistId } from "./specialists-data"
 import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
+import { recordSpecialistFeedback } from "@/actions/specialist-feedback"
 import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
@@ -894,6 +897,9 @@ export function BriefSpecialistDialog({
     const [speculativeDeepResponse, setSpeculativeDeepResponse] = useState("")
     const [speculativeComplexity, setSpeculativeComplexity] = useState<"simple" | "complex" | null>(null)
     const [isSpeculativeMode, setIsSpeculativeMode] = useState(false)
+
+    // Per-message feedback state (index → rating)
+    const [messageFeedback, setMessageFeedback] = useState<Record<number, 'positive' | 'negative'>>({})
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const panelFileInputRef = useRef<HTMLInputElement>(null)
@@ -2019,6 +2025,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
         }
     }, [messages])
 
+    /** Record thumbs-up / thumbs-down feedback for an assistant message. */
+    const handleFeedback = useCallback(async (messageIndex: number, rating: 'positive' | 'negative') => {
+        setMessageFeedback(prev => ({ ...prev, [messageIndex]: rating }))
+        await recordSpecialistFeedback(specialist.id, threadId, messageIndex, rating)
+    }, [specialist.id, threadId])
+
     /** Pre-fill the textarea with a natural question from a conversation starter chip. */
     const handleStarterClick = useCallback((highlight: string) => {
         setBriefText(`Help me with ${highlight}`)
@@ -2880,7 +2892,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     <>
                                                         <InlinePresentationCard deck={msg.slideDeck} />
                                                         {!msg.historical && (
-                                                            <div className="mt-2 flex justify-end">
+                                                            <div className="mt-2 flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'positive')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'positive'
+                                                                            ? 'text-success bg-success/10'
+                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
+                                                                    )}
+                                                                    title="Helpful"
+                                                                >
+                                                                    <ThumbsUp className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'negative')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'negative'
+                                                                            ? 'text-destructive bg-destructive/10'
+                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                                                                    )}
+                                                                    title="Not helpful"
+                                                                >
+                                                                    <ThumbsDown className="h-3.5 w-3.5" />
+                                                                </button>
                                                                 <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
@@ -2903,7 +2939,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                             </div>
                                                         )}
                                                         {!msg.historical && (
-                                                            <div className="mt-2 flex justify-end">
+                                                            <div className="mt-2 flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'positive')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'positive'
+                                                                            ? 'text-success bg-success/10'
+                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
+                                                                    )}
+                                                                    title="Helpful"
+                                                                >
+                                                                    <ThumbsUp className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'negative')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'negative'
+                                                                            ? 'text-destructive bg-destructive/10'
+                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                                                                    )}
+                                                                    title="Not helpful"
+                                                                >
+                                                                    <ThumbsDown className="h-3.5 w-3.5" />
+                                                                </button>
                                                                 <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
@@ -3859,7 +3919,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                     <>
                                                         <InlinePresentationCard deck={msg.slideDeck} />
                                                         {!msg.historical && (
-                                                            <div className="mt-2 flex justify-end">
+                                                            <div className="mt-2 flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'positive')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'positive'
+                                                                            ? 'text-success bg-success/10'
+                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
+                                                                    )}
+                                                                    title="Helpful"
+                                                                >
+                                                                    <ThumbsUp className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'negative')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'negative'
+                                                                            ? 'text-destructive bg-destructive/10'
+                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                                                                    )}
+                                                                    title="Not helpful"
+                                                                >
+                                                                    <ThumbsDown className="h-3.5 w-3.5" />
+                                                                </button>
                                                                 <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}
@@ -3882,7 +3966,31 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                             </div>
                                                         )}
                                                         {!msg.historical && (
-                                                            <div className="mt-2 flex justify-end">
+                                                            <div className="mt-2 flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'positive')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'positive'
+                                                                            ? 'text-success bg-success/10'
+                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
+                                                                    )}
+                                                                    title="Helpful"
+                                                                >
+                                                                    <ThumbsUp className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleFeedback(i, 'negative')}
+                                                                    className={cn(
+                                                                        'p-1 rounded-md transition-colors',
+                                                                        messageFeedback[i] === 'negative'
+                                                                            ? 'text-destructive bg-destructive/10'
+                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
+                                                                    )}
+                                                                    title="Not helpful"
+                                                                >
+                                                                    <ThumbsDown className="h-3.5 w-3.5" />
+                                                                </button>
                                                                 <MessageExportMenu content={msg.content} specialistName={specialist.name} />
                                                             </div>
                                                         )}

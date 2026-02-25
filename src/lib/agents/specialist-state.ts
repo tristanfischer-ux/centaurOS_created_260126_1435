@@ -27,9 +27,16 @@ import type { Json } from '@/types/database.types'
 
 export type SpecialistMood = 'energized' | 'concerned' | 'proud' | 'thoughtful' | 'neutral'
 
+/** Emotional intensity — how strongly the mood applies */
+export type MoodIntensity = 'low' | 'medium' | 'high'
+
 export interface SpecialistEmotionalState {
     /** Current emotional state of the specialist */
     mood: SpecialistMood
+    /** Optional secondary mood for compound states (e.g., "concerned + thoughtful") */
+    secondary?: SpecialistMood
+    /** How strongly the primary mood applies */
+    intensity: MoodIntensity
     /** What triggered this mood */
     trigger: string
     /** When this state was last updated */
@@ -59,6 +66,8 @@ export interface RelationshipDepth {
 
 const specialistMetadataSchema = z.object({
     specialist_mood: z.enum(['energized', 'concerned', 'proud', 'thoughtful', 'neutral']).catch('neutral'),
+    mood_secondary: z.enum(['energized', 'concerned', 'proud', 'thoughtful', 'neutral']).optional().catch(undefined),
+    mood_intensity: z.enum(['low', 'medium', 'high']).catch('medium'),
     mood_trigger: z.string().catch(''),
     mood_updated_at: z.string().catch(() => new Date().toISOString()),
     shared_history: z.array(z.string()).catch([]),
@@ -121,6 +130,8 @@ export async function getSpecialistState(
 
     const emotional: SpecialistEmotionalState = {
         mood: metadata.specialist_mood,
+        secondary: metadata.mood_secondary,
+        intensity: metadata.mood_intensity,
         trigger: metadata.mood_trigger,
         updatedAt: metadata.mood_updated_at,
     }
@@ -160,6 +171,7 @@ export async function updateSpecialistState(
     mood: SpecialistMood,
     trigger: string,
     conversationSummary?: string,
+    options?: { secondary?: SpecialistMood; intensity?: MoodIntensity },
 ): Promise<void> {
     const supabase = await createClient()
 
@@ -175,6 +187,8 @@ export async function updateSpecialistState(
     const updatedMetadata: SpecialistMetadata = {
         ...parsed,
         specialist_mood: mood,
+        mood_secondary: options?.secondary,
+        mood_intensity: options?.intensity ?? 'medium',
         mood_trigger: trigger,
         mood_updated_at: new Date().toISOString(),
         ...(conversationSummary ? { last_conversation_summary: conversationSummary } : {}),
@@ -231,6 +245,75 @@ export async function recordSharedMoment(
         .update({ metadata: updatedMetadata as unknown as Json })
         .eq('id', threadId)
         .eq('foundry_id', foundryId)
+}
+
+// ─── Auto Mood Detection ────────────────────────────────────────────
+
+/** Keyword signals for each mood — simple heuristic, no LLM call needed */
+const MOOD_SIGNALS: Record<SpecialistMood, { positive: string[]; negative: string[] }> = {
+    energized: {
+        positive: ['excited', 'amazing', 'crushing it', 'nailed', 'smashing', 'huge win', 'milestone', 'shipped', 'launched', 'record', 'best ever'],
+        negative: [],
+    },
+    proud: {
+        positive: ['accomplished', 'proud', 'we did it', 'finished', 'completed', 'closed the deal', 'hit the target', 'exceeded'],
+        negative: [],
+    },
+    concerned: {
+        positive: [],
+        negative: ['worried', 'concerned', 'problem', 'issue', 'struggling', 'behind', 'missed', 'failing', 'losing', 'burnout', 'running out', 'cash', 'cut'],
+    },
+    thoughtful: {
+        positive: ['thinking about', 'considering', 'wondering', 'not sure', 'mulling', 'weighing', 'trade-off', 'deciding'],
+        negative: [],
+    },
+    neutral: { positive: [], negative: [] },
+}
+
+/**
+ * Infers a specialist's emotional state from conversation content.
+ *
+ * @description Lightweight keyword-based heuristic — no LLM call.
+ * Checks for positive/negative signal words and returns the best-matching
+ * mood with appropriate intensity. Called after each completed conversation.
+ *
+ * @param messages - Array of message strings from the conversation
+ * @returns Inferred emotional state, or neutral if no strong signal
+ */
+export function inferMoodFromConversation(messages: string[]): Pick<SpecialistEmotionalState, 'mood' | 'secondary' | 'intensity' | 'trigger'> {
+    const combined = messages.join(' ').toLowerCase()
+
+    const scores: Partial<Record<SpecialistMood, number>> = {}
+
+    for (const [mood, signals] of Object.entries(MOOD_SIGNALS) as [SpecialistMood, typeof MOOD_SIGNALS[SpecialistMood]][]) {
+        if (mood === 'neutral') continue
+        let score = 0
+        for (const word of signals.positive) {
+            if (combined.includes(word)) score += 1
+        }
+        for (const word of signals.negative) {
+            if (combined.includes(word)) score += 1
+        }
+        if (score > 0) scores[mood] = score
+    }
+
+    const entries = Object.entries(scores) as [SpecialistMood, number][]
+    if (entries.length === 0) {
+        return { mood: 'neutral', intensity: 'medium', trigger: '' }
+    }
+
+    // Sort by score descending
+    entries.sort((a, b) => b[1] - a[1])
+    const [topMood, topScore] = entries[0]!
+    const secondary = entries[1]?.[0]
+
+    const intensity: MoodIntensity = topScore >= 3 ? 'high' : topScore >= 2 ? 'medium' : 'low'
+
+    // Find the trigger word(s) that drove this mood
+    const allSignals = [...(MOOD_SIGNALS[topMood].positive), ...(MOOD_SIGNALS[topMood].negative)]
+    const trigger = allSignals.find(w => combined.includes(w)) ?? ''
+
+    return { mood: topMood, secondary, intensity, trigger }
 }
 
 /**
@@ -291,14 +374,32 @@ export function compileSpecialistStatePrompt(
     // Emotional state — shapes the specialist's tone for this conversation
     if (emotional.mood !== 'neutral') {
         lines.push('')
+        const intensityPrefix: Record<MoodIntensity, string> = {
+            low: 'You have a slight sense that',
+            medium: 'You feel',
+            high: 'You strongly feel',
+        }
+        const prefix = intensityPrefix[emotional.intensity]
         const moodGuidance: Record<SpecialistMood, string> = {
-            energized: `You're feeling energized about this founder's progress. Let that positive energy show — be enthusiastic and forward-looking.`,
-            concerned: `You have some concerns about ${emotional.trigger}. Bring this up diplomatically but don't ignore it.`,
-            proud: `You're proud of what this founder has accomplished recently. Acknowledge it genuinely.`,
-            thoughtful: `You've been thinking deeply about ${emotional.trigger}. Share your reflections.`,
+            energized: `${prefix} energized about this founder's progress. Let that positive energy show — be enthusiastic and forward-looking.`,
+            concerned: `${prefix} concerned about ${emotional.trigger || 'the current situation'}. Bring this up diplomatically but don't ignore it.`,
+            proud: `${prefix} proud of what this founder has accomplished. Acknowledge it genuinely.`,
+            thoughtful: `${prefix} thoughtful about ${emotional.trigger || 'the direction'}. Share your reflections.`,
             neutral: '',
         }
         lines.push(moodGuidance[emotional.mood])
+
+        // Secondary mood enrichment
+        if (emotional.secondary && emotional.secondary !== 'neutral' && emotional.secondary !== emotional.mood) {
+            const secondaryNote: Partial<Record<SpecialistMood, string>> = {
+                concerned: `You're also carrying some concern underneath — don't lose sight of the risks.`,
+                thoughtful: `You're also in a reflective mode — consider the longer-term implications.`,
+                energized: `There's also real excitement underneath — let some of that optimism come through.`,
+                proud: `There's also a sense of pride — acknowledge what's been built.`,
+            }
+            const note = secondaryNote[emotional.secondary]
+            if (note) lines.push(note)
+        }
     }
 
     return lines.join('\n')

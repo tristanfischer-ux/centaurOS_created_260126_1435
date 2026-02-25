@@ -2,7 +2,8 @@
  * @file use-relevant-specialist.ts
  *
  * @description Hook that maps context (objective title, task description,
- * pillar name, etc.) to the most relevant specialist using keyword matching.
+ * pillar name, etc.) to the most relevant specialist using weighted keyword
+ * matching with bigram support and negative keyword suppression.
  *
  * Returns the specialist ID and name so the caller can pre-select
  * in AskSpecialistButton or SpecialistPicker.
@@ -19,136 +20,230 @@ interface DomainRule {
   specialistId: SpecialistId
   /** Human-readable specialist name */
   specialistName: string
-  /** Keywords that signal this domain (lowercase) */
-  keywords: string[]
+  /** Primary keywords score 3x — core domain terms */
+  primaryKeywords: string[]
+  /** Secondary keywords score 1x — adjacent/overlapping terms */
+  secondaryKeywords: string[]
+  /** Bigrams (two-word phrases) score 5x — highly specific to this domain */
+  bigrams: string[]
+  /** If ANY of these keywords appear, suppress this specialist's score by 50% */
+  negativeKeywords: string[]
 }
 
 const DOMAIN_RULES: DomainRule[] = [
   {
     specialistId: 'cto',
     specialistName: 'Max',
-    keywords: [
+    primaryKeywords: [
       'technology', 'tech stack', 'architecture', 'infrastructure', 'software',
-      'first principles', 'delete', 'optimize', 'scalability', 'platform',
-      'microservices', 'cloud', 'aws', 'azure', 'gcp', 'devops', 'ci cd',
-      'make vs buy', 'buy vs build', 'technical debt', 'refactor', 'system design',
-      'database', 'api', 'backend', 'frontend', 'full stack', 'programming',
-      'code', 'engineering decisions', 'tech strategy', 'digital transformation',
+      'scalability', 'platform', 'microservices', 'cloud', 'devops',
+      'technical debt', 'system design', 'database', 'api', 'backend',
+      'frontend', 'full stack', 'digital transformation',
     ],
+    secondaryKeywords: [
+      'aws', 'azure', 'gcp', 'ci cd', 'refactor', 'programming', 'code',
+      'engineering decisions', 'tech strategy', 'first principles', 'optimize',
+    ],
+    bigrams: [
+      'tech stack', 'system design', 'make vs buy', 'buy vs build',
+      'technical debt', 'digital transformation', 'first principles',
+    ],
+    negativeKeywords: ['hire', 'recruit', 'onboard', 'compensation'],
   },
   {
     specialistId: 'vp-engineering',
     specialistName: 'Jian',
-    keywords: [
-      'engineering', 'developer', 'team', 'velocity', 'sprint', 'scrum',
-      'agile', 'deployment', 'deploy', 'ci cd', 'code review', 'quality',
-      'testing', 'unit test', 'integration test', 'technical hiring',
-      'engineering manager', 'tech lead', 'architecture', 'system design',
-      'build', 'ship', 'lead time', 'mttf', 'mttr', 'incident', 'on call',
+    primaryKeywords: [
+      'engineering', 'velocity', 'sprint', 'scrum', 'agile', 'deployment',
+      'code review', 'testing', 'engineering manager', 'tech lead',
+      'incident', 'on call',
     ],
+    secondaryKeywords: [
+      'developer', 'team', 'deploy', 'ci cd', 'quality', 'unit test',
+      'integration test', 'build', 'ship', 'lead time', 'mttf', 'mttr',
+    ],
+    bigrams: [
+      'code review', 'engineering velocity', 'sprint planning',
+      'tech lead', 'engineering manager', 'unit test', 'integration test',
+    ],
+    negativeKeywords: ['marketing', 'sales', 'fundraise'],
   },
   {
     specialistId: 'vp-manufacturing',
     specialistName: 'Fang',
-    keywords: [
-      'manufacturing', 'production', 'factory', 'dfm', 'design for manufacturing',
-      'first article', 'pilot', 'scale up', 'yield', 'quality', 'qc', 'qa',
-      'tolerance', 'tooling', 'mold', 'injection', 'casting', 'cnc',
-      'assembly', 'bill of materials', 'bom', 'supplier', 'vendor', 'oem',
-      'contract manufacturer', 'cm', 'production planning', 'capacity',
-      'operations', 'bottleneck', 'throughput', 'process', 'efficiency',
+    primaryKeywords: [
+      'manufacturing', 'production', 'factory', 'dfm', 'yield', 'tooling',
+      'mold', 'injection', 'casting', 'cnc', 'assembly', 'bom',
+      'oem', 'throughput',
     ],
+    secondaryKeywords: [
+      'quality', 'qc', 'qa', 'tolerance', 'supplier', 'vendor',
+      'contract manufacturer', 'cm', 'capacity', 'operations',
+      'bottleneck', 'process', 'efficiency', 'pilot', 'scale up',
+    ],
+    bigrams: [
+      'design for manufacturing', 'bill of materials', 'first article',
+      'contract manufacturer', 'production planning', 'scale up',
+      'manufacturing engineer',
+    ],
+    negativeKeywords: ['marketing', 'sales', 'fundraise', 'legal'],
   },
   {
     specialistId: 'vp-supply-chain',
     specialistName: 'Chase',
-    keywords: [
-      'supply chain', 'procurement', 'sourcing', 'vendor', 'supplier',
-      'logistics', 'lead time', 'inventory', 'stock', 'procure', 'purchase',
-      'negotiate', 'cost', 'pricing', 'dual source', 'backup', 'contingency',
-      'materials', 'raw material', 'component', 'parts', 'fulfillment',
-      'shipping', 'freight', 'import', 'export', 'tariff', 'duty',
+    primaryKeywords: [
+      'supply chain', 'procurement', 'sourcing', 'logistics', 'inventory',
+      'fulfillment', 'shipping', 'freight', 'import', 'export',
+      'tariff', 'duty',
     ],
+    secondaryKeywords: [
+      'vendor', 'supplier', 'lead time', 'stock', 'procure', 'purchase',
+      'negotiate', 'cost', 'pricing', 'dual source', 'backup', 'contingency',
+      'materials', 'raw material', 'component', 'parts',
+    ],
+    bigrams: [
+      'supply chain', 'lead time', 'dual source', 'raw material',
+    ],
+    negativeKeywords: ['marketing', 'sales', 'fundraise', 'legal'],
   },
   {
     specialistId: 'product-lead',
     specialistName: 'Priya',
-    keywords: [
-      'product', 'feature', 'roadmap', 'mvp', 'prd', 'user story', 'ux',
-      'ui', 'design', 'prototype', 'sprint', 'backlog', 'engineering',
-      'development', 'technical', 'spec', 'build', 'ship', 'launch',
-      'iteration', 'beta', 'release', 'scope',
+    primaryKeywords: [
+      'product', 'roadmap', 'mvp', 'prd', 'user story', 'ux', 'ui',
+      'prototype', 'backlog', 'launch', 'iteration', 'beta', 'release',
     ],
+    secondaryKeywords: [
+      'feature', 'design', 'sprint', 'engineering', 'development',
+      'technical', 'spec', 'build', 'ship', 'scope',
+    ],
+    bigrams: [
+      'user story', 'product roadmap', 'feature request', 'user experience',
+    ],
+    negativeKeywords: ['hire', 'recruit', 'fundraise', 'legal'],
   },
   {
     specialistId: 'growth-marketer',
     specialistName: 'Mia',
-    keywords: [
+    primaryKeywords: [
       'marketing', 'brand', 'growth', 'acquisition', 'content', 'seo',
-      'social media', 'campaign', 'email', 'newsletter', 'ads', 'funnel',
-      'landing page', 'awareness', 'pr', 'press', 'blog', 'viral',
-      'channel', 'audience', 'engagement', 'influencer', 'organic',
+      'social media', 'campaign', 'ads', 'funnel', 'awareness', 'pr',
+      'press', 'viral', 'engagement', 'influencer',
     ],
+    secondaryKeywords: [
+      'email', 'newsletter', 'landing page', 'blog', 'channel',
+      'audience', 'organic',
+    ],
+    bigrams: [
+      'social media', 'landing page', 'content marketing',
+      'growth strategy', 'brand awareness',
+    ],
+    negativeKeywords: ['legal', 'compliance', 'manufacturing'],
   },
   {
     specialistId: 'sales-lead',
     specialistName: 'Sal',
-    keywords: [
+    primaryKeywords: [
       'sales', 'revenue', 'pipeline', 'deal', 'close', 'prospect',
-      'outreach', 'cold email', 'proposal', 'pricing', 'quota', 'crm',
-      'customer', 'client', 'contract', 'negotiation', 'demo', 'pitch',
-      'conversion', 'upsell', 'churn', 'retention', 'renewal',
+      'outreach', 'proposal', 'quota', 'crm', 'negotiation',
+      'conversion', 'upsell', 'churn', 'retention',
     ],
+    secondaryKeywords: [
+      'cold email', 'pricing', 'customer', 'client', 'contract',
+      'demo', 'pitch', 'renewal',
+    ],
+    bigrams: [
+      'sales pipeline', 'cold email', 'sales strategy', 'deal close',
+    ],
+    negativeKeywords: ['hire', 'legal', 'manufacturing'],
   },
   {
     specialistId: 'finance-lead',
     specialistName: 'Finn',
-    keywords: [
-      'finance', 'budget', 'runway', 'p&l', 'cost', 'revenue model',
-      'cash flow', 'burn rate', 'financial', 'accounting', 'tax',
-      'expense', 'profit', 'margin', 'forecast', 'projection', 'unit economics',
-      'payroll', 'invoice', 'billing',
+    primaryKeywords: [
+      'finance', 'budget', 'runway', 'p&l', 'revenue model', 'cash flow',
+      'burn rate', 'financial', 'accounting', 'tax', 'profit', 'margin',
+      'forecast', 'unit economics',
     ],
+    secondaryKeywords: [
+      'cost', 'expense', 'projection', 'payroll', 'invoice', 'billing',
+    ],
+    bigrams: [
+      'burn rate', 'cash flow', 'unit economics', 'revenue model',
+      'financial model',
+    ],
+    negativeKeywords: ['hire', 'marketing', 'manufacturing'],
   },
   {
     specialistId: 'hiring-team',
     specialistName: 'Harper',
-    keywords: [
-      'hire', 'hiring', 'recruit', 'team', 'culture', 'onboard',
-      'onboarding', 'job description', 'jd', 'talent', 'hr',
-      'human resources', 'compensation', 'benefits', 'headcount',
-      'interview', 'performance review', 'people', 'org chart',
+    primaryKeywords: [
+      'hire', 'hiring', 'recruit', 'onboard', 'onboarding', 'talent',
+      'hr', 'human resources', 'compensation', 'benefits', 'headcount',
+      'interview', 'performance review',
+    ],
+    secondaryKeywords: [
+      'team', 'culture', 'job description', 'jd', 'people', 'org chart',
       'remote', 'workplace',
+    ],
+    bigrams: [
+      'job description', 'performance review', 'human resources',
+      'org chart', 'hiring plan',
+    ],
+    // INTENT: When domain-specific nouns accompany "hire", the domain specialist
+    // is likely more relevant (e.g., "hire a manufacturing engineer" → Fang).
+    negativeKeywords: [
+      'manufacturing', 'engineering', 'supply chain', 'finance',
+      'legal', 'marketing', 'sales',
     ],
   },
   {
     specialistId: 'legal-counsel',
     specialistName: 'Leo',
-    keywords: [
+    primaryKeywords: [
       'legal', 'compliance', 'contract', 'ip', 'intellectual property',
-      'patent', 'trademark', 'terms of service', 'privacy policy',
-      'gdpr', 'regulation', 'liability', 'nda', 'agreement', 'license',
-      'corporate', 'governance', 'risk', 'audit',
+      'patent', 'trademark', 'privacy policy', 'gdpr', 'regulation',
+      'liability', 'nda', 'agreement', 'license', 'governance',
     ],
+    secondaryKeywords: [
+      'terms of service', 'corporate', 'risk', 'audit',
+    ],
+    bigrams: [
+      'intellectual property', 'privacy policy', 'terms of service',
+    ],
+    negativeKeywords: ['marketing', 'sales', 'manufacturing'],
   },
   {
     specialistId: 'fundraising-advisor',
     specialistName: 'Fiona',
-    keywords: [
-      'fundraise', 'fundraising', 'investor', 'pitch', 'raise', 'round',
-      'seed', 'series a', 'vc', 'venture', 'angel', 'valuation',
-      'term sheet', 'cap table', 'dilution', 'deck', 'pitch deck',
-      'due diligence', 'equity',
+    primaryKeywords: [
+      'fundraise', 'fundraising', 'investor', 'raise', 'round', 'seed',
+      'series a', 'vc', 'venture', 'angel', 'valuation', 'term sheet',
+      'cap table', 'dilution', 'equity', 'due diligence',
     ],
+    secondaryKeywords: [
+      'pitch', 'deck', 'pitch deck',
+    ],
+    bigrams: [
+      'pitch deck', 'term sheet', 'cap table', 'due diligence',
+      'series a', 'venture capital',
+    ],
+    negativeKeywords: ['manufacturing', 'engineering', 'legal'],
   },
   {
     specialistId: 'chief-of-staff',
     specialistName: 'Cal',
-    keywords: [
-      'meeting', 'decision', 'priority',
-      'weekly', 'alignment', 'coordination', 'workflow',
-      'board meeting', 'stakeholder', 'agenda', 'follow up', 'planning',
+    primaryKeywords: [
+      'meeting', 'decision', 'priority', 'alignment', 'coordination',
+      'workflow', 'board meeting', 'stakeholder', 'agenda',
     ],
+    secondaryKeywords: [
+      'weekly', 'follow up', 'planning',
+    ],
+    bigrams: [
+      'board meeting', 'decision making',
+    ],
+    negativeKeywords: [],
   },
 ]
 
@@ -160,18 +255,51 @@ const DEFAULT_SPECIALIST = {
 
 // ─── Scoring logic ───────────────────────────────────────────────────────────
 
+const PRIMARY_WEIGHT = 3
+const SECONDARY_WEIGHT = 1
+const BIGRAM_WEIGHT = 5
+const NEGATIVE_PENALTY = 0.5 // multiply score by this if negative keywords found
+
 /**
- * Scores how well text matches a set of keywords.
- * Returns the number of keyword matches found.
+ * Scores how well text matches a domain rule using weighted keywords,
+ * bigram phrases, and negative keyword suppression.
  */
-function scoreKeywords(text: string, keywords: string[]): number {
+function scoreDomainRule(text: string, rule: DomainRule): number {
   const lower = text.toLowerCase()
   let score = 0
-  for (const kw of keywords) {
-    if (lower.includes(kw)) {
-      score += 1
+
+  // Bigrams score highest — they're the most specific signal
+  for (const bg of rule.bigrams) {
+    if (lower.includes(bg)) {
+      score += BIGRAM_WEIGHT
     }
   }
+
+  // Primary keywords — core domain terms
+  for (const kw of rule.primaryKeywords) {
+    if (lower.includes(kw)) {
+      score += PRIMARY_WEIGHT
+    }
+  }
+
+  // Secondary keywords — adjacent terms
+  for (const kw of rule.secondaryKeywords) {
+    if (lower.includes(kw)) {
+      score += SECONDARY_WEIGHT
+    }
+  }
+
+  // Negative keyword suppression — if domain-crossing terms appear,
+  // this specialist is probably not the right one
+  if (score > 0 && rule.negativeKeywords.length > 0) {
+    for (const neg of rule.negativeKeywords) {
+      if (lower.includes(neg)) {
+        score *= NEGATIVE_PENALTY
+        break // one penalty is enough
+      }
+    }
+  }
+
   return score
 }
 
@@ -196,10 +324,10 @@ interface RelevantSpecialistResult {
  *
  * @example
  * const { specialistId, specialistName } = useRelevantSpecialist(
- *   'Increase Q3 revenue by 40%',
- *   'Build outbound sales pipeline and close enterprise deals'
+ *   'Hire a manufacturing engineer',
+ *   'Need someone with DFM experience for the factory line'
  * )
- * // Returns { specialistId: 'sales-lead', specialistName: 'Sal', isDefault: false }
+ * // Returns { specialistId: 'vp-manufacturing', specialistName: 'Fang', isDefault: false }
  */
 export function useRelevantSpecialist(
   title: string,
@@ -207,33 +335,7 @@ export function useRelevantSpecialist(
   pillarTitle?: string | null,
 ): RelevantSpecialistResult {
   return useMemo(() => {
-    // Combine all available text for scoring
-    const combined = [title, description ?? '', pillarTitle ?? ''].join(' ')
-
-    if (!combined.trim()) {
-      return { ...DEFAULT_SPECIALIST, isDefault: true }
-    }
-
-    let bestScore = 0
-    let bestRule: DomainRule | null = null
-
-    for (const rule of DOMAIN_RULES) {
-      const score = scoreKeywords(combined, rule.keywords)
-      if (score > bestScore) {
-        bestScore = score
-        bestRule = rule
-      }
-    }
-
-    if (bestRule && bestScore >= 1) {
-      return {
-        specialistId: bestRule.specialistId,
-        specialistName: bestRule.specialistName,
-        isDefault: false,
-      }
-    }
-
-    return { ...DEFAULT_SPECIALIST, isDefault: true }
+    return matchSpecialist(title, description, pillarTitle)
   }, [title, description, pillarTitle])
 }
 
@@ -242,6 +344,15 @@ export function useRelevantSpecialist(
  * utility functions). Same logic as the hook but without memoization.
  */
 export function getRelevantSpecialist(
+  title: string,
+  description?: string | null,
+  pillarTitle?: string | null,
+): RelevantSpecialistResult {
+  return matchSpecialist(title, description, pillarTitle)
+}
+
+/** Shared matching logic used by both hook and non-hook variants. */
+function matchSpecialist(
   title: string,
   description?: string | null,
   pillarTitle?: string | null,
@@ -256,14 +367,15 @@ export function getRelevantSpecialist(
   let bestRule: DomainRule | null = null
 
   for (const rule of DOMAIN_RULES) {
-    const score = scoreKeywords(combined, rule.keywords)
+    const score = scoreDomainRule(combined, rule)
     if (score > bestScore) {
       bestScore = score
       bestRule = rule
     }
   }
 
-  if (bestRule && bestScore >= 1) {
+  // Minimum score threshold — at least one primary keyword match (3)
+  if (bestRule && bestScore >= PRIMARY_WEIGHT) {
     return {
       specialistId: bestRule.specialistId,
       specialistName: bestRule.specialistName,

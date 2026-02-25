@@ -56,6 +56,85 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
 import { buildHandoffContext } from "@/lib/agents/handoff-context"
 
+// ─── Token Budget ────────────────────────────────────────────────────────────
+
+/** Approximate token count via chars/4 heuristic. Good enough for budgeting. */
+function estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4)
+}
+
+/**
+ * Layer priority order (highest first). Layers not in this list get lowest priority.
+ * INTENT: When the total context exceeds the budget, lower-priority layers are
+ * dropped first so the specialist retains the most critical context.
+ */
+const LAYER_PRIORITIES: Record<string, number> = {
+    'Handoff Context': 100,        // Critical for continuity across specialist switches
+    'Emotional State': 90,         // Relationship depth drives conversation style
+    'Founder Preferences': 85,     // Communication style matters
+    'Decision Journal': 80,        // "Remember when" references
+    'Specialist Knowledge': 75,    // Persistent facts from past conversations
+    'Temporal Awareness': 70,      // Time-of-day, milestones
+    'External Intelligence': 60,   // Sweep reports
+    'Task Ownership': 55,          // Active work
+    'Since Last Talked': 50,       // What changed since last chat
+    'Knowledge Vault': 45,         // Organizational knowledge search results
+    'Emotional Awareness': 40,     // Detecting founder mood from message
+}
+
+/** Token budget per model tier (context layers only, excluding personality prompt) */
+const TOKEN_BUDGETS: Record<string, number> = {
+    claude: 6000,
+    qwen: 4000,
+    minimax: 4000,
+    'qwen-local': 4000,
+}
+
+interface CollectedLayer {
+    name: string
+    block: string
+    tokens: number
+    priority: number
+}
+
+/**
+ * Applies token budget to collected context layers, keeping highest-priority
+ * layers and dropping/truncating lower-priority ones when over budget.
+ */
+function applyTokenBudget(
+    layers: CollectedLayer[],
+    modelTier: string,
+): { blocks: string; activeLayers: string[]; tokensUsed: number; tokenBudget: number } {
+    const budget = TOKEN_BUDGETS[modelTier] ?? 4000
+    const sorted = [...layers].sort((a, b) => b.priority - a.priority)
+    const kept: CollectedLayer[] = []
+    let tokensUsed = 0
+
+    for (const layer of sorted) {
+        if (tokensUsed + layer.tokens <= budget) {
+            kept.push(layer)
+            tokensUsed += layer.tokens
+        } else {
+            // Try to fit a truncated version of this layer
+            const remaining = budget - tokensUsed
+            if (remaining > 200) { // Only truncate if we can keep a meaningful chunk
+                const truncatedBlock = layer.block.slice(0, remaining * 4) + '\n...(truncated)'
+                const truncTokens = estimateTokens(truncatedBlock)
+                kept.push({ ...layer, block: truncatedBlock, tokens: truncTokens })
+                tokensUsed += truncTokens
+            }
+            break // Budget exhausted
+        }
+    }
+
+    return {
+        blocks: kept.map(l => `\n\n${l.block}`).join(''),
+        activeLayers: kept.map(l => l.name),
+        tokensUsed,
+        tokenBudget: budget,
+    }
+}
+
 /**
  * Parameters for building the specialist context layers.
  */
@@ -89,16 +168,22 @@ export interface ContextLayerParams {
  * @param params - The context assembly parameters
  * @returns Object with context blocks string and list of active layer names
  */
-export async function buildContextLayers(params: ContextLayerParams): Promise<{
+export async function buildContextLayers(params: ContextLayerParams & {
+    /** Model tier for token budget (defaults to 'claude') */
+    modelTier?: string
+}): Promise<{
     contextBlocks: string
     activeLayers: string[]
+    /** Approximate tokens used by context layers */
+    contextTokensUsed: number
+    /** Token budget that was applied */
+    contextTokenBudget: number
 }> {
     const {
         foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath,
-        handoffSourceThreadId, handoffSourceSpecialistId,
+        handoffSourceThreadId, handoffSourceSpecialistId, modelTier = 'claude',
     } = params
-    let contextBlocks = ""
-    const activeLayers: string[] = []
+    const collectedLayers: CollectedLayer[] = []
 
     if (!isConversationalFastPath) {
         // Deep handoff context: when specialist B is receiving a handoff from specialist A,
@@ -108,8 +193,12 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
             try {
                 const handoffBlock = await buildHandoffContext(foundryId, handoffSourceSpecialistId, handoffSourceThreadId)
                 if (handoffBlock) {
-                    contextBlocks += `\n\n${handoffBlock}`
-                    activeLayers.push('Handoff Context')
+                    collectedLayers.push({
+                        name: 'Handoff Context',
+                        block: handoffBlock,
+                        tokens: estimateTokens(handoffBlock),
+                        priority: LAYER_PRIORITIES['Handoff Context'] ?? 0,
+                    })
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load handoff context:", err)
@@ -130,8 +219,12 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
                     specialist?.name ?? specialistId,
                 )
                 if (prefsBlock) {
-                    contextBlocks += `\n\n${prefsBlock}`
-                    activeLayers.push('Founder Preferences')
+                    collectedLayers.push({
+                        name: 'Founder Preferences',
+                        block: prefsBlock,
+                        tokens: estimateTokens(prefsBlock),
+                        priority: LAYER_PRIORITIES['Founder Preferences'] ?? 0,
+                    })
                 }
             } catch (err) {
                 console.warn("[PromptBuilder] Could not load founder preferences:", err)
@@ -225,8 +318,12 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
             const results = await Promise.allSettled(layerPromises)
             for (const result of results) {
                 if (result.status === 'fulfilled' && result.value.block) {
-                    contextBlocks += `\n\n${result.value.block}`
-                    activeLayers.push(result.value.layer)
+                    collectedLayers.push({
+                        name: result.value.layer,
+                        block: result.value.block,
+                        tokens: estimateTokens(result.value.block),
+                        priority: LAYER_PRIORITIES[result.value.layer] ?? 0,
+                    })
                 } else if (result.status === 'rejected') {
                     console.warn("[PromptBuilder] Context layer failed:", result.reason)
                 }
@@ -249,29 +346,52 @@ export async function buildContextLayers(params: ContextLayerParams): Promise<{
             }
         }
         const temporalBlock = compileTemporalPrompt(undefined, foundryCreatedAt)
-        contextBlocks += `\n\n${temporalBlock}`
-        activeLayers.push('Temporal Awareness')
+        collectedLayers.push({
+            name: 'Temporal Awareness',
+            block: temporalBlock,
+            tokens: estimateTokens(temporalBlock),
+            priority: LAYER_PRIORITIES['Temporal Awareness'] ?? 0,
+        })
 
         // Emotional awareness: detect founder's emotional state from their message
         const emotionalBlock = compileEmotionalPrompt(input)
         if (emotionalBlock) {
-            contextBlocks += `\n\n${emotionalBlock}`
-            activeLayers.push('Emotional Awareness')
+            collectedLayers.push({
+                name: 'Emotional Awareness',
+                block: emotionalBlock,
+                tokens: estimateTokens(emotionalBlock),
+                priority: LAYER_PRIORITIES['Emotional Awareness'] ?? 0,
+            })
         }
     } else {
         // Fast path: lightweight temporal + emotional only (no DB queries)
         const temporalBlock = compileTemporalPrompt()
-        contextBlocks += `\n\n${temporalBlock}`
-        activeLayers.push('Temporal Awareness')
+        collectedLayers.push({
+            name: 'Temporal Awareness',
+            block: temporalBlock,
+            tokens: estimateTokens(temporalBlock),
+            priority: LAYER_PRIORITIES['Temporal Awareness'] ?? 0,
+        })
 
         const emotionalBlock = compileEmotionalPrompt(input)
         if (emotionalBlock) {
-            contextBlocks += `\n\n${emotionalBlock}`
-            activeLayers.push('Emotional Awareness')
+            collectedLayers.push({
+                name: 'Emotional Awareness',
+                block: emotionalBlock,
+                tokens: estimateTokens(emotionalBlock),
+                priority: LAYER_PRIORITIES['Emotional Awareness'] ?? 0,
+            })
         }
     }
 
-    return { contextBlocks, activeLayers }
+    // Apply token budget — highest-priority layers kept first
+    const budgeted = applyTokenBudget(collectedLayers, modelTier)
+    return {
+        contextBlocks: budgeted.blocks,
+        activeLayers: budgeted.activeLayers,
+        contextTokensUsed: budgeted.tokensUsed,
+        contextTokenBudget: budgeted.tokenBudget,
+    }
 }
 
 // ─── "Since We Last Talked" Context Bridge ─────────────────────────────

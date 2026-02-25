@@ -1046,7 +1046,7 @@ Rules:
 
     // AUDIT: Heavy context layers extracted to prompt-builder.ts (2026-02-19, refactor step 6 of 8).
     // Each layer is independently failable — see prompt-builder.ts for the full assembly logic.
-    const { contextBlocks: contextLayers, activeLayers } = await buildContextLayers({
+    const { contextBlocks: contextLayers, activeLayers, contextTokensUsed, contextTokenBudget } = await buildContextLayers({
         foundryId,
         specialistId,
         threadId,
@@ -1055,8 +1055,10 @@ Rules:
         isConversationalFastPath,
         handoffSourceThreadId,
         handoffSourceSpecialistId,
+        modelTier: modelTier ?? 'claude',
     })
     systemPromptWithContext += contextLayers
+    console.info(`[Execute] Context layers: ${activeLayers.join(', ')} (${contextTokensUsed}/${contextTokenBudget} tokens)`)
 
     if (companyContext) {
         systemPromptWithContext += `\n\n${companyContext}`

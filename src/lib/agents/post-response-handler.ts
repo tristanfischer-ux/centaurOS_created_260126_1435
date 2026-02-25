@@ -151,6 +151,24 @@ export function createPostResponseCallback(
                             console.warn("[PostResponse] Specialist knowledge extraction failed:", err)
                         })
                     }).catch(() => {})
+
+                    // Auto mood inference — keyword heuristic, no LLM call
+                    import("@/lib/agents/specialist-state").then(({ inferMoodFromConversation, updateSpecialistState }) => {
+                        const userMsg = input.trim() || finalPrompt.slice(0, 500)
+                        const inferred = inferMoodFromConversation([userMsg, cleanOutput || fullOutput])
+                        if (inferred.mood !== 'neutral') {
+                            updateSpecialistState(
+                                threadId!,
+                                foundryId!,
+                                inferred.mood,
+                                inferred.trigger,
+                                undefined,
+                                { secondary: inferred.secondary, intensity: inferred.intensity },
+                            ).catch((err) => {
+                                console.warn("[PostResponse] Mood inference update failed:", err)
+                            })
+                        }
+                    }).catch(() => {})
                 }
             } catch (err) {
                 console.warn("[PostResponse] Failed to record assistant message:", err)
