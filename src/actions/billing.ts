@@ -24,6 +24,7 @@ import {
   DEFAULT_FEE_CONFIG,
 } from '@/types/billing'
 import { DEFAULT_PLATFORM_FEE_PERCENT } from '@/types/payments'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // STRIPE CUSTOMER MANAGEMENT
@@ -102,7 +103,7 @@ export async function getSavedPaymentMethods(): Promise<{
         .order('created_at', { ascending: false })
       
       if (error) {
-        return { methods: [], error: error.message }
+        return { methods: [], error: sanitizeErrorMessage(error) }
       }
       
       const methods: SavedPaymentMethod[] = (data || []).map(m => ({
@@ -196,7 +197,7 @@ export async function savePaymentMethod(
         .single()
       
       if (error) {
-        return { method: null, error: error.message }
+        return { method: null, error: sanitizeErrorMessage(error) }
       }
       
       const method: SavedPaymentMethod = {
@@ -253,7 +254,7 @@ export async function setDefaultPaymentMethod(
         .eq('user_id', user.id)
 
       if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
       }
 
       revalidatePath('/settings')
@@ -308,7 +309,7 @@ export async function deletePaymentMethod(
         .eq('user_id', user.id)
       
       if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
       }
       
       // If deleted method was default, set another as default
@@ -358,7 +359,7 @@ export async function getAccountBalance(): Promise<{
         .single()
       
       if (error && error.code !== 'PGRST116') { // Not found is OK
-        return { balance: null, error: error.message }
+        return { balance: null, error: sanitizeErrorMessage(error) }
       }
       
       if (!data) {
@@ -412,7 +413,7 @@ export async function getBalanceTransactions(
         .limit(limit)
       
       if (error) {
-        return { transactions: [], error: error.message }
+        return { transactions: [], error: sanitizeErrorMessage(error) }
       }
       
       const transactions: BalanceTransaction[] = (data || []).map(t => ({
@@ -636,7 +637,7 @@ export async function getFailedPayments(): Promise<{
         .order('created_at', { ascending: false })
       
       if (error) {
-        return { payments: [], error: error.message }
+        return { payments: [], error: sanitizeErrorMessage(error) }
       }
       
       const payments: FailedPayment[] = (data || []).map(p => ({
@@ -754,7 +755,7 @@ export async function retryFailedPayment(
       return { success: false, error: 'Payment requires additional action' }
     } catch (error) {
       console.error('Error in retryFailedPayment:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to retry payment' }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
   })
 }
@@ -790,7 +791,7 @@ export async function getPayoutPreferences(): Promise<{
         .single()
       
       if (error && error.code !== 'PGRST116') {
-        return { preferences: null, error: error.message }
+        return { preferences: null, error: sanitizeErrorMessage(error) }
       }
       
       if (!data) {
@@ -868,7 +869,7 @@ export async function updatePayoutPreferences(
         })
       
       if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
       }
       
       revalidatePath('/provider-portal/payments')
@@ -928,7 +929,7 @@ export async function requestPayout(
         .single()
       
       if (error) {
-        return { request: null, error: error.message }
+        return { request: null, error: sanitizeErrorMessage(error) }
       }
       
       // Initiate the payout in Stripe
@@ -959,7 +960,7 @@ export async function requestPayout(
           .from('payout_requests')
           .update({
             status: 'failed',
-            failure_reason: stripeError instanceof Error ? stripeError.message : 'Failed to initiate payout',
+            failure_reason: sanitizeErrorMessage(stripeError),
           })
           .eq('id', data.id)
         
@@ -1030,7 +1031,7 @@ export async function updatePreferredCurrency(
         .eq('id', user.id)
       
       if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
       }
       
       revalidatePath('/settings')
@@ -1059,7 +1060,7 @@ export async function getExchangeRates(): Promise<{
       .gt('expires_at', new Date().toISOString())
     
     if (error) {
-      return { rates: [], error: error.message }
+      return { rates: [], error: sanitizeErrorMessage(error) }
     }
     
     const rates: ExchangeRate[] = (data || []).map(r => ({

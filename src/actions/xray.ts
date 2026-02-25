@@ -49,6 +49,7 @@ import type { ModuleEnrichment } from "@/app/(platform)/the-forge/services/inspi
 import type { ConvergenceEvaluation, ProposedChange } from "@/app/(platform)/the-forge/services/convergence-controller"
 import type { EngineeringReviewResult } from "@/app/(platform)/the-forge/services/xray-to-objectives"
 import type { Json } from "@/types/database.types"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
         .delete()
         .eq("id", scan.id)
         .eq("foundry_id", foundryId)
-      const message = aiError instanceof Error ? aiError.message : "AI scan failed"
+      const message = sanitizeErrorMessage(aiError)
       console.error("[XRay] AI scan failed, deleted placeholder:", {
         scanId: scan.id,
         foundryId,
@@ -641,7 +642,7 @@ export async function generateCadModelsAction(
               },
             }
           } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : "Unknown error"
+            const errorMsg = sanitizeErrorMessage(error)
             // Persist the failed CadQuery code for debugging if available
             const failedCode = error instanceof CadGenerationError ? error.cadQueryCode : undefined
             console.error(`[XRay] Failed to generate CAD model for module ${xrayModule.id}:`, {
@@ -765,7 +766,7 @@ export async function generateSystemCadAction(scanId: string): Promise<
       console.info("[XRay] System CAD model generated:", { scanId, hasStl: !!result.stlUrl })
       return { spec: updatedSpec }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : "Unknown"
+      const errorMsg = sanitizeErrorMessage(error)
       const failedCode = error instanceof CadGenerationError ? error.cadQueryCode : undefined
       console.error("[XRay] System CAD generation failed:", {
         error: errorMsg,
@@ -2621,7 +2622,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
       )
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Research failed",
+        error: sanitizeErrorMessage(error),
         report: "",
         sources: [],
         researchTime: Date.now() - start,

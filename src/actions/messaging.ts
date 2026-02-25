@@ -29,6 +29,7 @@ import {
   type ConversationStatus,
   type ConversationType
 } from '@/lib/messaging/service'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface StartConversationParams {
   sellerId: string
@@ -49,7 +50,7 @@ export async function getConversations(status?: ConversationStatus) {
     } catch (error) {
       console.error('Failed to get conversations:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to get conversations' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -82,7 +83,7 @@ export async function getConversationMessages(
     } catch (error) {
       console.error('Failed to get conversation messages:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to get messages' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -142,7 +143,7 @@ export async function sendNewMessage(
     } catch (error) {
       console.error('Failed to send message:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to send message' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -186,7 +187,7 @@ export async function startConversation(
     } catch (error) {
       console.error('Failed to start conversation:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to start conversation' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -206,7 +207,7 @@ export async function markConversationRead(
     } catch (error) {
       console.error('Failed to mark conversation as read:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to mark as read' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -237,7 +238,7 @@ export async function archiveConversation(
     } catch (error) {
       console.error('Failed to archive conversation:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to archive conversation' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -268,7 +269,7 @@ export async function unarchiveConversation(
     } catch (error) {
       console.error('Failed to unarchive conversation:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to unarchive conversation' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -301,7 +302,7 @@ export async function createSystemMessage(
     } catch (error) {
       console.error('Failed to create system message:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to create system message' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -361,7 +362,7 @@ export async function startDirectMessage(
     } catch (error) {
       console.error('Failed to start direct message:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to start conversation' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -437,7 +438,7 @@ export async function startTaskDiscussion(
     } catch (error) {
       console.error('Failed to start task discussion:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to start discussion' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -509,7 +510,7 @@ export async function startObjectiveDiscussion(
     } catch (error) {
       console.error('Failed to start objective discussion:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to start discussion' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -588,7 +589,7 @@ export async function contactExpert(
     } catch (error) {
       console.error('Failed to contact expert:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to contact expert' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -609,7 +610,7 @@ export async function getEnhancedConversations(options?: {
     } catch (error) {
       console.error('Failed to get enhanced conversations:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to get conversations' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -644,7 +645,7 @@ export async function markConversationAsReadEnhanced(
     } catch (error) {
       console.error('Failed to mark conversation as read:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to mark as read' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -668,7 +669,7 @@ export async function searchConversations(
     } catch (error) {
       console.error('Failed to search conversations:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to search' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -688,7 +689,7 @@ export async function toggleConversationMute(
     } catch (error) {
       console.error('Failed to toggle mute:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to toggle mute' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })
@@ -716,7 +717,7 @@ export async function getParticipants(
     } catch (error) {
       console.error('Failed to get participants:', error)
       return { 
-        error: error instanceof Error ? error.message : 'Failed to get participants' 
+        error: sanitizeErrorMessage(error) 
       }
     }
   })

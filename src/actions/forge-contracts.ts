@@ -19,6 +19,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -101,7 +102,7 @@ export async function getForgeContractsAction(
 
   if (error) {
     console.error('[ForgeContracts] Failed to load contracts:', { scanId, error: error.message })
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
 
   return { contracts: (data ?? []) as unknown as ForgeContract[] }
@@ -233,7 +234,7 @@ export async function generateRfqPackAction(
 
     if (error) {
       console.error('[ForgeContracts] Failed to update RFQ pack:', { scanId: input.scanId, error: error.message })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
     result = data
   } else {
@@ -253,7 +254,7 @@ export async function generateRfqPackAction(
 
     if (error) {
       console.error('[ForgeContracts] Failed to create RFQ pack:', { scanId: input.scanId, error: error.message })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
     result = data
   }
@@ -381,7 +382,7 @@ export async function generateForgeContractAction(
       type: input.templateType,
       error: error.message,
     })
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath("/the-forge/cad-lab")
@@ -416,7 +417,7 @@ export async function updateForgeContractStatusAction(
 
   if (error) {
     console.error('[ForgeContracts] Failed to update status:', { contractId, status, error: error.message })
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
 
   return { success: true }
@@ -448,7 +449,7 @@ export async function deleteForgeContractAction(
 
   if (error) {
     console.error('[ForgeContracts] Failed to delete contract:', { contractId, error: error.message })
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
 
   return { success: true }

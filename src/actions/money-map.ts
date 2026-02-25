@@ -32,6 +32,7 @@ import type {
 } from '@/types/money-map'
 
 import { computeMoneyMapSummary, computeProfitability } from '@/lib/money-map/allocation'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============================================================
 // Helpers
@@ -97,12 +98,12 @@ export async function getRevenueStreams(): Promise<ActionResult<RevenueStream[]>
 
     if (error) {
       console.error('[MoneyMap] Failed to fetch revenue streams:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data as RevenueStream[], error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error fetching revenue streams:', message)
     return { data: null, error: message }
   }
@@ -152,13 +153,13 @@ export async function createRevenueStream(input: RevenueStreamInput): Promise<Ac
 
     if (error) {
       console.error('[MoneyMap] Failed to create revenue stream:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: data as RevenueStream, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error creating revenue stream:', message)
     return { data: null, error: message }
   }
@@ -211,13 +212,13 @@ export async function updateRevenueStream(
 
     if (error) {
       console.error('[MoneyMap] Failed to update revenue stream:', { id, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: data as RevenueStream, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error updating revenue stream:', message)
     return { data: null, error: message }
   }
@@ -249,13 +250,13 @@ export async function deleteRevenueStream(id: string): Promise<ActionResult> {
 
     if (error) {
       console.error('[MoneyMap] Failed to delete revenue stream:', { id, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: null, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error deleting revenue stream:', message)
     return { data: null, error: message }
   }
@@ -286,12 +287,12 @@ export async function getCostItems(): Promise<ActionResult<CostItem[]>> {
 
     if (error) {
       console.error('[MoneyMap] Failed to fetch cost items:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data as CostItem[], error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error fetching cost items:', message)
     return { data: null, error: message }
   }
@@ -339,13 +340,13 @@ export async function createCostItem(input: CostItemInput): Promise<ActionResult
 
     if (error) {
       console.error('[MoneyMap] Failed to create cost item:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: data as CostItem, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error creating cost item:', message)
     return { data: null, error: message }
   }
@@ -398,13 +399,13 @@ export async function updateCostItem(
 
     if (error) {
       console.error('[MoneyMap] Failed to update cost item:', { id, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: data as CostItem, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error updating cost item:', message)
     return { data: null, error: message }
   }
@@ -436,13 +437,13 @@ export async function deleteCostItem(id: string): Promise<ActionResult> {
 
     if (error) {
       console.error('[MoneyMap] Failed to delete cost item:', { id, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data: null, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error deleting cost item:', message)
     return { data: null, error: message }
   }
@@ -471,12 +472,12 @@ export async function getCostLinks(): Promise<ActionResult<CostLink[]>> {
 
     if (error) {
       console.error('[MoneyMap] Failed to fetch cost links:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: (data ?? []) as CostLink[], error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error fetching cost links:', message)
     return { data: null, error: message }
   }
@@ -526,7 +527,7 @@ export async function upsertCostLinks(
 
     if (deleteError) {
       console.error('[MoneyMap] Failed to delete existing cost links:', { costItemId, error: deleteError.message })
-      return { data: null, error: deleteError.message }
+      return { data: null, error: sanitizeErrorMessage(deleteError) }
     }
 
     // Insert new links
@@ -544,14 +545,14 @@ export async function upsertCostLinks(
 
       if (error) {
         console.error('[MoneyMap] Failed to upsert cost links:', { costItemId, error: error.message })
-        return { data: null, error: error.message }
+        return { data: null, error: sanitizeErrorMessage(error) }
       }
     }
 
     revalidatePath('/money-map')
     return { data: null, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error upserting cost links:', message)
     return { data: null, error: message }
   }
@@ -620,7 +621,7 @@ export async function getMoneyMapData(): Promise<ActionResult<MoneyMapData>> {
       error: null,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error fetching money map data:', message)
     return { data: null, error: message }
   }
@@ -649,12 +650,12 @@ export async function getSnapshots(): Promise<ActionResult<MoneyMapSnapshot[]>> 
 
     if (error) {
       console.error('[MoneyMap] Failed to fetch snapshots:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data ?? [], error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error fetching snapshots:', message)
     return { data: null, error: message }
   }
@@ -714,13 +715,13 @@ export async function createSnapshot(
 
     if (error) {
       console.error('[MoneyMap] Failed to create snapshot:', { foundryId, error: error.message })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/money-map')
     return { data, error: null }
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[MoneyMap] Unexpected error creating snapshot:', message)
     return { data: null, error: message }
   }

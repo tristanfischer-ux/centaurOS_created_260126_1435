@@ -49,10 +49,16 @@ function MapInner({ lat, lng, postcode }: GeoResult) {
         Promise.all([
             import('leaflet'),
             import('react-leaflet'),
-            import('leaflet/dist/leaflet.css'),
         ]).then(([L, RL]) => {
+            // Load Leaflet CSS at runtime
+            if (!document.querySelector('link[href*="leaflet"]')) {
+                const link = document.createElement('link')
+                link.rel = 'stylesheet'
+                link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+                document.head.appendChild(link)
+            }
             // Fix default marker icons (Leaflet + webpack issue)
-            delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
+            delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
             L.Icon.Default.mergeOptions({
                 iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
                 iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',

@@ -175,7 +175,7 @@ export async function getPaymentStatus(
     console.error('Error getting payment status:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to get payment status',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -279,7 +279,7 @@ export async function approveAndReleaseMilestone(
     console.error('Error approving milestone:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to approve milestone',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -385,7 +385,7 @@ export async function releaseFullPayment(
     console.error('Error releasing full payment:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to release payment',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -500,7 +500,7 @@ export async function requestRefund(
     console.error('Error requesting refund:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to request refund',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -574,7 +574,7 @@ export async function getOrderEscrowBalance(orderId: string): Promise<
     console.error('Error getting escrow balance:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to get escrow balance',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -634,7 +634,7 @@ export async function confirmOrderPayment(
     console.error('Error confirming payment:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to confirm payment',
+      error: sanitizeErrorMessage(error),
     }
   }
 }

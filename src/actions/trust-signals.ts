@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES
@@ -78,7 +79,7 @@ async function getCurrentProviderProfile() {
         .single()
 
     if (error && error.code !== 'PGRST116') {
-        return { profile: null, error: error.message }
+        return { profile: null, error: sanitizeErrorMessage(error) }
     }
 
     return { profile, error: null }
@@ -117,7 +118,7 @@ export async function getPortfolioItems(providerId?: string): Promise<{
 
         if (error) {
             console.error('Error fetching portfolio:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as PortfolioItem[], error: null }
@@ -169,7 +170,7 @@ export async function addPortfolioItem(data: {
 
         if (error) {
             console.error('Error adding portfolio item:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/portfolio')
@@ -223,7 +224,7 @@ export async function updatePortfolioItem(
 
         if (error) {
             console.error('Error updating portfolio item:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/portfolio')
@@ -257,7 +258,7 @@ export async function deletePortfolioItem(id: string): Promise<{
 
         if (error) {
             console.error('Error deleting portfolio item:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/portfolio')
@@ -298,7 +299,7 @@ export async function reorderPortfolioItems(
 
             if (error) {
                 console.error('Error reordering portfolio:', error)
-                return { success: false, error: error.message }
+                return { success: false, error: sanitizeErrorMessage(error) }
             }
         }
 
@@ -342,7 +343,7 @@ export async function getCertifications(providerId?: string): Promise<{
 
         if (error) {
             console.error('Error fetching certifications:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as Certification[], error: null }
@@ -396,7 +397,7 @@ export async function addCertification(data: {
 
         if (error) {
             console.error('Error adding certification:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -447,7 +448,7 @@ export async function updateCertification(
 
         if (error) {
             console.error('Error updating certification:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -481,7 +482,7 @@ export async function deleteCertification(id: string): Promise<{
 
         if (error) {
             console.error('Error deleting certification:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -523,7 +524,7 @@ export async function getProviderBadges(providerId?: string): Promise<{
 
         if (error) {
             console.error('Error fetching badges:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as ProviderBadge[], error: null }

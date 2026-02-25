@@ -7,6 +7,7 @@ import { createObjectiveSchema, updateObjectiveSchema, validate } from '@/lib/va
 import { withAuth } from '@/lib/server-action-utils'
 import { withRetry } from '@/lib/retry'
 import { scheduleTaskDates } from '@/lib/schedule-task-dates'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 
 
@@ -97,7 +98,7 @@ export async function createObjective(formData: FormData) {
             })
             objective = result
         } catch (error) {
-            return { error: error instanceof Error ? error.message : 'Failed to create objective' }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         if (!objective) return { error: 'Failed to create objective' }
@@ -222,7 +223,7 @@ export async function createObjective(formData: FormData) {
                     return JSON.parse(str)
                 } catch (parseError) {
                     console.error('Failed to parse AI task JSON:', parseError)
-                    throw new Error(`Invalid task data format: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`)
+                    throw new Error(`Invalid task data format: ${sanitizeErrorMessage(parseError)}`)
                 }
             })
 
@@ -296,7 +297,7 @@ export async function createObjective(formData: FormData) {
                     return { error: `Failed to create tasks and cleanup failed. Objective ID: ${objective.id}` }
                 }
                 
-                const errorMessage = taskError instanceof Error ? taskError.message : 'Unknown error'
+                const errorMessage = sanitizeErrorMessage(taskError)
                 return { error: `Failed to create tasks: ${errorMessage}` }
             }
         }
@@ -402,7 +403,7 @@ export async function updateObjective(
                 objectiveId,
                 error: error instanceof Error ? error.message : 'Unknown error'
             })
-            return { error: error instanceof Error ? error.message : 'Failed to update objective' }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         // AUDIT: Log update event
@@ -514,7 +515,7 @@ export async function deleteObjective(id: string, childAction: 'keep' | 'cascade
 
         if (deleteError) {
             console.error('[ObjectiveService] Delete error:', { id, error: deleteError.message })
-            return { error: deleteError.message }
+            return { error: sanitizeErrorMessage(deleteError) }
         }
 
         revalidatePath('/objectives')
@@ -548,7 +549,7 @@ export async function deleteObjectives(ids: string[], childAction: 'keep' | 'cas
             .select('id, creator_id, foundry_id')
             .in('id', ids)
 
-        if (fetchError) return { error: fetchError.message }
+        if (fetchError) return { error: sanitizeErrorMessage(fetchError) }
 
         // SECURITY: Filter objectives - must belong to user's foundry, and either:
         // - User is creator, OR
@@ -660,7 +661,7 @@ export async function archiveObjective(objectiveId: string): Promise<{ success: 
 
         if (archiveError) {
             console.error('[ObjectiveService] Archive error:', { objectiveId, error: archiveError.message })
-            return { error: archiveError.message }
+            return { error: sanitizeErrorMessage(archiveError) }
         }
 
         // AUDIT: Log the archive
@@ -875,7 +876,7 @@ export async function createObjectiveFromSubsystem(input: {
 
         } catch (error) {
             console.error('[CreateSubsystemObjective] Unexpected error:', error)
-            return { error: error instanceof Error ? error.message : 'Failed to create objective' }
+            return { error: sanitizeErrorMessage(error) }
         }
     })
 }
@@ -1019,7 +1020,7 @@ export async function getStrategicObjectives() {
                 foundryId,
                 error: error.message,
             })
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: data || [] }
@@ -1063,7 +1064,7 @@ export async function createStrategicObjective(title: string) {
                 foundryId,
                 error: error.message,
             })
-            return { error: error.message }
+            return { error: sanitizeErrorMessage(error) }
         }
 
         // AUDIT: Log creation
@@ -1128,7 +1129,7 @@ export async function updateStrategicObjective(
                 id,
                 error: updateError.message,
             })
-            return { error: updateError.message }
+            return { error: sanitizeErrorMessage(updateError) }
         }
 
         // AUDIT: Log update
@@ -1214,7 +1215,7 @@ export async function deleteStrategicObjective(id: string) {
                 id,
                 error: deleteError.message,
             })
-            return { error: deleteError.message }
+            return { error: sanitizeErrorMessage(deleteError) }
         }
 
         // AUDIT: Log deletion
@@ -1283,7 +1284,7 @@ export async function linkObjectiveToStrategic(
                 strategicObjectiveId,
                 error: updateError.message,
             })
-            return { error: updateError.message }
+            return { error: sanitizeErrorMessage(updateError) }
         }
 
         // AUDIT: Log the link/unlink
@@ -1361,7 +1362,7 @@ export async function updateObjectiveDates(
                 objectiveId,
                 error: updateError.message,
             })
-            return { error: updateError.message }
+            return { error: sanitizeErrorMessage(updateError) }
         }
 
         // AUDIT: Log the date change
@@ -1449,7 +1450,7 @@ export async function moveTaskToObjective(
                 targetObjectiveId,
                 error: updateError.message,
             })
-            return { error: updateError.message }
+            return { error: sanitizeErrorMessage(updateError) }
         }
 
         // Recalculate progress for both source and target objectives

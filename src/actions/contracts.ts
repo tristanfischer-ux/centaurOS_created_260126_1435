@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface ContractTemplate {
     id: string
@@ -130,7 +131,7 @@ export async function generateContract(input: {
             })
             .eq('id', existingContract.id)
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     } else {
         // Create new contract
         const { error } = await supabase
@@ -142,7 +143,7 @@ export async function generateContract(input: {
                 variable_values: input.variableValues
             })
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     }
     
     revalidatePath(`/orders/${input.orderId}`)
@@ -199,7 +200,7 @@ export async function signContract(contractId: string) {
         .update(updates)
         .eq('id', contractId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath(`/orders/${(contract.orders as { id: string }).id}`)
     return { success: true, error: null }
@@ -235,7 +236,7 @@ export async function getOrderContract(orderId: string) {
         .single()
     
     if (error && error.code !== 'PGRST116') {
-        return { contract: null, error: error.message }
+        return { contract: null, error: sanitizeErrorMessage(error) }
     }
     
     return { contract: data as OrderContract | null, error: null }

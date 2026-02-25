@@ -44,6 +44,7 @@ import type {
   FoundryMember,
   MilestoneOption,
 } from '@/types/canvas'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============================================================================
 // HELPERS
@@ -102,7 +103,7 @@ export async function getStrategicGoals(): Promise<
         foundryId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { data: (data ?? []) as StrategicGoal[] }
@@ -246,7 +247,7 @@ export async function getGoalBundle(
         goalId,
         error: milestoneError.message,
       })
-      return { error: milestoneError.message }
+      return { error: sanitizeErrorMessage(milestoneError) }
     }
 
     let effectiveMilestones = (milestones ?? []) as Milestone[]
@@ -269,7 +270,7 @@ export async function getGoalBundle(
           goalId,
           error: objError.message,
         })
-        return { error: objError.message }
+        return { error: sanitizeErrorMessage(objError) }
       }
 
       objectives = (objData ?? []) as CanvasObjective[]
@@ -348,7 +349,7 @@ export async function getGoalBundle(
           goalId,
           error: taskError.message,
         })
-        return { error: taskError.message }
+        return { error: sanitizeErrorMessage(taskError) }
       }
 
       // Resolve assignees for each task
@@ -541,7 +542,7 @@ export async function getAllMilestones(): Promise<
         foundryId,
         error: msError.message,
       })
-      return { error: msError.message }
+      return { error: sanitizeErrorMessage(msError) }
     }
 
     if (!milestones || milestones.length === 0) {
@@ -606,7 +607,7 @@ export async function getFoundryMembers(): Promise<
         foundryId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { data: (data ?? []) as FoundryMember[] }
@@ -642,7 +643,7 @@ export async function getObjectivesForLinking(): Promise<
         foundryId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { data: (data ?? []) as Array<{ id: string; title: string }> }
@@ -698,7 +699,7 @@ export async function createStrategicGoal(
         foundryId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     // AUDIT: Log goal creation
@@ -771,7 +772,7 @@ export async function createMilestones(
         goalId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     console.info('[CanvasService] Milestones created:', {
@@ -841,7 +842,7 @@ export async function createCanvasObjective(
         milestoneId: input.milestone_id,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     revalidateCanvas()
@@ -906,7 +907,7 @@ export async function createCanvasTask(
         objectiveId: input.objective_id,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     // Insert into task_assignees for multi-assignee compatibility
@@ -973,7 +974,7 @@ export async function acceptGhost(
         itemId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     console.info('[CanvasService] Ghost accepted:', { itemType, itemId, foundryId })
@@ -1017,7 +1018,7 @@ export async function rejectGhost(
           itemId,
           error: error.message,
         })
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
       }
     } else {
       // SECURITY: Only allow rejecting objectives that are actually ghosts
@@ -1034,7 +1035,7 @@ export async function rejectGhost(
           itemId,
           error: objError.message,
         })
-        return { error: objError.message }
+        return { error: sanitizeErrorMessage(objError) }
       }
 
       // Also soft-delete ghost tasks under this objective
@@ -1111,7 +1112,7 @@ export async function updateCanvasItem(
           itemId,
           error: error.message,
         })
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
       }
     } else {
       // Task update
@@ -1141,7 +1142,7 @@ export async function updateCanvasItem(
           itemId,
           error: error.message,
         })
-        return { error: error.message }
+        return { error: sanitizeErrorMessage(error) }
       }
 
       // Sync task_assignees junction table when assignee_id changes
@@ -1295,7 +1296,7 @@ export async function softDeleteGoal(
         goalId,
         error: goalDeleteError.message,
       })
-      return { error: goalDeleteError.message }
+      return { error: sanitizeErrorMessage(goalDeleteError) }
     }
 
     // AUDIT: Log the cascade deletion
@@ -1360,7 +1361,7 @@ export async function getUnlinkedItems(): Promise<
         foundryId,
         error: objError.message,
       })
-      return { error: objError.message }
+      return { error: sanitizeErrorMessage(objError) }
     }
 
     const objectives = (objData ?? []) as CanvasObjective[]
@@ -1406,7 +1407,7 @@ export async function getUnlinkedItems(): Promise<
         foundryId,
         error: orphanError.message,
       })
-      return { error: orphanError.message }
+      return { error: sanitizeErrorMessage(orphanError) }
     }
 
     // 5. Fetch tasks linked to unlinked objectives
@@ -1527,7 +1528,7 @@ export async function linkObjectiveToMilestone(
         milestoneId,
         error: updateError.message,
       })
-      return { error: updateError.message }
+      return { error: sanitizeErrorMessage(updateError) }
     }
 
     console.info('[CanvasService] Objective linked to milestone:', {
@@ -1586,7 +1587,7 @@ export async function linkTaskToObjective(
         objectiveId,
         error: updateError.message,
       })
-      return { error: updateError.message }
+      return { error: sanitizeErrorMessage(updateError) }
     }
 
     console.info('[CanvasService] Task linked to objective:', {
