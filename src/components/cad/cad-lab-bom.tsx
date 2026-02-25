@@ -148,7 +148,8 @@ export function CadLabBom({
       level: "system", id: "__system", name: projectName || "System",
       material: "", quantity: 1, massKg: systemMass,
       unitCost: systemTotal, totalCost: systemTotal, supplierType: "",
-      leadWeeks: 0, isEstimated: moduleEntries.some((m) => m.isEstimated),
+      leadWeeks: Math.max(...moduleEntries.map((m) => m.leadWeeks), 0),
+      isEstimated: moduleEntries.some((m) => m.isEstimated),
       hasDiagnostics: true, children: moduleEntries,
     }
   }, [modules, diagnosticAnswers, projectName])

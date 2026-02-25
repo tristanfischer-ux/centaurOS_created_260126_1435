@@ -14,18 +14,28 @@ import { MATERIALS } from "@/lib/engineering-data/materials"
 /**
  * Maps diagnostic material class names to engineering database material IDs.
  * Used to look up real cost_per_kg_usd from the materials database.
+ *
+ * INTENT: Must cover every option in the diagnostics UI material picker
+ * (cad-lab-diagnostics.tsx) plus any legacy/alias names that might exist
+ * in saved diagnostic answers.
  */
 const MATERIAL_CLASS_TO_DB_IDS: Record<string, string[]> = {
+  // Diagnostic UI options (exact match to cad-lab-diagnostics.tsx)
   "PLA/PETG": ["pla", "petg"],
   "ABS/Nylon": ["abs", "nylon-pa6"],
+  "Resin (standard)": ["pla"],                  // SLA resin cost ≈ PLA filament
+  "Aluminum 6061": ["al-6061-t6"],
+  "Steel (mild)": ["steel-1018"],
+  "Stainless Steel": ["ss-304", "ss-316"],
+  "Titanium": ["ti-6al-4v"],
+  "Copper/Brass": ["cu-c110", "brass-c360"],
+  "Carbon Fiber": ["cf-woven-3k", "cf-unidirectional"],
+  // Legacy/alias names (from older diagnostic data or other components)
   "Aluminium": ["al-6061-t6", "al-7075-t6"],
   "Steel/Iron": ["steel-1018", "steel-4140"],
-  "Stainless Steel": ["ss-304", "ss-316"],
-  "Copper/Brass": ["copper-c110", "brass-c360"],
-  "Titanium": ["ti-6al-4v"],
-  "Carbon Fiber Composite": ["cf-uni", "cf-woven"],
-  "CFRP/GFRP": ["cf-uni", "fiberglass"],
-  "Silicone/Rubber": ["tpu"],
+  "Carbon Fiber Composite": ["cf-woven-3k", "cf-unidirectional"],
+  "CFRP/GFRP": ["cf-unidirectional", "fiberglass-e-glass"],
+  "Silicone/Rubber": ["tpu-95a"],
 }
 
 /**
