@@ -18,7 +18,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { sanitizeErrorMessage, isValidUUID } from '@/lib/security/sanitize'
 import { getGoogleClient } from '@/lib/google/client'
 import { google } from 'googleapis'
 import type { Json } from '@/types/database.types'
@@ -1062,6 +1062,50 @@ export async function shareArtifact(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return { error: 'Not authenticated' }
+  }
+
+  // SECURITY: Validate artifact UUID
+  if (!isValidUUID(artifactId)) {
+    return { error: 'Invalid artifact ID' }
+  }
+
+  // SECURITY: Validate each userId in the array
+  if (userIds) {
+    for (const uid of userIds) {
+      if (!isValidUUID(uid)) {
+        return { error: 'Invalid user ID in share list' }
+      }
+    }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation before allowing share
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { error: 'User not in a foundry' }
+  }
+
+  const { data: artifact, error: fetchError } = await supabase
+    .from('agent_artifacts')
+    .select('id, created_by, foundry_id')
+    .eq('id', artifactId)
+    .single()
+
+  if (fetchError || !artifact) {
+    return { error: 'Artifact not found' }
+  }
+
+  if (artifact.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to share artifact:', {
+      artifactId, userId: user.id, ownerId: artifact.created_by,
+    })
+    return { error: 'You can only share your own artifacts' }
+  }
+
+  if (artifact.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on share attempt:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: artifact.foundry_id,
+    })
+    return { error: 'Artifact not found' }
   }
 
   const updateData: {
