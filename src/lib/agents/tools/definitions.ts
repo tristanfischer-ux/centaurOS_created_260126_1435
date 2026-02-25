@@ -337,13 +337,13 @@ export const TOOL_CALCULATE_UNIT_ECONOMICS: ToolDefinition = {
 export const TOOL_FORECAST_METRIC: ToolDefinition = {
     name: "forecast_metric",
     description:
-        "Forecast a financial metric (revenue or expenses) using REAL historical data and linear regression. Returns trend analysis, R² fit quality, projected values with confidence intervals, and a chart. Use this when the founder asks 'where are we heading?' or wants revenue/expense projections.",
+        "Forecast a financial metric (revenue, expenses, or burn rate) using REAL historical data. Supports linear regression and exponential smoothing. Returns trend analysis, fit quality, projected values with confidence intervals, and a chart. Use this when the founder asks 'where are we heading?' or wants revenue/expense/burn projections.",
     parameters: {
         type: "object",
         properties: {
             metric: {
                 type: "string",
-                enum: ["revenue", "expenses"],
+                enum: ["revenue", "expenses", "burn_rate"],
                 description: "Which metric to forecast. Defaults to 'expenses'.",
             },
             method: {

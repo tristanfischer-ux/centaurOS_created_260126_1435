@@ -25,12 +25,12 @@ import type { ToolHandler } from "./common"
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**
- * Convert smallest currency unit (pence/cents) to display string.
- * Uses the company's currency for locale formatting when available.
+ * Convert smallest currency unit (pence/cents) to display string with currency symbol.
+ * Uses Intl.NumberFormat for automatic locale + symbol handling.
  */
 function formatAmount(amount: number, currency = "GBP"): string {
     const locale = currency === "USD" ? "en-US" : currency === "EUR" ? "de-DE" : "en-GB"
-    return (amount / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return new Intl.NumberFormat(locale, { style: "currency", currency }).format(amount / 100)
 }
 
 /** Get YYYY-MM key from a date string. Returns null if date is invalid. */
@@ -49,15 +49,25 @@ function futureMonthLabel(monthsAhead: number): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
 }
 
-/** Fetch the company's currency from foundry profile. */
+/** Module-level cache for foundry currency lookups (60s TTL). */
+const currencyCache = new Map<string, { value: string; ts: number }>()
+const CURRENCY_CACHE_TTL_MS = 60_000
+
+/** Fetch the company's currency from foundry profile (cached 60s). */
 async function getFoundryCurrency(foundryId: string): Promise<string> {
+    const cached = currencyCache.get(foundryId)
+    if (cached && Date.now() - cached.ts < CURRENCY_CACHE_TTL_MS) {
+        return cached.value
+    }
     const supabase = createAdminClient()
     const { data } = await supabase
         .from("foundries")
         .select("currency")
         .eq("id", foundryId)
         .single()
-    return data?.currency ?? "GBP"
+    const currency = data?.currency ?? "GBP"
+    currencyCache.set(foundryId, { value: currency, ts: Date.now() })
+    return currency
 }
 
 // ─── analyze_cashflow ───────────────────────────────────────────────
@@ -301,6 +311,7 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
 
     let totalBudgeted = 0
     let totalActual = 0
+    const chartData: Array<{ label: string; value: number; value2: number }> = []
 
     for (const b of budgets) {
         // Normalize budget amount to the analysis period
@@ -323,6 +334,13 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
         totalBudgeted += budgetAmount
         totalActual += actual
 
+        // Use normalized budgetAmount for chart (not raw b.amount)
+        chartData.push({
+            label: b.name,
+            value: Math.round(budgetAmount / 100),
+            value2: Math.round(actual / 100),
+        })
+
         md += `| ${b.name} | ${b.category} | ${formatAmount(budgetAmount, currency)} | ${formatAmount(actual, currency)} | ${variance >= 0 ? "+" : ""}${formatAmount(variance, currency)} (${variancePct}%) | ${status} |\n`
     }
 
@@ -342,12 +360,7 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
         md += "\n"
     }
 
-    // Chart: budget vs actual
-    const chartData = budgets.map((b) => ({
-        label: b.name,
-        value: Math.round(b.amount / 100),
-        value2: Math.round((actualByCategory[b.category] ?? 0) / 100),
-    }))
+    // Chart: budget vs actual (uses period-normalized amounts built above)
     md += `\n<!-- CHART ${JSON.stringify({
         type: "bar",
         title: "Budget vs Actual",
@@ -444,8 +457,8 @@ export const handleCalculateUnitEconomics: ToolHandler = async (args, _ctx) => {
 // ─── forecast_metric ────────────────────────────────────────────────
 
 /**
- * Forecasts a financial metric using historical data. Uses linear regression
- * for trend projection with simple confidence intervals.
+ * Forecasts a financial metric using historical data. Supports linear regression
+ * and exponential smoothing for trend projection with confidence intervals.
  *
  * DECISION: Using TypeScript linear regression instead of Modal Python here.
  * The math is simple enough (OLS regression) that numpy is overkill, and
@@ -519,8 +532,89 @@ export const handleForecastMetric: ToolHandler = async (args, ctx) => {
 
     const values = sortedMonths.map((m) => monthlyValues[m])
     const n = values.length
+    const metricLabel = metric.charAt(0).toUpperCase() + metric.slice(1)
 
-    // Linear regression
+    // Branch on method
+    if (method === "exponential") {
+        // ── Exponential smoothing (alpha=0.3) ──
+        const alpha = 0.3
+        const smoothed: number[] = [values[0]]
+        for (let i = 1; i < n; i++) {
+            smoothed.push(alpha * values[i] + (1 - alpha) * smoothed[i - 1])
+        }
+        const lastSmoothed = smoothed[n - 1]
+
+        // MAE (mean absolute error) as fit metric
+        let totalAbsError = 0
+        for (let i = 1; i < n; i++) {
+            totalAbsError += Math.abs(values[i] - smoothed[i - 1])
+        }
+        const mae = n > 1 ? totalAbsError / (n - 1) : 0
+
+        // Forecast: extend last smoothed value (flat forecast for single exponential smoothing)
+        const forecasts: Array<{ month: string; predicted: number; lower: number; upper: number }> = []
+        for (let i = 0; i < periodsAhead; i++) {
+            // 80% interval using MAE as spread estimate (z ≈ 1.28), widening with sqrt of horizon
+            const margin = 1.28 * mae * Math.sqrt(i + 1)
+            forecasts.push({
+                month: futureMonthLabel(i + 1),
+                predicted: Math.max(0, lastSmoothed),
+                lower: Math.max(0, lastSmoothed - margin),
+                upper: lastSmoothed + margin,
+            })
+        }
+
+        const meanValue = values.reduce((a, b) => a + b, 0) / n
+
+        let md = `## ${metricLabel} Forecast\n\n`
+        md += `**Method:** Exponential smoothing (α=${alpha})\n`
+        md += `**Based on:** ${n} months of historical data\n`
+        md += `**MAE (fit quality):** ${formatAmount(mae, currency)} ${meanValue > 0 && mae / meanValue < 0.15 ? "(good fit)" : meanValue > 0 && mae / meanValue < 0.3 ? "(moderate fit)" : "(weak fit — treat projections with caution)"}\n`
+        md += `**Last smoothed value:** ${formatAmount(lastSmoothed, currency)}\n\n`
+
+        // Historical table
+        md += `### Historical Data\n\n`
+        md += `| Month | Actual | Smoothed |\n|-------|--------|----------|\n`
+        for (let i = 0; i < sortedMonths.length; i++) {
+            md += `| ${sortedMonths[i]} | ${formatAmount(values[i], currency)} | ${formatAmount(smoothed[i], currency)} |\n`
+        }
+        md += "\n"
+
+        // Forecast table
+        md += `### Forecast (next ${periodsAhead} months)\n\n`
+        md += `| Month | Predicted | Range (80% confidence) |\n|-------|-----------|------------------------|\n`
+        for (const f of forecasts) {
+            md += `| ${f.month} | ${formatAmount(f.predicted, currency)} | ${formatAmount(f.lower, currency)} – ${formatAmount(f.upper, currency)} |\n`
+        }
+        md += "\n"
+
+        // Chart
+        const chartData = [
+            ...sortedMonths.map((m, i) => ({
+                label: m,
+                value: Math.round(values[i] / 100),
+                value2: Math.round(smoothed[i] / 100),
+            })),
+            ...forecasts.map((f) => ({
+                label: f.month + " (F)",
+                value: 0,
+                value2: Math.round(f.predicted / 100),
+            })),
+        ]
+        md += `\n<!-- CHART ${JSON.stringify({
+            type: "line",
+            title: `${metricLabel} — Historical & Forecast (Exponential Smoothing)`,
+            data: chartData,
+            xLabel: "Month",
+            yLabel: "Amount",
+            seriesName: "Actual",
+            series2Name: "Smoothed/Forecast",
+        })} -->`
+
+        return md
+    }
+
+    // ── Linear regression (default) ──
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
     for (let i = 0; i < n; i++) {
         sumX += i
@@ -567,10 +661,8 @@ export const handleForecastMetric: ToolHandler = async (args, ctx) => {
         })
     }
 
-    const metricLabel = metric.charAt(0).toUpperCase() + metric.slice(1)
-
     let md = `## ${metricLabel} Forecast\n\n`
-    md += `**Method:** ${method === "exponential" ? "Exponential smoothing" : "Linear regression"}\n`
+    md += `**Method:** Linear regression\n`
     md += `**Based on:** ${n} months of historical data\n`
     md += `**R² (fit quality):** ${rSquared.toFixed(3)} ${rSquared > 0.7 ? "(good fit)" : rSquared > 0.4 ? "(moderate fit)" : "(weak fit — treat projections with caution)"}\n`
     md += `**Trend:** ${slope > 0 ? "Increasing" : slope < 0 ? "Decreasing" : "Flat"} at ${formatAmount(Math.abs(slope), currency)}/month\n\n`

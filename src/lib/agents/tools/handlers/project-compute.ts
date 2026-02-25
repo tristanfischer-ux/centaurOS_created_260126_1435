@@ -226,7 +226,8 @@ export const handleAnalyzeCriticalPath: ToolHandler = async (args, ctx) => {
 
 /**
  * Analyzes task distribution across team members to identify
- * overallocation and unassigned work.
+ * overallocation and unassigned work. Uses effort-based weighting
+ * (estimated days) for more accurate overload detection.
  */
 export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
     const supabase = createAdminClient()
@@ -265,8 +266,17 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
 
     const profileMap = new Map(profiles.map((p) => [p.id, p]))
 
+    // Estimate effort in days per task from start_date/end_date (default 5 days)
+    function estimateEffortDays(t: typeof tasks[0]): number {
+        if (t.start_date && t.end_date) {
+            const diff = new Date(t.end_date).getTime() - new Date(t.start_date).getTime()
+            return Math.max(1, Math.ceil(diff / (24 * 60 * 60 * 1000)))
+        }
+        return 5
+    }
+
     // Aggregate by assignee
-    const workload: Record<string, { name: string; role: string; tasks: typeof tasks }> = {}
+    const workload: Record<string, { name: string; role: string; tasks: typeof tasks; estDays: number }> = {}
     let unassignedCount = 0
 
     for (const t of tasks) {
@@ -280,16 +290,21 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
                 name: p ? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() : "Unknown",
                 role: p?.role ?? "—",
                 tasks: [],
+                estDays: 0,
             }
         }
         workload[t.assignee_id].tasks.push(t)
+        workload[t.assignee_id].estDays += estimateEffortDays(t)
     }
 
-    // Sort by task count descending
-    const sorted = Object.entries(workload).sort((a, b) => b[1].tasks.length - a[1].tasks.length)
+    // Sort by estimated days descending (effort-weighted, not raw count)
+    const sorted = Object.entries(workload).sort((a, b) => b[1].estDays - a[1].estDays)
 
     const avgLoad = sorted.length > 0
         ? sorted.reduce((s, [, w]) => s + w.tasks.length, 0) / sorted.length
+        : 0
+    const avgEffort = sorted.length > 0
+        ? sorted.reduce((s, [, w]) => s + w.estDays, 0) / sorted.length
         : 0
 
     let md = `## Workload Analysis\n\n`
@@ -300,21 +315,23 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
     md += `| Unassigned | ${unassignedCount} |\n`
     md += `| Team members with tasks | ${sorted.length} |\n`
     md += `| Average tasks per person | ${avgLoad.toFixed(1)} |\n`
+    md += `| Average est. days per person | ${avgEffort.toFixed(1)} |\n`
     md += "\n"
 
     // Workload table
     md += `### Task Distribution\n\n`
-    md += `| Team Member | Role | Active Tasks | Status |\n`
-    md += `|-------------|------|-------------|--------|\n`
+    md += `| Team Member | Role | Active Tasks | Est. Days | Status |\n`
+    md += `|-------------|------|-------------|-----------|--------|\n`
 
     for (const [, w] of sorted) {
-        const ratio = avgLoad > 0 ? w.tasks.length / avgLoad : 0
+        // Use effort-based ratio for overload detection instead of raw task count
+        const ratio = avgEffort > 0 ? w.estDays / avgEffort : 0
         let status: string
         if (ratio >= 1.5) {
             status = "**Overloaded** (50%+ above average)"
         } else if (ratio >= 1.2) {
             status = "Heavy load"
-        } else if (ratio <= 0.5 && avgLoad > 2) {
+        } else if (ratio <= 0.5 && avgEffort > 5) {
             status = "Light — has capacity"
         } else {
             status = "Balanced"
@@ -328,7 +345,7 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
         }
         const statusSummary = Object.entries(statusMap).map(([s, c]) => `${s}: ${c}`).join(", ")
 
-        md += `| ${w.name} | ${w.role} | ${w.tasks.length} (${statusSummary}) | ${status} |\n`
+        md += `| ${w.name} | ${w.role} | ${w.tasks.length} (${statusSummary}) | ${w.estDays} | ${status} |\n`
     }
     md += "\n"
 
@@ -369,7 +386,7 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
 
 /**
  * Predicts objective completion dates based on actual task completion velocity.
- * Uses rolling completion rate to extrapolate when remaining tasks will be done.
+ * Uses per-objective velocity when available, falling back to proportional scaling.
  */
 export const handlePredictCompletion: ToolHandler = async (args, ctx) => {
     const objectiveId = args.objective_id as string | undefined
@@ -450,11 +467,20 @@ export const handlePredictCompletion: ToolHandler = async (args, ctx) => {
             predictedDate = "Done"
             onTrack = "Complete"
         } else if (dailyVelocity > 0) {
-            // Scale velocity to this objective (proportion of total work)
-            const objVelocity = objTasks.length > 0
-                ? dailyVelocity * (objTasks.length / tasks.length)
-                : dailyVelocity / objectives.length
-            const daysRemaining = remaining / Math.max(objVelocity, 0.01)
+            // Per-objective velocity: tasks completed for THIS objective in last 30 days
+            const objRecentlyCompleted = recentlyCompleted.filter(
+                (t) => t.objective_id === obj.id,
+            ).length
+            const objDailyVelocity = objRecentlyCompleted / 30
+
+            // Fall back to proportional scaling only when per-objective velocity is 0
+            const effectiveVelocity = objDailyVelocity > 0
+                ? objDailyVelocity
+                : objTasks.length > 0
+                    ? dailyVelocity * (objTasks.length / tasks.length)
+                    : dailyVelocity / objectives.length
+
+            const daysRemaining = remaining / Math.max(effectiveVelocity, 0.01)
             const predicted = new Date(Date.now() + daysRemaining * 24 * 60 * 60 * 1000)
             predictedDate = predicted.toISOString().split("T")[0]
 
