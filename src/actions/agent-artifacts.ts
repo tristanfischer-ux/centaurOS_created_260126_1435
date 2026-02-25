@@ -453,8 +453,40 @@ export async function updateArtifact(
     return { data: null, error: 'Not authenticated' }
   }
 
-  if (!artifactId) {
-    return { data: null, error: 'Artifact ID is required' }
+  // SECURITY: Validate artifact UUID format
+  if (!isValidUUID(artifactId)) {
+    return { data: null, error: 'Invalid artifact ID' }
+  }
+
+  // SECURITY: Verify foundry membership
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { data: null, error: 'User not in a foundry' }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation
+  const { data: artifact, error: fetchError } = await supabase
+    .from('agent_artifacts')
+    .select('id, created_by, foundry_id')
+    .eq('id', artifactId)
+    .single()
+
+  if (fetchError || !artifact) {
+    return { data: null, error: 'Artifact not found' }
+  }
+
+  if (artifact.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to update artifact:', {
+      artifactId, userId: user.id, ownerId: artifact.created_by,
+    })
+    return { data: null, error: 'You can only update your own artifacts' }
+  }
+
+  if (artifact.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on update attempt:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: artifact.foundry_id,
+    })
+    return { data: null, error: 'Artifact not found' }
   }
 
   // Build update object — only include provided fields
@@ -512,14 +544,40 @@ export async function toggleArtifactStar(artifactId: string): Promise<{
     return { isStarred: false, error: 'Not authenticated' }
   }
 
-  // Fetch current state
+  // SECURITY: Validate artifact UUID format
+  if (!isValidUUID(artifactId)) {
+    return { isStarred: false, error: 'Invalid artifact ID' }
+  }
+
+  // SECURITY: Verify foundry membership
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { isStarred: false, error: 'User not in a foundry' }
+  }
+
+  // Fetch current state + ownership columns
   const { data: current } = await supabase
     .from('agent_artifacts')
-    .select('is_starred')
+    .select('is_starred, created_by, foundry_id')
     .eq('id', artifactId)
     .single()
 
   if (!current) {
+    return { isStarred: false, error: 'Artifact not found' }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation
+  if (current.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to toggle star:', {
+      artifactId, userId: user.id, ownerId: current.created_by,
+    })
+    return { isStarred: false, error: 'You can only star your own artifacts' }
+  }
+
+  if (current.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on star toggle:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: current.foundry_id,
+    })
     return { isStarred: false, error: 'Artifact not found' }
   }
 
@@ -558,8 +616,40 @@ export async function deleteArtifact(artifactId: string): Promise<{
     return { error: 'Not authenticated' }
   }
 
-  if (!artifactId) {
-    return { error: 'Artifact ID is required' }
+  // SECURITY: Validate artifact UUID format
+  if (!isValidUUID(artifactId)) {
+    return { error: 'Invalid artifact ID' }
+  }
+
+  // SECURITY: Verify foundry membership
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { error: 'User not in a foundry' }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation
+  const { data: artifact, error: fetchError } = await supabase
+    .from('agent_artifacts')
+    .select('id, created_by, foundry_id')
+    .eq('id', artifactId)
+    .single()
+
+  if (fetchError || !artifact) {
+    return { error: 'Artifact not found' }
+  }
+
+  if (artifact.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to delete artifact:', {
+      artifactId, userId: user.id, ownerId: artifact.created_by,
+    })
+    return { error: 'You can only delete your own artifacts' }
+  }
+
+  if (artifact.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on delete attempt:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: artifact.foundry_id,
+    })
+    return { error: 'Artifact not found' }
   }
 
   const { error } = await supabase
@@ -611,6 +701,43 @@ export async function deleteArtifacts(artifactIds: string[]): Promise<{
   const MAX_BATCH_SIZE = 100
   if (artifactIds.length > MAX_BATCH_SIZE) {
     return { deletedCount: 0, error: `Cannot delete more than ${MAX_BATCH_SIZE} artifacts at once` }
+  }
+
+  // SECURITY: Validate all UUIDs
+  if (artifactIds.some(id => !isValidUUID(id))) {
+    return { deletedCount: 0, error: 'Invalid artifact ID in batch' }
+  }
+
+  // SECURITY: Verify foundry membership
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { deletedCount: 0, error: 'User not in a foundry' }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation for ALL artifacts
+  const { data: artifacts, error: fetchError } = await supabase
+    .from('agent_artifacts')
+    .select('id, created_by, foundry_id')
+    .in('id', artifactIds)
+
+  if (fetchError) {
+    return { deletedCount: 0, error: 'Failed to verify artifact ownership' }
+  }
+
+  if (!artifacts || artifacts.length !== artifactIds.length) {
+    return { deletedCount: 0, error: 'One or more artifacts not found' }
+  }
+
+  const unauthorizedArtifact = artifacts.find(
+    a => a.created_by !== user.id || a.foundry_id !== foundryId
+  )
+  if (unauthorizedArtifact) {
+    console.warn('[AgentArtifacts] Unauthorized bulk delete attempt:', {
+      userId: user.id, foundryId,
+      unauthorizedId: unauthorizedArtifact.id,
+      ownerId: unauthorizedArtifact.created_by,
+    })
+    return { deletedCount: 0, error: 'You can only delete your own artifacts' }
   }
 
   const { error, count } = await supabase
@@ -909,6 +1036,11 @@ export async function updateArtifactContent(
     return { data: null, error: 'Not authenticated' }
   }
 
+  // SECURITY: Validate artifact UUID format
+  if (!isValidUUID(artifactId)) {
+    return { data: null, error: 'Invalid artifact ID' }
+  }
+
   const foundryId = await getFoundryIdCached()
   if (!foundryId) {
     return { data: null, error: 'No active foundry' }
@@ -918,6 +1050,21 @@ export async function updateArtifactContent(
   const { data: current, error: fetchError } = await getArtifact(artifactId)
   if (fetchError || !current) {
     return { data: null, error: fetchError || 'Artifact not found' }
+  }
+
+  // SECURITY: Verify ownership and foundry isolation
+  if (current.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to update artifact content:', {
+      artifactId, userId: user.id, ownerId: current.created_by,
+    })
+    return { data: null, error: 'You can only update your own artifacts' }
+  }
+
+  if (current.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on content update:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: current.foundry_id,
+    })
+    return { data: null, error: 'Artifact not found' }
   }
 
   const newVersion = current.version_number + 1
@@ -1020,6 +1167,42 @@ export async function restoreArtifactVersion(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return { data: null, error: 'Not authenticated' }
+  }
+
+  // SECURITY: Validate UUID formats
+  if (!isValidUUID(artifactId) || !isValidUUID(versionId)) {
+    return { data: null, error: 'Invalid ID' }
+  }
+
+  // SECURITY: Verify foundry membership
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) {
+    return { data: null, error: 'User not in a foundry' }
+  }
+
+  // SECURITY: Verify artifact ownership before allowing restore
+  const { data: artifact, error: fetchError } = await supabase
+    .from('agent_artifacts')
+    .select('id, created_by, foundry_id')
+    .eq('id', artifactId)
+    .single()
+
+  if (fetchError || !artifact) {
+    return { data: null, error: 'Artifact not found' }
+  }
+
+  if (artifact.created_by !== user.id) {
+    console.warn('[AgentArtifacts] Non-owner attempted to restore artifact version:', {
+      artifactId, versionId, userId: user.id, ownerId: artifact.created_by,
+    })
+    return { data: null, error: 'You can only restore your own artifacts' }
+  }
+
+  if (artifact.foundry_id !== foundryId) {
+    console.warn('[AgentArtifacts] Foundry mismatch on version restore:', {
+      artifactId, userFoundry: foundryId, artifactFoundry: artifact.foundry_id,
+    })
+    return { data: null, error: 'Artifact not found' }
   }
 
   // Fetch the version to restore

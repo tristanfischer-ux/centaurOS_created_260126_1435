@@ -7744,6 +7744,7 @@ export type Database = {
           created_at: string | null
           created_by_provider_id: string | null
           currency: string | null
+          data_quality_score: number
           description: string | null
           embedding: string | null
           id: string
@@ -7778,6 +7779,7 @@ export type Database = {
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
+          data_quality_score?: number
           description?: string | null
           embedding?: string | null
           id?: string
@@ -7812,6 +7814,7 @@ export type Database = {
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
+          data_quality_score?: number
           description?: string | null
           embedding?: string | null
           id?: string
@@ -15922,6 +15925,12 @@ export type Database = {
           relationship: string
         }[]
       }
+      compute_data_quality_score: {
+        Args: {
+          rec: Database["public"]["Tables"]["marketplace_listings"]["Row"]
+        }
+        Returns: number
+      }
       count_active_founders: {
         Args: { target_foundry_id: string }
         Returns: number
@@ -16408,6 +16417,7 @@ export type Database = {
           total_released: number
         }[]
       }
+      get_investor_stats: { Args: never; Returns: Json }
       get_invitation_by_token: {
         Args: { invitation_token: string }
         Returns: {

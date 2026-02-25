@@ -341,7 +341,7 @@ export async function searchMarketplaceListings(
         case 'relevance':
         case 'verified':
         default:
-            query = query.order('is_verified', { ascending: false }).order('created_at', { ascending: false })
+            query = query.order('data_quality_score', { ascending: false }).order('is_verified', { ascending: false }).order('created_at', { ascending: false })
     }
 
     query = query.range(from, to)
