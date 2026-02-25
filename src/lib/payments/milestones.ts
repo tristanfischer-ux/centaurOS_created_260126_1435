@@ -1,4 +1,3 @@
-// @ts-nocheck - sendNotification() expects NotificationParams but called with partial object; Milestone type uses camelCase vs DB snake_case
 /**
  * Milestone Service
  * Manages milestone-based payment releases for marketplace orders
@@ -81,7 +80,7 @@ export async function createMilestones(
       return { milestones: null, error: createError?.message || 'Failed to create milestones' }
     }
 
-    // Map to response type
+    // Map to response type (created_at is non-null in practice but nullable in DB schema)
     const mappedMilestones: Milestone[] = created.map((m) => ({
       id: m.id,
       orderId: m.order_id,
@@ -92,7 +91,7 @@ export async function createMilestones(
       status: m.status as MilestoneStatus,
       submittedAt: m.submitted_at,
       approvedAt: m.approved_at,
-      createdAt: m.created_at,
+      createdAt: m.created_at ?? new Date().toISOString(),
     }))
 
     return { milestones: mappedMilestones, error: null }
@@ -136,7 +135,7 @@ export async function getMilestones(
       status: m.status as MilestoneStatus,
       submittedAt: m.submitted_at,
       approvedAt: m.approved_at,
-      createdAt: m.created_at,
+      createdAt: m.created_at ?? new Date().toISOString(),
     }))
 
     return { milestones, error: null }
@@ -217,10 +216,10 @@ export async function submitMilestone(
       try {
         await sendNotification({
           userId: order.buyer.id,
-          type: 'milestone_submitted',
+          priority: 'medium',
           title: 'Milestone Submitted for Review',
-          message: `"${milestone.title}" has been submitted for your approval${notes ? `: ${notes}` : ''}.`,
-          link: `/marketplace/orders/${order.id}`,
+          body: `"${milestone.title}" has been submitted for your approval${notes ? `: ${notes}` : ''}.`,
+          actionUrl: `/marketplace/orders/${order.id}`,
           metadata: {
             orderId: order.id,
             orderNumber: order.order_number,
@@ -244,7 +243,7 @@ export async function submitMilestone(
         status: updated.status as MilestoneStatus,
         submittedAt: updated.submitted_at,
         approvedAt: updated.approved_at,
-        createdAt: updated.created_at,
+        createdAt: updated.created_at ?? new Date().toISOString(),
       },
       error: null,
     }
@@ -284,6 +283,7 @@ export async function approveMilestone(milestoneId: string): Promise<
           order_number,
           seller_id,
           escrow_status,
+          currency,
           seller:provider_profiles!orders_seller_id_fkey(
             user_id,
             user:profiles!provider_profiles_user_id_fkey(id, email, full_name)
@@ -330,6 +330,7 @@ export async function approveMilestone(milestoneId: string): Promise<
       order_number: string
       seller_id: string
       escrow_status: string
+      currency?: string
       seller: {
         user_id: string
         user: { id: string; email: string; full_name: string }
@@ -358,10 +359,10 @@ export async function approveMilestone(milestoneId: string): Promise<
       try {
         await sendNotification({
           userId: order.seller.user.id,
-          type: 'milestone_approved',
+          priority: 'high',
           title: 'Milestone Approved - Payment Released',
-          message: `"${milestone.title}" has been approved. Payment of ${formatCurrencyFromMinorUnits(releaseResult.sellerAmount!, milestone.order.currency || 'GBP')} is being transferred to your account.`,
-          link: `/provider-portal/orders/${order.id}`,
+          body: `"${milestone.title}" has been approved. Payment of ${formatCurrencyFromMinorUnits(releaseResult.sellerAmount!, order.currency ?? 'GBP')} is being transferred to your account.`,
+          actionUrl: `/provider-portal/orders/${order.id}`,
           metadata: {
             orderId: order.id,
             orderNumber: order.order_number,
@@ -386,7 +387,7 @@ export async function approveMilestone(milestoneId: string): Promise<
         status: 'paid' as MilestoneStatus, // Will be updated by releaseToSeller
         submittedAt: updated.submitted_at,
         approvedAt: updated.approved_at,
-        createdAt: updated.created_at,
+        createdAt: updated.created_at ?? new Date().toISOString(),
       },
       payment: {
         transferId: releaseResult.transfer.id,
@@ -532,10 +533,10 @@ export async function disputeMilestone(
       try {
         await sendNotification({
           userId: notifyUserId,
-          type: 'milestone_disputed',
+          priority: 'high',
           title: 'Milestone Disputed',
-          message: `${notifierName || 'A user'} has disputed "${milestone.title}": ${reason}`,
-          link: isBuyer ? `/provider-portal/orders/${order.id}` : `/marketplace/orders/${order.id}`,
+          body: `${notifierName || 'A user'} has disputed "${milestone.title}": ${reason}`,
+          actionUrl: isBuyer ? `/provider-portal/orders/${order.id}` : `/marketplace/orders/${order.id}`,
           metadata: {
             orderId: order.id,
             orderNumber: order.order_number,
@@ -560,7 +561,7 @@ export async function disputeMilestone(
         status: updated.status as MilestoneStatus,
         submittedAt: updated.submitted_at,
         approvedAt: updated.approved_at,
-        createdAt: updated.created_at,
+        createdAt: updated.created_at ?? new Date().toISOString(),
       },
       disputeId: dispute?.id || 'dispute-created',
       error: null,

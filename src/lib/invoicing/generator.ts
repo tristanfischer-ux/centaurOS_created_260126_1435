@@ -1,4 +1,3 @@
-// @ts-nocheck - invoices table with nested buyer/seller profile joins returns complex type not matching Invoice interface; regenerate types after schema stabilizes
 /**
  * Invoice Generator Service
  * Handles generation of invoices, self-bills, and platform fee invoices
@@ -127,7 +126,8 @@ export async function generateBuyerInvoice(
     const invoiceNumber = await getInvoiceNumber(supabase, 'INV')
 
     // Build line items
-    const netAmount = order.total_amount - order.vat_amount
+    // INTENT: DB columns vat_amount/vat_rate/currency are nullable; default to 0/'GBP' since we guard for missing orders above
+    const netAmount = order.total_amount - (order.vat_amount ?? 0)
     const lineItems: InvoiceLineItem[] = [
       {
         id: '1',
@@ -135,16 +135,16 @@ export async function generateBuyerInvoice(
         quantity: 1,
         unitPrice: netAmount,
         amount: netAmount,
-        vatRate: order.vat_rate,
-        vatAmount: order.vat_amount,
+        vatRate: order.vat_rate ?? 0,
+        vatAmount: order.vat_amount ?? 0,
       },
     ]
 
     // Build VAT breakdown
     const vatBreakdown = formatVATBreakdown({
       totalAmount: order.total_amount,
-      vatAmount: order.vat_amount,
-      vatRate: order.vat_rate,
+      vatAmount: order.vat_amount ?? 0,
+      vatRate: order.vat_rate ?? 0,
       taxTreatment: order.tax_treatment as TaxTreatment,
     })
 
@@ -163,7 +163,7 @@ export async function generateBuyerInvoice(
       subtotal: netAmount,
       vatBreakdown,
       total: order.total_amount,
-      currency: order.currency,
+      currency: order.currency ?? 'GBP',
       taxTreatment: order.tax_treatment as TaxTreatment,
       reverseChargeApplies: order.tax_treatment === 'reverse_charge',
       notes: order.tax_treatment === 'reverse_charge' 
@@ -234,8 +234,9 @@ export async function generateSellerSelfBill(
     const invoiceNumber = await getInvoiceNumber(supabase, 'SB')
 
     // Calculate seller's net payment (total - platform fee)
-    const netToSeller = order.total_amount - order.platform_fee
-    const sellerVAT = order.vat_amount // VAT passed through
+    // INTENT: DB columns platform_fee/vat_amount/vat_rate/currency are nullable; default to 0/'GBP'
+    const netToSeller = order.total_amount - (order.platform_fee ?? 0)
+    const sellerVAT = order.vat_amount ?? 0
 
     // Build line items
     const lineItems: InvoiceLineItem[] = [
@@ -245,7 +246,7 @@ export async function generateSellerSelfBill(
         quantity: 1,
         unitPrice: netToSeller - sellerVAT,
         amount: netToSeller - sellerVAT,
-        vatRate: order.vat_rate,
+        vatRate: order.vat_rate ?? 0,
         vatAmount: sellerVAT,
       },
     ]
@@ -253,7 +254,7 @@ export async function generateSellerSelfBill(
     // Build VAT breakdown
     const vatBreakdown: VATBreakdown = {
       netAmount: netToSeller - sellerVAT,
-      vatRate: order.vat_rate,
+      vatRate: order.vat_rate ?? 0,
       vatAmount: sellerVAT,
       grossAmount: netToSeller,
       taxTreatment: order.tax_treatment as TaxTreatment,
@@ -275,7 +276,7 @@ export async function generateSellerSelfBill(
       subtotal: netToSeller - sellerVAT,
       vatBreakdown,
       total: netToSeller,
-      currency: order.currency,
+      currency: order.currency ?? 'GBP',
       taxTreatment: order.tax_treatment as TaxTreatment,
       reverseChargeApplies: false,
       notes: 'Self-billing invoice issued by Fractional Forge on your behalf.',
@@ -337,7 +338,8 @@ export async function generatePlatformFeeInvoice(
     const invoiceNumber = await getInvoiceNumber(supabase, 'PF')
 
     // Calculate platform fee with VAT
-    const feeVAT = calculatePlatformFeeVAT(order.platform_fee, true)
+    // INTENT: platform_fee is nullable in DB; default to 0
+    const feeVAT = calculatePlatformFeeVAT(order.platform_fee ?? 0, true)
 
     // Build line items
     const lineItems: InvoiceLineItem[] = [
@@ -377,7 +379,7 @@ export async function generatePlatformFeeInvoice(
       subtotal: feeVAT.netFee,
       vatBreakdown,
       total: feeVAT.grossFee,
-      currency: order.currency,
+      currency: order.currency ?? 'GBP',
       taxTreatment: 'standard',
       reverseChargeApplies: false,
       notes: 'Platform fee automatically deducted from order payment.',
@@ -502,7 +504,7 @@ export async function getOrderInvoices(
       id: doc.id,
       documentType: doc.document_type,
       fileUrl: doc.file_url,
-      generatedAt: doc.generated_at,
+      generatedAt: doc.generated_at ?? '',
     }))
 
     return { data: documents, error: null }

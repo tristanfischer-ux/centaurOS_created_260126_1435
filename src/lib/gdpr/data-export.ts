@@ -1,4 +1,3 @@
-// @ts-nocheck - Data export queries multiple tables (orders, messages, reviews, payments) with nested joins; types need UntypedClient workaround until all tables in schema
 /**
  * Data Export Service
  * Handles collection and export of user data for GDPR compliance
@@ -278,14 +277,18 @@ export async function collectUserData(
       .eq("buyer_id", userId)
       .order("created_at", { ascending: false })
 
-    const bookings: BookingExportData[] = (bookingsData || []).map((b) => ({
-      id: b.id,
-      status: b.status,
-      scheduled_at: b.scheduled_at,
-      duration_minutes: b.duration_minutes,
-      provider_name: b.provider?.display_name || null,
-      created_at: b.created_at,
-    }))
+    const bookings: BookingExportData[] = (bookingsData || []).map((b) => {
+      // Handle provider as potentially being an array or single object (Supabase join shape)
+      const provider = Array.isArray(b.provider) ? b.provider[0] : b.provider
+      return {
+        id: b.id,
+        status: b.status,
+        scheduled_at: b.scheduled_at,
+        duration_minutes: b.duration_minutes,
+        provider_name: provider?.display_name || null,
+        created_at: b.created_at,
+      }
+    })
 
     // Collect audit log entries for this user
     const { data: auditData } = await supabase

@@ -1,4 +1,3 @@
-// @ts-nocheck - escrow_transactions and payment_intents tables not in generated types; Payment/EscrowTransaction types use camelCase vs DB snake_case
 /**
  * Payment Flow Service
  * Manages the complete payment lifecycle for marketplace orders
@@ -33,6 +32,10 @@ import {
   updateVelocityUsage 
 } from '@/lib/fraud/detection'
 import { formatCurrencyFromMinorUnits } from '@/lib/format'
+
+// Duplicated from stripe/escrow (not exported there) — amount limits in pence
+const MIN_TRANSACTION_AMOUNT = 100 // £1.00
+const MAX_TRANSACTION_AMOUNT = 100000000 // £1,000,000.00
 
 /**
  * Response type for initiatePayment
@@ -266,7 +269,7 @@ export async function initiatePayment(
       buyerId: order.buyer_id,
       sellerId: order.seller_id,
       listingId: order.listing_id,
-      orderType: order.order_type,
+      orderType: order.order_type as Order['orderType'], // DB includes 'trial' variant not yet in Order type
       status: order.status as OrderStatus,
       totalAmount: amount,
       platformFee,
@@ -277,8 +280,8 @@ export async function initiatePayment(
       businessFunctionId: order.business_function_id,
       vatAmount: Number(order.vat_amount),
       vatRate: Number(order.vat_rate),
-      taxTreatment: order.tax_treatment,
-      createdAt: order.created_at,
+      taxTreatment: (order.tax_treatment ?? 'standard') as Order['taxTreatment'], // DB column is nullable
+      createdAt: order.created_at ?? new Date().toISOString(),
       completedAt: order.completed_at,
     }
 
@@ -359,10 +362,10 @@ export async function confirmPayment(
       try {
         await sendNotification({
           userId: seller.user.id,
-          type: 'payment_received',
+          priority: 'medium',
           title: 'Payment Received',
-          message: `Payment of ${formatCurrencyFromMinorUnits(Number(order.total_amount), order.currency)} has been received and held in escrow for order ${order.order_number}.`,
-          link: `/provider-portal/orders/${order.id}`,
+          body: `Payment of ${formatCurrencyFromMinorUnits(Number(order.total_amount), order.currency ?? 'GBP')} has been received and held in escrow for order ${order.order_number}.`,
+          actionUrl: `/provider-portal/orders/${order.id}`,
           metadata: {
             orderId: order.id,
             orderNumber: order.order_number,
@@ -572,19 +575,19 @@ export async function getPaymentStatus(
       buyerId: order.buyer_id,
       sellerId: order.seller_id,
       listingId: order.listing_id,
-      orderType: order.order_type,
+      orderType: order.order_type as Order['orderType'], // DB includes 'trial' variant not yet in Order type
       status: order.status as OrderStatus,
       totalAmount: Number(order.total_amount),
       platformFee: Number(order.platform_fee),
-      currency: order.currency,
+      currency: order.currency ?? 'GBP', // DB column is nullable
       stripePaymentIntentId: order.stripe_payment_intent_id,
       escrowStatus: order.escrow_status as EscrowStatus,
       objectiveId: order.objective_id,
       businessFunctionId: order.business_function_id,
       vatAmount: Number(order.vat_amount),
       vatRate: Number(order.vat_rate),
-      taxTreatment: order.tax_treatment,
-      createdAt: order.created_at,
+      taxTreatment: (order.tax_treatment ?? 'standard') as Order['taxTreatment'], // DB column is nullable
+      createdAt: order.created_at ?? new Date().toISOString(), // DB column is nullable
       completedAt: order.completed_at,
     }
 
@@ -595,7 +598,7 @@ export async function getPaymentStatus(
       type: t.type as EscrowTransactionType,
       amount: Number(t.amount),
       stripeTransferId: t.stripe_transfer_id,
-      createdAt: t.created_at,
+      createdAt: t.created_at ?? new Date().toISOString(),
     }))
 
     const mappedMilestones: Milestone[] = milestones.map((m) => ({
@@ -608,7 +611,7 @@ export async function getPaymentStatus(
       status: m.status as MilestoneStatus,
       submittedAt: m.submitted_at,
       approvedAt: m.approved_at,
-      createdAt: m.created_at,
+      createdAt: m.created_at ?? new Date().toISOString(),
     }))
 
     return {
