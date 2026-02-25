@@ -3,7 +3,7 @@
  *
  * Tests: edit budget, edit funding opportunity, edit project + delete tx, mark invoice paid
  * Auth:  Uses saved storageState for elena.vasquez@perigee-labs.com (see auth-elena.setup.ts)
- *        Run `npx playwright test --project=auth-setup-elena` once to create elena.json
+ *        Run `npx tsx scripts/create-elena-auth.ts` once to create/refresh elena.json
  */
 
 import { test, expect } from '@playwright/test'
@@ -37,13 +37,10 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await card.hover()
     await page.waitForTimeout(300)
 
-    // Two action buttons with [class*="absolute"]: Pencil (right-8) + Trash (right-2)
+    // Pencil (right-8) + Trash (right-2) — absolutely positioned inside the card
     const editBtn = card.locator('button[class*="right-8"]')
-    const deleteBtn = card.locator('button[class*="right-2"]')
-    // Click the pencil
     await editBtn.click()
 
-    // Dialog should open pre-filled
     const dialog = page.locator('[role="dialog"]')
     await expect(dialog).toBeVisible({ timeout: 5000 })
     await expect(dialog.locator('h2')).toContainText('Edit Budget')
@@ -52,7 +49,6 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     const currentName = await nameInput.inputValue()
     expect(currentName.length).toBeGreaterThan(0)
 
-    // Change the amount by +500
     const amountInput = dialog.locator('input#edit-budget-amount')
     const currentAmount = await amountInput.inputValue()
     const newAmount = String(parseFloat(currentAmount) + 500)
@@ -75,26 +71,23 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     }).first()
     await expect(kanbanCard).toBeVisible({ timeout: 10000 })
 
-    // Capture card name before edit
     const cardName = await kanbanCard.locator('[class*="leading-tight"]').first().textContent()
 
     await kanbanCard.hover()
     await page.waitForTimeout(300)
 
-    // Pencil is first ghost button in the card header action cluster
+    // Pencil is first opacity-0 button in the card header action cluster
     const pencilBtn = kanbanCard.locator('button[class*="opacity-0"]').first()
-    await pencilBtn.click({ force: true }) // force because it's opacity-0 normally
+    await pencilBtn.click({ force: true })
 
     const dialog = page.locator('[role="dialog"]')
     await expect(dialog).toBeVisible({ timeout: 5000 })
     await expect(dialog.locator('h2')).toContainText('Edit Funding Opportunity')
 
-    // Name should be pre-filled with card name
     const nameInput = dialog.locator('input#edit-funding-name')
     const prefilledName = await nameInput.inputValue()
     expect(prefilledName).toBe(cardName?.trim())
 
-    // Update notes
     const notesField = dialog.locator('textarea#edit-funding-notes')
     await notesField.fill('Updated via Phase 2 CRUD test')
 
@@ -113,7 +106,6 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await projectLink.click()
     await page.waitForLoadState('networkidle')
 
-    // Pencil is in the header next to project name
     const pencilBtn = page.locator('h1').locator('..').locator('button').first()
     await expect(pencilBtn).toBeVisible({ timeout: 5000 })
     await pencilBtn.click()
@@ -126,19 +118,16 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     const currentName = await nameInput.inputValue()
     expect(currentName.length).toBeGreaterThan(0)
 
-    // Read current status so we can cycle it
     const statusTrigger = dialog.locator('[role="combobox"]')
     const currentStatus = await statusTrigger.textContent()
     await statusTrigger.click()
 
-    // Toggle between active↔completed
     const targetStatus = currentStatus?.toLowerCase().includes('completed') ? 'Active' : 'Completed'
     await page.locator('[role="option"]').filter({ hasText: targetStatus }).click()
 
     await dialog.locator('button').filter({ hasText: 'Save Changes' }).click()
     await expect(dialog).not.toBeVisible({ timeout: 8000 })
 
-    // Header area (parent of h1) should contain the new status text
     const headerArea = page.locator('h1').locator('..')
     await expect(headerArea).toContainText(new RegExp(targetStatus, 'i'), { timeout: 5000 })
 
@@ -146,106 +135,89 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
   })
 
   test('4. Delete Transaction — Trash only on manual rows, two-click confirm, count decreases', async ({ page }) => {
-    await page.goto(`${BASE}/finance/projects`)
-    await page.waitForLoadState('networkidle')
+    // Loop through projects to find one with a deletable manual transaction.
+    // project-detail-view.tsx marks rows with data-testid="tx-row" and delete buttons
+    // with data-testid="tx-delete-btn" (only rendered for manual transactions).
+    let foundDeletable = false
 
-    const projectLink = page.locator('a[href*="/finance/projects/"]').first()
-    await projectLink.click()
-    await page.waitForLoadState('networkidle')
+    for (let p = 0; p < 15; p++) {
+      await page.goto(`${BASE}/finance/projects`)
+      await page.waitForLoadState('networkidle')
 
-    // Transaction rows (grid-cols-6 data rows, not the header)
-    const txRows = page.locator('[class*="grid-cols-6"]').filter({ hasNot: page.locator('text=Description') })
-    const rowCount = await txRows.count()
+      const projectLinks = page.locator('a[href*="/finance/projects/"]')
+      const linkCount = await projectLinks.count()
+      if (p >= linkCount) break
 
-    if (rowCount === 0) {
-      console.log('⚠️  No transactions found — skipping delete test')
-      return
+      await projectLinks.nth(p).click()
+      await page.waitForLoadState('networkidle')
+
+      const txRows = page.locator('[data-testid="tx-row"]')
+      const rowCount = await txRows.count()
+      if (rowCount === 0) continue
+
+      const manualRows = txRows.filter({ has: page.locator('[data-testid="tx-delete-btn"]') })
+      if ((await manualRows.count()) === 0) continue
+
+      const targetRow = manualRows.first()
+      await targetRow.hover()
+      await page.waitForTimeout(400)
+
+      const trashBtn = targetRow.locator('[data-testid="tx-delete-btn"]')
+
+      await trashBtn.click({ force: true })
+      await expect(targetRow.locator('text=Delete?')).toBeVisible({ timeout: 3000 })
+
+      await trashBtn.click({ force: true })
+      await page.waitForTimeout(800)
+
+      const newRowCount = await txRows.count()
+      expect(newRowCount).toBe(rowCount - 1)
+
+      foundDeletable = true
+      console.log(`✅ Transaction deleted — rows: ${rowCount} → ${newRowCount}`)
+      break
     }
 
-    // Find a manual row (has a Trash button — linked expenses don't)
-    let targetRow = txRows.first()
-    let trashBtn = targetRow.locator('button').last()
-
-    for (let i = 0; i < rowCount; i++) {
-      const row = txRows.nth(i)
-      await row.hover()
-      await page.waitForTimeout(200)
-      const btn = row.locator('button').last()
-      if (await btn.isVisible()) {
-        targetRow = row
-        trashBtn = btn
-        break
-      }
-      if (i === rowCount - 1) {
-        console.log('⚠️  No deletable transactions found (all linked expenses) — skipping')
-        return
-      }
+    if (!foundDeletable) {
+      console.log('⚠️  No deletable transactions found across projects — skipping')
     }
-
-    // First click → shows "Delete?" confirmation
-    await trashBtn.click()
-    await expect(targetRow.locator('text=Delete?')).toBeVisible({ timeout: 3000 })
-
-    // Second click → confirms
-    await trashBtn.click()
-    await page.waitForTimeout(800)
-
-    const newRowCount = await txRows.count()
-    expect(newRowCount).toBe(rowCount - 1)
-
-    console.log(`✅ Transaction deleted — rows: ${rowCount} → ${newRowCount}`)
   })
 
   test('5. Mark Invoice Paid (detail page) — button for sent/overdue, click updates badge', async ({ page }) => {
     await page.goto(`${BASE}/finance/invoices`)
     await page.waitForLoadState('networkidle')
 
-    // Switch to Invoices tab
     await page.locator('button').filter({ hasText: /^Invoices/ }).click()
     await page.waitForTimeout(300)
 
-    // Invoice detail links are /finance/invoices/{uuid} — exclude /new
-    const invoiceLinks = page.locator('a[href*="/finance/invoices/"]:not([href$="new"])')
-    const linkCount = await invoiceLinks.count()
+    // Find a payable invoice row in the list via "Paid" button DOM presence,
+    // then navigate to its detail page to test the "Mark as Paid" button there.
+    const payableRow = page.locator('div.group')
+      .filter({ has: page.locator('a[href*="/finance/invoices/"]') })
+      .filter({ has: page.locator('button', { hasText: 'Paid' }) })
+      .first()
 
-    if (linkCount === 0) {
-      console.log('⚠️  No invoices found — skipping')
+    if ((await payableRow.count()) === 0) {
+      console.log('⚠️  No sent/overdue invoices found — skipping')
       return
     }
 
-    let foundPayable = false
-    for (let i = 0; i < Math.min(linkCount, 8); i++) {
-      await page.goto(`${BASE}/finance/invoices`)
-      await page.waitForLoadState('networkidle')
-      await page.locator('button').filter({ hasText: /^Invoices/ }).click()
-      await page.waitForTimeout(300)
+    const invoiceLink = payableRow.locator('a[href*="/finance/invoices/"]').first()
+    const href = await invoiceLink.getAttribute('href')
+    const invoiceUrl = href?.startsWith('http') ? href : `${BASE}${href}`
 
-      await page.locator('a[href*="/finance/invoices/"]:not([href$="new"])').nth(i).click()
-      await page.waitForLoadState('networkidle')
+    await page.goto(invoiceUrl!)
+    await page.waitForLoadState('networkidle')
 
-      // Status is shown as text sibling to the invoice number h1
-      const headerText = await page.locator('h1').locator('..').textContent({ timeout: 5000 })
-      const status = headerText?.match(/\b(draft|sent|paid|overdue|cancelled)\b/i)?.[0]
+    const markPaidBtn = page.locator('button').filter({ hasText: 'Mark as Paid' })
+    await expect(markPaidBtn).toBeVisible({ timeout: 5000 })
+    await markPaidBtn.click()
+    await page.waitForTimeout(1000)
 
-      if (status?.match(/sent|overdue/i)) {
-        foundPayable = true
-        const markPaidBtn = page.locator('button').filter({ hasText: 'Mark as Paid' })
-        await expect(markPaidBtn).toBeVisible({ timeout: 5000 })
-        await markPaidBtn.click()
-        await page.waitForTimeout(1000)
+    await expect(page.locator('h1').locator('..')).toContainText(/paid/i, { timeout: 8000 })
+    await expect(markPaidBtn).not.toBeVisible()
 
-        // Header area should now contain "paid"
-        await expect(page.locator('h1').locator('..')).toContainText(/paid/i, { timeout: 8000 })
-        await expect(markPaidBtn).not.toBeVisible()
-
-        console.log(`✅ Invoice (${status}) marked as paid`)
-        break
-      }
-    }
-
-    if (!foundPayable) {
-      console.log('⚠️  No sent/overdue invoices found — skipping')
-    }
+    console.log(`✅ Invoice marked as paid`)
   })
 
   test('6. Mark Invoice Paid (list page) — hover button appears, badge updates inline', async ({ page }) => {
@@ -255,28 +227,28 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await page.locator('button').filter({ hasText: /^Invoices/ }).click()
     await page.waitForTimeout(300)
 
-    // Rows contain the status as text — find a row with "sent" or "overdue" in its text
-    const sentRow = page.locator('div.group').filter({
-      hasText: /\bsent\b|\boverdue\b/i,
-    }).first()
+    // "Paid" button is conditionally rendered only for sent/overdue invoices —
+    // filter by its DOM presence to avoid text-content regex issues.
+    const sentRow = page.locator('div.group')
+      .filter({ has: page.locator('a[href*="/finance/invoices/"]') })
+      .filter({ has: page.locator('button', { hasText: 'Paid' }) })
+      .first()
 
-    if (await sentRow.count() === 0) {
+    if ((await sentRow.count()) === 0) {
       console.log('⚠️  No sent/overdue invoices in list — skipping hover test')
       return
     }
 
     const invoiceNumber = await sentRow.locator('p.font-medium').first().textContent()
 
-    // Hover to reveal Mark Paid button
     await sentRow.hover()
     await page.waitForTimeout(300)
 
-    const paidBtn = sentRow.locator('button').filter({ hasText: /paid/i })
+    const paidBtn = sentRow.locator('button').filter({ hasText: 'Paid' })
     await expect(paidBtn).toBeVisible({ timeout: 3000 })
     await paidBtn.click()
     await page.waitForTimeout(1000)
 
-    // Row text should now contain "paid" (badge updated in-place)
     await expect(sentRow).toContainText(/paid/i, { timeout: 5000 })
 
     console.log(`✅ Invoice ${invoiceNumber} marked paid from list`)
