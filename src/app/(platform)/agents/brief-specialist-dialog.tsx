@@ -33,8 +33,6 @@ import {
     Scale,
     Maximize2,
     Minimize2,
-    ThumbsUp,
-    ThumbsDown,
 } from "lucide-react"
 import { validateFile, formatFileSize, isImageFile } from "@/lib/file-upload"
 import { cn } from "@/lib/utils"
@@ -60,8 +58,9 @@ import {
     parseStructuredOutputs,
     stripStructuredOutputBlocks,
 } from "@/lib/agents/message-parsers"
-import type { ProposedActionType, ProposedAction } from "@/lib/agents/message-parsers"
+import type { ProposedActionType, ProposedAction, ChatMessage } from "@/lib/agents/message-parsers"
 export type { ProposedActionType, ProposedAction } from "@/lib/agents/message-parsers"
+import { ChatMessageList } from "@/components/specialists/chat-message-list"
 import { toast } from "sonner"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread, getRecentSpecialistOutputs, getSpecialistThreadHistory, getSpecialistRelationshipSummary } from "@/actions/agent-memory"
@@ -93,10 +92,7 @@ import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
 import type { SlideDeckContent } from "@/lib/ai-providers/types"
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
-import { InlinePresentationCard } from "@/components/specialists/inline-presentation-card"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
-import { ChartRenderer } from "@/components/specialists/chart-renderer"
-import { StructuredOutputRenderer } from "@/components/specialists/structured-output-renderer"
 import type { ChartSpec } from "@/lib/agents/tools/chart-spec"
 import type { StructuredOutputSpec } from "@/lib/agents/tools/structured-output-spec"
 import { ExternalActionCard } from "@/components/specialists/external-action-card"
@@ -204,31 +200,8 @@ interface PendingAttachment {
     mimeType: string
 }
 
-interface ChatMessage {
-    role: "user" | "assistant"
-    content: string
-    timestamp: Date
-    /** Marks messages loaded from previous sessions (shown dimmer with separator) */
-    historical?: boolean
-    /** Parsed from PROPOSED_ACTIONS in assistant messages; shown as inline approval cards. */
-    proposals?: ProposedAction[]
-    /** Rollout id from execute response; used to attach rewards when tasks from this message are completed. */
-    rolloutId?: string | null
-    /** Parsed slide deck for presentation messages; rendered as InlinePresentationCard. */
-    slideDeck?: SlideDeckContent | null
-    /** Parsed from PROPOSED_PLAN in assistant messages; rendered as ExecutionPlanCard. */
-    executionPlan?: ExecutionPlan | null
-    /** Marks messages that are proactive openers from background sweeps — specialist-initiated. */
-    isProactive?: boolean
-    /** Parsed from CHART blocks in assistant messages; rendered as inline Recharts visualizations. */
-    charts?: ChartSpec[]
-    /** Parsed from PROPOSED_EXTERNAL_ACTION blocks; rendered as ExternalActionCards for founder approval. */
-    externalActions?: ProposedExternalAction[]
-    /** Parsed from PROPOSED_PAGE_ACTION blocks; rendered as PageActionCards for founder approval. */
-    pageActions?: ProposedPageAction[]
-    /** Parsed from STRUCTURED_OUTPUT blocks; rendered as rich visual components. */
-    structuredOutputs?: StructuredOutputSpec[]
-}
+// AUDIT: ChatMessage interface moved to src/lib/agents/message-parsers.ts (2026-02-25, refactor step 2 of 5).
+// Imported above via: import type { ChatMessage } from "@/lib/agents/message-parsers"
 
 // ─── PROPOSED_PLAN component imports ──────────────────────────────────────────
 
@@ -2303,146 +2276,15 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 )}
-                                {messages.map((msg, i) => {
-                                    const isLastAssistant = msg.role === "assistant" && !msg.historical && i === messages.length - 1
-                                    const isFirstHistorical = msg.historical && i === 0
-                                    const isTransitionToNew = !msg.historical && i > 0 && messages[i - 1]?.historical
-                                    return (
-                                    <div key={i}>
-                                        {isFirstHistorical && (
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <div className="flex-1 border-t border-muted" />
-                                                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                                                    Previous conversation
-                                                </span>
-                                                <div className="flex-1 border-t border-muted" />
-                                            </div>
-                                        )}
-                                        {isTransitionToNew && (
-                                            <div className="flex items-center gap-2 my-4">
-                                                <div className="flex-1 border-t border-international-orange/30" />
-                                                <span className="text-[10px] font-mono uppercase tracking-widest text-international-orange/70">
-                                                    Now
-                                                </span>
-                                                <div className="flex-1 border-t border-international-orange/30" />
-                                            </div>
-                                        )}
-                                        <div className={cn(
-                                            "flex gap-2.5",
-                                            msg.role === "user" ? "justify-end" : "justify-start",
-                                            msg.historical && "opacity-60"
-                                        )}>
-                                            {msg.role === "assistant" && (
-                                                <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-1">
-                                                    <SpecialistChatAvatar
-                                                        specialist={specialist}
-                                                        state={isLastAssistant && (tts.isPlaying || tts.isLoading) ? "speaking" : "idle"}
-                                                    />
-                                                </div>
-                                            )}
-                                            <div className={cn(
-                                                "max-w-[90%] rounded-lg px-3 py-2.5",
-                                                msg.role === "user"
-                                                    ? "bg-international-orange/10 text-foreground"
-                                                    : msg.isProactive
-                                                        ? "bg-international-orange/5 border border-international-orange/20"
-                                                        : "bg-muted/50 border border-muted"
-                                            )}>
-                                                {/* Proactive initiative badge */}
-                                                {msg.isProactive && (
-                                                    <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-medium uppercase tracking-wider text-international-orange/70">
-                                                        <Sparkles className="h-3 w-3" />
-                                                        <span>{specialist.name} reached out</span>
-                                                    </div>
-                                                )}
-                                                {msg.role === "user" ? (
-                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                                                ) : msg.slideDeck ? (
-                                                    <>
-                                                        <InlinePresentationCard deck={msg.slideDeck} />
-                                                        {!msg.historical && (
-                                                            <div className="mt-2 flex items-center justify-end gap-1">
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'positive')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'positive'
-                                                                            ? 'text-success bg-success/10'
-                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
-                                                                    )}
-                                                                    title="Helpful"
-                                                                >
-                                                                    <ThumbsUp className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'negative')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'negative'
-                                                                            ? 'text-destructive bg-destructive/10'
-                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
-                                                                    )}
-                                                                    title="Not helpful"
-                                                                >
-                                                                    <ThumbsDown className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Markdown content={msg.content} className="text-sm" />
-                                                        {msg.charts && msg.charts.length > 0 && (
-                                                            <div className="mt-3 space-y-3">
-                                                                {msg.charts.map((chart, ci) => (
-                                                                    <ChartRenderer key={`chart-${ci}`} spec={chart} />
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {msg.structuredOutputs && msg.structuredOutputs.length > 0 && (
-                                                            <div className="mt-3 space-y-3">
-                                                                {msg.structuredOutputs.map((so, si) => (
-                                                                    <StructuredOutputRenderer key={`so-${si}`} spec={so} />
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {!msg.historical && (
-                                                            <div className="mt-2 flex items-center justify-end gap-1">
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'positive')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'positive'
-                                                                            ? 'text-success bg-success/10'
-                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
-                                                                    )}
-                                                                    title="Helpful"
-                                                                >
-                                                                    <ThumbsUp className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'negative')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'negative'
-                                                                            ? 'text-destructive bg-destructive/10'
-                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
-                                                                    )}
-                                                                    title="Not helpful"
-                                                                >
-                                                                    <ThumbsDown className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    )
-                                })}
+                                {/* AUDIT: message loop extracted to ChatMessageList (2026-02-25, refactor step 2 of 5) */}
+                                <ChatMessageList
+                                    messages={messages}
+                                    specialist={specialist}
+                                    messageFeedback={messageFeedback}
+                                    onFeedback={handleFeedback}
+                                    tts={tts}
+                                    compact
+                                />
 
                                 {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (
@@ -3328,148 +3170,14 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         )}
                                     </div>
                                 )}
-                                {messages.map((msg, i) => {
-                                    const isLastAssistant = msg.role === "assistant" && !msg.historical && i === messages.length - 1
-                                    const isFirstHistorical = msg.historical && i === 0
-                                    const isTransitionToNew = !msg.historical && i > 0 && messages[i - 1]?.historical
-                                    return (
-                                    <div key={i}>
-                                        {/* "Previous conversation" separator */}
-                                        {isFirstHistorical && (
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <div className="flex-1 border-t border-muted" />
-                                                <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                                                    Previous conversation
-                                                </span>
-                                                <div className="flex-1 border-t border-muted" />
-                                            </div>
-                                        )}
-                                        {/* "Now" separator between historical and new messages */}
-                                        {isTransitionToNew && (
-                                            <div className="flex items-center gap-2 my-4">
-                                                <div className="flex-1 border-t border-international-orange/30" />
-                                                <span className="text-[10px] font-mono uppercase tracking-widest text-international-orange/70">
-                                                    Now
-                                                </span>
-                                                <div className="flex-1 border-t border-international-orange/30" />
-                                            </div>
-                                        )}
-                                        <div className={cn(
-                                            "flex gap-3",
-                                            msg.role === "user" ? "justify-end" : "justify-start",
-                                            msg.historical && "opacity-60"
-                                        )}>
-                                            {msg.role === "assistant" && (
-                                                <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-1">
-                                                    <SpecialistChatAvatar
-                                                        specialist={specialist}
-                                                        state={isLastAssistant && (tts.isPlaying || tts.isLoading) ? "speaking" : "idle"}
-                                                    />
-                                                </div>
-                                            )}
-                                            <div className={cn(
-                                                "max-w-[85%] rounded-lg px-4 py-3",
-                                                msg.role === "user"
-                                                    ? "bg-international-orange/10 text-foreground"
-                                                    : msg.isProactive
-                                                        ? "bg-international-orange/5 border border-international-orange/20"
-                                                        : "bg-muted/50 border border-muted"
-                                            )}>
-                                                {/* Proactive initiative badge */}
-                                                {msg.isProactive && (
-                                                    <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-medium uppercase tracking-wider text-international-orange/70">
-                                                        <Sparkles className="h-3 w-3" />
-                                                        <span>{specialist.name} reached out</span>
-                                                    </div>
-                                                )}
-                                                {msg.role === "user" ? (
-                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                                                ) : msg.slideDeck ? (
-                                                    <>
-                                                        <InlinePresentationCard deck={msg.slideDeck} />
-                                                        {!msg.historical && (
-                                                            <div className="mt-2 flex items-center justify-end gap-1">
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'positive')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'positive'
-                                                                            ? 'text-success bg-success/10'
-                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
-                                                                    )}
-                                                                    title="Helpful"
-                                                                >
-                                                                    <ThumbsUp className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'negative')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'negative'
-                                                                            ? 'text-destructive bg-destructive/10'
-                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
-                                                                    )}
-                                                                    title="Not helpful"
-                                                                >
-                                                                    <ThumbsDown className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Markdown content={msg.content} className="text-sm" />
-                                                        {msg.charts && msg.charts.length > 0 && (
-                                                            <div className="mt-3 space-y-3">
-                                                                {msg.charts.map((chart, ci) => (
-                                                                    <ChartRenderer key={`chart-${ci}`} spec={chart} />
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {msg.structuredOutputs && msg.structuredOutputs.length > 0 && (
-                                                            <div className="mt-3 space-y-3">
-                                                                {msg.structuredOutputs.map((so, si) => (
-                                                                    <StructuredOutputRenderer key={`so-${si}`} spec={so} />
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        {!msg.historical && (
-                                                            <div className="mt-2 flex items-center justify-end gap-1">
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'positive')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'positive'
-                                                                            ? 'text-success bg-success/10'
-                                                                            : 'text-muted-foreground/40 hover:text-success hover:bg-success/10'
-                                                                    )}
-                                                                    title="Helpful"
-                                                                >
-                                                                    <ThumbsUp className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => handleFeedback(i, 'negative')}
-                                                                    className={cn(
-                                                                        'p-1 rounded-md transition-colors',
-                                                                        messageFeedback[i] === 'negative'
-                                                                            ? 'text-destructive bg-destructive/10'
-                                                                            : 'text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10'
-                                                                    )}
-                                                                    title="Not helpful"
-                                                                >
-                                                                    <ThumbsDown className="h-3.5 w-3.5" />
-                                                                </button>
-                                                                <MessageExportMenu content={msg.content} specialistName={specialist.name} />
-                                                            </div>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    )
-                                })}
+                                {/* AUDIT: message loop extracted to ChatMessageList (2026-02-25, refactor step 2 of 5) */}
+                                <ChatMessageList
+                                    messages={messages}
+                                    specialist={specialist}
+                                    messageFeedback={messageFeedback}
+                                    onFeedback={handleFeedback}
+                                    tts={tts}
+                                />
 
                                 {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (

@@ -32,6 +32,7 @@ import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard
 import { validatePageAction } from "@/lib/agents/tools/page-action-types"
 import type { ProposedPageAction } from "@/lib/agents/tools/page-action-types"
 import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SlideDeckContent } from "@/lib/ai-providers/types"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,33 @@ interface ProposedEdit {
     artifactId: string
     title: string
     changeSummary: string
+}
+
+/** A message in the specialist chat. Shared type used by dialog, panel, and ChatMessageList. */
+export interface ChatMessage {
+    role: "user" | "assistant"
+    content: string
+    timestamp: Date
+    /** Marks messages loaded from previous sessions (shown dimmer with separator) */
+    historical?: boolean
+    /** Parsed from PROPOSED_ACTIONS in assistant messages; shown as inline approval cards. */
+    proposals?: ProposedAction[]
+    /** Rollout id from execute response; used to attach rewards when tasks from this message are completed. */
+    rolloutId?: string | null
+    /** Parsed slide deck for presentation messages; rendered as InlinePresentationCard. */
+    slideDeck?: SlideDeckContent | null
+    /** Parsed from PROPOSED_PLAN in assistant messages; rendered as ExecutionPlanCard. */
+    executionPlan?: ExecutionPlan | null
+    /** Marks messages that are proactive openers from background sweeps — specialist-initiated. */
+    isProactive?: boolean
+    /** Parsed from CHART blocks in assistant messages; rendered as inline Recharts visualizations. */
+    charts?: ChartSpec[]
+    /** Parsed from PROPOSED_EXTERNAL_ACTION blocks; rendered as ExternalActionCards for founder approval. */
+    externalActions?: ProposedExternalAction[]
+    /** Parsed from PROPOSED_PAGE_ACTION blocks; rendered as PageActionCards for founder approval. */
+    pageActions?: ProposedPageAction[]
+    /** Parsed from STRUCTURED_OUTPUT blocks; rendered as rich visual components. */
+    structuredOutputs?: StructuredOutputSpec[]
 }
 
 // ─── Utility ────────────────────────────────────────────────────────────────
