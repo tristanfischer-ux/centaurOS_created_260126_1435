@@ -413,7 +413,7 @@ export async function createTask(formData: FormData) {
       revalidatePath('/new-tasks')
       return { success: true, taskId: data.id }
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
+      const message = sanitizeErrorMessage(error)
       console.error('[CreateTask] Unhandled error in createTask:', {
         error: message,
         stack: error instanceof Error ? error.stack : undefined,
@@ -2262,7 +2262,7 @@ export async function archiveTask(taskId: string): Promise<{ success: true } | {
 
         if (archiveError) {
             console.error('[TaskService] Archive error:', { taskId, error: archiveError.message })
-            return { error: archiveError.message }
+            return { error: sanitizeErrorMessage(archiveError) }
         }
 
         // AUDIT: Log the archive

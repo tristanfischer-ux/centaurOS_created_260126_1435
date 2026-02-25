@@ -149,7 +149,7 @@ function ListRow({
                     'min-w-[44px] min-h-[44px] w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0',
                     isSelectedForCompare
                         ? 'bg-international-orange text-white shadow-md'
-                        : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'
+                        : 'bg-muted text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100'
                 )}
                 aria-label={isSelectedForCompare ? 'Remove from comparison' : 'Add to comparison'}
             >
@@ -235,7 +235,7 @@ function ListRow({
                         'min-w-[44px] min-h-[44px] w-8 h-8 rounded-full flex items-center justify-center transition-all',
                         isSaved
                             ? 'bg-destructive text-destructive-foreground'
-                            : 'bg-muted text-muted-foreground opacity-0 group-hover:opacity-100'
+                            : 'bg-muted text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100'
                     )}
                     aria-label={isSaved ? 'Remove from saved' : 'Save for later'}
                 >

@@ -256,7 +256,7 @@ export async function getTasksNeedingEscalation(timeoutHours: number = 24): Prom
 
         if (error) {
             console.error('Error fetching tasks needing escalation:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         const result = (data || [])
