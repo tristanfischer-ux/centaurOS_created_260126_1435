@@ -319,11 +319,13 @@ export function InvestorBrowser({
 
           {/* Load more */}
           {hasMore && (
-            <div className="flex justify-center pt-4">
+            <div className="flex flex-col items-center gap-2 pt-6">
               <Button
                 variant="secondary"
+                size="lg"
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
+                className="min-w-[200px]"
               >
                 {isLoadingMore ? (
                   <>
@@ -331,9 +333,12 @@ export function InvestorBrowser({
                     Loading…
                   </>
                 ) : (
-                  'Load more'
+                  `Load more (${total - firms.length} remaining)`
                 )}
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Showing {firms.length} of {total}
+              </p>
             </div>
           )}
         </>

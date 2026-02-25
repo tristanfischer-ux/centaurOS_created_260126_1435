@@ -214,6 +214,65 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
 
+          {/* Key People — placed early so contacts are visible without scrolling */}
+          {contacts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  Key People
+                </h2>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {contacts.map((contact: InvestorContact) => (
+                    <div key={contact.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted shrink-0">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-foreground">{contact.full_name}</p>
+                          {contact.is_decision_maker && (
+                            <Badge variant="outline" className="text-xs">Decision Maker</Badge>
+                          )}
+                        </div>
+                        {contact.title && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{contact.title}</p>
+                        )}
+                        {contact.seniority && (
+                          <p className="text-xs text-muted-foreground">{formatSeniority(contact.seniority)}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          {contact.linkedin_url && (
+                            <a
+                              href={contact.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
+                            >
+                              <Linkedin className="h-3 w-3" />
+                              LinkedIn
+                            </a>
+                          )}
+                          {contact.email && (
+                            <a
+                              href={`mailto:${contact.email}`}
+                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
+                            >
+                              <Mail className="h-3 w-3" />
+                              Email
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Investment thesis */}
           {attrs.investment_thesis && (
             <Card>
@@ -279,64 +338,6 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             </Card>
           )}
 
-          {/* Key People */}
-          {contacts.length > 0 && (
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  Key People
-                </h2>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {contacts.map((contact: InvestorContact) => (
-                    <div key={contact.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
-                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted shrink-0">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-foreground">{contact.full_name}</p>
-                          {contact.is_decision_maker && (
-                            <Badge variant="outline" className="text-xs">Decision Maker</Badge>
-                          )}
-                        </div>
-                        {contact.title && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{contact.title}</p>
-                        )}
-                        {contact.seniority && (
-                          <p className="text-xs text-muted-foreground">{formatSeniority(contact.seniority)}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-1.5">
-                          {contact.linkedin_url && (
-                            <a
-                              href={contact.linkedin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
-                            >
-                              <Linkedin className="h-3 w-3" />
-                              LinkedIn
-                            </a>
-                          )}
-                          {contact.email && (
-                            <a
-                              href={`mailto:${contact.email}`}
-                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
-                            >
-                              <Mail className="h-3 w-3" />
-                              Email
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
 
         {/* Sidebar — 1/3 width */}
@@ -401,10 +402,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     </p>
                   </div>
                 )}
-                {attrs.outreach_status && (
+                {attrs.outreach_status && attrs.outreach_status !== 'not_started' && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Status</p>
-                    <p className="text-sm text-foreground">{attrs.outreach_status}</p>
+                    <p className="text-sm text-foreground">{attrs.outreach_status.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}</p>
                   </div>
                 )}
               </CardContent>

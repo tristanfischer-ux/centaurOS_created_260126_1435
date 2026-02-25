@@ -59,6 +59,11 @@ const PRIORITY_DESCRIPTIONS: Record<string, string> = {
   C: 'Lower priority — secondary-tier or niche focus',
 }
 
+/** Formats a snake_case outreach status to Title Case. */
+function formatStatus(raw: string): string {
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -116,7 +121,10 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           {/* Active deploying indicator */}
           <div className="shrink-0 mt-0.5">
             {attrs.is_active_deploying ? (
-              <CheckCircle2 className="h-4 w-4 text-success" aria-label="Actively deploying capital" />
+              <span className="flex items-center gap-1 text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Active</span>
+              </span>
             ) : (
               <Circle className="h-4 w-4 text-muted-foreground" aria-label="Not currently deploying" />
             )}
@@ -179,10 +187,10 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           </div>
         )}
 
-        {/* Outreach status */}
-        {attrs.outreach_status && (
+        {/* Outreach status — hide the default "not_started" */}
+        {attrs.outreach_status && attrs.outreach_status !== 'not_started' && (
           <p className="text-xs text-muted-foreground">
-            Status: <span className="text-foreground font-medium">{attrs.outreach_status}</span>
+            Status: <span className="text-foreground font-medium">{formatStatus(attrs.outreach_status)}</span>
           </p>
         )}
       </CardContent>
