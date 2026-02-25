@@ -137,7 +137,7 @@ export const SUPPLIER_CATEGORY_MAP: Record<string, string[]> = {
   "CNC Machining|Copper/Brass": ["CNC Machine Shop", "Specialty Metals"],
   "FDM 3D Print|PLA/PETG": ["3D Print Service Bureau", "Rapid Prototyping"],
   "FDM 3D Print|ABS/Nylon": ["3D Print Service Bureau", "Rapid Prototyping"],
-  "SLA/Resin Print|PLA/PETG": ["SLA Print Service", "Rapid Prototyping"],
+  "SLA/Resin Print|ABS/Nylon": ["SLA Print Service", "Rapid Prototyping"],
   "SLA/Resin Print|Silicone/Rubber": ["SLA Print Service", "Specialty Prototyping"],
   "SLS/Powder Print|ABS/Nylon": ["SLS Print Service", "Industrial Prototyping"],
   "Sheet Metal|Steel/Iron": ["Sheet Metal Fabricator", "Metal Stamping"],
@@ -151,6 +151,23 @@ export const SUPPLIER_CATEGORY_MAP: Record<string, string[]> = {
   "Casting|Copper/Brass": ["Investment Casting", "Brass Foundry"],
   "Manual/Assembly|PCB/Electronic": ["PCB Assembly (PCBA)", "Electronics Manufacturer"],
   "Manual/Assembly|Other": ["Contract Assembler", "Light Manufacturing"],
+  // Additional valid combos
+  "Sheet Metal|Copper/Brass": ["Sheet Metal Fabricator", "Specialty Metals"],
+  "Casting|Zinc": ["Die Casting", "Zinc Specialist"],
+  "Casting|Stainless Steel": ["Investment Casting", "Precision Casting"],
+  "Casting|Titanium": ["Investment Casting", "Aerospace Foundry"],
+  "FDM 3D Print|Carbon Fiber Composite": ["3D Print Service Bureau", "Advanced Materials Prototyping"],
+  "FDM 3D Print|CFRP/GFRP": ["3D Print Service Bureau", "Advanced Materials Prototyping"],
+  "CNC Machining|Carbon Fiber Composite": ["CNC Machine Shop", "Composites Specialist"],
+  "CNC Machining|CFRP/GFRP": ["CNC Machine Shop", "Composites Specialist"],
+  "CNC Machining|Wood/Plywood": ["CNC Machine Shop", "Woodworking CNC"],
+  "SLS/Powder Print|Aluminium": ["Metal SLS Service", "Industrial Prototyping"],
+  "SLS/Powder Print|Steel/Iron": ["Metal SLS Service", "Industrial Prototyping"],
+  "SLS/Powder Print|Titanium": ["Metal SLS Service", "Aerospace Prototyping"],
+  "Injection Molding|Glass/Ceramic": ["Injection Molder", "Technical Ceramics"],
+  "Sheet Metal|Titanium": ["Sheet Metal Fabricator", "Aerospace Sheet Metal"],
+  "Manual/Assembly|Silicone/Rubber": ["Rubber Specialist", "Elastomer Assembler"],
+  "Manual/Assembly|Wood/Plywood": ["Carpentry Workshop", "Light Manufacturing"],
 }
 
 /**

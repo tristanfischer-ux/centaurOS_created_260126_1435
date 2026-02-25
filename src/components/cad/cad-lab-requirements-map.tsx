@@ -103,7 +103,7 @@ function deriveRows(
 }
 
 function truncate(str: string, max: number): string {
-  return str.length > max ? str.slice(0, max).trimEnd() + "\..." : str
+  return str.length > max ? str.slice(0, max).trimEnd() + "..." : str
 }
 
 function readinessStyle(r: "ready" | "partial" | "missing") {
@@ -129,7 +129,7 @@ export function CadLabRequirementsMap({
   modules,
   diagnosticAnswers,
 }: CadLabRequirementsMapProps): React.ReactNode {
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   const rows = useMemo(
     () => deriveRows(modules, diagnosticAnswers),
@@ -147,7 +147,7 @@ export function CadLabRequirementsMap({
         if (!s) return ""
         // Escape double quotes and wrap in quotes if contains comma or quote
         const escaped = s.replace(/"/g, '""')
-        return escaped.includes(",") || escaped.includes('"')
+        return escaped.includes(",") || escaped.includes('"') || escaped.includes("\n") || escaped.includes("\r")
           ? `"${escaped}"`
           : escaped
       }
@@ -162,7 +162,7 @@ export function CadLabRequirementsMap({
       ].join(",")
     })
 
-    const csv = [header, ...csvRows].join("\n")
+    const csv = "\uFEFF" + [header, ...csvRows].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -171,8 +171,13 @@ export function CadLabRequirementsMap({
     a.click()
     URL.revokeObjectURL(url)
 
-    trackFeatureUse("cad_lab_requirements_csv_downloaded", {})
-  }, [rows])
+    trackFeatureUse("cad_lab_requirements_csv_downloaded", {
+      moduleCount: rows.length,
+      readyCount,
+      partialCount,
+      missingCount,
+    })
+  }, [rows, readyCount, partialCount, missingCount])
 
   // ── Empty state ──
   if (modules.length === 0) {
@@ -181,7 +186,7 @@ export function CadLabRequirementsMap({
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Requirements &amp; Supplier Mapping
+            Requirements & Supplier Mapping
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -203,7 +208,7 @@ export function CadLabRequirementsMap({
         <div className="flex items-center justify-between">
           <CardTitle className="text-base flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Requirements &amp; Supplier Mapping
+            Requirements & Supplier Mapping
             <span className="text-xs font-normal text-muted-foreground">
               {modules.length} module{modules.length !== 1 ? "s" : ""} mapped
             </span>
@@ -217,10 +222,12 @@ export function CadLabRequirementsMap({
       <CardContent className="space-y-4">
         {/* Summary readiness pills */}
         <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-success-light text-status-success font-medium">
-            <CheckCircle2 className="h-3 w-3" />
-            {readyCount} ready
-          </div>
+          {readyCount > 0 && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-success-light text-status-success font-medium">
+              <CheckCircle2 className="h-3 w-3" />
+              {readyCount} ready
+            </div>
+          )}
           {partialCount > 0 && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-status-warning-light text-status-warning font-medium">
               <AlertTriangle className="h-3 w-3" />
@@ -247,14 +254,22 @@ export function CadLabRequirementsMap({
           </div>
 
           {rows.map((row) => {
-            const isExpanded = expandedId === row.moduleId
+            const isExpanded = expandedIds.has(row.moduleId)
             const rs = readinessStyle(row.readiness)
 
             return (
               <div key={row.moduleId}>
                 {/* Row */}
                 <button
-                  onClick={() => setExpandedId(isExpanded ? null : row.moduleId)}
+                  aria-expanded={isExpanded}
+                  onClick={() =>
+                    setExpandedIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(row.moduleId)) next.delete(row.moduleId)
+                      else next.add(row.moduleId)
+                      return next
+                    })
+                  }
                   className="w-full text-left hover:bg-muted/50 transition-colors"
                 >
                   <div className="grid grid-cols-1 md:grid-cols-[1.2fr_1.5fr_0.8fr_0.8fr_1.5fr_0.6fr] gap-2 px-4 py-3 items-center">
@@ -271,40 +286,46 @@ export function CadLabRequirementsMap({
                     </div>
 
                     {/* Requirement (purpose) */}
-                    <span className="text-xs text-muted-foreground truncate">
+                    <div className="text-xs text-muted-foreground truncate">
+                      <span className="md:hidden font-medium text-foreground">Requirement: </span>
                       {truncate(row.purpose, 80)}
-                    </span>
+                    </div>
 
                     {/* Process */}
-                    <span
+                    <div
                       className={cn(
                         "text-xs",
                         row.process ? "text-foreground" : "text-muted-foreground italic"
                       )}
                     >
+                      <span className="md:hidden font-medium">Process: </span>
                       {row.process || "Not specified"}
-                    </span>
+                    </div>
 
                     {/* Material */}
-                    <span
+                    <div
                       className={cn(
                         "text-xs",
                         row.material ? "text-foreground" : "text-muted-foreground italic"
                       )}
                     >
+                      <span className="md:hidden font-medium">Material: </span>
                       {row.material || "Not specified"}
-                    </span>
+                    </div>
 
                     {/* Supplier categories */}
-                    <div className="flex flex-wrap gap-1">
-                      {row.supplierCategories.map((cat) => (
-                        <span
-                          key={cat}
-                          className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground font-medium"
-                        >
-                          {cat}
-                        </span>
-                      ))}
+                    <div>
+                      <span className="md:hidden text-xs font-medium text-foreground">Suppliers: </span>
+                      <div className="flex flex-wrap gap-1 mt-0.5 md:mt-0">
+                        {row.supplierCategories.map((cat) => (
+                          <span
+                            key={cat}
+                            className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-foreground font-medium"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                     </div>
 
                     {/* Readiness badge */}

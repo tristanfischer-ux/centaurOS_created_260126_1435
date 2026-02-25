@@ -327,10 +327,14 @@ export function CadLabCostEstimate({
                       paddingAngle={2}
                       strokeWidth={0}
                     >
-                      {[COLOR_MATERIAL, COLOR_PROCESS, COLOR_TOOLING]
-                        .slice(0, [totalMaterialCost, totalProcessCost, totalToolingCost].filter((v) => v > 0).length)
-                        .map((color, i) => (
-                          <Cell key={i} fill={color} />
+                      {[
+                        { value: totalMaterialCost, color: COLOR_MATERIAL },
+                        { value: totalProcessCost, color: COLOR_PROCESS },
+                        { value: totalToolingCost, color: COLOR_TOOLING },
+                      ]
+                        .filter((d) => d.value > 0)
+                        .map((d, i) => (
+                          <Cell key={i} fill={d.color} />
                         ))}
                     </Pie>
                     <Tooltip content={<CostDonutTooltip total={systemTotal} />} />
@@ -392,11 +396,11 @@ export function CadLabCostEstimate({
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="text-left p-2 font-semibold text-muted-foreground">Module</th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">Material</th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">Process</th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">Tooling</th>
-                  <th className="text-right p-2 font-semibold text-foreground">Total</th>
+                  <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Module</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Material</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Process</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Tooling</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-foreground">Total</th>
                 </tr>
               </thead>
               <tbody>

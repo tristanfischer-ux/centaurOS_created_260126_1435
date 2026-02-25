@@ -19,7 +19,7 @@
 "use client"
 
 import { useMemo, useState, useCallback } from "react"
-import { List, Download } from "lucide-react"
+import { List, Download, AlertTriangle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -51,6 +51,8 @@ interface BomEntry {
   supplierType: string
   leadWeeks: number
   isEstimated: boolean
+  /** Module has no diagnostic answers — all values are defaults */
+  hasDiagnostics: boolean
   children?: BomEntry[]
 }
 
@@ -97,6 +99,7 @@ export function CadLabBom({
   const bom = useMemo((): BomEntry => {
     const moduleEntries: BomEntry[] = modules.map((mod) => {
       const answers = diagnosticAnswers[mod.id] || {}
+      const hasDiagnostics = Object.keys(answers).length > 0
       const process = answers.mfg_process || "Other"
       const material = answers.material || "Other"
       const batchSize = parseBatchSize(answers.batch_size || "1-10 (prototyping)")
@@ -127,13 +130,14 @@ export function CadLabBom({
         supplierType,
         leadWeeks: 0,
         isEstimated: true, // Always estimated (evenly split)
+        hasDiagnostics: true,
       }))
 
       return {
         level: "module" as const, id: mod.id, name: mod.name,
         material: answers.material || "", quantity: 1, massKg,
         unitCost: totalPerUnit, totalCost: totalPerUnit, supplierType,
-        leadWeeks: mod.leadWeeks, isEstimated, children: partEntries,
+        leadWeeks: mod.leadWeeks, isEstimated, hasDiagnostics, children: partEntries,
       }
     })
 
@@ -145,7 +149,7 @@ export function CadLabBom({
       material: "", quantity: 1, massKg: systemMass,
       unitCost: systemTotal, totalCost: systemTotal, supplierType: "",
       leadWeeks: 0, isEstimated: moduleEntries.some((m) => m.isEstimated),
-      children: moduleEntries,
+      hasDiagnostics: true, children: moduleEntries,
     }
   }, [modules, diagnosticAnswers, projectName])
 
@@ -165,7 +169,7 @@ export function CadLabBom({
     }
     flatten(bom)
 
-    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n")
+    const csv = "\uFEFF" + rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -173,7 +177,11 @@ export function CadLabBom({
     a.download = `${(projectName || "bom").replace(/\s+/g, "_").toLowerCase()}_bom.csv`
     a.click()
     URL.revokeObjectURL(url)
-    trackFeatureUse("cad_lab_bom_csv_downloaded", {})
+    trackFeatureUse("cad_lab_bom_csv_downloaded", {
+      moduleCount: bom.children?.length ?? 0,
+      totalCost: bom.totalCost,
+      hasEstimates: bom.isEstimated,
+    })
   }, [bom, projectName])
 
   // ── Empty state ─────────────────────────────────────────────────
@@ -221,26 +229,30 @@ export function CadLabBom({
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b bg-muted/50">
-                <th className="text-left p-2 font-semibold text-muted-foreground">Name</th>
-                <th className="text-left p-2 font-semibold text-muted-foreground">Material</th>
-                <th className="text-right p-2 font-semibold text-muted-foreground">Mass</th>
-                <th className="text-right p-2 font-semibold text-muted-foreground">Cost/Unit</th>
-                <th className="text-left p-2 font-semibold text-muted-foreground">Supplier Type</th>
-                <th className="text-right p-2 font-semibold text-muted-foreground">Lead Time</th>
+                <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Name</th>
+                <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Material</th>
+                <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Mass</th>
+                <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Cost/Unit</th>
+                <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Supplier Type</th>
+                <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Lead Time</th>
               </tr>
             </thead>
             <tbody>
               {/* System row */}
               <tr className="border-b bg-muted/50 cursor-pointer" onClick={() => toggle(bom.id)}>
                 <td className="p-2 font-bold text-foreground">
-                  <span className="mr-1">{expandedIds.has(bom.id) ? "\u25BE" : "\u25B8"}</span>
+                  <span className="mr-1" aria-hidden="true">{expandedIds.has(bom.id) ? "\u25BE" : "\u25B8"}</span>
                   {bom.name}
                 </td>
                 <td className="p-2 text-muted-foreground">&mdash;</td>
-                <td className="p-2 text-right text-muted-foreground">&mdash;</td>
+                <td className="p-2 text-right font-mono text-foreground">{fmtMass(bom.massKg)}</td>
                 <td className="p-2 text-right font-mono font-bold text-foreground">{fmtCost(bom.totalCost)}</td>
                 <td className="p-2 text-muted-foreground">&mdash;</td>
-                <td className="p-2 text-right text-muted-foreground">&mdash;</td>
+                <td className="p-2 text-right text-foreground">
+                  {Math.max(...(bom.children?.map((m) => m.leadWeeks) ?? [0])) > 0
+                    ? `${Math.max(...(bom.children?.map((m) => m.leadWeeks) ?? [0]))} wk`
+                    : "\u2014"}
+                </td>
               </tr>
               {/* Module rows (when system expanded) */}
               {expandedIds.has(bom.id) && bom.children?.map((mod) => (
@@ -263,11 +275,22 @@ function ModuleRow({ entry, isExpanded, onToggle }: { entry: BomEntry; isExpande
   const hasParts = entry.children && entry.children.length > 0
   return (
     <>
-      <tr className={cn("border-b cursor-pointer hover:bg-muted/30 transition-colors")} onClick={() => hasParts && onToggle(entry.id)}>
+      <tr
+        className={cn("border-b transition-colors", hasParts && "cursor-pointer hover:bg-muted/30")}
+        onClick={() => hasParts && onToggle(entry.id)}
+        aria-expanded={hasParts ? isExpanded : undefined}
+      >
         <td className="p-2 pl-6 font-semibold text-foreground">
-          {hasParts && <span className="mr-1">{isExpanded ? "\u25BE" : "\u25B8"}</span>}
-          {entry.name}
-          {entry.isEstimated && <span className="text-[10px] font-mono text-status-warning ml-1" title="Mass estimated">~</span>}
+          <div className="flex items-center gap-1">
+            {hasParts && <span className="mr-1" aria-hidden="true">{isExpanded ? "\u25BE" : "\u25B8"}</span>}
+            {entry.name}
+            {entry.isEstimated && <span className="text-[10px] font-mono text-status-warning ml-1" title="Mass estimated">~</span>}
+            {!entry.hasDiagnostics && (
+              <span title="No diagnostic data — using default values" className="ml-1">
+                <AlertTriangle className="h-3 w-3 text-status-warning" />
+              </span>
+            )}
+          </div>
         </td>
         <td className="p-2 text-foreground">
           {entry.material || <span className="italic text-muted-foreground">Not specified</span>}

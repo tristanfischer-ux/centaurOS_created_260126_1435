@@ -23,7 +23,7 @@
 "use client"
 
 import { useMemo, useCallback } from "react"
-import { Download, Gem, Factory } from "lucide-react"
+import { Download, Gem, Factory, AlertTriangle } from "lucide-react"
 import {
   PieChart,
   Pie,
@@ -34,7 +34,6 @@ import {
   YAxis,
   ResponsiveContainer,
   Tooltip,
-  Legend,
 } from "recharts"
 
 import { Button } from "@/components/ui/button"
@@ -189,7 +188,7 @@ export function CadLabRawMaterials({
           : "0"
       const escape = (s: string) => {
         const escaped = s.replace(/"/g, '""')
-        return escaped.includes(",") || escaped.includes('"')
+        return escaped.includes(",") || escaped.includes('"') || escaped.includes("\n") || escaped.includes("\r")
           ? `"${escaped}"`
           : escaped
       }
@@ -203,7 +202,7 @@ export function CadLabRawMaterials({
       ].join(",")
     })
 
-    const csv = [header, ...csvRows].join("\n")
+    const csv = "\uFEFF" + [header, ...csvRows].join("\n")
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
@@ -212,7 +211,12 @@ export function CadLabRawMaterials({
     a.click()
     URL.revokeObjectURL(url)
 
-    trackFeatureUse("cad_lab_raw_materials_csv_downloaded", {})
+    trackFeatureUse("cad_lab_raw_materials_csv_downloaded", {
+      materialCount: summary.rows.length,
+      totalRawCost: summary.totalRawCost,
+      totalManufacturingCost: summary.totalManufacturingCost,
+      valueAddMargin: summary.valueAddMargin,
+    })
   }, [summary])
 
   // ── Helpers ──
@@ -290,8 +294,16 @@ export function CadLabRawMaterials({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* ── Estimated mass warning ── */}
+        {summary.hasAnyEstimates && (
+          <div className="flex items-start gap-2 p-3 bg-status-warning-light rounded text-xs text-status-warning-dark">
+            <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+            <span>Some modules use estimated mass (0.2 kg fallback). Generate CAD models for more accurate material costs.</span>
+          </div>
+        )}
+
         {/* ── Section 1: Hero Metrics ── */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="bg-muted/30 p-4 rounded-lg">
             <div className="flex items-center gap-1.5 mb-1">
               <Gem className="h-3.5 w-3.5 text-muted-foreground" />
@@ -346,48 +358,63 @@ export function CadLabRawMaterials({
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               Material Cost Distribution
             </p>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={donutData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={2}
-                  label={({ name, percent }: { name?: string; percent?: number }) =>
-                    `${name ?? ""} (${((percent ?? 0) * 100).toFixed(0)}%)`
-                  }
-                  labelLine={{ strokeWidth: 1 }}
-                >
-                  {donutData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  content={({ active, payload }) => {
-                    if (!active || !payload?.length) return null
-                    const d = payload[0].payload as (typeof donutData)[number]
-                    return (
-                      <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
-                        <p className="font-semibold text-foreground">
-                          {d.name}
-                        </p>
-                        <p className="text-muted-foreground">
-                          {fmt(d.value)} (
-                          {pct(d.value, summary.totalRawCost)}%)
-                        </p>
-                        <p className="text-muted-foreground mt-0.5">
-                          Used in: {d.modules.join(", ")}
-                        </p>
-                      </div>
-                    )
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              <ResponsiveContainer width="100%" height={200} className="sm:max-w-[240px]">
+                <PieChart>
+                  <Pie
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={2}
+                    strokeWidth={0}
+                  >
+                    {donutData.map((entry) => (
+                      <Cell key={`cell-${entry.name}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null
+                      const d = payload[0].payload as (typeof donutData)[number]
+                      return (
+                        <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
+                          <p className="font-semibold text-foreground">
+                            {d.name}
+                          </p>
+                          <p className="text-muted-foreground">
+                            {fmt(d.value)} (
+                            {pct(d.value, summary.totalRawCost)}%)
+                          </p>
+                          <p className="text-muted-foreground mt-0.5">
+                            Used in: {d.modules.join(", ")}
+                          </p>
+                        </div>
+                      )
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Legend beside the chart */}
+              <div className="flex flex-col gap-1.5 text-xs">
+                {donutData.map((d) => (
+                  <div key={d.name} className="flex items-center gap-2">
+                    <span
+                      className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: d.color }}
+                      aria-hidden="true"
+                    />
+                    <span className="text-foreground font-medium">{d.name}</span>
+                    <span className="text-muted-foreground font-mono">
+                      {fmt(d.value)} ({pct(d.value, summary.totalRawCost)}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -450,9 +477,7 @@ export function CadLabRawMaterials({
                 radius={[0, 4, 4, 0]}
                 barSize={28}
               />
-              <Legend
-                wrapperStyle={{ display: "none" }}
-              />
+              {/* Legend handled by inline stats below */}
             </BarChart>
           </ResponsiveContainer>
 
@@ -498,22 +523,22 @@ export function CadLabRawMaterials({
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b bg-muted/50">
-                  <th className="text-left p-2 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">
                     Material
                   </th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">
                     Modules
                   </th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">
                     Total kg
                   </th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">
                     Cost/kg
                   </th>
-                  <th className="text-right p-2 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">
                     Total Cost
                   </th>
-                  <th className="text-left p-2 pl-3 font-semibold text-muted-foreground">
+                  <th scope="col" className="text-left p-2 pl-3 font-semibold text-muted-foreground">
                     % of Raw
                   </th>
                 </tr>
