@@ -39,6 +39,21 @@ interface ImagenResponse {
   error?: { code: number; message: string; status: string }
 }
 
+// ─── No-Text Enforcement ────────────────────────────────────────────
+
+const NO_TEXT_SUFFIX = "\n\nCRITICAL: This image must contain ZERO text, letters, words, numbers, labels, annotations, dimensions, or writing of any kind. The image should be purely visual with no readable characters anywhere."
+
+/**
+ * Appends a strong no-text instruction to any image prompt.
+ * Applied as the last step before sending to the image API, ensuring
+ * ALL codepaths (hardcoded fallback, Opus-generated briefs, research
+ * banners) get the same guardrail.
+ */
+function enforceNoText(prompt: string): string {
+  if (prompt.includes("ZERO text")) return prompt
+  return prompt + NO_TEXT_SUFFIX
+}
+
 // ─── Prompt Templates ────────────────────────────────────────────────
 
 /**
@@ -57,11 +72,13 @@ function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief): string 
   }
 
   // Fallback: build prompt directly from module spec
+  // DECISION: Avoid naming specific components/IOs — image models render
+  // them as garbled text.  Describe visually instead.
   return `Create a clean, professional technical engineering illustration showing a ${module.detail.whatItIs}.
 
-The diagram should clearly show these key components through visual differentiation (color coding, positioning, distinct shapes): ${module.keyParts.join(", ")}.
+The diagram should clearly show ${module.keyParts.length} distinct key components through visual differentiation (color coding, positioning, distinct shapes).
 
-Show inputs (${module.io.in.join(", ")}) flowing in from the left side, and outputs (${module.io.out.join(", ")}) flowing out to the right.
+Show input flow entering from the left side and output flow exiting to the right.
 
 Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. Do NOT include any text, labels, words, or annotations anywhere in the image.`
 }
@@ -79,21 +96,12 @@ function buildSystemPrompt(spec: XRaySpec, brief?: SystemStructuralBrief): strin
   if (brief?.imagePrompt) {
     return brief.imagePrompt
   }
-  const moduleFlow = spec.modules
-    .map((m) => `${m.name}: ${m.purpose}`)
-    .join("\n")
 
-  // Build IO chain description
-  const ioChain = spec.modules
-    .map((m) => `${m.io.in.join("/")} → [${m.name}] → ${m.io.out.join("/")}`)
-    .join(" → ")
+  // DECISION: Don't list module names or IO chains — image models render
+  // them as garbled text labels on the diagram.  Use count-based description.
+  return `Create a professional engineering process flow diagram for a system that performs: ${spec.function}.
 
-  return `Create a professional engineering process flow diagram for: ${spec.function}.
-
-This system is composed of ${spec.modules.length} connected subsystems:
-${moduleFlow}
-
-Material/signal flow path: ${ioChain}
+This system is composed of ${spec.modules.length} connected subsystems arranged in a processing chain.
 
 Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. Do NOT include any text, labels, words, annotations, title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
 }
@@ -149,6 +157,7 @@ async function callImagenImage(
       sampleCount: 1,
       aspectRatio: toImagenAspectRatio(aspectRatio),
       imageSize: "2K",
+      negativePrompt: "text, words, letters, labels, annotations, writing, captions, titles, numbers, measurements, dimensions, handwriting, typography, font",
     },
   }
 
@@ -256,8 +265,10 @@ async function callImageWithFallback(
   prompt: string,
   imageConfig: { aspectRatio?: string } = {},
 ): Promise<{ mimeType: string; data: string }> {
+  // Enforce no-text guardrail on ALL prompts regardless of source
+  const safePrompt = enforceNoText(prompt)
   try {
-    return await callImagenImage(prompt, imageConfig.aspectRatio)
+    return await callImagenImage(safePrompt, imageConfig.aspectRatio)
   } catch (imagenError) {
     const errorMessage = imagenError instanceof Error ? imagenError.message : String(imagenError)
 
@@ -272,7 +283,7 @@ async function callImageWithFallback(
     )
 
     const size = geminiAspectToOpenAISize(imageConfig.aspectRatio)
-    return await callOpenAIImage(prompt, size)
+    return await callOpenAIImage(safePrompt, size)
   }
 }
 
@@ -374,12 +385,11 @@ export async function generateResearchIllustration(
   modulePurposes: string[],
 ): Promise<string> {
   const hasModules = moduleNames.length > 0
-  const moduleList = hasModules
-    ? moduleNames.map((name, i) => `- ${name}: ${modulePurposes[i] ?? ""}`).join("\n")
-    : ""
 
+  // DECISION: Don't list module names — image models render them as garbled
+  // text.  Use count-based description instead.
   const moduleContext = hasModules
-    ? `\n\nThis is an engineering overview showing the complete system with its major sub-assemblies:\n${moduleList}`
+    ? `\n\nThis is an engineering overview showing the complete system with its ${moduleNames.length} major sub-assemblies.`
     : ""
 
   const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}

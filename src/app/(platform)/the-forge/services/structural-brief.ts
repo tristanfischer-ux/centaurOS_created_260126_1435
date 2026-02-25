@@ -82,11 +82,13 @@ Write a detailed narrative (150-300 words) describing:
 Be SPECIFIC about shapes: "a horizontal cylindrical pressure vessel" not "a container". "Three vertical tube bundles arranged in parallel" not "heat exchange elements". Describe relative positions: "mounted on the left side of the base frame" not "attached to the module".
 
 ### IMAGE PROMPT
-Write a prompt (80-150 words) for Gemini image generation. This should produce a clean, professional isometric technical illustration. Include:
+Write a prompt (80-150 words) for image generation. CRITICAL CONSTRAINT: The prompt must NOT mention any specific component names, labels, dimensions, or text that could appear in the image. Describe components ONLY by their visual appearance (shape, color, position, relative size), never by name or label. Image models will hallucinate garbled text if the prompt contains technical terms or names — keep it purely visual.
+Include:
 - Specific visual style: "clean isometric technical illustration, white background, thin precise lines, subtle gray grid, engineering specification style"
-- All key components visually differentiated by color, position, and shape — NO text labels (image models cannot render text)
+- All key components visually differentiated by color, position, and shape — described by appearance only
 - Input/output flow direction (left-to-right)
 - Cutaway or transparency if needed to show internal components
+- End the prompt with: "The image must contain absolutely no text, letters, words, numbers, labels, or annotations of any kind."
 
 ### CAD INSTRUCTIONS
 Write detailed instructions (200-400 words) for generating CadQuery Python code. This drives a 200-600 line CadQuery model, so be thorough. Include:
@@ -125,7 +127,7 @@ Describe the assembled product (150-250 words):
 - General material and finish
 
 ### IMAGE PROMPT
-Write a prompt (80-120 words) for a process flow diagram showing all modules as connected, color-coded blocks with flow arrows. Clean, modern style. IMPORTANT: Do NOT request any text, labels, or annotations — image models cannot render readable text.
+Write a prompt (80-120 words) for a process flow diagram showing all modules as connected, color-coded blocks with flow arrows. Clean, modern style. CRITICAL CONSTRAINT: The prompt must NOT mention any module names, labels, dimensions, or text that could appear in the image. Describe blocks ONLY by their visual appearance (color, shape, relative size). Image models hallucinate garbled text when prompts contain names — keep it purely visual. End with: "The image must contain absolutely no text, letters, words, numbers, labels, or annotations of any kind."
 
 ### CAD INSTRUCTIONS
 Detailed instructions (200-400 words) for a CadQuery model of the assembled product. This is the HERO model — the main visualization. Be thorough:
