@@ -137,10 +137,9 @@ function InlineEditCell({
 
 interface EnrichmentViewProps {
     foundryId: string
-    userId: string
 }
 
-export function EnrichmentView({ foundryId, userId }: EnrichmentViewProps) {
+export function EnrichmentView({ foundryId }: EnrichmentViewProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
 

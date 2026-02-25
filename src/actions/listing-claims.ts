@@ -197,19 +197,26 @@ export async function updateClaimedListing(
     if (!user) return { error: 'Unauthorized' }
 
     // INTENT: Merge structured fields into attributes JSONB
+    // Use !== undefined so that empty arrays/strings clear the field (set to null)
+    // while undefined means "not touched" and preserves the old value.
     let attributes: Record<string, unknown> | undefined
-    if (updates.capabilities || updates.certifications || updates.industries || updates.employees || updates.established || updates.location) {
+    const attrFields = ['capabilities', 'certifications', 'industries', 'employees', 'established', 'location'] as const
+    const hasAttrUpdate = attrFields.some(f => updates[f] !== undefined)
+
+    if (hasAttrUpdate) {
         // Fetch current attributes first
         const { data: current } = await supabase.rpc('get_my_claimed_listing')
         const currentAttrs = ((current as ClaimedListing[])?.[0]?.attributes || {}) as Record<string, unknown>
 
         attributes = { ...currentAttrs }
-        if (updates.capabilities) attributes.capabilities = updates.capabilities
-        if (updates.certifications) attributes.certifications = updates.certifications
-        if (updates.industries) attributes.industries = updates.industries
-        if (updates.employees) attributes.employees = updates.employees
-        if (updates.established) attributes.established = updates.established
-        if (updates.location) attributes.location = updates.location
+        for (const field of attrFields) {
+            if (updates[field] !== undefined) {
+                const val = updates[field]
+                // Empty array or empty string → null (clear); otherwise set the value
+                const isEmpty = Array.isArray(val) ? val.length === 0 : val === ''
+                attributes[field] = isEmpty ? null : val
+            }
+        }
     }
 
     const { data, error } = await supabase.rpc('update_claimed_listing', {

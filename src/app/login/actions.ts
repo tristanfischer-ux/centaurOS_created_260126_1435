@@ -78,7 +78,14 @@ export async function login(formData: FormData) {
     await resetRateLimit('login', clientIP)
 
     revalidatePath('/', 'layout')
-    
+
+    // INTENT: If the user was redirected to login from a protected page,
+    // send them back there after successful auth.
+    const redirectRaw = formData.get('redirect') as string | null
+    const redirectTo = redirectRaw && redirectRaw.startsWith('/') && !redirectRaw.includes('//')
+        ? redirectRaw
+        : null
+
     // Check user's account type and foundry memberships to determine redirect
     if (loggedInUser) {
         const { data: profile } = await supabase
@@ -90,6 +97,11 @@ export async function login(formData: FormData) {
         // Suppliers go to their dedicated portal
         if (profile?.account_type === 'supplier') {
             redirect('/supplier-portal')
+        }
+
+        // INTENT: Honor the redirect param for non-supplier accounts
+        if (redirectTo) {
+            redirect(redirectTo)
         }
 
         // Check how many foundries the user belongs to

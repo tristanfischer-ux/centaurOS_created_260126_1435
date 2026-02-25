@@ -40,7 +40,6 @@ export default async function EnrichmentPage(): Promise<React.ReactNode> {
     return (
         <EnrichmentView
             foundryId={profile.foundry_id}
-            userId={user.id}
         />
     )
 }

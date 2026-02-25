@@ -84,6 +84,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
         const result = await getMyListingExecutives()
         if (result.data) {
             setExecutives(result.data.filter((e) => e.status !== 'removed'))
+        } else if (result.error) {
+            toast.error(result.error)
         }
         setIsLoading(false)
     }
@@ -171,6 +173,7 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
     }
 
     function handleRemove(exec: ListingExecutive) {
+        if (!window.confirm(`Remove ${exec.full_name}? This action cannot be undone.`)) return
         startTransition(async () => {
             const result = await removeExecutive(exec.id)
             if (result.error) {
@@ -275,6 +278,7 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => openEdit(exec)}
+                                            aria-label={`Edit ${exec.full_name}`}
                                         >
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Button>
@@ -283,6 +287,7 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                                             size="sm"
                                             onClick={() => handleRemove(exec)}
                                             disabled={isPending}
+                                            aria-label={`Remove ${exec.full_name}`}
                                         >
                                             <Trash2 className="h-3.5 w-3.5 text-destructive" />
                                         </Button>

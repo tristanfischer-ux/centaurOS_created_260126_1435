@@ -18,6 +18,7 @@ const PUBLIC_ROUTES = [
     '/api/dev-login',  // Dev-only auto-login for AI agents/tests (returns 404 in production)
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
+    '/claim',  // Public listing claim flow (outreach)
 ]
 
 // Routes that require company admin (Executive/Founder) role
@@ -97,6 +98,7 @@ export async function updateSession(request: NextRequest) {
     if (!user && !isPublicRoute) {
         const appDomain = process.env.NEXT_PUBLIC_APP_DOMAIN || 'https://fractionalforge.app'
         const loginUrl = new URL('/login', appDomain)
+        loginUrl.searchParams.set('redirect', pathname)
         return NextResponse.redirect(loginUrl)
     }
 

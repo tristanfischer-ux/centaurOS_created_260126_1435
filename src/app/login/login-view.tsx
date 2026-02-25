@@ -89,7 +89,7 @@ const formItemVariants: Variants = {
 /**
  * LoginForm — Animated form with warm, inviting copy.
  */
-function LoginForm(): React.ReactNode {
+function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode {
     const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.app'
 
     return (
@@ -127,6 +127,7 @@ function LoginForm(): React.ReactNode {
                 <Suspense fallback={null}>
                     <ErrorMessage />
                 </Suspense>
+                {redirect && <input type="hidden" name="redirect" value={redirect} />}
 
                 <motion.div variants={formItemVariants} className="space-y-4">
                     <div className="space-y-2">
@@ -184,7 +185,7 @@ function LoginForm(): React.ReactNode {
  * compact mobile banner (mobile), animated login form on right.
  * Continues the energy and optimism from the marketing landing page.
  */
-export function LoginView(): React.ReactNode {
+export function LoginView({ redirect }: { redirect?: string | null }): React.ReactNode {
     return (
         <div className="min-h-screen flex flex-col lg:flex-row w-full bg-background">
             {/* Mobile Hero Banner (visible on small screens) */}
@@ -205,7 +206,7 @@ export function LoginView(): React.ReactNode {
                         backgroundSize: '32px 32px',
                     }}
                 />
-                <LoginForm />
+                <LoginForm redirect={redirect} />
             </div>
         </div>
     )
