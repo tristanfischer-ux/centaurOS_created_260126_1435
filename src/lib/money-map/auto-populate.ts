@@ -1,4 +1,3 @@
-// @ts-nocheck - Platform tables may not be in generated types yet
 /**
  * @file auto-populate.ts
  *
@@ -21,6 +20,14 @@ interface AutoPopulateResult {
   revenue_streams: RevenueStreamInput[]
   cost_items: CostItemInput[]
 }
+
+// DECISION: These row shapes describe future platform columns that are not yet
+// in the generated Supabase types (foundry_id, weekly_rate, platform_fee, etc.).
+// Each query is wrapped in try/catch so a schema mismatch at runtime is safe.
+// Once the columns land in a migration, regenerate types and remove the casts.
+interface OrderRow { total_amount: number; status: string; created_at: string }
+interface RetainerRow { weekly_rate: number; status: string }
+interface EscrowRow { platform_fee: number; stripe_fee: number; created_at: string }
 
 /**
  * Aggregate platform data into Money Map inputs.
@@ -47,15 +54,17 @@ export async function aggregatePlatformData(foundryId: string): Promise<AutoPopu
   // 1. Marketplace order revenue (as buyer or seller)
   // -------------------------------------------------------
   try {
+    // GOTCHA: 'delivered' is not yet in the order_status enum; cast needed on .in() values
+    const validStatuses = ['completed', 'delivered'] as const
     const { data: orders } = await supabase
       .from('orders')
       .select('total_amount, status, created_at')
-      .eq('foundry_id', foundryId)
-      .in('status', ['completed', 'delivered'])
-      .gte('created_at', since)
+      .eq('foundry_id' as string, foundryId)
+      .in('status', validStatuses as unknown as ('completed' | 'pending')[])
+      .gte('created_at', since) as unknown as { data: OrderRow[] | null }
 
     if (orders && orders.length > 0) {
-      const total = orders.reduce((sum: number, o: { total_amount: number }) => sum + (o.total_amount || 0), 0)
+      const total = orders.reduce((sum: number, o) => sum + (o.total_amount || 0), 0)
       const monthlyAvg = Math.round((total / 3) * 100) / 100
 
       if (monthlyAvg > 0) {
@@ -82,13 +91,13 @@ export async function aggregatePlatformData(foundryId: string): Promise<AutoPopu
     const { data: retainers } = await supabase
       .from('retainers')
       .select('weekly_rate, status')
-      .eq('foundry_id', foundryId)
-      .eq('status', 'active')
+      .eq('foundry_id' as string, foundryId)
+      .eq('status', 'active') as unknown as { data: RetainerRow[] | null }
 
     if (retainers && retainers.length > 0) {
       // Weekly rate × ~4.33 weeks/month
       const monthlyTotal = retainers.reduce(
-        (sum: number, r: { weekly_rate: number }) => sum + (r.weekly_rate || 0) * 4.33,
+        (sum: number, r) => sum + (r.weekly_rate || 0) * 4.33,
         0
       )
       const monthlyAvg = Math.round(monthlyTotal * 100) / 100
@@ -116,16 +125,16 @@ export async function aggregatePlatformData(foundryId: string): Promise<AutoPopu
     const { data: escrow } = await supabase
       .from('escrow_transactions')
       .select('platform_fee, stripe_fee, created_at')
-      .eq('foundry_id', foundryId)
-      .gte('created_at', since)
+      .eq('foundry_id' as string, foundryId)
+      .gte('created_at', since) as unknown as { data: EscrowRow[] | null }
 
     if (escrow && escrow.length > 0) {
       const totalPlatformFees = escrow.reduce(
-        (sum: number, e: { platform_fee: number }) => sum + (e.platform_fee || 0),
+        (sum: number, e) => sum + (e.platform_fee || 0),
         0
       )
       const totalStripeFees = escrow.reduce(
-        (sum: number, e: { stripe_fee: number }) => sum + (e.stripe_fee || 0),
+        (sum: number, e) => sum + (e.stripe_fee || 0),
         0
       )
 

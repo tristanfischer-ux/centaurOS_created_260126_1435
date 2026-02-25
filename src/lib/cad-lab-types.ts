@@ -153,6 +153,24 @@ export interface CadLabInterfaceResult {
   tokensOut: number
 }
 
+// ─── Visual Style Spec ──────────────────────────────────────────────
+
+/**
+ * AI-generated visual style specification for cohesive module illustrations.
+ *
+ * @description Generated once per decomposition by a fast Claude call, then
+ * injected into every module image prompt so all illustrations share a
+ * consistent color palette, material rendering, and contextual framing.
+ */
+export interface VisualStyleSpec {
+  /** Dominant colors to use across all module illustrations (e.g. "steel blue, warm gray, copper accent") */
+  colorPalette: string
+  /** How materials and surfaces should be rendered (e.g. "brushed metal with soft specular highlights") */
+  materialRendering: string
+  /** Shared context that ties modules together (e.g. "sub-assemblies of a compact quadrotor drone frame") */
+  unifyingContext: string
+}
+
 // ─── Module Types ────────────────────────────────────────────────────
 
 /**

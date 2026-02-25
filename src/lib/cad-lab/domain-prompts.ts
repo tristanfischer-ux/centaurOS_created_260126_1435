@@ -192,6 +192,37 @@ export function getModuleDecompositionPrompt(domain: CadLabDomain): string {
   return `${MODULE_DECOMPOSITION_ROLE[domain]}\n\n${BASE_MODULE_DECOMPOSITION}`
 }
 
+// ─── Visual style spec prompt (cohesive illustrations) ────────────────
+
+const VISUAL_STYLE_SYSTEM_PROMPT = `You are an art director for a professional engineering specification document.
+
+Given a product description and its module list, generate a cohesive visual style specification that will be injected into every module illustration prompt. The goal is that all module images look like they belong to the same document — as if each is a zoomed-in detail view of one master concept drawing.
+
+Output STRICTLY as JSON with exactly these 3 fields:
+
+{
+  "colorPalette": "3-4 dominant colors described by name (e.g. 'steel blue, warm gray, copper accent, matte white'). Pick colors appropriate for the product's domain and materials.",
+  "materialRendering": "How surfaces and materials should be rendered across all illustrations (e.g. 'brushed metal with soft specular highlights and subtle anodized color tints'). Keep it specific enough to be visually consistent.",
+  "unifyingContext": "A short phrase that frames every module as part of one system (e.g. 'sub-assemblies of a compact quadrotor drone with carbon-fiber arms'). This gets prepended to each module prompt."
+}
+
+RULES:
+- Output ONLY valid JSON — no markdown, no explanation
+- Colors must be described by name, not hex codes (image models don't understand hex)
+- materialRendering should describe a single consistent rendering approach
+- unifyingContext should name the product and its defining physical characteristic
+- Keep each value under 30 words`
+
+/**
+ * Returns the system prompt for generating a VisualStyleSpec via Claude.
+ *
+ * @description Used once per decomposition to generate a shared visual style
+ * that gets injected into every module image prompt for cohesion.
+ */
+export function getVisualStyleSystemPrompt(): string {
+  return VISUAL_STYLE_SYSTEM_PROMPT
+}
+
 // ─── Diagnostics pre-fill prompts ─────────────────────────────────────
 
 const BASE_DIAGNOSTICS = `For each module, output exactly these 6 fields:

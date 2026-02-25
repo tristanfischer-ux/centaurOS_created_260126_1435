@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { overlayModuleLabels, overlaySystemLegend } from "./image-overlay"
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
 import type { StructuralBrief, SystemStructuralBrief } from "./structural-brief"
+import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -54,6 +55,25 @@ function enforceNoText(prompt: string): string {
   return prompt + NO_TEXT_SUFFIX
 }
 
+// ─── Cohesive Style Suffix ───────────────────────────────────────────
+
+/**
+ * Deterministic rendering rules appended to ALL image prompts.
+ * This is the "floor" — even if the AI-generated VisualStyleSpec is vague,
+ * all images share identical perspective, background, line weight, grid, and shadow.
+ */
+const COHESIVE_STYLE_SUFFIX = `
+
+Rendering rules (mandatory for visual consistency across all illustrations in this set):
+- Perspective: 30-degree isometric view, camera slightly above and to the right
+- Background: pure white (#FFFFFF), no gradients or textures
+- Line weight: thin, uniform 1px strokes for outlines and internal edges
+- Grid: subtle light gray (#F0F0F0) engineering grid visible in background
+- Shadows: single soft drop shadow, bottom-right, 15% opacity
+- Lighting: single directional light from upper-left, soft ambient fill
+- Scale: component fills 70-80% of frame with generous margins
+- No decorative elements, borders, title blocks, or watermarks`
+
 // ─── Prompt Templates ────────────────────────────────────────────────
 
 /**
@@ -63,24 +83,49 @@ function enforceNoText(prompt: string): string {
  *
  * @param module - The module to generate an image for
  * @param brief - Optional structural brief from Opus orchestrator
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns A narrative prompt optimized for Gemini image generation
  */
-function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief): string {
-  // If we have an Opus structural brief, use its image prompt for consistency
+function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief, visualStyle?: VisualStyleSpec): string {
+  // If we have an Opus structural brief, use its image prompt (+ cohesive suffix)
   if (brief?.imagePrompt) {
-    return brief.imagePrompt
+    let prompt = brief.imagePrompt
+    if (visualStyle) {
+      prompt = injectVisualStyle(prompt, visualStyle)
+    }
+    return prompt + COHESIVE_STYLE_SUFFIX
   }
 
   // Fallback: build prompt directly from module spec
   // DECISION: Avoid naming specific components/IOs — image models render
   // them as garbled text.  Describe visually instead.
-  return `Create a clean, professional technical engineering illustration showing a ${module.detail.whatItIs}.
+  const styleContext = visualStyle
+    ? `This is a detailed sub-view of a larger system: ${visualStyle.unifyingContext}.
+
+Color palette: use ${visualStyle.colorPalette} as the dominant colors.
+Material rendering: ${visualStyle.materialRendering}.
+
+`
+    : ""
+
+  return `${styleContext}Create a clean, professional technical engineering illustration showing a ${module.detail.whatItIs}.
 
 The diagram should clearly show ${module.keyParts.length} distinct key components through visual differentiation (color coding, positioning, distinct shapes).
 
 Show input flow entering from the left side and output flow exiting to the right.
 
-Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. Do NOT include any text, labels, words, or annotations anywhere in the image.`
+Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. Do NOT include any text, labels, words, or annotations anywhere in the image.${COHESIVE_STYLE_SUFFIX}`
+}
+
+/**
+ * Injects VisualStyleSpec directives into an existing prompt string.
+ */
+function injectVisualStyle(prompt: string, style: VisualStyleSpec): string {
+  return `Context: This is a detailed sub-view of ${style.unifyingContext}.
+Color palette: ${style.colorPalette}.
+Material rendering: ${style.materialRendering}.
+
+${prompt}`
 }
 
 /**
@@ -334,6 +379,7 @@ async function uploadToStorage(
  * @param scanId - The scan ID for storage namespacing
  * @param module - The module to generate an image for
  * @param brief - Optional structural brief from Opus orchestrator for consistency with 3D model
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns The public URL of the generated image
  *
  * @throws Error if image generation or upload fails
@@ -342,8 +388,9 @@ export async function generateModuleImage(
   scanId: string,
   module: ModuleSpec,
   brief?: StructuralBrief,
+  visualStyle?: VisualStyleSpec,
 ): Promise<string> {
-  const prompt = buildModulePrompt(module, brief)
+  const prompt = buildModulePrompt(module, brief, visualStyle)
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
@@ -374,6 +421,7 @@ export async function generateModuleImage(
  * @param subject - The product/system being researched
  * @param moduleNames - Names of decomposed modules (for context)
  * @param modulePurposes - One-line purposes per module (for context)
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns The public URL of the generated illustration
  *
  * @throws Error if image generation or upload fails
@@ -383,6 +431,7 @@ export async function generateResearchIllustration(
   subject: string,
   moduleNames: string[],
   modulePurposes: string[],
+  visualStyle?: VisualStyleSpec,
 ): Promise<string> {
   const hasModules = moduleNames.length > 0
 
@@ -392,9 +441,13 @@ export async function generateResearchIllustration(
     ? `\n\nThis is an engineering overview showing the complete system with its ${moduleNames.length} major sub-assemblies.`
     : ""
 
-  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}
+  const styleDirective = visualStyle
+    ? `\n\nColor palette: use ${visualStyle.colorPalette} as the dominant colors. Material rendering: ${visualStyle.materialRendering}. Context: ${visualStyle.unifyingContext}.`
+    : ""
 
-Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Do NOT include any text, labels, words, or annotations anywhere in the image. Generous whitespace around the illustration.`
+  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}${styleDirective}
+
+Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Do NOT include any text, labels, words, or annotations anywhere in the image. Generous whitespace around the illustration.${COHESIVE_STYLE_SUFFIX}`
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",

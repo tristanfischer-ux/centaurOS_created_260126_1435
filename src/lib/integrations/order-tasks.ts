@@ -1,4 +1,3 @@
-// @ts-nocheck - TaskStatus enum from DB doesn't include all statuses used here (onboarding, check_in, milestone_review); align enums or add missing values to schema
 /**
  * Order → Task Integration
  * Auto-create and manage tasks when orders are created/updated
@@ -19,6 +18,26 @@ type TaskStatus = Database["public"]["Enums"]["task_status"]
 
 // Task type for order_tasks junction table
 export type OrderTaskType = 'onboarding' | 'check_in' | 'milestone_review' | 'completion'
+
+/**
+ * Look up the default "No objective set" objective for a foundry.
+ * Every foundry has one (created by migration 20260202270000_enforce_task_objectives).
+ * Order-linked tasks aren't tied to a user objective, so they use this default.
+ */
+async function getDefaultObjectiveId(
+  supabase: TypedSupabaseClient,
+  foundryId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('objectives')
+    .select('id')
+    .eq('foundry_id', foundryId)
+    .eq('title', 'No objective set')
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle()
+  return data?.id ?? null
+}
 
 interface OrderDetails {
   id: string
@@ -82,6 +101,12 @@ export async function createOrderTasks(
     const templates = getTaskTemplate(orderDetails.order_type as OrderType, 'order_created')
     const createdTasks: CreatedTask[] = []
 
+    // Order tasks aren't tied to a user-created objective; use the foundry default
+    const defaultObjectiveId = await getDefaultObjectiveId(supabase, foundryId)
+    if (!defaultObjectiveId) {
+      return { tasks: [], error: 'No default objective found for foundry' }
+    }
+
     const orderCreatedAt = new Date(orderDetails.created_at)
 
     for (const template of templates) {
@@ -98,6 +123,7 @@ export async function createOrderTasks(
           .from('tasks')
           .insert({
             foundry_id: foundryId,
+            objective_id: defaultObjectiveId,
             title: taskData.title,
             description: taskData.description,
             creator_id: creatorId,
@@ -202,6 +228,11 @@ export async function createAcceptedOrderTasks(
     const templates = getTaskTemplate(orderDetails.order_type as OrderType, 'order_accepted')
     const createdTasks: CreatedTask[] = []
 
+    const defaultObjectiveId = await getDefaultObjectiveId(supabase, foundryId)
+    if (!defaultObjectiveId) {
+      return { tasks: [], error: 'No default objective found for foundry' }
+    }
+
     const orderCreatedAt = new Date(orderDetails.created_at)
 
     for (const template of templates) {
@@ -216,6 +247,7 @@ export async function createAcceptedOrderTasks(
           .from('tasks')
           .insert({
             foundry_id: foundryId,
+            objective_id: defaultObjectiveId,
             title: taskData.title,
             description: taskData.description,
             creator_id: creatorId,
@@ -269,6 +301,12 @@ async function createMilestoneReviewTask(
   const tasks: CreatedTask[] = []
   const template = milestoneTemplates[0]
 
+  const defaultObjectiveId = await getDefaultObjectiveId(supabase, foundryId)
+  if (!defaultObjectiveId) {
+    console.error('No default objective found for foundry:', foundryId)
+    return tasks
+  }
+
   const title = formatTemplateText(template.title, {
     milestoneTitle,
     providerName,
@@ -282,6 +320,7 @@ async function createMilestoneReviewTask(
     .from('tasks')
     .insert({
       foundry_id: foundryId,
+      objective_id: defaultObjectiveId,
       title,
       description,
       creator_id: creatorId,
@@ -339,6 +378,7 @@ export async function updateTasksOnOrderChange(
     
     switch (newStatus) {
       case 'cancelled':
+        // @ts-expect-error -- 'Cancelled' is a valid runtime status but missing from the task_status DB enum; align enum in a future migration
         taskStatus = 'Cancelled'
         break
       case 'completed':

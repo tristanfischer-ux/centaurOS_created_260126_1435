@@ -16,9 +16,10 @@
  * - Context consumer: src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx
  */
 
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, VisualStyleSpec } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration } from "@/app/(platform)/the-forge/services/image-generator"
+import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
@@ -39,16 +40,18 @@ interface GenerateImagesResult {
  *
  * @param projectId - The CAD Lab project ID (used as storage namespace)
  * @param module - The module to generate an image for
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns Updated module with imageUrl/imageStatus set
  */
 export async function generateCadLabSingleImageAction(
   projectId: string,
   module: CadLabModule,
+  visualStyle?: VisualStyleSpec,
 ): Promise<{ module: CadLabModule } | { error: string }> {
   return withAuth(async () => {
     try {
       const adapted = cadLabModuleToModuleSpec(module)
-      const url = await generateModuleImage(projectId, adapted)
+      const url = await generateModuleImage(projectId, adapted, undefined, visualStyle)
 
       return {
         module: {
@@ -78,11 +81,13 @@ export async function generateCadLabSingleImageAction(
  *
  * @param projectId - The CAD Lab project ID (used as storage namespace)
  * @param modules - The modules to generate images for
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns Updated modules with imageUrl/imageStatus filled in
  */
 export async function generateCadLabModuleImagesAction(
   projectId: string,
   modules: CadLabModule[],
+  visualStyle?: VisualStyleSpec,
 ): Promise<GenerateImagesResult | { error: string }> {
   return withAuth(async () => {
     const updatedModules = [...modules]
@@ -99,7 +104,7 @@ export async function generateCadLabModuleImagesAction(
           const adapted = cadLabModuleToModuleSpec(module)
 
           try {
-            const url = await generateModuleImage(projectId, adapted)
+            const url = await generateModuleImage(projectId, adapted, undefined, visualStyle)
             updatedModules[globalIdx] = {
               ...module,
               imageUrl: url,
@@ -142,6 +147,7 @@ export async function generateCadLabModuleImagesAction(
  * @param subject - The product/system being researched
  * @param moduleNames - Names of decomposed modules
  * @param modulePurposes - One-line purpose per module
+ * @param visualStyle - Optional shared visual style for cross-module cohesion
  * @returns The public URL of the generated illustration, or an error
  */
 export async function generateCadLabSystemIllustrationAction(
@@ -149,14 +155,89 @@ export async function generateCadLabSystemIllustrationAction(
   subject: string,
   moduleNames: string[],
   modulePurposes: string[],
+  visualStyle?: VisualStyleSpec,
 ): Promise<{ url: string } | { error: string }> {
   return withAuth(async () => {
     try {
-      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes)
+      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle)
       return { url }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Generates a VisualStyleSpec for cohesive module illustrations.
+ *
+ * @description Calls Claude (Sonnet, fast) to produce a shared color palette,
+ * material rendering, and unifying context that gets injected into every module
+ * image prompt. Typically adds ~1-2s to the pipeline — negligible vs 15-30s image gen.
+ *
+ * @param subject - The product/system name
+ * @param modules - The decomposed modules (names + purposes used as context)
+ * @returns The generated VisualStyleSpec, or an error
+ */
+export async function generateVisualStyleAction(
+  subject: string,
+  modules: Array<{ name: string; purpose: string }>,
+): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
+  return withAuth(async () => {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping visual style generation")
+      return { error: "ANTHROPIC_API_KEY not configured" }
+    }
+
+    const moduleList = modules.map((m) => `- ${m.name}: ${m.purpose}`).join("\n")
+    const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}`
+
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 256,
+          system: getVisualStyleSystemPrompt(),
+          messages: [{ role: "user", content: userMessage }],
+        }),
+        signal: AbortSignal.timeout(15_000),
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[CAD-LAB-IMAGES] Visual style API error:", { status: response.status, body: errText.slice(0, 200) })
+        return { error: `API error (${response.status})` }
+      }
+
+      const data = await response.json()
+      const text = data.content?.[0]?.text ?? ""
+
+      // Parse JSON — strip any markdown fences the model might add
+      const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+      const parsed = JSON.parse(jsonStr) as VisualStyleSpec
+
+      if (!parsed.colorPalette || !parsed.materialRendering || !parsed.unifyingContext) {
+        console.error("[CAD-LAB-IMAGES] Visual style missing required fields:", parsed)
+        return { error: "Incomplete visual style response" }
+      }
+
+      console.log("[CAD-LAB-IMAGES] Generated visual style:", {
+        colorPalette: parsed.colorPalette.slice(0, 60),
+        unifyingContext: parsed.unifyingContext.slice(0, 60),
+      })
+
+      return { visualStyle: parsed }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Failed to generate visual style:", errorMsg)
       return { error: errorMsg }
     }
   })

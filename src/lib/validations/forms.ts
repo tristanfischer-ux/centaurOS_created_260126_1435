@@ -1,4 +1,3 @@
-// @ts-nocheck - Zod v4 changed .refine() return type and error handling; update to use .superRefine() or upgrade validation patterns
 import { z } from 'zod'
 
 /**
@@ -34,10 +33,10 @@ export const rfqSchema = z.object({
         .min(20, 'Description must be at least 20 characters')
         .max(5000, 'Description must be less than 5000 characters'),
     rfq_type: z.enum(['commodity', 'custom', 'service'], {
-        required_error: 'Please select an RFQ type',
+        error: 'Please select an RFQ type',
     }),
     urgency: z.enum(['low', 'medium', 'high', 'critical'], {
-        required_error: 'Please select urgency level',
+        error: 'Please select urgency level',
     }),
     deadline: z.string().optional(),
     budget_min: z.number().min(0).optional(),
@@ -84,10 +83,10 @@ export type ProviderProfileFormData = z.infer<typeof providerProfileSchema>
 
 export const bookingSchema = z.object({
     startDate: z.date({
-        required_error: 'Please select a start date',
+        error: 'Please select a start date',
     }),
     endDate: z.date({
-        required_error: 'Please select an end date',
+        error: 'Please select an end date',
     }),
     message: z.string().max(1000, 'Message is too long').optional(),
 }).refine(
@@ -129,7 +128,7 @@ export const certificationSchema = z.object({
         .min(2, 'Issuer must be at least 2 characters')
         .max(100, 'Issuer must be less than 100 characters'),
     issue_date: z.date({
-        required_error: 'Please select issue date',
+        error: 'Please select issue date',
     }),
     expiry_date: z.date().optional(),
     credential_id: z.string().optional(),

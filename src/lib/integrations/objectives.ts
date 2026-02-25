@@ -1,4 +1,3 @@
-// @ts-nocheck - objectives table with nested orders/listings joins returns complex type not matching ObjectiveWithOrders interface
 /**
  * Objective Linking Integration
  * Link orders to objectives and track spend/progress
@@ -149,9 +148,9 @@ export async function getObjectiveOrders(
       orderNumber: order.order_number,
       status: order.status as OrderStatus,
       totalAmount: order.total_amount,
-      currency: order.currency,
+      currency: order.currency ?? 'GBP',
       orderType: order.order_type as OrderType,
-      createdAt: order.created_at,
+      createdAt: order.created_at ?? new Date().toISOString(),
       completedAt: order.completed_at,
       listing: order.listing,
       seller: {
