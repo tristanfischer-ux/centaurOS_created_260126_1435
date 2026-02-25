@@ -215,22 +215,38 @@ export const TOOL_RUN_CALCULATION: ToolDefinition = {
         `Execute a JavaScript calculation in a sandboxed environment. Has access to Math, JSON, Date, Array, Object, Number, String, parseFloat, parseInt, Map, Set, RegExp.
 
 Domain libraries available:
+
+**finance.**
 - finance.npv(rate, cashflows) — Net Present Value (rate as decimal, e.g. 0.1 for 10%)
 - finance.irr(cashflows) — Internal Rate of Return
 - finance.roi(gain, cost) — Return on Investment
 - finance.paybackPeriod(cashflows) — Payback period in years
 - finance.compoundGrowth(startValue, endValue, years) — CAGR
+- finance.burnRate(expenses[]) — Average monthly burn from expense array
+- finance.runway(cashBalance, monthlyBurn) — Months of runway remaining
+- finance.unitEconomics(cac, monthlyRevenue, grossMarginPct?, monthlyChurnRate?) — Returns {ltv, ltvCacRatio, paybackMonths}
+- finance.scenarioTable(baseValue, growthRates[], periods) — Multi-scenario comparison matrix
 
+**charts.**
 - charts.bar(title, data, options?) — Create a bar chart (data: [{label, value}])
 - charts.line(title, data, options?) — Create a line chart
 - charts.pie(title, data) — Create a pie chart
 - charts.area(title, data, options?) — Create an area chart
   Options: {xLabel?, yLabel?, seriesName?, series2Name?}. Data points can include value2 for dual-series.
 
+**stats.**
 - stats.mean(values) — Arithmetic mean
 - stats.median(values) — Median
 - stats.stddev(values) — Sample standard deviation
 - stats.percentile(values, p) — Percentile (p: 0-100)
+- stats.linearRegression(xValues, yValues) — Returns {slope, intercept, rSquared}
+- stats.movingAverage(values, windowSize) — Simple moving average
+- stats.correlation(xValues, yValues) — Pearson correlation coefficient
+- stats.growthRate(values) — Period-over-period growth rates array
+
+**forecast.**
+- forecast.linearForecast(history[], periodsAhead) — Linear trend extrapolation; returns {forecast[], slope, intercept, rSquared}
+- forecast.exponentialSmoothing(values[], alpha?) — Single exponential smoothing; returns {smoothed[], nextForecast}
 
 To output a chart, return a chart spec object using charts.bar(), charts.line(), etc. as the last expression.
 The last expression's value is returned as the result. Use console.log() for intermediate output.`,
@@ -244,6 +260,201 @@ The last expression's value is returned as the result. Use console.log() for int
             },
         },
         required: ["code"],
+    },
+}
+
+// ─── Finance Computation Tools ──────────────────────────────────────
+
+export const TOOL_ANALYZE_CASHFLOW: ToolDefinition = {
+    name: "analyze_cashflow",
+    description:
+        "Analyze the company's cash flow using REAL expense and invoice data. Computes monthly inflows, outflows, burn rate, runway, expense breakdown by category, and optional projections. Use this when the founder asks about burn rate, runway, cash position, or spending trends — gives real numbers, not estimates.",
+    parameters: {
+        type: "object",
+        properties: {
+            time_horizon_months: {
+                type: "number",
+                description: "Number of months to analyze and project. Defaults to 6.",
+            },
+            include_projections: {
+                type: "boolean",
+                description: "Include trend-based projections for future months. Defaults to false.",
+            },
+        },
+        required: [],
+    },
+}
+
+export const TOOL_ANALYZE_BUDGET_VARIANCE: ToolDefinition = {
+    name: "analyze_budget_variance",
+    description:
+        "Compare actual spending against budgets using REAL expense data. Shows over/under-spend per budget category, unbudgeted spending, and variance percentages. Use this when the founder asks about budget adherence, overspending, or financial discipline.",
+    parameters: {
+        type: "object",
+        properties: {
+            budget_id: {
+                type: "string",
+                description: "Specific budget ID to analyze. If omitted, analyzes all active budgets.",
+            },
+            period: {
+                type: "string",
+                enum: ["monthly", "quarterly"],
+                description: "Analysis period. Defaults to 'monthly'.",
+            },
+        },
+        required: [],
+    },
+}
+
+export const TOOL_CALCULATE_UNIT_ECONOMICS: ToolDefinition = {
+    name: "calculate_unit_economics",
+    description:
+        "Calculate unit economics (LTV, LTV/CAC ratio, payback period) from provided inputs. Use this when discussing customer acquisition cost, lifetime value, or SaaS metrics. You provide the numbers from the conversation context — the tool does the math correctly.",
+    parameters: {
+        type: "object",
+        properties: {
+            cac: {
+                type: "number",
+                description: "Customer Acquisition Cost (in the company's currency).",
+            },
+            monthly_revenue_per_customer: {
+                type: "number",
+                description: "Average monthly revenue per customer.",
+            },
+            gross_margin_pct: {
+                type: "number",
+                description: "Gross margin as a percentage (e.g., 70 for 70%). Defaults to 100.",
+            },
+            monthly_churn_rate: {
+                type: "number",
+                description: "Monthly churn rate as a decimal (e.g., 0.05 for 5%). Defaults to 0.01.",
+            },
+        },
+        required: ["cac", "monthly_revenue_per_customer"],
+    },
+}
+
+export const TOOL_FORECAST_METRIC: ToolDefinition = {
+    name: "forecast_metric",
+    description:
+        "Forecast a financial metric (revenue or expenses) using REAL historical data and linear regression. Returns trend analysis, R² fit quality, projected values with confidence intervals, and a chart. Use this when the founder asks 'where are we heading?' or wants revenue/expense projections.",
+    parameters: {
+        type: "object",
+        properties: {
+            metric: {
+                type: "string",
+                enum: ["revenue", "expenses"],
+                description: "Which metric to forecast. Defaults to 'expenses'.",
+            },
+            method: {
+                type: "string",
+                enum: ["linear", "exponential"],
+                description: "Forecasting method. Defaults to 'linear'.",
+            },
+            periods_ahead: {
+                type: "number",
+                description: "Number of months to forecast ahead. Defaults to 3.",
+            },
+        },
+        required: [],
+    },
+}
+
+/** Finance computation tools that provide real calculations from company data. */
+export const FINANCE_COMPUTE_TOOLS: ToolDefinition[] = [
+    TOOL_ANALYZE_CASHFLOW,
+    TOOL_ANALYZE_BUDGET_VARIANCE,
+    TOOL_CALCULATE_UNIT_ECONOMICS,
+    TOOL_FORECAST_METRIC,
+]
+
+// ─── Project/Strategy Computation Tools ─────────────────────────────
+
+export const TOOL_ANALYZE_CRITICAL_PATH: ToolDefinition = {
+    name: "analyze_critical_path",
+    description:
+        "Analyze the critical path through task dependencies using REAL task data. Identifies the longest dependency chain (which determines minimum project duration), bottleneck tasks that block the most work, and tasks with slack that can absorb delays. Use this when the founder asks about project timelines, bottlenecks, or 'what's blocking us?'",
+    parameters: {
+        type: "object",
+        properties: {
+            objective_id: {
+                type: "string",
+                description: "Optional: scope analysis to a specific objective. If omitted, analyzes all tasks.",
+            },
+        },
+        required: [],
+    },
+}
+
+export const TOOL_ANALYZE_WORKLOAD: ToolDefinition = {
+    name: "analyze_workload",
+    description:
+        "Analyze task distribution across team members using REAL assignment data. Detects overloaded team members, identifies people with capacity, and lists unassigned tasks. Use this when the founder asks about team capacity, workload balance, or who can take on more work.",
+    parameters: {
+        type: "object",
+        properties: {},
+        required: [],
+    },
+}
+
+export const TOOL_PREDICT_COMPLETION: ToolDefinition = {
+    name: "predict_completion",
+    description:
+        "Predict objective completion dates based on REAL task completion velocity. Measures how fast tasks are actually being completed (last 30 days) and extrapolates when each objective will finish. Flags objectives that are behind schedule. Use this when the founder asks 'when will X be done?' or 'are we on track?'",
+    parameters: {
+        type: "object",
+        properties: {
+            objective_id: {
+                type: "string",
+                description: "Optional: predict for a specific objective. If omitted, predicts for all active objectives.",
+            },
+        },
+        required: [],
+    },
+}
+
+/** Project/strategy computation tools. */
+export const PROJECT_COMPUTE_TOOLS: ToolDefinition[] = [
+    TOOL_ANALYZE_CRITICAL_PATH,
+    TOOL_ANALYZE_WORKLOAD,
+    TOOL_PREDICT_COMPLETION,
+]
+
+// ─── Marketplace & Outreach Computation Tools ───────────────────────
+
+export const TOOL_SCORE_SUPPLIERS: ToolDefinition = {
+    name: "score_suppliers",
+    description:
+        "Score and rank suppliers based on REAL review data. Computes a weighted composite score from average rating, recommendation rate, and review volume. Use this when comparing suppliers, selecting vendors, or answering 'who should we work with?'",
+    parameters: {
+        type: "object",
+        properties: {
+            category: {
+                type: "string",
+                description: "Optional: filter suppliers by category.",
+            },
+            limit: {
+                type: "number",
+                description: "Maximum suppliers to return. Defaults to 20.",
+            },
+        },
+        required: [],
+    },
+}
+
+export const TOOL_ANALYZE_OUTREACH: ToolDefinition = {
+    name: "analyze_outreach_performance",
+    description:
+        "Analyze outreach campaign performance from REAL email tracking data. Computes open rates, reply rates, conversion funnels by campaign and sequence position, and contact quality distribution. Use this when evaluating campaign effectiveness or planning future outreach.",
+    parameters: {
+        type: "object",
+        properties: {
+            campaign_id: {
+                type: "string",
+                description: "Optional: analyze a specific campaign. If omitted, analyzes all campaigns.",
+            },
+        },
+        required: [],
     },
 }
 

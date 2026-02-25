@@ -26,6 +26,10 @@ import {
     TOOL_QUERY_PAST_ADVICE,
     TOOL_QUERY_MARKETPLACE,
     FINANCE_TOOLS,
+    FINANCE_COMPUTE_TOOLS,
+    PROJECT_COMPUTE_TOOLS,
+    TOOL_SCORE_SUPPLIERS,
+    TOOL_ANALYZE_OUTREACH,
     ENGINEERING_TOOLS,
     ENGINEERING_COMPUTE_TOOLS,
     TOOL_RUN_ENGINEERING_CALC,
@@ -69,6 +73,21 @@ import {
     handleLookupMaterial,
     handleLookupProcess,
 } from "./handlers/engineering-compute"
+import {
+    handleAnalyzeCashflow,
+    handleAnalyzeBudgetVariance,
+    handleCalculateUnitEconomics,
+    handleForecastMetric,
+} from "./handlers/finance-compute"
+import {
+    handleAnalyzeCriticalPath,
+    handleAnalyzeWorkload,
+    handlePredictCompletion,
+} from "./handlers/project-compute"
+import {
+    handleScoreSuppliers,
+    handleAnalyzeOutreachPerformance,
+} from "./handlers/marketplace-compute"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -116,6 +135,21 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     run_calculation: handleRunCalculation,
     web_search: handleWebSearch,
 
+    // Finance computation tools
+    analyze_cashflow: handleAnalyzeCashflow,
+    analyze_budget_variance: handleAnalyzeBudgetVariance,
+    calculate_unit_economics: handleCalculateUnitEconomics,
+    forecast_metric: handleForecastMetric,
+
+    // Project/strategy computation tools
+    analyze_critical_path: handleAnalyzeCriticalPath,
+    analyze_workload: handleAnalyzeWorkload,
+    predict_completion: handlePredictCompletion,
+
+    // Marketplace & outreach computation tools
+    score_suppliers: handleScoreSuppliers,
+    analyze_outreach_performance: handleAnalyzeOutreachPerformance,
+
     // Engineering computation tools (Python on Modal)
     run_engineering_calc: handleRunEngineeringCalc,
     calculate_stress: handleCalculateStress,
@@ -134,8 +168,8 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
  * domain-specific tools. Data-heavy specialists get run_calculation.
  */
 const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
-    // Strategy — needs strategic goals + finance context + calculation
-    strategist: [...COMMON_TOOLS, ...STRATEGY_TOOLS, ...FINANCE_TOOLS, TOOL_RUN_CALCULATION],
+    // Strategy — needs strategic goals + finance context + calculation + project analysis
+    strategist: [...COMMON_TOOLS, ...STRATEGY_TOOLS, ...FINANCE_TOOLS, ...FINANCE_COMPUTE_TOOLS, ...PROJECT_COMPUTE_TOOLS, TOOL_RUN_CALCULATION],
 
     // CTO — engineering metrics + product roadmap + calculation + engineering compute
     cto: [
@@ -149,12 +183,13 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
         TOOL_CALCULATE_TOLERANCE_STACK,
     ],
 
-    // VP Engineering — engineering metrics + people context + all engineering computation tools
+    // VP Engineering — engineering metrics + people context + all engineering computation tools + project analysis
     "vp-engineering": [
         ...COMMON_TOOLS,
         ...ENGINEERING_TOOLS,
         ...PEOPLE_TOOLS,
         ...ENGINEERING_COMPUTE_TOOLS,
+        ...PROJECT_COMPUTE_TOOLS,
         TOOL_RUN_ENGINEERING_CALC,
         TOOL_RUN_CALCULATION,
     ],
@@ -167,24 +202,25 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
         TOOL_RUN_CALCULATION,
     ],
 
-    // VP Supply Chain — marketplace + material/process lookups + tolerance analysis
+    // VP Supply Chain — marketplace + material/process lookups + tolerance analysis + supplier scoring
     "vp-supply-chain": [
         ...COMMON_TOOLS,
         TOOL_QUERY_MARKETPLACE,
+        TOOL_SCORE_SUPPLIERS,
         TOOL_LOOKUP_MATERIAL,
         TOOL_LOOKUP_PROCESS,
         TOOL_CALCULATE_TOLERANCE_STACK,
         TOOL_RUN_CALCULATION,
     ],
 
-    // Product Lead — product roadmap + common
-    "product-lead": [...COMMON_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],
+    // Product Lead — product roadmap + common + project analysis
+    "product-lead": [...COMMON_TOOLS, ...PRODUCT_TOOLS, ...PROJECT_COMPUTE_TOOLS, TOOL_RUN_CALCULATION],
 
-    // Growth Marketing — common + marketing tools + marketplace + calculation
-    "growth-marketer": [...COMMON_TOOLS, ...MARKETING_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_RUN_CALCULATION],
+    // Growth Marketing — common + marketing tools + marketplace + calculation + outreach analytics
+    "growth-marketer": [...COMMON_TOOLS, ...MARKETING_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_ANALYZE_OUTREACH, TOOL_RUN_CALCULATION],
 
-    // Sales Lead — common + financial overview + marketplace
-    "sales-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS, TOOL_QUERY_MARKETPLACE],
+    // Sales Lead — common + financial overview + marketplace + supplier scoring
+    "sales-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_SCORE_SUPPLIERS],
 
     // Chief of Staff — needs everything for cross-functional coordination
     "chief-of-staff": [
@@ -192,14 +228,16 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
         ...STRATEGY_TOOLS,
         ...PEOPLE_TOOLS,
         ...FINANCE_TOOLS,
+        ...FINANCE_COMPUTE_TOOLS,
+        ...PROJECT_COMPUTE_TOOLS,
         TOOL_RUN_CALCULATION,
     ],
 
-    // Finance Lead — finance tools + calculation (core for CFO)
-    "finance-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS, TOOL_RUN_CALCULATION],
+    // Finance Lead — finance tools + calculation + finance computation (core for CFO)
+    "finance-lead": [...COMMON_TOOLS, ...FINANCE_TOOLS, ...FINANCE_COMPUTE_TOOLS, TOOL_RUN_CALCULATION],
 
-    // Fundraising Advisor — finance tools + calculation
-    "fundraising-advisor": [...COMMON_TOOLS, ...FINANCE_TOOLS, TOOL_RUN_CALCULATION],
+    // Fundraising Advisor — finance tools + calculation + finance computation
+    "fundraising-advisor": [...COMMON_TOOLS, ...FINANCE_TOOLS, ...FINANCE_COMPUTE_TOOLS, TOOL_RUN_CALCULATION],
 
     // People/HR — people tools + team overview
     "hiring-team": [...COMMON_TOOLS, ...PEOPLE_TOOLS],
