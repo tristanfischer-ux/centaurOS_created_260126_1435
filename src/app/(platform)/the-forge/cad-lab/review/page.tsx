@@ -104,26 +104,62 @@ export default function CadLabReviewPage(): React.ReactNode {
   const hasAnyData = modules.length > 0 || hasResearch || !!researchResult
 
   // ── Section navigation state ──
-  const REVIEW_SECTIONS = useMemo(() => [
-    { id: "review-header", label: "Overview" },
-    { id: "executive-summary", label: "Summary" },
-    { id: "review-package", label: "Review" },
-    { id: "dfm-analysis", label: "DFM" },
-    { id: "risk-register", label: "Risks" },
-    { id: "diagnostics", label: "Diagnostics" },
-    { id: "supply-chain", label: "Supply Chain" },
-    { id: "timeline", label: "Timeline" },
-    { id: "requirements-map", label: "Requirements" },
-    { id: "bill-of-materials", label: "BOM" },
-    { id: "raw-materials", label: "Materials" },
-    { id: "cost-estimate", label: "Cost" },
-    { id: "drawing-exports", label: "Exports" },
-    { id: "experts", label: "Experts" },
-    { id: "factory-guide", label: "Factory" },
-    { id: "contracting", label: "Contracts" },
+  const REVIEW_SECTION_GROUPS = useMemo(() => [
+    {
+      group: "Engineering",
+      sections: [
+        { id: "executive-summary", label: "Summary" },
+        { id: "review-package", label: "Review" },
+        { id: "dfm-analysis", label: "DFM" },
+        { id: "risk-register", label: "Risks" },
+      ],
+    },
+    {
+      group: "Manufacturing",
+      sections: [
+        { id: "diagnostics", label: "Diagnostics" },
+        { id: "requirements-map", label: "Requirements" },
+        { id: "bill-of-materials", label: "BOM" },
+        { id: "raw-materials", label: "Materials" },
+      ],
+    },
+    {
+      group: "Commercial",
+      sections: [
+        { id: "cost-estimate", label: "Cost" },
+        { id: "supply-chain", label: "Supply Chain" },
+        { id: "timeline", label: "Timeline" },
+      ],
+    },
+    {
+      group: "Engagement",
+      sections: [
+        { id: "experts", label: "Experts" },
+        { id: "factory-guide", label: "Factory" },
+        { id: "contracting", label: "Contracts" },
+      ],
+    },
+    {
+      group: "Exports",
+      sections: [
+        { id: "drawing-exports", label: "Exports" },
+      ],
+    },
   ], [])
 
+  // Flat section list for IntersectionObserver — includes top anchor
+  const REVIEW_SECTIONS = useMemo(
+    () => [{ id: "review-header", label: "Overview" }, ...REVIEW_SECTION_GROUPS.flatMap((g) => g.sections)],
+    [REVIEW_SECTION_GROUPS],
+  )
+
   const [activeSection, setActiveSection] = useState("review-header")
+
+  // Derived: which group is currently in view
+  const activeGroup = useMemo(
+    () => REVIEW_SECTION_GROUPS.find((g) => g.sections.some((s) => s.id === activeSection))?.group ?? null,
+    [REVIEW_SECTION_GROUPS, activeSection],
+  )
 
   const handleSectionClick = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -240,26 +276,45 @@ export default function CadLabReviewPage(): React.ReactNode {
       {/* ── Section navigation ── */}
       {hasAnyData && (
         <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
+          {/* Group pills */}
           <div className="flex items-center gap-1">
-            {REVIEW_SECTIONS.map((section) => (
+            {REVIEW_SECTION_GROUPS.map((group) => (
               <button
-                key={section.id}
-                onClick={() => handleSectionClick(section.id)}
+                key={group.group}
+                onClick={() => handleSectionClick(group.sections[0].id)}
                 className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                  activeSection === section.id
+                  activeGroup === group.group
                     ? "bg-international-orange-light text-international-orange"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
-                {section.label}
+                {group.group}
               </button>
             ))}
           </div>
+          {/* Active group child sections */}
+          {activeGroup && (
+            <div className="flex items-center gap-0.5 mt-1">
+              {REVIEW_SECTION_GROUPS.find((g) => g.group === activeGroup)?.sections.map((section) => (
+                <button
+                  key={section.id}
+                  onClick={() => handleSectionClick(section.id)}
+                  className={`px-2 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
+                    activeSection === section.id
+                      ? "text-international-orange font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+          )}
         </nav>
       )}
 
-      {/* ── Build Context Summary — carries forward key context from Build stage ── */}
-      <Card className="overflow-hidden">
+      {/* ── Project Overview — system context + key metrics merged into one card ── */}
+      <Card id="executive-summary" className="overflow-hidden">
         <div className="flex items-start gap-4 p-5">
           {/* System illustration thumbnail */}
           {systemIllustrationUrl && (
@@ -288,12 +343,18 @@ export default function CadLabReviewPage(): React.ReactNode {
             </div>
           </div>
         </div>
-        {/* Collapsible: Build module overview */}
+        {/* Executive metrics row */}
+        {modules.length > 0 && (
+          <div className="px-5 pb-5 border-t pt-4">
+            <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} bare />
+          </div>
+        )}
+        {/* Collapsible: module overview */}
         <button
           onClick={() => setShowBuildContext(!showBuildContext)}
           className="flex items-center justify-between w-full px-5 py-2.5 border-t text-left hover:bg-muted/50 transition-colors"
         >
-          <span className="text-xs font-medium text-muted-foreground">Build Stage Summary</span>
+          <span className="text-xs font-medium text-muted-foreground">Module Overview</span>
           {showBuildContext
             ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
@@ -331,18 +392,15 @@ export default function CadLabReviewPage(): React.ReactNode {
         )}
       </Card>
 
-      {/* Executive summary — key metrics at a glance */}
-      <div id="executive-summary">
-        <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
-      </div>
-
       {/* Engineering review package — quality scorecard, per-module summary */}
       <div id="review-package">
+        <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
         <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
       </div>
 
       {/* DFM analysis dashboard — manufacturing grade, risk register */}
       <div id="dfm-analysis">
+        <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
         <CadLabAnalysisDashboard modules={modules} projectName={subject} />
       </div>
 
@@ -398,6 +456,7 @@ export default function CadLabReviewPage(): React.ReactNode {
 
       {/* Expert discipline matching */}
       <div id="experts">
+        <p className="text-[11px] text-muted-foreground mb-2">Specialist matching based on Build modules</p>
         <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
       </div>
 

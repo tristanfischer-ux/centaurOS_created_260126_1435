@@ -49,6 +49,8 @@ interface CadLabExecutiveSummaryProps {
   modules: CadLabModule[]
   diagnosticAnswers: DiagnosticAnswers
   projectName: string
+  /** When true, renders just the metrics content without a Card wrapper (for embedding in another card) */
+  bare?: boolean
 }
 
 interface SummaryData {
@@ -72,6 +74,7 @@ export function CadLabExecutiveSummary({
   modules,
   diagnosticAnswers,
   projectName,
+  bare,
 }: CadLabExecutiveSummaryProps): React.ReactNode {
   const data = useMemo((): SummaryData => {
     let totalMassKg = 0
@@ -152,18 +155,8 @@ export function CadLabExecutiveSummary({
         ? `${(data.totalMassKg * 1000).toFixed(0)}g`
         : `${data.totalMassKg.toFixed(2)}kg`
 
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
-          <CircleDot className="h-4 w-4" />
-          Executive Summary
-          <span className="text-xs font-normal text-muted-foreground">
-            {projectName}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+  const metricsContent = (
+    <div className="space-y-4">
         {/* Hero metrics row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <MetricCard
@@ -288,7 +281,23 @@ export function CadLabExecutiveSummary({
             </div>
           </div>
         </div>
-      </CardContent>
+    </div>
+  )
+
+  if (bare) return metricsContent
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <CircleDot className="h-4 w-4" />
+          Executive Summary
+          <span className="text-xs font-normal text-muted-foreground">
+            {projectName}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{metricsContent}</CardContent>
     </Card>
   )
 }

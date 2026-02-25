@@ -478,30 +478,45 @@ export default function CadLabBuildPage(): React.ReactNode {
         /></div>
       )}
 
-      {/* ── Research Report (moved from Concept — this is where the user first reads it in depth) ── */}
+      {/* ── Research Report — collapsed by default once modules exist (reference material) ── */}
       {hasResearch && (
-        <div id="build-research"><ResearchSection
-          hasResearch={hasResearch}
-          isAnyLoading={isAnyLoading}
-          researchResult={researchResult}
-          editableReport={editableReport}
-          setEditableReport={setEditableReport}
-          showSources={showSources}
-          setShowSources={setShowSources}
-          handleReset={handleReset}
-          onRetryResearch={handleResearch}
-          systemIllustrationUrl={systemIllustrationUrl}
-          systemIllustrationStatus={systemIllustrationStatus}
-        /></div>
+        <div id="build-research">
+          <CollapsibleSection
+            title="Research Report"
+            subtitle={editableReport
+              ? editableReport.slice(0, 100).replace(/\n/g, " ").trim() + (editableReport.length > 100 ? "…" : "")
+              : "Market analysis and technical overview"}
+            icon={<FileText className="h-4 w-4" />}
+            defaultOpen={modules.length === 0}
+          >
+            <ResearchSection
+              hasResearch={hasResearch}
+              isAnyLoading={isAnyLoading}
+              researchResult={researchResult}
+              editableReport={editableReport}
+              setEditableReport={setEditableReport}
+              showSources={showSources}
+              setShowSources={setShowSources}
+              handleReset={handleReset}
+              onRetryResearch={handleResearch}
+              systemIllustrationUrl={systemIllustrationUrl}
+              systemIllustrationStatus={systemIllustrationStatus}
+            />
+          </CollapsibleSection>
+        </div>
       )}
 
       {/* ── Manufacturing Context (moved from Concept) ── */}
       {hasResearch && (
         <div id="build-mfg-context"><CollapsibleSection
           title="Manufacturing Context"
-          subtitle="Process, material, tolerance, and compliance preferences"
+          subtitle={
+            designBrief.useCase && designBrief.targetProcess && designBrief.targetMaterial
+              ? `${designBrief.targetProcess} · ${designBrief.targetMaterial} · ${designBrief.useCase}`
+              : "Process, material, tolerance, and compliance preferences"
+          }
           icon={<Ruler className="h-4 w-4" />}
-          defaultOpen={false}
+          defaultOpen={!(designBrief.useCase && designBrief.targetProcess && designBrief.targetMaterial)}
         >
           <DesignIntakeForm
             modelId={modelId}
