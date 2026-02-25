@@ -45,6 +45,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
+import { CompanyLocationMap } from "@/components/marketplace/CompanyLocationMap"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
@@ -198,7 +199,12 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                 <div className="space-y-4">
                     {/* Key Metrics */}
                     <KeyMetricsCard category={category} attrs={attrs} />
-                    
+
+                    {/* Location Map */}
+                    {(attrs.ch_registered_address || attrs.location) && (
+                        <CompanyLocationMap address={String(attrs.ch_registered_address || attrs.location)} />
+                    )}
+
                     {/* Trust & Credentials Section */}
                     {(trustSignals || ratings) && (
                         <ProviderTrustSection
