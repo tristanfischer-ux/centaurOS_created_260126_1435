@@ -28,6 +28,7 @@ import { FAST_MODEL_CHAIN, buildSpeculativeFastPrompt, parseComplexityTag } from
 import { getSpecialistWorkflows } from "@/lib/agents/specialist-workflows"
 // AUDIT: Decision journal imports moved to post-response-handler.ts (2026-02-19, refactor step 7 of 8)
 import { buildContextLayers, buildCrossSpecialistContext } from "@/lib/agents/prompt-builder"
+import { classifyComplexity } from "@/lib/agents/complexity-classifier"
 import { buildHandoffContext } from "@/lib/agents/handoff-context"
 import { createPostResponseCallback } from "@/lib/agents/post-response-handler"
 import { shouldTriggerWebSearch, runPreSearch, formatSearchResultsForPrompt } from "@/lib/agents/web-search"
@@ -1167,6 +1168,22 @@ Rules:
             const truncatedContext = sections.join("\n\n")
             systemPromptWithContext = systemPromptWithContext.replace(companyContext, truncatedContext)
             console.warn(`[agents/execute] Trimmed company context: removed ${trimmedChars} chars (${sections.length} sections kept)`, { specialistId })
+        }
+    }
+
+    // Complexity-based tier escalation — Fix 4
+    // When a minimax-tier specialist receives a request classified as 'high' complexity
+    // (long message + analysis/strategy keywords + multiple questions), escalate to the
+    // qwen tier for that single request to maintain response quality.
+    // DECISION: minimax→qwen only (not qwen→claude) to keep cost predictable.
+    if (modelTier === 'minimax' && specialistId && modality === 'text') {
+        const complexity = classifyComplexity(input)
+        if (complexity === 'high') {
+            console.info('[agents/execute] Complexity escalation: minimax → qwen', {
+                specialistId,
+                inputLength: input.length,
+            })
+            modelTier = 'qwen'
         }
     }
 
