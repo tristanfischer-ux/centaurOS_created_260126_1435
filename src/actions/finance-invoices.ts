@@ -402,7 +402,12 @@ function mapStandaloneInvoice(row: any): StandaloneInvoice {
     invoiceNumber: row.invoice_number,
     recipientName: row.recipient_name,
     recipientEmail: row.recipient_email,
-    lineItems: (row.line_items as InvoiceLineItem[]) ?? [],
+    lineItems: (() => {
+      const raw = row.line_items
+      if (Array.isArray(raw)) return raw as InvoiceLineItem[]
+      if (typeof raw === 'string') { try { return JSON.parse(raw) as InvoiceLineItem[] } catch { return [] } }
+      return []
+    })(),
     subtotal: row.subtotal,
     vatAmount: row.vat_amount,
     total: row.total,

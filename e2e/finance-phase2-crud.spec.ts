@@ -138,17 +138,20 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     // Loop through projects to find one with a deletable manual transaction.
     // project-detail-view.tsx marks rows with data-testid="tx-row" and delete buttons
     // with data-testid="tx-delete-btn" (only rendered for manual transactions).
+    //
+    // GOTCHA: clicking Next.js <Link> + waitForLoadState('networkidle') does NOT wait
+    // for client-side navigation. Use page.goto() with the href instead.
     let foundDeletable = false
 
-    for (let p = 0; p < 15; p++) {
-      await page.goto(`${BASE}/finance/projects`)
-      await page.waitForLoadState('networkidle')
+    // Collect project hrefs from the list page first
+    await page.goto(`${BASE}/finance/projects`)
+    await page.waitForLoadState('networkidle')
+    const projectHrefs = await page.locator('a[href*="/finance/projects/"]').evaluateAll(
+      (els) => els.map((el) => (el as HTMLAnchorElement).href)
+    )
 
-      const projectLinks = page.locator('a[href*="/finance/projects/"]')
-      const linkCount = await projectLinks.count()
-      if (p >= linkCount) break
-
-      await projectLinks.nth(p).click()
+    for (const projectUrl of projectHrefs.slice(0, 15)) {
+      await page.goto(projectUrl)
       await page.waitForLoadState('networkidle')
 
       const txRows = page.locator('[data-testid="tx-row"]')
