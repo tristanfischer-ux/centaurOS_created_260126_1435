@@ -82,6 +82,9 @@ import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
 import type { SpecialistId } from "./specialists-data"
 import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
 import { recordSpecialistFeedback } from "@/actions/specialist-feedback"
+import { findRelatedPendingDecisions } from "@/actions/decision-outcomes"
+import { DecisionOutcomePrompt } from "@/components/specialists/decision-outcome-prompt"
+import type { DecisionEntry } from "@/lib/agents/decision-journal"
 import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
@@ -342,6 +345,9 @@ export function BriefSpecialistDialog({
 
     // Per-message feedback state (index → rating)
     const [messageFeedback, setMessageFeedback] = useState<Record<number, 'positive' | 'negative'>>({})
+
+    /** Pending decisions surfaced for outcome recording after assistant responses */
+    const [decisionPrompts, setDecisionPrompts] = useState<DecisionEntry[]>([])
 
     const textareaRef = useRef<HTMLTextAreaElement>(null)
     const panelFileInputRef = useRef<HTMLInputElement>(null)
@@ -1393,6 +1399,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setMessages((prev) => [...prev, assistantMessage])
             setStreamingResponse("")
 
+            // After response completes, surface any pending decisions related to this response
+            setDecisionPrompts([]) // Clear previous prompts
+            findRelatedPendingDecisions(displayResponse, specialist.id).then(related => {
+                if (related.length > 0) setDecisionPrompts(related)
+            }).catch(() => {})
+
             // Finish streaming TTS with the cleaned display text (plays any remaining sentence)
             if (isTtsStreaming) {
                 tts.finishStreaming(displayResponse)
@@ -2286,6 +2298,21 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     compact
                                 />
 
+                                {/* Decision outcome prompts — surfaces pending decisions matching the last response */}
+                                {decisionPrompts.length > 0 && !isExecuting && (
+                                    <div className="space-y-1.5">
+                                        {decisionPrompts.map(decision => (
+                                            <DecisionOutcomePrompt
+                                                key={decision.id}
+                                                decision={decision}
+                                                compact
+                                                onDismiss={() => setDecisionPrompts(prev => prev.filter(d => d.id !== decision.id))}
+                                                onRecorded={(id) => setDecisionPrompts(prev => prev.filter(d => d.id !== id))}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+
                                 {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (
                                     <div className="flex gap-2.5 justify-start">
@@ -3178,6 +3205,20 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     onFeedback={handleFeedback}
                                     tts={tts}
                                 />
+
+                                {/* Decision outcome prompts — surfaces pending decisions matching the last response */}
+                                {decisionPrompts.length > 0 && !isExecuting && (
+                                    <div className="space-y-2">
+                                        {decisionPrompts.map(decision => (
+                                            <DecisionOutcomePrompt
+                                                key={decision.id}
+                                                decision={decision}
+                                                onDismiss={() => setDecisionPrompts(prev => prev.filter(d => d.id !== decision.id))}
+                                                onRecorded={(id) => setDecisionPrompts(prev => prev.filter(d => d.id !== id))}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
 
                                 {/* Streaming indicator — speculative dual-stream or standard */}
                                 {isStreaming && (
