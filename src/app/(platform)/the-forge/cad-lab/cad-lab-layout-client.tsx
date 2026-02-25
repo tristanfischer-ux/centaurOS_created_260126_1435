@@ -42,7 +42,7 @@ import { SECTOR_LABELS } from "@/types/foundry"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { CadLabProvider, useCadLab } from "./cad-lab-context"
-import { CadLabNav } from "./cad-lab-nav"
+import { CadLabNav, CadLabBottomNav } from "./cad-lab-nav"
 import { formatRelativeTime } from "./cad-lab-utils"
 
 export function CadLabProviderWrapper({ children }: { children: React.ReactNode }): React.ReactNode {
@@ -126,7 +126,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   }, [])
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       {/* ── Header (consolidated: breadcrumb + title + badges in 2 rows) ── */}
       <div className="pb-4 border-b border-muted space-y-2">
         {/* Row 1: Breadcrumb + save status + projects */}
@@ -346,6 +346,9 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
           subject={subject}
         />
       )}
+
+      {/* ── Sticky bottom pipeline nav (pipeline pages only) ── */}
+      {!isMashupOrTemplates(pathname) && <CadLabBottomNav />}
     </div>
   )
 }

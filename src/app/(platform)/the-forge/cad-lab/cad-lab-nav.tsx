@@ -49,7 +49,7 @@ interface StageDefinition {
   features: string[]
 }
 
-const STAGES: StageDefinition[] = [
+export const STAGES: StageDefinition[] = [
   {
     id: "research",
     label: "Concept",
@@ -90,7 +90,7 @@ const STAGES: StageDefinition[] = [
  * @param generatedCount - Number of modules with generated CAD
  * @returns Access map with enabled/completed per stage
  */
-function getStageAccess(
+export function getStageAccess(
   hasResearch: boolean,
   moduleCount: number,
   generatedCount: number,
@@ -100,6 +100,111 @@ function getStageAccess(
     build: { enabled: hasResearch && moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
     review: { enabled: true, completed: generatedCount > 0 && generatedCount === moduleCount },
   }
+}
+
+/**
+ * CadLabBottomNav — Persistent fixed bottom bar for pipeline stage navigation.
+ *
+ * @description Always visible at the bottom of the viewport on pipeline pages,
+ * allowing users to switch stages without scrolling back to the top stepper.
+ * Active stage is highlighted in International Orange. Locked stages open the
+ * same preview dialog as the top stepper.
+ */
+export function CadLabBottomNav(): React.ReactNode {
+  const pathname = usePathname()
+  const { hasResearch, modules, generatedModuleCount } = useCadLab()
+  const [previewStageId, setPreviewStageId] = useState<string | null>(null)
+
+  const access = getStageAccess(hasResearch, modules.length, generatedModuleCount)
+  const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
+
+  return (
+    <>
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t border-border"
+        aria-label="Pipeline stage navigation"
+      >
+        <div className="flex items-stretch h-14 max-w-screen-lg mx-auto">
+          {STAGES.map((stage) => {
+            const { enabled, completed } = access[stage.id]
+            const isActive = stage.href === FORGE_ROUTES.cadLab
+              ? pathname === FORGE_ROUTES.cadLab
+              : pathname.startsWith(stage.href)
+            const Icon = stage.icon
+
+            return enabled ? (
+              <Link
+                key={stage.id}
+                href={stage.href}
+                className={cn(
+                  "flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium transition-colors",
+                  isActive
+                    ? "text-international-orange border-t-2 border-international-orange -mt-px"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-current={isActive ? "step" : undefined}
+              >
+                {completed && !isActive
+                  ? <CheckCircle2 className="h-4 w-4" />
+                  : <Icon className="h-4 w-4" />}
+                <span>{stage.label}</span>
+              </Link>
+            ) : (
+              <button
+                key={stage.id}
+                onClick={() => setPreviewStageId(stage.id)}
+                className="flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground/50 transition-opacity hover:opacity-70"
+              >
+                <Icon className="h-4 w-4" />
+                <span>{stage.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </nav>
+
+      {/* Locked-stage preview dialog (same content as top stepper) */}
+      <Dialog open={previewStageId !== null} onOpenChange={(open) => { if (!open) setPreviewStageId(null) }}>
+        <DialogContent size="sm">
+          {previewStage && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <previewStage.icon className="h-5 w-5 text-muted-foreground" />
+                  {previewStage.label}
+                </DialogTitle>
+                <DialogDescription>
+                  {previewStage.description}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-muted/50 border border-muted">
+                  <Lock className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-xs font-medium text-foreground">How to unlock</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{previewStage.unlockHint}</p>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    What you&apos;ll get
+                  </p>
+                  <ul className="space-y-1.5">
+                    {previewStage.features.map((feature) => (
+                      <li key={feature} className="text-sm text-foreground flex items-center gap-2">
+                        <div className="h-1.5 w-1.5 rounded-full bg-international-orange flex-shrink-0" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  )
 }
 
 /**
