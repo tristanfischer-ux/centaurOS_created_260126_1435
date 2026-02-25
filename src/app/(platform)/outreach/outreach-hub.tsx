@@ -9,14 +9,16 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Plus, Users, Mail, Megaphone, Database } from 'lucide-react'
+import { Send, Plus, Users, Mail, Megaphone, Database, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
 import { getCampaigns, deleteCampaign } from '@/actions/outreach'
 import { CampaignCard } from './campaign-card'
 import { CreateCampaignDialog } from './create-campaign-dialog'
+import { OutreachDashboard } from './outreach-dashboard'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import type { Campaign } from '@/types/outreach'
 
 interface OutreachHubProps {
@@ -29,6 +31,7 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
     const [campaigns, setCampaigns] = useState<Campaign[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isCreateOpen, setIsCreateOpen] = useState(false)
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'campaigns'>('dashboard')
     const [isPending, startTransition] = useTransition()
 
     const loadCampaigns = useCallback(async () => {
@@ -98,74 +101,114 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                 </div>
             </div>
 
-            {/* Quick stats */}
-            {campaigns.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-international-orange/10">
-                                <Megaphone className="h-5 w-5 text-international-orange" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-foreground">{campaigns.length}</p>
-                                <p className="text-xs text-muted-foreground">Campaigns</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-info/10">
-                                <Users className="h-5 w-5 text-info" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
-                                <p className="text-xs text-muted-foreground">Total Contacts</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-success/10">
-                                <Mail className="h-5 w-5 text-success" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-foreground">{totalSequenced}</p>
-                                <p className="text-xs text-muted-foreground">Sequenced</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            {/* Tab toggle */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-fit">
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('dashboard')}
+                    className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                        activeTab === 'dashboard'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    )}
+                >
+                    <LayoutDashboard className="h-4 w-4" />
+                    Dashboard
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('campaigns')}
+                    className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                        activeTab === 'campaigns'
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                    )}
+                >
+                    <Megaphone className="h-4 w-4" />
+                    Campaigns
+                </button>
+            </div>
+
+            {/* Dashboard tab */}
+            {activeTab === 'dashboard' && (
+                <OutreachDashboard />
             )}
 
-            {/* Campaign grid or empty state */}
-            {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-48 rounded-lg bg-muted animate-pulse" />
-                    ))}
-                </div>
-            ) : campaigns.length === 0 ? (
-                <EmptyState
-                    icon={<Send className="h-12 w-12" />}
-                    title="Create your first outreach campaign"
-                    description="Import prospects, let Sal generate personalized email sequences, then copy and send."
-                    action={
-                        <Button onClick={() => setIsCreateOpen(true)}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Campaign
-                        </Button>
-                    }
-                />
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {campaigns.map(campaign => (
-                        <CampaignCard
-                            key={campaign.id}
-                            campaign={campaign}
-                            onDelete={() => handleDelete(campaign.id)}
+            {/* Campaigns tab */}
+            {activeTab === 'campaigns' && (
+                <>
+                    {/* Quick stats */}
+                    {campaigns.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <Card>
+                                <CardContent className="flex items-center gap-3 p-4">
+                                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-international-orange/10">
+                                        <Megaphone className="h-5 w-5 text-international-orange" />
+                                    </div>
+                                    <div>
+                                        <p className="text-2xl font-bold text-foreground">{campaigns.length}</p>
+                                        <p className="text-xs text-muted-foreground">Campaigns</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="flex items-center gap-3 p-4">
+                                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-info/10">
+                                        <Users className="h-5 w-5 text-info" />
+                                    </div>
+                                    <div>
+                                        <p className="text-2xl font-bold text-foreground">{totalContacts}</p>
+                                        <p className="text-xs text-muted-foreground">Total Contacts</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="flex items-center gap-3 p-4">
+                                    <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-success/10">
+                                        <Mail className="h-5 w-5 text-success" />
+                                    </div>
+                                    <div>
+                                        <p className="text-2xl font-bold text-foreground">{totalSequenced}</p>
+                                        <p className="text-xs text-muted-foreground">Sequenced</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+
+                    {/* Campaign grid or empty state */}
+                    {isLoading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {[1, 2, 3].map(i => (
+                                <div key={i} className="h-48 rounded-lg bg-muted animate-pulse" />
+                            ))}
+                        </div>
+                    ) : campaigns.length === 0 ? (
+                        <EmptyState
+                            icon={<Send className="h-12 w-12" />}
+                            title="Create your first outreach campaign"
+                            description="Import prospects, let Sal generate personalized email sequences, then copy and send."
+                            action={
+                                <Button onClick={() => setIsCreateOpen(true)}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    New Campaign
+                                </Button>
+                            }
                         />
-                    ))}
-                </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {campaigns.map(campaign => (
+                                <CampaignCard
+                                    key={campaign.id}
+                                    campaign={campaign}
+                                    onDelete={() => handleDelete(campaign.id)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </>
             )}
 
             {/* Create campaign dialog */}

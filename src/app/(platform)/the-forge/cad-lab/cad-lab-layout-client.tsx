@@ -88,7 +88,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     projects, isLoadingProjects,
     handleLoadProject, handleDeleteProject, handleReset,
     // Progress
-    progressLines, isResearching, isDecomposing, isBatchRunning, activeModuleId,
+    progressLines, isResearching, isDecomposing, isBatchRunning, generatingModuleIds,
     // Milestone
     milestone, setMilestone,
     // Post-research idle detection
@@ -104,7 +104,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     }
   }, [projectParam, handleLoadProject])
 
-  const isAnyActive = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
+  const isAnyActive = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
   const currentStageLabel = getCurrentStageLabel(pathname)
 
   // Auto-dismiss the research milestone banner after 8s (other milestones stay until dismissed)

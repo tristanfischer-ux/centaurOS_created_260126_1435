@@ -61,7 +61,7 @@ interface ModuleCarouselProps {
   modules: CadLabModule[]
   batchProgress: Record<string, BatchStatus>
   isBatchRunning: boolean
-  activeModuleId: string | null
+  generatingModuleIds: Set<string>
   onGenerate: (moduleId: string) => void
   onViewResult?: (moduleId: string) => void
   /** When true, after starting generation for current module, auto-advance to next */
@@ -76,7 +76,7 @@ export function ModuleCarousel({
   modules,
   batchProgress,
   isBatchRunning,
-  activeModuleId,
+  generatingModuleIds,
   onGenerate,
   onViewResult,
   autoAdvanceOnGenerate = true,
@@ -88,7 +88,7 @@ export function ModuleCarousel({
   const isGenerating = status === "interface" || status === "generating"
   const isDone = status === "done"
   const isError = status === "error"
-  const canGenerate = focusedModule && focusedModule.status !== "generated" && !activeModuleId && !isBatchRunning
+  const canGenerate = focusedModule && focusedModule.status !== "generated" && !generatingModuleIds.has(focusedModule.id) && !isBatchRunning
 
   // Auto-advance to next pending module when current one starts generating
   const handleGenerateClick = useCallback(() => {

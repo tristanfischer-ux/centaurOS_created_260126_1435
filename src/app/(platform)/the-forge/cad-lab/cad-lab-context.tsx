@@ -114,7 +114,7 @@ export interface CadLabContextValue {
   setModules: Dispatch<SetStateAction<CadLabModule[]>>
   expandedModuleId: string | null
   setExpandedModuleId: (v: string | null) => void
-  activeModuleId: string | null
+  generatingModuleIds: Set<string>
   diagnosticAnswers: DiagnosticAnswers
   setDiagnosticAnswers: Dispatch<SetStateAction<DiagnosticAnswers>>
   aiPrefilled: boolean
@@ -258,7 +258,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [modules, setModules] = useState<CadLabModule[]>([])
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
-  const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
+  const [generatingModuleIds, setGeneratingModuleIds] = useState<Set<string>>(new Set())
+
+  const startGenerating = useCallback((id: string) => {
+    setGeneratingModuleIds((prev) => new Set(prev).add(id))
+  }, [])
+
+  const stopGenerating = useCallback((id: string) => {
+    setGeneratingModuleIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
   const [diagnosticAnswers, setDiagnosticAnswers] = useState<DiagnosticAnswers>({})
   const [aiPrefilled, setAiPrefilled] = useState(false)
 
@@ -312,7 +324,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     designBrief.quantityTarget,
   ]
   const designReadinessPct = Math.round((readinessFields.filter((v) => v.trim().length > 0).length / readinessFields.length) * 100)
-  const isAnyLoading = isResearching || isDecomposing || isBatchRunning || activeModuleId !== null
+  const isAnyLoading = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
   const generatedModuleCount = modules.filter((m) => m.status === "generated").length
   const riskCount = modules.reduce(
     (sum, m) => sum + m.failureModes.length + m.unknowns.length + (m.result?.dfm?.issues?.length ?? 0),
@@ -591,7 +603,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod) return
 
-    setActiveModuleId(moduleId)
+    startGenerating(moduleId)
     setProgressLines([])
 
     const moduleResearchText = mod.moduleResearch ||
@@ -653,8 +665,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
       }
     }
-    setActiveModuleId(null)
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine])
+    stopGenerating(moduleId)
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating])
 
   /**
    * Single-click handler that runs the full pipeline for one module
@@ -667,7 +679,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod || !activeProjectId) return
 
-    setActiveModuleId(moduleId)
+    startGenerating(moduleId)
     setProgressLines([])
     addProgressLine(`Starting pipeline for ${mod.name}...`)
 
@@ -692,7 +704,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           addProgressLine(`Dimensions planned for ${mod.name}. Generating CAD...`)
         } else {
           addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
-          setActiveModuleId(null)
+          stopGenerating(moduleId)
           return
         }
       }
@@ -730,9 +742,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         ),
       )
     } finally {
-      setActiveModuleId(null)
+      stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine])
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating])
 
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
@@ -1146,7 +1158,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setAssumptionNotes("")
     setModules([])
     setExpandedModuleId(null)
-    setActiveModuleId(null)
+    setGeneratingModuleIds(new Set())
     setDiagnosticAnswers({})
     setProgressLines([])
     setBatchProgress({})
@@ -1321,7 +1333,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     showSources, setShowSources, hasResearch,
     handleResearch, handleReset,
     isDecomposing, modules, setModules,
-    expandedModuleId, setExpandedModuleId, activeModuleId,
+    expandedModuleId, setExpandedModuleId, generatingModuleIds,
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
