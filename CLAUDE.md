@@ -1,5 +1,7 @@
 # ForgeOS (CentaurOS) — Agent Directives & Design System
 
+> **System architecture reference:** See [ARCHITECTURE.md](./ARCHITECTURE.md) for a comprehensive overview of how ForgeOS works — tech stack, 13 AI specialists, CAD lab, marketplace, data flows, security model, and database schema.
+
 ## Agent Workflow
 
 ### Verification Before Done
