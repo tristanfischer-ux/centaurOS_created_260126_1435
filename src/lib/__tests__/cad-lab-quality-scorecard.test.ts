@@ -100,16 +100,18 @@ describe("computeCadLabQualityScorecard", () => {
     }
 
     expect(computeCadLabQualityScorecard(modules, diagnostics)).toEqual({
-      cadValidityScore: 50,
+      cadValidityScore: 60,
       drawingCompletenessScore: 43,
       rfqReadinessScore: 48,
-      overallScore: 47,
+      overallScore: 50,
       blockers: [
         "1 module(s) not generated",
         "1 generated module(s) missing DFM analysis",
         "2 module(s) missing procurement diagnostics",
         "1 generated module(s) missing STEP/STL/manifest",
       ],
+      validationPassCount: 2,
+      validationFailCount: 0,
     })
   })
 })
