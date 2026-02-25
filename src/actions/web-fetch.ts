@@ -22,6 +22,7 @@ import { Readability } from "@mozilla/readability"
 import DOMPurify from "isomorphic-dompurify"
 import { JSDOM } from "jsdom"
 import { createClient } from "@/lib/supabase/server"
+import { checkRateLimit } from "@/lib/security/rate-limit"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -269,6 +270,12 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
 
   if (!user) {
     return { success: false, error: "Authentication required" }
+  }
+
+  // SECURITY: Rate limit web fetches to prevent abuse
+  const rateLimitError = await checkRateLimit('webFetch', user.id)
+  if (rateLimitError) {
+    return { success: false, error: rateLimitError }
   }
 
   // VALIDATION: Check URL is safe

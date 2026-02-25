@@ -88,6 +88,7 @@ export const RATE_LIMIT_CONFIGS = {
     // General API
     api: { limit: 100, window: 60 * 1000 },              // 100 requests per minute
     upload: { limit: 20, window: 60 * 1000 },            // 20 uploads per minute
+    webFetch: { limit: 30, window: 60 * 1000 },          // 30 web fetches per minute
     
     // Public endpoints
     health: { limit: 60, window: 60 * 1000 },            // 60 requests per minute
