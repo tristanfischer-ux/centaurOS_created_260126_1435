@@ -27,6 +27,11 @@ import {
     TOOL_QUERY_MARKETPLACE,
     FINANCE_TOOLS,
     ENGINEERING_TOOLS,
+    ENGINEERING_COMPUTE_TOOLS,
+    TOOL_RUN_ENGINEERING_CALC,
+    TOOL_LOOKUP_MATERIAL,
+    TOOL_LOOKUP_PROCESS,
+    TOOL_CALCULATE_TOLERANCE_STACK,
     PRODUCT_TOOLS,
     PEOPLE_TOOLS,
     STRATEGY_TOOLS,
@@ -55,6 +60,15 @@ import { handleWriteDocument } from "./handlers/documents"
 import { handleQueryPastAdvice } from "./handlers/memory-search"
 import { handleAskSpecialist } from "./handlers/delegation"
 import { handleQueryMarketplace } from "./handlers/marketplace"
+import {
+    handleRunEngineeringCalc,
+    handleCalculateStress,
+    handleCalculateToleranceStack,
+    handleCalculateThermal,
+    handleCalculateFastener,
+    handleLookupMaterial,
+    handleLookupProcess,
+} from "./handlers/engineering-compute"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -101,6 +115,15 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     // Utility tools
     run_calculation: handleRunCalculation,
     web_search: handleWebSearch,
+
+    // Engineering computation tools (Python on Modal)
+    run_engineering_calc: handleRunEngineeringCalc,
+    calculate_stress: handleCalculateStress,
+    calculate_tolerance_stack: handleCalculateToleranceStack,
+    calculate_thermal: handleCalculateThermal,
+    calculate_fastener: handleCalculateFastener,
+    lookup_material: handleLookupMaterial,
+    lookup_process: handleLookupProcess,
 }
 
 // ─── Specialist → Tool Definitions Map ───────────────────────────────
@@ -114,17 +137,45 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
     // Strategy — needs strategic goals + finance context + calculation
     strategist: [...COMMON_TOOLS, ...STRATEGY_TOOLS, ...FINANCE_TOOLS, TOOL_RUN_CALCULATION],
 
-    // CTO — engineering metrics + product roadmap + calculation
-    cto: [...COMMON_TOOLS, ...ENGINEERING_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],
+    // CTO — engineering metrics + product roadmap + calculation + engineering compute
+    cto: [
+        ...COMMON_TOOLS,
+        ...ENGINEERING_TOOLS,
+        ...PRODUCT_TOOLS,
+        TOOL_RUN_CALCULATION,
+        TOOL_RUN_ENGINEERING_CALC,
+        TOOL_LOOKUP_MATERIAL,
+        TOOL_LOOKUP_PROCESS,
+        TOOL_CALCULATE_TOLERANCE_STACK,
+    ],
 
-    // VP Engineering — engineering metrics + people context + calculation
-    "vp-engineering": [...COMMON_TOOLS, ...ENGINEERING_TOOLS, ...PEOPLE_TOOLS, TOOL_RUN_CALCULATION],
+    // VP Engineering — engineering metrics + people context + all engineering computation tools
+    "vp-engineering": [
+        ...COMMON_TOOLS,
+        ...ENGINEERING_TOOLS,
+        ...PEOPLE_TOOLS,
+        ...ENGINEERING_COMPUTE_TOOLS,
+        TOOL_RUN_ENGINEERING_CALC,
+        TOOL_RUN_CALCULATION,
+    ],
 
-    // VP Manufacturing — common tools + calculation
-    "vp-manufacturing": [...COMMON_TOOLS, TOOL_RUN_CALCULATION],
+    // VP Manufacturing — all engineering computation tools (core for DFM reviews)
+    "vp-manufacturing": [
+        ...COMMON_TOOLS,
+        ...ENGINEERING_COMPUTE_TOOLS,
+        TOOL_RUN_ENGINEERING_CALC,
+        TOOL_RUN_CALCULATION,
+    ],
 
-    // VP Supply Chain — common tools + marketplace + calculation
-    "vp-supply-chain": [...COMMON_TOOLS, TOOL_QUERY_MARKETPLACE, TOOL_RUN_CALCULATION],
+    // VP Supply Chain — marketplace + material/process lookups + tolerance analysis
+    "vp-supply-chain": [
+        ...COMMON_TOOLS,
+        TOOL_QUERY_MARKETPLACE,
+        TOOL_LOOKUP_MATERIAL,
+        TOOL_LOOKUP_PROCESS,
+        TOOL_CALCULATE_TOLERANCE_STACK,
+        TOOL_RUN_CALCULATION,
+    ],
 
     // Product Lead — product roadmap + common
     "product-lead": [...COMMON_TOOLS, ...PRODUCT_TOOLS, TOOL_RUN_CALCULATION],

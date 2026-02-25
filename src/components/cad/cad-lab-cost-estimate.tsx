@@ -49,13 +49,10 @@ import { chartColors } from "@/lib/chart-colors"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import {
-  MATERIAL_COST_PER_KG,
-  PROCESS_HOURLY_RATE,
-  HOURS_PER_KG,
-  TOOLING_COST,
   parseBatchSize,
   getModuleMassKg,
 } from "@/lib/cad-lab-cost-constants"
+import { findMaterial } from "@/lib/engineering-data"
 
 // ─── Chart Colors ───────────────────────────────────────────────────
 
@@ -63,6 +60,104 @@ const COLOR_MATERIAL = chartColors[0]  // Orange
 const COLOR_PROCESS = chartColors[1]   // Blue
 const COLOR_TOOLING = chartColors[3]   // Amber
 
+/**
+ * Maps diagnostic material class strings → engineering database material IDs.
+ * Uses the primary/representative material for each class to get real cost data.
+ *
+ * FLOW: Diagnostic UI → class string → this map → engineering database → real cost
+ */
+const DIAGNOSTIC_MATERIAL_TO_DB_ID: Record<string, string> = {
+  "PLA/PETG": "pla",
+  "ABS/Nylon": "abs",
+  "Resin (standard)": "pla",              // SLA resin cost ≈ PLA filament
+  "Aluminum 6061": "al-6061-t6",
+  "Aluminium": "al-6061-t6",
+  "Steel (mild)": "steel-1018",
+  "Steel/Iron": "steel-1018",
+  "Stainless Steel": "ss-304",
+  "Titanium": "ti-6al-4v",
+  "Copper/Brass": "copper-c110",
+  "Carbon Fiber": "cf-woven-3k",
+  "Carbon Fiber Composite": "cf-woven-3k",
+  "CFRP/GFRP": "cf-woven-3k",
+}
+
+/**
+ * Resolves material cost per kg from the engineering database.
+ * Falls back to hardcoded estimates for materials not in the DB.
+ *
+ * @param diagnosticMaterial - Material class string from diagnostics UI
+ * @returns Cost per kg in USD (midpoint of range from DB, or hardcoded fallback)
+ */
+function getMaterialCostPerKg(diagnosticMaterial: string): number {
+  // Try engineering database first via diagnostic mapping
+  const dbId = DIAGNOSTIC_MATERIAL_TO_DB_ID[diagnosticMaterial]
+  if (dbId) {
+    const mat = findMaterial(dbId)
+    if (mat) {
+      return (mat.cost_per_kg_usd.low + mat.cost_per_kg_usd.high) / 2
+    }
+  }
+
+  // Fallback for materials not in engineering database
+  return MATERIAL_COST_FALLBACK[diagnosticMaterial] ?? 20
+}
+
+/** Fallback costs for materials not covered by the engineering database. */
+const MATERIAL_COST_FALLBACK: Record<string, number> = {
+  "Wood/Plywood": 3,
+  "Silicone/Rubber": 15,
+  "Glass/Ceramic": 10,
+  "PCB/Electronic": 0, // Process-driven, not material-driven
+  "Other": 20,
+}
+
+/**
+ * Approximate hourly rate by manufacturing process.
+ * Includes machine time + operator cost estimates.
+ */
+const PROCESS_HOURLY_RATE: Record<string, number> = {
+  "FDM 3D Print": 15,
+  "SLA/Resin Print": 25,
+  "SLS/Powder Print": 40,
+  "CNC Machining": 85,
+  "Sheet Metal": 60,
+  "Injection Molding": 0, // Amortized per-unit, handled separately
+  "Casting": 45,
+  "Manual/Assembly": 40,
+  "Other": 50,
+}
+
+/**
+ * Estimated processing hours per kg by process.
+ * Very rough — real values depend on geometry complexity.
+ */
+const HOURS_PER_KG: Record<string, number> = {
+  "FDM 3D Print": 8,
+  "SLA/Resin Print": 6,
+  "SLS/Powder Print": 4,
+  "CNC Machining": 3,
+  "Sheet Metal": 1.5,
+  "Injection Molding": 0.02, // Very fast per unit
+  "Casting": 2,
+  "Manual/Assembly": 5,
+  "Other": 3,
+}
+
+/**
+ * Tooling cost by process. One-time cost amortized over batch.
+ */
+const TOOLING_COST: Record<string, number> = {
+  "FDM 3D Print": 0,
+  "SLA/Resin Print": 0,
+  "SLS/Powder Print": 0,
+  "CNC Machining": 200,
+  "Sheet Metal": 500,
+  "Injection Molding": 5000,
+  "Casting": 1500,
+  "Manual/Assembly": 0,
+  "Other": 0,
+}
 // ─── Types ──────────────────────────────────────────────────────────
 
 interface ModuleCost {
@@ -127,7 +222,7 @@ export function CadLabCostEstimate({
         mod.result?.massGrams,
       )
 
-      const materialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
+      const materialCostPerKg = getMaterialCostPerKg(material)
       const materialCost = massKg * materialCostPerKg
 
       const hourlyRate = PROCESS_HOURLY_RATE[process] ?? 50

@@ -300,6 +300,250 @@ export const ENGINEERING_TOOLS: ToolDefinition[] = [
     },
 ]
 
+// ─── Engineering Computation Tools ───────────────────────────────────
+
+/**
+ * Engineering computation tools backed by Python on Modal.
+ * Unlike run_calculation (JS sandbox for finance), these have access to
+ * numpy, scipy, sympy, and pint for real engineering math.
+ */
+
+export const TOOL_RUN_ENGINEERING_CALC: ToolDefinition = {
+    name: "run_engineering_calc",
+    description:
+        "Execute a Python engineering calculation on Modal with access to numpy, scipy, sympy, and pint. Use this for custom engineering computations that don't fit the structured tools (calculate_stress, calculate_thermal, etc.). The script should print its result as JSON to stdout via json.dumps(). Available libraries: numpy, scipy, sympy, pint, math, json.",
+    parameters: {
+        type: "object",
+        properties: {
+            code: {
+                type: "string",
+                description:
+                    "Python code to execute. Must print result as JSON to stdout. Has access to numpy, scipy, sympy, pint.",
+            },
+            description: {
+                type: "string",
+                description: "Brief description of what this calculation does (for logging).",
+            },
+        },
+        required: ["code"],
+    },
+}
+
+export const TOOL_CALCULATE_STRESS: ToolDefinition = {
+    name: "calculate_stress",
+    description:
+        "Perform structural stress analysis on common geometry types. Returns maximum stress, safety factors against yield and ultimate failure, and a pass/fail verdict. Use this when evaluating whether a part will survive its intended loads. Supported geometry types: 'beam' (simply supported, center load), 'cylinder'/'pressure_vessel' (thin-wall hoop stress), 'column' (Euler buckling).",
+    parameters: {
+        type: "object",
+        properties: {
+            geometry_type: {
+                type: "string",
+                enum: ["beam", "cylinder", "pressure_vessel", "column"],
+                description: "Type of structural element to analyze.",
+            },
+            load_N: {
+                type: "number",
+                description: "Applied load in Newtons. For beams: center point load. For columns: axial compressive load.",
+            },
+            material: {
+                type: "string",
+                description: "Material name or ID from the engineering database (e.g., 'al-6061-t6', 'Aluminum 6061-T6', 'steel 4140').",
+            },
+            // Beam/column dimensions
+            length_mm: {
+                type: "number",
+                description: "Length/span in mm (beams and columns).",
+            },
+            width_mm: {
+                type: "number",
+                description: "Cross-section width in mm (beams and columns).",
+            },
+            height_mm: {
+                type: "number",
+                description: "Cross-section height in mm (beams and columns).",
+            },
+            // Cylinder/pressure vessel dimensions
+            pressure_MPa: {
+                type: "number",
+                description: "Internal pressure in MPa (pressure vessels).",
+            },
+            outer_diameter_mm: {
+                type: "number",
+                description: "Outer diameter in mm (pressure vessels).",
+            },
+            wall_thickness_mm: {
+                type: "number",
+                description: "Wall thickness in mm (pressure vessels).",
+            },
+            // Column options
+            end_condition: {
+                type: "string",
+                enum: ["fixed-fixed", "fixed-pinned", "pinned-pinned", "fixed-free"],
+                description: "Column end conditions for buckling analysis. Defaults to 'pinned-pinned'.",
+            },
+        },
+        required: ["geometry_type", "load_N", "material"],
+    },
+}
+
+export const TOOL_CALCULATE_TOLERANCE_STACK: ToolDefinition = {
+    name: "calculate_tolerance_stack",
+    description:
+        "Perform tolerance stack-up analysis using worst-case, RSS (root sum square), and Monte Carlo methods. Use this when checking if multiple mating parts will fit together within their tolerance bands. Returns total stack range, interference probability, and gap analysis.",
+    parameters: {
+        type: "object",
+        properties: {
+            dimensions: {
+                type: "array",
+                items: {
+                    type: "object",
+                    properties: {
+                        nominal_mm: {
+                            type: "number",
+                            description: "Nominal dimension in mm.",
+                        },
+                        tolerance_mm: {
+                            type: "number",
+                            description: "Bilateral tolerance (±) in mm.",
+                        },
+                    },
+                    required: ["nominal_mm", "tolerance_mm"],
+                },
+                description: "Array of dimensions with their tolerances. Minimum 2 dimensions.",
+            },
+            method: {
+                type: "string",
+                enum: ["worst_case", "rss", "monte_carlo"],
+                description: "Primary analysis method. All three are always computed, but this sets the focus. Defaults to 'rss'.",
+            },
+            target_gap_mm: {
+                type: "number",
+                description: "Target gap/clearance in mm. If provided, performs gap interference analysis.",
+            },
+        },
+        required: ["dimensions"],
+    },
+}
+
+export const TOOL_CALCULATE_THERMAL: ToolDefinition = {
+    name: "calculate_thermal",
+    description:
+        "Perform steady-state thermal analysis for heat dissipation. Calculates temperature rise from power dissipation through conduction and convection. Use this to check if a component will overheat under operating conditions. Returns max temperature, thermal resistances, and comparison against material limits.",
+    parameters: {
+        type: "object",
+        properties: {
+            power_w: {
+                type: "number",
+                description: "Power dissipation in Watts.",
+            },
+            material: {
+                type: "string",
+                description: "Material name or ID from the engineering database.",
+            },
+            surface_area_mm2: {
+                type: "number",
+                description: "Total exposed surface area in mm². This is the area available for heat dissipation.",
+            },
+            thickness_mm: {
+                type: "number",
+                description: "Material thickness for conduction calculation in mm. Defaults to 5mm.",
+            },
+            ambient_temp_c: {
+                type: "number",
+                description: "Ambient temperature in °C. Defaults to 25°C.",
+            },
+            convection_coefficient: {
+                type: "number",
+                description: "Convection heat transfer coefficient in W/(m²·K). Defaults to 10 (natural convection in still air). Use ~25 for light breeze, ~50 for forced air, ~500-5000 for water cooling.",
+            },
+        },
+        required: ["power_w", "material", "surface_area_mm2"],
+    },
+}
+
+export const TOOL_CALCULATE_FASTENER: ToolDefinition = {
+    name: "calculate_fastener",
+    description:
+        "Analyze a bolted joint: preload force, bolt stress, safety factors against proof load and joint separation. Use this when sizing bolts or verifying existing fastener selections. Returns recommended torque, clamping force, and pass/fail verdict.",
+    parameters: {
+        type: "object",
+        properties: {
+            bolt_size: {
+                type: "string",
+                description: "Metric bolt size (e.g., 'M3', 'M8', 'M12').",
+            },
+            grade: {
+                type: "string",
+                enum: ["4.6", "4.8", "5.8", "8.8", "10.9", "12.9"],
+                description: "Bolt property class. Defaults to '8.8'.",
+            },
+            preload_torque_Nm: {
+                type: "number",
+                description: "Applied tightening torque in Nm. If omitted, uses 75% of proof load (recommended).",
+            },
+            external_load_N: {
+                type: "number",
+                description: "External tensile load on the joint in Newtons. Defaults to 0.",
+            },
+            joint_material: {
+                type: "string",
+                description: "Material of the clamped joint members. Affects stiffness ratio. Defaults to 'steel'.",
+            },
+        },
+        required: ["bolt_size"],
+    },
+}
+
+export const TOOL_LOOKUP_MATERIAL: ToolDefinition = {
+    name: "lookup_material",
+    description:
+        "Query the engineering material properties database. Returns REAL values from MatWeb/ASM — not LLM estimates. Use this whenever you need material properties for calculations, design decisions, or recommendations. Covers ~40 metals, polymers, composites, and ceramics with mechanical, thermal, and manufacturing data.",
+    parameters: {
+        type: "object",
+        properties: {
+            material_name: {
+                type: "string",
+                description: "Material name or ID (e.g., 'al-6061-t6', 'Aluminum 6061-T6', 'PLA', 'stainless 316'). Supports fuzzy matching.",
+            },
+            property: {
+                type: "string",
+                description: "Optional: return only a specific property (e.g., 'yield_strength_mpa', 'thermal_conductivity_w_mk', 'cost_per_kg_usd'). If omitted, returns the full material data card.",
+            },
+        },
+        required: ["material_name"],
+    },
+}
+
+export const TOOL_LOOKUP_PROCESS: ToolDefinition = {
+    name: "lookup_process",
+    description:
+        "Query the manufacturing process constraints database. Returns REAL constraints (min wall thickness, achievable tolerances, max part size, compatible materials, design rules, economics). Use this when evaluating manufacturability or recommending a process. Covers FDM, SLA, SLS, DMLS, CNC, Sheet Metal, Injection Molding, Casting, EDM, Waterjet, Laser Cutting, and more.",
+    parameters: {
+        type: "object",
+        properties: {
+            process_name: {
+                type: "string",
+                description: "Process name or ID (e.g., 'fdm', 'cnc-3-axis', 'injection-molding'). Supports fuzzy matching.",
+            },
+            for_material: {
+                type: "string",
+                description: "Material ID to find compatible processes for. Use this instead of process_name to get a list of all processes that work with a given material.",
+            },
+        },
+        required: [],
+    },
+}
+
+/** All engineering computation tools. */
+export const ENGINEERING_COMPUTE_TOOLS: ToolDefinition[] = [
+    TOOL_CALCULATE_STRESS,
+    TOOL_CALCULATE_TOLERANCE_STACK,
+    TOOL_CALCULATE_THERMAL,
+    TOOL_CALCULATE_FASTENER,
+    TOOL_LOOKUP_MATERIAL,
+    TOOL_LOOKUP_PROCESS,
+]
+
 // ─── Product Tools ───────────────────────────────────────────────────
 
 export const PRODUCT_TOOLS: ToolDefinition[] = [
