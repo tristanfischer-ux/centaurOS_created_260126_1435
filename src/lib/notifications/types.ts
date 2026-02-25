@@ -71,6 +71,7 @@ export type EmailTemplate =
     | 'waitlist_approved'
     | 'financial_alert'
     | 'finance_digest'
+    | 'listing_claim'
     | 'generic'
 
 export interface PushNotificationOptions {

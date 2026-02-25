@@ -7495,6 +7495,57 @@ export type Database = {
           },
         ]
       }
+      listing_claim_tokens: {
+        Row: {
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          listing_id: string
+          status: string
+          token: string
+        }
+        Insert: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          listing_id: string
+          status?: string
+          token?: string
+        }
+        Update: {
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          listing_id?: string
+          status?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_claim_tokens_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_claim_tokens_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       listing_migration: {
         Row: {
           contact_email: string | null
@@ -16287,6 +16338,23 @@ export type Database = {
         Args: { p_foundry_id: string; p_month?: string }
         Returns: Json
       }
+      get_my_claimed_listing: {
+        Args: never
+        Returns: {
+          attributes: Json
+          category: string
+          contact_email: string
+          contact_linkedin: string
+          contact_name: string
+          contact_phone: string
+          contact_title: string
+          description: string
+          listing_id: string
+          subcategory: string
+          title: string
+          verification_tier: string
+        }[]
+      }
       get_my_foundry_id: { Args: never; Returns: string }
       get_my_role: {
         Args: never
@@ -16684,6 +16752,7 @@ export type Database = {
         }
         Returns: string
       }
+      redeem_listing_claim: { Args: { p_token: string }; Returns: boolean }
       refresh_all_analytics: { Args: never; Returns: undefined }
       refresh_buyer_stats: { Args: never; Returns: undefined }
       refresh_platform_stats: { Args: never; Returns: undefined }
@@ -17372,6 +17441,19 @@ export type Database = {
         Args: { p_module_data: Json; p_module_id: string; p_project_id: string }
         Returns: undefined
       }
+      update_claimed_listing: {
+        Args: {
+          p_attributes?: Json
+          p_contact_email?: string
+          p_contact_linkedin?: string
+          p_contact_name?: string
+          p_contact_phone?: string
+          p_contact_title?: string
+          p_description?: string
+          p_listing_id: string
+        }
+        Returns: boolean
+      }
       update_company_profile: {
         Args: { p_company_profile: Json; p_foundry_id: string }
         Returns: Json
@@ -17456,6 +17538,15 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      validate_listing_claim: {
+        Args: { p_token: string }
+        Returns: {
+          company_name: string
+          email: string
+          is_valid: boolean
+          listing_id: string
+        }[]
       }
       verify_advisory_answer: {
         Args: { p_answer_id: string; p_status?: string }

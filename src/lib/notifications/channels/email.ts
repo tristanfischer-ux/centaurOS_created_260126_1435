@@ -374,6 +374,38 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         `
     }),
 
+    listing_claim: (data) => ({
+        subject: `${data.companyName}: Verify and update your listing on Fractional Forge`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: linear-gradient(135deg, #ff4500 0%, #ff6b35 100%); padding: 24px; border-radius: 8px 8px 0 0; text-align: center;">
+                    <h1 style="margin: 0; color: white; font-size: 22px;">Fractional Forge</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Your company is listed in our directory</p>
+                </div>
+                <div style="background: #f8fafc; padding: 24px; border-radius: 0 0 8px 8px; border: 1px solid #e2e8f0; border-top: none;">
+                    <p style="color: #1a1a1a; font-size: 16px;">Hi${data.contactName ? ` ${data.contactName}` : ''},</p>
+                    <p style="color: #475569; line-height: 1.6;">${data.companyName} appears in the Fractional Forge supplier directory. We&rsquo;d love for you to claim your listing, update any details, and optionally list fractional executive opportunities.</p>
+                    <div style="background: white; padding: 16px; border-radius: 8px; border: 1px solid #e2e8f0; margin: 20px 0;">
+                        <h3 style="margin: 0 0 8px 0; color: #1a1a1a;">${data.companyName}</h3>
+                        <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.5;">${data.description ? String(data.description).substring(0, 200) + '...' : 'View and update your company details.'}</p>
+                    </div>
+                    <div style="text-align: center; margin: 24px 0;">
+                        <a href="${data.claimUrl}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Claim Your Listing</a>
+                    </div>
+                    <p style="color: #94a3b8; font-size: 13px;">By claiming your listing you can:</p>
+                    <ul style="color: #64748b; font-size: 14px; line-height: 1.8;">
+                        <li>Update your company description and contact details</li>
+                        <li>Add capabilities, certifications, and industries served</li>
+                        <li>List fractional executive opportunities</li>
+                        <li>Get a verified badge on your listing</li>
+                    </ul>
+                </div>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #94a3b8; font-size: 12px; text-align: center;">This link expires in 30 days. If you didn&rsquo;t expect this email, you can safely ignore it.</p>
+            </div>
+        `
+    }),
+
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from ForgeOS'),
         html: `
