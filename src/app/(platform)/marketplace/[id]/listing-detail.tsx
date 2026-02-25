@@ -49,6 +49,7 @@ import { CompanyLocationMap } from "@/components/marketplace/CompanyLocationMap"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
+import type { PublicExecutive } from "@/actions/listing-executives"
 import { toast } from "sonner"
 
 interface TrustSignalsData {
@@ -67,9 +68,10 @@ interface MarketplaceListingDetailProps {
     listing: MarketplaceListing
     trustSignals?: TrustSignalsData | null
     ratings?: RatingsData | null
+    executives?: PublicExecutive[]
 }
 
-export function MarketplaceListingDetail({ listing, trustSignals, ratings }: MarketplaceListingDetailProps) {
+export function MarketplaceListingDetail({ listing, trustSignals, ratings, executives = [] }: MarketplaceListingDetailProps) {
     const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
     const [isContacting, setIsContacting] = useState(false)
@@ -190,6 +192,11 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
 
                     {/* Companies House info (directors, PSC, SIC codes) */}
                     <CompanyInfoSection attrs={attrs} />
+
+                    {/* Fractional Executives */}
+                    {executives.length > 0 && (
+                        <ExecutivesDisplay executives={executives} />
+                    )}
 
                     {/* All Attributes */}
                     <AttributesSection attrs={attrs} category={category} />
@@ -720,5 +727,76 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
                 {strValue}
             </span>
         </div>
+    )
+}
+
+// ── Executives Display ──────────────────────────────────────────────────────
+
+const AVAILABILITY_LABELS: Record<string, string> = {
+    full_time: 'Full-Time',
+    part_time: 'Part-Time',
+    advisory: 'Advisory',
+    project_based: 'Project-Based',
+}
+
+function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
+    return (
+        <Card>
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-international-orange" />
+                    <h2 className="text-lg font-semibold text-foreground">
+                        Fractional Executives
+                    </h2>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+                {executives.map((exec) => (
+                    <div
+                        key={exec.id}
+                        className="rounded-lg border border-border p-4"
+                    >
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-foreground">
+                                {exec.full_name}
+                            </span>
+                            {exec.title && (
+                                <span className="text-sm text-muted-foreground">
+                                    &middot; {exec.title}
+                                </span>
+                            )}
+                            <Badge variant="secondary" className="text-xs">
+                                {AVAILABILITY_LABELS[exec.availability] ?? exec.availability}
+                            </Badge>
+                        </div>
+                        {exec.bio && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                {exec.bio}
+                            </p>
+                        )}
+                        {exec.specializations && exec.specializations.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                                {exec.specializations.map((s) => (
+                                    <Badge key={s} variant="outline" className="text-xs">
+                                        {s}
+                                    </Badge>
+                                ))}
+                            </div>
+                        )}
+                        {exec.linkedin_url && (
+                            <a
+                                href={exec.linkedin_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-international-orange hover:underline inline-flex items-center gap-1 mt-2"
+                            >
+                                <ExternalLink className="h-3 w-3" />
+                                LinkedIn Profile
+                            </a>
+                        )}
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
     )
 }

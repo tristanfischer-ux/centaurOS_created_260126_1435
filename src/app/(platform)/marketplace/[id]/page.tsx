@@ -4,6 +4,7 @@ import { MarketplaceListingDetail } from "./listing-detail"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { getProviderTrustSignals } from "@/actions/trust-signals"
 import { getProviderRatings } from "@/actions/ratings"
+import { getListingExecutives } from "@/actions/listing-executives"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -45,11 +46,16 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
         ratings = { summary: ratingsResult.data, reviews: [], error: ratingsResult.error }
     }
 
+    // Fetch executives for this listing
+    const execResult = await getListingExecutives(id)
+    const executives = execResult.data ?? []
+
     return (
-        <MarketplaceListingDetail 
+        <MarketplaceListingDetail
             listing={listing as MarketplaceListing}
             trustSignals={trustSignals}
             ratings={ratings}
+            executives={executives}
         />
     )
 }

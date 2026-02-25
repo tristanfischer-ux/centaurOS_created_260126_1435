@@ -35,6 +35,7 @@ import { Badge } from '@/components/ui/badge'
 import { updateClaimedListing } from '@/actions/listing-claims'
 import type { ClaimedListing, ListingUpdateData } from '@/actions/listing-claims'
 import { toast } from 'sonner'
+import { ExecutivesSection } from './executives-section'
 
 interface ListingEditorProps {
     listing: ClaimedListing | null
@@ -356,6 +357,9 @@ export function ListingEditor({ listing, error }: ListingEditorProps) {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Fractional Executives */}
+            <ExecutivesSection listingId={listing.listing_id} />
 
             {/* Bottom save button */}
             <div className="flex justify-end pb-8">

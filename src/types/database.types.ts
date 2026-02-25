@@ -7546,6 +7546,93 @@ export type Database = {
           },
         ]
       }
+      listing_executives: {
+        Row: {
+          added_by: string | null
+          availability: string | null
+          bio: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          linkedin_url: string | null
+          listing_id: string
+          provider_profile_id: string | null
+          specializations: string[] | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          availability?: string | null
+          bio?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          linkedin_url?: string | null
+          listing_id: string
+          provider_profile_id?: string | null
+          specializations?: string[] | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          availability?: string | null
+          bio?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          linkedin_url?: string | null
+          listing_id?: string
+          provider_profile_id?: string | null
+          specializations?: string[] | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_executives_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_executives_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+          {
+            foreignKeyName: "listing_executives_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_executives_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "listing_executives_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
       listing_migration: {
         Row: {
           contact_email: string | null
@@ -15685,6 +15772,19 @@ export type Database = {
         Args: { p_thread_id: string }
         Returns: boolean
       }
+      add_listing_executive: {
+        Args: {
+          p_availability?: string
+          p_bio?: string
+          p_email?: string
+          p_full_name: string
+          p_linkedin_url?: string
+          p_listing_id: string
+          p_specializations?: string[]
+          p_title?: string
+        }
+        Returns: string
+      }
       addauth: { Args: { "": string }; Returns: boolean }
       addgeometrycolumn:
         | {
@@ -16321,6 +16421,19 @@ export type Database = {
           role: Database["public"]["Enums"]["member_role"]
         }[]
       }
+      get_listing_executives: {
+        Args: { p_listing_id: string }
+        Returns: {
+          availability: string
+          bio: string
+          full_name: string
+          id: string
+          linkedin_url: string
+          provider_profile_id: string
+          specializations: string[]
+          title: string
+        }[]
+      }
       get_marketplace_recommendations: {
         Args: { p_foundry_id: string; p_limit?: number }
         Returns: {
@@ -16356,6 +16469,23 @@ export type Database = {
         }[]
       }
       get_my_foundry_id: { Args: never; Returns: string }
+      get_my_listing_executives: {
+        Args: never
+        Returns: {
+          availability: string
+          bio: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          linkedin_url: string
+          listing_id: string
+          provider_profile_id: string
+          specializations: string[]
+          status: string
+          title: string
+        }[]
+      }
       get_my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["member_role"]
@@ -16758,6 +16888,10 @@ export type Database = {
       refresh_platform_stats: { Args: never; Returns: undefined }
       refresh_provider_stats: { Args: never; Returns: undefined }
       refresh_search_ranking: { Args: never; Returns: undefined }
+      remove_listing_executive: {
+        Args: { p_exec_id: string }
+        Returns: boolean
+      }
       repair_user_profile: { Args: never; Returns: Json }
       schedule_payment_retry: {
         Args: { p_failed_payment_id: string }
@@ -17465,6 +17599,20 @@ export type Database = {
       update_foundry_sector: {
         Args: { p_foundry_id: string; p_sector: string }
         Returns: undefined
+      }
+      update_listing_executive: {
+        Args: {
+          p_availability?: string
+          p_bio?: string
+          p_email?: string
+          p_exec_id: string
+          p_full_name?: string
+          p_linkedin_url?: string
+          p_specializations?: string[]
+          p_status?: string
+          p_title?: string
+        }
+        Returns: boolean
       }
       update_own_profile: { Args: { data: Json }; Returns: Json }
       update_trending_searches: { Args: never; Returns: undefined }
