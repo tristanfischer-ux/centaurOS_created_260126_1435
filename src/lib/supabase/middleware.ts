@@ -116,10 +116,11 @@ export async function updateSession(request: NextRequest) {
             .single()
 
         // RED TEAM FIX: Handle case where profile doesn't exist yet (new user)
-        // This can happen during signup flow — allow them through
+        // PGRST116 = "no rows returned" — expected for brand-new signups
         if (profileError && profileError.code !== 'PGRST116') {
             console.error(`[MIDDLEWARE] Failed to fetch profile for user ${user.id}:`, profileError)
-            // Allow through rather than blocking — RLS will handle data access
+            // SECURITY: Block access when profile check fails — don't rely solely on RLS
+            return new NextResponse('Service temporarily unavailable', { status: 503 })
         }
 
         // SECURITY: Check if user has been deactivated
@@ -188,7 +189,17 @@ export async function updateSession(request: NextRequest) {
                 pathname === route || pathname.startsWith(`${route}/`)
             )
 
-            if (!isAllowedForSupplier && !pathname.startsWith('/api/')) {
+            // SECURITY: Restrict supplier API access to an explicit allowlist
+            const supplierAllowedApiRoutes = [
+                '/api/marketplace', '/api/rfq', '/api/messages',
+                '/api/billing', '/api/webhooks', '/api/google',
+                '/api/settings', '/api/health', '/api/shared',
+            ]
+            const isAllowedApiForSupplier = supplierAllowedApiRoutes.some(route =>
+                pathname === route || pathname.startsWith(`${route}/`)
+            )
+
+            if (!isAllowedForSupplier && !isAllowedApiForSupplier) {
                 const referer = request.headers.get('referer')
                 if (referer?.includes('/supplier-portal')) {
                     console.warn('[Middleware] Potential redirect loop detected for supplier, allowing access to:', pathname)
