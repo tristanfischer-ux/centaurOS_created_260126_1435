@@ -219,7 +219,14 @@ export async function searchInvestors(
   }
 
   const total = count ?? 0
-  const hasMore = from + firms.length < total
+  // GOTCHA: When stage/sector filters are applied client-side, firms.length
+  // after filtering can be less than pageSize even when more DB rows exist.
+  // Use the raw page size (before filtering) to detect whether the DB has more
+  // pages — if the DB returned a full page, there may be more to fetch.
+  const rawPageSize = (data ?? []).length
+  const hasMore = stage?.length || sector?.length
+    ? rawPageSize >= pageSize  // client-filtered: more pages if DB returned a full page
+    : from + rawPageSize < total  // unfiltered: exact count is reliable
 
   return { firms, total, hasMore }
 }

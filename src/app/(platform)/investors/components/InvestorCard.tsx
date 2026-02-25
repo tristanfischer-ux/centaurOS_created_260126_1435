@@ -18,6 +18,15 @@ import type { InvestorFirm } from '@/actions/investors'
 // ---------------------------------------------------------------------------
 
 /**
+ * Ensures a URL has an http/https protocol prefix.
+ * Bare domains from CSV imports (e.g. "example.com") would otherwise be
+ * treated as relative paths by the browser.
+ */
+function ensureProtocol(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+}
+
+/**
  * Formats a GBP fund size number to a human-readable string.
  * e.g. 500000000 → "£500M", 1500000000 → "£1.5B"
  */
@@ -172,7 +181,7 @@ export function InvestorCard({ firm }: InvestorCardProps) {
         <div className="flex items-center gap-2">
           {attrs.website_url && (
             <a
-              href={attrs.website_url}
+              href={ensureProtocol(attrs.website_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -183,7 +192,7 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           )}
           {attrs.linkedin_company_url && (
             <a
-              href={attrs.linkedin_company_url}
+              href={ensureProtocol(attrs.linkedin_company_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
