@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -69,10 +69,14 @@ function truncate(s: string, max: number): string {
 export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
   // DECISION: Persist collapse state to localStorage so the user's preference
   // survives navigation and page refreshes.
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('investor-insights-collapsed') === '1'
-  })
+  // GOTCHA: Read localStorage in useEffect (not useState initialiser) to avoid
+  // SSR/client hydration mismatch — server always renders expanded, client
+  // syncs after mount.
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem('investor-insights-collapsed') === '1')
+  }, [])
 
   const handleToggle = useCallback(() => {
     setCollapsed(prev => {
