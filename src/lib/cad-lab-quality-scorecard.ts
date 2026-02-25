@@ -3,6 +3,7 @@ import {
   getModuleArtifactReadiness,
   isDiagnosticsComplete,
 } from "@/lib/cad-lab-readiness"
+import { validateModule } from "@/lib/cad-lab/validation-rules"
 
 export interface CadLabQualityScorecard {
   cadValidityScore: number
@@ -10,6 +11,10 @@ export interface CadLabQualityScorecard {
   rfqReadinessScore: number
   overallScore: number
   blockers: string[]
+  /** Number of modules that passed validation with no critical issues */
+  validationPassCount?: number
+  /** Number of modules with critical validation failures */
+  validationFailCount?: number
 }
 
 export type CadLabDiagnosticsByModule = Record<string, Record<string, string>>
@@ -34,10 +39,29 @@ export function computeCadLabQualityScorecard(
     (mod) => getModuleArtifactReadiness(mod).hasManifest,
   ).length
 
+  // INTENT: Run automated validation on generated modules
+  let validationPassCount = 0
+  let validationFailCount = 0
+  for (const mod of generated) {
+    const summary = validateModule(mod, diagnosticsByModule[mod.id] ?? {})
+    if (summary.criticalCount === 0) {
+      validationPassCount++
+    } else {
+      validationFailCount++
+    }
+  }
+
+  // INTENT: Validation pass rate factors into CAD validity — failing validation
+  // means the geometry/config is not ready for manufacturing
+  const validationFactor = generatedCount > 0
+    ? validationPassCount / generatedCount
+    : 1
+
   const cadValidityScore = Math.round(
-    (generatedCount / moduleCount) * 50 +
-      (geometryCount / moduleCount) * 25 +
-      (dfmCount / moduleCount) * 25,
+    (generatedCount / moduleCount) * 40 +
+      (geometryCount / moduleCount) * 20 +
+      (dfmCount / moduleCount) * 20 +
+      validationFactor * 20,
   )
 
   const drawingCompletenessScore = Math.round(
@@ -68,6 +92,9 @@ export function computeCadLabQualityScorecard(
   if (quoteReadyCount < generatedCount) {
     blockers.push(`${generatedCount - quoteReadyCount} generated module(s) missing STEP/STL/manifest`)
   }
+  if (validationFailCount > 0) {
+    blockers.push(`${validationFailCount} module(s) failed design validation with critical issues`)
+  }
 
   return {
     cadValidityScore,
@@ -75,5 +102,7 @@ export function computeCadLabQualityScorecard(
     rfqReadinessScore,
     overallScore,
     blockers,
+    validationPassCount,
+    validationFailCount,
   }
 }

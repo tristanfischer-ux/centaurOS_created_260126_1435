@@ -70,6 +70,7 @@ import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight-card"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
+import { ValidationSummary } from "@/components/cad/validation-summary"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
@@ -869,6 +870,14 @@ export default function CadLabBuildPage(): React.ReactNode {
                           <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                         </div>
 
+                        {/* Design Validation */}
+                        {(mod.status === "generated" || mod.result) && (
+                          <ValidationSummary
+                            module={mod}
+                            diagnostics={diagnosticAnswers?.[mod.id]}
+                          />
+                        )}
+
                         {/* IO Flow */}
                         <div className="flex items-center gap-4 text-xs">
                           <div>
@@ -1120,6 +1129,14 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Questions for Your Factory</p>
                         <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                       </div>
+
+                      {/* Design Validation */}
+                      {(mod.status === "generated" || mod.result) && (
+                        <ValidationSummary
+                          module={mod}
+                          diagnostics={diagnosticAnswers?.[mod.id]}
+                        />
+                      )}
 
                       {/* Specialist Reviews */}
                       {activeProjectId && (mod.status === "generated" || mod.result) && (
