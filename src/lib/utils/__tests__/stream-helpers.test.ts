@@ -132,6 +132,12 @@ describe("normalizeSpecialistError", () => {
         )
     })
 
+    it("normalizes stale thread errors", () => {
+        const result = normalizeSpecialistError("Invalid or inaccessible thread", SPECIALIST)
+        expect(result).toContain("lost track of the conversation thread")
+        expect(result).toContain(SPECIALIST)
+    })
+
     it("returns the raw error for unrecognized messages", () => {
         const raw = "Something completely unexpected happened"
         expect(normalizeSpecialistError(raw, SPECIALIST)).toBe(raw)
@@ -144,6 +150,7 @@ describe("normalizeSpecialistError", () => {
             "rate-limiting",
             "conversation is too long",
             "overloaded",
+            "Invalid or inaccessible thread",
         ]
         for (const error of knownErrors) {
             expect(normalizeSpecialistError(error, SPECIALIST)).toContain(SPECIALIST)
