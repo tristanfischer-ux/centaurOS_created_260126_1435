@@ -226,7 +226,7 @@ export function CadLabRawMaterials({
 
   // ── Empty state ──
   const hasDiagnostics = Object.keys(diagnosticAnswers).length > 0
-  if (!hasDiagnostics) {
+  if (!hasDiagnostics || modules.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -337,14 +337,16 @@ export function CadLabRawMaterials({
             <p
               className={cn(
                 "text-2xl font-bold font-mono",
-                summary.valueAddMargin > 60
-                  ? "text-status-success"
-                  : summary.valueAddMargin >= 30
-                    ? "text-status-warning"
-                    : "text-destructive",
+                summary.totalManufacturingCost === 0
+                  ? "text-muted-foreground"
+                  : summary.valueAddMargin > 60
+                    ? "text-status-success"
+                    : summary.valueAddMargin >= 30
+                      ? "text-status-warning"
+                      : "text-destructive",
               )}
             >
-              {summary.valueAddMargin.toFixed(1)}%
+              {summary.totalManufacturingCost === 0 ? "N/A" : `${summary.valueAddMargin.toFixed(1)}%`}
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
               Gap between raw materials and finished product

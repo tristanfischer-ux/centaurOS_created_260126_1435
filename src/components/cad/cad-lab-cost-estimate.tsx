@@ -221,9 +221,9 @@ export function CadLabCostEstimate({
                   <PieChart>
                     <Pie
                       data={[
-                        { name: "Material", value: totalMaterialCost },
-                        { name: "Processing", value: totalProcessCost },
-                        { name: "Tooling", value: totalToolingCost },
+                        { name: "Material", value: totalMaterialCost, color: COLOR_MATERIAL },
+                        { name: "Processing", value: totalProcessCost, color: COLOR_PROCESS },
+                        { name: "Tooling", value: totalToolingCost, color: COLOR_TOOLING },
                       ].filter((d) => d.value > 0)}
                       dataKey="value"
                       innerRadius={45}
@@ -232,9 +232,9 @@ export function CadLabCostEstimate({
                       strokeWidth={0}
                     >
                       {[
-                        { value: totalMaterialCost, color: COLOR_MATERIAL },
-                        { value: totalProcessCost, color: COLOR_PROCESS },
-                        { value: totalToolingCost, color: COLOR_TOOLING },
+                        { name: "Material", value: totalMaterialCost, color: COLOR_MATERIAL },
+                        { name: "Processing", value: totalProcessCost, color: COLOR_PROCESS },
+                        { name: "Tooling", value: totalToolingCost, color: COLOR_TOOLING },
                       ]
                         .filter((d) => d.value > 0)
                         .map((d, i) => (

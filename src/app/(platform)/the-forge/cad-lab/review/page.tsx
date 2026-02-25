@@ -41,6 +41,9 @@ import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
 import { CadLabRequirementsMap } from "@/components/cad/cad-lab-requirements-map"
 import { CadLabBom } from "@/components/cad/cad-lab-bom"
 import { CadLabRawMaterials } from "@/components/cad/cad-lab-raw-materials"
+import { CadLabTimeline } from "@/components/cad/cad-lab-timeline"
+import { CadLabRiskRegister } from "@/components/cad/cad-lab-risk-register"
+import { CadLabExecutiveSummary } from "@/components/cad/cad-lab-executive-summary"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
@@ -103,10 +106,13 @@ export default function CadLabReviewPage(): React.ReactNode {
   // ── Section navigation state ──
   const REVIEW_SECTIONS = useMemo(() => [
     { id: "review-header", label: "Overview" },
+    { id: "executive-summary", label: "Summary" },
     { id: "review-package", label: "Review" },
     { id: "dfm-analysis", label: "DFM" },
+    { id: "risk-register", label: "Risks" },
     { id: "diagnostics", label: "Diagnostics" },
     { id: "supply-chain", label: "Supply Chain" },
+    { id: "timeline", label: "Timeline" },
     { id: "requirements-map", label: "Requirements" },
     { id: "bill-of-materials", label: "BOM" },
     { id: "raw-materials", label: "Materials" },
@@ -325,6 +331,11 @@ export default function CadLabReviewPage(): React.ReactNode {
         )}
       </Card>
 
+      {/* Executive summary — key metrics at a glance */}
+      <div id="executive-summary">
+        <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
+      </div>
+
       {/* Engineering review package — quality scorecard, per-module summary */}
       <div id="review-package">
         <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
@@ -333,6 +344,11 @@ export default function CadLabReviewPage(): React.ReactNode {
       {/* DFM analysis dashboard — manufacturing grade, risk register */}
       <div id="dfm-analysis">
         <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+      </div>
+
+      {/* Risk register — aggregated failure modes and unknowns by severity */}
+      <div id="risk-register">
+        <CadLabRiskRegister modules={modules} />
       </div>
 
       {/* Engineering diagnostics — process, material, tolerance, finish, batch, environment */}
@@ -348,6 +364,11 @@ export default function CadLabReviewPage(): React.ReactNode {
       {/* Supply chain specifications per module */}
       <div id="supply-chain">
         <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
+
+      {/* Manufacturing timeline — Gantt with critical path */}
+      <div id="timeline">
+        <CadLabTimeline modules={modules} />
       </div>
 
       {/* Requirements mapping with supplier recommendations */}

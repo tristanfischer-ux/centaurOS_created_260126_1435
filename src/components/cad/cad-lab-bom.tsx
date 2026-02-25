@@ -98,7 +98,7 @@ export function CadLabBom({
 
   const bom = useMemo((): BomEntry => {
     const moduleEntries: BomEntry[] = modules.map((mod) => {
-      const answers = diagnosticAnswers[mod.id] || {}
+      const answers = diagnosticAnswers?.[mod.id] || {}
       const hasDiagnostics = Object.keys(answers).length > 0
       const process = answers.mfg_process || "Other"
       const material = answers.material || "Other"
