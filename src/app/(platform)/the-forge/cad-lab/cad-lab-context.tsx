@@ -62,6 +62,9 @@ import type { Sector } from "@/types/foundry"
 const CAD_LAB_ACTIVE_PROJECT_KEY = "forgeos:cad-lab:active-project"
 const CAD_LAB_DRAFT_SUBJECT_KEY = "forgeos:cad-lab:draft-subject"
 
+/** Maximum number of concurrent module generation requests */
+const MAX_CONCURRENCY = 3
+
 // ─── Context Shape ───────────────────────────────────────────────────
 
 type MilestoneType = "research" | "breakdown" | "generate" | "batch" | null
@@ -280,6 +283,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [batchProgress, setBatchProgress] = useState<Record<string, "queued" | "interface" | "generating" | "done" | "error">>({})
   // Track how many modules are actively running (for concurrency limiting)
   const activeModuleCountRef = useRef(0)
+  // Synchronous double-click guard — prevents duplicate handler invocations
+  // between click and React re-render (before disabled prop takes effect)
+  const generatingGuardRef = useRef(new Set<string>())
 
   // Shared concurrency gate — blocks until a generation slot is available
   const waitForSlot = useCallback((): Promise<void> => {
@@ -354,7 +360,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const addProgressLine = useCallback((line: string) => {
     setProgressLines((prev) => {
       const next = [...prev, line]
-      return next.length > 50 ? next.slice(-50) : next
+      return next.length > 200 ? next.slice(-200) : next
     })
   }, [])
 
@@ -669,6 +675,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod) return
+    if (generatingGuardRef.current.has(moduleId)) return
+    generatingGuardRef.current.add(moduleId)
 
     startGenerating(moduleId)
 
@@ -739,6 +747,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     } finally {
       activeModuleCountRef.current--
+      generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
   }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
@@ -753,6 +762,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleGenerateSingleModule = useCallback(async (moduleId: string) => {
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod || !activeProjectId) return
+    if (generatingGuardRef.current.has(moduleId)) return
+    generatingGuardRef.current.add(moduleId)
 
     startGenerating(moduleId)
 
@@ -822,6 +833,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       )
     } finally {
       activeModuleCountRef.current--
+      generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
   }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
@@ -924,9 +936,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [activeProjectId, modules.length])
 
   // ── Per-module generation with client-side concurrency limit ──
-
-  /** Maximum number of concurrent module generation requests */
-  const MAX_CONCURRENCY = 3
 
   /**
    * Generates all pending modules by firing independent API requests.

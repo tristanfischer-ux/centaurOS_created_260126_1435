@@ -793,7 +793,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs gap-1"
-                          disabled={generatingModuleIds.has(mod.id)}
+                          disabled={generatingModuleIds.has(mod.id) || isBatchRunning}
                           onClick={(e) => { e.stopPropagation(); handleGenerateSingleModule(mod.id) }}
                         >
                           <RotateCcw className="h-3 w-3" /> Retry
@@ -1058,10 +1058,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                     </div>
                   </button>
 
-                  {/* Inline progress bar while generating */}
+                  {/* Inline progress bar while generating — width reflects pipeline phase */}
                   {generatingModuleIds.has(mod.id) && (
                     <div className="h-1 bg-muted overflow-hidden">
-                      <div className="h-full w-1/3 bg-international-orange rounded-full animate-pulse" />
+                      <div className={cn(
+                        "h-full bg-international-orange rounded-full transition-all duration-700 animate-pulse",
+                        mod.status === "pending" ? "w-1/3" : "w-2/3"
+                      )} />
                     </div>
                   )}
 
@@ -1221,7 +1224,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                       {/* Module pipeline actions */}
                       <div className="flex items-center gap-2 pt-2 border-t border-muted">
                         {mod.status === "pending" && (
-                          <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "interface")} disabled={generatingModuleIds.has(mod.id)}>
+                          <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "interface")} disabled={generatingModuleIds.has(mod.id) || isBatchRunning}>
                             {generatingModuleIds.has(mod.id)
                               ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Planning Dimensions...</>
                               : <><Ruler className="h-3.5 w-3.5 mr-1.5" /> Plan Dimensions</>
@@ -1231,7 +1234,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                         {mod.status === "interface_ready" && (
                           <>
                             <span className="text-xs text-status-success flex items-center gap-1"><CheckCircle2 className="h-3 w-3" /> Dimensions planned</span>
-                            <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "generate")} disabled={generatingModuleIds.has(mod.id)}>
+                            <Button size="sm" variant="outline" onClick={() => handleModuleGenerate(mod.id, "generate")} disabled={generatingModuleIds.has(mod.id) || isBatchRunning}>
                               {generatingModuleIds.has(mod.id)
                                 ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Generating CAD...</>
                                 : <><ArrowRight className="h-3.5 w-3.5 mr-1.5" /> Generate CAD</>
@@ -1259,7 +1262,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                               variant="outline"
                               className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground"
                               onClick={() => handleModuleGenerate(mod.id, mod.interfaceDefinition ? "generate" : "interface")}
-                              disabled={generatingModuleIds.has(mod.id)}
+                              disabled={generatingModuleIds.has(mod.id) || isBatchRunning}
                             >
                               {generatingModuleIds.has(mod.id) ? (
                                 <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> Retrying...</>
