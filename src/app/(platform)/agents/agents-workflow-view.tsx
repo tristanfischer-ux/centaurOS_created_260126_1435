@@ -27,7 +27,7 @@ import { WorkflowTemplatesDialog } from "./components/workflow-templates-dialog"
 import { CreatePromptDialog } from "./components/create-prompt-dialog"
 import { AgentsHelpDialog } from "./components/agents-help-dialog"
 import { WorkflowResultsDialog } from "./components/workflow-results-dialog"
-import { getPromptById } from "./lib/prompt-library"
+import { getPromptById } from "./lib/prompts"
 import { dbCustomPromptToLocal, getCustomPromptById } from "./lib/custom-prompts"
 import {
     saveAgentWorkflow,

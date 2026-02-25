@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 import { formatCurrency } from '@/types/payments'
 import {
   createBudget,
@@ -108,6 +109,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
 
       if (result.data) {
         setData(prev => [...prev, { budget: result.data!, actual: 0, recurringActual: 0, expenseActual: 0, variance: amountPence, variancePct: 100 }])
+        toast.success('Budget created')
       }
     })
   }
@@ -153,6 +155,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
           const newVariancePct = monthlyBudget > 0 ? Math.round((newVariance / monthlyBudget) * 100) : 0
           return { ...item, budget: updated, variance: newVariance, variancePct: newVariancePct }
         }))
+        toast.success('Budget saved')
       }
 
       setEditingBudget(null)
@@ -164,6 +167,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
       const result = await deactivateBudget(budgetId)
       if (!result.error) {
         setData(prev => prev.filter(d => d.budget.id !== budgetId))
+        toast.success('Budget removed')
       }
     })
   }

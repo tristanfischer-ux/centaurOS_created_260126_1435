@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 import { formatCurrency } from '@/types/payments'
 import {
   createFundingOpportunity,
@@ -149,6 +150,7 @@ export function FundingView({ initialData }: FundingViewProps) {
 
       if (result.data) {
         setData(prev => [result.data!, ...prev])
+        toast.success('Opportunity created')
       }
     })
   }
@@ -194,6 +196,7 @@ export function FundingView({ initialData }: FundingViewProps) {
 
       if (result.data) {
         setData(prev => prev.map(d => d.id === result.data!.id ? result.data! : d))
+        toast.success('Opportunity saved')
       }
 
       setEditingOpportunity(null)
@@ -225,6 +228,7 @@ export function FundingView({ initialData }: FundingViewProps) {
       const result = await deleteFundingOpportunity(oppId)
       if (!result.error) {
         setData(prev => prev.filter(d => d.id !== oppId))
+        toast.success('Opportunity removed')
       }
     })
   }

@@ -1,9 +1,14 @@
 /**
  * @file finance-phase2-crud.spec.ts — E2E tests for Finance Phase 2 CRUD
  *
- * Tests: edit budget, edit funding opportunity, edit project + delete tx, mark invoice paid
- * Auth:  Uses saved storageState for elena.vasquez@perigee-labs.com (see auth-elena.setup.ts)
- *        Run `npx tsx scripts/create-elena-auth.ts` once to create/refresh elena.json
+ * Tests: edit budget, edit funding opportunity, edit project + delete tx,
+ *        mark invoice paid (detail), mark invoice paid (list), cancel edit
+ *
+ * Auth + seed: handled automatically by playwright.finance-phase2.config.ts
+ *   globalSetup refreshes elena.json and seeds test data before the suite runs.
+ *
+ * Usage:
+ *   npx playwright test --config=playwright.finance-phase2.config.ts
  */
 
 import { test, expect } from '@playwright/test'
@@ -13,8 +18,7 @@ import path from 'path'
 const BASE = 'https://fractionalforge.app'
 const ELENA_STORAGE = path.join(__dirname, '../.playwright/auth/elena.json')
 
-// Use pre-saved auth state for elena.vasquez (avoids login rate limiting)
-// Run `npx tsx scripts/create-elena-auth.ts` once to create/refresh elena.json
+// Fallback: inline storageState so the spec works even if run outside the dedicated config
 test.use({ storageState: ELENA_STORAGE })
 
 // Serial so tests don't race on shared Supabase state
@@ -30,9 +34,15 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await page.waitForLoadState('networkidle')
 
     // Budget cards contain a progress bar — use that to distinguish from nav .group items
-    const card = page.locator('.group').filter({
+    const budgetCards = page.locator('.group').filter({
       has: page.locator('[class*="rounded-full"][class*="bg-muted"][class*="overflow-hidden"]'),
-    }).first()
+    })
+
+    // Guard: fail loudly if Elena has no budgets (not a silent skip)
+    const budgetCount = await budgetCards.count()
+    expect(budgetCount, 'No budget cards found on /finance/budgets — verify Elena\'s account has budgets').toBeGreaterThan(0)
+
+    const card = budgetCards.first()
     await expect(card).toBeVisible({ timeout: 10000 })
     await card.hover()
     await page.waitForTimeout(300)
@@ -50,7 +60,7 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     expect(currentName.length).toBeGreaterThan(0)
 
     const amountInput = dialog.locator('input#edit-budget-amount')
-    // Always reset to a fixed value so the budget doesn't drift across test runs
+    // Always reset to a fixed value so the budget amount doesn't drift across runs
     const newAmount = '50000'
     await amountInput.fill(newAmount)
 
@@ -58,7 +68,7 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await expect(dialog).not.toBeVisible({ timeout: 8000 })
     await expect(card).toBeVisible()
 
-    console.log(`✅ Budget edit: "${currentName}" amount reset to ${newAmount}`)
+    console.log(`✅ Budget edit: "${currentName}" amount reset to £${newAmount}`)
   })
 
   test('2. Edit Funding Opportunity — Pencil on kanban card, dialog pre-fills', async ({ page }) => {
@@ -180,8 +190,12 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
       break
     }
 
+    // Fail loudly — a silent skip hides missing seed data
     if (!foundDeletable) {
-      console.log('⚠️  No deletable transactions found across projects — skipping')
+      throw new Error(
+        'No deletable (manual) transactions found across the first 15 projects. ' +
+        'Ensure globalSetup seeded a transaction: run `npx playwright test --config=playwright.finance-phase2.config.ts`'
+      )
     }
   })
 
@@ -199,9 +213,9 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
       .filter({ has: page.locator('button', { hasText: 'Paid' }) })
       .first()
 
+    // Fail loudly — setup should have seeded sent invoices
     if ((await payableRow.count()) === 0) {
-      console.log('⚠️  No sent/overdue invoices found — skipping')
-      return
+      throw new Error('No sent/overdue invoices found — ensure globalSetup seeded invoices')
     }
 
     const invoiceLink = payableRow.locator('a[href*="/finance/invoices/"]').first()
@@ -219,7 +233,7 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await expect(page.locator('h1').locator('..')).toContainText(/paid/i, { timeout: 8000 })
     await expect(markPaidBtn).not.toBeVisible()
 
-    console.log(`✅ Invoice marked as paid`)
+    console.log('✅ Invoice marked as paid (detail page)')
   })
 
   test('6. Mark Invoice Paid (list page) — hover button appears, badge updates inline', async ({ page }) => {
@@ -230,15 +244,15 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await page.waitForTimeout(300)
 
     // "Paid" button is conditionally rendered only for sent/overdue invoices —
-    // filter by its DOM presence to avoid text-content regex issues.
+    // filter by DOM presence to avoid text-content regex issues.
     const sentRow = page.locator('div.group')
       .filter({ has: page.locator('a[href*="/finance/invoices/"]') })
       .filter({ has: page.locator('button', { hasText: 'Paid' }) })
       .first()
 
+    // Fail loudly — setup seeds 2 invoices; test 5 marks only 1, so 1 remains
     if ((await sentRow.count()) === 0) {
-      console.log('⚠️  No sent/overdue invoices in list — skipping hover test')
-      return
+      throw new Error('No sent/overdue invoices in list — ensure setup seeded at least 2 invoices')
     }
 
     const invoiceNumber = await sentRow.locator('p.font-medium').first().textContent()
@@ -254,6 +268,42 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     await expect(sentRow).toContainText(/paid/i, { timeout: 5000 })
 
     console.log(`✅ Invoice ${invoiceNumber} marked paid from list`)
+  })
+
+  test('7. Cancel Edit — dialog closes without persisting changes', async ({ page }) => {
+    await page.goto(`${BASE}/finance/budgets`)
+    await page.waitForLoadState('networkidle')
+
+    const budgetCards = page.locator('.group').filter({
+      has: page.locator('[class*="rounded-full"][class*="bg-muted"][class*="overflow-hidden"]'),
+    })
+    const card = budgetCards.first()
+    await expect(card).toBeVisible({ timeout: 10000 })
+
+    // Read the current budget name from the card
+    const originalName = await card.locator('p.font-medium').first().textContent()
+
+    await card.hover()
+    await page.waitForTimeout(300)
+
+    const editBtn = card.locator('button[class*="right-8"]')
+    await editBtn.click()
+
+    const dialog = page.locator('[role="dialog"]')
+    await expect(dialog).toBeVisible({ timeout: 5000 })
+
+    // Dirty the name field with a value that must not persist
+    const nameInput = dialog.locator('input#edit-budget-name')
+    await nameInput.fill('SHOULD NOT BE SAVED')
+
+    // Click Cancel — dialog closes, no save
+    await dialog.locator('button').filter({ hasText: 'Cancel' }).click()
+    await expect(dialog).not.toBeVisible({ timeout: 3000 })
+
+    // Card must still display the original name
+    await expect(card.locator('p.font-medium').first()).toHaveText(originalName!.trim())
+
+    console.log(`✅ Cancel: "${originalName}" unchanged after cancel`)
   })
 
 })

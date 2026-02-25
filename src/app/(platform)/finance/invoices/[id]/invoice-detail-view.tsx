@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { PaymentLinkGenerator } from '@/components/finance/invoices/payment-link-generator'
+import { toast } from 'sonner'
 import { updateInvoiceStatus, createPaymentLink } from '@/actions/finance-invoices'
 import { formatCurrency } from '@/types/payments'
 import type { StandaloneInvoice, PaymentLink } from '@/types/finance'
@@ -42,7 +43,7 @@ export function InvoiceDetailView({ invoice: initialInvoice, paymentLink: initia
     startTransition(async () => {
       const result = await updateInvoiceStatus(invoice.id, 'sent')
       if (result.error) { setError(result.error); return }
-      if (result.data) setInvoice(result.data)
+      if (result.data) { setInvoice(result.data); toast.success('Invoice marked as sent') }
     })
   }
 
@@ -51,7 +52,7 @@ export function InvoiceDetailView({ invoice: initialInvoice, paymentLink: initia
     startTransition(async () => {
       const result = await updateInvoiceStatus(invoice.id, 'paid')
       if (result.error) { setError(result.error); return }
-      if (result.data) setInvoice(result.data)
+      if (result.data) { setInvoice(result.data); toast.success('Invoice marked as paid') }
     })
   }
 
@@ -60,7 +61,7 @@ export function InvoiceDetailView({ invoice: initialInvoice, paymentLink: initia
     startTransition(async () => {
       const result = await updateInvoiceStatus(invoice.id, 'cancelled')
       if (result.error) { setError(result.error); return }
-      if (result.data) setInvoice(result.data)
+      if (result.data) { setInvoice(result.data); toast.success('Invoice cancelled') }
     })
   }
 

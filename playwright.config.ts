@@ -158,22 +158,6 @@ export default defineConfig({
         trace: 'off',
       },
     },
-    // Finance Phase 2 CRUD — auth setup (SDK-based, no rate limiting)
-    {
-      name: 'auth-setup-elena',
-      testMatch: /auth-elena-sdk\.setup\.ts/,
-    },
-    // Finance Phase 2 CRUD — runs against production (fractionalforge.app)
-    // Run with: PLAYWRIGHT_SKIP_WEB_SERVER=1 npx playwright test --project=finance-phase2
-    {
-      name: 'finance-phase2',
-      testMatch: /finance-phase2-crud\.spec\.ts$/,
-      dependencies: ['auth-setup-elena'],
-      use: {
-        ...devices['Desktop Chrome'],
-        storageState: path.join(authDir, 'elena.json'),
-      },
-    },
   ],
   webServer:
     process.env.PLAYWRIGHT_SKIP_WEB_SERVER === '1'

@@ -11,7 +11,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { getPromptById } from "../lib/prompt-library"
+import { getPromptById } from "../lib/prompts"
 import { CATEGORY_META, CATEGORY_ACCENT_COLORS, type PromptCategory, type ExecutionStatus, type AttachedFile } from "../lib/agent-types"
 import { getIcon } from "./prompt-node"
 import { Markdown } from "@/components/ui/markdown"

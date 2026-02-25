@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from 'sonner'
 import { formatCurrency } from '@/types/payments'
 import { addProjectTransaction, updateProject, deleteProjectTransaction } from '@/actions/finance-projects'
 import type { FinanceProject, ProjectTransaction, ProjectTransactionType, ProjectStatus } from '@/types/finance'
@@ -116,6 +117,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
 
       if (result.data) {
         setTransactions(prev => [result.data!, ...prev])
+        toast.success('Transaction added')
       }
     })
   }
@@ -149,6 +151,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
 
       if (result.data) {
         setProjectState(result.data)
+        toast.success('Project saved')
       }
 
       setShowEdit(false)
@@ -165,6 +168,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
       const result = await deleteProjectTransaction(tx.id, projectState.id)
       if (!result.error) {
         setTransactions(prev => prev.filter(t => t.id !== tx.id))
+        toast.success('Transaction deleted')
       }
     })
   }

@@ -14,6 +14,7 @@ import { FileText, Plus, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/types/payments'
 import { updateInvoiceStatus } from '@/actions/finance-invoices'
@@ -62,10 +63,17 @@ export function InvoicesView({ initialInvoices, standaloneInvoices: initialStand
   const totalOutstanding = filteredOutstanding.reduce((sum, inv) => sum + inv.amount, 0)
 
   const handleMarkPaid = (invoiceId: string) => {
+    // Optimistic update — badge flips to paid immediately
+    setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'paid' as const } : inv))
     startTransition(async () => {
       const result = await updateInvoiceStatus(invoiceId, 'paid')
-      if (!result.error && result.data) {
+      if (result.error) {
+        // Revert on failure
+        setInvoices(prev => prev.map(inv => inv.id === invoiceId ? { ...inv, status: 'sent' as const } : inv))
+        toast.error('Failed to mark invoice as paid')
+      } else if (result.data) {
         setInvoices(prev => prev.map(inv => inv.id === invoiceId ? result.data! : inv))
+        toast.success('Invoice marked as paid')
       }
     })
   }
