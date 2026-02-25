@@ -7,6 +7,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sendInvitationEmail } from '@/lib/notifications/channels/email'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { getBaseUrl } from '@/lib/domains'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
@@ -373,7 +374,7 @@ export async function signupWithInvitation(formData: FormData): Promise<void> {
       email,
       error: authError.message,
     })
-    redirect(`/invite/${token}?error=${encodeURIComponent(authError.message)}`)
+    redirect(`/invite/${token}?error=${encodeURIComponent(sanitizeErrorMessage(authError))}`)
   }
   
   if (!authData.user) {

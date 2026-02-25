@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
-import { sanitizeEmail, escapeHtml } from "@/lib/security/sanitize";
+import { sanitizeEmail, escapeHtml, sanitizeErrorMessage } from "@/lib/security/sanitize";
 
 // Direct signup roles (Founder, Executive, Apprentice, Supplier)
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
@@ -257,7 +257,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
 
     if (authError) {
       console.error("[Signup] signUp error:", authError);
-      return errorWithValues(authError.message);
+      return errorWithValues(sanitizeErrorMessage(authError));
     }
 
     if (!authData.user) {

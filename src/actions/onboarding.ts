@@ -58,7 +58,7 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
         code: insertError.code,
         details: insertError.details,
       })
-      return { error: `Failed to create profile: ${insertError.message}` }
+      return { error: `Failed to create profile: ${sanitizeErrorMessage(insertError)}` }
     }
 
     revalidatePath('/')
@@ -90,7 +90,7 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
       code: error.code,
       details: error.details,
     })
-    return { error: `Failed to save selection: ${error.message}` }
+    return { error: `Failed to save selection: ${sanitizeErrorMessage(error)}` }
   }
   
   revalidatePath('/')
@@ -483,7 +483,7 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
       details: rpcError.details,
       hint: rpcError.hint,
     })
-    return { error: `Repair failed (${rpcError.code}): ${rpcError.message}` }
+    return { error: `Repair failed (${rpcError.code}): ${sanitizeErrorMessage(rpcError)}` }
   }
 
   const result = data as { success?: boolean; foundry_id?: string; action?: string; error?: string }

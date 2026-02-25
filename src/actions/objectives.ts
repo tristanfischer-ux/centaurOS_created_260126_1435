@@ -150,7 +150,7 @@ export async function createObjective(formData: FormData) {
                     return { error: `Failed to fetch pack items and cleanup failed. Objective ID: ${objective.id}` }
                 }
                 
-                return { error: `Failed to fetch pack items: ${packError.message}` }
+                return { error: `Failed to fetch pack items: ${sanitizeErrorMessage(packError)}` }
             }
 
             // Validate that we got the expected pack items
@@ -846,7 +846,7 @@ export async function createObjectiveFromSubsystem(input: {
                 if (tasksError) {
                     console.error('[CreateSubsystemObjective] Failed to create tasks:', tasksError)
                     await supabase.from('objectives').delete().eq('id', objective.id)
-                    return { error: `Failed to create tasks: ${tasksError.message}` }
+                    return { error: `Failed to create tasks: ${sanitizeErrorMessage(tasksError)}` }
                 }
 
                 const starts = tasksToInsert.map((t) => new Date(t.start_date).getTime())

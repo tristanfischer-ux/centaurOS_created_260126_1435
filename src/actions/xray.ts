@@ -158,7 +158,7 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
         foundryId,
         userId: user.id,
       })
-      return { error: `Failed to save scan: ${insertError.message}` }
+      return { error: `Failed to save scan: ${sanitizeErrorMessage(insertError)}` }
     }
 
     let spec: XRaySpec
@@ -198,7 +198,7 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
         scanId: scan.id,
         foundryId,
       })
-      return { error: `Failed to save scan: ${updateError.message}` }
+      return { error: `Failed to save scan: ${sanitizeErrorMessage(updateError)}` }
     }
 
     // AUDIT: Log scan creation
@@ -279,7 +279,7 @@ export async function refineScanAction(
         scanId,
         foundryId,
       })
-      return { error: `Failed to save refined scan: ${updateError.message}` }
+      return { error: `Failed to save refined scan: ${sanitizeErrorMessage(updateError)}` }
     }
 
     // AUDIT: Log scan refinement
@@ -420,7 +420,7 @@ export async function deriveProcessClassAction(
 
     if (updateError) {
       console.error("[XRay] Failed to update scan after diagnostic:", updateError.message)
-      return { error: `Failed to save diagnostic: ${updateError.message}` }
+      return { error: `Failed to save diagnostic: ${sanitizeErrorMessage(updateError)}` }
     }
 
     return { spec: updatedSpec }
@@ -820,7 +820,7 @@ export async function updateScanSpecAction(
       .eq("foundry_id", foundryId)
 
     if (error) {
-      return { error: `Failed to update scan: ${error.message}` }
+      return { error: `Failed to update scan: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -910,7 +910,7 @@ export async function listScansAction(): Promise<
       .limit(50)
 
     if (error) {
-      return { error: `Failed to list scans: ${error.message}` }
+      return { error: `Failed to list scans: ${sanitizeErrorMessage(error)}` }
     }
 
     return {
@@ -970,7 +970,7 @@ export async function updateProjectMetadataAction(
       .eq("foundry_id", foundryId)
 
     if (error) {
-      return { error: `Failed to update project: ${error.message}` }
+      return { error: `Failed to update project: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -1976,7 +1976,7 @@ export async function applyDesignChangesAction(
 
     if (updateError) {
       console.error("[XRay] Failed to persist design changes:", updateError.message)
-      return { error: `Failed to save changes: ${updateError.message}` }
+      return { error: `Failed to save changes: ${sanitizeErrorMessage(updateError)}` }
     }
 
     // AUDIT: Log the parameter changes
@@ -2072,7 +2072,7 @@ export async function createEngineeringReviewAction(
 
     if (taskError) {
       console.error("[XRay] Failed to create review tasks:", taskError.message)
-      return { error: `Tasks creation failed: ${taskError.message}` }
+      return { error: `Tasks creation failed: ${sanitizeErrorMessage(taskError)}` }
     }
 
     const taskIds = (tasks ?? []).map((t) => t.id)
@@ -2184,7 +2184,7 @@ export async function deleteScanAction(
         scanId,
         foundryId,
       })
-      return { error: `Failed to delete project: ${deleteError.message}` }
+      return { error: `Failed to delete project: ${sanitizeErrorMessage(deleteError)}` }
     }
 
     // AUDIT: Log scan deletion
@@ -2327,7 +2327,7 @@ export async function seedDemoConceptAction(): Promise<
         foundryId,
         userId: user.id,
       })
-      return { error: `Failed to seed demo: ${error.message}` }
+      return { error: `Failed to seed demo: ${sanitizeErrorMessage(error)}` }
     }
 
     console.info("[XRay] Demo concept seeded:", {
@@ -2660,7 +2660,7 @@ export async function saveConceptResearchAction(
 
     if (updateError) {
       console.error("[Forge] Failed to save research report:", updateError.message)
-      return { error: `Failed to save research: ${updateError.message}` }
+      return { error: `Failed to save research: ${sanitizeErrorMessage(updateError)}` }
     }
 
     return { success: true as const }

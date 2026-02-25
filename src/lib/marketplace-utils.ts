@@ -166,7 +166,39 @@ export function safeParseAttributes(attributes: unknown): Record<string, any> {
     }
   }
   if (typeof attributes === 'object' && !Array.isArray(attributes)) {
-    return attributes as Record<string, any>
+    const obj = attributes as Record<string, any>
+
+    // INTENT: Detect and repair double-serialized attributes from Python scripts.
+    // Corrupted rows have numeric keys "0","1","2"... each holding a single character
+    // of the original JSON string (e.g. {"0":"{","1":"\"","2":"k",...}).
+    if ('0' in obj && typeof obj['0'] === 'string' && obj['0'].length === 1) {
+      const namedKeys: Record<string, any> = {}
+      const numericKeys: number[] = []
+      for (const k of Object.keys(obj)) {
+        if (/^\d+$/.test(k)) {
+          numericKeys.push(Number(k))
+        } else {
+          namedKeys[k] = obj[k]
+        }
+      }
+
+      numericKeys.sort((a, b) => a - b)
+      let reconstructed = ''
+      for (const n of numericKeys) {
+        reconstructed += obj[String(n)]
+      }
+
+      try {
+        const parsed = JSON.parse(reconstructed) as Record<string, any>
+        return { ...parsed, ...namedKeys }
+      } catch {
+        // GOTCHA: If reconstruction fails, return only named keys rather than
+        // passing through the corrupted numeric-key object to the UI.
+        return namedKeys
+      }
+    }
+
+    return obj
   }
   return {}
 }

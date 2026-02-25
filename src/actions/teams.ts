@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { updateTeamNameSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export async function deleteTeam(teamId: string) {
     const supabase = await createClient()
@@ -142,7 +143,7 @@ export async function updateTeamName(teamId: string, name: string) {
         .eq('id', teamId)
 
     if (error) {
-        return { error: `Failed to update team name: ${error.message}` }
+        return { error: `Failed to update team name: ${sanitizeErrorMessage(error)}` }
     }
 
     revalidatePath('/team')

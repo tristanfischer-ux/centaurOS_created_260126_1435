@@ -378,7 +378,7 @@ Output ONLY the Python code.`
       console.error("[CAD-GRAMMAR-RESEARCH] Supabase insert failed:", insertError.message)
       return {
         success: false,
-        error: `Failed to store grammar: ${insertError.message}`,
+        error: `Failed to store grammar: ${sanitizeErrorMessage(insertError)}`,
         tokensIn: totalTokensIn,
         tokensOut: totalTokensOut,
       }

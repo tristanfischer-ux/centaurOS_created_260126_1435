@@ -14,6 +14,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type { Json } from "@/types/database.types"
 import type {
   CadLabResult,
@@ -103,7 +104,7 @@ export async function listCadLabProjects(): Promise<
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to list projects:", error.message)
-      return { error: `Failed to list projects: ${error.message}` }
+      return { error: `Failed to list projects: ${sanitizeErrorMessage(error)}` }
     }
 
     return {
@@ -228,7 +229,7 @@ export async function createCadLabProject(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to create project:", error.message)
-      return { error: `Failed to create project: ${error.message}` }
+      return { error: `Failed to create project: ${sanitizeErrorMessage(error)}` }
     }
 
     // AUDIT: Log project creation
@@ -278,7 +279,7 @@ export async function saveCadLabResearch(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save research:", error.message)
-      return { error: `Failed to save research: ${error.message}` }
+      return { error: `Failed to save research: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -311,7 +312,7 @@ export async function saveCadLabInterface(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save interface:", error.message)
-      return { error: `Failed to save interface: ${error.message}` }
+      return { error: `Failed to save interface: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -354,7 +355,7 @@ export async function saveCadLabResult(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save result:", error.message)
-      return { error: `Failed to save result: ${error.message}` }
+      return { error: `Failed to save result: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -386,7 +387,7 @@ export async function saveCadLabModules(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
-      return { error: `Failed to save modules: ${error.message}` }
+      return { error: `Failed to save modules: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -416,7 +417,7 @@ export async function saveCadLabSystemIllustration(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save system illustration URL:", error.message)
-      return { error: `Failed to save system illustration: ${error.message}` }
+      return { error: `Failed to save system illustration: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -451,7 +452,7 @@ export async function saveCadLabIntegratedAssembly(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save integrated assembly:", error.message)
-      return { error: `Failed to save: ${error.message}` }
+      return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -482,7 +483,7 @@ export async function saveCadLabProjectRfq(
       .single()
 
     if (loadError) {
-      return { error: `Failed to load project state: ${loadError.message}` }
+      return { error: `Failed to load project state: ${sanitizeErrorMessage(loadError)}` }
     }
 
     const existingResult = (current?.result as Record<string, unknown> | null) ?? {}
@@ -506,7 +507,7 @@ export async function saveCadLabProjectRfq(
       .eq("id", projectId)
 
     if (error) {
-      return { error: `Failed to save RFQ linkage: ${error.message}` }
+      return { error: `Failed to save RFQ linkage: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -544,7 +545,7 @@ export async function updateCadLabBatchStatus(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to update batch status:", error.message)
-      return { error: `Failed to update batch status: ${error.message}` }
+      return { error: `Failed to update batch status: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -629,7 +630,7 @@ export async function renameCadLabProject(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to rename project:", error.message)
-      return { error: `Failed to rename: ${error.message}` }
+      return { error: `Failed to rename: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }
@@ -660,7 +661,7 @@ export async function deleteCadLabProject(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to delete project:", error.message)
-      return { error: `Failed to delete: ${error.message}` }
+      return { error: `Failed to delete: ${sanitizeErrorMessage(error)}` }
     }
 
     // AUDIT: Log deletion

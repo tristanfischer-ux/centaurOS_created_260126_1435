@@ -11,6 +11,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { FoundryPurposeData, CompanyProfile } from '@/types/foundry'
 import type { Sector } from '@/types/foundry'
 import type { Json } from '@/types/database.types'
@@ -123,7 +124,7 @@ export async function updateFoundryPurpose(
         })
         return {
           success: false,
-          error: `Failed to update company purpose: ${updateError.message}`,
+          error: `Failed to update company purpose: ${sanitizeErrorMessage(updateError)}`,
         }
       }
       
@@ -329,7 +330,7 @@ export async function updateCompanyProfile(
         })
         return {
           success: false,
-          error: `Failed to update company profile: ${updateError.message}`,
+          error: `Failed to update company profile: ${sanitizeErrorMessage(updateError)}`,
         }
       }
 

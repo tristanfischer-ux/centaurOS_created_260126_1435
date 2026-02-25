@@ -12,6 +12,7 @@
 
 import { withAuth } from '@/lib/server-action-utils'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 interface StickyNoteData {
   /** The text content of the sticky note */
@@ -107,7 +108,7 @@ export async function convertStickyNotesToTasks(
           foundryId,
           error: error.message,
         })
-        return { data: null, error: `Failed to create task "${truncatedTitle}": ${error.message}` }
+        return { data: null, error: `Failed to create task "${truncatedTitle}": ${sanitizeErrorMessage(error)}` }
       }
 
       if (task) {
