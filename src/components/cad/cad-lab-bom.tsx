@@ -65,7 +65,7 @@ interface CadLabBomProps {
 // ─── Helpers ────────────────────────────────────────────────────────
 
 const fmtCost = (n: number) =>
-  `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  `£${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
 const fmtMass = (kg: number) => (kg < 0.01 ? "<0.01 kg" : `${kg.toFixed(2)} kg`)
 

@@ -22,7 +22,7 @@ import { useMemo } from "react"
 import {
   Layers,
   Scale,
-  DollarSign,
+  PoundSterling,
   Clock,
   ShieldCheck,
   AlertTriangle,
@@ -180,9 +180,9 @@ export function CadLabExecutiveSummary({
             warn={data.hasEstimatedMass}
           />
           <MetricCard
-            icon={<DollarSign className="h-3.5 w-3.5" />}
+            icon={<PoundSterling className="h-3.5 w-3.5" />}
             label="Cost / Unit"
-            value={`$${data.totalCostPerUnit.toFixed(2)}`}
+            value={`£${data.totalCostPerUnit.toFixed(2)}`}
             sub="mfg estimate"
           />
           <MetricCard

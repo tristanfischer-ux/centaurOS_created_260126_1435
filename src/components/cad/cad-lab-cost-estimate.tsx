@@ -24,7 +24,7 @@
 
 import { useMemo, useState } from "react"
 import {
-  DollarSign,
+  PoundSterling,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
@@ -167,7 +167,7 @@ export function CadLabCostEstimate({
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
+            <PoundSterling className="h-4 w-4" />
             Cost Estimation
           </CardTitle>
         </CardHeader>
@@ -188,10 +188,10 @@ export function CadLabCostEstimate({
           className="flex items-center justify-between w-full text-left"
         >
           <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4" />
+            <PoundSterling className="h-4 w-4" />
             Cost Estimation
             <span className="text-xs font-normal font-mono text-foreground bg-muted px-2 py-0.5 rounded">
-              ${systemTotal.toFixed(2)} / unit
+              £{systemTotal.toFixed(2)} / unit
             </span>
           </CardTitle>
           {isExpanded ? (
@@ -321,24 +321,24 @@ export function CadLabCostEstimate({
                         {c.process} · {c.material} · {(c.massKg * 1000).toFixed(0)}g
                       </div>
                     </td>
-                    <td className="p-2 text-right font-mono text-foreground">${c.materialCost.toFixed(2)}</td>
-                    <td className="p-2 text-right font-mono text-foreground">${c.processCost.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono text-foreground">£{c.materialCost.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono text-foreground">£{c.processCost.toFixed(2)}</td>
                     <td className="p-2 text-right font-mono text-foreground">
-                      {c.toolingCostPerUnit > 0 ? `$${c.toolingCostPerUnit.toFixed(2)}` : "—"}
+                      {c.toolingCostPerUnit > 0 ? `£${c.toolingCostPerUnit.toFixed(2)}` : "—"}
                     </td>
-                    <td className="p-2 text-right font-mono font-semibold text-foreground">${c.totalPerUnit.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono font-semibold text-foreground">£{c.totalPerUnit.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2">
                   <td className="p-2 font-semibold text-foreground">System Total</td>
-                  <td className="p-2 text-right font-mono font-semibold text-foreground">${totalMaterialCost.toFixed(2)}</td>
-                  <td className="p-2 text-right font-mono font-semibold text-foreground">${totalProcessCost.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono font-semibold text-foreground">£{totalMaterialCost.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono font-semibold text-foreground">£{totalProcessCost.toFixed(2)}</td>
                   <td className="p-2 text-right font-mono font-semibold text-foreground">
-                    {totalToolingCost > 0 ? `$${totalToolingCost.toFixed(2)}` : "—"}
+                    {totalToolingCost > 0 ? `£${totalToolingCost.toFixed(2)}` : "—"}
                   </td>
-                  <td className="p-2 text-right font-mono font-bold text-foreground text-sm">${systemTotal.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono font-bold text-foreground text-sm">£{systemTotal.toFixed(2)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -351,7 +351,7 @@ export function CadLabCostEstimate({
               <span className="text-muted-foreground">
                 At batch of <span className="font-semibold text-foreground">{maxBatch}</span> units:
                 per-unit system cost ≈ <span className={cn("font-semibold font-mono text-foreground")}>
-                  ${systemTotal.toFixed(2)}
+                  £{systemTotal.toFixed(2)}
                 </span>
                 {" "}(tooling amortized)
               </span>
@@ -393,7 +393,7 @@ function CostDonutTooltip({
     <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
       <p className="font-medium text-foreground">{item.name}</p>
       <p className="text-muted-foreground font-mono">
-        ${item.value.toFixed(2)} ({pct}%)
+        £{item.value.toFixed(2)} ({pct}%)
       </p>
     </div>
   )
@@ -424,11 +424,11 @@ function ModuleBarTooltip({
       {payload.map((p) => (
         <p key={p.dataKey} className="text-muted-foreground">
           <span style={{ color: p.color }}>●</span>{" "}
-          {p.name}: ${p.value.toFixed(2)}
+          {p.name}: £{p.value.toFixed(2)}
         </p>
       ))}
       <p className="font-semibold text-foreground mt-1 border-t pt-1">
-        Total: ${total.toFixed(2)}
+        Total: £{total.toFixed(2)}
       </p>
     </div>
   )

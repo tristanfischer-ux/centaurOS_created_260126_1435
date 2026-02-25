@@ -220,7 +220,7 @@ export function CadLabRawMaterials({
   }, [summary])
 
   // ── Helpers ──
-  const fmt = (n: number) => `$${n.toFixed(2)}`
+  const fmt = (n: number) => `£${n.toFixed(2)}`
   const pct = (n: number, total: number) =>
     total > 0 ? ((n / total) * 100).toFixed(1) : "0"
 
@@ -568,7 +568,7 @@ export function CadLabRawMaterials({
                         {r.totalKg.toFixed(3)}
                       </td>
                       <td className="p-2 text-right font-mono text-foreground">
-                        ${r.costPerKg.toFixed(2)}
+                        £{r.costPerKg.toFixed(2)}
                       </td>
                       <td className="p-2 text-right font-mono font-semibold text-foreground">
                         {fmt(r.totalCost)}

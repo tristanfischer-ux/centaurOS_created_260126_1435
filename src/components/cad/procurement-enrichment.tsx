@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  DollarSign,
+  PoundSterling,
   Shield,
   Star,
   AlertTriangle,
@@ -201,7 +201,7 @@ export function ProcurementEnrichment({
                 <div className="flex items-center gap-2 shrink-0">
                   {r.unitPrice != null && (
                     <span className="text-sm font-semibold text-foreground">
-                      ${r.unitPrice.toFixed(2)}
+                      £{r.unitPrice.toFixed(2)}
                     </span>
                   )}
                   <a
@@ -232,7 +232,7 @@ export function ProcurementEnrichment({
               ) : (
                 <ChevronRight className="h-4 w-4" />
               )}
-              <DollarSign className="h-4 w-4 text-international-orange" />
+              <PoundSterling className="h-4 w-4 text-international-orange" />
               Real Market Pricing
               <Badge variant="secondary" className="text-[10px] ml-2">
                 {pricing.length} component{pricing.length !== 1 ? 's' : ''} with pricing
@@ -254,7 +254,7 @@ export function ProcurementEnrichment({
                       </span>
                       {bestTier && (
                         <span className="text-sm font-bold text-foreground">
-                          ${bestTier.unit_price_usd.toFixed(2)}/ea
+                          £{bestTier.unit_price_usd.toFixed(2)}/ea
                         </span>
                       )}
                     </div>

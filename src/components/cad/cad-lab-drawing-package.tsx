@@ -401,11 +401,11 @@ export function buildFullReviewReport(
     const toolCost = batchSize > 0 ? (TOOLING_COST[process] ?? 0) / batchSize : 0
     const totalCost = matCost + procCost + toolCost
     const supplierType = getSupplierCategories(diag?.mfg_process || null, diag?.material || null)[0]
-    lines.push(`| ${mod.name} | (assembly) | ${material} | ${massKg.toFixed(2)} | $${totalCost.toFixed(2)} | ${supplierType} | ${mod.leadWeeks} wk |`)
+    lines.push(`| ${mod.name} | (assembly) | ${material} | ${massKg.toFixed(2)} | £${totalCost.toFixed(2)} | ${supplierType} | ${mod.leadWeeks} wk |`)
     for (const part of mod.keyParts) {
       const partCost = mod.keyParts.length > 0 ? totalCost / mod.keyParts.length : 0
       const partMass = mod.keyParts.length > 0 ? massKg / mod.keyParts.length : 0
-      lines.push(`| | ${part} | ${material} | ~${partMass.toFixed(2)} | ~$${partCost.toFixed(2)} | ${supplierType} | — |`)
+      lines.push(`| | ${part} | ${material} | ~${partMass.toFixed(2)} | ~£${partCost.toFixed(2)} | ${supplierType} | — |`)
     }
   }
   lines.push("")
@@ -441,17 +441,17 @@ export function buildFullReviewReport(
   const valueAdd = totalMfg > 0 ? ((totalMfg - totalRawCost) / totalMfg * 100) : 0
 
   lines.push("## Raw Materials Breakdown", "")
-  lines.push(`- **Raw Material Cost:** $${totalRawCost.toFixed(2)}`)
-  lines.push(`- **Processing Cost:** $${totalProcessing.toFixed(2)}`)
-  lines.push(`- **Tooling Cost:** $${totalTooling.toFixed(2)}`)
-  lines.push(`- **Total Manufacturing Cost:** $${totalMfg.toFixed(2)}`)
+  lines.push(`- **Raw Material Cost:** £${totalRawCost.toFixed(2)}`)
+  lines.push(`- **Processing Cost:** £${totalProcessing.toFixed(2)}`)
+  lines.push(`- **Tooling Cost:** £${totalTooling.toFixed(2)}`)
+  lines.push(`- **Total Manufacturing Cost:** £${totalMfg.toFixed(2)}`)
   lines.push(`- **Value-Add Margin:** ${valueAdd.toFixed(1)}%`)
   lines.push("")
   lines.push("| Material | Total kg | Cost/kg | Total Cost | % of Raw |")
   lines.push("| --- | --- | --- | --- | --- |")
   for (const row of materialRows) {
     const pct = totalRawCost > 0 ? (row.total / totalRawCost * 100).toFixed(1) : "0"
-    lines.push(`| ${row.name} | ${row.kg.toFixed(2)} | $${row.costPerKg.toFixed(2)} | $${row.total.toFixed(2)} | ${pct}% |`)
+    lines.push(`| ${row.name} | ${row.kg.toFixed(2)} | £${row.costPerKg.toFixed(2)} | £${row.total.toFixed(2)} | ${pct}% |`)
   }
   lines.push("")
 
