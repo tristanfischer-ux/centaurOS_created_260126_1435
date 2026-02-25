@@ -1593,6 +1593,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
 
                 rolloutIdFromResponse = res.headers.get("X-Rollout-Id")
 
+                // Sync thread state if server auto-healed a stale thread
+                const newThreadId = res.headers.get("X-New-Thread-Id")
+                if (newThreadId) {
+                    setThreadId(newThreadId)
+                }
+
                 // Handle streaming response
                 const reader = res.body?.getReader()
                 if (!reader) throw new Error("No response body")

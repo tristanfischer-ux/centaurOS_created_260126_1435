@@ -101,5 +101,8 @@ export function normalizeSpecialistError(error: string, specialistName: string):
     if (error.includes("overloaded") || error.includes("temporarily overloaded")) {
         return `${specialistName}'s AI provider is temporarily overloaded. Try again in a few seconds.`
     }
+    if (error.includes("Invalid or inaccessible thread")) {
+        return `${specialistName} lost track of the conversation thread. Please close and reopen the chat to start fresh.`
+    }
     return error
 }

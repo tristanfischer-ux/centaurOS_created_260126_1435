@@ -207,6 +207,14 @@ export async function POST(request: Request) {
     let speculative: boolean
     let handoffSourceThreadId: string | undefined
     let handoffSourceSpecialistId: string | undefined
+    let healedThreadId: string | null = null
+    // Attaches X-New-Thread-Id header when a stale thread was auto-healed
+    const withHealedThreadHeader = (response: Response): Response => {
+        if (!healedThreadId) return response
+        const headers = new Headers(response.headers)
+        headers.set("X-New-Thread-Id", healedThreadId)
+        return new Response(response.body, { headers })
+    }
     let currentRoute: string | undefined
     let cadLabProjectId: string | undefined
 
@@ -337,10 +345,29 @@ export async function POST(request: Request) {
             .eq("foundry_id", foundryId)
             .single()
         if (!thread) {
-            return NextResponse.json(
-                { error: "Invalid or inaccessible thread" },
-                { status: 403 }
-            )
+            // Auto-heal: if this is a specialist chat, create a fresh thread via SECURITY DEFINER RPC
+            if (specialistId) {
+                const { data: freshThreadId } = await supabase.rpc(
+                    'get_or_create_specialist_thread',
+                    {
+                        p_foundry_id: foundryId,
+                        p_user_id: user.id,
+                        p_context_type: 'specialist',
+                        p_context_id: specialistId,
+                        p_metadata: { specialistId, specialistType: 'specialist' },
+                    }
+                )
+                if (freshThreadId) {
+                    threadId = freshThreadId as string
+                    healedThreadId = freshThreadId as string
+                }
+                // If RPC also fails, proceed without threadId (non-critical)
+            } else {
+                return NextResponse.json(
+                    { error: "Invalid or inaccessible thread" },
+                    { status: 403 }
+                )
+            }
         }
     }
 
@@ -1200,7 +1227,7 @@ Rules:
                 }
             }
 
-            return await handleSpeculativeStreaming(
+            return withHealedThreadHeader(await handleSpeculativeStreaming(
                 fallbackChain,
                 finalPrompt,
                 systemPromptWithContext,
@@ -1211,13 +1238,13 @@ Rules:
                 specialist?.name ?? "Specialist",
                 specialist?.title ?? "Advisor",
                 specialist?.workingStyle ?? "",
-            )
+            ))
         }
         // DECISION: Route to tool-aware streaming when specialist has tools (claude-tier).
         // This enables the multi-turn tool loop where the model can query data,
         // run calculations, and search the web before responding.
         if (modality === "text" && specialistTools.length > 0 && foundryId && specialistId) {
-            return await handleToolAwareStreaming({
+            return withHealedThreadHeader(await handleToolAwareStreaming({
                 chain: fallbackChain,
                 finalPrompt,
                 systemPrompt: systemPromptWithContext,
@@ -1232,13 +1259,13 @@ Rules:
                 specialistId,
                 userId: user.id,
                 threadId,
-            })
+            }))
         }
         if (modality === "text") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers)
+            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, systemPromptWithContext, memoryCallback, enableThinking, conversationHistory, rolloutId, enableWebSearchForStreaming, activeLayers))
         }
         if (modality === "slides") {
-            return await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId)
+            return withHealedThreadHeader(await handleTextStreaming(fallbackChain, finalPrompt, SLIDES_SYSTEM_PROMPT, memoryCallback, enableThinking, undefined, rolloutId))
         }
         if (modality === "image") {
             const result = await handleImageGeneration(apiKey, providerId, modelId, finalPrompt)
