@@ -13,7 +13,7 @@
  */
 
 import { Suspense } from 'react'
-import { Users, ShieldCheck, Briefcase, MapPin } from 'lucide-react'
+import { Users, Briefcase } from 'lucide-react'
 import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
