@@ -200,12 +200,6 @@ export async function updateSession(request: NextRequest) {
             )
 
             if (!isAllowedForSupplier && !isAllowedApiForSupplier) {
-                const referer = request.headers.get('referer')
-                if (referer?.includes('/supplier-portal')) {
-                    console.warn('[Middleware] Potential redirect loop detected for supplier, allowing access to:', pathname)
-                    return response
-                }
-
                 const redirectUrl = request.nextUrl.clone()
                 redirectUrl.pathname = '/supplier-portal'
                 return NextResponse.redirect(redirectUrl)
