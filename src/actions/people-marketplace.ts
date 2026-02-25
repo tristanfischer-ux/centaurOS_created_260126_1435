@@ -1,8 +1,7 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { withAuth, withUser } from '@/lib/server-action-utils'
-import { getBaseUrl } from '@/lib/domains'
+import { withUser } from '@/lib/server-action-utils'
 import type { MarketplaceListing } from './marketplace'
 
 /**
@@ -47,7 +46,9 @@ export interface EnrichedPersonListing extends MarketplaceListing {
  *
  * @returns {Promise<EnrichedPersonListing[]>} People listings with trust data
  *
- * @security Requires authenticated user. Listing data is public-read via RLS.
+ * @security Requires authenticated user (direct supabase.auth.getUser check).
+ * Does not need foundry scoping — listing data is public-read via RLS and
+ * not tenant-specific. Compare with `findTalentMatches` which uses `withUser`.
  */
 export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing[]> {
     const supabase = await createClient()
@@ -190,7 +191,7 @@ export interface TalentMatchResult {
 }
 
 export async function findTalentMatches(query: string): Promise<TalentMatchResult> {
-    return withUser(async ({ supabase, user }) => {
+    return withUser(async () => {
         if (!query || query.trim().length < 3) {
             return { matches: [], explanation: '', error: 'Query too short' }
         }
@@ -202,71 +203,24 @@ export async function findTalentMatches(query: string): Promise<TalentMatchResul
             return { matches: [], explanation: 'No talent listings available yet.', error: null }
         }
 
-        // Call AI to extract requirements and score matches
-        try {
-            const response = await fetch(`${getBaseUrl()}/api/marketplace/talent-match`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // Forward auth cookie for the API route
-                    'Cookie': '', // Server action context - API route will re-auth
-                },
-                body: JSON.stringify({
-                    query: query.trim(),
-                    listings: enrichedListings.map(l => ({
-                        id: l.id,
-                        title: l.title,
-                        description: l.description,
-                        subcategory: l.subcategory,
-                        attributes: l.attributes,
-                        is_verified: l.is_verified,
-                        trustData: l.trustData,
-                    })),
-                }),
-            })
-
-            if (!response.ok) {
-                // Fallback: simple keyword matching
-                return performKeywordMatching(query, enrichedListings)
-            }
-
-            const result = await response.json()
-            if (!result.success) {
-                return performKeywordMatching(query, enrichedListings)
-            }
-
-            // Map AI scores back to enriched listings
-            const scoredMatches: TalentMatch[] = (result.matches || [])
-                .map((m: { id: string; score: number; reasons: string[]; highlightedSkills: string[] }) => {
-                    const listing = enrichedListings.find(l => l.id === m.id)
-                    if (!listing) return null
-                    return {
-                        listing,
-                        matchScore: m.score,
-                        matchReasons: m.reasons,
-                        highlightedSkills: m.highlightedSkills,
-                    }
-                })
-                .filter(Boolean)
-                .slice(0, 5)
-
-            return {
-                matches: scoredMatches as TalentMatch[],
-                explanation: result.explanation || '',
-                error: null,
-            }
-        } catch (err) {
-            console.error('[PeopleMarketplace] AI matching failed, falling back to keyword:', err)
-            return performKeywordMatching(query, enrichedListings)
-        }
+        // DECISION: Using keyword matching directly. The AI-powered
+        // /api/marketplace/talent-match route is available for future direct
+        // client use, but calling it from a server action sends empty cookies
+        // and always fails auth. Keyword matching is fast and reliable.
+        return performKeywordMatching(query, enrichedListings)
     }) as Promise<TalentMatchResult>
 }
 
+/** Escape special regex characters in user input to prevent ReDoS. */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /**
- * Fallback keyword-based matching when AI is unavailable.
+ * Keyword-based talent matching.
  *
- * @description Scores listings based on keyword overlap between the query
- * and listing title, description, skills, and expertise fields.
+ * @description Scores listings based on word-boundary keyword overlap between
+ * the query and listing title, description, skills, and expertise fields.
  */
 function performKeywordMatching(
     query: string,
@@ -275,23 +229,25 @@ function performKeywordMatching(
     const queryWords = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
 
     const scored = listings.map(listing => {
+        const attrs = listing.attributes as Record<string, unknown> | null
         const searchableText = [
             listing.title,
             listing.description,
             listing.subcategory,
-            ...(listing.attributes?.skills || []),
-            ...(listing.attributes?.expertise || []),
-            listing.attributes?.role || '',
-            listing.attributes?.location || '',
-            ...(listing.attributes?.industries || []),
-            ...(listing.attributes?.previous_companies || []),
+            ...((attrs?.skills as string[]) ?? []),
+            ...((attrs?.expertise as string[]) ?? []),
+            (attrs?.role as string) || '',
+            (attrs?.location as string) || '',
+            ...((attrs?.industries as string[]) ?? []),
+            ...((attrs?.previous_companies as string[]) ?? []),
         ].join(' ').toLowerCase()
 
         let score = 0
         const matchedWords: string[] = []
 
         for (const word of queryWords) {
-            if (searchableText.includes(word)) {
+            const pattern = new RegExp('\\b' + escapeRegex(word) + '\\b', 'i')
+            if (pattern.test(searchableText)) {
                 score += 10
                 matchedWords.push(word)
             }
@@ -310,8 +266,8 @@ function performKeywordMatching(
         const maxPossible = queryWords.length * 10 + 16
         const normalizedScore = Math.min(100, Math.round((score / maxPossible) * 100))
 
-        const skills = listing.attributes?.skills || listing.attributes?.expertise || []
-        const highlightedSkills = (skills as string[]).filter((s: string) =>
+        const skills = (attrs?.skills as string[]) ?? (attrs?.expertise as string[]) ?? []
+        const highlightedSkills = skills.filter((s: string) =>
             queryWords.some(w => s.toLowerCase().includes(w))
         )
 

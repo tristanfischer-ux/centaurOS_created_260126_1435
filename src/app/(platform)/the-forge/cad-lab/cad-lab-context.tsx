@@ -44,7 +44,7 @@ import {
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -52,6 +52,7 @@ import type {
   CadLabModule,
   ClaudeModelId,
   CadLabDesignBrief,
+  VisualStyleSpec,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
@@ -140,7 +141,7 @@ export interface CadLabContextValue {
 
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
-  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string) => Promise<void>
+  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec) => Promise<void>
 
   // Progressive module reveal
   revealedModuleIds: Set<string>
@@ -279,6 +280,20 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [batchProgress, setBatchProgress] = useState<Record<string, "queued" | "interface" | "generating" | "done" | "error">>({})
   // Track how many modules are actively running (for concurrency limiting)
   const activeModuleCountRef = useRef(0)
+
+  // Shared concurrency gate — blocks until a generation slot is available
+  const waitForSlot = useCallback((): Promise<void> => {
+    if (activeModuleCountRef.current < MAX_CONCURRENCY) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const check = setInterval(() => {
+        if (activeModuleCountRef.current < MAX_CONCURRENCY) {
+          clearInterval(check)
+          resolve()
+        }
+      }, 200)
+    })
+  }, [])
+
   // Ref for batch reconnection polling interval (so cleanup always works)
   const batchPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -337,7 +352,40 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Progress helper ──
   const addProgressLine = useCallback((line: string) => {
-    setProgressLines((prev) => [...prev, line])
+    setProgressLines((prev) => {
+      const next = [...prev, line]
+      return next.length > 50 ? next.slice(-50) : next
+    })
+  }, [])
+
+  // ── Debounced DB save for modules (prevents overlapping writes during concurrency) ──
+  const modulesRef = useRef<CadLabModule[]>(modules)
+  useEffect(() => { modulesRef.current = modules }, [modules])
+
+  const savePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const debouncedSaveModules = useCallback(() => {
+    if (!activeProjectId) return
+    if (savePendingRef.current) clearTimeout(savePendingRef.current)
+    savePendingRef.current = setTimeout(async () => {
+      savePendingRef.current = null
+      try {
+        await saveCadLabModules(activeProjectId, modulesRef.current)
+        setLastSaved(new Date().toISOString())
+      } catch {
+        console.error("[CAD-LAB] Debounced save failed")
+      }
+    }, 500)
+  }, [activeProjectId])
+
+  // Cleanup pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (savePendingRef.current) {
+        clearTimeout(savePendingRef.current)
+        savePendingRef.current = null
+      }
+    }
   }, [])
 
   // ── Project List ──
@@ -455,41 +503,60 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           })
           .catch(() => { /* Non-critical */ })
 
-        // Auto-chain: trigger image generation immediately after decomposition
-        // Non-blocking — images fill in progressively while user sees module cards
-        // Pass activeProjectId explicitly to avoid stale closure issues
-        handleGenerateModuleImages(res.modules, activeProjectId ?? undefined)
-          .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+        // Generate shared visual style for cohesive illustrations (~1-2s),
+        // then trigger image generation with it. Non-blocking overall.
+        const imagesPipeline = async () => {
+          // FLOW: visual style → module images + system illustration (parallel)
+          let visualStyle: VisualStyleSpec | undefined
+          try {
+            const styleRes = await generateVisualStyleAction(
+              subject,
+              res.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
+            )
+            if ("visualStyle" in styleRes) {
+              visualStyle = styleRes.visualStyle
+            }
+          } catch {
+            // Non-critical — images still generate, just without coordinated style
+          }
 
-        // Also trigger system illustration for research report (non-blocking)
-        if (activeProjectId) {
-          setSystemIllustrationStatus("generating")
-          setSystemIllustrationError(null)
-          generateCadLabSystemIllustrationAction(
-            activeProjectId,
-            subject,
-            res.modules.map((m) => m.name),
-            res.modules.map((m) => m.purpose),
-          )
-            .then((illRes) => {
-              if ("url" in illRes) {
-                setSystemIllustrationUrl(illRes.url)
-                setSystemIllustrationStatus("complete")
-                // Persist to DB so the image survives page reloads
-                saveCadLabSystemIllustration(activeProjectId!, illRes.url)
-                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
-              } else {
-                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
+          // Pass activeProjectId explicitly to avoid stale closure issues
+          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle)
+            .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+
+          // Also trigger system illustration for research report
+          if (activeProjectId) {
+            setSystemIllustrationStatus("generating")
+            setSystemIllustrationError(null)
+            generateCadLabSystemIllustrationAction(
+              activeProjectId,
+              subject,
+              res.modules.map((m) => m.name),
+              res.modules.map((m) => m.purpose),
+              visualStyle,
+            )
+              .then((illRes) => {
+                if ("url" in illRes) {
+                  setSystemIllustrationUrl(illRes.url)
+                  setSystemIllustrationStatus("complete")
+                  // Persist to DB so the image survives page reloads
+                  saveCadLabSystemIllustration(activeProjectId!, illRes.url)
+                    .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+                } else {
+                  console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
+                  setSystemIllustrationStatus("failed")
+                  setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
+                }
+              })
+              .catch((e) => {
+                console.error("[CAD-LAB] System illustration failed:", e)
                 setSystemIllustrationStatus("failed")
-                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
-              }
-            })
-            .catch((e) => {
-              console.error("[CAD-LAB] System illustration failed:", e)
-              setSystemIllustrationStatus("failed")
-              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
-            })
+                setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+              })
+          }
         }
+        imagesPipeline()
+          .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
       }
     } catch (err) {
       timers.forEach(clearTimeout)
@@ -501,7 +568,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string) => {
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec) => {
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
@@ -550,7 +617,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
-        const res = await generateCadLabSingleImageAction(projectId, mod)
+        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle)
         if ("module" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
@@ -604,73 +671,77 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (!mod) return
 
     startGenerating(moduleId)
-    setProgressLines([])
+
+    // Concurrency gate — queue if slots are full
+    if (activeModuleCountRef.current >= MAX_CONCURRENCY) {
+      toast.info(`${mod.name} queued — waiting for a generation slot...`, { duration: 3000 })
+    }
+    await waitForSlot()
+    activeModuleCountRef.current++
 
     const moduleResearchText = mod.moduleResearch ||
       `Module: ${mod.name}\nPurpose: ${mod.purpose}\nKey Parts: ${mod.keyParts.join(", ")}\nDescription: ${mod.description}\n\nFrom parent research:\n${editableReport}`
 
-    if (step === "interface") {
-      try {
-        addProgressLine(`Planning dimensions for ${mod.name}...`)
-        const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
-        if (res.success) {
+    try {
+      if (step === "interface") {
+        try {
+          addProgressLine(`Planning dimensions for ${mod.name}...`)
+          const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
+          if (res.success) {
+            let updated: CadLabModule[] | null = null
+            setModules((prev) => {
+              updated = prev.map((m) =>
+                m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
+              )
+              return updated
+            })
+            debouncedSaveModules()
+            addProgressLine(`Dimensions planned for ${mod.name}!`)
+          } else {
+            addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
+          }
+        } catch (err) {
+          console.error("[CAD-LAB] Module interface generation failed:", err)
+          addProgressLine(`Failed to plan dimensions for ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
+        }
+      } else {
+        try {
+          if (!activeProjectId) throw new Error("Project not initialized")
+
+          addProgressLine(`Generating CAD model for ${mod.name}...`)
+          const response = await fetch("/api/cad-lab/generate-module", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectId: activeProjectId,
+              moduleId,
+            }),
+          })
+
+          if (!response.ok) {
+            const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+            throw new Error(errBody.error || `HTTP ${response.status}`)
+          }
+
+          const data = await response.json() as { done: boolean; module: CadLabModule }
           let updated: CadLabModule[] | null = null
           setModules((prev) => {
-            updated = prev.map((m) =>
-              m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
-            )
+            updated = prev.map((m) => (m.id === moduleId ? data.module : m))
             return updated
           })
-          if (activeProjectId && updated) {
-            await saveCadLabModules(activeProjectId, updated)
-            setLastSaved(new Date().toISOString())
-          }
-          addProgressLine(`Dimensions planned for ${mod.name}!`)
-        } else {
-          addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
+          debouncedSaveModules()
+          addProgressLine(`${mod.name} generated successfully!`)
+          setExpandedModuleId(moduleId)
+        } catch (err) {
+          console.error("[CAD-LAB] Module CAD generation failed:", err)
+          addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
         }
-      } catch (err) {
-        console.error("[CAD-LAB] Module interface generation failed:", err)
-        addProgressLine(`Failed to plan dimensions for ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
       }
-    } else {
-      try {
-        if (!activeProjectId) throw new Error("Project not initialized")
-
-        addProgressLine(`Generating CAD model for ${mod.name}...`)
-        const response = await fetch("/api/cad-lab/generate-module", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId: activeProjectId,
-            moduleId,
-          }),
-        })
-
-        if (!response.ok) {
-          const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
-          throw new Error(errBody.error || `HTTP ${response.status}`)
-        }
-
-        const data = await response.json() as { done: boolean; module: CadLabModule }
-        let updated: CadLabModule[] | null = null
-        setModules((prev) => {
-          updated = prev.map((m) => (m.id === moduleId ? data.module : m))
-          return updated
-        })
-        if (activeProjectId && updated) {
-          await saveCadLabModules(activeProjectId, updated)
-          setLastSaved(new Date().toISOString())
-        }
-        addProgressLine(`${mod.name} generated successfully!`)
-        setExpandedModuleId(moduleId)
-      } catch (err) {
-        console.error("[CAD-LAB] Module CAD generation failed:", err)
-        addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)
-      }
+    } finally {
+      activeModuleCountRef.current--
+      stopGenerating(moduleId)
     }
-    stopGenerating(moduleId)
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating])
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
 
   /**
    * Single-click handler that runs the full pipeline for one module
@@ -684,7 +755,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (!mod || !activeProjectId) return
 
     startGenerating(moduleId)
-    setProgressLines([])
+
+    // Concurrency gate — queue if slots are full
+    if (activeModuleCountRef.current >= MAX_CONCURRENCY) {
+      toast.info(`${mod.name} queued — waiting for a generation slot...`, { duration: 3000 })
+    }
+    await waitForSlot()
+    activeModuleCountRef.current++
+
     addProgressLine(`Starting pipeline for ${mod.name}...`)
 
     const moduleResearchText = mod.moduleResearch ||
@@ -703,12 +781,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             )
             return latestModules
           })
-          if (latestModules) await saveCadLabModules(activeProjectId, latestModules)
-          setLastSaved(new Date().toISOString())
+          debouncedSaveModules()
           addProgressLine(`Dimensions planned for ${mod.name}. Generating CAD...`)
         } else {
           addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
-          stopGenerating(moduleId)
           return
         }
       }
@@ -731,8 +807,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         latestModules = prev.map((m) => (m.id === moduleId ? data.module : m))
         return latestModules
       })
-      if (latestModules) await saveCadLabModules(activeProjectId, latestModules)
-      setLastSaved(new Date().toISOString())
+      debouncedSaveModules()
       addProgressLine(`${mod.name} generated successfully!`)
       setExpandedModuleId(moduleId)
     } catch (err) {
@@ -746,9 +821,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         ),
       )
     } finally {
+      activeModuleCountRef.current--
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating])
+  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
 
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
@@ -893,22 +969,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     addProgressLine("Each module runs independently — results appear as they complete.")
 
-    // Client-side concurrency limiter
+    // Client-side concurrency limiter (uses shared waitForSlot)
     let completedCount = modules.filter((m) => m.status === "generated").length
     let errorCount = 0
-    activeModuleCountRef.current = 0
-
-    const waitForSlot = (): Promise<void> => {
-      if (activeModuleCountRef.current < MAX_CONCURRENCY) return Promise.resolve()
-      return new Promise<void>((resolve) => {
-        const check = setInterval(() => {
-          if (activeModuleCountRef.current < MAX_CONCURRENCY) {
-            clearInterval(check)
-            resolve()
-          }
-        }, 200)
-      })
-    }
 
     const RETRYABLE_STATUSES = new Set([500, 502, 503, 529])
 
@@ -1018,7 +1081,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         sendNotification("The Forge — Batch Finished", `${errorCount} module(s) failed for "${subject}". Check results.`)
       }
     }
-  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject])
+  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot])
 
   // ── Retry system illustration ──
   const handleRetryIllustration = useCallback(() => {
@@ -1141,6 +1204,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Reset ──
   const handleReset = useCallback(() => {
+    // Flush any pending debounced save before clearing state
+    if (savePendingRef.current) {
+      clearTimeout(savePendingRef.current)
+      savePendingRef.current = null
+    }
     if (typeof window !== "undefined") {
       localStorage.removeItem(CAD_LAB_ACTIVE_PROJECT_KEY)
       localStorage.removeItem(CAD_LAB_DRAFT_SUBJECT_KEY)

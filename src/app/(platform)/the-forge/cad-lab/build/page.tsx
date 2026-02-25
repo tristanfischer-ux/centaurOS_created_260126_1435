@@ -1006,7 +1006,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                         </div>
                       )}
                       <div className={`h-2 w-2 rounded-full flex-shrink-0 ${
-                        mod.status === "generated" ? "bg-status-success"
+                        generatingModuleIds.has(mod.id) ? "bg-international-orange animate-pulse"
+                        : mod.status === "generated" ? "bg-status-success"
                         : mod.status === "interface_ready" ? "bg-status-info"
                         : mod.status === "failed" ? "bg-destructive"
                         : "bg-muted-foreground"
@@ -1055,6 +1056,13 @@ export default function CadLabBuildPage(): React.ReactNode {
                       }
                     </div>
                   </button>
+
+                  {/* Inline progress bar while generating */}
+                  {generatingModuleIds.has(mod.id) && (
+                    <div className="h-1 bg-muted overflow-hidden">
+                      <div className="h-full w-1/3 bg-international-orange rounded-full animate-pulse" />
+                    </div>
+                  )}
 
                   {/* Expanded module detail */}
                   {expandedModuleId === mod.id && (

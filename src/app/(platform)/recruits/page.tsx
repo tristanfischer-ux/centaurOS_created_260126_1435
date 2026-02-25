@@ -12,18 +12,15 @@
  * - Talent finder: src/components/marketplace/talent-finder.tsx
  */
 
-import { Suspense } from 'react'
-import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
+import { getSavedMarketplaceListings } from '@/actions/marketplace'
 import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
-import { Skeleton } from '@/components/ui/skeleton'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
-import type { EnrichedPersonListing } from '@/actions/people-marketplace'
 import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
 
 const RECRUITS_STATS_LABELS: StatsLabels = {
@@ -42,24 +39,6 @@ const RECRUITS_STATS_LABELS: StatsLabels = {
 export const revalidate = 30
 
 /**
- * Loading skeleton for the Recruits page.
- */
-function RecruitsLoading(): React.ReactElement {
-    return (
-        <div className="space-y-6">
-            <Skeleton className="h-10 w-48" />
-            <Skeleton className="h-32 w-full rounded-xl" />
-            <Skeleton className="h-12 w-full max-w-lg" />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <Skeleton key={i} className="h-80 w-full rounded-xl" />
-                ))}
-            </div>
-        </div>
-    )
-}
-
-/**
  * Server component for the Recruits page.
  *
  * @description Fetches enriched People marketplace listings with trust signals,
@@ -70,26 +49,21 @@ function RecruitsLoading(): React.ReactElement {
  */
 export default async function RecruitsPage(): Promise<React.ReactElement> {
     let listings: MarketplaceListing[] = []
-    let enrichedListings: EnrichedPersonListing[] = []
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
 
     // Fetch enriched People listings, foundry context, and stats in parallel
-    const [enrichedResult, plainListingsResult, foundryContext, statsResult] = await Promise.allSettled([
+    // DECISION: Removed redundant getMarketplaceListings('People') — MarketplaceBrowse
+    // fetches its own listings internally. Enriched listings are the primary source.
+    const [enrichedResult, foundryContext, statsResult] = await Promise.allSettled([
         getEnrichedPeopleListings(),
-        getMarketplaceListings('People'),
         getFoundryContext(),
         getRecruitsStats(),
     ])
 
     if (enrichedResult.status === 'fulfilled') {
-        enrichedListings = enrichedResult.value
-        // Use enriched listings as the main listings for the grid
         listings = enrichedResult.value
-    } else if (plainListingsResult.status === 'fulfilled') {
-        // Fallback to plain listings if enrichment fails
-        listings = plainListingsResult.value
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
@@ -140,26 +114,26 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
         }
     }
 
+    // DECISION: No Suspense wrapper — this server component awaits all data
+    // before rendering, so Suspense would never trigger its fallback.
     return (
-        <Suspense fallback={<RecruitsLoading />}>
-            <div className="space-y-6">
-                {/* AI Talent Finder - the "aha moment" */}
-                <TalentFinderWrapper />
+        <div className="space-y-6">
+            {/* AI Talent Finder - the "aha moment" */}
+            <TalentFinderWrapper />
 
-                {/* Standard marketplace browse with enriched People cards */}
-                <MarketplaceBrowse
-                    initialListings={listings}
-                    recommendations={recommendations}
-                    initialSavedIds={savedIds}
-                    initialSavedListings={savedListings}
-                    foundryContext={ctx || undefined}
-                    allowedCategories={['People']}
-                    pageTitle="Recruits"
-                    pageSubtitle="Find expert talent to grow your team"
-                    stats={recruitsStats ?? undefined}
-                    statsLabels={RECRUITS_STATS_LABELS}
-                />
-            </div>
-        </Suspense>
+            {/* Standard marketplace browse with enriched People cards */}
+            <MarketplaceBrowse
+                initialListings={listings}
+                recommendations={recommendations}
+                initialSavedIds={savedIds}
+                initialSavedListings={savedListings}
+                foundryContext={ctx || undefined}
+                allowedCategories={['People']}
+                pageTitle="Recruits"
+                pageSubtitle="Find expert talent to grow your team"
+                stats={recruitsStats ?? undefined}
+                statsLabels={RECRUITS_STATS_LABELS}
+            />
+        </div>
     )
 }

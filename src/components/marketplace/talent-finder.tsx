@@ -24,6 +24,7 @@ import {
     Award,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { findTalentMatches } from '@/actions/people-marketplace'
 import type { TalentMatch, TalentMatchResult } from '@/actions/people-marketplace'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
@@ -68,6 +69,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
     const [isSearching, setIsSearching] = useState(false)
     const [results, setResults] = useState<TalentMatchResult | null>(null)
     const [visibleMatches, setVisibleMatches] = useState<TalentMatch[]>([])
+    const [animationComplete, setAnimationComplete] = useState(true)
     const [placeholderIndex, setPlaceholderIndex] = useState(0)
     const inputRef = useRef<HTMLInputElement>(null)
 
@@ -83,10 +85,13 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
     useEffect(() => {
         if (!results?.matches.length) {
             setVisibleMatches([])
+            // If results exist but matches is empty, animation is already "complete"
+            if (results) setAnimationComplete(true)
             return
         }
 
         setVisibleMatches([])
+        setAnimationComplete(false)
         const matches = results.matches
         let index = 0
 
@@ -95,6 +100,8 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                 setVisibleMatches(prev => [...prev, matches[index]])
                 index++
                 setTimeout(addNext, 200)
+            } else {
+                setAnimationComplete(true)
             }
         }
 
@@ -110,31 +117,11 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
 
         setIsSearching(true)
         setResults(null)
+        setAnimationComplete(false)
 
         try {
-            const response = await fetch('/api/marketplace/talent-match', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    query: query.trim(),
-                    // Pass empty listings - the API will fetch them
-                    listings: [],
-                }),
-            })
-
-            // If API fails, fall back to server action
-            if (!response.ok) {
-                const { findTalentMatches } = await import('@/actions/people-marketplace')
-                const result = await findTalentMatches(query.trim())
-                setResults(result)
-                return
-            }
-
-            // For now, use the server action directly for reliable matching
-            const { findTalentMatches } = await import('@/actions/people-marketplace')
             const result = await findTalentMatches(query.trim())
             setResults(result)
-
         } catch (err) {
             console.error('[TalentFinder] Search failed:', err)
             toast.error('Search failed. Please try again.')
@@ -207,7 +194,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                             )}
                             <Button
                                 onClick={handleSearch}
-                                disabled={isSearching || !query.trim()}
+                                disabled={isSearching || query.trim().length < 3}
                                 className="gap-2 rounded-lg"
                                 size="sm"
                             >
@@ -225,6 +212,11 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                             </Button>
                         </div>
                     </div>
+                    {query.trim().length > 0 && query.trim().length < 3 && (
+                        <p className="text-xs text-muted-foreground mt-2 ml-1">
+                            Enter at least 3 characters
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
@@ -244,7 +236,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
 
             {/* Results */}
             {results && !isSearching && (
-                <div className="space-y-3">
+                <div className="space-y-3" aria-live="polite">
                     {/* Summary */}
                     {results.explanation && (
                         <div className="flex items-center gap-2 px-1">
@@ -265,7 +257,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                                 />
                             ))}
                         </div>
-                    ) : (
+                    ) : animationComplete ? (
                         <Card className="border-dashed">
                             <CardContent className="py-8 text-center">
                                 <p className="text-sm text-muted-foreground">
@@ -273,7 +265,7 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
                                 </p>
                             </CardContent>
                         </Card>
-                    )}
+                    ) : null}
                 </div>
             )}
         </div>
@@ -313,10 +305,20 @@ function TalentMatchCard({
                 'group cursor-pointer border overflow-hidden',
                 'hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200',
                 'animate-in fade-in slide-in-from-bottom-2',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange/50',
                 rank === 1 && 'ring-2 ring-international-orange/30 border-international-orange/20'
             )}
             style={{ animationDelay: `${(rank - 1) * 150}ms` }}
+            role="button"
+            tabIndex={0}
+            aria-label={`View ${listing.title} — ${matchScore}% match`}
             onClick={() => onViewDetail(listing)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onViewDetail(listing)
+                }
+            }}
         >
             <CardContent className="p-4">
                 {/* Header: Avatar + Info + Score */}
@@ -350,10 +352,13 @@ function TalentMatchCard({
                     </div>
 
                     {/* Match score */}
-                    <div className={cn(
-                        'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 h-fit',
-                        scoreColor
-                    )}>
+                    <div
+                        className={cn(
+                            'flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 h-fit',
+                            scoreColor
+                        )}
+                        aria-label={`Match score: ${matchScore}%`}
+                    >
                         <TrendingUp className="w-3 h-3" />
                         {matchScore}%
                     </div>

@@ -1,6 +1,8 @@
 "use server"
 
+import { unstable_cache } from 'next/cache'
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import {
   extractPostcode,
   deriveRegionFromPostcode,
@@ -20,16 +22,37 @@ import type { MarketplaceStats } from "./marketplace-stats"
 /**
  * Compute aggregate recruits statistics for the analytics dashboard.
  *
- * @description Fetches all People listings and computes:
- * - Total and verified counts
- * - Subcategory (specialization) distribution
- * - Availability breakdown (Full-time, Part-time, Contract, etc.)
- * - UK regional coverage from postcode data
+ * @description Fetches all People listings and computes stats reusing the
+ * shared `MarketplaceStats` shape. Field name mappings for the Recruits context:
+ *
+ * | MarketplaceStats field | Recruits meaning                          | StatsLabels key        |
+ * |------------------------|-------------------------------------------|------------------------|
+ * | `totalListings`        | Total talent (people count)               | "Total Talent"         |
+ * | `verifiedCount`        | Verified talent count                     | KPI 2                  |
+ * | `manufacturingTypes`   | Distinct specialization count             | "Specializations"      |
+ * | `companyTypeCounts`    | Subcategory (specialization) distribution | "Specialization Dist." |
+ * | `companySizeCounts`    | Availability breakdown (FT/PT/Contract)   | "Availability"         |
+ * | `regionCounts`         | UK regional coverage from postcodes       | "Regional Coverage"    |
+ * | `avgCompanyAge`        | Unused — always null for People           | —                      |
  *
  * @returns MarketplaceStats or null on error
  */
 export async function getRecruitsStats(): Promise<MarketplaceStats | null> {
   const supabase = await createClient()
+
+  // AUTH: Require authenticated user before querying listings
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  return getCachedRecruitsStats()
+}
+
+// DECISION: Using admin client (service role) for the cached function because
+// unstable_cache can revalidate during a different user's request. RLS would
+// reject the query if user B's cookies triggered revalidation of user A's cache.
+// Safe because auth is verified in getRecruitsStats() before calling this.
+const fetchRecruitsStats = async (): Promise<MarketplaceStats | null> => {
+  const supabase = createAdminClient()
 
   // Paginate to handle large datasets
   const allRows: {
@@ -161,3 +184,10 @@ export async function getRecruitsStats(): Promise<MarketplaceStats | null> {
     avgCompanyAge: null,
   }
 }
+
+/** Cached recruits stats — 5 minute TTL, shared across all users. */
+const getCachedRecruitsStats = unstable_cache(
+  fetchRecruitsStats,
+  ['recruits-stats'],
+  { revalidate: 300, tags: ['recruits-stats'] }
+)
