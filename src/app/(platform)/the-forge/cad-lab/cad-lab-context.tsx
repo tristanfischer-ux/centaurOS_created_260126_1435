@@ -31,7 +31,7 @@ import {
   generateSystemAssembly,
 } from "@/actions/cad-lab"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -148,6 +148,9 @@ export interface CadLabContextValue {
 
   // Progressive module reveal
   revealedModuleIds: Set<string>
+
+  // Visual style (persisted for retry consistency)
+  visualStyle: VisualStyleSpec | null
 
   // System illustration (research report banner)
   systemIllustrationUrl: string | null
@@ -308,6 +311,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Progressive module reveal ──
   const [revealedModuleIds, setRevealedModuleIds] = useState<Set<string>>(new Set())
+
+  // ── Visual style (shared across all illustration retries) ──
+  const [visualStyle, setVisualStyle] = useState<VisualStyleSpec | null>(null)
 
   // ── System illustration (research report banner) ──
   const [systemIllustrationUrl, setSystemIllustrationUrl] = useState<string | null>(null)
@@ -521,6 +527,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             )
             if ("visualStyle" in styleRes) {
               visualStyle = styleRes.visualStyle
+              setVisualStyle(visualStyle)
+              if (activeProjectId) {
+                saveCadLabVisualStyle(activeProjectId, visualStyle)
+                  .catch((e) => console.error("[CAD-LAB] Failed to persist visual style:", e))
+              }
             }
           } catch {
             // Non-critical — images still generate, just without coordinated style
@@ -1102,6 +1113,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       subject,
       modules.map((m) => m.name),
       modules.map((m) => m.purpose),
+      visualStyle ?? undefined,
     )
       .then((illRes) => {
         if ("url" in illRes) {
@@ -1120,7 +1132,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setSystemIllustrationStatus("failed")
         setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
       })
-  }, [activeProjectId, subject, modules])
+  }, [activeProjectId, subject, modules, visualStyle])
 
   // ── Research ──
   const handleResearch = useCallback(async () => {
@@ -1312,6 +1324,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setShowProjects(false)
       setMilestone(null)
       setProgressLines([])
+      setVisualStyle(p.visualStyle ?? null)
       setSystemIllustrationUrl(p.systemIllustrationUrl ?? null)
       setSystemIllustrationStatus(p.systemIllustrationUrl ? "complete" : "idle")
       setSystemIllustrationError(null)
@@ -1420,6 +1433,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isBatchRunning, batchProgress,
     isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
+    visualStyle,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,

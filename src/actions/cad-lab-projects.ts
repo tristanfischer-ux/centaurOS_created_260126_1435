@@ -22,6 +22,7 @@ import type {
   CadLabModule,
   ClaudeModelId,
   CadLabDesignBrief,
+  VisualStyleSpec,
 } from "@/lib/cad-lab-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -70,6 +71,9 @@ export interface CadLabProjectData {
   modules: CadLabModule[] | null
   /** Linked RFQ created from this project (if any) */
   linkedRfqId: string | null
+
+  /** AI-generated visual style spec for cohesive module illustrations */
+  visualStyle: VisualStyleSpec | null
 
   /** System overview illustration URL */
   systemIllustrationUrl: string | null
@@ -176,6 +180,7 @@ export async function loadCadLabProject(
         generatedCode: project.generated_code,
         modules,
         linkedRfqId,
+        visualStyle: (project.visual_style as VisualStyleSpec | null) ?? null,
         systemIllustrationUrl: project.system_illustration_url ?? null,
         integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
@@ -418,6 +423,36 @@ export async function saveCadLabSystemIllustration(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save system illustration URL:", error.message)
       return { error: `Failed to save system illustration: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Visual Style ────────────────────────────────────────────────
+
+/**
+ * Persists the AI-generated visual style spec to the project record.
+ *
+ * @param projectId - Project to update
+ * @param style - Visual style spec for cohesive module illustrations
+ * @returns Success or error
+ */
+export async function saveCadLabVisualStyle(
+  projectId: string,
+  style: VisualStyleSpec,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ visual_style: style as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save visual style:", error.message)
+      return { error: `Failed to save visual style: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }

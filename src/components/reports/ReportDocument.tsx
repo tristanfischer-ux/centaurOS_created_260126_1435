@@ -25,6 +25,10 @@ import {
   BlockersRisksSection,
   CompletionTrendSection,
   WeekAheadSection,
+  FinancialSnapshotSection,
+  SalesPipelineSection,
+  EngineeringActivitySection,
+  KnowledgeLearningSection,
 } from '@/components/reports/sections'
 
 import type {
@@ -44,6 +48,10 @@ const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
   'blockers-risks': BlockersRisksSection,
   'completion-trend': CompletionTrendSection,
   'week-ahead': WeekAheadSection,
+  'financial-snapshot': FinancialSnapshotSection,
+  'sales-pipeline': SalesPipelineSection,
+  'engineering-activity': EngineeringActivitySection,
+  'knowledge-learning': KnowledgeLearningSection,
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

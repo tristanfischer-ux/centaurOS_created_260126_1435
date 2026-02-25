@@ -3550,6 +3550,7 @@ export type Database = {
           system_illustration_url: string | null
           thumbnail_svg: string | null
           updated_at: string
+          visual_style: Json | null
         }
         Insert: {
           batch_started_at?: string | null
@@ -3574,6 +3575,7 @@ export type Database = {
           system_illustration_url?: string | null
           thumbnail_svg?: string | null
           updated_at?: string
+          visual_style?: Json | null
         }
         Update: {
           batch_started_at?: string | null
@@ -3598,6 +3600,7 @@ export type Database = {
           system_illustration_url?: string | null
           thumbnail_svg?: string | null
           updated_at?: string
+          visual_style?: Json | null
         }
         Relationships: []
       }
@@ -13166,6 +13169,44 @@ export type Database = {
           },
         ]
       }
+      specialist_feedback: {
+        Row: {
+          created_at: string
+          foundry_id: string
+          id: string
+          message_index: number
+          rating: string
+          specialist_id: string
+          thread_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          foundry_id: string
+          id?: string
+          message_index: number
+          rating: string
+          specialist_id: string
+          thread_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          message_index?: number
+          rating?: string
+          specialist_id?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "specialist_feedback_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       specialist_knowledge_base: {
         Row: {
           confidence: number
@@ -15981,6 +16022,7 @@ export type Database = {
       }
       debug_check_foundry: { Args: { p_foundry_id: string }; Returns: Json }
       debug_profiles_policies: { Args: never; Returns: Json }
+      decay_knowledge_confidence: { Args: never; Returns: number }
       diagnose_foundry_rls: { Args: never; Returns: Json }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:

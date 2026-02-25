@@ -23,6 +23,10 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 import { generateExecutiveNarrative, generateSectionNarrative } from '@/lib/reports/ai-narrative'
+import { fetchFinancialSnapshotData } from '@/actions/report-sections/financial'
+import { fetchSalesPipelineData } from '@/actions/report-sections/sales-pipeline'
+import { fetchEngineeringActivityData } from '@/actions/report-sections/engineering'
+import { fetchKnowledgeLearningData } from '@/actions/report-sections/knowledge-learning'
 import type { NarrativeContext, NarrativeOptions } from '@/lib/reports/ai-narrative'
 import type { Json } from '@/types/database.types'
 import type {
@@ -44,6 +48,10 @@ import type {
   CompletionTrendSectionData,
   WeekAheadSectionData,
   UpcomingTask,
+  FinancialSnapshotSectionData,
+  SalesPipelineSectionData,
+  EngineeringActivitySectionData,
+  KnowledgeLearningSectionData,
   ReportSectionType,
 } from '@/lib/reports/report-document-types'
 
@@ -141,6 +149,38 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       )
     }
 
+    if (requestedSections.includes('financial-snapshot')) {
+      fetchPromises.push(
+        fetchFinancialSnapshotData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('financial-snapshot', { type: 'financial-snapshot', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('sales-pipeline')) {
+      fetchPromises.push(
+        fetchSalesPipelineData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('sales-pipeline', { type: 'sales-pipeline', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('engineering-activity')) {
+      fetchPromises.push(
+        fetchEngineeringActivityData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('engineering-activity', { type: 'engineering-activity', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('knowledge-learning')) {
+      fetchPromises.push(
+        fetchKnowledgeLearningData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('knowledge-learning', { type: 'knowledge-learning', data })
+        })
+      )
+    }
+
     await Promise.all(fetchPromises)
 
     // INTENT: After all data is fetched, enhance the executive summary with
@@ -179,6 +219,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
     const narrativeSectionTypes: ReportSectionType[] = [
       'key-metrics', 'objectives-progress', 'team-activity',
       'blockers-risks', 'completion-trend', 'week-ahead',
+      'financial-snapshot', 'sales-pipeline', 'engineering-activity', 'knowledge-learning',
     ]
 
     await Promise.all(
@@ -772,11 +813,40 @@ function buildDynamicTitle(
     ? (blockersSection.data as BlockersRisksSectionData)
     : null
 
+  const financialSection = sectionDataMap.get('financial-snapshot')
+  const financial = financialSection?.type === 'financial-snapshot'
+    ? (financialSection.data as FinancialSnapshotSectionData)
+    : null
+
+  const pipelineSection = sectionDataMap.get('sales-pipeline')
+  const pipeline = pipelineSection?.type === 'sales-pipeline'
+    ? (pipelineSection.data as SalesPipelineSectionData)
+    : null
+
   const completedMetric = metrics?.metrics.find(m => m.label === 'Tasks Completed')
   const blockerCount = blockers?.blockers.length ?? 0
   const criticalBlockers = blockers?.blockers.filter(b => b.severity === 'critical').length ?? 0
 
   const fragments: string[] = []
+
+  // Financial signals (highest priority for board packs)
+  if (financial) {
+    const revenueGrowth = financial.previousPeriodRevenue > 0
+      ? ((financial.periodRevenue - financial.previousPeriodRevenue) / financial.previousPeriodRevenue) * 100
+      : 0
+    if (revenueGrowth > 10) {
+      fragments.push('Strong Revenue Week')
+    } else if (financial.netPosition < 0) {
+      fragments.push('Cash Position Needs Review')
+    } else if (financial.overBudgetCount > 0) {
+      fragments.push(`${financial.overBudgetCount} Budget${financial.overBudgetCount > 1 ? 's' : ''} Over`)
+    }
+  }
+
+  // Pipeline signals
+  if (pipeline && pipeline.rfqs.responsesReceived > 0) {
+    fragments.push(`${pipeline.rfqs.responsesReceived} Pipeline Response${pipeline.rfqs.responsesReceived > 1 ? 's' : ''}`)
+  }
 
   // Completion momentum
   if (completedMetric) {
@@ -784,7 +854,7 @@ function buildDynamicTitle(
       fragments.push('Strong Sprint')
     } else if (completedMetric.trend === 'down' && completedMetric.changePercent < -10) {
       fragments.push('Slower Week')
-    } else if (completedMetric.value > 0) {
+    } else if (completedMetric.value > 0 && fragments.length === 0) {
       fragments.push(`${completedMetric.value} Tasks Shipped`)
     }
   }
@@ -796,8 +866,10 @@ function buildDynamicTitle(
     fragments.push(`${blockerCount} Blocker${blockerCount > 1 ? 's' : ''} Need Attention`)
   }
 
-  if (fragments.length === 0) return baseTitle
-  return `${baseTitle}: ${fragments.join(', ')}`
+  // INTENT: Keep title concise — max 2 fragments
+  const selected = fragments.slice(0, 2)
+  if (selected.length === 0) return baseTitle
+  return `${baseTitle}: ${selected.join(', ')}`
 }
 
 // ========================
@@ -832,6 +904,27 @@ function buildNarrativeContext(
     ? (blockersSection.data as BlockersRisksSectionData)
     : null
 
+  // INTENT: Pull cross-cutting data from new sections for richer executive narratives
+  const financialSection = sectionDataMap.get('financial-snapshot')
+  const financial = financialSection?.type === 'financial-snapshot'
+    ? (financialSection.data as FinancialSnapshotSectionData)
+    : null
+
+  const pipelineSection = sectionDataMap.get('sales-pipeline')
+  const pipeline = pipelineSection?.type === 'sales-pipeline'
+    ? (pipelineSection.data as SalesPipelineSectionData)
+    : null
+
+  const engineeringSection = sectionDataMap.get('engineering-activity')
+  const engineering = engineeringSection?.type === 'engineering-activity'
+    ? (engineeringSection.data as EngineeringActivitySectionData)
+    : null
+
+  const knowledgeSection = sectionDataMap.get('knowledge-learning')
+  const knowledge = knowledgeSection?.type === 'knowledge-learning'
+    ? (knowledgeSection.data as KnowledgeLearningSectionData)
+    : null
+
   const completedMetric = metrics?.metrics.find(m => m.label === 'Tasks Completed')
   const createdMetric = metrics?.metrics.find(m => m.label === 'Tasks Created')
 
@@ -856,6 +949,15 @@ function buildNarrativeContext(
     overdueTaskCount: metrics?.metrics.find(m => m.label === 'Overdue Tasks')?.value,
     standupParticipationRate: team?.standupParticipationRate ?? undefined,
     objectivesCompleted: objectives?.totalCompleted,
+    // Cross-cutting business context
+    periodRevenue: financial?.periodRevenue,
+    periodExpenses: financial?.periodExpenses,
+    previousPeriodRevenue: financial?.previousPeriodRevenue,
+    pipelineReplies: pipeline?.outreach.repliesReceived,
+    pipelineRFQsAwarded: pipeline?.rfqs.awarded,
+    cadProjectsCompleted: engineering?.completedThisPeriod,
+    knowledgeNotesAdded: knowledge?.knowledge.addedThisPeriod,
+    overBudgetCategories: financial?.overBudgetCount,
   }
 }
 

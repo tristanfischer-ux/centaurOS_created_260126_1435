@@ -39,6 +39,15 @@ export interface NarrativeContext {
   overdueTaskCount?: number
   standupParticipationRate?: number
   objectivesCompleted?: number
+  // Phase 5: Cross-cutting business context
+  periodRevenue?: number
+  periodExpenses?: number
+  previousPeriodRevenue?: number
+  pipelineReplies?: number
+  pipelineRFQsAwarded?: number
+  cadProjectsCompleted?: number
+  knowledgeNotesAdded?: number
+  overBudgetCategories?: number
 }
 
 export interface NarrativeOptions {
@@ -263,6 +272,19 @@ function buildExecutiveUserPrompt(ctx: NarrativeContext): string {
     ctx.overdueTaskCount != null ? `Overdue tasks: ${ctx.overdueTaskCount}` : '',
     ctx.standupParticipationRate != null ? `Standup participation: ${Math.round(ctx.standupParticipationRate)}%` : '',
     ctx.objectivesCompleted != null ? `Objectives completed this period: ${ctx.objectivesCompleted}` : '',
+    '',
+    // Financial context
+    ctx.periodRevenue != null ? `Period revenue: £${(ctx.periodRevenue / 100).toFixed(2)}` : '',
+    ctx.periodExpenses != null ? `Period expenses: £${(ctx.periodExpenses / 100).toFixed(2)}` : '',
+    ctx.previousPeriodRevenue != null ? `Previous period revenue: £${(ctx.previousPeriodRevenue / 100).toFixed(2)}` : '',
+    ctx.overBudgetCategories != null && ctx.overBudgetCategories > 0 ? `Over-budget categories: ${ctx.overBudgetCategories}` : '',
+    // Pipeline context
+    ctx.pipelineReplies != null && ctx.pipelineReplies > 0 ? `Pipeline replies received: ${ctx.pipelineReplies}` : '',
+    ctx.pipelineRFQsAwarded != null && ctx.pipelineRFQsAwarded > 0 ? `RFQs awarded: ${ctx.pipelineRFQsAwarded}` : '',
+    // Engineering context
+    ctx.cadProjectsCompleted != null && ctx.cadProjectsCompleted > 0 ? `CAD projects completed: ${ctx.cadProjectsCompleted}` : '',
+    // Knowledge context
+    ctx.knowledgeNotesAdded != null && ctx.knowledgeNotesAdded > 0 ? `Knowledge notes added: ${ctx.knowledgeNotesAdded}` : '',
   ].filter(Boolean).join('\n')
 }
 
@@ -373,6 +395,10 @@ const SECTION_FALLBACKS: Record<string, string> = {
   'blockers-risks': 'The items below represent current blockers and objectives that may need additional attention.',
   'completion-trend': 'Task completion volume over the period is shown below, highlighting daily throughput.',
   'week-ahead': 'These are the upcoming tasks and deadlines for the next week.',
+  'financial-snapshot': 'A summary of revenue, expenses, and budget health for the reporting period.',
+  'sales-pipeline': 'Outreach, RFQ, and discovery call activity across the sales pipeline this period.',
+  'engineering-activity': 'CAD Lab project activity and engineering throughput for this period.',
+  'knowledge-learning': 'Knowledge vault contributions and apprenticeship programme progress.',
   'cover': '',
   'executive-summary': '',
 }

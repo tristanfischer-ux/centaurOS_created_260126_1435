@@ -279,14 +279,24 @@ export function Sparkline({ data, color = 'orange', height = 32, className }: Sp
 /**
  * @description Formats a numeric metric value based on its format type.
  */
-export function formatMetricValue(value: number, format: 'percentage' | 'number' | 'decimal'): string {
+export function formatMetricValue(value: number, format: 'percentage' | 'number' | 'decimal' | 'currency'): string {
   switch (format) {
     case 'percentage':
       return `${Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value)}%`
     case 'decimal':
       return Intl.NumberFormat('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 }).format(value)
+    case 'currency':
+      return `£${Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value / 100)}`
     case 'number':
     default:
       return Intl.NumberFormat('en-US').format(value)
   }
+}
+
+/**
+ * @description Formats a pence value to a human-readable currency string.
+ * Used by financial report sections.
+ */
+export function formatPence(pence: number): string {
+  return `£${Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(pence / 100)}`
 }

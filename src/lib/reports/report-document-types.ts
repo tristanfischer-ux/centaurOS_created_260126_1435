@@ -24,6 +24,10 @@ export type ReportSectionType =
   | 'blockers-risks'
   | 'completion-trend'
   | 'week-ahead'
+  | 'financial-snapshot'
+  | 'sales-pipeline'
+  | 'engineering-activity'
+  | 'knowledge-learning'
 
 export interface ReportSectionConfig {
   type: ReportSectionType
@@ -52,7 +56,7 @@ export interface KPIMetric {
   label: string
   value: number
   previousValue: number
-  format: 'number' | 'percentage' | 'decimal'
+  format: 'number' | 'percentage' | 'decimal' | 'currency'
   trend: 'up' | 'down' | 'stable'
   changePercent: number
   sparklineData?: number[]
@@ -148,6 +152,106 @@ export interface WeekAheadSectionData {
   sectionNarrative?: string
 }
 
+// ========================
+// Financial Snapshot
+// ========================
+
+export interface BudgetHealthRow {
+  category: string
+  budgeted: number
+  actual: number
+  variance: number
+  variancePercent: number
+}
+
+export interface FinancialSnapshotSectionData {
+  periodRevenue: number
+  previousPeriodRevenue: number
+  periodExpenses: number
+  previousPeriodExpenses: number
+  netPosition: number
+  previousNetPosition: number
+  activeOrderCount: number
+  activeOrdersByStatus: { status: string; count: number }[]
+  budgetHealth: BudgetHealthRow[]
+  overBudgetCount: number
+  sectionNarrative?: string
+}
+
+// ========================
+// Sales Pipeline
+// ========================
+
+export interface SalesPipelineSectionData {
+  outreach: {
+    activeCampaigns: number
+    contactsReached: number
+    emailsSent: number
+    repliesReceived: number
+    replyRate: number
+    topCampaignName: string | null
+  }
+  rfqs: {
+    openCount: number
+    sentThisPeriod: number
+    responsesReceived: number
+    awarded: number
+    pipelineValue: number
+  }
+  discoveryCalls: {
+    scheduled: number
+    completed: number
+    conversions: number
+    noShows: number
+  }
+  sectionNarrative?: string
+}
+
+// ========================
+// Engineering Activity
+// ========================
+
+export interface RecentProject {
+  id: string
+  name: string
+  stage: string
+  status: string
+  createdAt: string
+}
+
+export interface EngineeringActivitySectionData {
+  totalActive: number
+  createdThisPeriod: number
+  completedThisPeriod: number
+  byStage: { stage: string; count: number }[]
+  byStatus: { status: string; count: number }[]
+  totalModulesGenerated: number
+  recentProjects: RecentProject[]
+  sectionNarrative?: string
+}
+
+// ========================
+// Knowledge & Learning
+// ========================
+
+export interface KnowledgeLearningSectionData {
+  knowledge: {
+    totalNotes: number
+    addedThisPeriod: number
+    topDomains: { name: string; count: number }[]
+    byType: { type: string; count: number }[]
+    verifiedCount: number
+  }
+  apprenticeships: {
+    activeEnrollments: number
+    modulesCompleted: number
+    otjtHoursLogged: number
+    reviewsDue: number
+    averageProgress: number
+  }
+  sectionNarrative?: string
+}
+
 export type SectionData =
   | { type: 'cover'; data: CoverSectionData }
   | { type: 'executive-summary'; data: ExecutiveSummarySectionData }
@@ -157,6 +261,10 @@ export type SectionData =
   | { type: 'blockers-risks'; data: BlockersRisksSectionData }
   | { type: 'completion-trend'; data: CompletionTrendSectionData }
   | { type: 'week-ahead'; data: WeekAheadSectionData }
+  | { type: 'financial-snapshot'; data: FinancialSnapshotSectionData }
+  | { type: 'sales-pipeline'; data: SalesPipelineSectionData }
+  | { type: 'engineering-activity'; data: EngineeringActivitySectionData }
+  | { type: 'knowledge-learning'; data: KnowledgeLearningSectionData }
 
 // ========================
 // Report Document
