@@ -277,9 +277,51 @@ export async function getLatestBriefingFormatted(
   ].join('\n')
 }
 
+// ─── Activity Helpers (cost optimisation — Fix 8) ────────────────────────────
+
+/**
+ * Returns the set of foundry IDs that have had specialist activity within the
+ * given number of days. Used to skip insight creation for dormant foundries.
+ */
+async function getActiveFoundryIds(supabase: ReturnType<typeof createAdminClient>, daysBack: number): Promise<string[]> {
+  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+  const { data } = await supabase
+    .from('agent_memory_threads')
+    .select('foundry_id')
+    .gt('last_interaction_at', cutoff)
+  return [...new Set((data ?? []).map((t) => t.foundry_id).filter(Boolean))] as string[]
+}
+
+/**
+ * Returns true if the specialist has at least one memory thread updated in the
+ * given number of days — used to decide whether to skip non-morning briefings.
+ */
+async function hasRecentSpecialistActivity(
+  supabase: ReturnType<typeof createAdminClient>,
+  specialistId: string,
+  daysBack: number,
+): Promise<boolean> {
+  const cutoff = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
+    .from('agent_memory_threads')
+    .select('id', { count: 'exact', head: true })
+    .eq('context_type', 'specialist')
+    .eq('context_id', specialistId)
+    .gt('last_interaction_at', cutoff)
+  return (count ?? 0) > 0
+}
+
+// Minimum headline count to justify an LLM synthesis call
+const MIN_RELEVANT_HEADLINES = 3
+
 /**
  * Generate briefings for all specialists for the given briefing type.
  * Stores global rows (foundry_id NULL) and creates one agent_insight per foundry per specialist.
+ *
+ * Cost optimisations (Fix 8):
+ * - Active foundries only: agent_insights skipped for foundries with no activity in 7 days
+ * - Minimum headlines: skip synthesis entirely if <3 relevant headlines found
+ * - Frequency reduction: skip midday/evening runs for specialists with 0 conversations in 30 days
  */
 export async function generateSpecialistBriefings(
   briefingType: BriefingType
@@ -290,13 +332,9 @@ export async function generateSpecialistBriefings(
   const results: SpecialistBriefingResult[] = []
   let totalCostUsd = 0
 
-  // Load foundries once for insight creation (same pattern as sweep orchestrator)
-  const { data: foundries } = await supabase
-    .from('foundries')
-    .select('id')
-    .order('created_at', { ascending: false })
-    .limit(500)
-  const foundryIds = (foundries ?? []).map((f) => f.id as string)
+  // Active foundry IDs (activity in last 7 days) — insights only sent to these
+  const activeFoundryIds = await getActiveFoundryIds(supabase, 7)
+  console.info(`[SpecialistBriefings] Active foundries: ${activeFoundryIds.length} (last 7 days)`)
 
   for (let i = 0; i < specialistIds.length; i += BATCH_SIZE) {
     const batch = specialistIds.slice(i, i + BATCH_SIZE)
@@ -304,7 +342,23 @@ export async function generateSpecialistBriefings(
       batch.map(async (specialistId): Promise<SpecialistBriefingResult> => {
         const specialist = SPECIALISTS.find((s) => s.id === specialistId)
         try {
+          // Frequency reduction: skip non-morning runs for low-activity specialists
+          if (briefingType !== 'morning') {
+            const active = await hasRecentSpecialistActivity(supabase, specialistId, 30)
+            if (!active) {
+              console.info(`[SpecialistBriefings] Skipping ${briefingType} for inactive specialist: ${specialistId}`)
+              return { specialistId, status: 'skipped', error: 'No activity in 30 days — morning-only mode' }
+            }
+          }
+
           const headlines = await fetchHeadlinesForSpecialist(specialistId, briefingType)
+
+          // Minimum headline threshold: skip synthesis if too few relevant headlines
+          if (headlines.length < MIN_RELEVANT_HEADLINES) {
+            console.info(`[SpecialistBriefings] Skipping ${specialistId}: only ${headlines.length} headlines (min ${MIN_RELEVANT_HEADLINES})`)
+            return { specialistId, status: 'skipped', error: `Only ${headlines.length} headlines found` }
+          }
+
           const synthesized = await synthesizeBriefing(specialistId, briefingType, headlines)
           const costUsd = estimateAICost(
             BRIEFING_MODEL,
@@ -343,8 +397,9 @@ export async function generateSpecialistBriefings(
             }
           }
 
+          // Only create insights for active foundries (activity in last 7 days)
           await createBriefingInsights(
-            foundryIds,
+            activeFoundryIds,
             specialistId,
             specialist?.name ?? specialistId,
             briefingType,

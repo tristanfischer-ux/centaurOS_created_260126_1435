@@ -56,15 +56,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
     const completed = result.results.filter((r) => r.status === 'completed').length
     const failed = result.results.filter((r) => r.status === 'failed').length
+    const skipped = result.results.filter((r) => r.status === 'skipped').length
 
     console.info(
-      `[Cron] Specialist briefings complete: ${briefingType}, ${completed} ok, ${failed} failed, $${result.totalCostUsd.toFixed(4)} cost`
+      `[Cron] Specialist briefings complete: ${briefingType}, ${completed} ok, ${skipped} skipped, ${failed} failed, $${result.totalCostUsd.toFixed(4)} cost`
     )
 
     return NextResponse.json({
       success: true,
       briefingType,
       completed,
+      skipped,
       failed,
       totalCostUsd: Number(result.totalCostUsd.toFixed(4)),
       durationMs: result.durationMs,
