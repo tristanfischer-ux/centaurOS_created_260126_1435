@@ -206,6 +206,8 @@ export interface AdvancedFilters {
     location?: string
     availability?: string
     skills?: string[]
+    companyTypes?: string[]
+    companySizes?: string[]
 }
 
 export interface SearchMarketplaceListingsParams {
@@ -300,6 +302,20 @@ export async function searchMarketplaceListings(
             ).join(',')
             query = query.or(skillFilters)
         }
+        if (af.companyTypes && af.companyTypes.length > 0) {
+            const typeFilters = af.companyTypes.map(
+                (t) => `attributes->>company_type.ilike.%${t}%`
+            ).join(',')
+            query = query.or(typeFilters)
+        }
+        if (af.companySizes && af.companySizes.length > 0) {
+            // INTENT: Company size is stored in attributes under both ch_company_size and company_size keys.
+            const sizeFilters = af.companySizes.flatMap((s) => [
+                `attributes->>ch_company_size.ilike.%${s}%`,
+                `attributes->>company_size.ilike.%${s}%`,
+            ]).join(',')
+            query = query.or(sizeFilters)
+        }
     }
 
     const sort = params.sort ?? 'verified'
@@ -377,6 +393,17 @@ export async function searchMarketplaceListings(
                 if (af.minExperience != null) semQuery = semQuery.gte('attributes->>years_experience', af.minExperience)
                 if (af.location) semQuery = semQuery.ilike('attributes->>location', `%${af.location}%`)
                 if (af.availability) semQuery = semQuery.ilike('attributes->>availability', `%${af.availability}%`)
+                if (af.companyTypes && af.companyTypes.length > 0) {
+                    const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${t}%`).join(',')
+                    semQuery = semQuery.or(typeFilters)
+                }
+                if (af.companySizes && af.companySizes.length > 0) {
+                    const sizeFilters = af.companySizes.flatMap((s) => [
+                        `attributes->>ch_company_size.ilike.%${s}%`,
+                        `attributes->>company_size.ilike.%${s}%`,
+                    ]).join(',')
+                    semQuery = semQuery.or(sizeFilters)
+                }
             }
             const { data: semanticListings } = await semQuery
             const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
@@ -425,6 +452,17 @@ export async function searchMarketplaceListings(
             if (af.minExperience != null) cq = cq.gte('attributes->>years_experience', af.minExperience)
             if (af.location) cq = cq.ilike('attributes->>location', `%${af.location}%`)
             if (af.availability) cq = cq.ilike('attributes->>availability', `%${af.availability}%`)
+            if (af.companyTypes && af.companyTypes.length > 0) {
+                const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${t}%`).join(',')
+                cq = cq.or(typeFilters)
+            }
+            if (af.companySizes && af.companySizes.length > 0) {
+                const sizeFilters = af.companySizes.flatMap((s) => [
+                    `attributes->>ch_company_size.ilike.%${s}%`,
+                    `attributes->>company_size.ilike.%${s}%`,
+                ]).join(',')
+                cq = cq.or(sizeFilters)
+            }
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cq = cq.eq('category', cat as any)

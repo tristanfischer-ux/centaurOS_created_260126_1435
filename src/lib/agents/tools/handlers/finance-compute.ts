@@ -24,15 +24,40 @@ import type { ToolHandler } from "./common"
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
-/** Convert pence to display currency (amounts stored as pence/cents). */
-function penceToCurrency(pence: number): string {
-    return (pence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/**
+ * Convert smallest currency unit (pence/cents) to display string.
+ * Uses the company's currency for locale formatting when available.
+ */
+function formatAmount(amount: number, currency = "GBP"): string {
+    const locale = currency === "USD" ? "en-US" : currency === "EUR" ? "de-DE" : "en-GB"
+    return (amount / 100).toLocaleString(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/** Get YYYY-MM key from a date string. */
-function toMonthKey(dateStr: string): string {
+/** Get YYYY-MM key from a date string. Returns null if date is invalid. */
+function toMonthKey(dateStr: string | null | undefined): string | null {
+    if (!dateStr) return null
     const d = new Date(dateStr)
+    if (isNaN(d.getTime())) return null
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+/** Safely compute a future month label (handles year rollover correctly). */
+function futureMonthLabel(monthsAhead: number): string {
+    const d = new Date()
+    d.setDate(1) // Avoid month-end rollover (Jan 31 + 1 month → Mar 3)
+    d.setMonth(d.getMonth() + monthsAhead)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+}
+
+/** Fetch the company's currency from foundry profile. */
+async function getFoundryCurrency(foundryId: string): Promise<string> {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+        .from("foundries")
+        .select("currency")
+        .eq("id", foundryId)
+        .single()
+    return data?.currency ?? "GBP"
 }
 
 // ─── analyze_cashflow ───────────────────────────────────────────────
@@ -42,9 +67,10 @@ function toMonthKey(dateStr: string): string {
  * buckets, computing burn rate, runway, and trend.
  */
 export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
-    const horizonMonths = (args.time_horizon_months as number) ?? 6
+    const horizonMonths = Math.min(Math.max((args.time_horizon_months as number) ?? 6, 1), 24)
     const includeProjections = (args.include_projections as boolean) ?? false
     const supabase = createAdminClient()
+    const currency = await getFoundryCurrency(ctx.foundryId)
 
     // Fetch data for the lookback period (double the horizon for trend analysis)
     const lookbackMs = horizonMonths * 2 * 30 * 24 * 60 * 60 * 1000
@@ -67,6 +93,13 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
             .order("created_at", { ascending: true }),
     ])
 
+    if (expensesRes.error) {
+        return `## Cash Flow Analysis\n\nError fetching expenses: ${expensesRes.error.message}`
+    }
+    if (invoicesRes.error) {
+        return `## Cash Flow Analysis\n\nError fetching invoices: ${invoicesRes.error.message}`
+    }
+
     const expenses = expensesRes.data ?? []
     const invoices = invoicesRes.data ?? []
 
@@ -76,11 +109,13 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
 
     for (const e of expenses) {
         const key = toMonthKey(e.expense_date)
+        if (!key) continue
         monthlyOutflows[key] = (monthlyOutflows[key] ?? 0) + (e.amount ?? 0)
     }
 
     for (const inv of invoices) {
         const key = toMonthKey(inv.created_at ?? inv.due_date)
+        if (!key) continue
         monthlyInflows[key] = (monthlyInflows[key] ?? 0) + (inv.total ?? 0)
     }
 
@@ -107,9 +142,9 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
     let md = `## Cash Flow Analysis\n\n`
     md += `### Key Metrics\n\n`
     md += `| Metric | Value |\n|--------|-------|\n`
-    md += `| Avg monthly expenses (last ${recentMonths.length}mo) | ${penceToCurrency(avgMonthlyBurn)} |\n`
-    md += `| Avg monthly revenue (last ${recentMonths.length}mo) | ${penceToCurrency(avgMonthlyRevenue)} |\n`
-    md += `| Net monthly burn | ${penceToCurrency(netBurn)} |\n`
+    md += `| Avg monthly expenses (last ${recentMonths.length}mo) | ${formatAmount(avgMonthlyBurn, currency)} |\n`
+    md += `| Avg monthly revenue (last ${recentMonths.length}mo) | ${formatAmount(avgMonthlyRevenue, currency)} |\n`
+    md += `| Net monthly burn | ${formatAmount(netBurn, currency)} |\n`
     if (netBurn > 0) {
         md += `| **Note** | Company is spending more than it earns — net burn is positive |\n`
     }
@@ -120,7 +155,7 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
     md += `| Month | Inflows | Outflows | Net |\n|-------|---------|----------|-----|\n`
     for (const m of monthData) {
         const netSign = m.net >= 0 ? "+" : ""
-        md += `| ${m.month} | ${penceToCurrency(m.inflow)} | ${penceToCurrency(m.outflow)} | ${netSign}${penceToCurrency(m.net)} |\n`
+        md += `| ${m.month} | ${formatAmount(m.inflow, currency)} | ${formatAmount(m.outflow, currency)} | ${netSign}${formatAmount(m.net, currency)} |\n`
     }
     md += "\n"
 
@@ -137,7 +172,7 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
     const totalSpend = sortedCats.reduce((s, [, v]) => s + v, 0)
     for (const [cat, amt] of sortedCats) {
         const pct = totalSpend > 0 ? ((amt / totalSpend) * 100).toFixed(1) : "0"
-        md += `| ${cat} | ${penceToCurrency(amt)} | ${pct}% |\n`
+        md += `| ${cat} | ${formatAmount(amt, currency)} | ${pct}% |\n`
     }
     md += "\n"
 
@@ -164,10 +199,7 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
         for (let i = 0; i < horizonMonths; i++) {
             const projected = slope * (n + i) + intercept
             const sign = projected >= 0 ? "+" : ""
-            const futureDate = new Date()
-            futureDate.setMonth(futureDate.getMonth() + i + 1)
-            const label = `${futureDate.getFullYear()}-${String(futureDate.getMonth() + 1).padStart(2, "0")}`
-            md += `| ${label} | ${sign}${penceToCurrency(projected)} |\n`
+            md += `| ${futureMonthLabel(i + 1)} | ${sign}${formatAmount(projected, currency)} |\n`
         }
         md += "\n"
     }
@@ -200,7 +232,11 @@ export const handleAnalyzeCashflow: ToolHandler = async (args, ctx) => {
 export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
     const budgetId = args.budget_id as string | undefined
     const period = (args.period as string) ?? "monthly"
+    if (period !== "monthly" && period !== "quarterly") {
+        return "## Budget Variance Analysis\n\nInvalid period. Use 'monthly' or 'quarterly'."
+    }
     const supabase = createAdminClient()
+    const currency = await getFoundryCurrency(ctx.foundryId)
 
     // Fetch active budgets
     let budgetQuery = supabase
@@ -213,7 +249,11 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
         budgetQuery = budgetQuery.eq("id", budgetId)
     }
 
-    const { data: budgets } = await budgetQuery.limit(20)
+    const { data: budgets, error: budgetError } = await budgetQuery.limit(20)
+
+    if (budgetError) {
+        return `## Budget Variance Analysis\n\nError fetching budgets: ${budgetError.message}`
+    }
 
     if (!budgets || budgets.length === 0) {
         return "## Budget Variance Analysis\n\nNo active budgets found. Create budgets first to track variance."
@@ -236,12 +276,16 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
     const periodStartStr = periodStart.toISOString().split("T")[0]
 
     // Fetch actual expenses for the period
-    const { data: expenses } = await supabase
+    const { data: expenses, error: expenseError } = await supabase
         .from("finance_expenses")
         .select("amount, category, status")
         .eq("foundry_id", ctx.foundryId)
         .gte("expense_date", periodStartStr)
         .in("status", ["approved", "paid"])
+
+    if (expenseError) {
+        return `## Budget Variance Analysis\n\nError fetching expenses: ${expenseError.message}`
+    }
 
     // Aggregate actual spend by category
     const actualByCategory: Record<string, number> = {}
@@ -279,11 +323,11 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
         totalBudgeted += budgetAmount
         totalActual += actual
 
-        md += `| ${b.name} | ${b.category} | ${penceToCurrency(budgetAmount)} | ${penceToCurrency(actual)} | ${variance >= 0 ? "+" : ""}${penceToCurrency(variance)} (${variancePct}%) | ${status} |\n`
+        md += `| ${b.name} | ${b.category} | ${formatAmount(budgetAmount, currency)} | ${formatAmount(actual, currency)} | ${variance >= 0 ? "+" : ""}${formatAmount(variance, currency)} (${variancePct}%) | ${status} |\n`
     }
 
     const totalVariance = totalBudgeted - totalActual
-    md += `| **Total** | | **${penceToCurrency(totalBudgeted)}** | **${penceToCurrency(totalActual)}** | **${totalVariance >= 0 ? "+" : ""}${penceToCurrency(totalVariance)}** | ${totalVariance >= 0 ? "Under budget" : "**OVER BUDGET**"} |\n`
+    md += `| **Total** | | **${formatAmount(totalBudgeted, currency)}** | **${formatAmount(totalActual, currency)}** | **${totalVariance >= 0 ? "+" : ""}${formatAmount(totalVariance, currency)}** | ${totalVariance >= 0 ? "Under budget" : "**OVER BUDGET**"} |\n`
     md += "\n"
 
     // Unbudgeted categories
@@ -293,7 +337,7 @@ export const handleAnalyzeBudgetVariance: ToolHandler = async (args, ctx) => {
         md += `### Unbudgeted Spending\n\n`
         md += `| Category | Amount |\n|----------|--------|\n`
         for (const [cat, amt] of unbudgeted.sort((a, b) => b[1] - a[1])) {
-            md += `| ${cat} | ${penceToCurrency(amt)} |\n`
+            md += `| ${cat} | ${formatAmount(amt, currency)} |\n`
         }
         md += "\n"
     }
@@ -331,6 +375,15 @@ export const handleCalculateUnitEconomics: ToolHandler = async (args, _ctx) => {
 
     if (cac == null || monthlyRevenue == null) {
         return "Error: `cac` and `monthly_revenue_per_customer` are required."
+    }
+    if (cac < 0 || monthlyRevenue < 0) {
+        return "Error: `cac` and `monthly_revenue_per_customer` must be non-negative."
+    }
+    if (grossMarginPct < 0 || grossMarginPct > 100) {
+        return "Error: `gross_margin_pct` must be between 0 and 100."
+    }
+    if (monthlyChurnRate < 0 || monthlyChurnRate > 1) {
+        return "Error: `monthly_churn_rate` must be between 0 and 1 (e.g., 0.05 for 5%)."
     }
 
     const marginDecimal = grossMarginPct / 100
@@ -401,39 +454,59 @@ export const handleCalculateUnitEconomics: ToolHandler = async (args, _ctx) => {
 export const handleForecastMetric: ToolHandler = async (args, ctx) => {
     const metric = (args.metric as string) ?? "expenses"
     const method = (args.method as string) ?? "linear"
-    const periodsAhead = (args.periods_ahead as number) ?? 3
+    const periodsAhead = Math.min(Math.max((args.periods_ahead as number) ?? 3, 1), 12)
+
+    if (!["revenue", "invoices", "expenses", "burn_rate"].includes(metric)) {
+        return "## Forecast Error\n\nInvalid metric. Use 'revenue', 'expenses', or 'burn_rate'."
+    }
+    if (!["linear", "exponential"].includes(method)) {
+        return "## Forecast Error\n\nInvalid method. Use 'linear' or 'exponential'."
+    }
+
     const supabase = createAdminClient()
+    const currency = await getFoundryCurrency(ctx.foundryId)
 
     // Fetch 12 months of historical data
     const lookbackDate = new Date()
+    lookbackDate.setDate(1) // Avoid month-end rollover
     lookbackDate.setMonth(lookbackDate.getMonth() - 12)
     const startStr = lookbackDate.toISOString().split("T")[0]
 
     const monthlyValues: Record<string, number> = {}
 
     if (metric === "revenue" || metric === "invoices") {
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from("finance_standalone_invoices")
             .select("total, created_at, status")
             .eq("foundry_id", ctx.foundryId)
             .gte("created_at", startStr + "T00:00:00Z")
             .in("status", ["sent", "paid"])
 
+        if (error) {
+            return `## ${metric} Forecast\n\nError fetching invoice data: ${error.message}`
+        }
+
         for (const inv of data ?? []) {
             const key = toMonthKey(inv.created_at)
+            if (!key) continue
             monthlyValues[key] = (monthlyValues[key] ?? 0) + (inv.total ?? 0)
         }
     } else {
-        // Default: expenses
-        const { data } = await supabase
+        // Default: expenses / burn_rate
+        const { data, error } = await supabase
             .from("finance_expenses")
             .select("amount, expense_date, status")
             .eq("foundry_id", ctx.foundryId)
             .gte("expense_date", startStr)
             .in("status", ["approved", "paid"])
 
+        if (error) {
+            return `## ${metric} Forecast\n\nError fetching expense data: ${error.message}`
+        }
+
         for (const e of data ?? []) {
             const key = toMonthKey(e.expense_date)
+            if (!key) continue
             monthlyValues[key] = (monthlyValues[key] ?? 0) + (e.amount ?? 0)
         }
     }
@@ -471,18 +544,23 @@ export const handleForecastMetric: ToolHandler = async (args, ctx) => {
     // Standard error for confidence intervals
     const se = n > 2 ? Math.sqrt(ssRes / (n - 2)) : 0
 
+    // Denominator for prediction interval: sum of squared deviations of x from mean
+    // GOTCHA: When all x values are the same (n=1, impossible here due to n>=3 check),
+    // sxDev would be 0. With n>=3, sumX2 - sumX²/n is always > 0.
+    const sxDev = sumX2 - (sumX ** 2) / n
+
     // Forecast
     const forecasts: Array<{ month: string; predicted: number; lower: number; upper: number }> = []
-    const now = new Date()
     for (let i = 0; i < periodsAhead; i++) {
         const futureIdx = n + i
         const predicted = slope * futureIdx + intercept
-        // Approximate 80% confidence interval
-        const margin = 1.28 * se * Math.sqrt(1 + 1 / n + ((futureIdx - (n - 1) / 2) ** 2) / (sumX2 - sumX ** 2 / n || 1))
-        const futureDate = new Date(now.getFullYear(), now.getMonth() + i + 1, 1)
-        const monthLabel = `${futureDate.getFullYear()}-${String(futureDate.getMonth() + 1).padStart(2, "0")}`
+        const xMean = sumX / n
+        // Approximate 80% prediction interval (z ≈ 1.28 for 80% two-sided)
+        const margin = sxDev > 0
+            ? 1.28 * se * Math.sqrt(1 + 1 / n + ((futureIdx - xMean) ** 2) / sxDev)
+            : 1.28 * se // Fallback: no x-deviation correction when data is degenerate
         forecasts.push({
-            month: monthLabel,
+            month: futureMonthLabel(i + 1),
             predicted: Math.max(0, predicted),
             lower: Math.max(0, predicted - margin),
             upper: predicted + margin,
@@ -495,13 +573,13 @@ export const handleForecastMetric: ToolHandler = async (args, ctx) => {
     md += `**Method:** ${method === "exponential" ? "Exponential smoothing" : "Linear regression"}\n`
     md += `**Based on:** ${n} months of historical data\n`
     md += `**R² (fit quality):** ${rSquared.toFixed(3)} ${rSquared > 0.7 ? "(good fit)" : rSquared > 0.4 ? "(moderate fit)" : "(weak fit — treat projections with caution)"}\n`
-    md += `**Trend:** ${slope > 0 ? "Increasing" : slope < 0 ? "Decreasing" : "Flat"} at ${penceToCurrency(Math.abs(slope))}/month\n\n`
+    md += `**Trend:** ${slope > 0 ? "Increasing" : slope < 0 ? "Decreasing" : "Flat"} at ${formatAmount(Math.abs(slope), currency)}/month\n\n`
 
     // Historical table
     md += `### Historical Data\n\n`
     md += `| Month | Actual |\n|-------|--------|\n`
     for (let i = 0; i < sortedMonths.length; i++) {
-        md += `| ${sortedMonths[i]} | ${penceToCurrency(values[i])} |\n`
+        md += `| ${sortedMonths[i]} | ${formatAmount(values[i], currency)} |\n`
     }
     md += "\n"
 
@@ -509,7 +587,7 @@ export const handleForecastMetric: ToolHandler = async (args, ctx) => {
     md += `### Forecast (next ${periodsAhead} months)\n\n`
     md += `| Month | Predicted | Range (80% confidence) |\n|-------|-----------|------------------------|\n`
     for (const f of forecasts) {
-        md += `| ${f.month} | ${penceToCurrency(f.predicted)} | ${penceToCurrency(f.lower)} – ${penceToCurrency(f.upper)} |\n`
+        md += `| ${f.month} | ${formatAmount(f.predicted, currency)} | ${formatAmount(f.lower, currency)} – ${formatAmount(f.upper, currency)} |\n`
     }
     md += "\n"
 

@@ -101,6 +101,8 @@ interface MarketplaceToolbarProps {
     advancedFilters?: AdvancedFilters
     /** Remove a specific advanced filter by key. */
     onRemoveAdvancedFilter?: (key: keyof AdvancedFilters) => void
+    /** Update a specific advanced filter (used for removing individual values from array filters). */
+    onUpdateAdvancedFilter?: <K extends keyof AdvancedFilters>(key: K, value: AdvancedFilters[K]) => void
 }
 
 /**
@@ -134,6 +136,7 @@ export function MarketplaceToolbar({
     activeFilterCount = 0,
     advancedFilters,
     onRemoveAdvancedFilter,
+    onUpdateAdvancedFilter,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -371,13 +374,30 @@ export function MarketplaceToolbar({
                     {advancedFilters.skills?.map((skill) => (
                         <FilterChip key={skill} label={skill} onRemove={() => {
                             const next = (advancedFilters.skills ?? []).filter(s => s !== skill)
-                            // INTENT: Removing one skill at a time; when empty, remove the whole key
                             if (next.length === 0) {
                                 onRemoveAdvancedFilter('skills')
                             } else {
-                                // Can't remove just one via removeAdvancedFilter, so we don't render individual skill chips in closed mode
-                                // Instead the parent handles this via updateAdvancedFilter
                                 onRemoveAdvancedFilter('skills')
+                            }
+                        }} />
+                    ))}
+                    {advancedFilters.companyTypes?.map((type) => (
+                        <FilterChip key={`ct-${type}`} label={type} onRemove={() => {
+                            const next = (advancedFilters.companyTypes ?? []).filter(t => t !== type)
+                            if (next.length === 0) {
+                                onRemoveAdvancedFilter('companyTypes')
+                            } else if (onUpdateAdvancedFilter) {
+                                onUpdateAdvancedFilter('companyTypes', next)
+                            }
+                        }} />
+                    ))}
+                    {advancedFilters.companySizes?.map((size) => (
+                        <FilterChip key={`cs-${size}`} label={`Size: ${size}`} onRemove={() => {
+                            const next = (advancedFilters.companySizes ?? []).filter(s => s !== size)
+                            if (next.length === 0) {
+                                onRemoveAdvancedFilter('companySizes')
+                            } else if (onUpdateAdvancedFilter) {
+                                onUpdateAdvancedFilter('companySizes', next)
                             }
                         }} />
                     ))}

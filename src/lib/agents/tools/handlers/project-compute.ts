@@ -30,12 +30,14 @@ export const handleAnalyzeCriticalPath: ToolHandler = async (args, ctx) => {
     const objectiveId = args.objective_id as string | undefined
     const supabase = createAdminClient()
 
-    // Fetch tasks
+    // Fetch non-completed tasks (exclude terminal statuses dynamically)
     let taskQuery = supabase
         .from("tasks")
         .select("id, title, status, start_date, end_date, assignee_id, objective_id, progress")
         .eq("foundry_id", ctx.foundryId)
         .is("deleted_at", null)
+        .not("status", "eq", "Completed")
+        .not("status", "eq", "Rejected")
 
     if (objectiveId) {
         taskQuery = taskQuery.eq("objective_id", objectiveId)
@@ -48,6 +50,13 @@ export const handleAnalyzeCriticalPath: ToolHandler = async (args, ctx) => {
             .select("task_id, depends_on_task_id, dependency_type")
             .eq("foundry_id", ctx.foundryId),
     ])
+
+    if (tasksRes.error) {
+        return `## Critical Path Analysis\n\nError fetching tasks: ${tasksRes.error.message}`
+    }
+    if (depsRes.error) {
+        return `## Critical Path Analysis\n\nError fetching dependencies: ${depsRes.error.message}`
+    }
 
     const tasks = tasksRes.data ?? []
     const deps = depsRes.data ?? []
@@ -140,7 +149,9 @@ export const handleAnalyzeCriticalPath: ToolHandler = async (args, ctx) => {
             : totalDuration
         latestFinish.set(id, lf)
         latestStart.set(id, lf - (duration.get(id) ?? 5))
-        slack.set(id, lf - (earliestFinish.get(id) ?? 0))
+        // GOTCHA: Slack can go negative if there are circular deps or data inconsistencies.
+        // Clamp to 0 — negative slack means "already late", which we flag separately.
+        slack.set(id, Math.max(0, lf - (earliestFinish.get(id) ?? 0)))
     }
 
     // Critical path = tasks with zero slack
@@ -220,13 +231,16 @@ export const handleAnalyzeCriticalPath: ToolHandler = async (args, ctx) => {
 export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
     const supabase = createAdminClient()
 
+    // Fetch non-terminal tasks (exclude Completed and Rejected dynamically
+    // rather than hardcoding all active status names)
     const [tasksRes, profilesRes] = await Promise.all([
         supabase
             .from("tasks")
             .select("id, title, status, assignee_id, start_date, end_date, objective_id")
             .eq("foundry_id", ctx.foundryId)
             .is("deleted_at", null)
-            .in("status", ["Pending", "Accepted", "Amended", "Pending_Peer_Review", "Pending_Executive_Approval"])
+            .not("status", "eq", "Completed")
+            .not("status", "eq", "Rejected")
             .limit(300),
         supabase
             .from("profiles")
@@ -234,6 +248,13 @@ export const handleAnalyzeWorkload: ToolHandler = async (_args, ctx) => {
             .eq("foundry_id", ctx.foundryId)
             .limit(100),
     ])
+
+    if (tasksRes.error) {
+        return `## Workload Analysis\n\nError fetching tasks: ${tasksRes.error.message}`
+    }
+    if (profilesRes.error) {
+        return `## Workload Analysis\n\nError fetching profiles: ${profilesRes.error.message}`
+    }
 
     const tasks = tasksRes.data ?? []
     const profiles = profilesRes.data ?? []
@@ -366,7 +387,11 @@ export const handlePredictCompletion: ToolHandler = async (args, ctx) => {
         objQuery = objQuery.in("status", ["active", "in_progress"])
     }
 
-    const { data: objectives } = await objQuery.limit(20)
+    const { data: objectives, error: objError } = await objQuery.limit(20)
+
+    if (objError) {
+        return `## Completion Prediction\n\nError fetching objectives: ${objError.message}`
+    }
 
     if (!objectives || objectives.length === 0) {
         return "## Completion Prediction\n\nNo active objectives found."
@@ -374,13 +399,17 @@ export const handlePredictCompletion: ToolHandler = async (args, ctx) => {
 
     // Fetch all tasks for these objectives
     const objIds = objectives.map((o) => o.id)
-    const { data: allTasks } = await supabase
+    const { data: allTasks, error: taskError } = await supabase
         .from("tasks")
         .select("id, status, objective_id, created_at, updated_at")
         .eq("foundry_id", ctx.foundryId)
         .is("deleted_at", null)
         .in("objective_id", objIds)
         .limit(500)
+
+    if (taskError) {
+        return `## Completion Prediction\n\nError fetching tasks: ${taskError.message}`
+    }
 
     const tasks = allTasks ?? []
 

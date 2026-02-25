@@ -11,6 +11,7 @@ import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
 import { MarketplaceStatsSection } from './MarketplaceStatsSection'
 import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
+import type { MarketplaceRegion } from '@/lib/marketplace-utils'
 import { dismissRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
 import { toast } from 'sonner'
@@ -262,7 +263,29 @@ export function MarketplaceBrowse({
             {activeTab === 'browse' && (
                 <>
                     {/* Analytics section */}
-                    {stats && <MarketplaceStatsSection stats={stats} />}
+                    {stats && (
+                        <MarketplaceStatsSection
+                            stats={stats}
+                            selectedCompanyTypes={state.advancedFilters.companyTypes}
+                            selectedCompanySizes={state.advancedFilters.companySizes}
+                            selectedRegion={state.selectedRegion !== 'All Regions' ? state.selectedRegion : undefined}
+                            onCompanyTypeClick={(type) => {
+                                const current = state.advancedFilters.companyTypes ?? []
+                                const next = current.includes(type) ? current.filter(t => t !== type) : [...current, type]
+                                state.updateAdvancedFilter('companyTypes', next.length > 0 ? next : undefined)
+                            }}
+                            onCompanySizeClick={(size) => {
+                                const current = state.advancedFilters.companySizes ?? []
+                                const next = current.includes(size) ? current.filter(s => s !== size) : [...current, size]
+                                state.updateAdvancedFilter('companySizes', next.length > 0 ? next : undefined)
+                            }}
+                            onRegionClick={(region) => {
+                                state.setSelectedRegion(
+                                    state.selectedRegion === region ? 'All Regions' : region as MarketplaceRegion
+                                )
+                            }}
+                        />
+                    )}
 
                     {/* AI + Gap Recommendations (compact, dismissible) */}
                     <MarketplaceRecommendations
@@ -299,6 +322,7 @@ export function MarketplaceBrowse({
                         activeFilterCount={state.activeFilterCount}
                         advancedFilters={state.advancedFilters}
                         onRemoveAdvancedFilter={state.removeAdvancedFilter}
+                        onUpdateAdvancedFilter={state.updateAdvancedFilter}
                     />
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}

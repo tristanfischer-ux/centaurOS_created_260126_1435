@@ -28,15 +28,24 @@ import type { ToolHandler } from "./common"
  */
 export const handleScoreSuppliers: ToolHandler = async (args, ctx) => {
     const category = args.category as string | undefined
-    const limit = (args.limit as number) ?? 20
+    const limit = Math.min(Math.max((args.limit as number) ?? 20, 1), 100)
     const supabase = createAdminClient()
 
     // Fetch supplier reviews
-    const { data: reviews } = await supabase
+    let reviewQuery = supabase
         .from("supplier_reviews")
         .select("supplier_id, rating, would_recommend, order_value_range, verified_purchase")
         .eq("foundry_id", ctx.foundryId)
-        .limit(500)
+
+    if (category) {
+        reviewQuery = reviewQuery.eq("category", category)
+    }
+
+    const { data: reviews, error: reviewError } = await reviewQuery.limit(500)
+
+    if (reviewError) {
+        return `## Supplier Scoring\n\nError fetching reviews: ${reviewError.message}`
+    }
 
     if (!reviews || reviews.length === 0) {
         return "## Supplier Scoring\n\nNo supplier reviews found. Reviews are needed to score suppliers."
@@ -62,10 +71,12 @@ export const handleScoreSuppliers: ToolHandler = async (args, ctx) => {
     }
 
     // Fetch supplier profiles for names
+    // SECURITY: Filter by foundry_id to prevent cross-tenant data leakage
     const supplierIds = Object.keys(supplierStats)
     const { data: suppliers } = await supabase
         .from("profiles")
         .select("id, first_name, last_name, company_name")
+        .eq("foundry_id", ctx.foundryId)
         .in("id", supplierIds.slice(0, 50))
 
     const nameMap = new Map(
@@ -152,7 +163,11 @@ export const handleAnalyzeOutreachPerformance: ToolHandler = async (args, ctx) =
         campaignQuery = campaignQuery.eq("id", campaignId)
     }
 
-    const { data: campaigns } = await campaignQuery.order("created_at", { ascending: false }).limit(20)
+    const { data: campaigns, error: campaignError } = await campaignQuery.order("created_at", { ascending: false }).limit(20)
+
+    if (campaignError) {
+        return `## Outreach Performance\n\nError fetching campaigns: ${campaignError.message}`
+    }
 
     if (!campaigns || campaigns.length === 0) {
         return "## Outreach Performance\n\nNo campaigns found."
@@ -161,12 +176,16 @@ export const handleAnalyzeOutreachPerformance: ToolHandler = async (args, ctx) =
     const campaignIds = campaigns.map((c) => c.id)
 
     // Fetch emails for these campaigns
-    const { data: emails } = await supabase
+    const { data: emails, error: emailError } = await supabase
         .from("outreach_emails")
         .select("id, campaign_id, status, sequence_position, sent_at, opened_at, replied_at, subject")
         .eq("foundry_id", ctx.foundryId)
         .in("campaign_id", campaignIds)
         .limit(1000)
+
+    if (emailError) {
+        return `## Outreach Performance\n\nError fetching emails: ${emailError.message}`
+    }
 
     // Fetch contacts for scoring distribution
     const { data: contacts } = await supabase

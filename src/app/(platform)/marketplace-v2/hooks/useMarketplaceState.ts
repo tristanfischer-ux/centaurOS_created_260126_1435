@@ -139,6 +139,10 @@ export function useMarketplaceState({
         if (rmin) initial.minRate = Number(rmin)
         const rmax = searchParams?.get('rmax')
         if (rmax) initial.maxRate = Number(rmax)
+        const ct = searchParams?.get('ct')
+        if (ct) initial.companyTypes = ct.split(',').filter(Boolean)
+        const cs = searchParams?.get('cs')
+        if (cs) initial.companySizes = cs.split(',').filter(Boolean)
         return initial
     })
 
@@ -216,6 +220,8 @@ export function useMarketplaceState({
         if (f.skills && f.skills.length > 0) p.set('sk', f.skills.join(','))
         if (f.minRate != null) p.set('rmin', String(f.minRate))
         if (f.maxRate != null) p.set('rmax', String(f.maxRate))
+        if (f.companyTypes && f.companyTypes.length > 0) p.set('ct', f.companyTypes.join(','))
+        if (f.companySizes && f.companySizes.length > 0) p.set('cs', f.companySizes.join(','))
         const newURL = p.toString() ? `${pathname}?${p.toString()}` : pathname
         router.push(newURL, { scroll: false })
     }, [pathname, router, advancedFilters])

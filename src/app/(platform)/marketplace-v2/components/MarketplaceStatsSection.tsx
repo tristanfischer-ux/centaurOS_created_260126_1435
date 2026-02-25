@@ -38,6 +38,12 @@ import type { MarketplaceStats } from '@/actions/marketplace-stats'
 
 interface MarketplaceStatsSectionProps {
   stats: MarketplaceStats
+  selectedCompanyTypes?: string[]
+  selectedCompanySizes?: string[]
+  selectedRegion?: string
+  onCompanyTypeClick?: (type: string) => void
+  onCompanySizeClick?: (size: string) => void
+  onRegionClick?: (region: string) => void
 }
 
 // ─── Size color mapping for donut chart ─────────────────────────────────────
@@ -109,7 +115,15 @@ function KPICard({ icon: Icon, value, label }: {
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export function MarketplaceStatsSection({ stats }: MarketplaceStatsSectionProps) {
+export function MarketplaceStatsSection({
+  stats,
+  selectedCompanyTypes = [],
+  selectedCompanySizes = [],
+  selectedRegion,
+  onCompanyTypeClick,
+  onCompanySizeClick,
+  onRegionClick,
+}: MarketplaceStatsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
   const {
@@ -195,13 +209,29 @@ export function MarketplaceStatsSection({ stats }: MarketplaceStatsSectionProps)
                           content={<BarTooltip />}
                           cursor={{ fill: 'hsl(var(--muted))' }}
                         />
-                        <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
-                          {companyTypeCounts.slice(0, 12).map((_, index) => (
-                            <Cell
-                              key={`type-${index}`}
-                              fill={getChartColor(index, true)}
-                            />
-                          ))}
+                        <Bar
+                          dataKey="count"
+                          radius={[0, 4, 4, 0]}
+                          barSize={16}
+                          cursor={onCompanyTypeClick ? 'pointer' : undefined}
+                          onClick={onCompanyTypeClick ? (data) => {
+                            const name = data?.payload?.name as string | undefined
+                            if (name) onCompanyTypeClick(name)
+                          } : undefined}
+                        >
+                          {companyTypeCounts.slice(0, 12).map((entry, index) => {
+                            const isSelected = selectedCompanyTypes.includes(entry.name)
+                            const hasSelection = selectedCompanyTypes.length > 0
+                            return (
+                              <Cell
+                                key={`type-${index}`}
+                                fill={getChartColor(index, true)}
+                                fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
+                                stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
+                                strokeWidth={isSelected ? 1.5 : 0}
+                              />
+                            )
+                          })}
                         </Bar>
                       </BarChart>
                     </ResponsiveContainer>
@@ -231,13 +261,24 @@ export function MarketplaceStatsSection({ stats }: MarketplaceStatsSectionProps)
                           paddingAngle={2}
                           dataKey="count"
                           nameKey="name"
+                          cursor={onCompanySizeClick ? 'pointer' : undefined}
+                          onClick={onCompanySizeClick ? (data: { name: string }) => {
+                            if (data?.name) onCompanySizeClick(data.name)
+                          } : undefined}
                         >
-                          {companySizeCounts.map((entry, index) => (
-                            <Cell
-                              key={`size-${index}`}
-                              fill={getSizeColor(entry.name)}
-                            />
-                          ))}
+                          {companySizeCounts.map((entry, index) => {
+                            const isSelected = selectedCompanySizes.includes(entry.name)
+                            const hasSelection = selectedCompanySizes.length > 0
+                            return (
+                              <Cell
+                                key={`size-${index}`}
+                                fill={getSizeColor(entry.name)}
+                                fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
+                                stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
+                                strokeWidth={isSelected ? 2 : 0}
+                              />
+                            )
+                          })}
                         </Pie>
                         <Tooltip content={<DonutTooltip />} />
                       </PieChart>
@@ -254,15 +295,31 @@ export function MarketplaceStatsSection({ stats }: MarketplaceStatsSectionProps)
                   </div>
                   {/* Legend */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center mt-1">
-                    {companySizeCounts.map((entry) => (
-                      <div key={entry.name} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <span
-                          className="h-2 w-2 rounded-full shrink-0"
-                          style={{ backgroundColor: getSizeColor(entry.name) }}
-                        />
-                        {entry.name} ({entry.count})
-                      </div>
-                    ))}
+                    {companySizeCounts.map((entry) => {
+                      const isSelected = selectedCompanySizes.includes(entry.name)
+                      const hasSelection = selectedCompanySizes.length > 0
+                      return (
+                        <button
+                          key={entry.name}
+                          type="button"
+                          onClick={() => onCompanySizeClick?.(entry.name)}
+                          className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                          style={{ opacity: hasSelection && !isSelected ? 0.4 : 1 }}
+                        >
+                          <span
+                            className="h-2 w-2 rounded-full shrink-0"
+                            style={{
+                              backgroundColor: getSizeColor(entry.name),
+                              outline: isSelected ? '2px solid hsl(var(--foreground))' : 'none',
+                              outlineOffset: '1px',
+                            }}
+                          />
+                          <span className={isSelected ? 'font-medium text-foreground' : ''}>
+                            {entry.name} ({entry.count})
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -301,8 +358,26 @@ export function MarketplaceStatsSection({ stats }: MarketplaceStatsSectionProps)
                           dataKey="count"
                           radius={[0, 4, 4, 0]}
                           barSize={16}
-                          fill={chartColors[1]}
-                        />
+                          cursor={onRegionClick ? 'pointer' : undefined}
+                          onClick={onRegionClick ? (data) => {
+                            const name = data?.payload?.name as string | undefined
+                            if (name) onRegionClick(name)
+                          } : undefined}
+                        >
+                          {regionCounts.map((entry, index) => {
+                            const isSelected = selectedRegion === entry.name
+                            const hasSelection = !!selectedRegion
+                            return (
+                              <Cell
+                                key={`region-${index}`}
+                                fill={chartColors[1]}
+                                fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
+                                stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
+                                strokeWidth={isSelected ? 1.5 : 0}
+                              />
+                            )
+                          })}
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
