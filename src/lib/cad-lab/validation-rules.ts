@@ -14,9 +14,9 @@
  * - Quality scorecard: src/lib/cad-lab-quality-scorecard.ts
  */
 
-import { PROCESSES, findProcess } from "@/lib/engineering-data/processes"
+import { PROCESSES } from "@/lib/engineering-data/processes"
 import { MATERIALS } from "@/lib/engineering-data/materials"
-import type { CadLabModule, CadLabDfmResult } from "@/lib/cad-lab-types"
+import type { CadLabModule } from "@/lib/cad-lab-types"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -45,6 +45,7 @@ export type ValidationCategory =
   | "tolerance"
   | "structural"
   | "environment"
+  | "economics"
 
 export interface ValidationSummary {
   /** Overall verdict */
@@ -92,13 +93,13 @@ const DIAG_PROCESS_TO_DB_IDS: Record<string, string[]> = {
 const DIAG_MATERIAL_TO_DB_IDS: Record<string, string[]> = {
   "PLA/PETG": ["pla", "petg"],
   "ABS/Nylon": ["abs", "nylon-pa6", "nylon-pa12"],
-  "Resin (standard)": ["resin-standard", "resin-tough"],
+  "Resin (standard)": [], // DECISION: No matching IDs in materials DB for resins
   "Aluminum 6061": ["al-6061-t6"],
-  "Steel (mild)": ["steel-1018", "steel-a36"],
-  "Stainless Steel": ["ss-304", "ss-316l"],
+  "Steel (mild)": ["steel-1018", "steel-4140"],
+  "Stainless Steel": ["ss-304", "ss-316"],
   "Titanium": ["ti-6al-4v"],
-  "Copper/Brass": ["copper-c110", "brass-c360"],
-  "Carbon Fiber": ["cf-uni", "cf-woven", "cf-nylon"],
+  "Copper/Brass": ["cu-c110", "brass-c360"],
+  "Carbon Fiber": ["cf-unidirectional", "cf-woven-3k", "cf-chopped-sls"],
   "Wood/Plywood": [],
   "Other": [],
 }
@@ -241,9 +242,16 @@ function validateProcessBuildVolume(
 
   if (processes.length === 0) return results
 
-  // DECISION: Sort part dims largest-first and check against sorted build volume
-  // This allows rotation to fit
+  // DECISION: Sort part dims largest-first and check against sorted build volume.
+  // This allows rotation to fit.
   const partDims = [bbox.xLen, bbox.yLen, bbox.zLen].sort((a, b) => b - a)
+
+  // DECISION: Check against the LARGEST build volume in the process group.
+  // e.g. "CNC Machining" maps to both cnc-3axis and cnc-5axis — the part only
+  // needs to fit in ONE of them, not all.
+  let bestFit = false
+  let bestProc = processes[0]
+  let bestBuildDims = [0, 0, 0]
 
   for (const proc of processes) {
     const buildDims = [
@@ -252,19 +260,30 @@ function validateProcessBuildVolume(
       proc.max_part_size_mm.z,
     ].sort((a, b) => b - a)
 
-    const fits = partDims.every((d, i) => d <= buildDims[i])
-
-    if (!fits) {
-      results.push({
-        ruleId: "geo-build-volume",
-        category: "geometry",
-        severity: "critical",
-        message: `Part (${partDims.map(d => d.toFixed(0)).join("×")}mm) exceeds ${proc.name} build volume (${buildDims.map(d => d.toFixed(0)).join("×")}mm)`,
-        suggestion: `Consider splitting the part, selecting a larger-format process, or reducing part size`,
-        measuredValue: `${partDims.map(d => d.toFixed(0)).join("×")}mm`,
-        threshold: `${buildDims.map(d => d.toFixed(0)).join("×")}mm`,
-      })
+    if (partDims.every((d, i) => d <= buildDims[i])) {
+      bestFit = true
+      break
     }
+
+    // Track the process with the largest volume for the error message
+    const volume = buildDims[0] * buildDims[1] * buildDims[2]
+    const bestVolume = bestBuildDims[0] * bestBuildDims[1] * bestBuildDims[2]
+    if (volume > bestVolume) {
+      bestProc = proc
+      bestBuildDims = buildDims
+    }
+  }
+
+  if (!bestFit) {
+    results.push({
+      ruleId: "geo-build-volume",
+      category: "geometry",
+      severity: "critical",
+      message: `Part (${partDims.map(d => d.toFixed(0)).join("×")}mm) exceeds ${bestProc.name} build volume (${bestBuildDims.map(d => d.toFixed(0)).join("×")}mm)`,
+      suggestion: `Consider splitting the part, selecting a larger-format process, or reducing part size`,
+      measuredValue: `${partDims.map(d => d.toFixed(0)).join("×")}mm`,
+      threshold: `${bestBuildDims.map(d => d.toFixed(0)).join("×")}mm`,
+    })
   }
 
   return results
@@ -431,8 +450,11 @@ function validateMassSanity(
 ): ValidationResult[] {
   const results: ValidationResult[] = []
 
-  const massGrams = module.result?.massGrams ?? module.result?.massProperties?.massKg
-    ? (module.result?.massProperties?.massKg ?? 0) * 1000
+  // GOTCHA: Explicit intermediates to avoid ?? / ternary precedence bug
+  const rawMassGrams = module.result?.massGrams
+  const rawMassKg = module.result?.massProperties?.massKg
+  const massGrams = rawMassGrams != null ? rawMassGrams
+    : rawMassKg != null ? rawMassKg * 1000
     : null
   if (massGrams == null) return results
 
@@ -440,7 +462,7 @@ function validateMassSanity(
   if (massGrams < 1 && !module.name.toLowerCase().includes("label") && !module.name.toLowerCase().includes("decal")) {
     results.push({
       ruleId: "struct-mass-low",
-      category: "structural",
+      category: "economics",
       severity: "warning",
       message: `Part mass is extremely low (${massGrams.toFixed(2)}g) — may indicate missing geometry or incorrect material density`,
       suggestion: "Check that material density is set correctly and that the model is solid (not just surfaces)",
@@ -453,7 +475,7 @@ function validateMassSanity(
   if (massGrams > 50000) {
     results.push({
       ruleId: "struct-mass-high",
-      category: "structural",
+      category: "economics",
       severity: "warning",
       message: `Part mass is ${(massGrams / 1000).toFixed(1)}kg — unusually heavy for a single module`,
       suggestion: "Verify dimensions are in mm and material density is correct. Consider if this should be decomposed into sub-modules.",
@@ -600,7 +622,7 @@ function validateBatchEconomics(
   if (batchMid < proc.min_batch_economical) {
     results.push({
       ruleId: "econ-batch-small",
-      category: "structural",
+      category: "economics",
       severity: "warning",
       message: `Batch size ~${batchMid} is below ${proc.name} economical minimum of ${proc.min_batch_economical} units`,
       suggestion: proc.setup_cost_usd.high > 1000
@@ -615,7 +637,7 @@ function validateBatchEconomics(
   if (batchMid > 1000 && proc.category === "additive" && proc.id !== "binder-jetting") {
     results.push({
       ruleId: "econ-batch-additive-high",
-      category: "structural",
+      category: "economics",
       severity: "warning",
       message: `${proc.name} at ${batchMid}+ units is cost-ineffective — additive manufacturing has high per-unit cost`,
       suggestion: "For 1000+ units, consider injection molding, die casting, or sheet metal stamping for significantly lower per-unit cost",
