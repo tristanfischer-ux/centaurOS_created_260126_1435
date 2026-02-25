@@ -13,7 +13,6 @@
  */
 
 import { Suspense } from 'react'
-import { Users, Briefcase } from 'lucide-react'
 import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
@@ -30,9 +29,9 @@ import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsS
 const RECRUITS_STATS_LABELS: StatsLabels = {
     sectionTitle: 'Recruits Insights',
     kpi1Label: 'Total Talent',
-    kpi1Icon: Users,
+    kpi1Icon: 'users',
     kpi3Label: 'Specializations',
-    kpi3Icon: Briefcase,
+    kpi3Icon: 'briefcase',
     chart1Title: 'Specialization Distribution',
     chart2Title: 'Availability Breakdown',
     chart3Title: 'Regional Coverage',

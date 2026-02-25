@@ -22,6 +22,8 @@ import {
   ChevronUp,
   BarChart3,
   Calendar,
+  Users,
+  Briefcase,
 } from 'lucide-react'
 import {
   BarChart,
@@ -37,14 +39,28 @@ import {
 import { chartColors, getChartColor } from '@/lib/chart-colors'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
 
+// ─── Icon lookup (serialisable string → component) ──────────────────────────
+
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  factory: Factory,
+  wrench: Wrench,
+  users: Users,
+  briefcase: Briefcase,
+  shieldCheck: ShieldCheck,
+  mapPin: MapPin,
+  calendar: Calendar,
+}
+
 // ─── Configurable Labels ─────────────────────────────────────────────────────
 
 export interface StatsLabels {
   sectionTitle?: string
   kpi1Label?: string
-  kpi1Icon?: React.ComponentType<{ className?: string }>
+  /** Icon name key — resolved via ICON_MAP in this client component */
+  kpi1Icon?: string
   kpi3Label?: string
-  kpi3Icon?: React.ComponentType<{ className?: string }>
+  /** Icon name key — resolved via ICON_MAP in this client component */
+  kpi3Icon?: string
   chart1Title?: string
   chart2Title?: string
   chart3Title?: string
@@ -161,15 +177,18 @@ export function MarketplaceStatsSection({
   const {
     sectionTitle = 'Marketplace Insights',
     kpi1Label = 'Suppliers',
-    kpi1Icon: KPI1Icon = Factory,
+    kpi1Icon: kpi1IconName,
     kpi3Label = 'Mfg Types',
-    kpi3Icon: KPI3Icon = Wrench,
+    kpi3Icon: kpi3IconName,
     chart1Title = 'Manufacturing Type Distribution',
     chart2Title = 'Company Size',
     chart3Title = 'Regional Coverage',
     barTooltipNoun = 'suppliers',
     donutTooltipNoun = 'companies',
   } = labels ?? {}
+
+  const KPI1Icon = (kpi1IconName && ICON_MAP[kpi1IconName]) || Factory
+  const KPI3Icon = (kpi3IconName && ICON_MAP[kpi3IconName]) || Wrench
 
   // Fix 6: avoid re-slicing on every render
   const typeData: { name: string; count: number }[] = useMemo(() => companyTypeCounts.slice(0, 12), [companyTypeCounts])

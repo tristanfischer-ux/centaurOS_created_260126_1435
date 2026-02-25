@@ -36,6 +36,8 @@ import {
     CheckCircle2,
     FlaskConical,
     Loader2,
+    Building2,
+    Calendar,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
@@ -76,7 +78,7 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
     const ratingAvg = attrs.rating_average as number | undefined
     const reviewCount = attrs.total_reviews as number | undefined
     const responseHours = attrs.response_time_hours as number | undefined
-    const location = attrs.location as string | undefined
+    const location = (attrs.location || attrs.ch_registered_address) as string | undefined
     const experience = attrs.experience as string | undefined
     const headline = attrs.headline as string | undefined
     const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
@@ -199,6 +201,9 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                             </p>
                         </div>
 
+                        {/* Company Details (CH data) */}
+                        <CompanyDetailsSection attrs={attrs} />
+
                         {/* Skills / Tags */}
                         {tags.length > 0 && (
                             <div>
@@ -317,5 +322,72 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                 </ScrollArea>
             </DialogContent>
         </Dialog>
+    )
+}
+
+/** Compact company details section for the modal — shows CH enrichment data */
+function CompanyDetailsSection({ attrs }: { attrs: Record<string, unknown> }) {
+    const details: { label: string; value: string; icon: React.ReactNode }[] = []
+
+    if (attrs.ch_company_status) {
+        details.push({
+            label: 'Status',
+            value: String(attrs.ch_company_status).replace(/\b\w/g, (c) => c.toUpperCase()),
+            icon: <CheckCircle2 className="w-3.5 h-3.5" />,
+        })
+    }
+    if (attrs.ch_company_number) {
+        details.push({ label: 'CH No.', value: String(attrs.ch_company_number), icon: <Building2 className="w-3.5 h-3.5" /> })
+    }
+    if (attrs.ch_registered_address && !attrs.location) {
+        details.push({ label: 'Address', value: String(attrs.ch_registered_address), icon: <MapPin className="w-3.5 h-3.5" /> })
+    }
+    if (attrs.ch_incorporation_date) {
+        const date = new Date(String(attrs.ch_incorporation_date))
+        if (!isNaN(date.getTime())) {
+            details.push({
+                label: 'Incorporated',
+                value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+                icon: <Calendar className="w-3.5 h-3.5" />,
+            })
+        }
+    }
+    if (attrs.ch_company_size) {
+        details.push({ label: 'Size', value: String(attrs.ch_company_size), icon: <Users className="w-3.5 h-3.5" /> })
+    }
+    if (attrs.ch_company_type) {
+        details.push({ label: 'Type', value: String(attrs.ch_company_type), icon: <Building2 className="w-3.5 h-3.5" /> })
+    }
+    if (attrs.website_url) {
+        details.push({ label: 'Website', value: String(attrs.website_url), icon: <ExternalLink className="w-3.5 h-3.5" /> })
+    }
+
+    if (details.length === 0) return null
+
+    return (
+        <div>
+            <h3 className="text-sm font-semibold text-foreground mb-2">Company Details</h3>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {details.map((d) => (
+                    <div key={d.label} className="flex items-center gap-1.5 text-sm">
+                        <span className="text-muted-foreground shrink-0">{d.icon}</span>
+                        <span className="text-muted-foreground">{d.label}:</span>
+                        {d.label === 'Website' ? (
+                            <a
+                                href={d.value}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-international-orange hover:underline truncate"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {(() => { try { return new URL(d.value).hostname.replace(/^www\./, '') } catch { return d.value } })()}
+                            </a>
+                        ) : (
+                            <span className="font-medium text-foreground truncate">{d.value}</span>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
     )
 }

@@ -21,13 +21,9 @@ import {
   Sparkles,
   PlayCircle,
   PenTool,
-  FileCheck2,
   Search,
   Box,
   ClipboardCheck,
-  Eye,
-  CheckCircle2,
-  Layers,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -36,6 +32,7 @@ import { cn } from "@/lib/utils"
 import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { RecentProjectsGrid } from "./recent-projects-grid"
+import { SampleProjectPreview } from "./sample-project-preview"
 import { ForgeScreenContext } from "./forge-screen-context"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -133,7 +130,6 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
 
       {!hasRecent ? (
         <div className="space-y-8">
-          {/* eslint-disable-next-line react/jsx-no-undef -- defined below in same file */}
           <SampleProjectPreview />
           <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
@@ -220,19 +216,6 @@ function StartingPointsSection(): React.ReactNode {
         ))}
       </div>
 
-      {/* Destination callout + Component Library link */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-xl border bg-muted/40 px-5 py-4">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-status-success-light">
-            <FileCheck2 className="h-4 w-4 text-status-success" />
-          </div>
-          <p className="text-sm text-muted-foreground leading-snug">
-            <span className="font-medium text-foreground">Every path ends the same way</span>
-            {" "}— a supplier-ready engineering package you can send as an RFQ.
-          </p>
-        </div>
-        {/* Component Library link hidden — will be restored when Assembly Builder ships */}
-      </div>
     </div>
   )
 }
@@ -305,81 +288,6 @@ function StartingPathCard({ path }: { path: StartingPath }): React.ReactNode {
         </span>
       </div>
     </Link>
-  )
-}
-
-// ─── Sample Project Preview ──────────────────────────────────────────
-
-const SAMPLE_MODULES = [
-  { name: "Handle Assembly", dims: "120×45×30 mm" },
-  { name: "Lever Mechanism", dims: "85×20×15 mm" },
-  { name: "Cap Grip", dims: "40×40×25 mm" },
-  { name: "Pivot Housing", dims: "30×30×20 mm" },
-]
-
-const SAMPLE_DELIVERABLES = [
-  "STEP + STL files",
-  "7 orthographic views",
-  "DFM analysis",
-  "Cost estimate",
-  "RFQ package",
-]
-
-/**
- * SampleProjectPreview — Shows first-timers what a completed engineering
- * package looks like, reducing uncertainty before they start.
- */
-function SampleProjectPreview(): React.ReactNode {
-  return (
-    <div className="rounded-xl border bg-muted/20 p-6 space-y-4">
-      <div className="flex items-center gap-2">
-        <Eye className="h-4 w-4 text-international-orange" />
-        <h3 className="text-sm font-semibold text-foreground">See what you&apos;ll get</h3>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Here&apos;s what a completed engineering package looks like for a sample product — a &quot;Smart Bottle Opener&quot; with 4 modules.
-      </p>
-
-      {/* Sample modules */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {SAMPLE_MODULES.map((mod) => (
-          <div key={mod.name} className="rounded-lg border bg-background p-3 space-y-1.5">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded-md bg-status-success-light flex items-center justify-center flex-shrink-0">
-                <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
-              </div>
-              <p className="text-xs font-medium text-foreground truncate">{mod.name}</p>
-            </div>
-            <p className="text-[10px] text-muted-foreground font-mono">{mod.dims}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Stats row */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1">
-          <Layers className="h-3 w-3" /> 4 sub-assemblies
-        </span>
-        <span className="flex items-center gap-1">
-          <Box className="h-3 w-3" /> 12 components
-        </span>
-        <span className="flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3 text-status-success" /> All CAD generated
-        </span>
-      </div>
-
-      {/* Deliverables */}
-      <div className="space-y-1.5">
-        <p className="text-xs font-medium text-muted-foreground">What you&apos;ll receive:</p>
-        <div className="flex flex-wrap gap-1.5">
-          {SAMPLE_DELIVERABLES.map((d) => (
-            <span key={d} className="text-xs bg-status-success-light text-status-success px-2 py-0.5 rounded-full font-medium">
-              {d}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
   )
 }
 

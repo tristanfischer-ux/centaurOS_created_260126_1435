@@ -60,6 +60,10 @@ export const ATTRIBUTE_LABELS: Record<string, string> = {
   ch_registered_address: 'Registered Address',
   ch_incorporation_date: 'Incorporation Date',
   ch_company_size: 'Company Size (CH)',
+  ch_directors: 'Directors',
+  ch_psc: 'Persons of Significant Control',
+  ch_sic_codes: 'SIC Codes',
+  ch_company_type: 'Company Type',
 }
 
 /**
@@ -76,12 +80,6 @@ export const HIDDEN_ATTRIBUTES = new Set([
   'data_source',
   'data_confidence',
   'last_verified',
-  // Companies House enrichment (shown in charts, not in listing detail)
-  'ch_company_number',
-  'ch_company_status',
-  'ch_registered_address',
-  'ch_incorporation_date',
-  'ch_company_size',
   'data_source',
   // Already displayed in header or category-specific sections
   'headline',

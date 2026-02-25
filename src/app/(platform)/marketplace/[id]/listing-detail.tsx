@@ -187,6 +187,9 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings }: Mar
                     {category === 'Products' && <ProductsSection attrs={attrs} />}
                     {category === 'Services' && <ServicesSection attrs={attrs} />}
 
+                    {/* Companies House info (directors, PSC, SIC codes) */}
+                    <CompanyInfoSection attrs={attrs} />
+
                     {/* All Attributes */}
                     <AttributesSection attrs={attrs} category={category} />
                 </div>
@@ -233,6 +236,22 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
     }
 
+    // CH data fallbacks — show key company info when marketplace-specific fields are missing
+    if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
+    if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
+    if (attrs.ch_incorporation_date) {
+        const date = new Date(attrs.ch_incorporation_date)
+        if (!isNaN(date.getTime())) {
+            metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
+        }
+    }
+    if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
+    if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
+    if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
+        metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
+    }
+    if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
+
     if (metrics.length === 0) return null
 
     return (
@@ -247,9 +266,21 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
                             {metric.icon}
                             <span className="text-sm">{metric.label}</span>
                         </div>
-                        <span className="text-sm font-semibold text-foreground text-right">
-                            {metric.value}
-                        </span>
+                        {metric.label === 'Website' && typeof metric.value === 'string' && isURL(metric.value) ? (
+                            <a
+                                href={metric.value}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
+                            >
+                                {new URL(metric.value).hostname.replace(/^www\./, '')}
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                        ) : (
+                            <span className="text-sm font-semibold text-foreground text-right max-w-[60%]">
+                                {metric.value}
+                            </span>
+                        )}
                     </div>
                 ))}
             </CardContent>
@@ -426,9 +457,90 @@ function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
     )
 }
 
+// Companies House info section — directors, PSC, SIC codes
+function CompanyInfoSection({ attrs }: { attrs: Record<string, any> }) {
+    const directors = Array.isArray(attrs.ch_directors) ? attrs.ch_directors : []
+    const pscs = Array.isArray(attrs.ch_psc) ? attrs.ch_psc : []
+    const sicCodes = Array.isArray(attrs.ch_sic_codes) ? attrs.ch_sic_codes : []
+
+    if (directors.length === 0 && pscs.length === 0 && sicCodes.length === 0) return null
+
+    return (
+        <div className="space-y-4">
+            {directors.length > 0 && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <Users className="h-5 w-5" />
+                        Directors
+                    </h2>
+                    <Card>
+                        <CardContent className="pt-4">
+                            <div className="space-y-1">
+                                {directors.map((d: { name?: string; appointed_on?: string }, i: number) => (
+                                    <div key={i} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                                        <span className="text-sm font-medium text-foreground">{d.name || 'Unknown'}</span>
+                                        {d.appointed_on && (
+                                            <span className="text-xs text-muted-foreground">
+                                                Appointed {new Date(d.appointed_on).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </section>
+            )}
+
+            {pscs.length > 0 && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <ShieldCheck className="h-5 w-5" />
+                        Persons of Significant Control
+                    </h2>
+                    <Card>
+                        <CardContent className="pt-4">
+                            <div className="space-y-1">
+                                {pscs.map((p: { name?: string; natures_of_control?: string[] }, i: number) => (
+                                    <div key={i} className="py-2 border-b border-border last:border-0">
+                                        <span className="text-sm font-medium text-foreground">{p.name || 'Unknown'}</span>
+                                        {p.natures_of_control && p.natures_of_control.length > 0 && (
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {p.natures_of_control.map((n: string, j: number) => (
+                                                    <Badge key={j} variant="secondary" className="text-[10px]">
+                                                        {n.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </section>
+            )}
+
+            {sicCodes.length > 0 && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <BarChart3 className="h-5 w-5" />
+                        SIC Codes
+                    </h2>
+                    <div className="flex flex-wrap gap-2">
+                        {sicCodes.map((code: string, i: number) => (
+                            <Badge key={i} variant="secondary">{code}</Badge>
+                        ))}
+                    </div>
+                </section>
+            )}
+        </div>
+    )
+}
+
 // Attributes Section - renders all remaining attributes
 function AttributesSection({ attrs, category }: { attrs: Record<string, any>; category: string }) {
-    // Keys already shown in category-specific sections or key metrics
+    // Keys already shown in category-specific sections, key metrics, or company info
     const shownKeys = new Set([
         'role', 'rate', 'pricing', 'cost', 'price',
         'years_experience', 'projects_completed', 'education',
@@ -437,7 +549,11 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
         'accuracy', 'latency', 'throughput',
         'certifications', 'capabilities', 'lead_time', 'moq',
         'specialty', 'focus_areas', 'turnaround', 'capacity',
-        'location', 'availability'
+        'location', 'availability',
+        // CH fields shown in KeyMetricsCard or CompanyInfoSection
+        'ch_company_status', 'ch_company_number', 'ch_incorporation_date',
+        'ch_company_size', 'ch_company_type', 'ch_registered_address',
+        'ch_directors', 'ch_psc', 'ch_sic_codes', 'website_url',
     ])
 
     const remainingAttrs = Object.entries(attrs)
