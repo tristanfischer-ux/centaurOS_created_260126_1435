@@ -179,7 +179,7 @@ function scheduleModules(modules: CadLabModule[]): ScheduledModule[] {
 
   // Find critical path: trace back from the module with the latest end time
   const allScheduled = Array.from(scheduled.values())
-  const maxEnd = Math.max(...allScheduled.map((s) => s.endWeek))
+  const maxEnd = Math.max(...allScheduled.map((s) => s.endWeek), 0)
 
   // Mark modules on the critical path by tracing backwards
   const criticalSet = new Set<string>()
@@ -249,7 +249,23 @@ export function CadLabTimeline({
     }
   }, [modules])
 
-  if (modules.length === 0) return null
+  if (modules.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Manufacturing Timeline
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Complete the Concept stage to generate a manufacturing timeline. Module lead times and dependencies are needed.
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   // Week scale markers
   const weekMarkers: number[] = []

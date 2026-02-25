@@ -162,7 +162,25 @@ export function CadLabRiskRegister({
     return map
   }, [filtered])
 
-  if (entries.length === 0) return null
+  if (entries.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4" />
+            Risk Register
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            {modules.length === 0
+              ? "Complete the Concept stage to identify risks. Failure modes, unknowns, and DFM issues will appear here."
+              : "No risks identified across your modules. Generate CAD to surface DFM issues."}
+          </p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card>
