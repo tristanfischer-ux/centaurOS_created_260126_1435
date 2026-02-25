@@ -22,22 +22,6 @@ import type { Specialist } from "@/app/(platform)/agents/specialists-data"
 const MAX_DATE_HORIZON_DAYS = 730
 
 /**
- * Converts an estimatedWeeks value into start/end ISO date strings.
- *
- * @param estimatedWeeks - Number of weeks from today
- * @returns Start (today) and end (today + weeks*7) as YYYY-MM-DD strings
- */
-function computeDatesFromWeeks(estimatedWeeks: number): { startDate: string; endDate: string } {
-    const start = new Date()
-    const end = new Date()
-    end.setDate(end.getDate() + estimatedWeeks * 7)
-    return {
-        startDate: start.toISOString().split("T")[0],
-        endDate: end.toISOString().split("T")[0],
-    }
-}
-
-/**
  * Clamps a date string to within MAX_DATE_HORIZON_DAYS from today.
  * Returns null if the date is invalid or in the past.
  *
@@ -60,8 +44,8 @@ function clampDate(dateStr: string): string | null {
 }
 
 /**
- * Resolves start/end dates from a ProposedAction, preferring explicit dates
- * over estimatedWeeks computation.
+ * Resolves start/end dates from a ProposedAction when explicit dates are provided.
+ * Returns null when no explicit dates exist, allowing the wave-based scheduler to handle placement.
  *
  * @param proposal - The proposed action to extract dates from
  * @returns Object with startDate/endDate strings, or null if no dates available
@@ -81,15 +65,6 @@ function resolveDatesFromProposal(proposal: ProposedAction): { startDate: string
     // If we have explicit dates, use them
     if (startDate && endDate) {
         return { startDate, endDate }
-    }
-
-    // Fall back to estimatedWeeks computation
-    if (proposal.estimatedWeeks && proposal.estimatedWeeks > 0) {
-        const computed = computeDatesFromWeeks(proposal.estimatedWeeks)
-        return {
-            startDate: clampDate(computed.startDate) ?? computed.startDate,
-            endDate: clampDate(computed.endDate) ?? computed.endDate,
-        }
     }
 
     return null
