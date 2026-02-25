@@ -183,7 +183,7 @@ Secure pattern:
 3. Filter ALL queries by foundry_id
 4. Never trust client-side foundry_id — always derive from auth
 
-RLS is currently DISABLED on profiles. Application-level filtering is the primary defense.
+RLS is ENABLED on profiles (as of migration 20260216800000). Three canonical policies: INSERT for own profile, UPDATE for own profile, SELECT USING (true) — intentionally permissive to support cross-foundry marketplace/messaging visibility. R-011 in ISMS risk register documents the accepted risk.
 
 ---
 

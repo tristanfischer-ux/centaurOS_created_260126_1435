@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { createClient as createAdminClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { getProfileHubData } from '@/actions/profile-hub'
 import { getUserFoundries } from '@/lib/supabase/foundry-context'
@@ -8,20 +8,6 @@ import { ProfileHubView } from './profile-hub-view'
 export const metadata = {
   title: 'My Profile | ForgeOS',
   description: 'Manage your profile and marketplace presence',
-}
-
-/**
- * Gets the admin Supabase client for accessing messaging_links table.
- *
- * @returns Admin client or null if env vars missing
- */
-function getAdminClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !serviceKey) return null
-  return createAdminClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
 }
 
 /**
@@ -52,18 +38,15 @@ export default async function MyProfilePage() {
   lastMonday.setDate(lastMonday.getDate() - 7)
 
   // Fetch profile data, foundries, telegram link, and enrichment data in parallel
-  const admin = getAdminClient()
   const [data, foundriesResult, telegramResult, completionHistoryResult] = await Promise.all([
     getProfileHubData(),
     getUserFoundries(),
-    admin
-      ? admin
-          .from('messaging_links')
-          .select('id, platform_username, verified_at')
-          .eq('profile_id', user.id)
-          .eq('platform', 'telegram')
-          .single()
-      : Promise.resolve({ data: null }),
+    createAdminClient()
+      .from('messaging_links')
+      .select('id, platform_username, verified_at')
+      .eq('profile_id', user.id)
+      .eq('platform', 'telegram')
+      .single(),
     // Task completion history for sparkline (last 30 days)
     supabase
       .from('task_history')

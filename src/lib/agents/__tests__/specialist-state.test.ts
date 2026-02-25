@@ -101,6 +101,7 @@ describe("parseSpecialistMetadata", () => {
 describe("compileSpecialistStatePrompt", () => {
     const DEFAULT_EMOTIONAL: SpecialistEmotionalState = {
         mood: "neutral",
+        intensity: "medium",
         trigger: "",
         updatedAt: "2026-02-19T10:00:00Z",
     }
@@ -168,6 +169,7 @@ describe("compileSpecialistStatePrompt", () => {
     it("includes mood guidance for non-neutral moods", () => {
         const prompt = compileSpecialistStatePrompt({
             mood: "energized",
+            intensity: "medium",
             trigger: "great results",
             updatedAt: "2026-02-19T10:00:00Z",
         }, DEFAULT_RELATIONSHIP, "Sage")
@@ -184,6 +186,7 @@ describe("compileSpecialistStatePrompt", () => {
     it("includes the concerned trigger in mood guidance", () => {
         const prompt = compileSpecialistStatePrompt({
             mood: "concerned",
+            intensity: "medium",
             trigger: "declining revenue",
             updatedAt: "2026-02-19T10:00:00Z",
         }, DEFAULT_RELATIONSHIP, "Sage")

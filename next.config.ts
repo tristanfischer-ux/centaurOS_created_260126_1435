@@ -9,13 +9,6 @@ const analyzeBundles = withBundleAnalyzer({
 
 const nextConfig: NextConfig = {
   turbopack: {},
-  
-  // Type checking runs separately via `npm run typecheck` in CI
-  // Build-time type checking disabled until existing errors are resolved
-  // See: .github/workflows/docker-build.yml for CI type check step
-  typescript: {
-    ignoreBuildErrors: true,
-  },
 
   // Required for Docker runner image (copies .next/standalone)
   output: "standalone",
@@ -126,7 +119,7 @@ const nextConfig: NextConfig = {
               // SECURITY: Allow iframes from any origin for the in-app browser (/browse).
               // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
-              "frame-src 'self' https://*.stripe.com https: http:",
+              "frame-src 'self' https://*.stripe.com https:",
               // SECURITY: worker-src allows Three.js Web Workers for 3D rendering (blob: URLs)
               "worker-src 'self' blob:",
               "frame-ancestors 'self'",
