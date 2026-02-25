@@ -44,15 +44,14 @@ async function main() {
 
   // ─── 1. Seed invoices ─────────────────────────────────────────────────────
 
-  // Mark any lingering 'sent' E2E test invoices as 'paid' so they don't pollute the list
+  // Delete ALL prior E2E test invoices (any status) so they don't accumulate over time
   await admin
     .from('finance_standalone_invoices')
-    .update({ status: 'paid' })
+    .delete()
     .eq('foundry_id', foundryId)
     .eq('created_by', userId)
-    .eq('status', 'sent')
     .in('recipient_name', ['Test Client Alpha', 'Test Client Beta'])
-  console.log('✓ Cleaned up lingering sent E2E test invoices')
+  console.log('✓ Deleted prior E2E test invoices (all statuses)')
 
   // Determine next invoice numbers
   const year = new Date().getFullYear()
@@ -130,6 +129,14 @@ async function main() {
     .limit(5)
 
   if (projectError || !projects?.length) throw new Error(`No projects found: ${projectError?.message}`)
+
+  // Cleanup: delete orphaned E2E transactions from previous failed runs
+  await admin
+    .from('finance_project_transactions')
+    .delete()
+    .in('project_id', projects.map(p => p.id))
+    .like('description', 'E2E Test — manual transaction%')
+  console.log('✓ Cleaned up orphaned E2E transactions')
 
   // Prefer an active project, fall back to any project
   const targetProject = projects.find(p => p.status === 'active') ?? projects[0]

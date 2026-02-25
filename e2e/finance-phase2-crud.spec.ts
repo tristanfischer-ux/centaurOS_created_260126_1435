@@ -50,15 +50,15 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
     expect(currentName.length).toBeGreaterThan(0)
 
     const amountInput = dialog.locator('input#edit-budget-amount')
-    const currentAmount = await amountInput.inputValue()
-    const newAmount = String(parseFloat(currentAmount) + 500)
+    // Always reset to a fixed value so the budget doesn't drift across test runs
+    const newAmount = '50000'
     await amountInput.fill(newAmount)
 
     await dialog.locator('button').filter({ hasText: 'Save Changes' }).click()
     await expect(dialog).not.toBeVisible({ timeout: 8000 })
     await expect(card).toBeVisible()
 
-    console.log(`✅ Budget edit: "${currentName}" amount ${currentAmount} → ${newAmount}`)
+    console.log(`✅ Budget edit: "${currentName}" amount reset to ${newAmount}`)
   })
 
   test('2. Edit Funding Opportunity — Pencil on kanban card, dialog pre-fills', async ({ page }) => {
