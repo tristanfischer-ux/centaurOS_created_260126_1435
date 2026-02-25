@@ -477,8 +477,43 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
 
     if (value === undefined || value === null) return null
 
-    // Render arrays as tag pills
+    // Render arrays — handle objects (directors, PSCs) vs simple strings
     if (Array.isArray(value)) {
+        const hasObjects = value.some(item => item && typeof item === 'object')
+
+        if (hasObjects) {
+            return (
+                <div>
+                    <p className="text-sm text-muted-foreground mb-2">{label}</p>
+                    <div className="space-y-2">
+                        {value.map((item, i) => {
+                            if (item && typeof item === 'object') {
+                                const name = item.name || item.title || 'Unknown'
+                                const detail = item.appointed_on
+                                    ? `Appointed ${new Date(item.appointed_on).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
+                                    : item.natures_of_control
+                                        ? (Array.isArray(item.natures_of_control)
+                                            ? item.natures_of_control.map((n: string) => n.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())).join(', ')
+                                            : String(item.natures_of_control))
+                                        : null
+                                return (
+                                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                                        <span className="text-sm font-medium text-foreground">{name}</span>
+                                        {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
+                                    </div>
+                                )
+                            }
+                            return (
+                                <Badge key={i} variant="secondary" className="text-xs">
+                                    {String(item)}
+                                </Badge>
+                            )
+                        })}
+                    </div>
+                </div>
+            )
+        }
+
         return (
             <div>
                 <p className="text-sm text-muted-foreground mb-2">{label}</p>
