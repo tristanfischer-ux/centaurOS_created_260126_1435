@@ -13,8 +13,10 @@
  */
 
 import { Suspense } from 'react'
+import { Users, ShieldCheck, Briefcase, MapPin } from 'lucide-react'
 import { getMarketplaceListings, getSavedMarketplaceListings } from '@/actions/marketplace'
 import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
+import { getRecruitsStats } from '@/actions/recruits-stats'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
@@ -23,6 +25,20 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { EnrichedPersonListing } from '@/actions/people-marketplace'
+import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
+
+const RECRUITS_STATS_LABELS: StatsLabels = {
+    sectionTitle: 'Recruits Insights',
+    kpi1Label: 'Total Talent',
+    kpi1Icon: Users,
+    kpi3Label: 'Specializations',
+    kpi3Icon: Briefcase,
+    chart1Title: 'Specialization Distribution',
+    chart2Title: 'Availability Breakdown',
+    chart3Title: 'Regional Coverage',
+    barTooltipNoun: 'people',
+    donutTooltipNoun: 'people',
+}
 
 export const revalidate = 30
 
@@ -60,11 +76,12 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
 
-    // Fetch enriched People listings and foundry context in parallel
-    const [enrichedResult, plainListingsResult, foundryContext] = await Promise.allSettled([
+    // Fetch enriched People listings, foundry context, and stats in parallel
+    const [enrichedResult, plainListingsResult, foundryContext, statsResult] = await Promise.allSettled([
         getEnrichedPeopleListings(),
         getMarketplaceListings('People'),
         getFoundryContext(),
+        getRecruitsStats(),
     ])
 
     if (enrichedResult.status === 'fulfilled') {
@@ -77,6 +94,7 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
+    const recruitsStats = statsResult.status === 'fulfilled' ? statsResult.value : null
 
     // Fetch foundry context for optional features
     let foundryId: string | null = ctx?.foundryId || null
@@ -139,6 +157,8 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
                     allowedCategories={['People']}
                     pageTitle="Recruits"
                     pageSubtitle="Find expert talent to grow your team"
+                    stats={recruitsStats ?? undefined}
+                    statsLabels={RECRUITS_STATS_LABELS}
                 />
             </div>
         </Suspense>

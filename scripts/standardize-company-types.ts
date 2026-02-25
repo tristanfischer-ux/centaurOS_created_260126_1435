@@ -111,6 +111,107 @@ for (const [variant, canonical] of NORMALIZATION_ENTRIES) {
 }
 
 // ---------------------------------------------------------------------------
+// Tier 2: Pattern / substring rules (checked when no exact match exists)
+// Order matters — first match wins. Put specific rules before catch-alls.
+// A canonical of "" means "remove the company_type field entirely".
+// ---------------------------------------------------------------------------
+
+const PATTERN_RULES: { test: (val: string) => boolean; canonical: string }[] = [
+  // CNC variants: "CNC Machining (Aerospace)", "CNC Machining (Medical)", etc.
+  { test: (v) => v.startsWith("CNC Machining ("), canonical: "CNC Machining" },
+  // 3D Printing with / instead of &, or bare "Additive Manufacturing"
+  {
+    test: (v) => v.includes("3D Printing") || v.includes("Additive Manufacturing"),
+    canonical: "3D Printing & Additive Manufacturing",
+  },
+  // Surface Treatment without "& Finishing", plus individual finishing processes
+  {
+    test: (v) =>
+      v === "Surface Treatment" ||
+      v.includes("Anodising") ||
+      v.includes("Anodizing") ||
+      v.includes("Electroplating") ||
+      v.includes("Powder Coating") ||
+      v.includes("Plating") ||
+      v === "Heat Treatment",
+    canonical: "Surface Treatment & Finishing",
+  },
+  // Sheet Metal variants
+  {
+    test: (v) =>
+      v === "Metal Fabrication" || v === "Sheet Metal" || v.includes("Metal Spinning"),
+    canonical: "Sheet Metal Fabrication",
+  },
+  // Electronics
+  {
+    test: (v) =>
+      v === "PCB" ||
+      v.includes("PCB Assembly") ||
+      v === "EMS" ||
+      v === "Electronic Manufacturing",
+    canonical: "Electronics Manufacturing",
+  },
+  // Injection molding UK spelling
+  {
+    test: (v) => v.includes("Injection Moulding") || v === "Plastic Injection",
+    canonical: "Injection Molding",
+  },
+  // Composites
+  {
+    test: (v) =>
+      v === "Composites" ||
+      v.includes("Carbon Fibre") ||
+      v.includes("Carbon Fiber") ||
+      v === "GRP" ||
+      v.includes("Fibreglass"),
+    canonical: "Composites & Advanced Materials",
+  },
+  // Welding
+  { test: (v) => v === "Welding" || v === "Structural Steel", canonical: "Welding & Fabrication" },
+  // Contract Manufacturing
+  {
+    test: (v) => v === "Assembly" || v === "Contract Manufacturing",
+    canonical: "Contract Manufacturing & Assembly",
+  },
+  // Springs/Fasteners/Gears
+  {
+    test: (v) => v === "Springs" || v === "Fasteners" || v === "Gears",
+    canonical: "Springs, Fasteners & Gears",
+  },
+  // Rubber
+  {
+    test: (v) => v === "Rubber Moulding" || v === "Rubber Molding",
+    canonical: "Rubber Moulding & Extrusion",
+  },
+  // Forging
+  {
+    test: (v) => v === "Forging" || v === "Stamping" || v === "Pressing",
+    canonical: "Forging & Pressing",
+  },
+  // Laser/Waterjet
+  {
+    test: (v) =>
+      v === "Laser Cutting" ||
+      v.includes("Waterjet") ||
+      v.includes("Water Jet") ||
+      v === "EDM",
+    canonical: "Laser & Waterjet Cutting",
+  },
+  // CNC catch-all (after specific CNC rules above)
+  {
+    test: (v) =>
+      v === "CNC" || v === "Precision Engineering" || v === "Turned Parts" || v === "Wire EDM",
+    canonical: "CNC Machining",
+  },
+  // Extrusion (but not Rubber Extrusion — that's already handled above)
+  { test: (v) => v.includes("Extrusion") && !v.includes("Rubber"), canonical: "Extrusion" },
+  // Casting variants (but not bare "Casting" which is already canonical)
+  { test: (v) => v.includes("Casting") && v !== "Casting", canonical: "Casting" },
+  // Clean up placeholder entries
+  { test: (v) => v === "placeholder", canonical: "" },
+];
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -172,18 +273,34 @@ async function main() {
   for (const listing of withCompanyType) {
     const current = (listing.attributes as Record<string, unknown>)
       .company_type as string;
-    const normalized = normMap.get(current.toLowerCase());
+
+    // Tier 1: exact match (case-insensitive)
+    let normalized = normMap.get(current.toLowerCase());
+
+    // Tier 2: pattern / substring match (case-sensitive, original value)
+    if (normalized === undefined) {
+      for (const rule of PATTERN_RULES) {
+        if (rule.test(current)) {
+          normalized = rule.canonical;
+          break;
+        }
+      }
+    }
 
     if (normalized === undefined) continue; // no mapping for this value
     if (current === normalized) continue; // already canonical
 
-    changeSummary.push({ id: listing.id, from: current, to: normalized });
+    // If normalized is empty string, we want to remove the company_type
+    // (for "placeholder" entries)
+    changeSummary.push({ id: listing.id, from: current, to: normalized || "(removed)" });
 
     if (!dryRun) {
-      const updatedAttributes = {
-        ...listing.attributes,
-        company_type: normalized,
-      };
+      const updatedAttributes = { ...listing.attributes };
+      if (normalized) {
+        (updatedAttributes as Record<string, unknown>).company_type = normalized;
+      } else {
+        delete (updatedAttributes as Record<string, unknown>).company_type;
+      }
 
       const { error } = await supabase
         .from("marketplace_listings")

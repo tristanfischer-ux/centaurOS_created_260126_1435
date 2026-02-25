@@ -26,7 +26,7 @@ export interface MarketplaceStats {
 
 // INTENT: Map UK postal code prefixes to broad regions for the regional chart.
 // We use the first 1-2 characters of the postal code to determine region.
-const POSTCODE_REGION_MAP: Record<string, string> = {
+export const POSTCODE_REGION_MAP: Record<string, string> = {
   // London
   E: "London", EC: "London", N: "London", NW: "London",
   SE: "London", SW: "London", W: "London", WC: "London",
@@ -75,7 +75,7 @@ const POSTCODE_REGION_MAP: Record<string, string> = {
  * Derive a UK region from a postal code string.
  * Tries 2-char prefix first, then 1-char.
  */
-function deriveRegionFromPostcode(postcode: string): string | null {
+export function deriveRegionFromPostcode(postcode: string): string | null {
   const clean = postcode.toUpperCase().replace(/\s+/g, "")
   if (clean.length < 2) return null
 
@@ -94,11 +94,78 @@ function deriveRegionFromPostcode(postcode: string): string | null {
  * Extract a postal code from an address string.
  * UK postcodes follow the pattern: A9 9AA, A99 9AA, A9A 9AA, AA9 9AA, AA99 9AA, AA9A 9AA
  */
-function extractPostcode(address: string): string | null {
+export function extractPostcode(address: string): string | null {
   const match = address.match(
     /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i
   )
   return match ? match[1] : null
+}
+
+// ─── City/Keyword → Region Fallback ─────────────────────────────────────────
+
+/**
+ * INTENT: Most non-CH listings only have free-text location like "Birmingham, UK"
+ * without postcodes. This keyword map provides a fallback for the regional chart.
+ */
+const CITY_REGION_MAP: Record<string, string> = {
+  // London
+  london: "London",
+  // South East
+  brighton: "South East", oxford: "South East", reading: "South East",
+  southampton: "South East", portsmouth: "South East", guildford: "South East",
+  canterbury: "South East", crawley: "South East", slough: "South East",
+  "milton keynes": "South East", basingstoke: "South East", maidstone: "South East",
+  watford: "South East", luton: "South East", chelmsford: "South East",
+  colchester: "South East", "st albans": "South East", "high wycombe": "South East",
+  // South West
+  bristol: "South West", bath: "South West", exeter: "South West",
+  plymouth: "South West", gloucester: "South West", swindon: "South West",
+  cheltenham: "South West", bournemouth: "South West", poole: "South West",
+  taunton: "South West", torquay: "South West", truro: "South West",
+  // Midlands
+  birmingham: "Midlands", coventry: "Midlands", leicester: "Midlands",
+  nottingham: "Midlands", derby: "Midlands", wolverhampton: "Midlands",
+  stoke: "Midlands", "stoke-on-trent": "Midlands", telford: "Midlands",
+  worcester: "Midlands", peterborough: "Midlands", northampton: "Midlands",
+  "west midlands": "Midlands", "east midlands": "Midlands",
+  // North West
+  manchester: "North West", liverpool: "North West", chester: "North West",
+  preston: "North West", blackpool: "North West", bolton: "North West",
+  warrington: "North West", wigan: "North West", stockport: "North West",
+  oldham: "North West", rochdale: "North West", salford: "North West",
+  carlisle: "North West", lancaster: "North West", crewe: "North West",
+  // North East
+  newcastle: "North East", sunderland: "North East", durham: "North East",
+  middlesbrough: "North East", darlington: "North East", gateshead: "North East",
+  "newcastle upon tyne": "North East",
+  // Yorkshire
+  leeds: "Yorkshire", sheffield: "Yorkshire", bradford: "Yorkshire",
+  hull: "Yorkshire", york: "Yorkshire", doncaster: "Yorkshire",
+  huddersfield: "Yorkshire", halifax: "Yorkshire", wakefield: "Yorkshire",
+  harrogate: "Yorkshire", barnsley: "Yorkshire", rotherham: "Yorkshire",
+  lincoln: "Yorkshire", scunthorpe: "Yorkshire",
+  // Scotland
+  edinburgh: "Scotland", glasgow: "Scotland", aberdeen: "Scotland",
+  dundee: "Scotland", inverness: "Scotland", stirling: "Scotland",
+  perth: "Scotland", paisley: "Scotland", kilmarnock: "Scotland",
+  // Wales
+  cardiff: "Wales", swansea: "Wales", newport: "Wales",
+  wrexham: "Wales", bangor: "Wales", llanelli: "Wales",
+  // Northern Ireland
+  belfast: "Northern Ireland", derry: "Northern Ireland",
+  lisburn: "Northern Ireland", newry: "Northern Ireland",
+}
+
+/**
+ * Try to derive a UK region from a free-text location string using city keywords.
+ * Checks if any known city name appears in the location string.
+ */
+function deriveRegionFromKeywords(location: string): string | null {
+  const lower = location.toLowerCase()
+  for (const [city, region] of Object.entries(CITY_REGION_MAP)) {
+    if (lower.includes(city)) return region
+  }
+  return null
 }
 
 // ─── Main Stats Function ────────────────────────────────────────────────────
@@ -229,6 +296,16 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
         if (postcode) {
           region = deriveRegionFromPostcode(postcode)
         }
+      }
+    }
+
+    // Fallback: keyword-based matching on any location-like field
+    if (!region) {
+      const locationText = (attrs.ch_registered_address as string)
+        ?? (attrs.location as string)
+        ?? (attrs.headquarters as string)
+      if (locationText) {
+        region = deriveRegionFromKeywords(locationText)
       }
     }
 

@@ -21,6 +21,7 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart3,
+  Calendar,
 } from 'lucide-react'
 import {
   BarChart,
@@ -153,6 +154,7 @@ export function MarketplaceStatsSection({
     companyTypeCounts,
     companySizeCounts,
     regionCounts,
+    avgCompanyAge,
   } = stats
 
   // Destructure labels with marketplace defaults
@@ -204,11 +206,14 @@ export function MarketplaceStatsSection({
       {isExpanded && (
         <CardContent className="space-y-6 pb-6">
           {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className={`grid grid-cols-2 gap-3 ${avgCompanyAge !== null ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
             <KPICard icon={KPI1Icon} value={totalListings} label={kpi1Label} />
             <KPICard icon={ShieldCheck} value={verifiedCount} label="Verified" />
             <KPICard icon={KPI3Icon} value={manufacturingTypes} label={kpi3Label} />
             <KPICard icon={MapPin} value={regionCount} label="Regions" />
+            {avgCompanyAge !== null && (
+              <KPICard icon={Calendar} value={`${avgCompanyAge} yrs`} label="Avg. Age" />
+            )}
           </div>
 
           {/* Charts */}

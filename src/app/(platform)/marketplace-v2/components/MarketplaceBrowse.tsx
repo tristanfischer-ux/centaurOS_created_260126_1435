@@ -9,7 +9,7 @@ import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
-import { MarketplaceStatsSection } from './MarketplaceStatsSection'
+import { MarketplaceStatsSection, type StatsLabels } from './MarketplaceStatsSection'
 import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
 import type { MarketplaceRegion } from '@/lib/marketplace-utils'
 import { dismissRecommendation } from '@/actions/marketplace'
@@ -52,6 +52,8 @@ interface MarketplaceBrowseProps {
     pageSubtitle?: string
     /** Aggregate stats for the analytics section. */
     stats?: MarketplaceStats
+    /** Custom labels/icons for the stats section. */
+    statsLabels?: StatsLabels
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -80,6 +82,7 @@ export function MarketplaceBrowse({
     pageTitle = 'Marketplace',
     pageSubtitle = 'Find expert talent, products, and services to grow your business',
     stats,
+    statsLabels,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -266,6 +269,7 @@ export function MarketplaceBrowse({
                     {stats && (
                         <MarketplaceStatsSection
                             stats={stats}
+                            labels={statsLabels}
                             selectedCompanyTypes={state.advancedFilters.companyTypes}
                             selectedCompanySizes={state.advancedFilters.companySizes}
                             selectedRegion={state.selectedRegion !== 'All Regions' ? state.selectedRegion : undefined}

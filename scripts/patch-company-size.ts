@@ -130,29 +130,45 @@ function sleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // 1. Fetch listings that have a companies_house_number
-  let query = supabase
-    .from("marketplace_listings")
-    .select("id, attributes")
-    .not("attributes->>companies_house_number", "is", null);
+  // 1. Fetch listings that have a CH number under EITHER attribute key.
+  // INTENT: Older listings use "companies_house_number", newer CH-enriched ones
+  // use "ch_company_number". We need to query both to cover the full dataset.
+  const allListings: { id: string; attributes: Record<string, unknown> }[] = [];
+  const seenIds = new Set<string>();
 
-  if (LIMIT) {
-    query = query.limit(LIMIT);
+  for (const attrKey of ["companies_house_number", "ch_company_number"]) {
+    let query = supabase
+      .from("marketplace_listings")
+      .select("id, attributes")
+      .not(`attributes->>${attrKey}`, "is", null);
+
+    if (LIMIT) {
+      query = query.limit(LIMIT);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error(`Failed to fetch listings (${attrKey}):`, error.message);
+      process.exit(1);
+    }
+
+    for (const row of data ?? []) {
+      if (!seenIds.has(row.id)) {
+        seenIds.add(row.id);
+        allListings.push(row as { id: string; attributes: Record<string, unknown> });
+      }
+    }
   }
 
-  const { data: listings, error: fetchError } = await query;
+  const listings = allListings;
 
-  if (fetchError) {
-    console.error("Failed to fetch listings:", fetchError.message);
-    process.exit(1);
-  }
-
-  if (!listings || listings.length === 0) {
-    console.log("No listings found with a companies_house_number. Nothing to do.");
+  if (listings.length === 0) {
+    console.log("No listings found with a CH company number. Nothing to do.");
     return;
   }
 
-  console.log(`Found ${listings.length} listing(s) with companies_house_number\n`);
+  console.log(`Found ${listings.length} listing(s) with a CH company number\n`);
 
   // Stats
   const stats: Record<string, number> = {};
@@ -162,8 +178,10 @@ async function main() {
 
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const attrs = listing.attributes as Record<string, any>;
-    const companyNumber: string = attrs.companies_house_number;
+    // Support both attribute key names
+    const companyNumber: string = attrs.ch_company_number ?? attrs.companies_house_number;
 
     // Skip if already has ch_company_size
     if (attrs.ch_company_size) {
