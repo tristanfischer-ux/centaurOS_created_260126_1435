@@ -36,8 +36,24 @@ import {
 import { chartColors, getChartColor } from '@/lib/chart-colors'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
 
+// ─── Configurable Labels ─────────────────────────────────────────────────────
+
+export interface StatsLabels {
+  sectionTitle?: string
+  kpi1Label?: string
+  kpi1Icon?: React.ComponentType<{ className?: string }>
+  kpi3Label?: string
+  kpi3Icon?: React.ComponentType<{ className?: string }>
+  chart1Title?: string
+  chart2Title?: string
+  chart3Title?: string
+  barTooltipNoun?: string
+  donutTooltipNoun?: string
+}
+
 interface MarketplaceStatsSectionProps {
   stats: MarketplaceStats
+  labels?: StatsLabels
   selectedCompanyTypes?: string[]
   selectedCompanySizes?: string[]
   selectedRegion?: string
@@ -57,36 +73,38 @@ const SIZE_COLORS: Record<string, string> = {
   Unknown: 'hsl(var(--muted-foreground) / 0.4)',
 }
 
-function getSizeColor(name: string): string {
-  return SIZE_COLORS[name] ?? chartColors[4]
+function getSizeColor(name: string, index?: number): string {
+  return SIZE_COLORS[name] ?? (index !== undefined ? getChartColor(index) : chartColors[4])
 }
 
 // ─── Tooltip Components ─────────────────────────────────────────────────────
 
-function BarTooltip({ active, payload }: {
+function BarTooltip({ active, payload, noun = 'suppliers' }: {
   active?: boolean
   payload?: Array<{ name: string; value: number; payload: { name: string; count: number } }>
+  noun?: string
 }) {
   if (!active || !payload || !payload[0]) return null
   const data = payload[0].payload
   return (
     <div className="rounded-lg border border-border bg-card p-2.5 shadow-lg text-xs">
       <p className="font-medium text-foreground">{data.name}</p>
-      <p className="text-muted-foreground mt-0.5">{data.count} suppliers</p>
+      <p className="text-muted-foreground mt-0.5">{data.count} {noun}</p>
     </div>
   )
 }
 
-function DonutTooltip({ active, payload }: {
+function DonutTooltip({ active, payload, noun = 'companies' }: {
   active?: boolean
   payload?: Array<{ payload: { name: string; count: number } }>
+  noun?: string
 }) {
   if (!active || !payload || !payload[0]) return null
   const data = payload[0].payload
   return (
     <div className="rounded-lg border border-border bg-card p-2.5 shadow-lg text-xs">
       <p className="font-medium text-foreground">{data.name}</p>
-      <p className="text-muted-foreground mt-0.5">{data.count} companies</p>
+      <p className="text-muted-foreground mt-0.5">{data.count} {noun}</p>
     </div>
   )
 }
@@ -117,6 +135,7 @@ function KPICard({ icon: Icon, value, label }: {
 
 export function MarketplaceStatsSection({
   stats,
+  labels,
   selectedCompanyTypes = [],
   selectedCompanySizes = [],
   selectedRegion,
@@ -136,6 +155,20 @@ export function MarketplaceStatsSection({
     regionCounts,
   } = stats
 
+  // Destructure labels with marketplace defaults
+  const {
+    sectionTitle = 'Marketplace Insights',
+    kpi1Label = 'Suppliers',
+    kpi1Icon: KPI1Icon = Factory,
+    kpi3Label = 'Mfg Types',
+    kpi3Icon: KPI3Icon = Wrench,
+    chart1Title = 'Manufacturing Type Distribution',
+    chart2Title = 'Company Size',
+    chart3Title = 'Regional Coverage',
+    barTooltipNoun = 'suppliers',
+    donutTooltipNoun = 'companies',
+  } = labels ?? {}
+
   // Don't render if no data
   if (totalListings === 0) return null
 
@@ -147,7 +180,7 @@ export function MarketplaceStatsSection({
             <div className="p-1.5 rounded-lg bg-international-orange/10">
               <BarChart3 className="h-4 w-4 text-international-orange" />
             </div>
-            Marketplace Insights
+            {sectionTitle}
           </CardTitle>
           <Button
             variant="ghost"
@@ -172,9 +205,9 @@ export function MarketplaceStatsSection({
         <CardContent className="space-y-6 pb-6">
           {/* KPI Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KPICard icon={Factory} value={totalListings} label="Suppliers" />
+            <KPICard icon={KPI1Icon} value={totalListings} label={kpi1Label} />
             <KPICard icon={ShieldCheck} value={verifiedCount} label="Verified" />
-            <KPICard icon={Wrench} value={manufacturingTypes} label="Mfg Types" />
+            <KPICard icon={KPI3Icon} value={manufacturingTypes} label={kpi3Label} />
             <KPICard icon={MapPin} value={regionCount} label="Regions" />
           </div>
 
@@ -185,7 +218,7 @@ export function MarketplaceStatsSection({
               <Card className="rounded-xl border shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
-                    Manufacturing Type Distribution
+                    {chart1Title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -206,7 +239,7 @@ export function MarketplaceStatsSection({
                           width={120}
                         />
                         <Tooltip
-                          content={<BarTooltip />}
+                          content={<BarTooltip noun={barTooltipNoun} />}
                           cursor={{ fill: 'hsl(var(--muted))' }}
                         />
                         <Bar
@@ -245,7 +278,7 @@ export function MarketplaceStatsSection({
               <Card className="rounded-xl border shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
-                    Company Size
+                    {chart2Title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -272,7 +305,7 @@ export function MarketplaceStatsSection({
                             return (
                               <Cell
                                 key={`size-${index}`}
-                                fill={getSizeColor(entry.name)}
+                                fill={getSizeColor(entry.name, index)}
                                 fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
                                 stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
                                 strokeWidth={isSelected ? 2 : 0}
@@ -280,7 +313,7 @@ export function MarketplaceStatsSection({
                             )
                           })}
                         </Pie>
-                        <Tooltip content={<DonutTooltip />} />
+                        <Tooltip content={<DonutTooltip noun={donutTooltipNoun} />} />
                       </PieChart>
                     </ResponsiveContainer>
                     {/* Center label */}
@@ -295,7 +328,7 @@ export function MarketplaceStatsSection({
                   </div>
                   {/* Legend */}
                   <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center mt-1">
-                    {companySizeCounts.map((entry) => {
+                    {companySizeCounts.map((entry, index) => {
                       const isSelected = selectedCompanySizes.includes(entry.name)
                       const hasSelection = selectedCompanySizes.length > 0
                       return (
@@ -309,7 +342,7 @@ export function MarketplaceStatsSection({
                           <span
                             className="h-2 w-2 rounded-full shrink-0"
                             style={{
-                              backgroundColor: getSizeColor(entry.name),
+                              backgroundColor: getSizeColor(entry.name, index),
                               outline: isSelected ? '2px solid hsl(var(--foreground))' : 'none',
                               outlineOffset: '1px',
                             }}
@@ -330,7 +363,7 @@ export function MarketplaceStatsSection({
               <Card className="rounded-xl border shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
-                    Regional Coverage
+                    {chart3Title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -351,7 +384,7 @@ export function MarketplaceStatsSection({
                           width={100}
                         />
                         <Tooltip
-                          content={<BarTooltip />}
+                          content={<BarTooltip noun={barTooltipNoun} />}
                           cursor={{ fill: 'hsl(var(--muted))' }}
                         />
                         <Bar
