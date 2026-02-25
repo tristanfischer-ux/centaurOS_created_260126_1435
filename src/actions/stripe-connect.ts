@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { createConnectAccount, createAccountLink, getAccountStatus, isAccountReady } from "@/lib/stripe/connect"
 
 import { getBaseUrl } from '@/lib/domains'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 const BASE_URL = getBaseUrl()
 
@@ -80,7 +81,7 @@ export async function createProviderStripeAccount(): Promise<{
         console.error('Error creating provider Stripe account:', error)
         return { 
             success: false, 
-            error: error instanceof Error ? error.message : 'Failed to create Stripe account' 
+            error: sanitizeErrorMessage(error) 
         }
     }
 }
@@ -126,7 +127,7 @@ export async function getStripeOnboardingLink(): Promise<{
     } catch (error) {
         console.error('Error getting Stripe onboarding link:', error)
         return { 
-            error: error instanceof Error ? error.message : 'Failed to get onboarding link' 
+            error: sanitizeErrorMessage(error) 
         }
     }
 }
@@ -220,7 +221,7 @@ export async function checkStripeAccountStatus(): Promise<{
             chargesEnabled: false,
             payoutsEnabled: false,
             detailsSubmitted: false,
-            error: error instanceof Error ? error.message : 'Failed to check account status' 
+            error: sanitizeErrorMessage(error) 
         }
     }
 }
@@ -262,7 +263,7 @@ export async function getStripeDashboardLink(): Promise<{
     } catch (error) {
         console.error('Error getting Stripe dashboard link:', error)
         return { 
-            error: error instanceof Error ? error.message : 'Failed to get dashboard link' 
+            error: sanitizeErrorMessage(error) 
         }
     }
 }

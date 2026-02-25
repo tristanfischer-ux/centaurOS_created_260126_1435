@@ -8,6 +8,7 @@ import type {
   SavedHiringRequirement,
   SavedFundingRequirement,
 } from '@/lib/business-plan-types'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // INTENT: Save the raw AI analysis to the DB so we can reference it
 // when creating hiring/funding records and support re-analysis history.
@@ -304,7 +305,7 @@ export async function getHiringRequirements(): Promise<{
         error: error.message,
         foundryId: profile.foundry_id,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     // GOTCHA: Supabase join returns objectives as an object, not array.
@@ -349,7 +350,7 @@ export async function updateHiringRequirementDate(
         error: error.message,
         hiringRequirementId: id,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return {}
@@ -386,7 +387,7 @@ export async function getFundingRequirements(): Promise<{
         error: error.message,
         foundryId: profile.foundry_id,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { data: (data || []) as SavedFundingRequirement[] }
@@ -424,7 +425,7 @@ export async function updateFundingRequirementStatus(
         error: error.message,
         fundingRequirementId: id,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return {}
@@ -490,7 +491,7 @@ export async function updateHiringRequirementStatus(
         error: error.message,
         hiringRequirementId: id,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return {}

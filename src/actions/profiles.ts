@@ -11,6 +11,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /**
  * Validates email format
@@ -148,7 +149,7 @@ export async function updateProfileDetails(
         if (updateError.code === '23505') {
             return { success: false, error: 'Email address is already in use' }
         }
-        return { success: false, error: updateError.message }
+        return { success: false, error: sanitizeErrorMessage(updateError) }
     }
     
     // TODO(TECH-DEBT): Add audit logging for profile updates

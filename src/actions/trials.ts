@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface TrialOrderInput {
     providerId: string
@@ -84,7 +85,7 @@ export async function createTrialOrder(input: TrialOrderInput) {
         .single()
     
     if (orderError) {
-        return { success: false, orderId: null, error: orderError.message }
+        return { success: false, orderId: null, error: sanitizeErrorMessage(orderError) }
     }
     
     // Create a conversation for the trial
@@ -172,7 +173,7 @@ export async function convertTrialToFullEngagement(trialOrderId: string, engagem
         .single()
     
     if (retainerError) {
-        return { success: false, orderId: null, error: retainerError.message }
+        return { success: false, orderId: null, error: sanitizeErrorMessage(retainerError) }
     }
     
     // Create the order linked to retainer
@@ -196,7 +197,7 @@ export async function convertTrialToFullEngagement(trialOrderId: string, engagem
         .single()
     
     if (orderError) {
-        return { success: false, orderId: null, error: orderError.message }
+        return { success: false, orderId: null, error: sanitizeErrorMessage(orderError) }
     }
     
     // Mark trial as converted

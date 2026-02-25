@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { generateAdvisoryAnswer } from './generate-advisory-answer'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Types
 export interface AdvisoryQuestion {
@@ -111,7 +112,7 @@ export async function createAdvisoryQuestion(data: {
 
         if (error) {
             console.error('Error creating advisory question:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         let aiAnswerId: string | undefined
@@ -215,7 +216,7 @@ export async function getAdvisoryQuestions(options?: {
 
         if (error) {
             console.error('Error fetching advisory questions:', error)
-            return { data: [], error: error.message, total: 0 }
+            return { data: [], error: sanitizeErrorMessage(error), total: 0 }
         }
 
         return {
@@ -413,7 +414,7 @@ export async function createAdvisoryAnswer(data: {
 
         if (error) {
             console.error('Error creating advisory answer:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/advisory')
@@ -593,7 +594,7 @@ export async function addAdvisoryComment(data: {
 
         if (error) {
             console.error('Error adding advisory comment:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/advisory')
@@ -685,7 +686,7 @@ export async function voteOnAnswer(
                     .delete()
                     .eq('id', existingVote.id)
 
-                if (error) return { success: false, error: error.message }
+                if (error) return { success: false, error: sanitizeErrorMessage(error) }
             } else {
                 // Update vote if different type
                 const { error } = await supabase
@@ -693,7 +694,7 @@ export async function voteOnAnswer(
                     .update({ vote_type: voteType })
                     .eq('id', existingVote.id)
 
-                if (error) return { success: false, error: error.message }
+                if (error) return { success: false, error: sanitizeErrorMessage(error) }
             }
         } else {
             // Create new vote
@@ -705,7 +706,7 @@ export async function voteOnAnswer(
                     vote_type: voteType
                 })
 
-            if (error) return { success: false, error: error.message }
+            if (error) return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/advisory')
@@ -733,7 +734,7 @@ export async function getUserVote(answerId: string): Promise<{ voteType: 'up' | 
             .single()
 
         if (error && error.code !== 'PGRST116') {
-            return { voteType: null, error: error.message }
+            return { voteType: null, error: sanitizeErrorMessage(error) }
         }
 
         return { voteType: data?.vote_type as 'up' | 'down' | null, error: null }

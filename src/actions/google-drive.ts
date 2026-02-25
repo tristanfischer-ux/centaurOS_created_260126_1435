@@ -20,6 +20,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getGoogleClient } from '@/lib/google/client'
 import { listDriveFiles, getDriveFile } from '@/lib/google/drive'
 import type { DriveFile } from '@/lib/google/drive'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /**
  * Browse the user's Google Drive files.
@@ -117,7 +118,7 @@ export async function attachDriveFileToTask(
             driveFileId,
             error: error.message,
         })
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
     }
 
     // AUDIT: Log file attachment
@@ -242,7 +243,7 @@ async function listDriveFilesRaw(
         return {
             files: [],
             nextPageToken: null,
-            error: err instanceof Error ? err.message : 'Failed to list documents',
+            error: sanitizeErrorMessage(err),
         }
     }
 }

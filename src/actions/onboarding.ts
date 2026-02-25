@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { Database } from '@/types/database.types'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 type AccountType = Database['public']['Enums']['account_type']
 
@@ -141,7 +142,7 @@ export async function createSampleData() {
     .select()
     .single()
   
-  if (objError) return { error: objError.message }
+  if (objError) return { error: sanitizeErrorMessage(objError) }
   
   // Create sample tasks
   const sampleTasks = [
@@ -196,7 +197,7 @@ export async function createApprenticeTrainingTasks() {
   
   if (objError) {
     console.error('Error creating training objective:', objError)
-    return { error: objError.message }
+    return { error: sanitizeErrorMessage(objError) }
   }
   
   // Create training tasks for apprentices
@@ -314,7 +315,7 @@ export async function updateOnboardingData(
       userId: user.id,
       error: error.message,
     })
-    return { error: error.message }
+    return { error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath('/', 'layout')

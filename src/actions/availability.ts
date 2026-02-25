@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES
@@ -71,7 +72,7 @@ export async function getProviderProfile(): Promise<{
                 return { data: null, error: null }
             }
             console.error('Error fetching provider profile:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as ProviderProfile, error: null }
@@ -105,7 +106,7 @@ export async function getAvailability(
 
         if (error) {
             console.error('Error fetching availability:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: (data || []) as AvailabilitySlot[], error: null }
@@ -152,7 +153,7 @@ export async function getProviderAvailabilityByUserId(
 
         if (error) {
             console.error('Error fetching availability:', error)
-            return { data: [], profile: profile as ProviderProfile, error: error.message }
+            return { data: [], profile: profile as ProviderProfile, error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -229,7 +230,7 @@ export async function setAvailability(
 
         if (error) {
             console.error('Error setting availability:', error)
-            return { success: false, data: null, error: error.message }
+            return { success: false, data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/availability')
@@ -308,7 +309,7 @@ export async function bulkSetAvailability(
 
         if (error) {
             console.error('Error bulk setting availability:', error)
-            return { success: false, updated: 0, skipped: 0, error: error.message }
+            return { success: false, updated: 0, skipped: 0, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/availability')
@@ -401,7 +402,7 @@ export async function updatePricing(
 
         if (error) {
             console.error('Error updating pricing:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/pricing')
@@ -444,7 +445,7 @@ export async function updateCapacitySettings(
 
         if (error) {
             console.error('Error updating capacity settings:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/pricing')
@@ -497,7 +498,7 @@ export async function ensureProviderProfile(): Promise<{
 
         if (error) {
             console.error('Error creating provider profile:', error)
-            return { data: null, isNew: false, error: error.message }
+            return { data: null, isNew: false, error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as ProviderProfile, isNew: true, error: null }

@@ -32,6 +32,7 @@ import type {
     InvoiceDraftPayload,
     PitchDeckPayload,
 } from '@/lib/agents/tools/permission-guard'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Google Sheets ──────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export async function createGoogleSheet(
 
         return { sheetUrl, error: null }
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         console.error('[ExternalIntegrations] Failed to create Google Sheet:', {
             error: message,
             userId: user.id,
@@ -239,7 +240,7 @@ export async function createCalendarEventFromProposal(
             error: null,
         }
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         console.error('[ExternalIntegrations] Failed to create calendar event:', {
             error: message,
             userId: user.id,
@@ -311,7 +312,7 @@ export async function sendDraftEmail(
 
         return { success: true, error: null }
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         console.error('[ExternalIntegrations] Failed to send email:', {
             error: message,
             userId: user.id,
@@ -345,7 +346,7 @@ export async function createLinearIssueFromProposal(
         const { createLinearIssue } = await import('@/lib/agents/external-actions/linear')
         return await createLinearIssue(payload)
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         return { issueUrl: null, error: `Failed to create Linear issue: ${message}` }
     }
 }
@@ -378,7 +379,7 @@ export async function sendSlackMessageFromProposal(
         const { sendSlackMessage } = await import('@/lib/agents/external-actions/slack')
         return await sendSlackMessage(payload)
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         return { success: false, error: `Failed to send Slack message: ${message}` }
     }
 }
@@ -414,7 +415,7 @@ export async function createInvoiceDraftFromProposal(
         const { createInvoiceDraft } = await import('@/lib/agents/external-actions/invoice')
         return await createInvoiceDraft(payload, foundryId)
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         return { invoiceId: null, error: `Failed to create invoice: ${message}` }
     }
 }
@@ -455,7 +456,7 @@ export async function generatePitchDeckFromProposal(
         const downloadUrl = `data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,${result.base64}`
         return { downloadUrl, filename: result.filename, error: null }
     } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unknown error'
+        const message = sanitizeErrorMessage(err)
         return { downloadUrl: null, filename: null, error: `Failed to generate deck: ${message}` }
     }
 }

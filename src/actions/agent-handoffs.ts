@@ -19,6 +19,7 @@ import {
   requestDelegation,
 } from '@/lib/agents/collaboration-hub'
 import { logAgentAction } from '@/lib/agents/permission-guard'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============================================================================
 // TYPES
@@ -99,6 +100,6 @@ export async function persistSpecialistHandoff(
   } catch (err) {
     console.error('[AgentHandoffs] Error persisting handoff:', err)
     // Never let persistence errors break the handoff UX
-    return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+    return { success: false, error: sanitizeErrorMessage(err) }
   }
 }

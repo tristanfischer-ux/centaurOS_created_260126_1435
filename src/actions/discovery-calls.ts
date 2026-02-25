@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { syncDiscoveryCallToCalendar, checkProviderCalendarAvailability } from '@/actions/google-calendar'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface DiscoveryCallSettings {
     id: string
@@ -69,7 +70,7 @@ export async function getDiscoveryCallSettings() {
         .single()
     
     if (error && error.code !== 'PGRST116') {
-        return { settings: null, error: error.message }
+        return { settings: null, error: sanitizeErrorMessage(error) }
     }
     
     return { settings: data as unknown as DiscoveryCallSettings | null, error: null }
@@ -104,13 +105,13 @@ export async function updateDiscoveryCallSettings(settings: Partial<Omit<Discove
             .update({ ...settings, updated_at: new Date().toISOString() })
             .eq('provider_id', provider.id)
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     } else {
         const { error } = await supabase
             .from('discovery_call_settings')
             .insert({ provider_id: provider.id, ...settings })
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     }
     
     revalidatePath('/provider-portal/discovery-calls')
@@ -170,7 +171,7 @@ export async function addDiscoveryCallSlot(slot: {
             ...slot
         })
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/discovery-calls')
     return { success: true, error: null }
@@ -188,7 +189,7 @@ export async function removeDiscoveryCallSlot(slotId: string) {
         .delete()
         .eq('id', slotId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/discovery-calls')
     return { success: true, error: null }
@@ -391,7 +392,7 @@ export async function bookDiscoveryCall(input: {
         .select()
         .single()
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     // Sync to Google Calendar with Meet link
     try {
@@ -472,7 +473,7 @@ export async function getDiscoveryCalls(role: 'provider' | 'buyer' = 'provider')
     
     const { data, error } = await query.order('scheduled_at', { ascending: true })
     
-    if (error) return { calls: [], error: error.message }
+    if (error) return { calls: [], error: sanitizeErrorMessage(error) }
     
     return { calls: data || [], error: null }
 }
@@ -519,7 +520,7 @@ export async function updateDiscoveryCallStatus(callId: string, status: Discover
         .update(updates)
         .eq('id', callId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/discovery-calls')
     revalidatePath('/dashboard')

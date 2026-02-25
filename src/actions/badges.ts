@@ -9,6 +9,7 @@ import { evaluateAllBadges as evaluateBadges } from "@/lib/badges/badge-rules"
 
 // Note: Types BadgeType and ProviderBadge are exported from '@/actions/trust-signals'
 // Import them directly from there: import { type BadgeType, type ProviderBadge } from '@/actions/trust-signals'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /**
  * Check and award any eligible badges for a provider
@@ -91,7 +92,7 @@ export async function awardBadge(
 
         if (error) {
             console.error('Error awarding badge:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal')
@@ -125,7 +126,7 @@ export async function revokeBadge(
 
         if (error) {
             console.error('Error revoking badge:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal')

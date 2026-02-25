@@ -20,6 +20,7 @@ import type {
   RawTaskHistory,
   TaskHistoryActionType
 } from '@/types/activity'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Note: The following tables are created by migration 20260201300000_activity_stream_tables.sql
 // and may not be in the generated types yet. We use type assertions for these tables:
@@ -203,7 +204,7 @@ export async function replyToActivity(
     console.error('replyToActivity error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to reply' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -252,7 +253,7 @@ export async function markActivityRead(
     console.error('markActivityRead error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to mark as read' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -320,7 +321,7 @@ export async function markMultipleActivityRead(
     console.error('markMultipleActivityRead error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to mark as read' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -456,7 +457,7 @@ export async function getActivityUnreadCount(): Promise<{
     console.error('getActivityUnreadCount error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get unread count' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -542,7 +543,7 @@ export async function addObjectiveComment(
     console.error('addObjectiveComment error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to add comment' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -892,7 +893,7 @@ export async function getActivityFeed(options?: {
     console.error('getActivityFeed error:', error)
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get activity feed' 
+      error: sanitizeErrorMessage(error) 
     }
   }
 }
@@ -1237,7 +1238,7 @@ export async function getThreadForSource(
     console.error('getThreadForSource error:', error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get thread'
+      error: sanitizeErrorMessage(error)
     }
   }
 }

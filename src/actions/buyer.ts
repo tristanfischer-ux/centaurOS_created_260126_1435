@@ -8,6 +8,7 @@ import {
     FavoriteProvider 
 } from "@/types/booking"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // GET BUYER DASHBOARD STATS
@@ -162,7 +163,7 @@ export async function getBuyerOrders(
 
         if (error) {
             console.error('Error fetching orders:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         // Check for unread messages and reviews
@@ -305,7 +306,7 @@ export async function getRecommendedProviders(limit: number = 6): Promise<{
 
         if (error) {
             console.error('Error fetching recommended providers:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         // Map to FavoriteProvider format
@@ -380,7 +381,7 @@ export async function addToFavorites(
 
         if (error) {
             console.error('Error adding to favorites:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/buyer')
@@ -418,7 +419,7 @@ export async function removeFromFavorites(providerId: string): Promise<{
 
         if (error) {
             console.error('Error removing from favorites:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/buyer')
@@ -477,7 +478,7 @@ export async function getFavoriteProviders(): Promise<{
 
         if (error) {
             console.error('Error fetching favorites:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         // Map to FavoriteProvider format

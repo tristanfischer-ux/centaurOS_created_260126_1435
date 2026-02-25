@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Types
 export interface TaskRequirement {
@@ -61,7 +62,7 @@ export async function setTaskRequirements(data: {
 
         if (error) {
             console.error('Error setting task requirements:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/tasks')
@@ -87,7 +88,7 @@ export async function getTaskRequirements(taskId: string): Promise<{ data: TaskR
 
         if (error && error.code !== 'PGRST116') {
             console.error('Error fetching task requirements:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { 
@@ -118,7 +119,7 @@ export async function deleteTaskRequirements(taskId: string): Promise<{ success:
 
         if (error) {
             console.error('Error deleting task requirements:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         return { success: true, error: null }
@@ -153,7 +154,7 @@ export async function getSuggestedAssignees(options?: {
 
         if (error) {
             console.error('Error fetching assignee suggestions:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: (data || []) as AssigneeSuggestion[], error: null }
@@ -210,7 +211,7 @@ export async function calculateWorkloadScore(userId: string): Promise<{ score: n
 
         if (error) {
             console.error('Error calculating workload score:', error)
-            return { score: 0, error: error.message }
+            return { score: 0, error: sanitizeErrorMessage(error) }
         }
 
         return { score: data || 0, error: null }
@@ -264,7 +265,7 @@ export async function getAvailableSkills(): Promise<{ data: string[]; error: str
 
         if (error) {
             console.error('Error fetching available skills:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         // Flatten and dedupe skills
@@ -303,7 +304,7 @@ export async function getSkillDistribution(): Promise<{
 
         if (error) {
             console.error('Error fetching skill distribution:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         // Count skill occurrences

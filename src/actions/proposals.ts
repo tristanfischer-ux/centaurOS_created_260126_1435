@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface ProposalInput {
     rfqId: string
@@ -68,7 +69,7 @@ export async function submitProposal(input: ProposalInput) {
             .update(proposalData)
             .eq('id', existingResponse.id)
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     } else {
         // Create new response
         const { error } = await supabase
@@ -78,7 +79,7 @@ export async function submitProposal(input: ProposalInput) {
                 responded_at: new Date().toISOString()
             })
         
-        if (error) return { success: false, error: error.message }
+        if (error) return { success: false, error: sanitizeErrorMessage(error) }
     }
     
     revalidatePath('/provider-portal/rfqs')
@@ -154,7 +155,7 @@ export async function markProposalViewed(proposalId: string) {
         .update({ buyer_viewed_at: new Date().toISOString() })
         .eq('id', proposalId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     return { success: true, error: null }
 }
@@ -182,7 +183,7 @@ export async function toggleProposalShortlist(proposalId: string) {
         .update({ buyer_shortlisted: !proposal.buyer_shortlisted })
         .eq('id', proposalId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath(`/rfqs/${proposal.rfq_id}`)
     return { success: true, error: null }
@@ -253,7 +254,7 @@ export async function awardProposal(proposalId: string) {
         .single()
     
     if (orderError) {
-        return { success: false, orderId: null, error: orderError.message }
+        return { success: false, orderId: null, error: sanitizeErrorMessage(orderError) }
     }
     
     // Create milestones from proposal if available
@@ -308,7 +309,7 @@ export async function getMyProposal(rfqId: string) {
         .single()
     
     if (error && error.code !== 'PGRST116') {
-        return { proposal: null, error: error.message }
+        return { proposal: null, error: sanitizeErrorMessage(error) }
     }
     
     return { proposal: data, error: null }

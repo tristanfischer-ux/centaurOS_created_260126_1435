@@ -4,6 +4,7 @@
 // Note: Using 'any' type assertions because provider_ratings and orders tables are not in generated database types
 
 import { createClient } from "@/lib/supabase/server"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface ProviderRating {
     id: string
@@ -77,7 +78,7 @@ export async function getProviderRatings(providerId: string): Promise<{
 
         if (error) {
             console.error('Error fetching provider ratings:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         if (!reviews || reviews.length === 0) {
@@ -143,7 +144,7 @@ export async function getProviderReviews(
 
         if (countError) {
             console.error('Error counting reviews:', countError)
-            return { data: [], total: 0, error: countError.message }
+            return { data: [], total: 0, error: sanitizeErrorMessage(countError) }
         }
 
         // Get reviews with reviewer info
@@ -170,7 +171,7 @@ export async function getProviderReviews(
 
         if (error) {
             console.error('Error fetching reviews:', error)
-            return { data: [], total: 0, error: error.message }
+            return { data: [], total: 0, error: sanitizeErrorMessage(error) }
         }
 
         const formattedReviews: ProviderRating[] = (reviews || []).map((review) => ({
@@ -267,7 +268,7 @@ export async function submitProviderReview(data: {
 
         if (error) {
             console.error('Error submitting review:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         // Trigger badge check for the provider

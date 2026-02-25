@@ -7,6 +7,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES
@@ -79,7 +80,7 @@ export async function getCertifications(providerId?: string): Promise<{
 
         if (error) {
             console.error('Error fetching certifications:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: (data || []).map(cert => ({ ...cert, is_verified: cert.is_verified ?? false, created_at: cert.created_at ?? '' })), error: null }
@@ -141,7 +142,7 @@ export async function addCertification(certification: {
 
         if (error) {
             console.error('Error adding certification:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -199,7 +200,7 @@ export async function updateCertification(
 
         if (error) {
             console.error('Error updating certification:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -247,7 +248,7 @@ export async function deleteCertification(certificationId: string): Promise<{
 
         if (error) {
             console.error('Error deleting certification:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -319,7 +320,7 @@ export async function requestVerification(certificationId: string): Promise<{
 
         if (updateError) {
             console.error('Error requesting verification:', updateError)
-            return { success: false, error: updateError.message }
+            return { success: false, error: sanitizeErrorMessage(updateError) }
         }
 
         revalidatePath('/provider-portal/certifications')
@@ -382,7 +383,7 @@ export async function getExpiringCertifications(providerId?: string): Promise<{
 
         if (error) {
             console.error('Error fetching expiring certifications:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         const expiringCerts = (data || []).map((cert: { id: string; certification_name: string; expiry_date: string | null }) => {

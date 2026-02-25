@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import type { Json } from '@/types/database.types'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface SelfServiceListingInput {
     title: string
@@ -51,7 +52,7 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .select()
         .single()
     
-    if (listingError) return { success: false, error: listingError.message }
+    if (listingError) return { success: false, error: sanitizeErrorMessage(listingError) }
     
     // Link the listing to the provider profile
     const { error: linkError } = await supabase
@@ -62,7 +63,7 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
     if (linkError) {
         // Rollback listing creation
         await supabase.from('marketplace_listings').delete().eq('id', listing.id)
-        return { success: false, error: linkError.message }
+        return { success: false, error: sanitizeErrorMessage(linkError) }
     }
     
     revalidatePath('/provider-portal')
@@ -101,7 +102,7 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
         .update(updateData)
         .eq('id', listingId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal')
     revalidatePath('/marketplace')
@@ -137,7 +138,7 @@ export async function getProviderListing() {
         .eq('user_id', user.id)
         .single()
     
-    if (providerError) return { listing: null, error: providerError.message }
+    if (providerError) return { listing: null, error: sanitizeErrorMessage(providerError) }
     
     return { listing: provider?.marketplace_listings || null, error: null }
 }
@@ -273,7 +274,7 @@ export async function submitListingForApproval(listingId: string) {
         .update({ approval_status: 'pending' })
         .eq('id', listingId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal')
     return { success: true, error: null }

@@ -105,7 +105,7 @@ export async function generateBriefingAction(
 
     return result
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
+    const message = sanitizeErrorMessage(error)
     console.error('[StrategicBriefing] Action failed:', { message })
     return {
       success: false,
@@ -175,7 +175,7 @@ async function gatherCompanyContext(
 
     return sections.length > 0 ? sections.join('\n\n') : null
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown'
+    const message = sanitizeErrorMessage(error)
     console.warn('[StrategicBriefing] Failed to gather company context:', { message })
     return null
   }

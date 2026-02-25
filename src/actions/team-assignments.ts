@@ -12,6 +12,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============================================================================
 // TEAM ASSIGNMENT ACTIONS
@@ -101,7 +102,7 @@ export async function addMemberToTeam(
         if (insertError.code === '23505') { // Unique constraint violation
             return { success: false, error: 'Member is already on this team' }
         }
-        return { success: false, error: insertError.message }
+        return { success: false, error: sanitizeErrorMessage(insertError) }
     }
     
     // TODO(TECH-DEBT): Add audit logging for team member changes
@@ -174,7 +175,7 @@ export async function removeMemberFromTeam(
         .eq('profile_id', memberId)
     
     if (deleteError) {
-        return { success: false, error: deleteError.message }
+        return { success: false, error: sanitizeErrorMessage(deleteError) }
     }
     
     // TODO(TECH-DEBT): Add audit logging for team member changes
@@ -267,7 +268,7 @@ export async function assignTaskToMember(
         if (insertError.code === '23505') { // Unique constraint violation
             return { success: false, error: 'Task is already assigned to this member' }
         }
-        return { success: false, error: insertError.message }
+        return { success: false, error: sanitizeErrorMessage(insertError) }
     }
     
     // Update tasks.assignee_id for backward compatibility (set to first assignee if null)
@@ -345,7 +346,7 @@ export async function unassignTaskFromMember(
         .eq('profile_id', memberId)
     
     if (deleteError) {
-        return { success: false, error: deleteError.message }
+        return { success: false, error: sanitizeErrorMessage(deleteError) }
     }
     
     // If this was the primary assignee, update tasks.assignee_id

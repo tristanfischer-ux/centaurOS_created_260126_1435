@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface CaseStudyInput {
     title: string
@@ -84,7 +85,7 @@ export async function createCaseStudy(input: CaseStudyInput) {
             display_order: nextOrder
         })
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/case-studies')
     return { success: true, error: null }
@@ -115,7 +116,7 @@ export async function updateCaseStudy(id: string, input: Partial<CaseStudyInput>
         })
         .eq('id', id)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/case-studies')
     return { success: true, error: null }
@@ -143,7 +144,7 @@ export async function deleteCaseStudy(id: string) {
         .delete()
         .eq('id', id)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/case-studies')
     return { success: true, error: null }
@@ -199,7 +200,7 @@ export async function toggleCaseStudyFeatured(id: string) {
         .update({ is_featured: !caseStudy.is_featured })
         .eq('id', id)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/provider-portal/case-studies')
     return { success: true, error: null }

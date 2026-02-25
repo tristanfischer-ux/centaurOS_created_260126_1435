@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface SignupIntent {
   id: string
@@ -59,7 +60,7 @@ export async function getUnfulfilledIntents(): Promise<{
 
   if (error) {
     console.error('Error fetching signup intents:', error)
-    return { intents: [], error: error.message }
+    return { intents: [], error: sanitizeErrorMessage(error) }
   }
 
   return { intents: (intents || []) as SignupIntent[] }
@@ -87,7 +88,7 @@ export async function fulfillIntent(intentId: string): Promise<{
 
   if (error) {
     console.error('Error fulfilling intent:', error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath('/dashboard')

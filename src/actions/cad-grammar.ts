@@ -21,6 +21,7 @@
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { createClient } from "@/lib/supabase/server"
 import { researchAndCreateGrammar } from "@/actions/cad-grammar-research"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -452,7 +453,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
       found: false,
       grammar: null,
       confidence: 0,
-      reasoning: `Grammar selection error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      reasoning: `Grammar selection error: ${sanitizeErrorMessage(err)}`,
       shouldFallback: true,
     }
   }
@@ -544,7 +545,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
     console.error("[CAD-GRAMMAR] Parameter extraction failed:", err)
     return {
       success: false,
-      error: `Parameter extraction error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      error: `Parameter extraction error: ${sanitizeErrorMessage(err)}`,
       params: {},
       reasoning: "",
       defaultedParams: [],
@@ -820,7 +821,7 @@ export async function generateFromGrammar(
     console.error("[CAD-GRAMMAR] Pipeline failed:", err)
     return {
       success: false,
-      error: `Grammar pipeline error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      error: `Grammar pipeline error: ${sanitizeErrorMessage(err)}`,
       generationTime: Date.now() - pipelineStart,
       tokensIn: totalTokensIn,
       tokensOut: totalTokensOut,

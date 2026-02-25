@@ -10,6 +10,7 @@ import {
   PitchPrepRequestWithUser,
   PitchPrepStatus,
 } from "@/types/pitch-prep"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // =============================================
 // PITCH PREP CRUD ACTIONS
@@ -128,7 +129,7 @@ export async function getMyPitchPrepRequests(): Promise<{
 
   if (error) {
     console.error("Failed to fetch pitch prep requests:", error)
-    return { data: null, error: error.message }
+    return { data: null, error: sanitizeErrorMessage(error) }
   }
 
   return { data: data as PitchPrepRequest[], error: null }
@@ -249,7 +250,7 @@ export async function updatePitchPrepRequest(
 
   if (error) {
     console.error("Failed to update pitch prep request:", error)
-    return { data: null, error: error.message }
+    return { data: null, error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath("/pitch-prep")
@@ -302,7 +303,7 @@ export async function cancelPitchPrepRequest(id: string): Promise<{
 
   if (error) {
     console.error("Failed to cancel pitch prep request:", error)
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath("/pitch-prep")

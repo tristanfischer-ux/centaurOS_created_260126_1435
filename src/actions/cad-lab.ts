@@ -54,6 +54,7 @@ import {
 } from "@/lib/cad-lab/mashup-prompts"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -620,7 +621,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Research failed",
+      error: sanitizeErrorMessage(error),
       report: "",
       sources: [],
       referenceModels: [],
@@ -772,7 +773,7 @@ Generate the complete interface definition following the exact 4-section format.
     console.error("[THE-FORGE] Step 2 failed:", error instanceof Error ? error.message : error)
       return {
         success: false,
-      error: error instanceof Error ? error.message : "Interface definition generation failed",
+      error: sanitizeErrorMessage(error),
       interfaceDefinition: "",
       generationTime: Date.now() - start,
       tokensIn: 0,
@@ -1067,7 +1068,7 @@ If the research report or interface definition contains any unresolved questions
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Unknown error",
+      error: sanitizeErrorMessage(err),
       generationTime: Date.now() - pipelineStart,
       tokensIn: totalTokensIn,
       tokensOut: totalTokensOut,
@@ -1192,7 +1193,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     console.error("[THE-FORGE] Module decomposition failed:", error instanceof Error ? error.message : error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Module decomposition failed",
+      error: sanitizeErrorMessage(error),
       modules: [],
       decompositionTime: Date.now() - start,
       tokensIn: 0,
@@ -1555,7 +1556,7 @@ export async function generateMashup(
       tokensOut,
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error"
+    const msg = sanitizeErrorMessage(err)
     console.error("[THE-FORGE] Mashup generation failed:", msg)
     return {
       success: false,
@@ -1663,7 +1664,7 @@ export async function planMashup(
       elapsedMs: Date.now() - startTime,
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error"
+    const msg = sanitizeErrorMessage(err)
     console.error("[THE-FORGE] planMashup failed:", msg)
     return { success: false, error: msg, elapsedMs: Date.now() - startTime }
   }
@@ -1796,7 +1797,7 @@ export async function executeMashupPlan(
       tokensOut,
     }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error"
+    const msg = sanitizeErrorMessage(err)
     console.error("[THE-FORGE] executeMashupPlan failed:", msg)
     return {
       success: false,
@@ -1972,7 +1973,7 @@ Return 3–4 suggestions as a JSON array.`
 
     return { suggestions }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unknown error"
+    const msg = sanitizeErrorMessage(err)
     console.error("[THE-FORGE] suggestMashupCombinations failed:", msg)
     return { error: "Failed to generate suggestions. Please try again." }
   }

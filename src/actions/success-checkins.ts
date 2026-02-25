@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface SuccessCheckin {
     id: string
@@ -203,7 +204,7 @@ export async function submitCheckinFeedback(checkinId: string, feedback: {
         .update(updates)
         .eq('id', checkinId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath('/orders')
     revalidatePath('/provider-portal/orders')
@@ -245,7 +246,7 @@ export async function createCustomCheckin(input: {
             scheduled_for: input.scheduledFor
         })
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     revalidatePath(`/orders/${input.orderId}`)
     return { success: true, error: null }
@@ -298,7 +299,7 @@ export async function updateActionItemStatus(checkinId: string, itemIndex: numbe
         .update({ action_items: actionItems })
         .eq('id', checkinId)
     
-    if (error) return { success: false, error: error.message }
+    if (error) return { success: false, error: sanitizeErrorMessage(error) }
     
     return { success: true, error: null }
 }

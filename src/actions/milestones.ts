@@ -16,6 +16,7 @@ import {
   disputeMilestone as disputeMilestoneService,
 } from '@/lib/payments/milestones'
 import { Milestone, MilestoneInput } from '@/types/payments'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /**
  * Result type for server actions
@@ -106,7 +107,7 @@ export async function createMilestones(
     console.error('Error creating milestones:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to create milestones',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -221,7 +222,7 @@ export async function updateMilestones(
     console.error('Error updating milestones:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to update milestones',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -299,7 +300,7 @@ export async function submitMilestoneDelivery(
     console.error('Error submitting milestone:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to submit milestone',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -385,7 +386,7 @@ export async function approveMilestoneDelivery(milestoneId: string): Promise<
     console.error('Error approving milestone:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to approve milestone',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -486,7 +487,7 @@ export async function disputeMilestoneDelivery(
     console.error('Error disputing milestone:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to dispute milestone',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -543,7 +544,7 @@ export async function getOrderMilestones(orderId: string): Promise<ActionResult<
     console.error('Error getting milestones:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to get milestones',
+      error: sanitizeErrorMessage(error),
     }
   }
 }
@@ -597,7 +598,7 @@ export async function getMilestoneProgress(orderId: string): Promise<
     console.error('Error getting milestone progress:', error)
     return {
       data: null,
-      error: error instanceof Error ? error.message : 'Failed to get milestone progress',
+      error: sanitizeErrorMessage(error),
     }
   }
 }

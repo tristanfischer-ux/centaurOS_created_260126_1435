@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { unstable_noStore as noStore } from 'next/cache'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export type PackItem = {
     id: string
@@ -87,7 +88,7 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
 
     if (originalError) {
         console.error('[getObjectivePacks] Error fetching objective packs:', originalError)
-        return { packs: [], error: originalError.message }
+        return { packs: [], error: sanitizeErrorMessage(originalError) }
     }
 
     // Skip subsystem packs when filtering by productCategory (they don't have product_category)
@@ -213,7 +214,7 @@ export async function getPackDetails(packId: string): Promise<{ pack: ObjectiveP
         .order('order_index')
 
     if (itemsError) {
-        return { pack: null, error: itemsError.message }
+        return { pack: null, error: sanitizeErrorMessage(itemsError) }
     }
 
     // Cast through unknown to handle the product_category field which may not be in generated types yet

@@ -20,6 +20,7 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration } from "@/app/(platform)/the-forge/services/image-generator"
 import { withAuth } from "@/lib/server-action-utils"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /** Concurrency limit — matches xray.ts batch size */
 const BATCH_SIZE = 3
@@ -57,7 +58,7 @@ export async function generateCadLabSingleImageAction(
         },
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      const errorMsg = sanitizeErrorMessage(err)
       console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, errorMsg)
       return {
         module: {
@@ -154,7 +155,7 @@ export async function generateCadLabSystemIllustrationAction(
       const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes)
       return { url }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Unknown error"
+      const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Failed to generate system illustration:", errorMsg)
       return { error: errorMsg }
     }

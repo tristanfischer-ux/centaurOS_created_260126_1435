@@ -32,6 +32,7 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { revalidatePath } from 'next/cache'
 import { withRetry } from '@/lib/retry'
 import type { Database } from '@/types/database.types'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ============================================================================
 // OPENAI CLIENT (singleton pattern — same as analyze.ts)
@@ -560,7 +561,7 @@ export async function persistStrategicPlan(plan: ParsedStrategicPlan): Promise<P
             operationalObjectiveIds,
             taskCount,
             skippedCount,
-            error: `Failed to create strategic objective "${so.title}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error: `Failed to create strategic objective "${so.title}": ${sanitizeErrorMessage(error)}`,
           }
         }
       }

@@ -23,6 +23,7 @@ import {
 } from "@/lib/gdpr/data-requests"
 import { getAuditLog, getAuditStats } from "@/lib/gdpr/audit"
 import { canDeleteUser } from "@/lib/gdpr/data-deletion"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Type helper for untyped tables
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +42,7 @@ export async function getPendingDataRequestsAction(): Promise<{
   } catch (err) {
     return {
       data: [],
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -67,7 +68,7 @@ export async function getAllDataRequestsAction(
   } catch (err) {
     return {
       data: [],
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
       count: 0,
     }
   }
@@ -99,7 +100,7 @@ export async function processDataRequest(
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -136,7 +137,7 @@ export async function denyDataRequest(
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -185,7 +186,7 @@ export async function getDataRequestDetail(
   } catch (err) {
     return {
       data: null,
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -287,7 +288,7 @@ export async function getGDPRDashboardStats(): Promise<{
   } catch (err) {
     return {
       stats: null,
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -353,7 +354,7 @@ export async function getUserAuditLog(
   } catch (err) {
     return {
       data: { entries: [], stats: null },
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -385,7 +386,7 @@ export async function startProcessingRequest(
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }
@@ -452,7 +453,7 @@ export async function getRecentGDPRActivity(
   } catch (err) {
     return {
       data: [],
-      error: err instanceof Error ? err.message : "Admin access required",
+      error: sanitizeErrorMessage(err),
     }
   }
 }

@@ -24,6 +24,7 @@ import type { PageAction } from "@/lib/page-actions"
 import { createProject } from "@/actions/finance-projects"
 import { createObjective } from "@/actions/objectives"
 import { createTask } from "@/actions/tasks"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ export async function executePageAction(
         console.error("[PageActionExecutor] Execution failed:", { actionType, err })
         return {
             success: false,
-            error: err instanceof Error ? err.message : "Action execution failed",
+            error: sanitizeErrorMessage(err),
         }
     }
 }

@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES
@@ -125,7 +126,7 @@ export async function createGuildEvent(data: {
 
         if (error) {
             console.error('[GuildEvents] createGuildEvent failed:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/guild')
@@ -177,7 +178,7 @@ export async function getGuildEvents(options?: {
 
         if (error) {
             console.error('[GuildEvents] getGuildEvents failed:', error)
-            return { data: [], error: error.message }
+            return { data: [], error: sanitizeErrorMessage(error) }
         }
 
         return { data: (data || []) as GuildEvent[], error: null }
@@ -218,7 +219,7 @@ export async function getGuildEvent(eventId: string): Promise<{ data: GuildEvent
 
         if (error) {
             console.error('[GuildEvents] getGuildEvent failed:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         return { data: data as GuildEvent, error: null }
@@ -300,7 +301,7 @@ export async function updateGuildEvent(
 
         if (error) {
             console.error('[GuildEvents] updateGuildEvent failed:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/guild')
@@ -355,7 +356,7 @@ export async function deleteGuildEvent(eventId: string): Promise<{ success: bool
 
         if (error) {
             console.error('[GuildEvents] deleteGuildEvent failed:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/guild')
@@ -441,7 +442,7 @@ export async function toggleRSVP(eventId: string): Promise<{
 
             if (insertError) {
                 console.error('[GuildEvents] toggleRSVP insert failed:', insertError)
-                return { attending: false, attendeeCount: 0, error: insertError.message }
+                return { attending: false, attendeeCount: 0, error: sanitizeErrorMessage(insertError) }
             }
 
             // SECURITY: Post-insert capacity re-check to mitigate race conditions
@@ -512,7 +513,7 @@ export async function getEventAttendees(eventId: string, limit: number = 50): Pr
 
         if (error) {
             console.error('[GuildEvents] getEventAttendees failed:', error)
-            return { data: [], totalCount: 0, error: error.message }
+            return { data: [], totalCount: 0, error: sanitizeErrorMessage(error) }
         }
 
         return { data: (data || []) as EventAttendee[], totalCount: count || 0, error: null }
@@ -580,7 +581,7 @@ export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
 
         if (error) {
             console.error('[GuildEvents] getEventRSVPStatuses failed:', error)
-            return { data: {}, error: error.message }
+            return { data: {}, error: sanitizeErrorMessage(error) }
         }
 
         // Build the result map

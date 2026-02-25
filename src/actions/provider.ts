@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Types for provider data
 interface ProviderOrderRow {
@@ -117,7 +118,7 @@ export async function getProviderProfile(): Promise<{
                 return { profile: null, error: null }
             }
             console.error('Error fetching provider profile:', error)
-            return { profile: null, error: error.message }
+            return { profile: null, error: sanitizeErrorMessage(error) }
         }
 
         return { profile: data as ProviderProfile, error: null }
@@ -165,7 +166,7 @@ export async function updateProviderProfile(data: {
 
         if (error) {
             console.error('Error updating provider profile:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal')
@@ -252,7 +253,7 @@ export async function submitProviderApplication(data: {
 
         if (error) {
             console.error('Error submitting provider application:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/become-provider')
@@ -440,7 +441,7 @@ export async function getProviderOrders(options?: {
 
         if (error) {
             console.error('Error fetching provider orders:', error)
-            return { orders: [], error: error.message }
+            return { orders: [], error: sanitizeErrorMessage(error) }
         }
 
         const orders: ProviderOrder[] = (data || []).map((order: ProviderOrderRow) => ({
@@ -489,7 +490,7 @@ export async function getProviderApplicationStatus(): Promise<{
                 return { application: null, error: null }
             }
             console.error('Error fetching provider application:', error)
-            return { application: null, error: error.message }
+            return { application: null, error: sanitizeErrorMessage(error) }
         }
 
         return { application: data as ProviderApplication, error: null }
@@ -670,7 +671,7 @@ export async function createProviderFromSignup(data: {
 
         if (createError) {
             console.error('Error creating provider profile:', createError)
-            return { success: false, error: createError.message }
+            return { success: false, error: sanitizeErrorMessage(createError) }
         }
 
         revalidatePath('/provider-portal')

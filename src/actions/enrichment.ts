@@ -27,6 +27,7 @@ import { summarizeWebsiteContent } from '@/lib/enrichment/website-summarizer'
 import { analyzeCompetitors } from '@/lib/enrichment/competitor-discovery'
 import type { CompanyIntelligence, CompanyProfile } from '@/types/foundry'
 import type { Json } from '@/types/database.types'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ export async function enrichCompanyWebsite(foundryId: string): Promise<Enrichmen
       data: { fieldsEnriched, totalChars: scrapeResult.totalChars },
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
+    const message = sanitizeErrorMessage(err)
     console.error('[Enrichment] Website enrichment failed:', { foundryId, error: message })
     return { success: false, error: `Enrichment failed: ${message}` }
   }
@@ -258,7 +259,7 @@ export async function updateCompanyIntel(
       data: { fieldsEnriched, totalChars: 0 },
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
+    const message = sanitizeErrorMessage(err)
     return { success: false, error: `Update failed: ${message}` }
   }
 }
@@ -379,7 +380,7 @@ export async function enrichCompetitors(foundryId: string): Promise<EnrichmentAc
       },
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error'
+    const message = sanitizeErrorMessage(err)
     console.error('[Enrichment] Competitor analysis failed:', { foundryId, error: message })
     return { success: false, error: `Analysis failed: ${message}` }
   }

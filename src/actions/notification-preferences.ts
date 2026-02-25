@@ -15,6 +15,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { registerPushSubscription, unregisterPushSubscription } from '@/lib/notifications/channels/push'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Types
 export interface ChannelPreferences {
@@ -96,7 +97,7 @@ export async function getNotificationPreferences(): Promise<{
 
         if (error) {
             console.error('Error fetching notification preferences:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         // Build response with defaults
@@ -141,7 +142,7 @@ export async function getNotificationPreferences(): Promise<{
         console.error('Failed to get notification preferences:', err)
         return { 
             data: null, 
-            error: err instanceof Error ? err.message : 'Failed to get preferences' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -188,7 +189,7 @@ export async function updateNotificationPreferences(
 
         if (error) {
             console.error('Error updating notification preferences:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/settings/notifications')
@@ -198,7 +199,7 @@ export async function updateNotificationPreferences(
         console.error('Failed to update notification preferences:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to update preferences' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -236,7 +237,7 @@ export async function updateAllNotificationPreferences(
         console.error('Failed to update all notification preferences:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to update preferences' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -272,7 +273,7 @@ export async function registerPushToken(
         console.error('Failed to register push token:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to register push token' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -302,7 +303,7 @@ export async function unregisterPushToken(): Promise<{ success: boolean; error: 
         console.error('Failed to unregister push token:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to unregister push token' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -346,7 +347,7 @@ export async function updateSMSPhoneNumber(
 
         if (error) {
             console.error('Error updating SMS phone number:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         // Also update profile phone number
@@ -364,7 +365,7 @@ export async function updateSMSPhoneNumber(
         console.error('Failed to update SMS phone number:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to update phone number' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -425,7 +426,7 @@ export async function getNotificationHistory(options?: {
 
         if (error) {
             console.error('Error fetching notification history:', error)
-            return { data: [], error: error.message, total: 0 }
+            return { data: [], error: sanitizeErrorMessage(error), total: 0 }
         }
 
         const mappedData = (data || []).map(item => ({
@@ -446,7 +447,7 @@ export async function getNotificationHistory(options?: {
         console.error('Failed to get notification history:', err)
         return { 
             data: [], 
-            error: err instanceof Error ? err.message : 'Failed to get history',
+            error: sanitizeErrorMessage(err),
             total: 0
         }
     }
@@ -475,7 +476,7 @@ export async function markNotificationLogAsRead(
 
         if (error) {
             console.error('Error marking notification as read:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         return { success: true, error: null }
@@ -484,7 +485,7 @@ export async function markNotificationLogAsRead(
         console.error('Failed to mark notification as read:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to mark as read' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }

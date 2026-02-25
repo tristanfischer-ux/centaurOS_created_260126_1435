@@ -13,6 +13,7 @@
 
 import { withAuth } from '@/lib/server-action-utils'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /** Row shape returned from the whiteboards table */
 export interface WhiteboardRow {
@@ -45,7 +46,7 @@ export async function getWhiteboards(): Promise<{ data: WhiteboardRow[] | null; 
         foundryId,
         error: error.message,
       })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data as WhiteboardRow[], error: null }
@@ -75,7 +76,7 @@ export async function getWhiteboard(
         foundryId,
         error: error.message,
       })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data as WhiteboardRow, error: null }
@@ -120,7 +121,7 @@ export async function createWhiteboard(params: {
         foundryId,
         error: error.message,
       })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/canvas')
@@ -173,7 +174,7 @@ export async function updateWhiteboard(
         foundryId,
         error: error.message,
       })
-      return { data: null, error: error.message }
+      return { data: null, error: sanitizeErrorMessage(error) }
     }
 
     return { data: data as WhiteboardRow, error: null }
@@ -202,7 +203,7 @@ export async function deleteWhiteboard(
         foundryId,
         error: error.message,
       })
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/canvas')

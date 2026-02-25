@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Types
 export interface Notification {
@@ -64,7 +65,7 @@ export async function createNotification(data: {
 
         if (error) {
             console.error('Error creating notification:', error)
-            return { id: null, error: error.message }
+            return { id: null, error: sanitizeErrorMessage(error) }
         }
 
         return { id: notificationId, error: null }
@@ -110,7 +111,7 @@ export async function createBulkNotifications(data: {
 
         if (error) {
             console.error('Error creating bulk notifications:', error)
-            return { count: 0, error: error.message }
+            return { count: 0, error: sanitizeErrorMessage(error) }
         }
 
         return { count: data.userIds.length, error: null }
@@ -162,7 +163,7 @@ export async function getMyNotifications(options?: {
 
         if (error) {
             console.error('Error fetching notifications:', error)
-            return { data: [], error: error.message, unreadCount: 0 }
+            return { data: [], error: sanitizeErrorMessage(error), unreadCount: 0 }
         }
 
         // Get unread count
@@ -244,7 +245,7 @@ export async function markAllNotificationsAsRead(): Promise<{ success: boolean; 
 
         if (error) {
             console.error('Error marking all notifications as read:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/')
@@ -307,7 +308,7 @@ export async function deleteReadNotifications(): Promise<{ count: number; error:
 
         if (error) {
             console.error('Error deleting read notifications:', error)
-            return { count: 0, error: error.message }
+            return { count: 0, error: sanitizeErrorMessage(error) }
         }
 
         return { count: data?.length || 0, error: null }

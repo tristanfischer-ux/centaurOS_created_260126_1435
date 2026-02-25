@@ -29,6 +29,7 @@ import {
   AccountTier,
   UserLimits,
 } from "@/lib/fraud/velocity"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Re-export types
 export type { FraudSignalType, FraudSeverity, FraudContext, RiskScore, AccountTier, UserLimits }
@@ -173,7 +174,7 @@ export async function getFraudSignals(
     const adminContext = await requireAdmin()
     supabase = adminContext.supabase
   } catch (err) {
-    return { data: [], error: err instanceof Error ? err.message : "Admin access required", total: 0 }
+    return { data: [], error: sanitizeErrorMessage(err), total: 0 }
   }
 
   // Build query
@@ -197,7 +198,7 @@ export async function getFraudSignals(
   const { data, error, count } = await query
 
   if (error) {
-    return { data: [], error: error.message, total: 0 }
+    return { data: [], error: sanitizeErrorMessage(error), total: 0 }
   }
 
   return {
@@ -230,7 +231,7 @@ export async function clearFraudFlag(
     supabase = adminContext.supabase
     userId = adminContext.userId
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Admin access required" }
+    return { success: false, error: sanitizeErrorMessage(err) }
   }
 
   // Update fraud signal
@@ -243,7 +244,7 @@ export async function clearFraudFlag(
     .eq("id", signalId)
 
   if (error) {
-    return { success: false, error: error.message }
+    return { success: false, error: sanitizeErrorMessage(error) }
   }
 
   revalidatePath("/admin")
@@ -268,7 +269,7 @@ export async function updateTransactionLimits(
     const adminContext = await requireAdmin()
     supabase = adminContext.supabase
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Admin access required" }
+    return { success: false, error: sanitizeErrorMessage(err) }
   }
 
   // Update each provided limit
@@ -297,7 +298,7 @@ export async function updateTransactionLimits(
       )
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
   }
 
@@ -417,7 +418,7 @@ export async function getHighRiskUsers(
     .order("created_at", { ascending: false })
 
   if (error) {
-    return { data: [], error: error.message }
+    return { data: [], error: sanitizeErrorMessage(error) }
   }
 
   // Group by user

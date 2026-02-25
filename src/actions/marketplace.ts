@@ -184,6 +184,7 @@ export interface MarketplaceListing {
 }
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /** Max semantic results to fetch during hybrid search. */
 const SEMANTIC_MATCH_COUNT = 50
@@ -549,7 +550,7 @@ export async function getMarketplaceRecommendations(limit: number = 10) {
 
             if (error) {
                 console.error('Error fetching marketplace recommendations:', error)
-                return { data: [] as MarketplaceRecommendation[], error: error.message }
+                return { data: [] as MarketplaceRecommendation[], error: sanitizeErrorMessage(error) }
             }
 
             return { data: (data || []) as MarketplaceRecommendation[], error: null }
@@ -582,7 +583,7 @@ export async function generateGapRecommendations() {
 
             if (error) {
                 console.error('Error generating gap recommendations:', error)
-                return { count: 0, error: error.message }
+                return { count: 0, error: sanitizeErrorMessage(error) }
             }
 
             revalidatePath('/marketplace')
@@ -621,7 +622,7 @@ export async function dismissRecommendation(recommendationId: string) {
 
             if (error) {
                 console.error('Error dismissing recommendation:', error)
-                return { success: false, error: error.message }
+                return { success: false, error: sanitizeErrorMessage(error) }
             }
 
             revalidatePath('/marketplace')
@@ -673,7 +674,7 @@ export async function createManualRecommendation(data: {
 
             if (error) {
                 console.error('Error creating manual recommendation:', error)
-                return { success: false, error: error.message }
+                return { success: false, error: sanitizeErrorMessage(error) }
             }
 
             revalidatePath('/marketplace')

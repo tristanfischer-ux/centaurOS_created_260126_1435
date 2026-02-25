@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES
@@ -66,7 +67,7 @@ export async function getPricing(
 
         if (error) {
             console.error('Error fetching pricing:', error)
-            return { data: null, error: error.message }
+            return { data: null, error: sanitizeErrorMessage(error) }
         }
 
         if (!data) {
@@ -264,7 +265,7 @@ export async function updatePricing(pricing: {
 
         if (error) {
             console.error('Error updating pricing:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: sanitizeErrorMessage(error) }
         }
 
         revalidatePath('/provider-portal/pricing')

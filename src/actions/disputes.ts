@@ -21,6 +21,7 @@ import {
   DisputeWithDetails,
   ResolveDisputeParams,
 } from "@/lib/disputes/service"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Re-export types
 export type { DisputeStatus, DisputeWithDetails, ResolveDisputeParams }
@@ -582,7 +583,7 @@ export async function getAllDisputes(options?: {
   const { data, error, count } = await query
 
   if (error) {
-    return { data: [], error: error.message, total: 0 }
+    return { data: [], error: sanitizeErrorMessage(error), total: 0 }
   }
 
   return {

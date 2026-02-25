@@ -22,6 +22,7 @@ import {
   type PermissionResult
 } from '@/lib/agents/permission-guard'
 import { withRetry } from '@/lib/retry'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 type UserScopedSupabaseClient = Awaited<ReturnType<typeof createClient>>
 
@@ -250,7 +251,7 @@ async function createObjectivePending(
 
     if (error) {
       console.error('[AgentObjectives] Error creating pending objective:', error)
-      return { id: null, success: false, error: error.message }
+      return { id: null, success: false, error: sanitizeErrorMessage(error) }
     }
 
     return { id: data?.id || null, success: true }
@@ -290,7 +291,7 @@ async function createObjectiveDirect(
 
     if (error) {
       console.error('[AgentObjectives] Error creating direct objective:', error)
-      return { id: null, success: false, error: error.message }
+      return { id: null, success: false, error: sanitizeErrorMessage(error) }
     }
 
     return { id: data?.id || null, success: true }
@@ -443,7 +444,7 @@ async function createTaskPending(
 
     if (error) {
       console.error('[AgentObjectives] Error creating pending task:', error)
-      return { id: null, success: false, error: error.message }
+      return { id: null, success: false, error: sanitizeErrorMessage(error) }
     }
 
     return { id: data?.id || null, success: true }
@@ -485,7 +486,7 @@ async function createTaskDirect(
 
     if (error) {
       console.error('[AgentObjectives] Error creating direct task:', error)
-      return { id: null, success: false, error: error.message }
+      return { id: null, success: false, error: sanitizeErrorMessage(error) }
     }
 
     return { id: data?.id || null, success: true }
@@ -523,7 +524,7 @@ export async function approveAgentObjective(
       .eq('agent_approved', false)
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
 
     // Revalidate
@@ -561,7 +562,7 @@ export async function rejectAgentObjective(
       .eq('agent_approved', false)
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/objectives')
@@ -597,7 +598,7 @@ export async function approveAgentTask(
       .eq('agent_approved', false)
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/tasks')
@@ -634,7 +635,7 @@ export async function rejectAgentTask(
       .eq('agent_approved', false)
 
     if (error) {
-      return { success: false, error: error.message }
+      return { success: false, error: sanitizeErrorMessage(error) }
     }
 
     revalidatePath('/tasks')

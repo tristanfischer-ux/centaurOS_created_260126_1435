@@ -16,6 +16,7 @@ import { sendNotification, sendBulkNotification } from '@/lib/notifications/serv
 import { sendTemplatedEmail } from '@/lib/notifications/channels/email'
 import { MARKETPLACE_NOTIFICATION_TYPES } from '@/lib/notifications/channels/in-app'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // Database row types (not yet in generated types)
 interface MarketplaceOrderRow {
@@ -106,7 +107,7 @@ export async function notifyNewRFQ(
         return { 
             success: false, 
             sent: 0, 
-            error: err instanceof Error ? err.message : 'Failed to send notifications' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -203,7 +204,7 @@ export async function notifyBookingRequest(
         console.error('Error notifying booking request:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to send notification' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -293,7 +294,7 @@ export async function notifyPaymentReceived(
         console.error('Error notifying payment received:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to send notification' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -408,7 +409,7 @@ export async function notifyOrderStatusChange(
         console.error('Error notifying order status change:', err)
         return { 
             success: false, 
-            error: err instanceof Error ? err.message : 'Failed to send notification' 
+            error: sanitizeErrorMessage(err) 
         }
     }
 }
@@ -484,7 +485,7 @@ export async function notifyEscrowReleased(
         return { success: result.success, error: result.success ? null : 'Failed to send notification' }
     } catch (err) {
         console.error('Error notifying escrow release:', err)
-        return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+        return { success: false, error: sanitizeErrorMessage(err) }
     }
 }
 
@@ -516,6 +517,6 @@ export async function notifyNewReview(
         return { success: result.success, error: result.success ? null : 'Failed to send notification' }
     } catch (err) {
         console.error('Error notifying new review:', err)
-        return { success: false, error: err instanceof Error ? err.message : 'Unknown error' }
+        return { success: false, error: sanitizeErrorMessage(err) }
     }
 }

@@ -19,6 +19,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -399,7 +400,7 @@ Output ONLY the Python code.`
     console.error("[CAD-GRAMMAR-RESEARCH] Research failed:", err)
     return {
       success: false,
-      error: `Grammar research error: ${err instanceof Error ? err.message : "Unknown error"}`,
+      error: `Grammar research error: ${sanitizeErrorMessage(err)}`,
       tokensIn: totalTokensIn,
       tokensOut: totalTokensOut,
     }
@@ -543,7 +544,7 @@ async function validateGrammarOnModal(
   } catch (err) {
     return {
       success: false,
-      error: err instanceof Error ? err.message : "Unknown error during Modal validation",
+      error: sanitizeErrorMessage(err),
     }
   }
 }

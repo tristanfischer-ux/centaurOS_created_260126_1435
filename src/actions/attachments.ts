@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { uploadAttachmentSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { sanitizeFileName, escapeHtml } from '@/lib/security/sanitize'
+import { sanitizeFileName, escapeHtml, sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export async function uploadTaskAttachment(taskId: string, formData: FormData) {
     const supabase = await createClient()
@@ -66,7 +66,7 @@ export async function uploadTaskAttachment(taskId: string, formData: FormData) {
 
     if (uploadError) {
         console.error('File upload failed:', uploadError)
-        return { error: uploadError.message }
+        return { error: sanitizeErrorMessage(uploadError) }
     }
 
     // SECURITY: Use signed URLs instead of public URLs to prevent unauthorized access

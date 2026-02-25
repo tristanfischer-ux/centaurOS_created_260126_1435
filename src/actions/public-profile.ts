@@ -3,6 +3,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 export interface PublicProfile {
     id: string
@@ -347,7 +348,7 @@ export async function updateProfileSlug(newSlug: string): Promise<{ success: boo
         .eq('user_id', user.id)
     
     if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
     }
     
     revalidatePath('/provider-portal/profile')
@@ -379,7 +380,7 @@ export async function updatePublicProfileSettings(settings: {
         .eq('user_id', user.id)
     
     if (error) {
-        return { success: false, error: error.message }
+        return { success: false, error: sanitizeErrorMessage(error) }
     }
     
     revalidatePath('/provider-portal/profile')

@@ -6,6 +6,7 @@ import { Database } from '@/types/database.types'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { withRetry } from '@/lib/retry'
 import { scheduleTaskDates, ensureNotInPast } from '@/lib/schedule-task-dates'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 type RiskLevel = Database['public']['Enums']['risk_level']
 
@@ -93,7 +94,7 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
             return result.data
         })
     } catch (error) {
-        return { error: error instanceof Error ? error.message : 'Failed to create objective' }
+        return { error: sanitizeErrorMessage(error) }
     }
 
     if (!objective) return { error: 'Failed to create objective' }
@@ -180,7 +181,7 @@ export async function createObjectiveFromInput(input: ObjectiveInput) {
     } catch (taskError) {
         console.error('Error creating tasks:', taskError)
         await supabase.from('objectives').delete().eq('id', objective.id)
-        return { error: taskError instanceof Error ? taskError.message : 'Failed to create tasks' }
+        return { error: sanitizeErrorMessage(taskError) }
     }
 
     const starts = resolvedDates.map((d) => new Date(d.start_date).getTime())

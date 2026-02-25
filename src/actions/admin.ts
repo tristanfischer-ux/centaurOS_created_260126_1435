@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache"
 import { requireAdmin } from "@/lib/admin/access"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // TYPES (inlined to avoid turbopack import issues)
@@ -172,7 +173,7 @@ export async function getAdminDashboardStats(): Promise<{
         console.error('Error fetching admin dashboard stats:', err)
         return {
             data: null,
-            error: err instanceof Error ? err.message : 'Failed to fetch dashboard stats'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -217,7 +218,7 @@ export async function getPendingApplications(status?: ApplicationStatus): Promis
         console.error('Error fetching applications:', err)
         return {
             data: [],
-            error: err instanceof Error ? err.message : 'Failed to fetch applications'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -253,7 +254,7 @@ export async function getApplicationDetail(id: string): Promise<{
         console.error('Error fetching application detail:', err)
         return {
             data: null,
-            error: err instanceof Error ? err.message : 'Failed to fetch application'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -309,7 +310,7 @@ export async function approveApplication(
         console.error('Error approving application:', err)
         return {
             success: false,
-            error: err instanceof Error ? err.message : 'Failed to approve application'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -363,7 +364,7 @@ export async function rejectApplication(
         console.error('Error rejecting application:', err)
         return {
             success: false,
-            error: err instanceof Error ? err.message : 'Failed to reject application'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -404,7 +405,7 @@ export async function getOpenDisputes(): Promise<{
         console.error('Error fetching disputes:', err)
         return {
             data: [],
-            error: err instanceof Error ? err.message : 'Failed to fetch disputes'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -503,7 +504,7 @@ export async function getPlatformHealth(): Promise<{
         console.error('Error fetching platform health:', err)
         return {
             data: null,
-            error: err instanceof Error ? err.message : 'Failed to fetch platform health'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -547,7 +548,7 @@ export async function logAdminAction(
         console.error('Error logging admin action:', err)
         return {
             success: false,
-            error: err instanceof Error ? err.message : 'Failed to log admin action'
+            error: sanitizeErrorMessage(err)
         }
     }
 }
@@ -611,7 +612,7 @@ export async function getRecentActivity(limit: number = 20): Promise<{
         console.error('Error fetching recent activity:', err)
         return {
             data: [],
-            error: err instanceof Error ? err.message : 'Failed to fetch recent activity'
+            error: sanitizeErrorMessage(err)
         }
     }
 }

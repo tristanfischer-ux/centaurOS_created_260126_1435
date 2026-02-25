@@ -11,6 +11,7 @@ import {
 } from "@/types/booking"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import { RETAINER_PLATFORM_FEE_PERCENT, DEFAULT_VAT_RATE } from "@/types/payments"
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // ==========================================
 // CONSTANTS
@@ -46,7 +47,7 @@ export async function checkAvailabilityForBooking(
 
         if (error) {
             console.error('Error checking availability:', error)
-            return { available: false, unavailableDates: [], error: error.message }
+            return { available: false, unavailableDates: [], error: sanitizeErrorMessage(error) }
         }
 
         const unavailableDates = slots?.map(s => s.date) || []
