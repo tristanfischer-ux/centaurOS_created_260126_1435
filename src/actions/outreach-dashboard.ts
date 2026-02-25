@@ -40,18 +40,8 @@ export interface PipelineStats {
     notRelevant: number
 }
 
-export interface NextAction {
-    type: 'enrich' | 'import' | 'generate' | 'send' | 'follow_up' | 'review_reply'
-    priority: 'high' | 'medium' | 'low'
-    title: string
-    description: string
-    count: number
-    actionUrl: string
-}
-
 export interface DashboardData {
     pipeline: PipelineStats
-    nextActions: NextAction[]
     campaignCount: number
     totalOutreachContacts: number
 }
@@ -92,30 +82,10 @@ export async function getOutreachDashboard(): Promise<{ data?: DashboardData; er
     }
 
     // FLOW: Get outreach contact stats for the foundry's campaigns
-    const { data: contacts } = await supabase
+    const { count: totalOutreachContacts } = await supabase
         .from('outreach_contacts')
-        .select('status')
+        .select('id', { count: 'exact', head: true })
         .eq('foundry_id', foundry_id)
-
-    const totalOutreachContacts = contacts?.length || 0
-
-    // FLOW: Get email stats — how many are approved but not sent
-    const { data: pendingEmails } = await supabase
-        .from('outreach_emails')
-        .select('id')
-        .eq('foundry_id', foundry_id)
-        .eq('status', 'approved')
-        .is('sent_at', null)
-
-    const pendingEmailCount = pendingEmails?.length || 0
-
-    // FLOW: Count contacts that replied (need review)
-    const repliedContacts = contacts?.filter(c => c.status === 'replied').length || 0
-
-    // FLOW: Count contacts that are new/researched but don't have sequences yet
-    const needsSequenceContacts = contacts?.filter(c =>
-        c.status === 'new' || c.status === 'researched' || c.status === 'scored' || c.status === 'approved'
-    ).length || 0
 
     // FLOW: Count campaigns
     const { count: campaignCount } = await supabase
@@ -123,75 +93,11 @@ export async function getOutreachDashboard(): Promise<{ data?: DashboardData; er
         .select('id', { count: 'exact', head: true })
         .eq('foundry_id', foundry_id)
 
-    // INTENT: Build prioritised next actions
-    const nextActions: NextAction[] = []
-    const notEnriched = pipeline.total - pipeline.enriched - pipeline.notRelevant
-
-    if (notEnriched > 0) {
-        nextActions.push({
-            type: 'enrich',
-            priority: pipeline.enriched === 0 ? 'high' : 'medium',
-            title: `Enrich ${notEnriched} companies`,
-            description: 'Add contact emails to marketplace listings so they can be imported into campaigns',
-            count: notEnriched,
-            actionUrl: '/outreach/enrichment?email=no_email',
-        })
-    }
-
-    if (pipeline.ready > 0) {
-        nextActions.push({
-            type: 'import',
-            priority: 'high',
-            title: `Import ${pipeline.ready} ready contacts`,
-            description: 'Enriched listings with emails ready to be imported into a campaign',
-            count: pipeline.ready,
-            actionUrl: '/outreach/enrichment?status=ready',
-        })
-    }
-
-    if (needsSequenceContacts > 0) {
-        nextActions.push({
-            type: 'generate',
-            priority: 'medium',
-            title: `Generate sequences for ${needsSequenceContacts} contacts`,
-            description: 'Contacts imported but without email sequences — generate personalised emails',
-            count: needsSequenceContacts,
-            actionUrl: '/outreach',
-        })
-    }
-
-    if (pendingEmailCount > 0) {
-        nextActions.push({
-            type: 'send',
-            priority: 'high',
-            title: `Send ${pendingEmailCount} approved emails`,
-            description: 'Emails approved and ready to send — copy to your email client or send directly',
-            count: pendingEmailCount,
-            actionUrl: '/outreach',
-        })
-    }
-
-    if (repliedContacts > 0) {
-        nextActions.push({
-            type: 'review_reply',
-            priority: 'high',
-            title: `Review ${repliedContacts} replies`,
-            description: 'Contacts have replied to your outreach — follow up to convert',
-            count: repliedContacts,
-            actionUrl: '/outreach',
-        })
-    }
-
-    // Sort by priority
-    const priorityOrder = { high: 0, medium: 1, low: 2 }
-    nextActions.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority])
-
     return {
         data: {
             pipeline,
-            nextActions,
             campaignCount: campaignCount || 0,
-            totalOutreachContacts,
+            totalOutreachContacts: totalOutreachContacts || 0,
         },
     }
 }
