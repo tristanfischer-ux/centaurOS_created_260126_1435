@@ -352,6 +352,122 @@ export async function importContacts(
     return { data: { imported: rows.length } }
 }
 
+/**
+ * @description Import enriched marketplace listings as outreach contacts.
+ * Bridges the enrichment workflow into the campaign pipeline.
+ *
+ * @param campaignId - Target campaign
+ * @param listingIds - marketplace_listings UUIDs to import
+ */
+export async function importListingsAsContacts(
+    campaignId: string,
+    listingIds: string[]
+): Promise<{ data?: { imported: number; skipped: number }; error?: string }> {
+    const ctx = await getAuthContext()
+    if ('error' in ctx) return { error: ctx.error }
+    const { supabase, user, foundry_id } = ctx
+
+    if (!listingIds.length) return { error: 'No listings selected' }
+
+    // FLOW: Fetch listing data for the selected IDs (only those with emails)
+    const { data: listings, error: fetchError } = await supabase
+        .from('marketplace_listings')
+        .select('id, title, description, category, subcategory, attributes, contact_name, contact_email, contact_title, contact_linkedin')
+        .in('id', listingIds)
+        .not('contact_email', 'is', null)
+
+    if (fetchError) {
+        console.error('[Outreach] Failed to fetch listings for import:', fetchError)
+        return { error: 'Failed to fetch listings' }
+    }
+
+    if (!listings || listings.length === 0) {
+        return { error: 'No listings with contact emails found' }
+    }
+
+    // INTENT: Check for duplicate emails already in this campaign
+    const emails = listings.map(l => l.contact_email!).filter(Boolean)
+    const { data: existingContacts } = await supabase
+        .from('outreach_contacts')
+        .select('email')
+        .eq('campaign_id', campaignId)
+        .eq('foundry_id', foundry_id)
+        .in('email', emails)
+
+    const existingEmails = new Set((existingContacts || []).map(c => c.email).filter(Boolean))
+
+    // INTENT: Map listings to outreach_contact rows
+    const rows = listings
+        .filter(l => l.contact_email && !existingEmails.has(l.contact_email))
+        .map(l => {
+            const attrs = (l.attributes || {}) as Record<string, unknown>
+            const nameParts = (l.contact_name || '').trim().split(/\s+/)
+            const firstName = nameParts[0] || l.title
+            const lastName = nameParts.slice(1).join(' ')
+
+            // INTENT: Extract domain from website URL
+            let domain = ''
+            try {
+                const url = attrs.website_url as string
+                if (url) domain = new URL(url.startsWith('http') ? url : `https://${url}`).hostname.replace('www.', '')
+            } catch {
+                // skip
+            }
+
+            return {
+                foundry_id,
+                campaign_id: campaignId,
+                created_by: user.id,
+                first_name: firstName,
+                last_name: lastName,
+                email: l.contact_email!,
+                company_name: l.title,
+                job_title: l.contact_title || '',
+                linkedin_url: l.contact_linkedin || '',
+                company_domain: domain,
+                industry: Array.isArray(attrs.industries) ? (attrs.industries as string[])[0] || '' : '',
+                company_size: (attrs.employees as string) || '',
+                source_listing_id: l.id,
+            }
+        })
+
+    const skipped = listings.length - rows.length
+
+    if (rows.length === 0) {
+        return { data: { imported: 0, skipped }, error: skipped > 0 ? `All ${skipped} contacts already exist in this campaign` : undefined }
+    }
+
+    // INTENT: Batch insert contacts
+    const { data: insertedContacts, error: insertError } = await supabase
+        .from('outreach_contacts')
+        .insert(rows)
+        .select('id, source_listing_id')
+
+    if (insertError) {
+        console.error('[Outreach] Failed to import listing contacts:', insertError)
+        return { error: 'Failed to import contacts' }
+    }
+
+    // FLOW: Update marketplace_listings outreach_status to 'imported' and link contact IDs
+    if (insertedContacts) {
+        for (const contact of insertedContacts) {
+            if (contact.source_listing_id) {
+                await supabase
+                    .from('marketplace_listings')
+                    .update({
+                        outreach_status: 'imported',
+                        outreach_contact_id: contact.id,
+                    })
+                    .eq('id', contact.source_listing_id)
+            }
+        }
+    }
+
+    revalidatePath(`/outreach/${campaignId}`)
+    revalidatePath('/outreach/enrichment')
+    return { data: { imported: rows.length, skipped } }
+}
+
 export async function updateContactStatus(
     contactIds: string[],
     status: ContactStatus

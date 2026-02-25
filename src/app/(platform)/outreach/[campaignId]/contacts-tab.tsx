@@ -14,6 +14,7 @@ import {
     ArrowUpDown,
     MoreHorizontal,
     Mail,
+    Building,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { AddContactDialog } from './add-contact-dialog'
 import { ImportContactsDialog } from './import-contacts-dialog'
+import { ImportMarketplaceDialog } from './import-marketplace-dialog'
 import { GenerateSequencesDialog } from './generate-sequences-dialog'
 import { ResearchContactsDialog } from './research-contacts-dialog'
 import { ContactDetailDialog } from './contact-detail-dialog'
@@ -68,6 +70,7 @@ export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToE
     const [sortDir, setSortDir] = useState<SortDir>('desc')
     const [isAddOpen, setIsAddOpen] = useState(false)
     const [isImportOpen, setIsImportOpen] = useState(false)
+    const [isMarketplaceImportOpen, setIsMarketplaceImportOpen] = useState(false)
     const [isGenerateOpen, setIsGenerateOpen] = useState(false)
     const [isResearchOpen, setIsResearchOpen] = useState(false)
     const [detailContact, setDetailContact] = useState<Contact | null>(null)
@@ -312,6 +315,10 @@ export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToE
                             Research All
                         </Button>
                     )}
+                    <Button variant="outline" size="sm" onClick={() => setIsMarketplaceImportOpen(true)}>
+                        <Building className="h-4 w-4 mr-1" />
+                        Import from Marketplace
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setIsImportOpen(true)}>
                         <Upload className="h-4 w-4 mr-1" />
                         Import CSV
@@ -338,9 +345,13 @@ export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToE
                 <EmptyState
                     icon={<Plus className="h-12 w-12" />}
                     title="No contacts yet"
-                    description="Add contacts manually or paste a CSV from LinkedIn Sales Navigator."
+                    description="Import from the marketplace, paste a CSV, or add contacts manually."
                     action={
                         <div className="flex gap-2">
+                            <Button variant="outline" onClick={() => setIsMarketplaceImportOpen(true)}>
+                                <Building className="h-4 w-4 mr-2" />
+                                Import from Marketplace
+                            </Button>
                             <Button variant="outline" onClick={() => setIsImportOpen(true)}>
                                 <Upload className="h-4 w-4 mr-2" />
                                 Import CSV
@@ -481,6 +492,12 @@ export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToE
             <ImportContactsDialog
                 open={isImportOpen}
                 onOpenChange={setIsImportOpen}
+                campaignId={campaign.id}
+                onImported={onRefresh}
+            />
+            <ImportMarketplaceDialog
+                open={isMarketplaceImportOpen}
+                onOpenChange={setIsMarketplaceImportOpen}
                 campaignId={campaign.id}
                 onImported={onRefresh}
             />
