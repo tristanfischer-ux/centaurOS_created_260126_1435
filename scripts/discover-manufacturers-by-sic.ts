@@ -312,7 +312,7 @@ function buildListing(
     attributes,
     is_demo: true,
     verification_tier: "claimed",
-    is_verified: true,
+    is_verified: false,
     image_url: null,
   }
 }

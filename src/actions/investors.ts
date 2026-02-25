@@ -47,6 +47,14 @@ export type InvestorFirm = {
     notable_portfolio?: string[]
     last_verified?: string
     aum_gbp?: number
+    founding_year?: number
+    bvca_member?: boolean
+    recent_deals_summary?: string
+    last_fund_close_date?: string
+    contact_email?: string
+    location?: string
+    data_source?: string
+    data_confidence?: string
   }
 }
 
@@ -169,7 +177,7 @@ export async function searchInvestors(
 
   // JSONB scalar filter: firm_type
   if (firmType && firmType.length > 0) {
-    q = q.or(firmType.map((t: string) => `attributes->firm_type.eq."${t}"`).join(','))
+    q = q.or(firmType.map((t: string) => `attributes->>firm_type.eq.${t}`).join(','))
   }
 
   // JSONB scalar filter: is_active_deploying
@@ -358,3 +366,45 @@ export const getInvestorStats = unstable_cache(
   ['investor-stats'],
   { revalidate: 300 }
 )
+
+// ---------------------------------------------------------------------------
+// Contacts
+// ---------------------------------------------------------------------------
+
+/**
+ * Shape of a single contact from the vc_pe_contacts table.
+ */
+export type InvestorContact = {
+  id: string
+  full_name: string
+  title: string | null
+  seniority: string | null
+  email: string | null
+  linkedin_url: string | null
+  is_decision_maker: boolean | null
+  outreach_status: string | null
+}
+
+/**
+ * Fetches contacts associated with an investor firm listing.
+ *
+ * @param listingId - The marketplace_listings UUID
+ * @returns Array of contacts (may be empty if none seeded)
+ */
+export async function getInvestorContacts(listingId: string): Promise<InvestorContact[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('vc_pe_contacts')
+    .select('id, full_name, title, seniority, email, linkedin_url, is_decision_maker, outreach_status')
+    .eq('listing_id', listingId)
+    .order('is_decision_maker', { ascending: false })
+    .order('full_name', { ascending: true })
+
+  if (error) {
+    console.error('[getInvestorContacts] Supabase error:', error)
+    return []
+  }
+
+  return (data ?? []) as InvestorContact[]
+}

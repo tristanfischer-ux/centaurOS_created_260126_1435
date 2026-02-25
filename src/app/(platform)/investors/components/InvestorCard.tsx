@@ -9,6 +9,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { InvestorFirm } from '@/actions/investors'
@@ -52,6 +53,12 @@ function priorityVariant(priority: string | undefined): 'destructive' | 'warning
   return 'outline'
 }
 
+const PRIORITY_DESCRIPTIONS: Record<string, string> = {
+  A: 'High priority — top-tier, actively deploying, most relevant',
+  B: 'Medium priority — strong investor, good deployment history',
+  C: 'Lower priority — secondary-tier or niche focus',
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -91,9 +98,18 @@ export function InvestorCard({ firm }: InvestorCardProps) {
                 </Badge>
               )}
               {attrs.outreach_priority && (
-                <Badge variant={priorityVariant(attrs.outreach_priority)} className="text-xs shrink-0">
-                  Priority {attrs.outreach_priority}
-                </Badge>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant={priorityVariant(attrs.outreach_priority)} className="text-xs shrink-0 cursor-help">
+                        Priority {attrs.outreach_priority}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{PRIORITY_DESCRIPTIONS[attrs.outreach_priority] ?? 'Outreach priority level'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </div>

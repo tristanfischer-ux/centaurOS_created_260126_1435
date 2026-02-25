@@ -14,16 +14,24 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
-import { getInvestorById } from '@/actions/investors'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { getInvestorById, getInvestorContacts } from '@/actions/investors'
+import type { InvestorContact } from '@/actions/investors'
 import {
   ArrowLeft,
   Building2,
+  Calendar,
   CheckCircle2,
   Circle,
+  Database,
   Globe,
   Linkedin,
+  Mail,
   MapPin,
+  Shield,
   TrendingUp,
+  User,
+  Users,
 } from 'lucide-react'
 
 export const revalidate = 60
@@ -49,6 +57,16 @@ function priorityVariant(priority: string | undefined): 'destructive' | 'warning
   if (priority === 'B') return 'warning'
   if (priority === 'C') return 'secondary'
   return 'outline'
+}
+
+const PRIORITY_DESCRIPTIONS: Record<string, string> = {
+  A: 'High priority — top-tier, actively deploying, most relevant firms',
+  B: 'Medium priority — strong investors, good deployment history',
+  C: 'Lower priority — secondary-tier or niche focus',
+}
+
+function formatSeniority(s: string): string {
+  return s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +95,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
+  const contacts = await getInvestorContacts(id)
 
   return (
     <div className="space-y-8 max-w-5xl">
@@ -129,9 +148,18 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             </div>
           </div>
           {attrs.outreach_priority && (
-            <Badge variant={priorityVariant(attrs.outreach_priority)} className="shrink-0">
-              Priority {attrs.outreach_priority}
-            </Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge variant={priorityVariant(attrs.outreach_priority)} className="shrink-0 cursor-help">
+                    Priority {attrs.outreach_priority}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{PRIORITY_DESCRIPTIONS[attrs.outreach_priority] ?? 'Outreach priority level'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>
@@ -142,17 +170,49 @@ export default async function InvestorDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main content — 2/3 width */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Description */}
-          {firm.description && (
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-semibold text-foreground">About</h2>
-              </CardHeader>
-              <CardContent>
+          {/* About */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-base font-semibold text-foreground">About</h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {firm.description && (
                 <p className="text-sm text-muted-foreground leading-relaxed">{firm.description}</p>
-              </CardContent>
-            </Card>
-          )}
+              )}
+
+              {/* Metadata row */}
+              {(attrs.founding_year || attrs.location || attrs.bvca_member) && (
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                  {attrs.founding_year && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Calendar className="h-3.5 w-3.5 shrink-0" />
+                      Founded {attrs.founding_year}
+                    </span>
+                  )}
+                  {attrs.location && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      {attrs.location}
+                    </span>
+                  )}
+                  {attrs.bvca_member && (
+                    <Badge variant="outline" className="text-xs">
+                      <Shield className="h-3 w-3 mr-1" />
+                      BVCA Member
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Recent activity */}
+              {attrs.recent_deals_summary && (
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Recent Activity</p>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Investment thesis */}
           {attrs.investment_thesis && (
@@ -218,6 +278,65 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
           )}
+
+          {/* Key People */}
+          {contacts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  Key People
+                </h2>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {contacts.map((contact: InvestorContact) => (
+                    <div key={contact.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                      <div className="flex items-center justify-center h-8 w-8 rounded-full bg-muted shrink-0">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-foreground">{contact.full_name}</p>
+                          {contact.is_decision_maker && (
+                            <Badge variant="outline" className="text-xs">Decision Maker</Badge>
+                          )}
+                        </div>
+                        {contact.title && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{contact.title}</p>
+                        )}
+                        {contact.seniority && (
+                          <p className="text-xs text-muted-foreground">{formatSeniority(contact.seniority)}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5">
+                          {contact.linkedin_url && (
+                            <a
+                              href={contact.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
+                            >
+                              <Linkedin className="h-3 w-3" />
+                              LinkedIn
+                            </a>
+                          )}
+                          {contact.email && (
+                            <a
+                              href={`mailto:${contact.email}`}
+                              className="text-international-orange hover:underline text-xs flex items-center gap-1"
+                            >
+                              <Mail className="h-3 w-3" />
+                              Email
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar — 1/3 width */}
@@ -277,12 +396,59 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     <Badge variant={priorityVariant(attrs.outreach_priority)}>
                       Priority {attrs.outreach_priority}
                     </Badge>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {PRIORITY_DESCRIPTIONS[attrs.outreach_priority]}
+                    </p>
                   </div>
                 )}
                 {attrs.outreach_status && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Status</p>
                     <p className="text-sm text-foreground">{attrs.outreach_status}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Contact & Data */}
+          {(attrs.contact_email || attrs.data_source || attrs.last_fund_close_date) && (
+            <Card>
+              <CardHeader>
+                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                  <Database className="h-4 w-4 text-muted-foreground" />
+                  Contact & Data
+                </h2>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {attrs.contact_email && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Email</p>
+                    <a
+                      href={`mailto:${attrs.contact_email}`}
+                      className="text-sm text-international-orange hover:underline flex items-center gap-1.5"
+                    >
+                      <Mail className="h-3.5 w-3.5 shrink-0" />
+                      {attrs.contact_email}
+                    </a>
+                  </div>
+                )}
+                {attrs.last_fund_close_date && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Last Fund Close</p>
+                    <p className="text-sm text-foreground">{attrs.last_fund_close_date}</p>
+                  </div>
+                )}
+                {attrs.data_source && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Data Source</p>
+                    <p className="text-sm text-foreground capitalize">{attrs.data_source.replace(/_/g, ' ')}</p>
+                  </div>
+                )}
+                {attrs.data_confidence && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Confidence</p>
+                    <Badge variant="outline" className="text-xs capitalize">{attrs.data_confidence}</Badge>
                   </div>
                 )}
               </CardContent>
