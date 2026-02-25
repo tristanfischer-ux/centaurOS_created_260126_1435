@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Plus, Users, Mail, Megaphone } from 'lucide-react'
+import { Send, Plus, Users, Mail, Megaphone, Database } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -86,10 +86,16 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                         Create campaigns, import prospects, generate email sequences
                     </p>
                 </div>
-                <Button onClick={() => setIsCreateOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Campaign
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={() => router.push('/outreach/enrichment')}>
+                        <Database className="h-4 w-4 mr-2" />
+                        Enrichment
+                    </Button>
+                    <Button onClick={() => setIsCreateOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Campaign
+                    </Button>
+                </div>
             </div>
 
             {/* Quick stats */}

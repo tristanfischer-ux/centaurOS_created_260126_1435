@@ -7596,6 +7596,13 @@ export type Database = {
           approved_by: string | null
           attributes: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
+          contact_email: string | null
+          contact_enriched_at: string | null
+          contact_linkedin: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          contact_source: string | null
+          contact_title: string | null
           created_at: string | null
           created_by_provider_id: string | null
           currency: string | null
@@ -7606,6 +7613,10 @@ export type Database = {
           is_demo: boolean
           is_self_created: boolean | null
           is_verified: boolean | null
+          last_contacted_at: string | null
+          outreach_contact_id: string | null
+          outreach_notes: string | null
+          outreach_status: string | null
           price: number | null
           search_vector: unknown
           subcategory: string
@@ -7619,6 +7630,13 @@ export type Database = {
           approved_by?: string | null
           attributes?: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
+          contact_email?: string | null
+          contact_enriched_at?: string | null
+          contact_linkedin?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_source?: string | null
+          contact_title?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
@@ -7629,6 +7647,10 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          last_contacted_at?: string | null
+          outreach_contact_id?: string | null
+          outreach_notes?: string | null
+          outreach_status?: string | null
           price?: number | null
           search_vector?: unknown
           subcategory: string
@@ -7642,6 +7664,13 @@ export type Database = {
           approved_by?: string | null
           attributes?: Json | null
           category?: Database["public"]["Enums"]["marketplace_category"]
+          contact_email?: string | null
+          contact_enriched_at?: string | null
+          contact_linkedin?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          contact_source?: string | null
+          contact_title?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
@@ -7652,6 +7681,10 @@ export type Database = {
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          last_contacted_at?: string | null
+          outreach_contact_id?: string | null
+          outreach_notes?: string | null
+          outreach_status?: string | null
           price?: number | null
           search_vector?: unknown
           subcategory?: string
@@ -9526,6 +9559,7 @@ export type Database = {
           score: number | null
           score_reasoning: string | null
           signals: Json
+          source_listing_id: string | null
           status: string
           tech_stack: Json
           updated_at: string
@@ -9552,6 +9586,7 @@ export type Database = {
           score?: number | null
           score_reasoning?: string | null
           signals?: Json
+          source_listing_id?: string | null
           status?: string
           tech_stack?: Json
           updated_at?: string
@@ -9578,6 +9613,7 @@ export type Database = {
           score?: number | null
           score_reasoning?: string | null
           signals?: Json
+          source_listing_id?: string | null
           status?: string
           tech_stack?: Json
           updated_at?: string
