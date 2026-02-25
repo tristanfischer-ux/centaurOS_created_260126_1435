@@ -1,3 +1,8 @@
+// Suppress expected console.error from task action error paths
+let consoleErrorSpy: jest.SpyInstance
+beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}) })
+afterAll(() => { consoleErrorSpy.mockRestore() })
+
 import { acceptTask, rejectTask, forwardTask, amendTask, createTask, updateTaskDates } from '../tasks'
 import { removeTeamMember } from '../team'
 

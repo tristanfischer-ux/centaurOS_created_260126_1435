@@ -13,6 +13,11 @@
  * @security These tests verify security-critical behavior.
  */
 
+// Suppress expected console.error from auth guard error paths
+let consoleErrorSpy: jest.SpyInstance
+beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}) })
+afterAll(() => { consoleErrorSpy.mockRestore() })
+
 import { createObjective } from '../objectives'
 import { getConversations } from '../messaging'
 import { createNotification, createBulkNotifications } from '../notifications'

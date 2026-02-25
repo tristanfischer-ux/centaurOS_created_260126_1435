@@ -1,3 +1,8 @@
+// Suppress expected console.error from attachment error paths
+let consoleErrorSpy: jest.SpyInstance
+beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}) })
+afterAll(() => { consoleErrorSpy.mockRestore() })
+
 import { uploadTaskAttachment, getTaskAttachments } from '../attachments'
 
 // Valid UUID test constants

@@ -8,6 +8,11 @@
  * @security Verifies that unauthenticated and foundry-less users are rejected.
  */
 
+// Suppress expected console.error from auth wrapper error paths
+let consoleErrorSpy: jest.SpyInstance
+beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}) })
+afterAll(() => { consoleErrorSpy.mockRestore() })
+
 // Valid UUID test constants
 const VALID_USER_ID = '550e8400-e29b-41d4-a716-446655440000'
 const VALID_FOUNDRY_ID = '550e8400-e29b-41d4-a716-446655440001'

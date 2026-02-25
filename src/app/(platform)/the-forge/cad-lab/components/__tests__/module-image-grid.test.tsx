@@ -3,10 +3,15 @@ import '@testing-library/jest-dom'
 import { ModuleImageGrid } from '../module-image-grid'
 import type { CadLabModule } from '@/lib/cad-lab-types'
 
+// Suppress expected console.error from mocked framer-motion props
+let consoleErrorSpy: jest.SpyInstance
+beforeAll(() => { consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {}) })
+afterAll(() => { consoleErrorSpy.mockRestore() })
+
 // Mock framer-motion to avoid animation issues in tests
 jest.mock('framer-motion', () => ({
   motion: {
-    div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
+    div: ({ children, layout: _layout, initial: _initial, animate: _animate, exit: _exit, ...props }: React.PropsWithChildren<Record<string, unknown>>) => (
       <div {...props}>{children}</div>
     ),
   },
