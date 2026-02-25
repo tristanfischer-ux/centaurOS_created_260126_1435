@@ -61,18 +61,18 @@ function DomainTreeItem({
 
   const expertiseCount = coverage.expertise?.length || 0
 
-  // Hide not_needed items unless showing all
-  if (!showAllDomains && coverage.status === 'not_needed') {
-    return null
-  }
-
-  // Handle keyboard selection
+  // Handle keyboard selection — must be above early return to satisfy rules-of-hooks
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
       onSelect?.(coverage)
     }
   }, [coverage, onSelect])
+
+  // Hide not_needed items unless showing all
+  if (!showAllDomains && coverage.status === 'not_needed') {
+    return null
+  }
 
   return (
     <div className="select-none">

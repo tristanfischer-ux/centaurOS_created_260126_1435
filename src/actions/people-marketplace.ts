@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { withAuth, withUser } from '@/lib/server-action-utils'
+import { getBaseUrl } from '@/lib/domains'
 import type { MarketplaceListing } from './marketplace'
 
 /**
@@ -203,7 +204,7 @@ export async function findTalentMatches(query: string): Promise<TalentMatchResul
 
         // Call AI to extract requirements and score matches
         try {
-            const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/marketplace/talent-match`, {
+            const response = await fetch(`${getBaseUrl()}/api/marketplace/talent-match`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
