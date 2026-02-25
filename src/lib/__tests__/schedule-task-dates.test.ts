@@ -114,9 +114,12 @@ describe('ensureNotInPast', () => {
   })
 
   it('returns the same date for a future date', () => {
-    const future = new Date(2026, 5, 15, 12, 0, 0, 0) // noon to avoid UTC date shift
+    const future = new Date(2026, 5, 15, 12, 0, 0, 0)
     const result = ensureNotInPast(future)
-    expect(toDateStr(result.toISOString())).toBe('2026-06-15')
+    // GOTCHA: Compare timestamps directly to avoid UTC-offset date drift when
+    // running tests in non-UTC timezones. toISOString() returns UTC, which can
+    // show the previous calendar day for large positive offsets (e.g. UTC+13).
+    expect(result.getTime()).toBe(future.getTime())
   })
 })
 
