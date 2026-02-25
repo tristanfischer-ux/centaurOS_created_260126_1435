@@ -30,10 +30,16 @@ import {
   ChevronRight,
   Box,
   Zap,
+  Lightbulb,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
@@ -48,6 +54,10 @@ interface DiagnosticQuestion {
   hint: string
   /** Available answer options */
   options: string[]
+  /** Default recommended option for early-stage prototyping */
+  recommended: string
+  /** Tooltip description per option */
+  optionDescriptions: Record<string, string>
 }
 
 /**
@@ -61,6 +71,7 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
     id: "mfg_process",
     question: "Primary manufacturing process?",
     hint: "Determines supplier pool and cost structure",
+    recommended: "FDM 3D Print",
     options: [
       "FDM 3D Print",
       "SLA/Resin Print",
@@ -72,11 +83,32 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Manual/Assembly",
       "Other",
     ],
+    optionDescriptions: {
+      "FDM 3D Print":
+        "Fused filament deposition. Cheapest and fastest for prototypes. Weak layer adhesion limits structural use.",
+      "SLA/Resin Print":
+        "Photopolymer resin cured by UV light. Higher surface detail than FDM. Parts can be brittle; not suitable for high-stress applications.",
+      "SLS/Powder Print":
+        "Laser-sintered nylon powder. Strong, functional parts with good detail. Higher cost and longer lead time than FDM.",
+      "CNC Machining":
+        "Subtractive cutting from solid block. Excellent precision and strength. Higher cost, longer lead time, ideal for metal parts.",
+      "Sheet Metal":
+        "Laser cut and bent flat metal stock. Great for enclosures, brackets, and structural frames. Efficient at higher volumes.",
+      "Injection Molding":
+        "High-pressure plastic injection into a mold. Very low unit cost at scale but tooling costs are high. Best for 1k+ units.",
+      Casting:
+        "Metal or resin poured into a mold. Good for complex shapes in metal. Longer lead time and higher setup cost.",
+      "Manual/Assembly":
+        "Hand assembly of purchased or custom components. Flexible but labor-intensive. Common for wiring harnesses and custom assemblies.",
+      Other:
+        "A process not listed above. Add context in the notes field to help with supplier matching.",
+    },
   },
   {
     id: "material",
     question: "Material class?",
     hint: "Affects structural properties, cost, and lead time",
+    recommended: "PLA/PETG",
     options: [
       "PLA/PETG",
       "ABS/Nylon",
@@ -90,11 +122,36 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Wood/Plywood",
       "Other",
     ],
+    optionDescriptions: {
+      "PLA/PETG":
+        "Common FDM filaments. PLA is easy to print but brittle; PETG is tougher with better heat resistance. Ideal for prototypes.",
+      "ABS/Nylon":
+        "Engineering plastics with good impact resistance and heat tolerance. ABS can warp; Nylon absorbs moisture. Better for functional parts.",
+      "Resin (standard)":
+        "General-purpose photopolymer for SLA/DLP printing. High detail, smooth surface. Can be brittle under load.",
+      "Aluminum 6061":
+        "Most common structural aluminum alloy. Excellent strength-to-weight ratio, good machinability, corrosion resistant.",
+      "Steel (mild)":
+        "Low-carbon steel. Strong and cheap but heavy and prone to rust. Good for structural frames and brackets.",
+      "Stainless Steel":
+        "Corrosion-resistant steel alloy. Harder to machine than mild steel. Used when rust resistance or aesthetics are required.",
+      Titanium:
+        "High strength, very light, corrosion resistant. Expensive and difficult to machine. Used in aerospace and medical applications.",
+      "Copper/Brass":
+        "Good electrical and thermal conductivity. Brass is easy to machine. Used for connectors, heat sinks, and decorative parts.",
+      "Carbon Fiber":
+        "Extremely high strength-to-weight. Expensive and requires specialist fabrication. Used in aerospace, automotive, and performance applications.",
+      "Wood/Plywood":
+        "Easy to cut and join. Good for enclosures, jigs, and non-structural parts. Not suitable for wet or high-stress environments.",
+      Other:
+        "A material not listed above. Add context to help with supplier matching.",
+    },
   },
   {
     id: "tolerance",
     question: "Tolerance class?",
     hint: "Tighter tolerances increase cost and reduce supplier options",
+    recommended: "Standard (±0.5mm)",
     options: [
       "Loose (±1mm)",
       "Standard (±0.5mm)",
@@ -102,11 +159,24 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Tight (±0.05mm)",
       "Ultra-tight (±0.01mm)",
     ],
+    optionDescriptions: {
+      "Loose (±1mm)":
+        "Acceptable for non-mating or decorative parts. Most FDM printers achieve this without tuning. Lowest cost.",
+      "Standard (±0.5mm)":
+        "Default for most prototype parts. Achievable with well-calibrated FDM or basic machining. Good cost-quality balance.",
+      "Precision (±0.1mm)":
+        "Required for parts that must fit together accurately. Achievable with SLS, CNC, or tuned SLA. Moderate cost increase.",
+      "Tight (±0.05mm)":
+        "For precision mechanical assemblies with moving parts. Requires CNC machining with careful setup. Significant cost increase.",
+      "Ultra-tight (±0.01mm)":
+        "Requires precision CNC, jig grinding, or specialized metrology. Very expensive. Only when truly necessary for function.",
+    },
   },
   {
     id: "finish",
     question: "Surface finish?",
     hint: "Post-processing adds time and cost",
+    recommended: "As-manufactured",
     options: [
       "As-manufactured",
       "Sanded/Deburred",
@@ -116,11 +186,27 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Plated",
       "N/A",
     ],
+    optionDescriptions: {
+      "As-manufactured":
+        "No post-processing beyond basic cleaning. Fastest and cheapest. Appropriate for prototype and internal parts.",
+      "Sanded/Deburred":
+        "Manual or mechanical removal of sharp edges and layer lines. Low cost, improves appearance and handling safety.",
+      "Painted/Coated":
+        "Spray paint, powder coat, or protective coating. Improves aesthetics and corrosion resistance. Adds 1–3 days.",
+      Anodized:
+        "Electrochemical surface treatment for aluminum. Hard, colorfast, corrosion resistant. Adds cost and 3–5 day lead time.",
+      Polished:
+        "Mirror or satin surface finish. Purely aesthetic or for reducing friction. Labor-intensive and expensive.",
+      Plated:
+        "Electroplated metal layer (nickel, chrome, gold). Improves corrosion resistance or conductivity. Specialist process.",
+      "N/A": "Surface finish not applicable to this part or process.",
+    },
   },
   {
     id: "batch_size",
     question: "Batch size?",
     hint: "Determines manufacturing method viability and unit economics",
+    recommended: "Prototype (1–5)",
     options: [
       "Prototype (1–5)",
       "Small batch (10–50)",
@@ -128,11 +214,24 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Production (500+)",
       "Mass production (10k+)",
     ],
+    optionDescriptions: {
+      "Prototype (1–5)":
+        "Early validation with minimal investment. FDM, SLA, and basic CNC are cost-effective. Unit cost is high but total spend is low.",
+      "Small batch (10–50)":
+        "Pre-production or pilot builds. SLS, sheet metal, and CNC become viable. Unit cost begins to fall.",
+      "Medium (50–500)":
+        "Low-volume production. Bridge tooling and cast parts become cost-effective. Requires design-for-manufacture review.",
+      "Production (500+)":
+        "Full production run. Injection molding and high-volume CNC economical. Requires robust quality control.",
+      "Mass production (10k+)":
+        "High-volume manufacturing. Tooling investment fully amortized. Requires offshore or high-volume domestic suppliers.",
+    },
   },
   {
     id: "environment",
     question: "Operating environment?",
     hint: "Affects material selection, sealing, and testing requirements",
+    recommended: "Indoor (office)",
     options: [
       "Indoor (office)",
       "Indoor (industrial)",
@@ -144,6 +243,26 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
       "Cleanroom",
       "Space/Vacuum",
     ],
+    optionDescriptions: {
+      "Indoor (office)":
+        "Controlled temperature and humidity. Minimal environmental stress. Most materials suitable. Lowest protection requirements.",
+      "Indoor (industrial)":
+        "Vibration, dust, oils, or elevated temperatures. Requires more robust materials and possibly IP-rated enclosures.",
+      "Outdoor (temperate)":
+        "UV exposure, rain, temperature cycling. Requires UV-stable materials, sealed enclosures, and corrosion-resistant fasteners.",
+      "Outdoor (harsh)":
+        "Extreme temperatures, wind, sand, or saltwater spray. Requires ruggedized design, IP67+ rating, and corrosion-resistant materials.",
+      "High temperature":
+        "Operating above 80°C. PLA unsuitable. Requires ABS, Nylon, PEEK, or metal. Thermal expansion must be accounted for.",
+      "Wet/Marine":
+        "Continuous water exposure. Requires stainless steel or coated fasteners, sealed electronics, and waterproof materials.",
+      Corrosive:
+        "Chemical exposure (acids, solvents, cleaning agents). Material compatibility check essential. Often requires PTFE, HDPE, or stainless.",
+      Cleanroom:
+        "Particulate and contamination control (ISO Class 5–8). Outgassing and particle generation must be minimized.",
+      "Space/Vacuum":
+        "Vacuum environment with extreme thermal cycling and radiation. Highly restricted material list. Requires specialist suppliers.",
+    },
   },
 ]
 
@@ -219,6 +338,23 @@ export function CadLabDiagnostics({
       [moduleId]: {
         ...(answers[moduleId] || {}),
         [questionId]: value,
+      },
+    })
+  }
+
+  const handleUseRecommended = (moduleId: string): void => {
+    const recommended = DIAGNOSTIC_QUESTIONS.reduce<Record<string, string>>(
+      (acc, q) => {
+        acc[q.id] = q.recommended
+        return acc
+      },
+      {}
+    )
+    onAnswersChange({
+      ...answers,
+      [moduleId]: {
+        ...(answers[moduleId] || {}),
+        ...recommended,
       },
     })
   }
@@ -330,6 +466,22 @@ export function CadLabDiagnostics({
                 {/* Expanded questionnaire */}
                 {isExpanded && (
                   <div className="border-t p-4 space-y-5 bg-muted/10">
+                    {/* "Use recommended answers" button — only when unanswered questions remain */}
+                    {!isComplete && (
+                      <div className="flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5"
+                          onClick={() => handleUseRecommended(mod.id)}
+                          type="button"
+                        >
+                          <Lightbulb className="h-3.5 w-3.5" />
+                          Use recommended answers
+                        </Button>
+                      </div>
+                    )}
+
                     {DIAGNOSTIC_QUESTIONS.map((q) => {
                       const currentAnswer = modAnswers[q.id]
                       return (
@@ -343,24 +495,42 @@ export function CadLabDiagnostics({
                             </p>
                           </div>
                           <div className="flex flex-wrap gap-1.5">
-                            {q.options.map((opt) => (
-                              <Button
-                                key={opt}
-                                variant={
-                                  currentAnswer === opt
-                                    ? "default"
-                                    : "outline"
-                                }
-                                size="sm"
-                                className="text-xs h-7"
-                                onClick={() =>
-                                  handleAnswer(mod.id, q.id, opt)
-                                }
-                                type="button"
-                              >
-                                {opt}
-                              </Button>
-                            ))}
+                            {q.options.map((opt) => {
+                              const isSelected = currentAnswer === opt
+                              const isRecommended = q.recommended === opt
+                              return (
+                                <Tooltip key={opt}>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant={isSelected ? "default" : "outline"}
+                                      size="sm"
+                                      className={cn(
+                                        "text-xs h-7",
+                                        !isSelected && isRecommended &&
+                                          "ring-1 ring-international-orange/40"
+                                      )}
+                                      onClick={() =>
+                                        handleAnswer(mod.id, q.id, opt)
+                                      }
+                                      type="button"
+                                    >
+                                      {!isSelected && isRecommended && (
+                                        <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
+                                      )}
+                                      {opt}
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    side="bottom"
+                                    className="max-w-[250px] z-[300]"
+                                  >
+                                    <p className="text-xs leading-relaxed">
+                                      {q.optionDescriptions[opt] ?? opt}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )
+                            })}
                           </div>
                         </div>
                       )
