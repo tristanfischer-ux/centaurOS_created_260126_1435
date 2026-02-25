@@ -20,6 +20,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -184,6 +185,12 @@ export async function researchAndCreateGrammar(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       return { success: false, error: "Authentication required", tokensIn: 0, tokensOut: 0 }
+    }
+
+    // SECURITY: Rate limit AI calls
+    const rateLimitError = await checkRateLimit('aiGrammar', user.id)
+    if (rateLimitError) {
+      return { success: false, error: rateLimitError, tokensIn: 0, tokensOut: 0 }
     }
 
     // ── Step 1: Research the domain ──

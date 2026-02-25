@@ -28,6 +28,7 @@ import type {
     OutreachEmail,
     OutreachKBEntry,
 } from '@/types/outreach'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -567,7 +568,11 @@ export async function researchContact(
 ): Promise<{ success?: boolean; error?: string }> {
     const ctx = await getAuthContext()
     if ('error' in ctx) return { error: ctx.error }
-    const { supabase, foundry_id } = ctx
+    const { supabase, user, foundry_id } = ctx
+
+    // SECURITY: Rate limit AI calls
+    const rateLimitError = await checkRateLimit('aiOutreach', user.id)
+    if (rateLimitError) return { error: rateLimitError }
 
     // Fetch campaign and contact
     const [campaignRes, contactRes] = await Promise.all([
@@ -648,6 +653,10 @@ export async function generateSequenceForContact(
     const ctx = await getAuthContext()
     if ('error' in ctx) return { error: ctx.error }
     const { supabase, user, foundry_id } = ctx
+
+    // SECURITY: Rate limit AI calls
+    const rateLimitError = await checkRateLimit('aiOutreach', user.id)
+    if (rateLimitError) return { error: rateLimitError }
 
     // Fetch campaign, contact, and knowledge base in parallel
     const [campaignRes, contactRes, kbRes] = await Promise.all([

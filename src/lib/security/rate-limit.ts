@@ -100,6 +100,8 @@ export const RATE_LIMIT_CONFIGS = {
     aiCadLab: { limit: 30, window: 60 * 1000 },           // 30 The Forge generations per minute (batch generates 2 calls per module × up to 10 modules)
     aiSmartGoal: { limit: 10, window: 60 * 1000 },        // 10 SMART goal suggestions per minute
     aiStrategicPlan: { limit: 5, window: 60 * 1000 },     // 5 strategic plans per minute
+    aiOutreach: { limit: 5, window: 60 * 1000 },            // 5 outreach AI calls per minute (heavy multi-turn)
+    aiGrammar: { limit: 20, window: 60 * 1000 },             // 20 grammar AI calls per minute (research uses 3 per invocation)
     
     // Telegram bot
     telegram: { limit: 20, window: 60 * 60 * 1000 },      // 20 commands per hour

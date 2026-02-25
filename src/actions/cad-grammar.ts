@@ -22,6 +22,7 @@ import type { CadLabResult } from "@/lib/cad-lab-types"
 import { createClient } from "@/lib/supabase/server"
 import { researchAndCreateGrammar } from "@/actions/cad-grammar-research"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -355,6 +356,18 @@ export async function selectGrammar(
     }
   }
 
+  // SECURITY: Rate limit AI calls
+  const rateLimitError = await checkRateLimit('aiGrammar', user.id)
+  if (rateLimitError) {
+    return {
+      found: false,
+      grammar: null,
+      confidence: 0,
+      reasoning: rateLimitError,
+      shouldFallback: false,
+    }
+  }
+
   // Fetch all available grammars (metadata only)
   const registry = await fetchGrammarRegistry()
 
@@ -478,6 +491,35 @@ export async function extractGrammarParams(
   grammar: CadGrammar,
   productDescription: string,
 ): Promise<GrammarParamsResult> {
+  // AUTH: Verify authenticated user
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return {
+      success: false,
+      error: "Authentication required",
+      params: {},
+      reasoning: "",
+      defaultedParams: [],
+      tokensIn: 0,
+      tokensOut: 0,
+    }
+  }
+
+  // SECURITY: Rate limit AI calls
+  const rateLimitError = await checkRateLimit('aiGrammar', user.id)
+  if (rateLimitError) {
+    return {
+      success: false,
+      error: rateLimitError,
+      params: {},
+      reasoning: "",
+      defaultedParams: [],
+      tokensIn: 0,
+      tokensOut: 0,
+    }
+  }
+
   // Build parameter documentation
   const paramDocs = grammar.paramSpecs.map((p) => {
     let doc = `- **${p.name}** (${p.type}${p.unit ? `, ${p.unit}` : ""}): ${p.description}`
