@@ -171,13 +171,12 @@ test.describe.serial('Finance Phase 2 CRUD', () => {
       await expect(targetRow.locator('text=Delete?')).toBeVisible({ timeout: 3000 })
 
       await trashBtn.click({ force: true })
-      await page.waitForTimeout(800)
 
-      const newRowCount = await txRows.count()
-      expect(newRowCount).toBe(rowCount - 1)
+      // Wait for the row to disappear (server action completes + React state updates)
+      await expect(txRows).toHaveCount(rowCount - 1, { timeout: 10000 })
 
       foundDeletable = true
-      console.log(`✅ Transaction deleted — rows: ${rowCount} → ${newRowCount}`)
+      console.log(`✅ Transaction deleted — rows: ${rowCount} → ${rowCount - 1}`)
       break
     }
 
