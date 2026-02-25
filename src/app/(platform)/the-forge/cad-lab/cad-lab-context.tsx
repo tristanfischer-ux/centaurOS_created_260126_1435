@@ -614,11 +614,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         addProgressLine(`Planning dimensions for ${mod.name}...`)
         const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
         if (res.success) {
-          const updated = modules.map((m) =>
-            m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
-          )
-          setModules(updated)
-          if (activeProjectId) {
+          let updated: CadLabModule[] | null = null
+          setModules((prev) => {
+            updated = prev.map((m) =>
+              m.id === moduleId ? { ...m, interfaceDefinition: res.interfaceDefinition, status: "interface_ready" as const } : m,
+            )
+            return updated
+          })
+          if (activeProjectId && updated) {
             await saveCadLabModules(activeProjectId, updated)
             setLastSaved(new Date().toISOString())
           }
@@ -650,11 +653,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         }
 
         const data = await response.json() as { done: boolean; module: CadLabModule }
-        const updated = modules.map((m) =>
-          m.id === moduleId ? data.module : m,
-        )
-        setModules(updated)
-        if (activeProjectId) {
+        let updated: CadLabModule[] | null = null
+        setModules((prev) => {
+          updated = prev.map((m) => (m.id === moduleId ? data.module : m))
+          return updated
+        })
+        if (activeProjectId && updated) {
           await saveCadLabModules(activeProjectId, updated)
           setLastSaved(new Date().toISOString())
         }

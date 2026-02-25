@@ -5,16 +5,17 @@
  *
  * @description Visual process flow showing how modules connect via inputs/outputs.
  * Renders module nodes in a responsive grid with hover-to-trace interaction.
- * Connections are grouped by signal type (Power, Data, Mechanical, Thermal).
+ * Connections are grouped by source module with signal-type coloring.
  *
  * FLOW: Parent passes CadLabModule[] → buildEdges() matches outputs→inputs →
- *       cards + connection pills rendered with hover-highlight traceability.
+ *       cards + connection rows rendered with hover-highlight traceability.
  */
 
 import { useMemo, useState } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, Box } from "lucide-react"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { cn } from "@/lib/utils"
+import { ForgeSectionHeader } from "../../components/forge-hover-explanations"
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
 
@@ -184,21 +185,16 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
     return counts
   }, [nodes, edges])
 
-  /** Edges grouped by signal type, ordered by SIGNAL_CONFIG key order. */
-  const edgesBySignalType = useMemo(() => {
-    const groups = new Map<SignalType, (FlowEdge & { fromName: string; toName: string })[]>()
+  /** Edges grouped by source module for the connections list. */
+  const groupedEdges = useMemo(() => {
+    const groups = new Map<string, { sourceName: string; edges: (FlowEdge & { toName: string })[] }>()
     for (const edge of edges) {
-      const fromName = nodes.find((n) => n.id === edge.from)?.name ?? edge.from
+      const sourceName = nodes.find((n) => n.id === edge.from)?.name ?? edge.from
       const toName = nodes.find((n) => n.id === edge.to)?.name ?? edge.to
-      if (!groups.has(edge.signalType)) groups.set(edge.signalType, [])
-      groups.get(edge.signalType)!.push({ ...edge, fromName, toName })
+      if (!groups.has(edge.from)) groups.set(edge.from, { sourceName, edges: [] })
+      groups.get(edge.from)!.edges.push({ ...edge, toName })
     }
-    const ordered: [SignalType, (FlowEdge & { fromName: string; toName: string })[]][] = []
-    for (const type of Object.keys(SIGNAL_CONFIG) as SignalType[]) {
-      const group = groups.get(type)
-      if (group && group.length > 0) ordered.push([type, group])
-    }
-    return ordered
+    return Array.from(groups.values())
   }, [edges, nodes])
 
   /* ── Empty state ─────────────────────────────────────────────────────── */
@@ -308,50 +304,65 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
           })}
         </div>
 
-        {/* ── Connections grouped by signal type ────────────────────────── */}
+        {/* ── Connections grouped by source module ────────────────────── */}
         {edges.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-border space-y-4">
-            <p className="text-xs font-semibold text-foreground">
-              Connections <span className="text-muted-foreground font-normal">({edges.length})</span>
+          <div className="mt-5 pt-4 border-t border-border">
+            <div className="mb-1">
+              <ForgeSectionHeader
+                title="Module Connections"
+                description="Shows where one module's output feeds into another module's input. If a connection is missing or mismatched, it signals a potential integration gap in your design."
+                detail="Connections are matched by comparing the input and output labels across your modules. Two or more shared keywords between an output and an input create a connection."
+              >
+                <span className="text-xs font-semibold text-foreground">
+                  Connections <span className="text-muted-foreground font-normal">({edges.length})</span>
+                </span>
+              </ForgeSectionHeader>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-3">
+              Matched by shared inputs and outputs between modules
             </p>
 
-            {edgesBySignalType.map(([signalType, groupEdges]) => {
-              const config = SIGNAL_CONFIG[signalType]
-              return (
-                <div key={signalType}>
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <div className={cn("h-2 w-2 rounded-full", config.dot)} />
-                    <p className="text-[11px] font-medium text-foreground">
-                      {config.label} <span className="text-muted-foreground font-normal">({groupEdges.length})</span>
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                    {groupEdges.map((e, i) => {
-                      const isHighlighted = hoveredModuleId === e.from || hoveredModuleId === e.to
+            <div className="space-y-4">
+              {groupedEdges.map((group) => (
+                <div key={group.sourceName}>
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                    From {group.sourceName}
+                  </p>
+                  <div className="space-y-1.5">
+                    {group.edges.map((edge, i) => {
+                      const config = SIGNAL_CONFIG[edge.signalType]
+                      const isHighlighted = hoveredModuleId === edge.from || hoveredModuleId === edge.to
                       const isEdgeDimmed = hoveredModuleId !== null && !isHighlighted
                       return (
                         <div
                           key={i}
                           className={cn(
-                            "flex items-center gap-2 text-xs rounded-md px-2.5 py-1.5 border transition-all duration-200",
-                            isHighlighted && [config.activeBorder, config.activeBg, "text-foreground"],
-                            isEdgeDimmed && "border-border bg-muted/10 text-muted-foreground opacity-40",
-                            !hoveredModuleId && "border-border bg-muted/20 text-foreground",
+                            "rounded-md px-3 py-2 border transition-all duration-200",
+                            isHighlighted && [config.activeBorder, config.activeBg],
+                            isEdgeDimmed && "border-border bg-muted/10 opacity-40",
+                            !hoveredModuleId && "border-border bg-muted/20 hover:bg-muted/40",
                           )}
                         >
-                          <span className="font-medium truncate">{e.fromName}</span>
-                          <span className={cn("flex-shrink-0", config.text)}>&rarr;</span>
-                          <span className="font-medium truncate">{e.toName}</span>
+                          <div className="flex items-center gap-2 text-xs">
+                            <div className={cn("h-2 w-2 rounded-full flex-shrink-0", config.dot)} />
+                            <span className={cn("flex-shrink-0", config.text)}>&rarr;</span>
+                            <span className="font-medium text-foreground">{edge.toName}</span>
+                          </div>
+                          {edge.label && (
+                            <p className="text-[10px] text-muted-foreground mt-0.5 ml-7">
+                              {edge.label}
+                            </p>
+                          )}
                         </div>
                       )
                     })}
                   </div>
                 </div>
-              )
-            })}
+              ))}
+            </div>
 
             {/* Signal type legend */}
-            <div className="flex flex-wrap items-center gap-4 pt-2 border-t border-border text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-4 pt-3 mt-4 border-t border-border text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Signal types:</span>
               {(Object.keys(SIGNAL_CONFIG) as SignalType[]).map((type) => (
                 <span key={type} className="flex items-center gap-1">
