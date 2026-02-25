@@ -31,6 +31,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import type { User } from '@supabase/supabase-js'
 
 /**
@@ -113,7 +114,7 @@ export async function withAuth<T>(
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
     })
-    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' } as T
+    return { error: sanitizeErrorMessage(error) } as T
   }
 }
 
@@ -155,6 +156,6 @@ export async function withUser<T>(
     console.error('[withUser] Unexpected error in server action:', {
       error: error instanceof Error ? error.message : 'Unknown error',
     })
-    return { error: error instanceof Error ? error.message : 'An unexpected error occurred' } as T
+    return { error: sanitizeErrorMessage(error) } as T
   }
 }
