@@ -33,3 +33,38 @@ scripts/*_stderr.log
 .expo/
 apps/mobile/.expo/
 apps/web/tsconfig.tsbuildinfo
+
+# Local test screenshots
+*.png
+!public/**/*.png
+!src/**/*.png
+
+# One-off test/debug scripts in root
+/test-*.ts
+/get-*.ts
+/debug-*.ts
+/verify-*.ts
+
+# E2E one-off tests (keep e2e/walkthrough/ and e2e/smoke/)
+/e2e/*check*.spec.ts
+/e2e/*verify*.spec.ts
+/e2e/*test-*.spec.ts
+/e2e/*manual*.spec.ts
+/e2e/*simple*.spec.ts
+
+# SQL migration markers
+*.sql.applied
+*.sql.done
+*.sql.skip
+
+# Local test artifacts
+_archive/
+e2e-results/
+*-screenshots/
+mobile-verification/
+settings-verification/
+
+# HTML debug dumps
+*.html
+!public/**/*.html
+!src/**/*.html
