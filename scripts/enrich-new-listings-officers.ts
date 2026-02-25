@@ -158,23 +158,39 @@ async function fetchSICCodes(companyNumber: string): Promise<{ sicCodes: string[
 // ---------------------------------------------------------------------------
 
 async function main() {
-  // Fetch listings that have a ch_company_number but no ch_directors
-  let query = supabase
-    .from("marketplace_listings")
-    .select("id, attributes")
-    .not("attributes->>ch_company_number", "is", null)
-    .is("attributes->>ch_directors", null)
+  // INTENT: Listings use two different attribute key names for CH company numbers.
+  // Older listings use "companies_house_number", newer ones use "ch_company_number".
+  // We query both keys and deduplicate to cover the full dataset.
+  const allListings: { id: string; attributes: Record<string, unknown> }[] = []
+  const seenIds = new Set<string>()
 
-  if (LIMIT) query = query.limit(LIMIT)
+  for (const attrKey of ["ch_company_number", "companies_house_number"]) {
+    let query = supabase
+      .from("marketplace_listings")
+      .select("id, attributes")
+      .not(`attributes->>${attrKey}`, "is", null)
+      .is("attributes->>ch_directors", null)
 
-  const { data: listings, error } = await query
+    if (LIMIT) query = query.limit(LIMIT)
 
-  if (error) {
-    console.error("Query failed:", error.message)
-    process.exit(1)
+    const { data, error } = await query
+
+    if (error) {
+      console.error(`Query failed (${attrKey}):`, error.message)
+      process.exit(1)
+    }
+
+    for (const row of data ?? []) {
+      if (!seenIds.has(row.id)) {
+        seenIds.add(row.id)
+        allListings.push(row as { id: string; attributes: Record<string, unknown> })
+      }
+    }
   }
 
-  if (!listings || listings.length === 0) {
+  const listings = allListings
+
+  if (listings.length === 0) {
     console.log("No listings need officer enrichment. All done.")
     return
   }
@@ -187,21 +203,34 @@ async function main() {
   for (let i = 0; i < listings.length; i++) {
     const listing = listings[i]
     const attrs = listing.attributes as Record<string, unknown>
-    const companyNumber = attrs.ch_company_number as string
+    const companyNumber = (attrs.ch_company_number ?? attrs.companies_house_number) as string
 
-    // Rate limit: 2 API calls per listing (officers + PSC), sometimes 3 (SIC)
-    // 0.15s between each call = ~6.5/sec, well within 600/min
-    if (i > 0) await sleep(150)
+    // Rate limit: 3 API calls per listing (officers + PSC + SIC profile).
+    // CH free tier = 600 req/min = 10/sec. With 3 calls per listing we need
+    // ~0.35s between calls to stay under limit. Use 0.4s for safety.
+    if (i > 0) await sleep(400)
 
     // Fetch officers
     const { officers, error: offErr } = await fetchOfficers(companyNumber)
     if (offErr) {
-      console.log(`[${i + 1}/${listings.length}] ${companyNumber} — officers ERROR: ${offErr}`)
-      errored++
-      continue
+      if (offErr.includes("429")) {
+        console.log(`[${i + 1}/${listings.length}] ${companyNumber} — rate limited, backing off 10s...`)
+        await sleep(10000)
+        const retry = await fetchOfficers(companyNumber)
+        if (retry.error) {
+          console.log(`[${i + 1}/${listings.length}] ${companyNumber} — officers ERROR after retry: ${retry.error}`)
+          errored++
+          continue
+        }
+        Object.assign(officers, retry.officers)
+      } else {
+        console.log(`[${i + 1}/${listings.length}] ${companyNumber} — officers ERROR: ${offErr}`)
+        errored++
+        continue
+      }
     }
 
-    await sleep(150)
+    await sleep(400)
 
     // Fetch PSC
     const { psc, error: pscErr } = await fetchPSC(companyNumber)
@@ -212,7 +241,7 @@ async function main() {
     // Fetch SIC codes if not already present
     let sicCodes = attrs.ch_sic_codes as string[] | null
     if (!sicCodes) {
-      await sleep(150)
+      await sleep(400)
       const { sicCodes: fetched, error: sicErr } = await fetchSICCodes(companyNumber)
       if (!sicErr) sicCodes = fetched
     }
