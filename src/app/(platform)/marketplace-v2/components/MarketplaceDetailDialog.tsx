@@ -38,6 +38,8 @@ import {
     Loader2,
     Building2,
     Calendar,
+    Globe,
+    Mail,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
@@ -341,7 +343,7 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                             Book Now
                                         </Link>
                                     </Button>
-                                ) : (
+                                ) : attrs.provider_id ? (
                                     <Button
                                         className="flex-1 gap-2 h-12"
                                         onClick={handleSendEnquiry}
@@ -354,6 +356,27 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                                         )}
                                         {listing.category === 'Products' ? 'Request Quote' :
                                          listing.category === 'AI' ? 'Get Started' : 'Send Enquiry'}
+                                    </Button>
+                                ) : attrs.contact_email ? (
+                                    <Button className="flex-1 gap-2 h-12" asChild>
+                                        <a href={`mailto:${attrs.contact_email}?subject=Enquiry about ${listing.title}`}>
+                                            <Mail className="w-4 h-4" />
+                                            Send Enquiry
+                                        </a>
+                                    </Button>
+                                ) : attrs.website_url ? (
+                                    <Button className="flex-1 gap-2 h-12" asChild>
+                                        <a href={String(attrs.website_url)} target="_blank" rel="noopener noreferrer">
+                                            <Globe className="w-4 h-4" />
+                                            Visit Website
+                                        </a>
+                                    </Button>
+                                ) : (
+                                    <Button className="flex-1 gap-2 h-12" asChild>
+                                        <Link href={`/marketplace/${listing.id}`}>
+                                            <ExternalLink className="w-4 h-4" />
+                                            View Full Profile
+                                        </Link>
                                     </Button>
                                 )}
                             </div>

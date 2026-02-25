@@ -295,6 +295,12 @@ export function MarketplaceBrowse({
                             onCompanyTypeClick={handleCompanyTypeClick}
                             onCompanySizeClick={handleCompanySizeClick}
                             onRegionClick={handleRegionClick}
+                            hasActiveFilters={
+                              (state.advancedFilters.companyTypes?.length ?? 0) > 0 ||
+                              (state.advancedFilters.companySizes?.length ?? 0) > 0 ||
+                              state.selectedSubRegions.length > 0
+                            }
+                            onClearFilters={state.clearFilters}
                         />
                     )}
 

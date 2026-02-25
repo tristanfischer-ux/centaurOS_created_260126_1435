@@ -87,109 +87,78 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
     }
   }
 
-  // ── Compute stats ──────────────────────────────────────────────────────
+  // ── Compute stats (single pass) ─────────────────────────────────────────
 
   const totalListings = allRows.length
-  const verifiedCount = allRows.filter((r) => r.is_verified === true).length
-
-  // Company type counts
+  const currentYear = new Date().getFullYear()
+  let verifiedCount = 0
+  let totalAge = 0
+  let ageCount = 0
   const typeCounts = new Map<string, number>()
+  const sizeCounts = new Map<string, number>()
+  const regionMap = new Map<string, number>()
+
   for (const row of allRows) {
     const attrs = row.attributes as Record<string, unknown> | null
-    const companyType = attrs?.company_type as string | undefined
+
+    // Verified count
+    if (row.is_verified === true) verifiedCount++
+
+    if (!attrs) continue
+
+    // Company type
+    const companyType = attrs.company_type as string | undefined
     if (companyType) {
       typeCounts.set(companyType, (typeCounts.get(companyType) ?? 0) + 1)
     }
-  }
-  const companyTypeCounts = [...typeCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([name, count]) => ({ name, count }))
 
-  const manufacturingTypes = typeCounts.size
-
-  // Company size counts
-  const sizeCounts = new Map<string, number>()
-  for (const row of allRows) {
-    const attrs = row.attributes as Record<string, unknown> | null
-    const size = (attrs?.ch_company_size as string) || (attrs?.company_size as string)
+    // Company size
+    const size = (attrs.ch_company_size as string) || (attrs.company_size as string)
     if (size) {
       sizeCounts.set(size, (sizeCounts.get(size) ?? 0) + 1)
     }
-  }
-  const companySizeCounts = [...sizeCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => ({ name, count }))
 
-  // Region counts — derive from ch_registered_address postal code or location
-  const regionMap = new Map<string, number>()
-  for (const row of allRows) {
-    const attrs = row.attributes as Record<string, unknown> | null
-    if (!attrs) continue
-
+    // Region — derive from postal code or keywords
     let region: string | null = null
 
-    // Try ch_registered_address first (has postal code)
     const chAddress = attrs.ch_registered_address as string | undefined
     if (chAddress) {
       const postcode = extractPostcode(chAddress)
-      if (postcode) {
-        region = deriveRegionFromPostcode(postcode)
-      }
+      if (postcode) region = deriveRegionFromPostcode(postcode)
     }
 
-    // Fallback: try location attribute
     if (!region) {
       const location = attrs.location as string | undefined
       if (location) {
         const postcode = extractPostcode(location)
-        if (postcode) {
-          region = deriveRegionFromPostcode(postcode)
-        }
+        if (postcode) region = deriveRegionFromPostcode(postcode)
       }
     }
 
-    // Fallback: try headquarters
     if (!region) {
       const hq = attrs.headquarters as string | undefined
       if (hq) {
         const postcode = extractPostcode(hq)
-        if (postcode) {
-          region = deriveRegionFromPostcode(postcode)
-        }
+        if (postcode) region = deriveRegionFromPostcode(postcode)
       }
     }
 
-    // Fallback: keyword-based matching on any location-like field
     if (!region) {
       const locationText = (attrs.ch_registered_address as string)
         ?? (attrs.location as string)
         ?? (attrs.headquarters as string)
-      if (locationText) {
-        region = deriveRegionFromKeywords(locationText)
-      }
+      if (locationText) region = deriveRegionFromKeywords(locationText)
     }
 
     if (region) {
       regionMap.set(region, (regionMap.get(region) ?? 0) + 1)
     }
-  }
-  const regionCounts = [...regionMap.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, count]) => ({ name, count }))
 
-  const regionCount = regionMap.size
-
-  // Average company age from incorporation dates
-  const currentYear = new Date().getFullYear()
-  let totalAge = 0
-  let ageCount = 0
-  for (const row of allRows) {
-    const attrs = row.attributes as Record<string, unknown> | null
+    // Company age
     const incDate =
-      (attrs?.ch_incorporation_date as string) ??
-      (attrs?.incorporation_date as string) ??
-      (attrs?.founded_year as string)
+      (attrs.ch_incorporation_date as string) ??
+      (attrs.incorporation_date as string) ??
+      (attrs.founded_year as string)
     if (incDate) {
       const year = parseInt(incDate.slice(0, 4), 10)
       if (!isNaN(year) && year > 1800 && year <= currentYear) {
@@ -198,6 +167,23 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
       }
     }
   }
+
+  const companyTypeCounts = [...typeCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([name, count]) => ({ name, count }))
+
+  const manufacturingTypes = typeCounts.size
+
+  const companySizeCounts = [...sizeCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }))
+
+  const regionCounts = [...regionMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }))
+
+  const regionCount = regionMap.size
   const avgCompanyAge = ageCount > 0 ? Math.round(totalAge / ageCount) : null
 
   return {

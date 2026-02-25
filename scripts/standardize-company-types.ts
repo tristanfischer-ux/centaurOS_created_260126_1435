@@ -209,6 +209,55 @@ const PATTERN_RULES: { test: (val: string) => boolean; canonical: string }[] = [
   { test: (v) => v.includes("Casting") && v !== "Casting", canonical: "Casting" },
   // Clean up placeholder entries
   { test: (v) => v === "placeholder", canonical: "" },
+  // ── VC-backed hardware & remaining unmapped types ──
+  {
+    test: (v) => /ai.*(chip|silicon|hardware|compute|accelerat)/i.test(v),
+    canonical: "AI & Compute Hardware",
+  },
+  { test: (v) => /quantum/i.test(v), canonical: "Quantum Technology" },
+  {
+    test: (v) => /robot|autonomous/i.test(v),
+    canonical: "Robotics & Automation",
+  },
+  {
+    test: (v) => /clean.?tech|green.?tech|carbon/i.test(v),
+    canonical: "Clean Technology",
+  },
+  {
+    test: (v) => /space|satellite|launch/i.test(v),
+    canonical: "Space Technology",
+  },
+  {
+    test: (v) => /bio.?tech|life.?science|pharma/i.test(v),
+    canonical: "Biotechnology",
+  },
+  {
+    test: (v) => /semicon/i.test(v),
+    canonical: "Semiconductor Manufacturing",
+  },
+  {
+    test: (v) => /fibre|fiber|optical/i.test(v),
+    canonical: "Fibre Optics & Photonics",
+  },
+  {
+    test: (v) => /drone|uav/i.test(v),
+    canonical: "Drone & UAV Manufacturing",
+  },
+  {
+    test: (v) => /batter|energy.?storage/i.test(v),
+    canonical: "Battery & Energy Storage",
+  },
+  { test: (v) => /packaging/i.test(v), canonical: "Packaging Manufacturing" },
+  {
+    test: (v) => /textile|weav|knit/i.test(v),
+    canonical: "Textile Manufacturing",
+  },
+  { test: (v) => /glass/i.test(v), canonical: "Glass Manufacturing" },
+  { test: (v) => /ceramic/i.test(v), canonical: "Ceramic Manufacturing" },
+  {
+    test: (v) => /metrol|inspect|testing.*lab/i.test(v),
+    canonical: "Metrology & Testing",
+  },
 ];
 
 // ---------------------------------------------------------------------------

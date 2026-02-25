@@ -16,18 +16,22 @@ export const POSTCODE_REGION_MAP: Record<string, string> = {
   BN: "South East", CT: "South East", GU: "South East", HP: "South East",
   ME: "South East", MK: "South East", OX: "South East", PO: "South East",
   RG: "South East", RH: "South East", SL: "South East", SO: "South East",
-  TN: "South East", AL: "South East", CM: "South East", CO: "South East",
+  TN: "South East", AL: "South East",
   DA: "South East", EN: "South East", HA: "South East", IG: "South East",
   KT: "South East", LU: "South East", RM: "South East", SG: "South East",
-  SM: "South East", SS: "South East", TW: "South East", UB: "South East",
+  SM: "South East", TW: "South East", UB: "South East",
   WD: "South East", BR: "South East", CR: "South East",
+  // East of England
+  NR: "East of England", IP: "East of England", CO: "East of England",
+  CM: "East of England", CB: "East of England", PE: "East of England",
+  SS: "East of England",
   // South West
   BA: "South West", BH: "South West", BS: "South West", DT: "South West",
   EX: "South West", GL: "South West", PL: "South West", SN: "South West",
   SP: "South West", TA: "South West", TQ: "South West", TR: "South West",
   // Midlands
   B: "Midlands", CV: "Midlands", DE: "Midlands", DY: "Midlands",
-  LE: "Midlands", NG: "Midlands", NN: "Midlands", PE: "Midlands",
+  LE: "Midlands", NG: "Midlands", NN: "Midlands",
   ST: "Midlands", TF: "Midlands", WR: "Midlands", WS: "Midlands",
   WV: "Midlands", HR: "Midlands", SY: "Midlands",
   // North West
@@ -97,8 +101,12 @@ export const CITY_REGION_MAP: Record<string, string> = {
   southampton: "South East", portsmouth: "South East", guildford: "South East",
   canterbury: "South East", crawley: "South East", slough: "South East",
   "milton keynes": "South East", basingstoke: "South East", maidstone: "South East",
-  watford: "South East", luton: "South East", chelmsford: "South East",
-  colchester: "South East", "st albans": "South East", "high wycombe": "South East",
+  watford: "South East", luton: "South East",
+  "st albans": "South East", "high wycombe": "South East",
+  // East of England
+  norwich: "East of England", cambridge: "East of England",
+  ipswich: "East of England", colchester: "East of England",
+  chelmsford: "East of England", peterborough: "East of England",
   // South West
   bristol: "South West", bath: "South West", exeter: "South West",
   plymouth: "South West", gloucester: "South West", swindon: "South West",
@@ -108,7 +116,8 @@ export const CITY_REGION_MAP: Record<string, string> = {
   birmingham: "Midlands", coventry: "Midlands", leicester: "Midlands",
   nottingham: "Midlands", derby: "Midlands", wolverhampton: "Midlands",
   stoke: "Midlands", "stoke-on-trent": "Midlands", telford: "Midlands",
-  worcester: "Midlands", peterborough: "Midlands", northampton: "Midlands",
+  worcester: "Midlands", northampton: "Midlands",
+  shrewsbury: "Midlands", hereford: "Midlands",
   "west midlands": "Midlands", "east midlands": "Midlands",
   // North West
   manchester: "North West", liverpool: "North West", chester: "North West",
@@ -130,12 +139,15 @@ export const CITY_REGION_MAP: Record<string, string> = {
   edinburgh: "Scotland", glasgow: "Scotland", aberdeen: "Scotland",
   dundee: "Scotland", inverness: "Scotland", stirling: "Scotland",
   perth: "Scotland", paisley: "Scotland", kilmarnock: "Scotland",
+  dumfries: "Scotland",
   // Wales
   cardiff: "Wales", swansea: "Wales", newport: "Wales",
   wrexham: "Wales", bangor: "Wales", llanelli: "Wales",
+  aberystwyth: "Wales",
   // Northern Ireland
   belfast: "Northern Ireland", derry: "Northern Ireland",
   lisburn: "Northern Ireland", newry: "Northern Ireland",
+  armagh: "Northern Ireland",
 }
 
 /**

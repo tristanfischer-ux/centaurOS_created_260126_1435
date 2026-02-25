@@ -24,6 +24,7 @@ import {
   Calendar,
   Users,
   Briefcase,
+  Filter,
 } from 'lucide-react'
 import {
   BarChart,
@@ -77,6 +78,8 @@ interface MarketplaceStatsSectionProps {
   onCompanyTypeClick?: (type: string) => void
   onCompanySizeClick?: (size: string) => void
   onRegionClick?: (region: string) => void
+  hasActiveFilters?: boolean
+  onClearFilters?: () => void
 }
 
 // ─── Size color mapping for donut chart ─────────────────────────────────────
@@ -159,6 +162,8 @@ export function MarketplaceStatsSection({
   onCompanyTypeClick,
   onCompanySizeClick,
   onRegionClick,
+  hasActiveFilters,
+  onClearFilters,
 }: MarketplaceStatsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -238,6 +243,19 @@ export function MarketplaceStatsSection({
             )}
           </div>
 
+          {/* Filter indicator (Fix 5) */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-1.5">
+              <Filter className="h-3 w-3" />
+              <span>Showing filtered view — click chart segments to toggle</span>
+              {onClearFilters && (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs ml-auto" onClick={onClearFilters}>
+                  Clear all
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Charts */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Manufacturing Type Distribution — Horizontal Bar */}
@@ -250,7 +268,7 @@ export function MarketplaceStatsSection({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
-                  <div className="h-[280px]">
+                  <div className="h-[200px] sm:h-[240px] md:h-[280px]" role="img" aria-label="Manufacturing type distribution bar chart showing top 12 types">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={typeData}
@@ -311,7 +329,7 @@ export function MarketplaceStatsSection({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
-                  <div className="h-[280px] relative">
+                  <div className="h-[200px] sm:h-[240px] md:h-[280px] relative" role="img" aria-label="Company size breakdown donut chart">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
@@ -397,7 +415,7 @@ export function MarketplaceStatsSection({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
-                  <div className="h-[280px]">
+                  <div className="h-[200px] sm:h-[240px] md:h-[280px]" role="img" aria-label="Regional coverage bar chart showing UK regions">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
                         data={regionCounts}

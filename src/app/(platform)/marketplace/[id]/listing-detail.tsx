@@ -42,6 +42,8 @@ import {
     MessageSquare,
     Loader2,
     ExternalLink,
+    Globe,
+    Mail,
 } from "lucide-react"
 import Link from "next/link"
 import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
@@ -137,7 +139,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                                 Book Consultation
                             </Link>
                         </Button>
-                    ) : (
+                    ) : attrs.provider_id ? (
                         <Button
                             variant="secondary"
                             onClick={handleContact}
@@ -155,22 +157,38 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                                 </>
                             )}
                         </Button>
+                    ) : attrs.contact_email ? (
+                        <Button variant="secondary" asChild>
+                            <a href={`mailto:${attrs.contact_email}?subject=Enquiry about ${listing.title}`}>
+                                <Mail className="h-4 w-4 mr-2" />
+                                Send Enquiry
+                            </a>
+                        </Button>
+                    ) : attrs.website_url ? (
+                        <Button variant="secondary" asChild>
+                            <a href={String(attrs.website_url)} target="_blank" rel="noopener noreferrer">
+                                <Globe className="h-4 w-4 mr-2" />
+                                Visit Website
+                            </a>
+                        </Button>
+                    ) : null}
+                    {attrs.provider_id && (
+                        <Button
+                            variant="default"
+                            onClick={handleContact}
+                            disabled={isContacting}
+                            className="bg-international-orange hover:bg-international-orange-hover"
+                        >
+                            {isContacting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Connecting...
+                                </>
+                            ) : (
+                                <MessageSquare className="h-4 w-4" />
+                            )}
+                        </Button>
                     )}
-                    <Button
-                        variant="default"
-                        onClick={handleContact}
-                        disabled={isContacting}
-                        className="bg-international-orange hover:bg-international-orange-hover"
-                    >
-                        {isContacting ? (
-                            <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Connecting...
-                            </>
-                        ) : (
-                            <MessageSquare className="h-4 w-4" />
-                        )}
-                    </Button>
                 </div>
             </div>
 
