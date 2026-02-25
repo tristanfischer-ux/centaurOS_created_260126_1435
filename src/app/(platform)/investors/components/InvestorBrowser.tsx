@@ -1,0 +1,292 @@
+/**
+ * @file InvestorBrowser.tsx
+ *
+ * @description Client component for the UK Investor Directory. Accepts server-fetched
+ * initial data and handles all interactive filter state: firm type tabs, search input
+ * (300ms debounce), active-deploying toggle, and pagination. Re-fetches from the
+ * searchInvestors server action when filters change.
+ */
+
+'use client'
+
+import { useState, useCallback, useEffect, useRef, useTransition } from 'react'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { InvestorCard } from './InvestorCard'
+import { searchInvestors } from '@/actions/investors'
+import { Search, X, RefreshCw, Building2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import type { InvestorFirm } from '@/actions/investors'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const FIRM_TYPES = ['All', 'VC', 'PE', 'Growth'] as const
+type FirmTypeFilter = typeof FIRM_TYPES[number]
+
+const PAGE_SIZE = 24
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+/**
+ * Skeleton grid shown while fetching.
+ */
+function InvestorGridSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Skeleton key={i} className="h-72 w-full rounded-xl" />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Empty state shown when no results match current filters.
+ */
+function EmptyState({ onClear }: { onClear: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
+      <div className="rounded-full bg-muted p-4">
+        <Building2 className="h-8 w-8 text-muted-foreground" />
+      </div>
+      <div className="space-y-1">
+        <p className="text-base font-semibold text-foreground">No investors found</p>
+        <p className="text-sm text-muted-foreground max-w-xs">
+          Try adjusting your filters or search term.
+        </p>
+      </div>
+      <Button variant="secondary" size="sm" onClick={onClear}>
+        <X className="h-4 w-4 mr-2" />
+        Clear filters
+      </Button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+interface InvestorBrowserProps {
+  initialFirms: InvestorFirm[]
+  initialTotal: number
+  initialHasMore: boolean
+}
+
+/**
+ * Interactive investor directory browser with filtering and search.
+ *
+ * @description Wraps the InvestorCard grid with client-side filter controls.
+ * Debounces the search input at 300ms to avoid excessive server action calls.
+ * Firm type tabs and active-only toggle trigger immediate refetches.
+ *
+ * @param initialFirms - Server-side pre-fetched first page
+ * @param initialTotal - Total count from server (for stats row)
+ * @param initialHasMore - Whether more pages exist
+ */
+export function InvestorBrowser({
+  initialFirms,
+  initialTotal,
+  initialHasMore,
+}: InvestorBrowserProps) {
+  const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
+  const [total, setTotal] = useState(initialTotal)
+  const [hasMore, setHasMore] = useState(initialHasMore)
+  const [page, setPage] = useState(1)
+
+  const [activeFirmType, setActiveFirmType] = useState<FirmTypeFilter>('All')
+  const [activeOnly, setActiveOnly] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  const [isPending, startTransition] = useTransition()
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Debounce search query
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery)
+    }, 300)
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    }
+  }, [searchQuery])
+
+  // Refetch when filters change (always back to page 1)
+  useEffect(() => {
+    startTransition(async () => {
+      const result = await searchInvestors({
+        firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
+        activeOnly,
+        query: debouncedQuery || undefined,
+        page: 1,
+        pageSize: PAGE_SIZE,
+      })
+      setFirms(result.firms)
+      setTotal(result.total)
+      setHasMore(result.hasMore)
+      setPage(1)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFirmType, activeOnly, debouncedQuery])
+
+  // Load more (append next page)
+  const handleLoadMore = useCallback(async () => {
+    setIsLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const result = await searchInvestors({
+        firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
+        activeOnly,
+        query: debouncedQuery || undefined,
+        page: nextPage,
+        pageSize: PAGE_SIZE,
+      })
+      setFirms(prev => [...prev, ...result.firms])
+      setHasMore(result.hasMore)
+      setPage(nextPage)
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [page, activeFirmType, activeOnly, debouncedQuery])
+
+  const handleClearFilters = useCallback(() => {
+    setActiveFirmType('All')
+    setActiveOnly(false)
+    setSearchQuery('')
+    setDebouncedQuery('')
+  }, [])
+
+  const hasActiveFilters = activeFirmType !== 'All' || activeOnly || searchQuery.length > 0
+
+  return (
+    <div className="space-y-6">
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
+        {/* Firm type chips */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {FIRM_TYPES.map(type => (
+            <button
+              key={type}
+              onClick={() => setActiveFirmType(type)}
+              className={cn(
+                'px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200',
+                activeFirmType === type
+                  ? 'bg-foreground text-background border-foreground'
+                  : 'bg-background text-foreground border-border hover:border-foreground/40'
+              )}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+
+        {/* Active deploying toggle */}
+        <button
+          onClick={() => setActiveOnly(prev => !prev)}
+          className={cn(
+            'px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200',
+            activeOnly
+              ? 'bg-success/10 text-success border-success/40'
+              : 'bg-background text-muted-foreground border-border hover:border-foreground/40'
+          )}
+        >
+          Active deploying
+        </button>
+
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            type="search"
+            placeholder="Search investors..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {isPending ? (
+              <span className="inline-flex items-center gap-1.5">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                Filtering…
+              </span>
+            ) : (
+              <>
+                Showing{' '}
+                <span className="font-semibold text-foreground">{firms.length}</span>
+                {' '}of{' '}
+                <span className="font-semibold text-foreground">{total}</span>
+                {' '}firms
+              </>
+            )}
+          </p>
+        </div>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={handleClearFilters} className="text-xs">
+            <X className="h-3.5 w-3.5 mr-1" />
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {/* Grid / states */}
+      {isPending ? (
+        <InvestorGridSkeleton />
+      ) : firms.length === 0 ? (
+        <EmptyState onClear={handleClearFilters} />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {firms.map(firm => (
+              <InvestorCard key={firm.id} firm={firm} />
+            ))}
+          </div>
+
+          {/* Load more */}
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <Button
+                variant="secondary"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Loading…
+                  </>
+                ) : (
+                  'Load more'
+                )}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}

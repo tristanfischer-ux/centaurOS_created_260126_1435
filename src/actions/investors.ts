@@ -1,0 +1,219 @@
+/**
+ * @file investors.ts
+ *
+ * @description Server actions for the UK Investor Directory. Queries marketplace_listings
+ * where category = 'Finance', searching by text in title/description and filtering by
+ * JSONB attribute fields. Exposes pagination helpers for both the directory listing page
+ * and the individual detail page.
+ *
+ * @security No foundry isolation required — investor data is read-only and public within
+ * the platform. The marketplace_listings table is append-only for admins.
+ *
+ * GOTCHA: The database enum marketplace_category does not yet include 'Finance'. We cast
+ * the category filter to `string` via a raw `.filter()` call to bypass the TypeScript
+ * enum constraint while the schema migration is pending.
+ */
+
+"use server"
+
+import { createClient } from '@/lib/supabase/server'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalised shape of a single investor firm record pulled from marketplace_listings.
+ */
+export type InvestorFirm = {
+  id: string
+  title: string
+  description: string | null
+  subcategory: string
+  attributes: {
+    firm_type?: string
+    fund_size_gbp?: number
+    fund_tier?: string
+    stage_focus?: string[]
+    sectors?: string[]
+    is_active_deploying?: boolean
+    hq_city?: string
+    outreach_priority?: string
+    outreach_status?: string
+    website_url?: string
+    linkedin_company_url?: string
+    investment_thesis?: string
+    notable_portfolio?: string[]
+    last_verified?: string
+    aum_gbp?: number
+  }
+}
+
+/**
+ * Filter parameters accepted by searchInvestors.
+ */
+export interface InvestorFilters {
+  firmType?: string[]       // 'VC' | 'PE' | 'Growth'
+  stage?: string[]          // 'Seed' | 'Series A' | etc
+  sector?: string[]
+  hqCity?: string
+  activeOnly?: boolean      // filter is_active_deploying = true
+  priority?: string         // 'A' | 'B' | 'C'
+  query?: string            // full-text search on title/description
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * Return shape from searchInvestors.
+ */
+export interface InvestorSearchResult {
+  firms: InvestorFirm[]
+  total: number
+  hasMore: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Casts a raw marketplace_listings row to InvestorFirm.
+ */
+function rowToFirm(row: Record<string, unknown>): InvestorFirm {
+  return {
+    id: row.id as string,
+    title: row.title as string,
+    description: (row.description as string | null) ?? null,
+    subcategory: (row.subcategory as string) ?? '',
+    attributes: (row.attributes as InvestorFirm['attributes']) ?? {},
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Server Actions
+// ---------------------------------------------------------------------------
+
+/**
+ * Searches and filters the UK investor directory.
+ *
+ * @description Queries marketplace_listings where category = 'Finance'.
+ * Applies optional ILIKE search on title/description, JSONB attribute filters,
+ * and standard pagination. Stage/sector array filtering is applied in-memory
+ * because PostgREST does not support JSONB array containment without a custom RPC.
+ *
+ * @param filters - Optional filter parameters
+ * @returns Paginated list of investor firms with total count and hasMore flag
+ */
+export async function searchInvestors(
+  filters: InvestorFilters = {}
+): Promise<InvestorSearchResult> {
+  const {
+    firmType,
+    stage,
+    sector,
+    hqCity,
+    activeOnly,
+    priority,
+    query,
+    page = 1,
+    pageSize = 24,
+  } = filters
+
+  const supabase = await createClient()
+
+  // INTENT: Build the query progressively, filtered to Finance category (VC/PE firms).
+  let q = supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes', { count: 'exact' })
+    .eq('category', 'Finance')
+
+  // Full-text search on title and description
+  if (query && query.trim().length > 0) {
+    const term = `%${query.trim()}%`
+    q = q.or(`title.ilike.${term},description.ilike.${term}`)
+  }
+
+  // JSONB scalar filter: firm_type
+  if (firmType && firmType.length > 0) {
+    q = q.or(firmType.map((t: string) => `attributes->firm_type.eq."${t}"`).join(','))
+  }
+
+  // JSONB scalar filter: is_active_deploying
+  if (activeOnly) {
+    q = q.filter('attributes->is_active_deploying', 'eq', 'true')
+  }
+
+  // JSONB scalar filter: hq_city
+  if (hqCity && hqCity.trim().length > 0) {
+    q = q.filter('attributes->>hq_city', 'ilike', `%${hqCity.trim()}%`)
+  }
+
+  // JSONB scalar filter: outreach_priority
+  if (priority) {
+    q = q.filter('attributes->>outreach_priority', 'eq', priority)
+  }
+
+  // Pagination
+  const from = (page - 1) * pageSize
+  const to = from + pageSize - 1
+  q = q.range(from, to).order('title', { ascending: true })
+
+  const { data, count, error } = await q
+
+  if (error) {
+    console.error('[searchInvestors] Supabase error:', error)
+    return { firms: [], total: 0, hasMore: false }
+  }
+
+  let firms = (data ?? []).map((row: Record<string, unknown>) => rowToFirm(row))
+
+  // DECISION: Apply stage/sector client-side after DB fetch because Supabase
+  // PostgREST does not support @> (array containment) on JSONB array fields
+  // without a custom RPC. Dataset is small enough (<1000 rows/page) for this.
+  if (stage && stage.length > 0) {
+    firms = firms.filter((f: InvestorFirm) => {
+      const stageFocus = f.attributes.stage_focus ?? []
+      return stage.some((s: string) => stageFocus.includes(s))
+    })
+  }
+
+  if (sector && sector.length > 0) {
+    firms = firms.filter((f: InvestorFirm) => {
+      const sectors = f.attributes.sectors ?? []
+      return sector.some((s: string) => sectors.includes(s))
+    })
+  }
+
+  const total = count ?? 0
+  const hasMore = from + firms.length < total
+
+  return { firms, total, hasMore }
+}
+
+/**
+ * Fetches a single investor firm by ID.
+ *
+ * @description Returns the full marketplace_listings record for the given ID,
+ * restricted to category = 'Finance' for safety.
+ *
+ * @param id - The marketplace_listings UUID
+ * @returns The investor firm or null if not found
+ */
+export async function getInvestorById(id: string): Promise<InvestorFirm | null> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('id', id)
+    .eq('category', 'Finance')
+    .single()
+
+  if (error || !data) {
+    console.error('[getInvestorById] Not found or error:', error)
+    return null
+  }
+
+  return rowToFirm(data as Record<string, unknown>)
+}

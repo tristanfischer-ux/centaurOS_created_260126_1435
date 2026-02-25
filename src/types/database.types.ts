@@ -15052,6 +15052,75 @@ export type Database = {
           },
         ]
       }
+      vc_pe_contacts: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          email_verified: boolean | null
+          full_name: string
+          id: string
+          is_decision_maker: boolean | null
+          last_contacted_at: string | null
+          linkedin_url: string | null
+          listing_id: string
+          notes: string | null
+          outreach_status: string | null
+          seniority: string | null
+          title: string | null
+          updated_at: string | null
+          warm_intro_path: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          full_name: string
+          id?: string
+          is_decision_maker?: boolean | null
+          last_contacted_at?: string | null
+          linkedin_url?: string | null
+          listing_id: string
+          notes?: string | null
+          outreach_status?: string | null
+          seniority?: string | null
+          title?: string | null
+          updated_at?: string | null
+          warm_intro_path?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          email_verified?: boolean | null
+          full_name?: string
+          id?: string
+          is_decision_maker?: boolean | null
+          last_contacted_at?: string | null
+          linkedin_url?: string | null
+          listing_id?: string
+          notes?: string | null
+          outreach_status?: string | null
+          seniority?: string | null
+          title?: string | null
+          updated_at?: string | null
+          warm_intro_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vc_pe_contacts_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vc_pe_contacts_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       waitlist: {
         Row: {
           approved_at: string | null
@@ -17403,7 +17472,12 @@ export type Database = {
         | "Growth"
         | "Bridge"
       legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
-      marketplace_category: "People" | "Products" | "Services" | "AI"
+      marketplace_category:
+        | "People"
+        | "Products"
+        | "Services"
+        | "AI"
+        | "Finance"
       member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
@@ -17634,7 +17708,7 @@ export const Constants = {
         "Bridge",
       ],
       legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
-      marketplace_category: ["People", "Products", "Services", "AI"],
+      marketplace_category: ["People", "Products", "Services", "AI", "Finance"],
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],

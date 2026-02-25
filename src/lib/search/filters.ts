@@ -424,6 +424,7 @@ export function calculateFacets(results: SearchResult[]): SearchFacets {
       Products: 0,
       Services: 0,
       AI: 0,
+      Finance: 0,
     },
     subcategories: {},
     tiers: {
