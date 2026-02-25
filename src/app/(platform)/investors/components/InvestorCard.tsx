@@ -54,19 +54,10 @@ interface InvestorCardProps {
 /**
  * Renders a single investor firm as a card in the directory grid.
  */
-// GOTCHA: stage_focus and sectors may be stored as a comma-separated string
-// (from CSV import) or as an array (from seeded data). Normalise before use.
-function toArray(val: unknown): string[] {
-  if (!val) return []
-  if (Array.isArray(val)) return val as string[]
-  if (typeof val === 'string') return val.split(',').map(s => s.trim()).filter(Boolean)
-  return []
-}
-
 export function InvestorCard({ firm }: InvestorCardProps) {
   const attrs = firm.attributes
-  const stageFocus = toArray(attrs.stage_focus).slice(0, 2)
-  const sectors = toArray(attrs.sectors).slice(0, 3)
+  const stageFocus = (attrs.stage_focus ?? []).slice(0, 2)
+  const sectors = (attrs.sectors ?? []).slice(0, 3)
 
   return (
     <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all">
@@ -139,9 +130,9 @@ export function InvestorCard({ firm }: InvestorCardProps) {
                 {s}
               </Badge>
             ))}
-            {toArray(attrs.stage_focus).length > 2 && (
+            {(attrs.stage_focus ?? []).length > 2 && (
               <span className="text-xs text-muted-foreground">
-                +{toArray(attrs.stage_focus).length - 2}
+                +{(attrs.stage_focus ?? []).length - 2}
               </span>
             )}
           </div>
@@ -155,9 +146,9 @@ export function InvestorCard({ firm }: InvestorCardProps) {
                 {s}
               </Badge>
             ))}
-            {toArray(attrs.sectors).length > 3 && (
+            {(attrs.sectors ?? []).length > 3 && (
               <span className="text-xs text-muted-foreground self-center">
-                +{toArray(attrs.sectors).length - 3}
+                +{(attrs.sectors ?? []).length - 3}
               </span>
             )}
           </div>

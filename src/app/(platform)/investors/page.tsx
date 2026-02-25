@@ -10,8 +10,10 @@
 
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { searchInvestors } from '@/actions/investors'
+import { searchInvestors, getInvestorStats } from '@/actions/investors'
+import type { InvestorStats } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
+import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 
 export const revalidate = 60
 
@@ -54,9 +56,11 @@ export default async function InvestorDirectoryPage() {
   let initialFirms: Awaited<ReturnType<typeof searchInvestors>>['firms'] = []
   let initialTotal = 0
   let initialHasMore = false
+  let stats: InvestorStats | null = null
 
-  const [searchResult] = await Promise.allSettled([
+  const [searchResult, statsResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),
+    getInvestorStats(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -67,15 +71,24 @@ export default async function InvestorDirectoryPage() {
     console.error('[InvestorDirectoryPage] Failed to fetch investors:', searchResult.reason)
   }
 
+  if (statsResult.status === 'fulfilled') {
+    stats = statsResult.value
+  } else {
+    console.error('[InvestorDirectoryPage] Failed to fetch stats:', statsResult.reason)
+  }
+
   return (
     <div className="space-y-8">
       {/* Page header */}
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">UK Investor Directory</h1>
         <p className="text-muted-foreground">
-          600 UK venture capital and private equity firms
+          {stats ? `${stats.total.toLocaleString()} UK venture capital and private equity firms` : 'UK venture capital and private equity firms'}
         </p>
       </div>
+
+      {/* Insights panel */}
+      {stats && <InvestorInsightsPanel stats={stats} />}
 
       {/* Color legend */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground border-b border-border pb-4">

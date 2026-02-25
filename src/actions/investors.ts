@@ -73,20 +73,52 @@ export interface InvestorSearchResult {
   hasMore: boolean
 }
 
+/**
+ * Aggregated stats for the investor directory insights panel.
+ */
+export interface InvestorStats {
+  total: number
+  investorCount: number
+  serviceProviderCount: number
+  withWebsiteCount: number
+  activeDeployingCount: number
+  subcategoryBreakdown: { name: string; count: number }[]
+  cityBreakdown: { name: string; count: number }[]
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalises a JSONB value to a string array.
+ * Handles: undefined/null → [], existing array → pass-through,
+ * CSV string (from import) → split on comma.
+ */
+function toStringArray(val: unknown): string[] {
+  if (!val) return []
+  if (Array.isArray(val)) return val as string[]
+  if (typeof val === 'string') return val.split(',').map(s => s.trim()).filter(Boolean)
+  return []
+}
+
+/**
  * Casts a raw marketplace_listings row to InvestorFirm.
+ * Normalises array fields so consumers never need to handle CSV strings.
  */
 function rowToFirm(row: Record<string, unknown>): InvestorFirm {
+  const attrs = (row.attributes as Record<string, unknown>) ?? {}
   return {
     id: row.id as string,
     title: row.title as string,
     description: (row.description as string | null) ?? null,
     subcategory: (row.subcategory as string) ?? '',
-    attributes: (row.attributes as InvestorFirm['attributes']) ?? {},
+    attributes: {
+      ...(attrs as InvestorFirm['attributes']),
+      stage_focus: toStringArray(attrs.stage_focus),
+      sectors: toStringArray(attrs.sectors),
+      notable_portfolio: toStringArray(attrs.notable_portfolio),
+    },
   }
 }
 
@@ -216,4 +248,83 @@ export async function getInvestorById(id: string): Promise<InvestorFirm | null> 
   }
 
   return rowToFirm(data as Record<string, unknown>)
+}
+
+/**
+ * Fetches aggregated stats for the investor directory insights panel.
+ *
+ * @description Pulls all Finance listings (subcategory + attributes only),
+ * then aggregates counts and breakdowns in JS. Designed for the insights panel
+ * header above the directory grid.
+ *
+ * @returns Aggregated InvestorStats or null on error
+ */
+export async function getInvestorStats(): Promise<InvestorStats> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('marketplace_listings')
+    .select('subcategory, attributes')
+    .eq('category', 'Finance')
+
+  if (error) {
+    console.error('[getInvestorStats] Supabase error:', error)
+    return {
+      total: 0,
+      investorCount: 0,
+      serviceProviderCount: 0,
+      withWebsiteCount: 0,
+      activeDeployingCount: 0,
+      subcategoryBreakdown: [],
+      cityBreakdown: [],
+    }
+  }
+
+  const rows = data ?? []
+  const total = rows.length
+
+  let investorCount = 0
+  let serviceProviderCount = 0
+  let withWebsiteCount = 0
+  let activeDeployingCount = 0
+  const subcategoryCounts: Record<string, number> = {}
+  const cityCounts: Record<string, number> = {}
+
+  for (const row of rows) {
+    const attrs = (row.attributes as Record<string, unknown>) ?? {}
+
+    if (attrs.is_investor === true) {
+      investorCount++
+    } else {
+      serviceProviderCount++
+    }
+    if (attrs.website_url) withWebsiteCount++
+    if (attrs.is_active_deploying === true) activeDeployingCount++
+
+    const sub = (row.subcategory as string) || 'Unknown'
+    subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
+
+    const city = (attrs.hq_city as string) || ''
+    if (city) cityCounts[city] = (cityCounts[city] ?? 0) + 1
+  }
+
+  const subcategoryBreakdown = Object.entries(subcategoryCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
+  const cityBreakdown = Object.entries(cityCounts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
+  return {
+    total,
+    investorCount,
+    serviceProviderCount,
+    withWebsiteCount,
+    activeDeployingCount,
+    subcategoryBreakdown,
+    cityBreakdown,
+  }
 }
