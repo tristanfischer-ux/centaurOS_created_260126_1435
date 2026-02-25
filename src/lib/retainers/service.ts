@@ -1,4 +1,3 @@
-// @ts-nocheck - retainers table not in generated types; run `supabase gen types` after applying retainers migration
 /**
  * Retainer Service
  * Core business logic for retainer management
@@ -109,12 +108,13 @@ export async function getRetainer(
       sellerProfile = profile
     }
 
+    // @ts-expect-error -- DB row spreads nullable fields (currency, etc.) that the domain type requires as non-null; values are guaranteed by DB defaults
     const retainerWithDetails: RetainerWithDetails = {
       ...retainer,
       buyer: retainer.buyer,
       seller: {
         ...retainer.seller,
-        profile: sellerProfile,
+        profile: sellerProfile ?? undefined,
       },
     }
 
@@ -146,7 +146,7 @@ export async function updateRetainer(
     }
 
     // Only allow updates on pending or active retainers
-    if (!['pending', 'active'].includes(current.status)) {
+    if (!['pending', 'active'].includes(current.status ?? '')) {
       return { success: false, error: 'Cannot update a cancelled or paused retainer' }
     }
 
@@ -324,7 +324,7 @@ export async function cancelRetainer(
       return { data: null, error: 'Retainer not found' }
     }
 
-    if (!['active', 'paused'].includes(retainer.status)) {
+    if (!['active', 'paused'].includes(retainer.status ?? '')) {
       return { data: null, error: 'Retainer is already cancelled or not yet active' }
     }
 
@@ -368,7 +368,7 @@ export async function cancelRetainer(
       noticePeriodDays: CANCELLATION_NOTICE_DAYS,
       remainingTimesheets: weeksRemaining,
       pendingAmount,
-      currency: retainer.currency,
+      currency: retainer.currency ?? 'GBP',
     }
 
     return { data: details, error: null }
@@ -578,7 +578,7 @@ export async function getRetainerStats(
       weeksActive,
       approvalRate,
       averageHoursPerWeek,
-      currency: retainer.currency,
+      currency: retainer.currency ?? 'GBP',
     }
 
     return { data: stats, error: null }

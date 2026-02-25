@@ -1,9 +1,9 @@
-// @ts-nocheck - marketplace_listings query with nested provider_profiles join returns type not matching SearchResult interface; regenerate types after schema stabilizes
 /**
  * Marketplace Search Service
  * Main entry point for all search functionality
  */
 
+import type { Json } from "@/types/database.types"
 import { createClient } from "@/lib/supabase/server"
 import {
   SearchParams,
@@ -244,7 +244,7 @@ async function fetchProviderData(
         forge_discount_percent,
         day_rate,
         currency,
-        updated_at
+        last_active_at
       `)
       .in('listing_id', listingIds)
       .eq('is_active', true)
@@ -254,7 +254,7 @@ async function fetchProviderData(
     // Fetch ratings for each provider
     const providerIds = providers.map((p) => p.id)
     const { data: ratings } = await supabase
-      .from('provider_reviews')
+      .from('reviews')
       .select('reviewee_id, rating')
       .in('reviewee_id', providerIds)
 
@@ -297,7 +297,7 @@ async function fetchProviderData(
         forge_discount_percent: provider.forge_discount_percent,
         day_rate: provider.day_rate,
         currency: provider.currency,
-        updated_at: provider.updated_at,
+        updated_at: provider.last_active_at,
       }
     }
   } catch (err) {
@@ -439,7 +439,7 @@ export async function getSearchSuggestions(
         id: `popular-${search.query}`,
         type: 'popular',
         text: search.query,
-        count: search.search_count,
+        count: search.search_count ?? undefined,
       })
     }
 
@@ -498,7 +498,7 @@ async function saveRecentSearch(
       .upsert({
         user_id: userId,
         query: query.trim(),
-        filters,
+        filters: filters as unknown as Json,
         results_count: resultsCount,
         created_at: new Date().toISOString(),
       }, {
@@ -515,11 +515,12 @@ async function saveRecentSearch(
       }, {
         onConflict: 'query',
       })
-.then(() => {
-  // Increment count (separate query since upsert doesn't support increment)
-  supabase.rpc('increment_search_count', { search_query: query.trim().toLowerCase() })
-    .catch(err => console.error('[SearchService] Failed to increment search count:', { error: err instanceof Error ? err.message : 'Unknown error' }))
-})
+
+    // Increment count (separate query since upsert doesn't support increment)
+    const { error: rpcError } = await supabase.rpc('increment_search_count', { search_query: query.trim().toLowerCase() })
+    if (rpcError) {
+      console.error('[SearchService] Failed to increment search count:', { error: rpcError.message })
+    }
   } catch (err) {
     console.error('[SearchService] Error saving recent search:', { error: err instanceof Error ? err.message : 'Unknown error' })
   }
@@ -541,7 +542,7 @@ export async function saveSearch(
       .upsert({
         user_id: userId,
         query: query.trim(),
-        filters: filters || {},
+        filters: (filters || {}) as unknown as Json,
         results_count: 0,
         created_at: new Date().toISOString(),
       }, {
@@ -660,9 +661,9 @@ export async function createSavedSearch(
         user_id: userId,
         name: name.trim(),
         query: query.trim(),
-        filters,
+        filters: filters as unknown as Json,
         is_alert_enabled: alertEnabled,
-        alert_frequency: alertEnabled ? alertFrequency : null,
+        alert_frequency: alertEnabled ? (alertFrequency ?? null) : null,
       })
       .select('id')
       .single()
@@ -739,8 +740,8 @@ export async function getPopularSearches(
     return (data || []).map(item => ({
       query: item.query,
       category: item.category as MarketplaceCategory | undefined,
-      count: item.search_count,
-      trending: item.trending,
+      count: item.search_count ?? 0,
+      trending: item.trending ?? false,
     }))
   } catch (err) {
     console.error('[SearchService] Failed to fetch popular searches:', { error: err instanceof Error ? err.message : 'Unknown error' })
@@ -760,7 +761,7 @@ function createEmptyResponse(params: SearchParams): SearchResponse {
     limit: params.limit || 20,
     hasMore: false,
     facets: {
-      categories: { People: 0, Products: 0, Services: 0, AI: 0 },
+      categories: { People: 0, Products: 0, Services: 0, AI: 0, Finance: 0 },
       subcategories: {},
       tiers: { pending: 0, standard: 0, verified: 0, premium: 0 },
       priceRanges: { '0-50': 0, '50-100': 0, '100-250': 0, '250-500': 0, '500+': 0 },

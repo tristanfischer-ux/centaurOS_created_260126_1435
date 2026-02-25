@@ -1,22 +1,23 @@
-// @ts-nocheck - RFQ types (RFQWithDetails, RFQSummary) use camelCase but DB returns snake_case; regenerate types with `supabase gen types` after schema stabilizes
 /**
  * RFQ Service
  * Core business logic for RFQ management
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
-import { Database } from '@/types/database.types'
+import { Database, Json } from '@/types/database.types'
 import {
   RFQ,
   RFQWithBuyer,
   RFQWithDetails,
   RFQSummary,
   RFQResponseWithProvider,
+  RFQBroadcastWithProvider,
   CreateRFQParams,
   UpdateRFQParams,
   RFQFilters,
   RFQStatus,
   SupplierMatch,
+  SupplierTier,
   RACE_CONSTANTS,
 } from '@/types/rfq'
 
@@ -53,7 +54,7 @@ export async function createRFQ(
         foundry_id: foundryId,
         rfq_type: params.rfq_type,
         title: params.title,
-        specifications: params.specifications || {},
+        specifications: (params.specifications || {}) as unknown as Json,
         budget_min: params.budget_min || null,
         budget_max: params.budget_max || null,
         deadline: params.deadline || null,
@@ -175,7 +176,7 @@ export async function getRFQ(
     const rfqWithDetails: RFQWithDetails = {
       ...(rfq as unknown as RFQWithBuyer),
       responses: responsesWithProfiles,
-      broadcasts: broadcasts || [],
+      broadcasts: (broadcasts || []) as unknown as RFQBroadcastWithProvider[],
       response_count: responsesWithProfiles.length,
       has_user_responded: hasUserResponded,
     }
@@ -221,7 +222,7 @@ export async function updateRFQ(
       .from('rfqs')
       .update({
         title: updates.title,
-        specifications: updates.specifications,
+        specifications: updates.specifications as unknown as Json | undefined,
         budget_min: updates.budget_min,
         budget_max: updates.budget_max,
         deadline: updates.deadline,
@@ -408,7 +409,7 @@ export async function matchSuppliers(
         user_id: provider.user_id,
         full_name: profile?.full_name || null,
         headline: provider.headline || null,
-        tier: provider.tier,
+        tier: (provider.tier ?? 'pending') as SupplierTier,
         timezone: provider.timezone || null,
         match_score: matchScore,
         match_reasons: matchReasons,
@@ -528,7 +529,7 @@ export async function getRFQs(
       deadline: rfq.deadline,
       category: rfq.category,
       urgency: rfq.urgency as 'urgent' | 'standard',
-      created_at: rfq.created_at,
+      created_at: rfq.created_at ?? new Date().toISOString(),
       response_count: responseCounts[rfq.id] || 0,
       buyer: rfq.buyer,
     }))
@@ -619,7 +620,7 @@ export async function getAvailableRFQsForSupplier(
       deadline: rfq.deadline,
       category: rfq.category,
       urgency: rfq.urgency as 'urgent' | 'standard',
-      created_at: rfq.created_at,
+      created_at: rfq.created_at ?? new Date().toISOString(),
       response_count: 0, // Not relevant for supplier view
       buyer: rfq.buyer,
     }))

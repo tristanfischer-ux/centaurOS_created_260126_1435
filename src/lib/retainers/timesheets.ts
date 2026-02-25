@@ -1,4 +1,3 @@
-// @ts-nocheck - timesheets table not in generated types; TimesheetWithDetails uses camelCase vs DB snake_case
 /**
  * Timesheet Service
  * Core business logic for timesheet management and weekly billing
@@ -173,7 +172,7 @@ export async function logHours(
     }
 
     // Only allow logging on draft or submitted (for amendments)
-    if (!['draft', 'submitted'].includes(timesheet.status)) {
+    if (!['draft', 'submitted'].includes(timesheet.status ?? '')) {
       return { data: null, error: 'Cannot log hours on this timesheet' }
     }
 
@@ -240,7 +239,7 @@ export async function updateTimesheetHours(
       return { data: null, error: 'Timesheet not found' }
     }
 
-    if (!['draft', 'submitted'].includes(timesheet.status)) {
+    if (!['draft', 'submitted'].includes(timesheet.status ?? '')) {
       return { data: null, error: 'Cannot modify this timesheet' }
     }
 
@@ -467,16 +466,18 @@ export async function getTimesheet(
       sellerProfile = profile
     }
 
-    const result: TimesheetWithDetails = {
+    // DB row has nullable fields (currency, status, etc.) that the app type expects as non-null;
+    // the Supabase join result shape also doesn't match RetainerWithDetails exactly.
+    const result = {
       ...timesheet,
       retainer: {
         ...timesheet.retainer,
         seller: {
           ...timesheet.retainer.seller,
-          profile: sellerProfile,
+          profile: sellerProfile ?? undefined,
         },
       },
-    }
+    } as unknown as TimesheetWithDetails
 
     return { data: result, error: null }
   } catch (err) {
@@ -607,7 +608,7 @@ export async function calculateWeeklyBilling(
       platformFee,
       vatAmount,
       total,
-      currency: timesheet.retainer.currency,
+      currency: timesheet.retainer.currency ?? 'GBP',
       weekStart: format(weekStartDate, 'dd MMM yyyy'),
       weekEnd: format(weekEndDate, 'dd MMM yyyy'),
       status: timesheet.status as TimesheetStatus,
