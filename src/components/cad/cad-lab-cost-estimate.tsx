@@ -30,82 +30,38 @@ import {
   AlertTriangle,
   Info,
 } from "lucide-react"
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Legend,
+} from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { chartColors } from "@/lib/chart-colors"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import {
+  MATERIAL_COST_PER_KG,
+  PROCESS_HOURLY_RATE,
+  HOURS_PER_KG,
+  TOOLING_COST,
+  parseBatchSize,
+  getModuleMassKg,
+} from "@/lib/cad-lab-cost-constants"
 
-// ─── Cost Lookup Tables ─────────────────────────────────────────────
+// ─── Chart Colors ───────────────────────────────────────────────────
 
-/**
- * Approximate material cost per kilogram by material class.
- *
- * @security None — public data, engineering estimates only.
- */
-const MATERIAL_COST_PER_KG: Record<string, number> = {
-  "PLA/PETG": 25,
-  "ABS/Nylon": 35,
-  "Aluminium": 8,
-  "Steel/Iron": 4,
-  "Stainless Steel": 12,
-  "Copper/Brass": 18,
-  "Titanium": 80,
-  "Carbon Fiber Composite": 60,
-  "CFRP/GFRP": 60,
-  "Wood/Plywood": 3,
-  "Silicone/Rubber": 15,
-  "Glass/Ceramic": 10,
-  "PCB/Electronic": 0, // Process-driven, not material-driven
-  "Other": 20,
-}
-
-/**
- * Approximate hourly rate by manufacturing process.
- * Includes machine time + operator cost estimates.
- */
-const PROCESS_HOURLY_RATE: Record<string, number> = {
-  "FDM 3D Print": 15,
-  "SLA/Resin Print": 25,
-  "SLS/Powder Print": 40,
-  "CNC Machining": 85,
-  "Sheet Metal": 60,
-  "Injection Molding": 0, // Amortized per-unit, handled separately
-  "Casting": 45,
-  "Manual/Assembly": 40,
-  "Other": 50,
-}
-
-/**
- * Estimated processing hours per kg by process.
- * Very rough — real values depend on geometry complexity.
- */
-const HOURS_PER_KG: Record<string, number> = {
-  "FDM 3D Print": 8,
-  "SLA/Resin Print": 6,
-  "SLS/Powder Print": 4,
-  "CNC Machining": 3,
-  "Sheet Metal": 1.5,
-  "Injection Molding": 0.02, // Very fast per unit
-  "Casting": 2,
-  "Manual/Assembly": 5,
-  "Other": 3,
-}
-
-/**
- * Tooling cost by process. One-time cost amortized over batch.
- */
-const TOOLING_COST: Record<string, number> = {
-  "FDM 3D Print": 0,
-  "SLA/Resin Print": 0,
-  "SLS/Powder Print": 0,
-  "CNC Machining": 200,
-  "Sheet Metal": 500,
-  "Injection Molding": 5000,
-  "Casting": 1500,
-  "Manual/Assembly": 0,
-  "Other": 0,
-}
+const COLOR_MATERIAL = chartColors[0]  // Orange
+const COLOR_PROCESS = chartColors[1]   // Blue
+const COLOR_TOOLING = chartColors[3]   // Amber
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -166,19 +122,10 @@ export function CadLabCostEstimate({
       const batchSize = parseBatchSize(batchSizeStr)
 
       // Get mass from CAD result or estimate from module data
-      let massKg = 0
-      let isEstimated = true
-
-      if (mod.result?.massProperties?.massKg) {
-        massKg = mod.result.massProperties.massKg
-        isEstimated = false
-      } else if (mod.result?.massGrams) {
-        massKg = mod.result.massGrams / 1000
-        isEstimated = false
-      } else {
-        // Rough estimate: 0.2 kg per module for unknown
-        massKg = 0.2
-      }
+      const { massKg, isEstimated } = getModuleMassKg(
+        mod.result?.massProperties?.massKg,
+        mod.result?.massGrams,
+      )
 
       const materialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
       const materialCost = massKg * materialCostPerKg
@@ -265,6 +212,86 @@ export function CadLabCostEstimate({
             </div>
           )}
 
+          {/* ── Charts ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Cost breakdown donut */}
+            <div className="p-4 border rounded-lg">
+              <p className="text-xs font-semibold text-foreground mb-3">Cost Composition</p>
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: "Material", value: totalMaterialCost },
+                        { name: "Processing", value: totalProcessCost },
+                        { name: "Tooling", value: totalToolingCost },
+                      ].filter((d) => d.value > 0)}
+                      dataKey="value"
+                      innerRadius={45}
+                      outerRadius={70}
+                      paddingAngle={2}
+                      strokeWidth={0}
+                    >
+                      {[COLOR_MATERIAL, COLOR_PROCESS, COLOR_TOOLING]
+                        .slice(0, [totalMaterialCost, totalProcessCost, totalToolingCost].filter((v) => v > 0).length)
+                        .map((color, i) => (
+                          <Cell key={i} fill={color} />
+                        ))}
+                    </Pie>
+                    <Tooltip content={<CostDonutTooltip total={systemTotal} />} />
+                    <Legend
+                      verticalAlign="bottom"
+                      height={28}
+                      formatter={(value: string) => (
+                        <span className="text-[10px] text-muted-foreground">{value}</span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Cost by module — horizontal stacked bar */}
+            {costs.length > 0 && (
+              <div className="p-4 border rounded-lg">
+                <p className="text-xs font-semibold text-foreground mb-3">Cost by Module</p>
+                <div className="h-[180px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={costs
+                        .slice()
+                        .sort((a, b) => b.totalPerUnit - a.totalPerUnit)
+                        .map((c) => ({
+                          name: c.moduleName.length > 16
+                            ? `${c.moduleName.slice(0, 14)}…`
+                            : c.moduleName,
+                          material: c.materialCost,
+                          process: c.processCost,
+                          tooling: c.toolingCostPerUnit,
+                        }))}
+                      layout="vertical"
+                      margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+                    >
+                      <XAxis type="number" hide />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10 }}
+                        width={80}
+                      />
+                      <Tooltip content={<ModuleBarTooltip />} cursor={{ fill: "hsl(var(--muted))" }} />
+                      <Bar dataKey="material" stackId="cost" fill={COLOR_MATERIAL} radius={[0, 0, 0, 0]} barSize={14} name="Material" />
+                      <Bar dataKey="process" stackId="cost" fill={COLOR_PROCESS} radius={[0, 0, 0, 0]} barSize={14} name="Processing" />
+                      <Bar dataKey="tooling" stackId="cost" fill={COLOR_TOOLING} radius={[0, 4, 4, 0]} barSize={14} name="Tooling" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Cost breakdown table */}
           <div className="border rounded-md overflow-auto">
             <table className="w-full text-xs">
@@ -338,22 +365,69 @@ export function CadLabCostEstimate({
   )
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────
+// ─── Chart Tooltips ──────────────────────────────────────────────────
 
-/**
- * Parse batch size from diagnostic answer string.
- *
- * @param batchStr - e.g. "1-10 (prototyping)" or "100-1000 (pilot)"
- * @returns Midpoint of the range
- */
-function parseBatchSize(batchStr: string): number {
-  const match = batchStr.match(/(\d+)-(\d+)/)
-  if (match) {
-    const low = parseInt(match[1], 10)
-    const high = parseInt(match[2], 10)
-    return Math.round((low + high) / 2)
-  }
-  const singleMatch = batchStr.match(/(\d+)\+?/)
-  if (singleMatch) return parseInt(singleMatch[1], 10)
-  return 5
+interface DonutTooltipPayload {
+  name: string
+  value: number
+  payload: { fill: string }
 }
+
+/** Custom tooltip for the cost composition donut chart. */
+function CostDonutTooltip({
+  active,
+  payload,
+  total,
+}: {
+  active?: boolean
+  payload?: DonutTooltipPayload[]
+  total: number
+}): React.ReactNode {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : "0"
+  return (
+    <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
+      <p className="font-medium text-foreground">{item.name}</p>
+      <p className="text-muted-foreground font-mono">
+        ${item.value.toFixed(2)} ({pct}%)
+      </p>
+    </div>
+  )
+}
+
+interface BarTooltipPayload {
+  name: string
+  value: number
+  color: string
+  dataKey: string
+}
+
+/** Custom tooltip for the cost-by-module stacked bar chart. */
+function ModuleBarTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean
+  payload?: BarTooltipPayload[]
+  label?: string
+}): React.ReactNode {
+  if (!active || !payload?.length) return null
+  const total = payload.reduce((s, p) => s + (p.value || 0), 0)
+  return (
+    <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
+      <p className="font-medium text-foreground mb-1">{label}</p>
+      {payload.map((p) => (
+        <p key={p.dataKey} className="text-muted-foreground">
+          <span style={{ color: p.color }}>●</span>{" "}
+          {p.name}: ${p.value.toFixed(2)}
+        </p>
+      ))}
+      <p className="font-semibold text-foreground mt-1 border-t pt-1">
+        Total: ${total.toFixed(2)}
+      </p>
+    </div>
+  )
+}
+

@@ -77,8 +77,8 @@ const STAGES: StageDefinition[] = [
     icon: ClipboardCheck,
     href: FORGE_ROUTES.cadLabReview,
     description: "Supplier-ready engineering review package.",
-    unlockHint: "Generate at least one module in the Build stage",
-    features: ["Review document", "Expert discipline matching", "Print & copy support", "RFQ package"],
+    unlockHint: "Always available — content builds as you progress",
+    features: ["Bill of Materials & raw materials breakdown", "Supplier mapping & cost visualizations", "Expert discipline matching", "RFQ package & full report downloads"],
   },
 ]
 
@@ -98,7 +98,7 @@ function getStageAccess(
   return {
     research: { enabled: true, completed: hasResearch },
     build: { enabled: hasResearch && moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
-    review: { enabled: moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
+    review: { enabled: true, completed: generatedCount > 0 && generatedCount === moduleCount },
   }
 }
 

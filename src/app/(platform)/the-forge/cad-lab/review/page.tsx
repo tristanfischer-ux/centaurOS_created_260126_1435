@@ -5,10 +5,10 @@
  *
  * @description Complete factory-ready review package with engineering documentation,
  * DFM analysis, diagnostics, supply chain specifications, cost estimates,
- * expert discipline matching, factory conversation guide, and contracting
- * (RFQ/SOW/NDA). Requires at least one generated module.
+ * BOM, raw materials breakdown, supplier mapping, expert discipline matching,
+ * factory conversation guide, and contracting (RFQ/SOW/NDA).
  *
- * Gate: shows empty state if no generated modules.
+ * Always accessible — shows a progressive welcome state when no data exists yet.
  */
 
 import { useState, useMemo, useEffect, useCallback } from "react"
@@ -38,6 +38,9 @@ import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
+import { CadLabRequirementsMap } from "@/components/cad/cad-lab-requirements-map"
+import { CadLabBom } from "@/components/cad/cad-lab-bom"
+import { CadLabRawMaterials } from "@/components/cad/cad-lab-raw-materials"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
@@ -47,7 +50,7 @@ import { useCadLab } from "../cad-lab-context"
 export default function CadLabReviewPage(): React.ReactNode {
   const router = useRouter()
   const {
-    modules, generatedModuleCount, subject,
+    modules, generatedModuleCount, subject, hasResearch,
     editableReport, diagnosticAnswers, setDiagnosticAnswers,
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,
@@ -93,23 +96,9 @@ export default function CadLabReviewPage(): React.ReactNode {
     }, [subject, modules, generatedModuleCount, diagnosticAnswers, linkedRfqId, designBrief]),
   )
 
-  // Show empty state only if no modules exist at all (pre-decomposition)
-  if (modules.length === 0) {
-    return (
-      <div className="py-12">
-        <EmptyState
-          title="No modules mapped yet"
-          description="Map sub-assemblies in the Build stage first, then come back here for supplier-ready documentation."
-          action={
-            <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
-              <Box className="h-4 w-4" />
-              Go to Build
-            </Button>
-          }
-        />
-      </div>
-    )
-  }
+  // INTENT: Progressive disclosure — Review is always accessible, but shows
+  // a welcome card when no data exists yet instead of blocking the page.
+  const hasAnyData = modules.length > 0 || hasResearch || !!researchResult
 
   // ── Section navigation state ──
   const REVIEW_SECTIONS = useMemo(() => [
@@ -118,6 +107,9 @@ export default function CadLabReviewPage(): React.ReactNode {
     { id: "dfm-analysis", label: "DFM" },
     { id: "diagnostics", label: "Diagnostics" },
     { id: "supply-chain", label: "Supply Chain" },
+    { id: "requirements-map", label: "Requirements" },
+    { id: "bill-of-materials", label: "BOM" },
+    { id: "raw-materials", label: "Materials" },
     { id: "cost-estimate", label: "Cost" },
     { id: "drawing-exports", label: "Exports" },
     { id: "experts", label: "Experts" },
@@ -221,24 +213,44 @@ export default function CadLabReviewPage(): React.ReactNode {
         </div>
       </div>
 
+      {/* Welcome state when no data exists yet */}
+      {!hasAnyData && (
+        <Card>
+          <CardContent className="pt-6">
+            <EmptyState
+              title="Your Review Dashboard"
+              description="This dashboard will populate with BOM, cost breakdowns, supplier mapping, and rich visualizations as you progress through Concept and Build. Start by describing your product."
+              action={
+                <Button onClick={() => router.push(FORGE_ROUTES.cadLab)} className="gap-1.5">
+                  <Box className="h-4 w-4" />
+                  Go to Concept
+                </Button>
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Section navigation ── */}
-      <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-        <div className="flex items-center gap-1">
-          {REVIEW_SECTIONS.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => handleSectionClick(section.id)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                activeSection === section.id
-                  ? "bg-international-orange-light text-international-orange"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              }`}
-            >
-              {section.label}
-            </button>
-          ))}
-        </div>
-      </nav>
+      {hasAnyData && (
+        <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-1">
+            {REVIEW_SECTIONS.map((section) => (
+              <button
+                key={section.id}
+                onClick={() => handleSectionClick(section.id)}
+                className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                  activeSection === section.id
+                    ? "bg-international-orange-light text-international-orange"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
 
       {/* ── Build Context Summary — carries forward key context from Build stage ── */}
       <Card className="overflow-hidden">
@@ -338,7 +350,22 @@ export default function CadLabReviewPage(): React.ReactNode {
         <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
       </div>
 
-      {/* Cost estimate with tooling breakdown */}
+      {/* Requirements mapping with supplier recommendations */}
+      <div id="requirements-map">
+        <CadLabRequirementsMap modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
+
+      {/* Hierarchical Bill of Materials */}
+      <div id="bill-of-materials">
+        <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
+      </div>
+
+      {/* Raw materials breakdown with charts and value-add analysis */}
+      <div id="raw-materials">
+        <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />
+      </div>
+
+      {/* Cost estimate with charts and tooling breakdown */}
       <div id="cost-estimate">
         <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
       </div>

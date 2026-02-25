@@ -8,8 +8,8 @@
  * a downloadable consolidated JSON manifest for RFQ handoff.
  */
 
-import { useMemo } from "react"
-import { FileArchive, Download, ExternalLink, CheckCircle2, AlertTriangle } from "lucide-react"
+import { useMemo, useCallback } from "react"
+import { FileArchive, Download, ExternalLink, CheckCircle2, AlertTriangle, FileDown } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
@@ -17,6 +17,15 @@ import type { CadLabModule, CadLabResult } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { getModuleArtifactReadiness } from "@/lib/cad-lab-readiness"
 import { trackFeatureUse } from "@/hooks/useActivityTracker"
+import {
+  MATERIAL_COST_PER_KG,
+  PROCESS_HOURLY_RATE,
+  HOURS_PER_KG,
+  TOOLING_COST,
+  parseBatchSize,
+  getModuleMassKg,
+  getSupplierCategories,
+} from "@/lib/cad-lab-cost-constants"
 
 interface CadLabDrawingPackageProps {
   projectName: string
@@ -342,6 +351,122 @@ export function buildProjectManifestPayload(
   }
 }
 
+/**
+ * Builds a comprehensive Markdown review report combining all sections.
+ */
+export function buildFullReviewReport(
+  projectName: string,
+  modules: CadLabModule[],
+  packageSummary: DrawingPackageSummary,
+  diagnosticAnswers?: DiagnosticAnswers,
+): string {
+  const now = new Date().toISOString()
+  const lines: string[] = [
+    `# ${projectName} — Full Review Report`,
+    "",
+    `Generated: ${now}`,
+    `Modules: ${modules.length} total, ${packageSummary.generatedModules.length} generated`,
+    `Package readiness: ${packageSummary.readinessPct}%`,
+    "",
+  ]
+
+  // ── Requirements & Supplier Mapping ──
+  lines.push("## Requirements & Supplier Mapping", "")
+  lines.push("| Module | Requirement | Process | Material | Recommended Suppliers | Readiness |")
+  lines.push("| --- | --- | --- | --- | --- | --- |")
+  for (const mod of modules) {
+    const diag = diagnosticAnswers?.[mod.id]
+    const process = diag?.mfg_process || "—"
+    const material = diag?.material || "—"
+    const suppliers = getSupplierCategories(diag?.mfg_process || null, diag?.material || null).join(", ")
+    const hasDiag = diag && Object.keys(diag).length > 0
+    const readiness = hasDiag && diag.mfg_process && diag.material && diag.tolerance
+      ? "Ready" : hasDiag ? "Partial" : "Incomplete"
+    lines.push(`| ${mod.name} | ${mod.purpose} | ${process} | ${material} | ${suppliers} | ${readiness} |`)
+  }
+  lines.push("")
+
+  // ── Bill of Materials ──
+  lines.push("## Bill of Materials", "")
+  lines.push("| Module | Part | Material | Mass (kg) | Cost/Unit | Supplier Type | Lead |")
+  lines.push("| --- | --- | --- | --- | --- | --- | --- |")
+  for (const mod of modules) {
+    const diag = diagnosticAnswers?.[mod.id]
+    const process = diag?.mfg_process || "Other"
+    const material = diag?.material || "Other"
+    const batchSize = parseBatchSize(diag?.batch_size || "1-10")
+    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams)
+    const matCost = massKg * (MATERIAL_COST_PER_KG[material] ?? 20)
+    const procCost = massKg * (HOURS_PER_KG[process] ?? 3) * (PROCESS_HOURLY_RATE[process] ?? 50)
+    const toolCost = batchSize > 0 ? (TOOLING_COST[process] ?? 0) / batchSize : 0
+    const totalCost = matCost + procCost + toolCost
+    const supplierType = getSupplierCategories(diag?.mfg_process || null, diag?.material || null)[0]
+    lines.push(`| ${mod.name} | (assembly) | ${material} | ${massKg.toFixed(2)} | $${totalCost.toFixed(2)} | ${supplierType} | ${mod.leadWeeks} wk |`)
+    for (const part of mod.keyParts) {
+      const partCost = mod.keyParts.length > 0 ? totalCost / mod.keyParts.length : 0
+      const partMass = mod.keyParts.length > 0 ? massKg / mod.keyParts.length : 0
+      lines.push(`| | ${part} | ${material} | ~${partMass.toFixed(2)} | ~$${partCost.toFixed(2)} | ${supplierType} | — |`)
+    }
+  }
+  lines.push("")
+
+  // ── Raw Materials Breakdown ──
+  const materialMap = new Map<string, { totalKg: number; modules: string[] }>()
+  let totalProcessing = 0
+  let totalTooling = 0
+  for (const mod of modules) {
+    const diag = diagnosticAnswers?.[mod.id]
+    const material = diag?.material || "Other"
+    const process = diag?.mfg_process || "Other"
+    const batchSize = parseBatchSize(diag?.batch_size || "1-10")
+    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams)
+    const existing = materialMap.get(material) || { totalKg: 0, modules: [] }
+    existing.totalKg += massKg
+    existing.modules.push(mod.name)
+    materialMap.set(material, existing)
+    totalProcessing += massKg * (HOURS_PER_KG[process] ?? 3) * (PROCESS_HOURLY_RATE[process] ?? 50)
+    totalTooling += batchSize > 0 ? (TOOLING_COST[process] ?? 0) / batchSize : 0
+  }
+
+  let totalRawCost = 0
+  const materialRows: Array<{ name: string; kg: number; costPerKg: number; total: number; modules: string[] }> = []
+  for (const [name, data] of materialMap.entries()) {
+    const costPerKg = MATERIAL_COST_PER_KG[name] ?? 20
+    const total = data.totalKg * costPerKg
+    totalRawCost += total
+    materialRows.push({ name, kg: data.totalKg, costPerKg, total, modules: data.modules })
+  }
+  materialRows.sort((a, b) => b.total - a.total)
+  const totalMfg = totalRawCost + totalProcessing + totalTooling
+  const valueAdd = totalMfg > 0 ? ((totalMfg - totalRawCost) / totalMfg * 100) : 0
+
+  lines.push("## Raw Materials Breakdown", "")
+  lines.push(`- **Raw Material Cost:** $${totalRawCost.toFixed(2)}`)
+  lines.push(`- **Processing Cost:** $${totalProcessing.toFixed(2)}`)
+  lines.push(`- **Tooling Cost:** $${totalTooling.toFixed(2)}`)
+  lines.push(`- **Total Manufacturing Cost:** $${totalMfg.toFixed(2)}`)
+  lines.push(`- **Value-Add Margin:** ${valueAdd.toFixed(1)}%`)
+  lines.push("")
+  lines.push("| Material | Total kg | Cost/kg | Total Cost | % of Raw |")
+  lines.push("| --- | --- | --- | --- | --- |")
+  for (const row of materialRows) {
+    const pct = totalRawCost > 0 ? (row.total / totalRawCost * 100).toFixed(1) : "0"
+    lines.push(`| ${row.name} | ${row.kg.toFixed(2)} | $${row.costPerKg.toFixed(2)} | $${row.total.toFixed(2)} | ${pct}% |`)
+  }
+  lines.push("")
+
+  // ── Existing supplier packet content ──
+  const supplierMarkdown = buildSupplierPacketMarkdown(projectName, modules, packageSummary, now, diagnosticAnswers)
+  // Skip the header since we already have one
+  const supplierLines = supplierMarkdown.split("\n")
+  const startIdx = supplierLines.findIndex((l) => l.startsWith("## Module Summary"))
+  if (startIdx >= 0) {
+    lines.push(...supplierLines.slice(startIdx))
+  }
+
+  return lines.join("\n")
+}
+
 export function CadLabDrawingPackage({
   projectName,
   modules,
@@ -403,6 +528,22 @@ export function CadLabDrawingPackage({
       readinessPct: packageSummary.readinessPct,
     })
   }
+
+  const handleDownloadFullReport = useCallback((): void => {
+    const report = buildFullReviewReport(projectName, modules, packageSummary, diagnosticAnswers)
+    const blob = new Blob([report], { type: "text/markdown" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `${projectName.replace(/\s+/g, "-").toLowerCase()}-full-review-report.md`
+    link.click()
+    URL.revokeObjectURL(url)
+    trackFeatureUse("cad_lab_full_report_downloaded", {
+      moduleCount: modules.length,
+      generatedModules: packageSummary.generatedModules.length,
+      readinessPct: packageSummary.readinessPct,
+    })
+  }, [projectName, modules, packageSummary, diagnosticAnswers])
 
   const handleOpenManifest = (manifest: { moduleId: string; moduleName: string; url: string }): void => {
     trackFeatureUse("cad_lab_manifest_opened", {
@@ -468,6 +609,16 @@ export function CadLabDrawingPackage({
           >
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Download module BOM (CSV)
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            className="text-xs gap-1.5"
+            onClick={handleDownloadFullReport}
+            disabled={modules.length === 0}
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            Download full review report
           </Button>
           {packageSummary.readinessPct === 100 ? (
             <span className="text-xs text-status-success flex items-center gap-1">

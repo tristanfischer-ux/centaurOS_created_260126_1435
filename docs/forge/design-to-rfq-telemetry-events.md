@@ -73,6 +73,11 @@ This document defines activity events emitted from Cad Lab Review and Procuremen
   - `quoteReadyModules`
   - `readinessPct`
 
+- `cad_lab_full_report_downloaded`
+  - `moduleCount`
+  - `generatedModules`
+  - `readinessPct`
+
 - `cad_lab_manifest_opened`
   - `moduleId`
   - `moduleName`
