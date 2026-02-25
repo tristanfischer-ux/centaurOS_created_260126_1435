@@ -16,6 +16,7 @@
 
 "use server"
 
+import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 
 // ---------------------------------------------------------------------------
@@ -250,6 +251,16 @@ export async function getInvestorById(id: string): Promise<InvestorFirm | null> 
   return rowToFirm(data as Record<string, unknown>)
 }
 
+// DECISION: firm_type is the reliable discriminator for investor vs service
+// provider. The is_investor flag was absent from the data (CSV import never
+// set it), so counts were always 0/596. These are the known capital-deployer
+// firm types in the UK Finance directory.
+const INVESTOR_FIRM_TYPES = new Set([
+  'VC', 'PE', 'Growth', 'Growth Equity', 'Family Office', 'CVC',
+  'Corporate VC', 'Accelerator', 'Angel', 'Angel Network', 'Debt Fund',
+  'Impact Fund', 'EIS Fund', 'SEIS Fund',
+])
+
 /**
  * Fetches aggregated stats for the investor directory insights panel.
  *
@@ -257,74 +268,86 @@ export async function getInvestorById(id: string): Promise<InvestorFirm | null> 
  * then aggregates counts and breakdowns in JS. Designed for the insights panel
  * header above the directory grid.
  *
- * @returns Aggregated InvestorStats or null on error
+ * DECISION: Wrapped with unstable_cache (5 min TTL) to avoid a full-table
+ * scan on every ISR revalidation. The page revalidates every 60s but investor
+ * data changes infrequently — 5 min is a safe window.
+ *
+ * @returns Aggregated InvestorStats
  */
-export async function getInvestorStats(): Promise<InvestorStats> {
-  const supabase = await createClient()
+export const getInvestorStats = unstable_cache(
+  async (): Promise<InvestorStats> => {
+    const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('marketplace_listings')
-    .select('subcategory, attributes')
-    .eq('category', 'Finance')
+    const { data, error } = await supabase
+      .from('marketplace_listings')
+      .select('subcategory, attributes')
+      .eq('category', 'Finance')
 
-  if (error) {
-    console.error('[getInvestorStats] Supabase error:', error)
+    if (error) {
+      console.error('[getInvestorStats] Supabase error:', error)
+      return {
+        total: 0,
+        investorCount: 0,
+        serviceProviderCount: 0,
+        withWebsiteCount: 0,
+        activeDeployingCount: 0,
+        subcategoryBreakdown: [],
+        cityBreakdown: [],
+      }
+    }
+
+    const rows = data ?? []
+    const total = rows.length
+
+    let investorCount = 0
+    let serviceProviderCount = 0
+    let withWebsiteCount = 0
+    let activeDeployingCount = 0
+    const subcategoryCounts: Record<string, number> = {}
+    const cityCounts: Record<string, number> = {}
+
+    for (const row of rows) {
+      const attrs = (row.attributes as Record<string, unknown>) ?? {}
+
+      // DECISION: Use firm_type to distinguish capital-deployers from service
+      // providers. is_investor flag was unreliable (never populated from CSV).
+      const firmType = (attrs.firm_type as string) ?? ''
+      if (INVESTOR_FIRM_TYPES.has(firmType)) {
+        investorCount++
+      } else {
+        serviceProviderCount++
+      }
+
+      if (attrs.website_url) withWebsiteCount++
+      if (attrs.is_active_deploying === true) activeDeployingCount++
+
+      const sub = (row.subcategory as string) || 'Unknown'
+      subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
+
+      const city = (attrs.hq_city as string) || ''
+      if (city) cityCounts[city] = (cityCounts[city] ?? 0) + 1
+    }
+
+    const subcategoryBreakdown = Object.entries(subcategoryCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    const cityBreakdown = Object.entries(cityCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
     return {
-      total: 0,
-      investorCount: 0,
-      serviceProviderCount: 0,
-      withWebsiteCount: 0,
-      activeDeployingCount: 0,
-      subcategoryBreakdown: [],
-      cityBreakdown: [],
+      total,
+      investorCount,
+      serviceProviderCount,
+      withWebsiteCount,
+      activeDeployingCount,
+      subcategoryBreakdown,
+      cityBreakdown,
     }
-  }
-
-  const rows = data ?? []
-  const total = rows.length
-
-  let investorCount = 0
-  let serviceProviderCount = 0
-  let withWebsiteCount = 0
-  let activeDeployingCount = 0
-  const subcategoryCounts: Record<string, number> = {}
-  const cityCounts: Record<string, number> = {}
-
-  for (const row of rows) {
-    const attrs = (row.attributes as Record<string, unknown>) ?? {}
-
-    if (attrs.is_investor === true) {
-      investorCount++
-    } else {
-      serviceProviderCount++
-    }
-    if (attrs.website_url) withWebsiteCount++
-    if (attrs.is_active_deploying === true) activeDeployingCount++
-
-    const sub = (row.subcategory as string) || 'Unknown'
-    subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
-
-    const city = (attrs.hq_city as string) || ''
-    if (city) cityCounts[city] = (cityCounts[city] ?? 0) + 1
-  }
-
-  const subcategoryBreakdown = Object.entries(subcategoryCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
-
-  const cityBreakdown = Object.entries(cityCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10)
-
-  return {
-    total,
-    investorCount,
-    serviceProviderCount,
-    withWebsiteCount,
-    activeDeployingCount,
-    subcategoryBreakdown,
-    cityBreakdown,
-  }
-}
+  },
+  ['investor-stats'],
+  { revalidate: 300 }
+)

@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Building2, TrendingUp, Globe, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -58,11 +58,29 @@ function StatCard({ icon, value, label }: StatCardProps) {
 // Component
 // ---------------------------------------------------------------------------
 
+// Truncates long tick labels so they fit within the fixed Y-axis width.
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+
 /**
  * Collapsible panel showing investor directory statistics and charts.
  */
 export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
-  const [collapsed, setCollapsed] = useState(false)
+  // DECISION: Persist collapse state to localStorage so the user's preference
+  // survives navigation and page refreshes.
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem('investor-insights-collapsed') === '1'
+  })
+
+  const handleToggle = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev
+      localStorage.setItem('investor-insights-collapsed', next ? '1' : '0')
+      return next
+    })
+  }, [])
 
   const activeDeployingData = [
     { name: 'Active', value: stats.activeDeployingCount },
@@ -80,7 +98,7 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(prev => !prev)}
+          onClick={handleToggle}
           className="text-muted-foreground h-7 gap-1 text-xs"
         >
           {collapsed ? (
@@ -135,15 +153,13 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={90}
+                      width={110}
                       tick={{ fontSize: 10 }}
                       tickLine={false}
                       axisLine={false}
+                      tickFormatter={(v: string) => truncate(v, 14)}
                     />
-                    <Tooltip
-                      contentStyle={{ fontSize: 11, borderRadius: 6 }}
-                      cursor={{ fill: 'hsl(var(--muted))' }}
-                    />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill="var(--color-international-orange)" radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -161,7 +177,7 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                     <Pie
                       data={activeDeployingData}
                       cx="50%"
-                      cy="45%"
+                      cy="50%"
                       innerRadius={55}
                       outerRadius={75}
                       paddingAngle={2}
@@ -173,8 +189,8 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>
-                {/* Center text */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4">
+                {/* Center text — aligned to cy="50%" */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-2xl font-bold text-foreground">
                     {stats.activeDeployingCount}
                   </span>
@@ -210,15 +226,13 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={70}
+                      width={80}
                       tick={{ fontSize: 10 }}
                       tickLine={false}
                       axisLine={false}
+                      tickFormatter={(v: string) => truncate(v, 11)}
                     />
-                    <Tooltip
-                      contentStyle={{ fontSize: 11, borderRadius: 6 }}
-                      cursor={{ fill: 'hsl(var(--muted))' }}
-                    />
+                    <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill="var(--color-electric-blue)" radius={[0, 3, 3, 0]} />
                   </BarChart>
                 </ResponsiveContainer>

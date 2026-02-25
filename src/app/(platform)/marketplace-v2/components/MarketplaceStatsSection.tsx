@@ -10,7 +10,7 @@
  * as props from the marketplace page.tsx.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import {
@@ -57,7 +57,7 @@ interface MarketplaceStatsSectionProps {
   labels?: StatsLabels
   selectedCompanyTypes?: string[]
   selectedCompanySizes?: string[]
-  selectedRegion?: string
+  selectedSubRegions?: string[]
   onCompanyTypeClick?: (type: string) => void
   onCompanySizeClick?: (size: string) => void
   onRegionClick?: (region: string) => void
@@ -139,7 +139,7 @@ export function MarketplaceStatsSection({
   labels,
   selectedCompanyTypes = [],
   selectedCompanySizes = [],
-  selectedRegion,
+  selectedSubRegions = [],
   onCompanyTypeClick,
   onCompanySizeClick,
   onRegionClick,
@@ -170,6 +170,9 @@ export function MarketplaceStatsSection({
     barTooltipNoun = 'suppliers',
     donutTooltipNoun = 'companies',
   } = labels ?? {}
+
+  // Fix 6: avoid re-slicing on every render
+  const typeData: { name: string; count: number }[] = useMemo(() => companyTypeCounts.slice(0, 12), [companyTypeCounts])
 
   // Don't render if no data
   if (totalListings === 0) return null
@@ -224,13 +227,14 @@ export function MarketplaceStatsSection({
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
                     {chart1Title}
+                    {onCompanyTypeClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
                   <div className="h-[280px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart
-                        data={companyTypeCounts.slice(0, 12)}
+                        data={typeData}
                         layout="vertical"
                         margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
                       >
@@ -257,7 +261,7 @@ export function MarketplaceStatsSection({
                             if (name) onCompanyTypeClick(name)
                           } : undefined}
                         >
-                          {companyTypeCounts.slice(0, 12).map((entry, index) => {
+                          {typeData.map((entry, index) => {
                             const isSelected = selectedCompanyTypes.includes(entry.name)
                             const hasSelection = selectedCompanyTypes.length > 0
                             return (
@@ -284,6 +288,7 @@ export function MarketplaceStatsSection({
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
                     {chart2Title}
+                    {onCompanySizeClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -369,6 +374,7 @@ export function MarketplaceStatsSection({
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium text-muted-foreground">
                     {chart3Title}
+                    {onRegionClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pb-4">
@@ -403,8 +409,8 @@ export function MarketplaceStatsSection({
                           } : undefined}
                         >
                           {regionCounts.map((entry, index) => {
-                            const isSelected = selectedRegion === entry.name
-                            const hasSelection = !!selectedRegion
+                            const isSelected = selectedSubRegions.includes(entry.name)
+                            const hasSelection = selectedSubRegions.length > 0
                             return (
                               <Cell
                                 key={`region-${index}`}

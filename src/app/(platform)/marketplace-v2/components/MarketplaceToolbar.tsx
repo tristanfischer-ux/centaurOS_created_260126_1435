@@ -95,6 +95,10 @@ interface MarketplaceToolbarProps {
     selectedRegion?: MarketplaceRegion
     /** Called when user changes the region filter. */
     onRegionChange?: (region: MarketplaceRegion) => void
+    /** Currently selected sub-regions from chart clicks (e.g. "London", "South East"). */
+    selectedSubRegions?: string[]
+    /** Toggle a sub-region selection (from chart click or chip removal). */
+    onToggleSubRegion?: (region: string) => void
     /** Number of active filters (shown as badge count on Filters button). */
     activeFilterCount?: number
     /** Current advanced filters, for rendering removable chips. */
@@ -133,6 +137,8 @@ export function MarketplaceToolbar({
     visibleCategories,
     selectedRegion = 'All Regions',
     onRegionChange,
+    selectedSubRegions = [],
+    onToggleSubRegion,
     activeFilterCount = 0,
     advancedFilters,
     onRemoveAdvancedFilter,
@@ -348,54 +354,57 @@ export function MarketplaceToolbar({
             </div>
 
             {/* Active filter chips (shown when filters applied but panel may be closed) */}
-            {advancedFilters && onRemoveAdvancedFilter && activeFilterCount > 0 && !showFilters && (
+            {((advancedFilters && onRemoveAdvancedFilter && activeFilterCount > 0 && !showFilters) || selectedSubRegions.length > 0) && (
                 <div className="flex flex-wrap gap-1.5">
-                    {advancedFilters.verifiedOnly && (
+                    {selectedSubRegions.map((region) => (
+                        <FilterChip key={`sr-${region}`} label={`Region: ${region}`} onRemove={() => onToggleSubRegion?.(region)} />
+                    ))}
+                    {advancedFilters?.verifiedOnly && onRemoveAdvancedFilter && (
                         <FilterChip label="Verified" onRemove={() => onRemoveAdvancedFilter('verifiedOnly')} />
                     )}
-                    {advancedFilters.minRating != null && (
+                    {advancedFilters?.minRating != null && onRemoveAdvancedFilter && (
                         <FilterChip label={`${advancedFilters.minRating}+ stars`} onRemove={() => onRemoveAdvancedFilter('minRating')} />
                     )}
-                    {advancedFilters.minExperience != null && (
+                    {advancedFilters?.minExperience != null && onRemoveAdvancedFilter && (
                         <FilterChip label={`${advancedFilters.minExperience}+ years`} onRemove={() => onRemoveAdvancedFilter('minExperience')} />
                     )}
-                    {advancedFilters.location && (
+                    {advancedFilters?.location && onRemoveAdvancedFilter && (
                         <FilterChip label={advancedFilters.location} onRemove={() => onRemoveAdvancedFilter('location')} />
                     )}
-                    {advancedFilters.availability && (
+                    {advancedFilters?.availability && onRemoveAdvancedFilter && (
                         <FilterChip label={advancedFilters.availability} onRemove={() => onRemoveAdvancedFilter('availability')} />
                     )}
-                    {advancedFilters.minRate != null && (
+                    {advancedFilters?.minRate != null && onRemoveAdvancedFilter && (
                         <FilterChip label={`Min $${advancedFilters.minRate}`} onRemove={() => onRemoveAdvancedFilter('minRate')} />
                     )}
-                    {advancedFilters.maxRate != null && (
+                    {advancedFilters?.maxRate != null && onRemoveAdvancedFilter && (
                         <FilterChip label={`Max $${advancedFilters.maxRate}`} onRemove={() => onRemoveAdvancedFilter('maxRate')} />
                     )}
-                    {advancedFilters.skills?.map((skill) => (
+                    {advancedFilters?.skills?.map((skill) => (
                         <FilterChip key={skill} label={skill} onRemove={() => {
                             const next = (advancedFilters.skills ?? []).filter(s => s !== skill)
                             if (next.length === 0) {
-                                onRemoveAdvancedFilter('skills')
-                            } else {
-                                onRemoveAdvancedFilter('skills')
+                                onRemoveAdvancedFilter!('skills')
+                            } else if (onUpdateAdvancedFilter) {
+                                onUpdateAdvancedFilter('skills', next)
                             }
                         }} />
                     ))}
-                    {advancedFilters.companyTypes?.map((type) => (
+                    {advancedFilters?.companyTypes?.map((type) => (
                         <FilterChip key={`ct-${type}`} label={type} onRemove={() => {
                             const next = (advancedFilters.companyTypes ?? []).filter(t => t !== type)
                             if (next.length === 0) {
-                                onRemoveAdvancedFilter('companyTypes')
+                                onRemoveAdvancedFilter!('companyTypes')
                             } else if (onUpdateAdvancedFilter) {
                                 onUpdateAdvancedFilter('companyTypes', next)
                             }
                         }} />
                     ))}
-                    {advancedFilters.companySizes?.map((size) => (
+                    {advancedFilters?.companySizes?.map((size) => (
                         <FilterChip key={`cs-${size}`} label={`Size: ${size}`} onRemove={() => {
                             const next = (advancedFilters.companySizes ?? []).filter(s => s !== size)
                             if (next.length === 0) {
-                                onRemoveAdvancedFilter('companySizes')
+                                onRemoveAdvancedFilter!('companySizes')
                             } else if (onUpdateAdvancedFilter) {
                                 onUpdateAdvancedFilter('companySizes', next)
                             }

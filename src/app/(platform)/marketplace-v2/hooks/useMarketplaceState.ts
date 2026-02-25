@@ -6,6 +6,7 @@ import type { MarketplaceListing, MarketplaceSortOption, AdvancedFilters } from 
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { safeParseAttributes, safeStringArray, deriveRegion, type MarketplaceRegion } from '@/lib/marketplace-utils'
+import { extractPostcode, deriveRegionFromPostcode, deriveRegionFromKeywords } from '@/lib/postcode-utils'
 import { getTechniqueById } from '@/lib/manufacturing-techniques'
 import type { ManufacturingTechnique } from '@/lib/manufacturing-techniques/types'
 
@@ -120,6 +121,7 @@ export function useMarketplaceState({
     /** When set, shows "AI interpreted" badge with this explanation. Cleared when user changes filters. */
     const [aiInterpretation, setAIInterpretation] = useState<string | null>(null)
     const [selectedRegion, setSelectedRegion] = useState<MarketplaceRegion>('All Regions')
+    const [selectedSubRegions, setSelectedSubRegions] = useState<string[]>([])
 
     // Advanced filter state
     const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(() => {
@@ -303,12 +305,7 @@ export function useMarketplaceState({
         [buildSearchParams]
     )
 
-    useEffect(() => {
-        if (currentPage === 1 && listings === initialListings && !debouncedQuery && activeCategory === defaultCategory && selectedSubcategories.size === 0 && advancedFilterCount === 0) {
-            return
-        }
-        fetchPage(1, false)
-    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories, advancedFilters]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Fix 1: Removed duplicate useEffect that shared the same dependency array
 
     const loadMore = useCallback(() => {
         if (isLoadingMore || !hasMore) return
@@ -334,6 +331,12 @@ export function useMarketplaceState({
             else next.add(sub)
             return next
         })
+    }, [])
+
+    const toggleSubRegion = useCallback((region: string) => {
+        setSelectedSubRegions(prev =>
+            prev.includes(region) ? prev.filter(r => r !== region) : [...prev, region]
+        )
     }, [])
 
     /** Apply filters extracted by AI search; refetch is triggered by effect. */
@@ -366,6 +369,7 @@ export function useMarketplaceState({
         setSortBy('relevance')
         setAIInterpretation(null)
         setSelectedRegion('All Regions')
+        setSelectedSubRegions([])
         setAdvancedFilters({})
         if (techniqueSlug) {
             const params = new URLSearchParams(searchParams?.toString() || '')
@@ -384,8 +388,9 @@ export function useMarketplaceState({
             sortBy !== 'relevance' ||
             activeTechnique !== null ||
             selectedRegion !== 'All Regions' ||
+            selectedSubRegions.length > 0 ||
             advancedFilterCount > 0,
-        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique, selectedRegion, advancedFilterCount]
+        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique, selectedRegion, selectedSubRegions.length, advancedFilterCount]
     )
 
     const activeFilterCount = useMemo(() => {
@@ -422,7 +427,7 @@ export function useMarketplaceState({
                 )
             })
         }
-        // Client-side region filtering
+        // Client-side region filtering (broad: UK / Europe / Global)
         if (selectedRegion !== 'All Regions') {
             result = result.filter(l => {
                 const attrs = safeParseAttributes(l.attributes)
@@ -430,8 +435,20 @@ export function useMarketplaceState({
                 return region === selectedRegion
             })
         }
+        // Client-side sub-region filtering (chart-clicked: London, South East, etc.)
+        if (selectedSubRegions.length > 0) {
+            result = result.filter(l => {
+                const attrs = safeParseAttributes(l.attributes)
+                const address = (attrs.ch_registered_address ?? attrs.location ?? attrs.headquarters) as string | undefined
+                if (!address) return false
+                const postcode = extractPostcode(address)
+                let subRegion = postcode ? deriveRegionFromPostcode(postcode) : null
+                if (!subRegion) subRegion = deriveRegionFromKeywords(address)
+                return subRegion ? selectedSubRegions.includes(subRegion) : false
+            })
+        }
         return result
-    }, [listings, activeTechnique, selectedRegion])
+    }, [listings, activeTechnique, selectedRegion, selectedSubRegions])
 
     const availableSubcategories = useMemo(() => {
         const catListings =
@@ -491,6 +508,8 @@ export function useMarketplaceState({
         clearTechniqueFilter,
         selectedRegion,
         setSelectedRegion,
+        selectedSubRegions,
+        toggleSubRegion,
         aiInterpretation,
         applyAIFilters,
         clearAIInterpretation,

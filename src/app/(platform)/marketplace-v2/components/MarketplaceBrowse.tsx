@@ -11,7 +11,6 @@ import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
 import { MarketplaceStatsSection, type StatsLabels } from './MarketplaceStatsSection'
 import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
-import type { MarketplaceRegion } from '@/lib/marketplace-utils'
 import { dismissRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
 import { toast } from 'sonner'
@@ -199,6 +198,26 @@ export function MarketplaceBrowse({
         setCompareListings([])
     }, [compareOrigin])
 
+    // Chart click handlers (Fix 5: extracted to useCallback)
+    const { companyTypes: selectedTypes, companySizes: selectedSizes } = state.advancedFilters
+    const { updateAdvancedFilter, toggleSubRegion } = state
+
+    const handleCompanyTypeClick = useCallback((type: string) => {
+        const current = selectedTypes ?? []
+        const next = current.includes(type) ? current.filter(t => t !== type) : [...current, type]
+        updateAdvancedFilter('companyTypes', next.length > 0 ? next : undefined)
+    }, [selectedTypes, updateAdvancedFilter])
+
+    const handleCompanySizeClick = useCallback((size: string) => {
+        const current = selectedSizes ?? []
+        const next = current.includes(size) ? current.filter(s => s !== size) : [...current, size]
+        updateAdvancedFilter('companySizes', next.length > 0 ? next : undefined)
+    }, [selectedSizes, updateAdvancedFilter])
+
+    const handleRegionClick = useCallback((region: string) => {
+        toggleSubRegion(region)
+    }, [toggleSubRegion])
+
     return (
         <div className="space-y-6">
             {/* Page header */}
@@ -272,22 +291,10 @@ export function MarketplaceBrowse({
                             labels={statsLabels}
                             selectedCompanyTypes={state.advancedFilters.companyTypes}
                             selectedCompanySizes={state.advancedFilters.companySizes}
-                            selectedRegion={state.selectedRegion !== 'All Regions' ? state.selectedRegion : undefined}
-                            onCompanyTypeClick={(type) => {
-                                const current = state.advancedFilters.companyTypes ?? []
-                                const next = current.includes(type) ? current.filter(t => t !== type) : [...current, type]
-                                state.updateAdvancedFilter('companyTypes', next.length > 0 ? next : undefined)
-                            }}
-                            onCompanySizeClick={(size) => {
-                                const current = state.advancedFilters.companySizes ?? []
-                                const next = current.includes(size) ? current.filter(s => s !== size) : [...current, size]
-                                state.updateAdvancedFilter('companySizes', next.length > 0 ? next : undefined)
-                            }}
-                            onRegionClick={(region) => {
-                                state.setSelectedRegion(
-                                    state.selectedRegion === region ? 'All Regions' : region as MarketplaceRegion
-                                )
-                            }}
+                            selectedSubRegions={state.selectedSubRegions}
+                            onCompanyTypeClick={handleCompanyTypeClick}
+                            onCompanySizeClick={handleCompanySizeClick}
+                            onRegionClick={handleRegionClick}
                         />
                     )}
 
@@ -323,6 +330,8 @@ export function MarketplaceBrowse({
                         visibleCategories={state.visibleCategories}
                         selectedRegion={state.selectedRegion}
                         onRegionChange={state.setSelectedRegion}
+                        selectedSubRegions={state.selectedSubRegions}
+                        onToggleSubRegion={state.toggleSubRegion}
                         activeFilterCount={state.activeFilterCount}
                         advancedFilters={state.advancedFilters}
                         onRemoveAdvancedFilter={state.removeAdvancedFilter}
