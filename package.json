@@ -132,6 +132,9 @@
     "dompurify": "3.2.4",
     "minimatch": "10.2.1"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@faker-js/faker": "^10.2.0",
     "@next/bundle-analyzer": "^16.1.6",
