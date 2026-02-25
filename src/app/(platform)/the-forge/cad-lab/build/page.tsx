@@ -74,7 +74,8 @@ import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ValidationSummary } from "@/components/cad/validation-summary"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
-import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
+import { Metric, SvgView, RenderedView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
+import { useRenderedViews } from "@/hooks/use-rendered-views"
 import { ModuleCarousel } from "../components/module-carousel"
 import { IntegrationView } from "../components/integration-view"
 // ProcessFlowDiagram removed — IO info is shown inline in System Architecture cards
@@ -1590,22 +1591,34 @@ function ModuleResultsView({
   moduleId: string
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }): React.ReactNode {
+  // Render high-quality orthographic views from STL using Three.js
+  const { views: renderedViews, loading: renderedLoading } = useRenderedViews(result.stlData)
+
+  // A view tab is available if we have STL (rendered views) OR a CadQuery SVG fallback
+  const hasIso = !!(result.stlData || result.svgIso)
+  const hasExploded = !!result.svgExploded
+  const hasFront = !!(result.stlData || result.svgFront)
+  const hasBack = !!(result.stlData || result.svgBack)
+  const hasLeft = !!(result.stlData || result.svgLeft)
+  const hasRight = !!(result.stlData || result.svgRight)
+  const hasTop = !!(result.stlData || result.svgTop)
+
   // Auto-select first available tab when current tab has no matching content
   useEffect(() => {
     const availableTabs: ViewTab[] = []
     if (result.stlData) availableTabs.push("3d")
-    if (result.svgIso) availableTabs.push("iso")
-    if (result.svgExploded) availableTabs.push("exploded")
-    if (result.svgFront) availableTabs.push("front")
-    if (result.svgBack) availableTabs.push("back")
-    if (result.svgLeft) availableTabs.push("left")
-    if (result.svgRight) availableTabs.push("right")
-    if (result.svgTop) availableTabs.push("top")
+    if (hasIso) availableTabs.push("iso")
+    if (hasExploded) availableTabs.push("exploded")
+    if (hasFront) availableTabs.push("front")
+    if (hasBack) availableTabs.push("back")
+    if (hasLeft) availableTabs.push("left")
+    if (hasRight) availableTabs.push("right")
+    if (hasTop) availableTabs.push("top")
 
     if (availableTabs.length > 0 && !availableTabs.includes(activeViewTab)) {
       setActiveViewTab(availableTabs[0])
     }
-  }, [result, activeViewTab, setActiveViewTab])
+  }, [result, hasIso, hasExploded, hasFront, hasBack, hasLeft, hasRight, hasTop, activeViewTab, setActiveViewTab])
 
   const handleDownloadFromUrl = (url: string, filename: string): void => {
     const link = document.createElement("a")
@@ -1614,6 +1627,39 @@ function ModuleResultsView({
     link.target = "_blank"
     link.rel = "noopener noreferrer"
     link.click()
+  }
+
+  // Renders a single orthographic view tab — prefers Three.js PNG, falls back to CadQuery SVG
+  const renderOrthoTab = (viewName: "iso" | "front" | "back" | "left" | "right" | "top", label: string) => {
+    const renderedSrc = renderedViews?.[viewName] ?? null
+    const svgSrc = viewName === "iso" ? result.svgIso
+      : viewName === "front" ? result.svgFront
+      : viewName === "back" ? result.svgBack
+      : viewName === "left" ? result.svgLeft
+      : viewName === "right" ? result.svgRight
+      : result.svgTop
+
+    // Prefer rendered PNG; fall back to CadQuery SVG if rendering failed/unavailable
+    if (result.stlData) {
+      return (
+        <TabsContent value={viewName} className="mt-3">
+          <RenderedView
+            src={renderedSrc}
+            alt={label}
+            onClick={() => onFullscreen(viewName, moduleId)}
+            loading={renderedLoading}
+          />
+        </TabsContent>
+      )
+    }
+    if (svgSrc) {
+      return (
+        <TabsContent value={viewName} className="mt-3">
+          <SvgView src={svgSrc} alt={label} onClick={() => onFullscreen(viewName, moduleId)} />
+        </TabsContent>
+      )
+    }
+    return null
   }
 
   return (
@@ -1659,13 +1705,13 @@ function ModuleResultsView({
             <Tabs value={activeViewTab} onValueChange={(v) => setActiveViewTab(v as ViewTab)}>
               <TabsList className="flex w-full overflow-x-auto">
                 {result.stlData && <TabsTrigger value="3d" className="flex-1">3D</TabsTrigger>}
-                {result.svgIso && <TabsTrigger value="iso" className="flex-1">Iso</TabsTrigger>}
-                {result.svgExploded && <TabsTrigger value="exploded" className="flex-1">Exploded</TabsTrigger>}
-                {result.svgFront && <TabsTrigger value="front" className="flex-1">Front</TabsTrigger>}
-                {result.svgBack && <TabsTrigger value="back" className="flex-1">Back</TabsTrigger>}
-                {result.svgLeft && <TabsTrigger value="left" className="flex-1">Left</TabsTrigger>}
-                {result.svgRight && <TabsTrigger value="right" className="flex-1">Right</TabsTrigger>}
-                {result.svgTop && <TabsTrigger value="top" className="flex-1">Top</TabsTrigger>}
+                {hasIso && <TabsTrigger value="iso" className="flex-1">Iso</TabsTrigger>}
+                {hasExploded && <TabsTrigger value="exploded" className="flex-1">Exploded</TabsTrigger>}
+                {hasFront && <TabsTrigger value="front" className="flex-1">Front</TabsTrigger>}
+                {hasBack && <TabsTrigger value="back" className="flex-1">Back</TabsTrigger>}
+                {hasLeft && <TabsTrigger value="left" className="flex-1">Left</TabsTrigger>}
+                {hasRight && <TabsTrigger value="right" className="flex-1">Right</TabsTrigger>}
+                {hasTop && <TabsTrigger value="top" className="flex-1">Top</TabsTrigger>}
               </TabsList>
               {result.stlData && (
                 <TabsContent value="3d" className="mt-3">
@@ -1674,13 +1720,13 @@ function ModuleResultsView({
                   </div>
                 </TabsContent>
               )}
-              {result.svgIso && <TabsContent value="iso" className="mt-3"><SvgView src={result.svgIso} alt="Isometric" onClick={() => onFullscreen("iso", moduleId)} /></TabsContent>}
-              {result.svgExploded && <TabsContent value="exploded" className="mt-3"><SvgView src={result.svgExploded} alt="Exploded" onClick={() => onFullscreen("exploded", moduleId)} /></TabsContent>}
-              {result.svgFront && <TabsContent value="front" className="mt-3"><SvgView src={result.svgFront} alt="Front" onClick={() => onFullscreen("front", moduleId)} /></TabsContent>}
-              {result.svgBack && <TabsContent value="back" className="mt-3"><SvgView src={result.svgBack} alt="Back" onClick={() => onFullscreen("back", moduleId)} /></TabsContent>}
-              {result.svgLeft && <TabsContent value="left" className="mt-3"><SvgView src={result.svgLeft} alt="Left" onClick={() => onFullscreen("left", moduleId)} /></TabsContent>}
-              {result.svgRight && <TabsContent value="right" className="mt-3"><SvgView src={result.svgRight} alt="Right" onClick={() => onFullscreen("right", moduleId)} /></TabsContent>}
-              {result.svgTop && <TabsContent value="top" className="mt-3"><SvgView src={result.svgTop} alt="Top" onClick={() => onFullscreen("top", moduleId)} /></TabsContent>}
+              {hasIso && renderOrthoTab("iso", "Isometric")}
+              {hasExploded && result.svgExploded && <TabsContent value="exploded" className="mt-3"><SvgView src={result.svgExploded} alt="Exploded" onClick={() => onFullscreen("exploded", moduleId)} /></TabsContent>}
+              {hasFront && renderOrthoTab("front", "Front")}
+              {hasBack && renderOrthoTab("back", "Back")}
+              {hasLeft && renderOrthoTab("left", "Left")}
+              {hasRight && renderOrthoTab("right", "Right")}
+              {hasTop && renderOrthoTab("top", "Top")}
             </Tabs>
           </div>
         </div>

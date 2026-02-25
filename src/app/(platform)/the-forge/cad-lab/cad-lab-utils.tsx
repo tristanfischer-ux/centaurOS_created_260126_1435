@@ -11,6 +11,8 @@ import { useRef, useEffect, useCallback, useState } from "react"
 import dynamic from "next/dynamic"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useRenderedViews } from "@/hooks/use-rendered-views"
+import type { RenderedViews } from "@/lib/render-orthographic-views"
 
 const STLViewer = dynamic(
   () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
@@ -213,10 +215,51 @@ export function SvgView({
   )
 }
 
+// ─── RenderedView ─────────────────────────────────────────────────
+
+/**
+ * RenderedView — displays a Three.js-rendered orthographic view PNG.
+ *
+ * Shows a skeleton while loading, then the rendered PNG with object-contain
+ * sizing. Same container dimensions as SvgView for visual consistency.
+ */
+export function RenderedView({
+  src,
+  alt,
+  onClick,
+  loading,
+}: {
+  src: string | null
+  alt: string
+  onClick: () => void
+  loading?: boolean
+}): React.ReactNode {
+  if (loading) {
+    return <Skeleton className="h-[500px] rounded-lg" />
+  }
+
+  if (!src) return null
+
+  return (
+    <div
+      className="bg-muted/30 rounded-lg h-[500px] cursor-pointer hover:opacity-90 transition-opacity overflow-hidden"
+      onClick={onClick}
+      role="img"
+      aria-label={alt}
+    >
+      <img src={src} alt={alt} className="w-full h-full object-contain" />
+    </div>
+  )
+}
+
 // ─── FullscreenOverlay ───────────────────────────────────────────────
 
 /**
- * FullscreenOverlay — full-viewport overlay for any view (3D STL or SVG).
+ * FullscreenOverlay — full-viewport overlay for any view (3D STL, rendered PNG, or SVG).
+ *
+ * @description For Iso/Front/Back/Left/Right/Top views: prefers Three.js-rendered PNG
+ * (via useRenderedViews) over CadQuery SVG fallback. For Exploded view: always uses
+ * CadQuery SVG (can't decompose merged STL). For 3D: interactive STLViewer.
  */
 export function FullscreenOverlay({
   view,
@@ -227,6 +270,11 @@ export function FullscreenOverlay({
   result: CadLabResult
   onClose: () => void
 }): React.ReactNode {
+  const { views: renderedViews, loading: renderedLoading } = useRenderedViews(
+    // Only render for views that benefit — not 3d or exploded
+    view !== "3d" && view !== "exploded" ? result.stlData : undefined,
+  )
+
   // Listen for Escape key to close the overlay
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -250,6 +298,8 @@ export function FullscreenOverlay({
     top: result.svgTop,
   }
 
+  const renderedViewMap: Partial<RenderedViews> = renderedViews ?? {}
+  const renderedSrc = renderedViewMap[view as keyof RenderedViews]
   const svgSrc = svgMap[view]
 
   return (
@@ -264,6 +314,10 @@ export function FullscreenOverlay({
         <div className="w-full h-full" onClick={(e) => e.stopPropagation()}>
           <STLViewer stlData={result.stlData} />
         </div>
+      ) : renderedLoading ? (
+        <Skeleton className="w-full h-full rounded-lg" />
+      ) : renderedSrc ? (
+        <img src={renderedSrc} alt={`${view} view`} className="w-full h-full object-contain" />
       ) : svgSrc ? (
         <InlineSvg src={svgSrc} alt={`${view} view`} className="w-full h-full" />
       ) : null}

@@ -14,8 +14,8 @@ import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
 import { scheduleTaskDates, addWorkingDays } from "@/lib/schedule-task-dates"
-import { isDestructiveAction } from "@/app/(platform)/agents/brief-specialist-dialog"
-import type { ProposedAction } from "@/app/(platform)/agents/brief-specialist-dialog"
+import { isDestructiveAction } from "@/lib/agents/message-parsers"
+import type { ProposedAction } from "@/lib/agents/message-parsers"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
 
 /** Maximum number of days into the future we allow for proposed dates (2 years). */

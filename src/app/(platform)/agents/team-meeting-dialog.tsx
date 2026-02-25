@@ -63,10 +63,10 @@ import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
 import { createArtifact } from "@/actions/agent-artifacts"
-import { parseProposedActions, stripProposedActionsBlock } from "./brief-specialist-dialog"
+import { parseProposedActions, stripProposedActionsBlock } from "@/lib/agents/message-parsers"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
 import type { Specialist } from "./specialists-data"
-import type { ProposedAction } from "./brief-specialist-dialog"
+import type { ProposedAction } from "@/lib/agents/message-parsers"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
