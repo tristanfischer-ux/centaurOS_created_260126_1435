@@ -256,7 +256,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
                 <span />
               </div>
               {transactions.map((tx) => (
-                <div key={tx.id} className="relative group grid grid-cols-6 items-center text-sm py-2 border-b border-border last:border-0">
+                <div key={tx.id} data-testid="tx-row" className="relative group grid grid-cols-6 items-center text-sm py-2 border-b border-border last:border-0">
                   <div className="col-span-2 flex items-center gap-2">
                     {tx.isRevenue ? (
                       <ArrowUpRight className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
@@ -279,6 +279,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
                   <div className="flex justify-end">
                     {tx.source !== 'linked_expense' && (
                       <Button
+                        data-testid="tx-delete-btn"
                         variant="ghost"
                         size="sm"
                         className={`h-auto p-1 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteTxId === tx.id ? 'opacity-100 text-destructive' : ''}`}
