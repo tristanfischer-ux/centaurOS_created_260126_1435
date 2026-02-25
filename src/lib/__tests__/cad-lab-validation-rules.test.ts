@@ -216,7 +216,13 @@ describe("validateMassSanity", () => {
       result: {
         success: true,
         bbox: { xLen: 50, yLen: 50, zLen: 50 },
-        massProperties: { massKg: 0.0005 },
+        massProperties: {
+          massKg: 0.0005,
+          volumeMm3: 100,
+          surfaceAreaMm2: 200,
+          centerOfGravity: [25, 25, 25],
+          materialDensityKgM3: 1200,
+        },
       },
     })
     const summary = validateModule(mod, {})
@@ -231,7 +237,13 @@ describe("validateMassSanity", () => {
         success: true,
         bbox: { xLen: 50, yLen: 50, zLen: 50 },
         massGrams: 200,
-        massProperties: { massKg: 0.001 },
+        massProperties: {
+          massKg: 0.001,
+          volumeMm3: 100,
+          surfaceAreaMm2: 200,
+          centerOfGravity: [25, 25, 25],
+          materialDensityKgM3: 1200,
+        },
       },
     })
     const summary = validateModule(mod, {})

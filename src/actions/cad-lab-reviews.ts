@@ -41,6 +41,9 @@ const REVIEW_MODEL = "claude-sonnet-4-6"
 const MAX_TOOL_LOOPS = 5
 const MAX_TOKENS = 8192
 
+/** Valid moduleId pattern — alphanumeric, hyphens, underscores */
+const MODULE_ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/
+
 /** Specialists allowed to review CAD Lab modules */
 const REVIEW_SPECIALISTS = new Set([
     "vp-manufacturing",
@@ -172,7 +175,10 @@ ${reviewContext}`
             tool_choice: { type: "auto" as const },
         }
 
-        let fullText = ""
+        // DECISION: Only use text from the FINAL API response for the review.
+        // Intermediate text (during tool-calling turns) may contain partial
+        // thinking that shouldn't be in the structured review output.
+        let finalText = ""
         let loopCount = 0
 
         while (loopCount <= MAX_TOOL_LOOPS) {
@@ -181,10 +187,11 @@ ${reviewContext}`
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const content: any[] = response.content ?? []
 
-            // Collect text
+            // Collect text from THIS response
+            let turnText = ""
             for (const block of content) {
                 if (block.type === "text" && block.text) {
-                    fullText += block.text
+                    turnText += block.text
                 }
             }
 
@@ -192,6 +199,8 @@ ${reviewContext}`
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const toolUseBlocks = content.filter((b: any) => b.type === "tool_use")
             if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
+                // INTENT: This is the final response — use its text as the review
+                finalText = turnText
                 break
             }
 
@@ -235,33 +244,29 @@ ${reviewContext}`
 
         // ── Parse structured review from markdown ──
         const review = parseReviewFromMarkdown(
-            fullText,
+            finalText,
             req.specialistId,
             specialist.name,
             calculationsPerformed,
             Date.now() - startTime,
         )
 
-        // ── Save review to project ──
+        // ── Save review to project (atomic upsert) ──
+        // SECURITY: RPC filters by foundry_id to prevent IDOR
+        // DECISION: Atomic Postgres merge prevents race condition when
+        // two specialists review the same module simultaneously
         try {
-            const { data: project } = await supabase
-                .from("cad_lab_projects")
-                .select("reviews")
-                .eq("id", req.projectId)
-                .single()
+            const { error: rpcError } = await supabase.rpc("upsert_cad_lab_review", {
+                p_project_id: req.projectId,
+                p_foundry_id: foundryId,
+                p_module_id: req.moduleId,
+                p_specialist_id: req.specialistId,
+                p_review: review as unknown as Json,
+            })
 
-            const existingReviews = (project?.reviews as Record<string, SpecialistReview[]> | null) ?? {}
-            const moduleReviews = existingReviews[req.moduleId] ?? []
-
-            // Replace existing review from same specialist, or append
-            const filtered = moduleReviews.filter(r => r.specialistId !== req.specialistId)
-            filtered.push(review)
-            existingReviews[req.moduleId] = filtered
-
-            await supabase
-                .from("cad_lab_projects")
-                .update({ reviews: existingReviews as unknown as Json })
-                .eq("id", req.projectId)
+            if (rpcError) {
+                console.error("[CAD-REVIEWS] Failed to save review:", rpcError)
+            }
         } catch (err) {
             console.error("[CAD-REVIEWS] Failed to save review:", err)
             // Non-fatal — still return the review
@@ -275,6 +280,9 @@ ${reviewContext}`
 
 /**
  * Parse the specialist's markdown response into a structured SpecialistReview.
+ *
+ * DECISION: Multiple regex patterns per field for resilience — LLMs vary
+ * format between "### VERDICT: PASS" and "**Verdict:** Pass" etc.
  */
 function parseReviewFromMarkdown(
     markdown: string,
@@ -283,42 +291,69 @@ function parseReviewFromMarkdown(
     calculations: ReviewCalculation[],
     reviewTimeMs: number,
 ): SpecialistReview {
-    // Extract verdict
-    const verdictMatch = markdown.match(/###\s*VERDICT:\s*(PASS|WARN|FAIL)/i)
-    const verdict: ReviewVerdict = verdictMatch
-        ? (verdictMatch[1].toLowerCase() as ReviewVerdict)
-        : "warn"
+    // Extract verdict — try multiple common LLM formats
+    const verdictPatterns = [
+        /#{1,3}\s*VERDICT:\s*(PASS|WARN|FAIL)/i,
+        /\*{1,2}VERDICT:?\*{1,2}\s*(PASS|WARN|FAIL)/i,
+        /\bverdict:\s*(PASS|WARN|FAIL)\b/i,
+    ]
+    let verdict: ReviewVerdict = "warn"
+    for (const pattern of verdictPatterns) {
+        const match = markdown.match(pattern)
+        if (match) {
+            verdict = match[1].toLowerCase() as ReviewVerdict
+            break
+        }
+    }
 
-    // Extract summary (line after VERDICT header)
-    const summaryMatch = markdown.match(/###\s*VERDICT:.*\n+(.+)/i)
-    const summary = summaryMatch
-        ? summaryMatch[1].trim()
-        : `Review completed by ${specialistName}`
+    // Extract summary — line after verdict header, or first non-empty line
+    const summaryPatterns = [
+        /#{1,3}\s*VERDICT:.*\n+(.+)/i,
+        /\*{1,2}VERDICT:?\*{1,2}.*\n+(.+)/i,
+    ]
+    let summary = `Review completed by ${specialistName}`
+    for (const pattern of summaryPatterns) {
+        const match = markdown.match(pattern)
+        if (match && match[1].trim().length > 10) {
+            summary = match[1].trim()
+            break
+        }
+    }
 
-    // Extract issues
+    // Extract issues — try multiple bracket/bold formats
     const issues: ReviewIssue[] = []
-    const issuePattern = /\*\*\[(CRITICAL|WARNING|INFO)\]\s*([^:*]+):\*\*\s*(.+)/gi
-    let issueMatch
-    while ((issueMatch = issuePattern.exec(markdown)) !== null) {
-        const issue: ReviewIssue = {
-            severity: issueMatch[1].toLowerCase() as ReviewIssue["severity"],
-            category: issueMatch[2].trim(),
-            message: issueMatch[3].trim(),
+    const issuePatterns = [
+        /\*\*\[(CRITICAL|WARNING|INFO)\]\s*([^:*]+):\*\*\s*(.+)/gi,
+        /\[(CRITICAL|WARNING|INFO)\]\s*\*\*([^:*]+):\*\*\s*(.+)/gi,
+        /-\s*\*\*(CRITICAL|WARNING|INFO)\*\*:?\s*([^:]+):\s*(.+)/gi,
+    ]
+    for (const issuePattern of issuePatterns) {
+        let issueMatch
+        while ((issueMatch = issuePattern.exec(markdown)) !== null) {
+            // Avoid duplicates if multiple patterns match the same issue
+            const message = issueMatch[3].trim()
+            if (issues.some(i => i.message === message)) continue
+
+            const issue: ReviewIssue = {
+                severity: issueMatch[1].toLowerCase() as ReviewIssue["severity"],
+                category: issueMatch[2].trim(),
+                message,
+            }
+            // Look for suggestion on next line
+            const afterIssue = markdown.slice(issueMatch.index + issueMatch[0].length, issueMatch.index + issueMatch[0].length + 500)
+            const sugMatch = afterIssue.match(/\*Suggestion:\*\s*(.+)/i)
+            if (sugMatch) {
+                issue.suggestion = sugMatch[1].trim()
+            }
+            issues.push(issue)
         }
-        // Look for suggestion on next line
-        const afterIssue = markdown.slice(issueMatch.index + issueMatch[0].length, issueMatch.index + issueMatch[0].length + 500)
-        const sugMatch = afterIssue.match(/\*Suggestion:\*\s*(.+)/i)
-        if (sugMatch) {
-            issue.suggestion = sugMatch[1].trim()
-        }
-        issues.push(issue)
     }
 
     // Extract recommendations
     const recommendations: string[] = []
-    const recsSection = markdown.match(/###\s*Recommendations\s*\n([\s\S]*?)(?=###|$)/i)
+    const recsSection = markdown.match(/#{1,3}\s*Recommendations?\s*\n([\s\S]*?)(?=#{1,3}|$)/i)
     if (recsSection) {
-        const recPattern = /^\s*\d+\.\s*(.+)/gm
+        const recPattern = /^\s*[-\d.]+[.)]\s*(.+)/gm
         let recMatch
         while ((recMatch = recPattern.exec(recsSection[1])) !== null) {
             recommendations.push(recMatch[1].trim())

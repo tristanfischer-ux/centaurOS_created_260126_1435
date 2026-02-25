@@ -17360,6 +17360,16 @@ export type Database = {
         }
         Returns: string
       }
+      upsert_cad_lab_review: {
+        Args: {
+          p_foundry_id: string
+          p_module_id: string
+          p_project_id: string
+          p_review: Json
+          p_specialist_id: string
+        }
+        Returns: undefined
+      }
       upsert_domain_familiarity: {
         Args: {
           p_domain_id: string

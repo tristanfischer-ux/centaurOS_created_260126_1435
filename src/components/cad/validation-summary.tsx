@@ -40,6 +40,9 @@ interface ValidationSummaryProps {
     defaultExpanded?: boolean
 }
 
+// INTENT: Stable empty object so useMemo doesn't recompute when diagnostics is undefined
+const EMPTY_DIAGNOSTICS: Record<string, string> = {}
+
 // ─── Category Labels ────────────────────────────────────────────────
 
 const CATEGORY_LABELS: Record<ValidationCategory, string> = {
@@ -48,6 +51,7 @@ const CATEGORY_LABELS: Record<ValidationCategory, string> = {
     tolerance: "Tolerance",
     structural: "Structural",
     environment: "Environment",
+    economics: "Batch Economics",
 }
 
 // ─── Severity Styling ───────────────────────────────────────────────
@@ -150,15 +154,18 @@ function IssueCard({ result }: { result: ValidationResult }) {
  */
 export function ValidationSummary({
     module,
-    diagnostics = {},
+    diagnostics,
     defaultExpanded = false,
 }: ValidationSummaryProps) {
     const [expanded, setExpanded] = useState(defaultExpanded)
 
-    // INTENT: Run validation synchronously — it's pure computation on local data
+    // INTENT: Run validation synchronously — it's pure computation on local data.
+    // GOTCHA: Use stable EMPTY_DIAGNOSTICS ref to avoid busting the memo when
+    // the parent doesn't pass diagnostics (which would create a new {} each render).
+    const stableDiagnostics = diagnostics ?? EMPTY_DIAGNOSTICS
     const summary = useMemo(
-        () => runModuleValidation(module, diagnostics),
-        [module, diagnostics],
+        () => runModuleValidation(module, stableDiagnostics),
+        [module, stableDiagnostics],
     )
 
     // Don't render if module hasn't been generated yet
