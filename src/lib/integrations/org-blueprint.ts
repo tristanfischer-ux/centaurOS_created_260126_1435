@@ -1,4 +1,3 @@
-// @ts-nocheck - CATEGORY_MAPPINGS uses business function categories that don't 1:1 map to MarketplaceCategory enum; listing queries with provider joins need type alignment
 /**
  * Org Blueprint → Marketplace Integration
  * Connect capability gaps to marketplace listings and orders
@@ -47,16 +46,17 @@ export interface GapFillResult {
 }
 
 // Category mappings from business function categories to marketplace categories
+// DECISION: mapped old agency/freelancer values to People/Services after marketplace_category enum was updated
 const categoryMappings: Record<string, MarketplaceCategory[]> = {
-  'Finance & Accounting': ['agencies', 'individual_freelancers'],
-  'Legal & Compliance': ['agencies', 'individual_freelancers'],
-  'Human Resources': ['agencies', 'individual_freelancers'],
-  'Marketing & Sales': ['agencies', 'individual_freelancers'],
-  'Operations': ['agencies', 'individual_freelancers', 'products_rfq'],
-  'Technology': ['agencies', 'individual_freelancers', 'products_rfq'],
-  'Customer Support': ['agencies', 'individual_freelancers'],
-  'Product & Design': ['agencies', 'individual_freelancers'],
-  'Administration': ['agencies', 'individual_freelancers'],
+  'Finance & Accounting': ['People', 'Services', 'Finance'],
+  'Legal & Compliance': ['People', 'Services'],
+  'Human Resources': ['People', 'Services'],
+  'Marketing & Sales': ['People', 'Services'],
+  'Operations': ['People', 'Services', 'Products'],
+  'Technology': ['People', 'Services', 'Products', 'AI'],
+  'Customer Support': ['People', 'Services'],
+  'Product & Design': ['People', 'Services'],
+  'Administration': ['People', 'Services'],
 }
 
 // Subcategory mappings for more precise matching
@@ -106,7 +106,7 @@ export async function getMarketplaceRecommendations(
     }
 
     // Determine which marketplace categories to search
-    const relevantCategories = categoryMappings[fn.category] || ['agencies', 'individual_freelancers']
+    const relevantCategories = categoryMappings[fn.category] || (['People', 'Services'] satisfies MarketplaceCategory[])
 
     // Get relevant subcategories based on function name
     const functionKeywords = fn.name.toLowerCase().split(/\s+/)
@@ -211,7 +211,7 @@ export async function getMarketplaceRecommendations(
           if (provider) {
             listing.provider = {
               id: provider.id,
-              displayName: provider.display_name,
+              displayName: provider.display_name ?? 'Unknown Provider',
               tier: provider.tier || 'standard',
             }
           }
@@ -276,10 +276,11 @@ export async function createOrderFromGap(
     }
 
     // Determine order type from listing category
+    // DECISION: mapped new marketplace_category enum values to OrderType
     let orderType: OrderType = 'service'
-    if (listing.category === 'products_rfq') {
+    if (listing.category === 'Products') {
       orderType = 'product_rfq'
-    } else if (listing.category === 'individual_freelancers') {
+    } else if (listing.category === 'People') {
       orderType = 'people_booking'
     }
 
@@ -314,6 +315,8 @@ export async function createOrderFromGap(
     }
 
     // Log the order event
+    // GOTCHA: order_history table planned but not yet in schema — insert is a no-op at DB level
+    // @ts-expect-error order_history table not yet in database schema
     await supabase.from('order_history').insert({
       order_id: order.id,
       event_type: 'created',
@@ -464,7 +467,7 @@ export async function getGapsWithMarketplaceMatches(
         functionName: fn.name,
         category: fn.category,
         description: fn.description,
-        isCritical: fn.is_critical,
+        isCritical: fn.is_critical ?? false,
         coverageStatus: cov.coverage_status as 'gap' | 'partial',
         listings,
         matchCount: listings.length,
@@ -493,7 +496,7 @@ export function buildMarketplaceSearchUrl(
   functionName: string,
   functionCategory: string
 ): string {
-  const categories = categoryMappings[functionCategory] || ['agencies']
+  const categories = categoryMappings[functionCategory] || (['People'] satisfies MarketplaceCategory[])
   const category = categories[0]
   
   // Build search query from function name

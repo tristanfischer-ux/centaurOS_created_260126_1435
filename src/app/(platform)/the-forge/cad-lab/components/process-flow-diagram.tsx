@@ -14,6 +14,7 @@
 import { useMemo, useState } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, Box } from "lucide-react"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import { hasKeywordOverlap } from "@/lib/cad-lab/keyword-matching"
 import { cn } from "@/lib/utils"
 import { ForgeSectionHeader } from "../../components/forge-hover-explanations"
 
@@ -78,36 +79,6 @@ function classifySignalType(label: string): SignalType {
 }
 
 /* ─── Edge building (keyword overlap) ──────────────────────────────────── */
-
-/** Stop words excluded from keyword matching. */
-const STOP_WORDS = new Set([
-  "the", "a", "an", "to", "of", "for", "from", "in", "on", "at", "and",
-  "or", "via", "per", "with", "each", "all", "into", "between", "by",
-])
-
-/** Extracts significant keywords from an IO label. */
-function extractKeywords(text: string): Set<string> {
-  return new Set(
-    text.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !STOP_WORDS.has(w)),
-  )
-}
-
-/** Returns true if two IO labels share at least `minShared` keywords. */
-function hasKeywordOverlap(a: string, b: string, minShared: number = 2): boolean {
-  const kA = extractKeywords(a)
-  const kB = extractKeywords(b)
-  let shared = 0
-  for (const w of kA) {
-    if (kB.has(w)) {
-      shared++
-      if (shared >= minShared) return true
-    }
-  }
-  return false
-}
 
 /**
  * Builds edges by matching outputs of one module to inputs of another
@@ -241,11 +212,17 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
             return (
               <div
                 key={node.id}
+                tabIndex={0}
+                role="group"
+                aria-label={node.name}
                 onMouseEnter={() => setHoveredModuleId(node.id)}
                 onMouseLeave={() => setHoveredModuleId(null)}
+                onFocus={() => setHoveredModuleId(node.id)}
+                onBlur={() => setHoveredModuleId(null)}
                 className={cn(
                   "rounded-lg border bg-card p-3 space-y-2 transition-all duration-200 cursor-default",
                   "hover:-translate-y-0.5 active:scale-[0.99]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange/40",
                   !hoveredModuleId && "border-border",
                   isHovered && "shadow-md ring-2 ring-international-orange/40 border-international-orange/40",
                   isConnected && !isHovered && "ring-1 ring-status-info/40 border-status-info/40",
@@ -269,7 +246,7 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {node.inputs.slice(0, 3).map((inp, j) => (
-                        <span key={j} className="text-[11px] text-foreground bg-chart-2/10 border border-chart-2/20 rounded px-1.5 py-0.5 leading-tight">
+                        <span key={j} title={inp} className="truncate max-w-[140px] text-[11px] text-foreground bg-chart-2/10 border border-chart-2/20 rounded px-1.5 py-0.5 leading-tight">
                           {inp}
                         </span>
                       ))}
@@ -289,7 +266,7 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {node.outputs.slice(0, 3).map((out, j) => (
-                        <span key={j} className="text-[11px] text-foreground bg-chart-3/10 border border-chart-3/20 rounded px-1.5 py-0.5 leading-tight">
+                        <span key={j} title={out} className="truncate max-w-[140px] text-[11px] text-foreground bg-chart-3/10 border border-chart-3/20 rounded px-1.5 py-0.5 leading-tight">
                           {out}
                         </span>
                       ))}
@@ -300,16 +277,27 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
                   </div>
                 )}
 
-                {/* Relationship summary footer */}
+                {/* Relationship summary footer — only show non-zero counts */}
                 {counts && (counts.receivesFrom > 0 || counts.feedsTo > 0) && (
                   <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
-                    Receives from {counts.receivesFrom} &middot; Feeds {counts.feedsTo}
+                    {[
+                      counts.receivesFrom > 0 && `Receives from ${counts.receivesFrom}`,
+                      counts.feedsTo > 0 && `Feeds ${counts.feedsTo}`,
+                    ].filter(Boolean).join(" \u00B7 ")}
                   </p>
                 )}
               </div>
             )
           })}
         </div>
+
+        {/* ── Empty connections explanation ──────────────────────────────── */}
+        {edges.length === 0 && modules.length > 0 && (
+          <p className="text-xs text-muted-foreground text-center mt-4">
+            No shared interfaces detected — module inputs and outputs may need
+            more descriptive labels to identify connections.
+          </p>
+        )}
 
         {/* ── Connections grouped by source module ────────────────────── */}
         {edges.length > 0 && (

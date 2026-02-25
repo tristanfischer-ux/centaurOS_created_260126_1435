@@ -1,7 +1,6 @@
-// @ts-nocheck - notification_preferences table not in generated types; run `supabase gen types` after adding table to schema
 /**
  * Multi-Channel Notification Service
- * 
+ *
  * Routes notifications to appropriate channels based on priority:
  * - Critical: push + sms + email (all simultaneously)
  * - High: push + email
@@ -10,9 +9,9 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { 
-    SendNotificationParams, 
-    NotificationResult, 
+import {
+    SendNotificationParams,
+    NotificationResult,
     NotificationChannel,
     NotificationPriority,
     UserNotificationPreferences,
@@ -38,7 +37,7 @@ const PRIORITY_CHANNELS: Record<NotificationPriority, NotificationChannel[]> = {
  */
 export async function sendNotification(params: SendNotificationParams): Promise<NotificationResult> {
     const { userId, priority, title, body, actionUrl, metadata } = params
-    
+
     const result: NotificationResult = {
         success: false,
         channels: [],
@@ -49,7 +48,7 @@ export async function sendNotification(params: SendNotificationParams): Promise<
     try {
         // Get user preferences and profile
         const { preferences, profile } = await getUserPreferencesAndProfile(userId)
-        
+
         // Determine which channels to use based on priority
         const targetChannels = PRIORITY_CHANNELS[priority]
         result.channels = targetChannels
@@ -74,9 +73,9 @@ export async function sendNotification(params: SendNotificationParams): Promise<
             if (channelResult.success) {
                 result.deliveredVia.push(channelResult.channel)
             } else if (channelResult.error) {
-                result.errors?.push({ 
-                    channel: channelResult.channel, 
-                    error: channelResult.error 
+                result.errors?.push({
+                    channel: channelResult.channel,
+                    error: channelResult.error
                 })
             }
         }
@@ -96,9 +95,9 @@ export async function sendNotification(params: SendNotificationParams): Promise<
 
     } catch (err) {
         console.error('Error sending notification:', err)
-        result.errors?.push({ 
-            channel: 'in_app', 
-            error: err instanceof Error ? err.message : 'Unknown error' 
+        result.errors?.push({
+            channel: 'in_app',
+            error: err instanceof Error ? err.message : 'Unknown error'
         })
     }
 
@@ -136,7 +135,7 @@ async function getUserPreferencesAndProfile(userId: string): Promise<{
         .single()
 
     // Get notification preferences
-    // Note: notification_preferences table may not be in generated types yet
+    // GOTCHA: notification_preferences table not in generated types yet — cast through unknown
     const { data: prefsData } = await supabase
         .from('notification_preferences' as 'profiles')
         .select('*')
@@ -282,9 +281,9 @@ async function sendToChannel(
                 return { success: false, error: `Unknown channel: ${channel}` }
         }
     } catch (err) {
-        return { 
-            success: false, 
-            error: err instanceof Error ? err.message : 'Channel send failed' 
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : 'Channel send failed'
         }
     }
 }
@@ -303,20 +302,23 @@ async function logNotification(params: {
 }): Promise<string | undefined> {
     const supabase = await createClient()
 
-    // Note: notification_log table may not be in generated types yet
-    const { data, error } = await (supabase
-        .from('notification_log' as 'profiles') as unknown as ReturnType<typeof supabase.from>)
-        .insert({
-            user_id: params.userId,
-            priority: params.priority,
-            channels: params.channels,
-            title: params.title,
-            body: params.body,
-            action_url: params.actionUrl || null,
-            delivered_via: params.deliveredVia
-        })
+    // GOTCHA: notification_log table not in generated types yet — cast insert payload through unknown
+    const logPayload = {
+        user_id: params.userId,
+        priority: params.priority,
+        channels: params.channels,
+        title: params.title,
+        body: params.body,
+        action_url: params.actionUrl || null,
+        delivered_via: params.deliveredVia
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- notification_log not in generated types
+    const { data, error } = await ((supabase
+        .from('notification_log' as 'profiles') as any)
+        .insert(logPayload)
         .select('id')
-        .single() as unknown as { data: { id: string } | null; error: { message: string } | null }
+        .single() as Promise<{ data: { id: string } | null; error: { message: string } | null }>)
 
     if (error) {
         console.error('Error logging notification:', error)
@@ -366,8 +368,8 @@ export async function sendBulkNotification(
 }
 
 // Re-export types for convenience
-export type { 
-    SendNotificationParams, 
+export type {
+    SendNotificationParams,
     NotificationResult,
     NotificationChannel,
     NotificationPriority

@@ -43,6 +43,7 @@ import {
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { hasKeywordOverlap } from "@/lib/cad-lab/keyword-matching"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1809,36 +1810,6 @@ interface ModuleConnection {
   toName: string
   /** The shared interface label (the matching input/output string) */
   label: string
-}
-
-/** Stop words excluded from keyword matching. */
-const KEYWORD_STOP_WORDS = new Set([
-  "the", "a", "an", "to", "of", "for", "from", "in", "on", "at", "and",
-  "or", "via", "per", "with", "each", "all", "into", "between", "by",
-])
-
-/** Extracts significant keywords from an IO label for fuzzy matching. */
-function extractKeywords(text: string): Set<string> {
-  return new Set(
-    text.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !KEYWORD_STOP_WORDS.has(w)),
-  )
-}
-
-/** Returns true if two IO labels share at least `minShared` keywords. */
-function hasKeywordOverlap(a: string, b: string, minShared: number = 2): boolean {
-  const kA = extractKeywords(a)
-  const kB = extractKeywords(b)
-  let shared = 0
-  for (const w of kA) {
-    if (kB.has(w)) {
-      shared++
-      if (shared >= minShared) return true
-    }
-  }
-  return false
 }
 
 /**

@@ -1,7 +1,6 @@
-// @ts-nocheck - notification_preferences table not in generated types; using type cast workaround `as 'profiles'` until table added to schema
 /**
  * Push Notification Channel
- * 
+ *
  * Handles Web Push API integration for browser notifications.
  */
 
@@ -25,27 +24,27 @@ export async function sendPushNotification(
     try {
         // Get user's push token from preferences
         const supabase = await createClient()
-        
-        // Note: notification_preferences table may not be in generated types yet
-        const { data: prefData, error: prefError } = await supabase
-            .from('notification_preferences' as 'profiles')
+
+        // DECISION: notification_preferences table not in generated types yet; cast result until migration adds it
+        const { data: prefData, error: prefError } = await (supabase
+            .from('notification_preferences' as 'profiles') as unknown as ReturnType<typeof supabase.from>)
             .select('push_token')
             .eq('user_id', userId)
             .eq('channel', 'push')
             .single() as unknown as { data: { push_token: string | null } | null; error: { message: string } | null }
 
         if (prefError || !prefData?.push_token) {
-            return { 
-                success: false, 
-                error: 'No push subscription found for user' 
+            return {
+                success: false,
+                error: 'No push subscription found for user'
             }
         }
 
         const pushSubscription = parsePushToken(prefData.push_token)
         if (!pushSubscription) {
-            return { 
-                success: false, 
-                error: 'Invalid push subscription format' 
+            return {
+                success: false,
+                error: 'Invalid push subscription format'
             }
         }
 
@@ -53,15 +52,15 @@ export async function sendPushNotification(
         // STUB: Replace with actual Web Push sending
         // ============================================
         // Example with web-push:
-        // 
+        //
         // import webpush from 'web-push'
-        // 
+        //
         // webpush.setVapidDetails(
         //     VAPID_SUBJECT,
         //     VAPID_PUBLIC_KEY!,
         //     VAPID_PRIVATE_KEY!
         // )
-        // 
+        //
         // const payload = JSON.stringify({
         //     title,
         //     body,
@@ -69,7 +68,7 @@ export async function sendPushNotification(
         //     badge: badge || '/icons/badge-72x72.png',
         //     data: { url: actionUrl }
         // })
-        // 
+        //
         // await webpush.sendNotification(pushSubscription, payload)
         // ============================================
 
@@ -84,23 +83,23 @@ export async function sendPushNotification(
 
     } catch (err) {
         console.error('Error sending push notification:', err)
-        
+
         // Handle specific web-push errors
         if (err instanceof Error) {
             // Subscription expired or invalid
             if (err.message.includes('410') || err.message.includes('404')) {
                 // Remove invalid subscription
                 await removeInvalidSubscription(userId)
-                return { 
-                    success: false, 
-                    error: 'Push subscription expired - user needs to re-subscribe' 
+                return {
+                    success: false,
+                    error: 'Push subscription expired - user needs to re-subscribe'
                 }
             }
         }
-        
-        return { 
-            success: false, 
-            error: err instanceof Error ? err.message : 'Failed to send push notification' 
+
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : 'Failed to send push notification'
         }
     }
 }
@@ -114,13 +113,13 @@ export async function registerPushSubscription(
 ): Promise<ChannelSendResult> {
     try {
         const supabase = await createClient()
-        
-        const pushToken = typeof subscription === 'string' 
-            ? subscription 
+
+        const pushToken = typeof subscription === 'string'
+            ? subscription
             : JSON.stringify(subscription)
 
         // Upsert push preference with token
-        // Note: notification_preferences table may not be in generated types yet
+        // DECISION: notification_preferences table not in generated types yet; cast until migration adds it
         const { error } = await (supabase
             .from('notification_preferences' as 'profiles') as unknown as ReturnType<typeof supabase.from>)
             .upsert({
@@ -132,7 +131,7 @@ export async function registerPushSubscription(
                 medium_enabled: true,
                 low_enabled: false,
                 push_token: pushToken
-            }, {
+            } as Record<string, unknown>, {
                 onConflict: 'user_id,channel'
             })
 
@@ -145,9 +144,9 @@ export async function registerPushSubscription(
 
     } catch (err) {
         console.error('Error registering push subscription:', err)
-        return { 
-            success: false, 
-            error: err instanceof Error ? err.message : 'Failed to register subscription' 
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : 'Failed to register subscription'
         }
     }
 }
@@ -159,10 +158,10 @@ export async function unregisterPushSubscription(userId: string): Promise<Channe
     try {
         const supabase = await createClient()
 
-        // Note: notification_preferences table may not be in generated types yet
+        // DECISION: notification_preferences table not in generated types yet; cast until migration adds it
         const { error } = await (supabase
             .from('notification_preferences' as 'profiles') as unknown as ReturnType<typeof supabase.from>)
-            .update({ push_token: null, enabled: false })
+            .update({ push_token: null, enabled: false } as Record<string, unknown>)
             .eq('user_id', userId)
             .eq('channel', 'push')
 
@@ -175,9 +174,9 @@ export async function unregisterPushSubscription(userId: string): Promise<Channe
 
     } catch (err) {
         console.error('Error unregistering push subscription:', err)
-        return { 
-            success: false, 
-            error: err instanceof Error ? err.message : 'Failed to unregister subscription' 
+        return {
+            success: false,
+            error: err instanceof Error ? err.message : 'Failed to unregister subscription'
         }
     }
 }
@@ -188,14 +187,14 @@ export async function unregisterPushSubscription(userId: string): Promise<Channe
 async function removeInvalidSubscription(userId: string): Promise<void> {
     try {
         const supabase = await createClient()
-        
-        // Note: notification_preferences table may not be in generated types yet
+
+        // DECISION: notification_preferences table not in generated types yet; cast until migration adds it
         await (supabase
             .from('notification_preferences' as 'profiles') as unknown as ReturnType<typeof supabase.from>)
-            .update({ push_token: null })
+            .update({ push_token: null } as Record<string, unknown>)
             .eq('user_id', userId)
             .eq('channel', 'push')
-            
+
     } catch (err) {
         console.error('Error removing invalid subscription:', err)
     }

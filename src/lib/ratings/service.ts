@@ -1,4 +1,3 @@
-// @ts-nocheck - reviews table with nested reviewer/order joins doesn't match ReviewWithDetails interface; provider_ratings table not in generated types
 /**
  * Rating System Service
  * Handles reviews, ratings, and statistical calculations
@@ -186,6 +185,7 @@ export async function getProviderRating(
   const wilsonScore = calculateWilsonScore(reviews || [])
 
   // Determine recent trend
+  // @ts-expect-error — Supabase types `created_at` as `string | null` but reviews always have created_at set by DB default
   const recentTrend = calculateTrend(reviews || [])
 
   return {
@@ -471,7 +471,9 @@ export async function getPendingReviews(
   }
 
   return {
-    data: ((orders as OrderWithSeller[]) || []).map((order) => ({
+    // GOTCHA: Supabase can't resolve `company_name` on provider_profiles (column doesn't exist in generated types).
+    // The join result shape doesn't match OrderWithSeller, but the runtime data is correct.
+    data: ((orders as unknown as OrderWithSeller[]) || []).map((order) => ({
       orderId: order.id,
       orderNumber: order.order_number,
       sellerName: order.seller?.display_name || order.seller?.company_name || "Unknown",
