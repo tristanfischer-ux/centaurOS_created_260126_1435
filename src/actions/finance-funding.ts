@@ -104,6 +104,57 @@ export async function createFundingOpportunity(
 }
 
 /**
+ * Update an existing funding opportunity.
+ */
+export async function updateFundingOpportunity(input: {
+  opportunityId: string
+  name: string
+  type: FundingType
+  amount?: number
+  funderName?: string
+  deadline?: string
+  notes?: string
+  url?: string
+}): Promise<FinanceActionResult<FundingOpportunity>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    const { data, error } = await supabase
+      .from('finance_funding_opportunities')
+      .update({
+        name: input.name,
+        type: input.type,
+        amount: input.amount ?? null,
+        funder_name: input.funderName ?? null,
+        deadline: input.deadline ?? null,
+        notes: input.notes ?? null,
+        url: input.url ?? null,
+      })
+      .eq('id', input.opportunityId)
+      .eq('foundry_id', foundryId)
+      .eq('created_by', user.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[Finance] Failed to update funding opportunity:', error)
+      return { data: null, error: 'Failed to update funding opportunity' }
+    }
+
+    revalidatePath('/finance/funding')
+    return { data: mapFunding(data), error: null }
+  } catch (err) {
+    console.error('[Finance] Failed to update funding opportunity:', err)
+    return { data: null, error: 'Failed to update funding opportunity' }
+  }
+}
+
+/**
  * Get all funding opportunities.
  */
 export async function getFundingOpportunities(): Promise<FinanceActionResult<FundingOpportunity[]>> {

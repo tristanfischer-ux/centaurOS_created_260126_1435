@@ -2,14 +2,14 @@
  * @file project-detail-view.tsx — Client component for project P&L detail
  *
  * @description Shows project summary, transaction list, and allows
- * adding new revenue/expense transactions.
+ * adding/deleting transactions and editing the project header.
  */
 
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight } from 'lucide-react'
+import { ArrowLeft, Plus, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Pencil, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,8 +30,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { formatCurrency } from '@/types/payments'
-import { addProjectTransaction } from '@/actions/finance-projects'
-import type { FinanceProject, ProjectTransaction, ProjectTransactionType } from '@/types/finance'
+import { addProjectTransaction, updateProject, deleteProjectTransaction } from '@/actions/finance-projects'
+import type { FinanceProject, ProjectTransaction, ProjectTransactionType, ProjectStatus } from '@/types/finance'
 
 const TX_TYPES: Array<{ value: ProjectTransactionType; label: string }> = [
   { value: 'order', label: 'Order' },
@@ -40,22 +40,45 @@ const TX_TYPES: Array<{ value: ProjectTransactionType; label: string }> = [
   { value: 'cost_item', label: 'Cost Item' },
 ]
 
+const PROJECT_STATUSES: Array<{ value: ProjectStatus; label: string }> = [
+  { value: 'active', label: 'Active' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'on_hold', label: 'On Hold' },
+  { value: 'cancelled', label: 'Cancelled' },
+]
+
+const STATUS_BADGE: Record<ProjectStatus, 'default' | 'secondary' | 'success' | 'destructive' | 'warning'> = {
+  active: 'success',
+  completed: 'secondary',
+  on_hold: 'warning',
+  cancelled: 'destructive',
+}
+
 interface ProjectDetailViewProps {
   project: FinanceProject
   initialTransactions: ProjectTransaction[]
 }
 
 export function ProjectDetailView({ project, initialTransactions }: ProjectDetailViewProps) {
+  const [projectState, setProjectState] = useState(project)
   const [transactions, setTransactions] = useState(initialTransactions)
   const [showAdd, setShowAdd] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [editProjectError, setEditProjectError] = useState<string | null>(null)
+  const [confirmDeleteTxId, setConfirmDeleteTxId] = useState<string | null>(null)
 
-  // Add form state
+  // Add transaction form state
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
   const [isRevenue, setIsRevenue] = useState(true)
   const [txType, setTxType] = useState<ProjectTransactionType>('order')
+
+  // Edit project form state
+  const [editProjectName, setEditProjectName] = useState(project.name)
+  const [editProjectClient, setEditProjectClient] = useState(project.clientName ?? '')
+  const [editProjectStatus, setEditProjectStatus] = useState<ProjectStatus>(project.status)
 
   const summary = useMemo(() => {
     const totalRevenue = transactions.filter(t => t.isRevenue).reduce((sum, t) => sum + t.amount, 0)
@@ -75,7 +98,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
     setError(null)
     startTransition(async () => {
       const result = await addProjectTransaction({
-        projectId: project.id,
+        projectId: projectState.id,
         transactionType: txType,
         description: description.trim(),
         amount: amountPence,
@@ -97,6 +120,55 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
     })
   }
 
+  const handleOpenEdit = () => {
+    setEditProjectName(projectState.name)
+    setEditProjectClient(projectState.clientName ?? '')
+    setEditProjectStatus(projectState.status)
+    setEditProjectError(null)
+    setShowEdit(true)
+  }
+
+  const handleUpdateProject = () => {
+    if (!editProjectName.trim()) {
+      setEditProjectError('Name is required')
+      return
+    }
+
+    setEditProjectError(null)
+    startTransition(async () => {
+      const result = await updateProject(projectState.id, {
+        name: editProjectName.trim(),
+        clientName: editProjectClient.trim() || undefined,
+        status: editProjectStatus,
+      })
+
+      if (result.error) {
+        setEditProjectError(result.error)
+        return
+      }
+
+      if (result.data) {
+        setProjectState(result.data)
+      }
+
+      setShowEdit(false)
+    })
+  }
+
+  const handleDeleteTransaction = (tx: ProjectTransaction) => {
+    if (confirmDeleteTxId !== tx.id) {
+      setConfirmDeleteTxId(tx.id)
+      return
+    }
+    setConfirmDeleteTxId(null)
+    startTransition(async () => {
+      const result = await deleteProjectTransaction(tx.id, projectState.id)
+      if (!result.error) {
+        setTransactions(prev => prev.filter(t => t.id !== tx.id))
+      }
+    })
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -108,9 +180,17 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
           </Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">{project.name}</h1>
-          {project.clientName && (
-            <p className="text-sm text-muted-foreground">{project.clientName}</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-display font-bold text-foreground tracking-tight">{projectState.name}</h1>
+            <Badge variant={STATUS_BADGE[projectState.status]}>
+              {projectState.status.replace('_', ' ')}
+            </Badge>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={handleOpenEdit}>
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </div>
+          {projectState.clientName && (
+            <p className="text-sm text-muted-foreground">{projectState.clientName}</p>
           )}
         </div>
         <Button onClick={() => setShowAdd(true)} className="bg-international-orange hover:bg-international-orange/90">
@@ -168,14 +248,15 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
             <p className="text-sm text-muted-foreground text-center py-6">No transactions yet. Add revenue or expenses to track this project&apos;s P&L.</p>
           ) : (
             <div className="space-y-1">
-              <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+              <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span className="col-span-2">Description</span>
                 <span>Type</span>
                 <span className="text-right">Amount</span>
                 <span className="text-right">Date</span>
+                <span />
               </div>
               {transactions.map((tx) => (
-                <div key={tx.id} className="grid grid-cols-5 items-center text-sm py-2 border-b border-border last:border-0">
+                <div key={tx.id} className="relative group grid grid-cols-6 items-center text-sm py-2 border-b border-border last:border-0">
                   <div className="col-span-2 flex items-center gap-2">
                     {tx.isRevenue ? (
                       <ArrowUpRight className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
@@ -195,6 +276,24 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
                   <span className="text-right text-muted-foreground text-xs">
                     {new Date(tx.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                   </span>
+                  <div className="flex justify-end">
+                    {tx.source !== 'linked_expense' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-auto p-1 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteTxId === tx.id ? 'opacity-100 text-destructive' : ''}`}
+                        onClick={() => handleDeleteTransaction(tx)}
+                        onBlur={() => setConfirmDeleteTxId(null)}
+                        disabled={isPending}
+                      >
+                        {confirmDeleteTxId === tx.id ? (
+                          <span className="text-[10px] font-medium">Delete?</span>
+                        ) : (
+                          <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -276,6 +375,59 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
               className="bg-international-orange hover:bg-international-orange/90"
             >
               {isPending ? 'Adding...' : 'Add Transaction'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Project Dialog */}
+      <Dialog open={showEdit} onOpenChange={setShowEdit}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-project-name">Name</Label>
+              <Input
+                id="edit-project-name"
+                placeholder="e.g. MK1 Chassis"
+                value={editProjectName}
+                onChange={(e) => setEditProjectName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-project-client">Client (optional)</Label>
+              <Input
+                id="edit-project-client"
+                placeholder="e.g. Acme Corp"
+                value={editProjectClient}
+                onChange={(e) => setEditProjectClient(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editProjectStatus} onValueChange={(v) => setEditProjectStatus(v as ProjectStatus)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROJECT_STATUSES.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {editProjectError && <p className="text-sm text-destructive">{editProjectError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEdit(false)}>Cancel</Button>
+            <Button
+              onClick={handleUpdateProject}
+              disabled={isPending}
+              className="bg-international-orange hover:bg-international-orange/90"
+            >
+              {isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>

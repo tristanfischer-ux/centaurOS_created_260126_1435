@@ -254,6 +254,7 @@ export interface ProjectTransaction {
   amount: number
   isRevenue: boolean
   createdAt: string
+  source?: 'manual' | 'linked_expense'
 }
 
 export interface ProjectPnL {

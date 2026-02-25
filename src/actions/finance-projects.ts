@@ -16,6 +16,7 @@ import type {
   FinanceActionResult,
   FinanceProject,
   ProjectPnL,
+  ProjectStatus,
   ProjectTransaction,
   CreateProjectInput,
   AddProjectTransactionInput,
@@ -60,6 +61,48 @@ export async function createProject(
   } catch (err) {
     console.error('[Finance] Failed to create project:', err)
     return { data: null, error: 'Failed to create project' }
+  }
+}
+
+/**
+ * Update a project's name, client, and status.
+ */
+export async function updateProject(
+  projectId: string,
+  input: { name: string; clientName?: string; status: ProjectStatus }
+): Promise<FinanceActionResult<FinanceProject>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    const { data, error } = await supabase
+      .from('finance_projects')
+      .update({
+        name: input.name,
+        client_name: input.clientName ?? null,
+        status: input.status,
+      })
+      .eq('id', projectId)
+      .eq('foundry_id', foundryId)
+      .eq('created_by', user.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[Finance] Failed to update project:', error)
+      return { data: null, error: 'Failed to update project' }
+    }
+
+    revalidatePath('/finance/projects')
+    revalidatePath(`/finance/projects/${projectId}`)
+    return { data: mapProject(data), error: null }
+  } catch (err) {
+    console.error('[Finance] Failed to update project:', err)
+    return { data: null, error: 'Failed to update project' }
   }
 }
 
@@ -190,6 +233,7 @@ export async function getProjectDetail(
     }
 
     // Map linked expenses to ProjectTransaction shape for unified display
+    // INTENT: source='linked_expense' gates delete button visibility — only manual entries can be deleted here.
     const linkedExpenses: ProjectTransaction[] = (linkedExpensesResult.data ?? []).map(e => ({
       id: e.id,
       projectId,
@@ -199,6 +243,7 @@ export async function getProjectDetail(
       amount: Number(e.amount),
       isRevenue: false,
       createdAt: e.expense_date ?? new Date().toISOString(),
+      source: 'linked_expense' as const,
     }))
 
     // Merge manual transactions + linked expenses, sorted by date descending
@@ -271,6 +316,53 @@ export async function addProjectTransaction(
 }
 
 /**
+ * Delete a manual project transaction.
+ * Only deletes from finance_project_transactions — never touches finance_expenses.
+ */
+export async function deleteProjectTransaction(
+  transactionId: string,
+  projectId: string
+): Promise<FinanceActionResult<null>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    // Verify project ownership first
+    const { data: project } = await supabase
+      .from('finance_projects')
+      .select('id')
+      .eq('id', projectId)
+      .eq('foundry_id', foundryId)
+      .eq('created_by', user.id)
+      .single()
+
+    if (!project) return { data: null, error: 'Project not found' }
+
+    const { error } = await supabase
+      .from('finance_project_transactions')
+      .delete()
+      .eq('id', transactionId)
+      .eq('project_id', projectId)
+
+    if (error) {
+      console.error('[Finance] Failed to delete transaction:', error)
+      return { data: null, error: 'Failed to delete transaction' }
+    }
+
+    revalidatePath(`/finance/projects/${projectId}`)
+    revalidatePath('/finance/projects')
+    return { data: null, error: null }
+  } catch (err) {
+    console.error('[Finance] Failed to delete transaction:', err)
+    return { data: null, error: 'Failed to delete transaction' }
+  }
+}
+
+/**
  * Update project status.
  */
 export async function updateProjectStatus(
@@ -335,5 +427,6 @@ function mapTransaction(row: any): ProjectTransaction {
     amount: Number(row.amount),
     isRevenue: row.is_revenue,
     createdAt: row.created_at,
+    source: 'manual',
   }
 }

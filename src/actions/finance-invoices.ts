@@ -337,7 +337,7 @@ export async function getStandaloneInvoice(
  */
 export async function updateInvoiceStatus(
   invoiceId: string,
-  status: 'sent' | 'cancelled'
+  status: 'sent' | 'paid' | 'cancelled'
 ): Promise<FinanceActionResult<StandaloneInvoice>> {
   try {
     const supabase = await createClient()

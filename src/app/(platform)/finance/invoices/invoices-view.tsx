@@ -2,19 +2,21 @@
  * @file invoices-view.tsx — Client component for the Invoices page
  *
  * @description Displays both marketplace invoices (from orders) and
- * standalone invoices in a filterable view with aging bucket indicators.
+ * standalone invoices in a filterable view with aging bucket indicators
+ * and quick Mark Paid action on hover.
  */
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { FileText, Plus } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { FileText, Plus, CheckCircle2 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { formatCurrency } from '@/types/payments'
+import { updateInvoiceStatus } from '@/actions/finance-invoices'
 import type { OutstandingInvoice, AgingBucket, StandaloneInvoice } from '@/types/finance'
 
 interface InvoicesViewProps {
@@ -47,15 +49,26 @@ const invoiceStatusVariants: Record<string, 'default' | 'secondary' | 'success' 
 type FilterValue = 'all' | AgingBucket
 type Tab = 'outstanding' | 'standalone'
 
-export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesViewProps) {
+export function InvoicesView({ initialInvoices, standaloneInvoices: initialStandaloneInvoices }: InvoicesViewProps) {
   const [filter, setFilter] = useState<FilterValue>('all')
   const [tab, setTab] = useState<Tab>('outstanding')
+  const [invoices, setInvoices] = useState(initialStandaloneInvoices)
+  const [isPending, startTransition] = useTransition()
 
   const filteredOutstanding = filter === 'all'
     ? initialInvoices
     : initialInvoices.filter(inv => inv.agingBucket === filter)
 
   const totalOutstanding = filteredOutstanding.reduce((sum, inv) => sum + inv.amount, 0)
+
+  const handleMarkPaid = (invoiceId: string) => {
+    startTransition(async () => {
+      const result = await updateInvoiceStatus(invoiceId, 'paid')
+      if (!result.error && result.data) {
+        setInvoices(prev => prev.map(inv => inv.id === invoiceId ? result.data! : inv))
+      }
+    })
+  }
 
   return (
     <div className="space-y-8">
@@ -100,7 +113,7 @@ export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesVi
               : 'border-transparent text-muted-foreground hover:text-foreground'
           )}
         >
-          Invoices ({standaloneInvoices.length})
+          Invoices ({invoices.length})
         </button>
       </div>
 
@@ -186,7 +199,7 @@ export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesVi
       {/* Standalone invoices tab */}
       {tab === 'standalone' && (
         <>
-          {standaloneInvoices.length === 0 ? (
+          {invoices.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center space-y-4">
                 <p className="text-sm text-muted-foreground">
@@ -204,13 +217,12 @@ export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesVi
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-3">
-                  {standaloneInvoices.map((invoice) => (
-                    <Link
+                  {invoices.map((invoice) => (
+                    <div
                       key={invoice.id}
-                      href={`/finance/invoices/${invoice.id}`}
-                      className="flex items-center justify-between py-3 border-b border-border last:border-0 hover:bg-muted/50 -mx-4 px-4 rounded transition-colors"
+                      className="flex items-center justify-between py-3 border-b border-border last:border-0 hover:bg-muted/50 -mx-4 px-4 rounded transition-colors group"
                     >
-                      <div className="space-y-0.5">
+                      <Link href={`/finance/invoices/${invoice.id}`} className="flex-1 space-y-0.5 min-w-0 mr-3">
                         <p className="text-sm font-medium text-foreground">
                           {invoice.invoiceNumber}
                         </p>
@@ -222,8 +234,20 @@ export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesVi
                             year: 'numeric',
                           })}
                         </p>
-                      </div>
-                      <div className="flex items-center gap-3">
+                      </Link>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2"
+                            onClick={() => handleMarkPaid(invoice.id)}
+                            disabled={isPending}
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-status-success" />
+                            <span className="text-xs">Paid</span>
+                          </Button>
+                        )}
                         <Badge variant={invoiceStatusVariants[invoice.status] ?? 'secondary'}>
                           {invoice.status}
                         </Badge>
@@ -234,7 +258,7 @@ export function InvoicesView({ initialInvoices, standaloneInvoices }: InvoicesVi
                           {formatCurrency(invoice.total, invoice.currency)}
                         </p>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </CardContent>

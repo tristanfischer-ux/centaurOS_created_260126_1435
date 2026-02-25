@@ -102,6 +102,51 @@ export async function createBudget(
 }
 
 /**
+ * Update an existing budget.
+ */
+export async function updateBudget(input: {
+  budgetId: string
+  name: string
+  category: BudgetCategory
+  period: BudgetPeriod
+  amount: number
+}): Promise<FinanceActionResult<Budget>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { data: null, error: 'Not authenticated' }
+
+    const { data, error } = await supabase
+      .from('finance_budgets')
+      .update({
+        name: input.name,
+        category: input.category,
+        period: input.period,
+        amount: input.amount,
+      })
+      .eq('id', input.budgetId)
+      .eq('foundry_id', foundryId)
+      .eq('created_by', user.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('[Finance] Failed to update budget:', error)
+      return { data: null, error: 'Failed to update budget' }
+    }
+
+    revalidatePath('/finance/budgets')
+    return { data: mapBudget(data), error: null }
+  } catch (err) {
+    console.error('[Finance] Failed to update budget:', err)
+    return { data: null, error: 'Failed to update budget' }
+  }
+}
+
+/**
  * Get all budgets with actual spend comparison.
  */
 export async function getBudgetsVsActual(): Promise<FinanceActionResult<BudgetVsActual[]>> {

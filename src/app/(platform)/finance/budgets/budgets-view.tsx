@@ -2,13 +2,13 @@
  * @file budgets-view.tsx — Client component for budget vs actual tracking
  *
  * @description Shows budget allocations with actual spend from Money Map,
- * variance indicators, and budget creation dialog.
+ * variance indicators, and budget creation/edit dialogs.
  */
 
 'use client'
 
 import { useState, useTransition } from 'react'
-import { PiggyBank, Plus, TrendingDown, TrendingUp, Minus, Trash2 } from 'lucide-react'
+import { PiggyBank, Plus, TrendingDown, TrendingUp, Minus, Trash2, Pencil } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,7 +31,9 @@ import {
 import { formatCurrency } from '@/types/payments'
 import {
   createBudget,
+  updateBudget,
   deactivateBudget,
+  type Budget,
   type BudgetVsActual,
   type BudgetCategory,
   type BudgetPeriod,
@@ -60,8 +62,10 @@ interface BudgetsViewProps {
 export function BudgetsView({ initialData }: BudgetsViewProps) {
   const [data, setData] = useState(initialData)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
 
   // Create form state
   const [name, setName] = useState('')
@@ -69,6 +73,12 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
   const [period, setPeriod] = useState<BudgetPeriod>('monthly')
   const [amount, setAmount] = useState('')
   const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0])
+
+  // Edit form state
+  const [editName, setEditName] = useState('')
+  const [editCategory, setEditCategory] = useState<BudgetCategory>('operations')
+  const [editPeriod, setEditPeriod] = useState<BudgetPeriod>('monthly')
+  const [editAmount, setEditAmount] = useState('')
 
   const handleCreate = () => {
     const amountPence = Math.round(parseFloat(amount) * 100)
@@ -92,15 +102,60 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
         return
       }
 
-      // Reset form and close
       setName('')
       setAmount('')
       setShowCreate(false)
 
-      // Refresh data - the page will revalidate but update local state optimistically
       if (result.data) {
         setData(prev => [...prev, { budget: result.data!, actual: 0, recurringActual: 0, expenseActual: 0, variance: amountPence, variancePct: 100 }])
       }
+    })
+  }
+
+  const handleOpenEdit = (budget: Budget) => {
+    setEditingBudget(budget)
+    setEditName(budget.name)
+    setEditCategory(budget.category)
+    setEditPeriod(budget.period)
+    setEditAmount(String(budget.amount / 100))
+    setEditError(null)
+  }
+
+  const handleEdit = () => {
+    const amountPence = Math.round(parseFloat(editAmount) * 100)
+    if (!editName || isNaN(amountPence) || amountPence <= 0) {
+      setEditError('Please fill in all required fields with valid values')
+      return
+    }
+    if (!editingBudget) return
+
+    setEditError(null)
+    startTransition(async () => {
+      const result = await updateBudget({
+        budgetId: editingBudget.id,
+        name: editName,
+        category: editCategory,
+        period: editPeriod,
+        amount: amountPence,
+      })
+
+      if (result.error) {
+        setEditError(result.error)
+        return
+      }
+
+      if (result.data) {
+        const updated = result.data
+        setData(prev => prev.map(item => {
+          if (item.budget.id !== updated.id) return item
+          const monthlyBudget = normaliseToMonthly(updated.amount, updated.period)
+          const newVariance = monthlyBudget - item.actual
+          const newVariancePct = monthlyBudget > 0 ? Math.round((newVariance / monthlyBudget) * 100) : 0
+          return { ...item, budget: updated, variance: newVariance, variancePct: newVariancePct }
+        }))
+      }
+
+      setEditingBudget(null)
     })
   }
 
@@ -149,6 +204,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
             <BudgetCard
               key={item.budget.id}
               item={item}
+              onEdit={handleOpenEdit}
               onDeactivate={handleDeactivate}
               isPending={isPending}
             />
@@ -277,6 +333,77 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Budget Dialog */}
+      <Dialog open={editingBudget !== null} onOpenChange={(open) => { if (!open) setEditingBudget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Budget</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-name">Name</Label>
+              <Input
+                id="edit-budget-name"
+                placeholder="e.g. Q1 Marketing Budget"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={editCategory} onValueChange={(v) => setEditCategory(v as BudgetCategory)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Period</Label>
+                <Select value={editPeriod} onValueChange={(v) => setEditPeriod(v as BudgetPeriod)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIODS.map((p) => (
+                      <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-budget-amount">Amount ({'\u00A3'})</Label>
+              <Input
+                id="edit-budget-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={editAmount}
+                onChange={(e) => setEditAmount(e.target.value)}
+              />
+            </div>
+            {editError && <p className="text-sm text-destructive">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingBudget(null)}>Cancel</Button>
+            <Button
+              onClick={handleEdit}
+              disabled={isPending}
+              className="bg-international-orange hover:bg-international-orange/90"
+            >
+              {isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -285,8 +412,9 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
 // Budget Card
 // ============================================================
 
-function BudgetCard({ item, onDeactivate, isPending }: {
+function BudgetCard({ item, onEdit, onDeactivate, isPending }: {
   item: BudgetVsActual
+  onEdit: (b: Budget) => void
   onDeactivate: (id: string) => void
   isPending: boolean
 }) {
@@ -349,6 +477,17 @@ function BudgetCard({ item, onDeactivate, isPending }: {
           </span>
           <span className="text-muted-foreground">({variancePct >= 0 ? '+' : ''}{variancePct}%)</span>
         </div>
+
+        {/* Edit */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => onEdit(budget)}
+          disabled={isPending}
+        >
+          <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
 
         {/* Deactivate */}
         <Button

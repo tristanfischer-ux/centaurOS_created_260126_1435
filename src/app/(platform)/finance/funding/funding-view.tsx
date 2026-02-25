@@ -2,13 +2,13 @@
  * @file funding-view.tsx — Client component for funding pipeline
  *
  * @description Kanban-style board showing funding opportunities
- * across pipeline stages with drag-to-move and create dialog.
+ * across pipeline stages with drag-to-move, create, and edit dialogs.
  */
 
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
-import { Landmark, Plus, ExternalLink, Trash2, ChevronRight, ChevronLeft } from 'lucide-react'
+import { Landmark, Plus, ExternalLink, Trash2, ChevronRight, ChevronLeft, Pencil } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +32,7 @@ import {
 import { formatCurrency } from '@/types/payments'
 import {
   createFundingOpportunity,
+  updateFundingOpportunity,
   moveFundingStage,
   deleteFundingOpportunity,
   type FundingOpportunity,
@@ -72,8 +73,10 @@ interface FundingViewProps {
 export function FundingView({ initialData }: FundingViewProps) {
   const [data, setData] = useState(initialData)
   const [showCreate, setShowCreate] = useState(false)
+  const [editingOpportunity, setEditingOpportunity] = useState<FundingOpportunity | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
 
   // Create form state
   const [name, setName] = useState('')
@@ -83,6 +86,15 @@ export function FundingView({ initialData }: FundingViewProps) {
   const [deadline, setDeadline] = useState('')
   const [notes, setNotes] = useState('')
   const [url, setUrl] = useState('')
+
+  // Edit form state
+  const [editName, setEditName] = useState('')
+  const [editType, setEditType] = useState<FundingType>('grant')
+  const [editAmount, setEditAmount] = useState('')
+  const [editFunderName, setEditFunderName] = useState('')
+  const [editDeadline, setEditDeadline] = useState('')
+  const [editNotes, setEditNotes] = useState('')
+  const [editUrl, setEditUrl] = useState('')
 
   const byStage = useMemo(() => {
     const grouped: Record<FundingStage, FundingOpportunity[]> = {
@@ -138,6 +150,53 @@ export function FundingView({ initialData }: FundingViewProps) {
       if (result.data) {
         setData(prev => [result.data!, ...prev])
       }
+    })
+  }
+
+  const handleOpenEdit = (opp: FundingOpportunity) => {
+    setEditingOpportunity(opp)
+    setEditName(opp.name)
+    setEditType(opp.type)
+    setEditAmount(opp.amount ? String(opp.amount / 100) : '')
+    setEditFunderName(opp.funderName ?? '')
+    setEditDeadline(opp.deadline ?? '')
+    setEditNotes(opp.notes ?? '')
+    setEditUrl(opp.url ?? '')
+    setEditError(null)
+  }
+
+  const handleEdit = () => {
+    if (!editName.trim()) {
+      setEditError('Name is required')
+      return
+    }
+    if (!editingOpportunity) return
+
+    const amountPence = editAmount ? Math.round(parseFloat(editAmount) * 100) : undefined
+    setEditError(null)
+
+    startTransition(async () => {
+      const result = await updateFundingOpportunity({
+        opportunityId: editingOpportunity.id,
+        name: editName.trim(),
+        type: editType,
+        amount: amountPence,
+        funderName: editFunderName.trim() || undefined,
+        deadline: editDeadline || undefined,
+        notes: editNotes.trim() || undefined,
+        url: editUrl.trim() || undefined,
+      })
+
+      if (result.error) {
+        setEditError(result.error)
+        return
+      }
+
+      if (result.data) {
+        setData(prev => prev.map(d => d.id === result.data!.id ? result.data! : d))
+      }
+
+      setEditingOpportunity(null)
     })
   }
 
@@ -250,22 +309,33 @@ export function FundingView({ initialData }: FundingViewProps) {
                     return (
                       <Card key={opp.id} className="group">
                         <CardContent className="p-3 space-y-2">
-                          <div className="flex items-start justify-between">
-                            <p className="text-sm font-medium text-foreground leading-tight">{opp.name}</p>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className={`h-auto p-0 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteId === opp.id ? 'opacity-100 text-destructive' : ''}`}
-                              onClick={() => handleDelete(opp.id)}
-                              onBlur={() => setConfirmDeleteId(null)}
-                              disabled={isPending}
-                            >
-                              {confirmDeleteId === opp.id ? (
-                                <span className="text-[10px] font-medium">Delete?</span>
-                              ) : (
-                                <Trash2 className="h-3 w-3 text-muted-foreground" />
-                              )}
-                            </Button>
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-sm font-medium text-foreground leading-tight flex-1">{opp.name}</p>
+                            <div className="flex items-center gap-0.5 flex-shrink-0">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleOpenEdit(opp)}
+                                disabled={isPending}
+                              >
+                                <Pencil className="h-3 w-3 text-muted-foreground" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={`h-auto p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteId === opp.id ? 'opacity-100 text-destructive' : ''}`}
+                                onClick={() => handleDelete(opp.id)}
+                                onBlur={() => setConfirmDeleteId(null)}
+                                disabled={isPending}
+                              >
+                                {confirmDeleteId === opp.id ? (
+                                  <span className="text-[10px] font-medium">Delete?</span>
+                                ) : (
+                                  <Trash2 className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </Button>
+                            </div>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Badge variant="secondary" className="text-[10px]">{TYPE_LABELS[opp.type]}</Badge>
@@ -415,6 +485,104 @@ export function FundingView({ initialData }: FundingViewProps) {
               className="bg-international-orange hover:bg-international-orange/90"
             >
               {isPending ? 'Creating...' : 'Create Opportunity'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editingOpportunity !== null} onOpenChange={(open) => { if (!open) setEditingOpportunity(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Funding Opportunity</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-funding-name">Name</Label>
+              <Input
+                id="edit-funding-name"
+                placeholder="e.g. Innovate UK Smart Grant"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={editType} onValueChange={(v) => setEditType(v as FundingType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-funding-amount">Amount ({'\u00A3'}, optional)</Label>
+                <Input
+                  id="edit-funding-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-funding-funder">Funder (optional)</Label>
+                <Input
+                  id="edit-funding-funder"
+                  placeholder="e.g. Innovate UK"
+                  value={editFunderName}
+                  onChange={(e) => setEditFunderName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-funding-deadline">Deadline (optional)</Label>
+                <Input
+                  id="edit-funding-deadline"
+                  type="date"
+                  value={editDeadline}
+                  onChange={(e) => setEditDeadline(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-funding-url">URL (optional)</Label>
+              <Input
+                id="edit-funding-url"
+                type="url"
+                placeholder="https://..."
+                value={editUrl}
+                onChange={(e) => setEditUrl(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-funding-notes">Notes (optional)</Label>
+              <Textarea
+                id="edit-funding-notes"
+                placeholder="Key requirements, eligibility notes..."
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+            {editError && <p className="text-sm text-destructive" role="alert">{editError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingOpportunity(null)}>Cancel</Button>
+            <Button
+              onClick={handleEdit}
+              disabled={isPending}
+              className="bg-international-orange hover:bg-international-orange/90"
+            >
+              {isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </DialogContent>

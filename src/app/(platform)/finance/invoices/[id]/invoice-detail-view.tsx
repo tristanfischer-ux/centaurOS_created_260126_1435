@@ -9,7 +9,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Send, XCircle, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Send, XCircle, RefreshCw, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +41,15 @@ export function InvoiceDetailView({ invoice: initialInvoice, paymentLink: initia
     setError(null)
     startTransition(async () => {
       const result = await updateInvoiceStatus(invoice.id, 'sent')
+      if (result.error) { setError(result.error); return }
+      if (result.data) setInvoice(result.data)
+    })
+  }
+
+  const handleMarkPaid = () => {
+    setError(null)
+    startTransition(async () => {
+      const result = await updateInvoiceStatus(invoice.id, 'paid')
       if (result.error) { setError(result.error); return }
       if (result.data) setInvoice(result.data)
     })
@@ -188,6 +197,16 @@ export function InvoiceDetailView({ invoice: initialInvoice, paymentLink: initia
               <Button onClick={handleMarkSent} disabled={isPending}>
                 <Send className="h-4 w-4 mr-2" />
                 Mark as Sent
+              </Button>
+            )}
+            {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+              <Button
+                onClick={handleMarkPaid}
+                disabled={isPending}
+                className="bg-status-success hover:bg-status-success/90 text-white"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Mark as Paid
               </Button>
             )}
             {(invoice.status === 'draft' || invoice.status === 'sent') && (
