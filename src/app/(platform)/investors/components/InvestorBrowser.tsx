@@ -5,13 +5,16 @@
  * initial data and handles all interactive filter state: firm type tabs, search input
  * (300ms debounce), active-deploying toggle, and pagination. Re-fetches from the
  * searchInvestors server action when filters change.
+ *
+ * URL sync: filters are reflected in the query string (?type=VC&active=1&q=sequoia)
+ * so users can share/bookmark filtered views. Initialises state from URL params on mount.
  */
 
 'use client'
 
 import { useState, useCallback, useEffect, useRef, useTransition } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InvestorCard } from './InvestorCard'
@@ -80,11 +83,12 @@ interface InvestorBrowserProps {
 }
 
 /**
- * Interactive investor directory browser with filtering and search.
+ * Interactive investor directory browser with filtering, search, and URL-synced state.
  *
  * @description Wraps the InvestorCard grid with client-side filter controls.
- * Debounces the search input at 300ms to avoid excessive server action calls.
- * Firm type tabs and active-only toggle trigger immediate refetches.
+ * Debounces the search input at 300ms. Firm type tabs and active-only toggle trigger
+ * immediate refetches. Filter state is synced to the URL query string so filtered
+ * views can be shared or bookmarked.
  *
  * @param initialFirms - Server-side pre-fetched first page
  * @param initialTotal - Total count from server (for stats row)
@@ -95,22 +99,45 @@ export function InvestorBrowser({
   initialTotal,
   initialHasMore,
 }: InvestorBrowserProps) {
-  const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
-  const [total, setTotal] = useState(initialTotal)
-  const [hasMore, setHasMore] = useState(initialHasMore)
-  const [page, setPage] = useState(1)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
 
-  const [activeFirmType, setActiveFirmType] = useState<FirmTypeFilter>('All')
-  const [activeOnly, setActiveOnly] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
+  // ---------------------------------------------------------------------------
+  // Filter state — initialised from URL params so shared links restore state
+  // ---------------------------------------------------------------------------
+
+  const [activeFirmType, setActiveFirmType] = useState<FirmTypeFilter>(() => {
+    const t = searchParams.get('type') as FirmTypeFilter
+    return FIRM_TYPES.includes(t) ? t : 'All'
+  })
+  const [activeOnly, setActiveOnly] = useState(() => searchParams.get('active') === '1')
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
+  const [debouncedQuery, setDebouncedQuery] = useState(() => searchParams.get('q') ?? '')
+
+  // DECISION: When URL has filters on mount, start with empty data so the skeleton
+  // shows while fetching the filtered set. When no URL filters, use SSR data directly
+  // and skip the initial refetch to avoid a redundant round-trip.
+  const hasUrlFilters = !!(searchParams.get('type') || searchParams.get('active') || searchParams.get('q'))
+
+  const [firms, setFirms] = useState<InvestorFirm[]>(hasUrlFilters ? [] : initialFirms)
+  const [total, setTotal] = useState(hasUrlFilters ? 0 : initialTotal)
+  const [hasMore, setHasMore] = useState(hasUrlFilters ? false : initialHasMore)
+  const [page, setPage] = useState(1)
 
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // INTENT: Skip the initial refetch when SSR data is already fresh (no URL filters).
+  // Flip to false after first render so subsequent filter changes always refetch.
+  const isFirstRender = useRef(!hasUrlFilters)
+
+  // ---------------------------------------------------------------------------
   // Debounce search query
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
@@ -121,8 +148,29 @@ export function InvestorBrowser({
     }
   }, [searchQuery])
 
-  // Refetch when filters change (always back to page 1)
+  // ---------------------------------------------------------------------------
+  // Sync filters → URL (replace, not push, to avoid polluting browser history)
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
+    const params = new URLSearchParams()
+    if (activeFirmType !== 'All') params.set('type', activeFirmType)
+    if (activeOnly) params.set('active', '1')
+    if (debouncedQuery) params.set('q', debouncedQuery)
+    const qs = params.toString()
+    router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
+  }, [activeFirmType, activeOnly, debouncedQuery, router, pathname])
+
+  // ---------------------------------------------------------------------------
+  // Refetch when filters change (always back to page 1)
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    // Skip first render when SSR data is already correct for the no-filter case
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     startTransition(async () => {
       const result = await searchInvestors({
         firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
@@ -139,7 +187,10 @@ export function InvestorBrowser({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFirmType, activeOnly, debouncedQuery])
 
+  // ---------------------------------------------------------------------------
   // Load more (append next page)
+  // ---------------------------------------------------------------------------
+
   const handleLoadMore = useCallback(async () => {
     setIsLoadingMore(true)
     try {
