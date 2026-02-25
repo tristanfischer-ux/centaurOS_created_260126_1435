@@ -332,7 +332,12 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         />
       )}
 
-      {/* ── Live progress (hidden in post-research idle and during decomposition on concept page — concept page renders it inline below Product Overview) ── */}
+      {/* ── Page content (sub-route) with fade transition ── */}
+      <PageTransition>
+        {children}
+      </PageTransition>
+
+      {/* ── Live progress (below page content so input stays at top; hidden in post-research idle and during decomposition — concept page renders decomposition progress inline) ── */}
       {!(hasResearch && modules.length === 0 && !isAnyActive) && !isDecomposing && (
         <CadLabProgress
           lines={progressLines}
@@ -341,11 +346,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
           subject={subject}
         />
       )}
-
-      {/* ── Page content (sub-route) with fade transition ── */}
-      <PageTransition>
-        {children}
-      </PageTransition>
     </div>
   )
 }

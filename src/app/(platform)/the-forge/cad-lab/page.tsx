@@ -18,22 +18,19 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   Loader2,
   ArrowRight,
   Layers,
   ImageIcon,
-  Pencil,
   RotateCcw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { InputWithSpeech } from "@/components/ui/input-with-speech"
 import { Card, CardContent } from "@/components/ui/card"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
-import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
@@ -71,7 +68,6 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
-  const [isEditingSubject, setIsEditingSubject] = useState(false)
   const executiveSummary = useMemo(() => extractExecutiveSummary(editableReport), [editableReport])
 
   useRegisterScreenContext(
@@ -107,18 +103,16 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
-      {/* ── Primary input + templates (hidden once research is complete) ── */}
-      {!hasResearch && (
-        <HeroSection
-          subject={subject}
-          setSubject={setSubject}
-          referenceModel={referenceModel}
-          isAnyLoading={isAnyLoading}
-          isResearching={isResearching}
-          hasResearch={hasResearch}
-          onResearch={handleResearch}
-        />
-      )}
+      {/* ── Primary input — always visible so the user sees what they're building ── */}
+      <HeroSection
+        subject={subject}
+        setSubject={setSubject}
+        referenceModel={referenceModel}
+        isAnyLoading={isAnyLoading}
+        isResearching={isResearching}
+        hasResearch={hasResearch}
+        onResearch={handleResearch}
+      />
 
 
       {/* ══════════════════════════════════════════════════════════════════
@@ -130,58 +124,6 @@ export default function CadLabResearchPage(): React.ReactNode {
           ══════════════════════════════════════════════════════════════════ */}
       {hasResearch && (
         <div className="space-y-6">
-          {/* ── Product subject heading (stays visible after research) ── */}
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-1 rounded-full bg-international-orange flex-shrink-0" />
-            {isEditingSubject ? (
-              <InputWithSpeech
-                enableSpeech
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                onSpeechTranscript={(text) => setSubject(subject ? subject + " " + text : text)}
-                onBlur={() => setIsEditingSubject(false)}
-                onKeyDown={(e) => { if (e.key === "Enter") setIsEditingSubject(false) }}
-                className="text-xl font-bold h-auto py-1 px-2"
-                autoFocus
-              />
-            ) : (
-              <button
-                onClick={() => setIsEditingSubject(true)}
-                className="group flex items-center gap-2 text-left"
-              >
-                <h2 className="text-xl font-bold text-foreground">{subject}</h2>
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-xs ml-auto"
-              onClick={handleResearch}
-              disabled={isAnyLoading}
-            >
-              <RotateCcw className="h-3 w-3" />
-              Re-Research
-            </Button>
-            <AskSpecialistButton
-              context={{
-                type: "general",
-                title: subject,
-                description: "Product concept in The Forge",
-                metadata: {
-                  status: hasResearch ? "researched" : "new",
-                  notes: modules.length > 0
-                    ? `${modules.length} sub-assemblies mapped: ${modules.map((m) => m.name).join(", ")}`
-                    : undefined,
-                },
-              }}
-              specialistId="cto"
-              specialistName="Max"
-              variant="chip"
-              label="Ask Max"
-            />
-          </div>
-
           {/* ── System overview illustration (silently hidden on failure — enhancement, not blocker) ── */}
           {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
             <Card className="overflow-hidden">
