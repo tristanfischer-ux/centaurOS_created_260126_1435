@@ -3543,6 +3543,7 @@ export type Database = {
           name: string
           research: Json | null
           result: Json | null
+          reviews: Json | null
           stage: string
           status: string
           subject: string
@@ -3566,6 +3567,7 @@ export type Database = {
           name?: string
           research?: Json | null
           result?: Json | null
+          reviews?: Json | null
           stage?: string
           status?: string
           subject: string
@@ -3589,6 +3591,7 @@ export type Database = {
           name?: string
           research?: Json | null
           result?: Json | null
+          reviews?: Json | null
           stage?: string
           status?: string
           subject?: string

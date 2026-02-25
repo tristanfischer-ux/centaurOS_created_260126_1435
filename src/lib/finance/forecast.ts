@@ -21,11 +21,18 @@ export interface RecurringCost {
   category: string
 }
 
+export interface OneTimeInflow {
+  label: string
+  amount: number  // in pence
+  month: string   // ISO month "2026-03" — inflow lands in this month
+}
+
 export interface ForecastInput {
   currentBalance: number         // in pence
   recurringRevenue: RecurringRevenue[]
   recurringCosts: RecurringCost[]
   months: number                 // how many months to project
+  oneTimeInflows?: OneTimeInflow[]  // e.g. won funding, one-off sales
 }
 
 export interface ForecastPoint {
@@ -86,17 +93,22 @@ export function projectCashFlow(input: ForecastInput): ForecastPoint[] {
     const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
     const label = date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
 
-    balance += monthlyNet
-    bestBalance += bestMonthlyNet
-    worstBalance += worstMonthlyNet
+    // One-time inflows (e.g. won funding) land in their designated month
+    const oneTimeThisMonth = (input.oneTimeInflows ?? [])
+      .filter(oi => oi.month === month)
+      .reduce((sum, oi) => sum + oi.amount, 0)
+
+    balance += monthlyNet + oneTimeThisMonth
+    bestBalance += bestMonthlyNet + oneTimeThisMonth
+    worstBalance += worstMonthlyNet + oneTimeThisMonth
 
     points.push({
       month,
       label,
       balance,
-      inflow: monthlyRevenue,
+      inflow: monthlyRevenue + oneTimeThisMonth,
       outflow: monthlyCosts,
-      net: monthlyNet,
+      net: monthlyNet + oneTimeThisMonth,
       bestCase: bestBalance,
       worstCase: worstBalance,
     })

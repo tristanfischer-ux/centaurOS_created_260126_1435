@@ -66,6 +66,7 @@ interface RawReportData {
   orders: Array<{ total_amount: number; vat_amount: number | null; status: string; created_at: string }>
   retainerEntries: Array<{ amount: number; created_at: string }>
   costItems: Array<{ name: string; amount: number; period: string; category: string }>
+  expenses: Array<{ description: string; amount: number; category: string }> // approved/paid, amounts in pence
   payouts: Array<{ amount: number; status: string; requested_at: string }>
   topUps: Array<{ amount: number; created_at: string }>
   openingBalance: number
@@ -97,7 +98,7 @@ export function buildPnLReport(
 
   const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0)
 
-  // Cost of sales (direct costs)
+  // Cost of sales (direct costs — materials and production from money map)
   const directCosts = data.costItems
     .filter(c => c.category === 'materials' || c.category === 'production')
     .map(c => ({
@@ -108,14 +109,29 @@ export function buildPnLReport(
   const totalCostOfSales = directCosts.reduce((s, c) => s + c.amount, 0)
   const grossProfit = totalRevenue - totalCostOfSales
 
-  // Operating expenses (indirect costs)
-  const opex = data.costItems
+  // Operating expenses: recurring cost items (indirect) + approved/paid expenses
+  const recurringOpex = data.costItems
     .filter(c => c.category !== 'materials' && c.category !== 'production')
     .map(c => ({
       label: c.name,
       amount: normaliseToMonthlyPence(c.amount, c.period),
       category: c.category,
     }))
+
+  // INTENT: Group claimed expenses by category so the P&L shows consolidated lines,
+  // not one row per receipt. Prefix with "Expenses: " to distinguish from cost items.
+  const expensesByCategory: Record<string, number> = {}
+  for (const e of (data.expenses ?? [])) {
+    const cat = e.category ?? 'other'
+    expensesByCategory[cat] = (expensesByCategory[cat] ?? 0) + e.amount
+  }
+  const claimedExpenses: PnLLineItem[] = Object.entries(expensesByCategory).map(([cat, amount]) => ({
+    label: `Expenses: ${cat.charAt(0).toUpperCase() + cat.slice(1)}`,
+    amount,
+    category: cat,
+  }))
+
+  const opex = [...recurringOpex, ...claimedExpenses]
   const totalOperatingExpenses = opex.reduce((s, c) => s + c.amount, 0)
   const operatingProfit = grossProfit - totalOperatingExpenses
 
@@ -205,14 +221,18 @@ export function buildCashFlowStatement(
   const operatingCostOut = data.costItems
     .reduce((sum, c) => sum + normaliseToMonthlyPence(c.amount, c.period), 0)
 
+  const expenseCashOut = (data.expenses ?? [])
+    .reduce((sum, e) => sum + e.amount, 0)
+
   const operating: CashFlowStatementSection = {
     label: 'Operating Activities',
     items: [
       { description: 'Order payments received', amount: orderCashIn },
       { description: 'Retainer payments received', amount: retainerCashIn },
       { description: 'Operating costs paid', amount: -operatingCostOut },
+      { description: 'Expenses paid', amount: -expenseCashOut },
     ].filter(i => i.amount !== 0),
-    total: orderCashIn + retainerCashIn - operatingCostOut,
+    total: orderCashIn + retainerCashIn - operatingCostOut - expenseCashOut,
   }
 
   // Investing: currently minimal

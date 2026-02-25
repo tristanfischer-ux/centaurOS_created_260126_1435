@@ -364,14 +364,73 @@ function ReportSection({ title, items, total, currency, isNegative, totalClassNa
   )
 }
 
+function buildCsvFromReport(report: PnLReport | VATReport | CashFlowStatement): string {
+  const rows: string[][] = []
+
+  if ('totalRevenue' in report) {
+    // P&L report
+    const pnl = report as PnLReport
+    rows.push(['Profit & Loss', pnl.period])
+    rows.push([])
+    rows.push(['Revenue', '', ''])
+    for (const item of pnl.revenue) rows.push([item.label, '', String(item.amount / 100)])
+    rows.push(['Total Revenue', '', String(pnl.totalRevenue / 100)])
+    rows.push([])
+    if (pnl.costOfSales.length > 0) {
+      rows.push(['Cost of Sales', '', ''])
+      for (const item of pnl.costOfSales) rows.push([item.label, '', String(-item.amount / 100)])
+      rows.push(['Total Cost of Sales', '', String(-pnl.totalCostOfSales / 100)])
+      rows.push([])
+    }
+    rows.push(['Gross Profit', '', String(pnl.grossProfit / 100)])
+    rows.push([])
+    if (pnl.operatingExpenses.length > 0) {
+      rows.push(['Operating Expenses', '', ''])
+      for (const item of pnl.operatingExpenses) rows.push([item.label, '', String(-item.amount / 100)])
+      rows.push(['Total Operating Expenses', '', String(-pnl.totalOperatingExpenses / 100)])
+      rows.push([])
+    }
+    rows.push(['Net Profit', '', String(pnl.netProfit / 100)])
+  } else if ('vatCollected' in report) {
+    // VAT report
+    const vat = report as VATReport
+    rows.push(['VAT Summary', vat.period])
+    rows.push([])
+    rows.push(['VAT Collected', String(vat.vatCollected / 100)])
+    rows.push(['VAT Paid', String(vat.vatPaid / 100)])
+    rows.push(['Net VAT Liability', String(vat.netVATLiability / 100)])
+    rows.push([])
+    rows.push(['Sales Breakdown'])
+    rows.push(['Description', 'Net', 'VAT', 'Gross'])
+    for (const item of vat.salesBreakdown) {
+      rows.push([item.description, String(item.net / 100), String(item.vat / 100), String(item.gross / 100)])
+    }
+  } else {
+    // Cash flow statement
+    const cf = report as CashFlowStatement
+    rows.push(['Cash Flow Statement', cf.period])
+    rows.push([])
+    for (const section of [cf.operating, cf.investing, cf.financing]) {
+      rows.push([section.label])
+      for (const item of section.items) rows.push([item.description, String(item.amount / 100)])
+      rows.push([`${section.label} Subtotal`, String(section.total / 100)])
+      rows.push([])
+    }
+    rows.push(['Net Change in Cash', String(cf.netChange / 100)])
+    rows.push(['Closing Balance', String(cf.closingBalance / 100)])
+  }
+
+  return rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n')
+}
+
 function ExportButton({ report }: { report: PnLReport | VATReport | CashFlowStatement }) {
   const handleExport = () => {
-    const json = JSON.stringify(report, null, 2)
-    const blob = new Blob([json], { type: 'application/json' })
+    const csv = buildCsvFromReport(report)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `report-${new Date().toISOString().split('T')[0]}.json`
+    a.download = `report-${new Date().toISOString().split('T')[0]}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -379,7 +438,7 @@ function ExportButton({ report }: { report: PnLReport | VATReport | CashFlowStat
   return (
     <Button variant="outline" size="sm" onClick={handleExport}>
       <Download className="h-4 w-4 mr-2" />
-      Export
+      Export CSV
     </Button>
   )
 }

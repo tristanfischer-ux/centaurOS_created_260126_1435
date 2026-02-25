@@ -47,10 +47,16 @@ CREATE INDEX IF NOT EXISTS vc_pe_contacts_outreach_status_idx ON public.vc_pe_co
 
 -- RLS: authenticated users can read; service role manages
 ALTER TABLE public.vc_pe_contacts ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Authenticated Read VC PE Contacts" ON public.vc_pe_contacts
-    FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Service Role Manage VC PE Contacts" ON public.vc_pe_contacts
-    FOR ALL USING (auth.role() = 'service_role');
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Authenticated Read VC PE Contacts') THEN
+    CREATE POLICY "Authenticated Read VC PE Contacts" ON public.vc_pe_contacts
+      FOR SELECT USING (auth.role() = 'authenticated');
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'Service Role Manage VC PE Contacts') THEN
+    CREATE POLICY "Service Role Manage VC PE Contacts" ON public.vc_pe_contacts
+      FOR ALL USING (auth.role() = 'service_role');
+  END IF;
+END $$;
 
 -- Auto-update updated_at on row change
 CREATE OR REPLACE FUNCTION public.update_vc_pe_contacts_updated_at()
@@ -61,6 +67,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS vc_pe_contacts_updated_at ON public.vc_pe_contacts;
 CREATE TRIGGER vc_pe_contacts_updated_at
     BEFORE UPDATE ON public.vc_pe_contacts
     FOR EACH ROW EXECUTE FUNCTION public.update_vc_pe_contacts_updated_at();

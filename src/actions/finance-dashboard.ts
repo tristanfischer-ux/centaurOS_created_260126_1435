@@ -103,6 +103,7 @@ export async function getFinanceDashboardData(): Promise<FinanceActionResult<{
       outstandingResult,
       costItemsResult,
       retainersResult,
+      currentExpensesResult,
     ] = await Promise.all([
       // 1. Cash position from wallet
       supabase
@@ -148,6 +149,15 @@ export async function getFinanceDashboardData(): Promise<FinanceActionResult<{
         .select('hourly_rate, weekly_hours, currency')
         .eq('buyer_id', user.id)
         .eq('status', 'active'),
+
+      // 7. Approved/paid expenses this month — INTENT: include real transactional spend
+      // in the monthly cost KPI alongside recurring money-map costs.
+      supabase
+        .from('finance_expenses')
+        .select('amount, category')
+        .eq('foundry_id', foundryId)
+        .in('status', ['approved', 'paid'])
+        .gte('expense_date', monthStart),
     ])
 
     // Compute wallet balance (in pence)
@@ -162,9 +172,13 @@ export async function getFinanceDashboardData(): Promise<FinanceActionResult<{
     const retainerRevenue = (retainersResult.data ?? [])
       .reduce((sum, r) => sum + Math.round((r.hourly_rate ?? 0) * (r.weekly_hours ?? 0) * 4.33 * 100), 0)
 
-    // Compute monthly costs (Money Map amounts are in pounds, normalise to monthly)
-    const monthlyCosts = (costItemsResult.data ?? [])
+    // Compute monthly costs: recurring money-map costs + actual expenses this month
+    // Money Map amounts are in pounds; expenses are in pence
+    const recurringCosts = (costItemsResult.data ?? [])
       .reduce((sum, c) => sum + Math.round(normaliseToMonthly(c.amount ?? 0, c.period ?? 'monthly') * 100), 0)
+    const expenseCosts = (currentExpensesResult.data ?? [])
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0)
+    const monthlyCosts = recurringCosts + expenseCosts
 
     // Outstanding invoices
     const outstanding = outstandingResult.data ?? []
@@ -406,15 +420,40 @@ export async function getExpenseBreakdown(): Promise<FinanceActionResult<Expense
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { data: null, error: 'No active foundry' }
 
-    const { data: costItems } = await supabase
-      .from('money_map_cost_items')
-      .select('amount, period, category')
-      .eq('foundry_id', foundryId)
-      .eq('is_active', true)
+    const monthStart = getMonthStart()
 
-    const normalised = (costItems ?? []).map(item => ({
-      category: item.category ?? 'other',
-      monthly_amount: normaliseToMonthly(item.amount ?? 0, item.period ?? 'monthly'),
+    const [{ data: costItems }, { data: expenses }] = await Promise.all([
+      supabase
+        .from('money_map_cost_items')
+        .select('amount, period, category')
+        .eq('foundry_id', foundryId)
+        .eq('is_active', true),
+
+      // Include this month's approved expenses in the breakdown
+      supabase
+        .from('finance_expenses')
+        .select('amount, category')
+        .eq('foundry_id', foundryId)
+        .in('status', ['approved', 'paid'])
+        .gte('expense_date', monthStart),
+    ])
+
+    // Combine recurring costs (normalised to monthly pounds) with expense amounts (pence → pounds)
+    const categoryTotals: Record<string, number> = {}
+
+    for (const item of (costItems ?? [])) {
+      const cat = item.category ?? 'other'
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + normaliseToMonthly(item.amount ?? 0, item.period ?? 'monthly')
+    }
+    for (const exp of (expenses ?? [])) {
+      const cat = exp.category ?? 'other'
+      // Expenses are in pence, convert to pounds to match money-map amounts
+      categoryTotals[cat] = (categoryTotals[cat] ?? 0) + (exp.amount ?? 0) / 100
+    }
+
+    const normalised = Object.entries(categoryTotals).map(([category, monthly_amount]) => ({
+      category,
+      monthly_amount,
     }))
 
     const breakdown = computeExpenseBreakdown(normalised, EXPENSE_COLORS)

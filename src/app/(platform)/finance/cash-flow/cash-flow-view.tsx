@@ -92,7 +92,7 @@ export function CashFlowView({ initialData, hasError }: CashFlowViewProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main area — chart */}
         <div className="lg:col-span-2 space-y-6">
-          <ForecastChart data={forecastPoints} />
+          <ForecastChart data={forecastPoints} fundingEvents={initialData.fundingEvents} />
 
           {/* Revenue & Cost Tables */}
           <RecurringTable

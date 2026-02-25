@@ -94,6 +94,7 @@ interface RawReportData {
   orders: Array<{ total_amount: number; vat_amount: number | null; status: string; created_at: string }>
   retainerEntries: Array<{ amount: number; created_at: string }>
   costItems: Array<{ name: string; amount: number; period: string; category: string }>
+  expenses: Array<{ description: string; amount: number; category: string }>
   payouts: Array<{ amount: number; status: string; requested_at: string }>
   topUps: Array<{ amount: number; created_at: string }>
   openingBalance: number
@@ -108,7 +109,7 @@ async function fetchReportData(range: DateRange): Promise<RawReportData | null> 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const [ordersResult, costItemsResult, payoutsResult, balanceResult, topUpsResult] = await Promise.all([
+  const [ordersResult, costItemsResult, expensesResult, payoutsResult, balanceResult, topUpsResult] = await Promise.all([
     // Orders in date range
     supabase
       .from('orders')
@@ -123,6 +124,17 @@ async function fetchReportData(range: DateRange): Promise<RawReportData | null> 
       .select('name, amount, period, category')
       .eq('foundry_id', foundryId)
       .eq('is_active', true),
+
+    // INTENT: Approved/paid expenses in the report period.
+    // These are transactional costs that aren't in money_map_cost_items,
+    // so the P&L was materially incomplete without them.
+    supabase
+      .from('finance_expenses')
+      .select('description, amount, category')
+      .eq('foundry_id', foundryId)
+      .in('status', ['approved', 'paid'])
+      .gte('expense_date', range.from)
+      .lte('expense_date', range.to),
 
     // Payout requests in range (scoped to current user)
     supabase
@@ -159,6 +171,11 @@ async function fetchReportData(range: DateRange): Promise<RawReportData | null> 
       created_at: o.created_at ?? '',
     })),
     retainerEntries: [], // INTENT: Retainer timesheet entries could be added when available
+    expenses: (expensesResult.data ?? []).map(e => ({
+      description: e.description ?? 'Expense',
+      amount: Number(e.amount), // in pence
+      category: e.category ?? 'other',
+    })),
     costItems: (costItemsResult.data ?? []).map(c => ({
       name: c.name ?? 'Cost item',
       amount: Number(c.amount),

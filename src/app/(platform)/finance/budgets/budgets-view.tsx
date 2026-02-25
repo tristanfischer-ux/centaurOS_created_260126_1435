@@ -99,7 +99,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
 
       // Refresh data - the page will revalidate but update local state optimistically
       if (result.data) {
-        setData(prev => [...prev, { budget: result.data!, actual: 0, variance: amountPence, variancePct: 100 }])
+        setData(prev => [...prev, { budget: result.data!, actual: 0, recurringActual: 0, expenseActual: 0, variance: amountPence, variancePct: 100 }])
       }
     })
   }
@@ -165,20 +165,22 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
           <CardContent>
             <div className="space-y-1">
               {/* Header row */}
-              <div className="grid grid-cols-5 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+              <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span>Category</span>
-                <span className="text-right">Budget (monthly)</span>
-                <span className="text-right">Actual (monthly)</span>
+                <span className="text-right">Budget</span>
+                <span className="text-right">Recurring</span>
+                <span className="text-right">Expenses</span>
                 <span className="text-right">Variance</span>
-                <span className="text-right">Variance %</span>
+                <span className="text-right">%</span>
               </div>
               {data.map((item) => {
                 const monthlyBudget = normaliseToMonthly(item.budget.amount, item.budget.period)
                 return (
-                  <div key={item.budget.id} className="grid grid-cols-5 text-sm py-2 border-b border-border last:border-0">
+                  <div key={item.budget.id} className="grid grid-cols-6 text-sm py-2 border-b border-border last:border-0">
                     <span className="text-foreground font-medium">{item.budget.name}</span>
                     <span className="text-right text-muted-foreground">{formatCurrency(monthlyBudget, item.budget.currency)}</span>
-                    <span className="text-right text-muted-foreground">{formatCurrency(item.actual, item.budget.currency)}</span>
+                    <span className="text-right text-muted-foreground">{formatCurrency(item.recurringActual, item.budget.currency)}</span>
+                    <span className="text-right text-muted-foreground">{formatCurrency(item.expenseActual, item.budget.currency)}</span>
                     <span className={`text-right font-medium ${item.variance >= 0 ? 'text-status-success' : 'text-destructive'}`}>
                       {formatCurrency(Math.abs(item.variance), item.budget.currency)}
                       {item.variance < 0 ? ' over' : ' under'}
@@ -323,7 +325,14 @@ function BudgetCard({ item, onDeactivate, isPending }: {
               style={{ width: `${Math.min(usagePct, 100)}%` }}
             />
           </div>
-          <p className="text-xs text-muted-foreground mt-1">{usagePct}% used</p>
+          <div className="flex justify-between text-xs text-muted-foreground mt-1">
+            <span>{usagePct}% used</span>
+            {item.expenseActual > 0 && (
+              <span className="text-xs">
+                {formatCurrency(item.recurringActual, budget.currency)} recurring · {formatCurrency(item.expenseActual, budget.currency)} expenses
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Variance */}

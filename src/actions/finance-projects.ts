@@ -92,19 +92,33 @@ export async function getProjectsWithPnL(): Promise<FinanceActionResult<ProjectP
       return { data: [], error: null }
     }
 
-    // Fetch all transactions for these projects
+    // Fetch manual transactions + linked expenses for all projects in parallel
     const projectIds = projects.map(p => p.id)
-    const { data: transactions } = await supabase
-      .from('finance_project_transactions')
-      .select('*')
-      .in('project_id', projectIds)
+    const [{ data: transactions }, { data: linkedExpenses }] = await Promise.all([
+      supabase
+        .from('finance_project_transactions')
+        .select('project_id, amount, is_revenue')
+        .in('project_id', projectIds),
+      supabase
+        .from('finance_expenses')
+        .select('project_id, amount')
+        .in('project_id', projectIds)
+        .in('status', ['approved', 'paid']),
+    ])
 
-    // Group transactions by project
+    // Group all cost entries by project
     const txByProject: Record<string, Array<{ amount: number; is_revenue: boolean }>> = {}
     for (const tx of (transactions ?? [])) {
       const pid = tx.project_id
       if (!txByProject[pid]) txByProject[pid] = []
       txByProject[pid].push({ amount: Number(tx.amount), is_revenue: tx.is_revenue ?? false })
+    }
+    // Linked expenses are always costs (is_revenue: false)
+    for (const exp of (linkedExpenses ?? [])) {
+      const pid = exp.project_id
+      if (!pid) continue
+      if (!txByProject[pid]) txByProject[pid] = []
+      txByProject[pid].push({ amount: Number(exp.amount), is_revenue: false })
     }
 
     const results: ProjectPnL[] = projects.map(row => {
@@ -146,7 +160,7 @@ export async function getProjectDetail(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: 'Not authenticated' }
 
-    const [projectResult, txResult] = await Promise.all([
+    const [projectResult, txResult, linkedExpensesResult] = await Promise.all([
       supabase
         .from('finance_projects')
         .select('*')
@@ -159,6 +173,15 @@ export async function getProjectDetail(
         .select('*')
         .eq('project_id', projectId)
         .order('created_at', { ascending: false }),
+      // INTENT: Auto-load expenses that have been linked to this project via project_id.
+      // Previously the project_id FK existed on finance_expenses but was never read here,
+      // so project costs were always understated for anyone using the expense module.
+      supabase
+        .from('finance_expenses')
+        .select('id, description, amount, category, expense_date, status')
+        .eq('project_id', projectId)
+        .in('status', ['approved', 'paid'])
+        .order('expense_date', { ascending: false }),
     ])
 
     if (projectResult.error) {
@@ -166,10 +189,26 @@ export async function getProjectDetail(
       return { data: null, error: 'Project not found' }
     }
 
+    // Map linked expenses to ProjectTransaction shape for unified display
+    const linkedExpenses: ProjectTransaction[] = (linkedExpensesResult.data ?? []).map(e => ({
+      id: e.id,
+      projectId,
+      transactionType: 'expense' as const,
+      referenceId: null,
+      description: e.description ?? `${e.category ?? 'Expense'}`,
+      amount: Number(e.amount),
+      isRevenue: false,
+      createdAt: e.expense_date ?? new Date().toISOString(),
+    }))
+
+    // Merge manual transactions + linked expenses, sorted by date descending
+    const allTransactions = [...(txResult.data ?? []).map(mapTransaction), ...linkedExpenses]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
     return {
       data: {
         project: mapProject(projectResult.data),
-        transactions: (txResult.data ?? []).map(mapTransaction),
+        transactions: allTransactions,
       },
       error: null,
     }

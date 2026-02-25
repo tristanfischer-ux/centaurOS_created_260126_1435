@@ -4,9 +4,11 @@ import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
+import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
+import type { MarketplaceStats } from '@/actions/marketplace-stats'
 
 export const revalidate = 30
 
@@ -37,9 +39,10 @@ export default async function MarketplacePage() {
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
+    let stats: MarketplaceStats | null = null
 
-    // Fetch first page of listings (Products + Services) and foundry context in parallel
-    const [searchResult, foundryContext] = await Promise.allSettled([
+    // Fetch first page of listings (Products + Services), foundry context, and stats in parallel
+    const [searchResult, foundryContext, statsResult] = await Promise.allSettled([
         searchMarketplaceListings({
             categories: ['Products', 'Services'],
             page: 1,
@@ -47,6 +50,7 @@ export default async function MarketplacePage() {
             sort: 'verified',
         }),
         getFoundryContext(),
+        getMarketplaceStats(),
     ])
 
     if (searchResult.status === 'fulfilled') {
@@ -59,6 +63,12 @@ export default async function MarketplacePage() {
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
+
+    if (statsResult.status === 'fulfilled') {
+        stats = statsResult.value
+    } else {
+        console.error('[Marketplace] Failed to fetch stats:', statsResult.reason)
+    }
 
     // Fetch foundry context for optional features
     let foundryId: string | null = ctx?.foundryId || null
@@ -118,6 +128,7 @@ export default async function MarketplacePage() {
                 foundryContext={ctx || undefined}
                 allowedCategories={['Products', 'Services']}
                 pageSubtitle="Find products and services to grow your business"
+                stats={stats || undefined}
             />
         </Suspense>
     )

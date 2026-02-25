@@ -2,39 +2,73 @@
  * @file cad-lab-cost-constants.ts — Shared manufacturing cost lookup tables.
  *
  * @description Centralised cost constants for The Forge cost estimation, BOM,
- * raw materials breakdown, and supplier mapping components. Values are
- * approximate, intended for early-stage founder guidance — not binding quotes.
+ * raw materials breakdown, and supplier mapping components. Where possible,
+ * costs are derived from the engineering database (real MatWeb/ASM data).
+ * Fallback values are approximate, intended for early-stage founder guidance.
  */
+
+import { MATERIALS } from "@/lib/engineering-data/materials"
 
 // ─── Material Cost per Kilogram ─────────────────────────────────────
 
 /**
- * Approximate raw material cost per kilogram by material class.
- * Used for raw BOM / value-add analysis.
+ * Maps diagnostic material class names to engineering database material IDs.
+ * Used to look up real cost_per_kg_usd from the materials database.
  */
-export const MATERIAL_COST_PER_KG: Record<string, number> = {
-  "PLA/PETG": 25,
-  "ABS/Nylon": 35,
-  "Aluminium": 8,
-  "Steel/Iron": 4,
-  "Stainless Steel": 12,
-  "Copper/Brass": 18,
-  "Titanium": 80,
-  "Carbon Fiber Composite": 60,
-  "CFRP/GFRP": 60,
-  "Wood/Plywood": 3,
-  "Silicone/Rubber": 15,
-  "Glass/Ceramic": 10,
-  "PCB/Electronic": 0, // Process-driven, not material-driven
-  "Concrete": 0.1,
-  "Timber": 0.8,
-  "Copper Wire": 22,
-  "Glass": 2.5,
-  "Zinc": 3.5,
-  "Lead": 2.2,
-  "Nickel": 16,
-  "Other": 20,
+const MATERIAL_CLASS_TO_DB_IDS: Record<string, string[]> = {
+  "PLA/PETG": ["pla", "petg"],
+  "ABS/Nylon": ["abs", "nylon-pa6"],
+  "Aluminium": ["al-6061-t6", "al-7075-t6"],
+  "Steel/Iron": ["steel-1018", "steel-4140"],
+  "Stainless Steel": ["ss-304", "ss-316"],
+  "Copper/Brass": ["copper-c110", "brass-c360"],
+  "Titanium": ["ti-6al-4v"],
+  "Carbon Fiber Composite": ["cf-uni", "cf-woven"],
+  "CFRP/GFRP": ["cf-uni", "fiberglass"],
+  "Silicone/Rubber": ["tpu"],
 }
+
+/**
+ * Resolve material cost from the engineering database when possible,
+ * falling back to hardcoded estimates for materials not in the DB.
+ */
+function buildMaterialCostMap(): Record<string, number> {
+  const materialIndex = new Map(MATERIALS.map(m => [m.id, m]))
+  const result: Record<string, number> = {}
+
+  for (const [className, dbIds] of Object.entries(MATERIAL_CLASS_TO_DB_IDS)) {
+    const costs: number[] = []
+    for (const id of dbIds) {
+      const mat = materialIndex.get(id)
+      if (mat) costs.push((mat.cost_per_kg_usd.low + mat.cost_per_kg_usd.high) / 2)
+    }
+    if (costs.length > 0) {
+      result[className] = Math.round(costs.reduce((a, b) => a + b, 0) / costs.length)
+    }
+  }
+
+  // Fallbacks for materials not in the engineering DB
+  return {
+    ...result,
+    "Wood/Plywood": 3,
+    "Glass/Ceramic": 10,
+    "PCB/Electronic": 0,
+    "Concrete": 0.1,
+    "Timber": 0.8,
+    "Copper Wire": 22,
+    "Glass": 2.5,
+    "Zinc": 3.5,
+    "Lead": 2.2,
+    "Nickel": 16,
+    "Other": 20,
+  }
+}
+
+/**
+ * Material cost per kilogram, derived from engineering database where possible.
+ * Falls back to estimates for materials not in the DB.
+ */
+export const MATERIAL_COST_PER_KG: Record<string, number> = buildMaterialCostMap()
 
 // ─── Process Cost Tables ────────────────────────────────────────────
 

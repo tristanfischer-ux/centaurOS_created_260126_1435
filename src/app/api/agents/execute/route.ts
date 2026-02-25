@@ -208,6 +208,7 @@ export async function POST(request: Request) {
     let handoffSourceThreadId: string | undefined
     let handoffSourceSpecialistId: string | undefined
     let currentRoute: string | undefined
+    let cadLabProjectId: string | undefined
 
     try {
         const body = await request.json()
@@ -238,6 +239,7 @@ export async function POST(request: Request) {
         handoffSourceThreadId = typeof body.handoffSourceThreadId === "string" ? body.handoffSourceThreadId : undefined
         handoffSourceSpecialistId = typeof body.handoffSourceSpecialistId === "string" ? body.handoffSourceSpecialistId : undefined
         currentRoute = typeof body.currentRoute === "string" ? body.currentRoute : undefined
+        cadLabProjectId = typeof body.cadLabProjectId === "string" ? body.cadLabProjectId : undefined
 
         if (!prompt || typeof prompt !== "string") {
             return NextResponse.json({ error: "prompt is required" }, { status: 400 })
@@ -404,6 +406,38 @@ export async function POST(request: Request) {
         } catch (err) {
             // Non-critical — proceed without company context
             console.warn("[agents/execute] Could not load company context:", err)
+        }
+    }
+
+    // 4d2. Inject CAD Lab project context when specialist is reviewing designs
+    if (cadLabProjectId && foundryId && specialistId) {
+        try {
+            const adminClient = createAdminClient()
+            const { data: cadProject } = await adminClient
+                .from("cad_lab_projects")
+                .select("subject, modules, research, result")
+                .eq("id", cadLabProjectId)
+                .eq("foundry_id", foundryId)
+                .single()
+
+            if (cadProject) {
+                const cadContextParts: string[] = ["\n\n## Active CAD Lab Project Context"]
+                cadContextParts.push(`**Product:** ${cadProject.subject}`)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const mods = cadProject.modules as any[]
+                if (mods && mods.length > 0) {
+                    cadContextParts.push(`**Modules (${mods.length}):**`)
+                    for (const m of mods) {
+                        const bboxStr = m.result?.bbox
+                            ? ` — ${m.result.bbox.xLen}×${m.result.bbox.yLen}×${m.result.bbox.zLen}mm`
+                            : ""
+                        cadContextParts.push(`- ${m.name}: ${m.purpose} [${m.status}]${bboxStr}`)
+                    }
+                }
+                companyContext += cadContextParts.join("\n")
+            }
+        } catch (err) {
+            console.debug("[agents/execute] CAD Lab context injection failed:", err)
         }
     }
 

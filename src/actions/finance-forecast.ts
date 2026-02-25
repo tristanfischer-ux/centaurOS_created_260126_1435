@@ -13,16 +13,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import type { FinanceActionResult } from '@/types/finance'
-import type { RecurringRevenue, RecurringCost, ForecastInput } from '@/lib/finance/forecast'
+import type { RecurringRevenue, RecurringCost, ForecastInput, OneTimeInflow } from '@/lib/finance/forecast'
 
 // ============================================================
 // Types
 // ============================================================
 
+export interface FundingEvent {
+  label: string
+  amount: number  // in pence
+  month: string   // ISO month "2026-03"
+}
+
 export interface CashFlowData {
   forecastInput: ForecastInput
   revenueBreakdown: RecurringRevenue[]
   costBreakdown: RecurringCost[]
+  fundingEvents: FundingEvent[]
 }
 
 // ============================================================
@@ -44,7 +51,7 @@ export async function getCashFlowData(
     if (!user) return { data: null, error: 'Not authenticated' }
 
     // Parallel data fetches
-    const [balanceResult, retainersResult, costsResult, revenueStreamsResult] = await Promise.all([
+    const [balanceResult, retainersResult, costsResult, revenueStreamsResult, wonFundingResult] = await Promise.all([
       // Current cash balance
       supabase
         .from('account_balances')
@@ -71,6 +78,15 @@ export async function getCashFlowData(
         .select('id, name, amount, period, category, is_active')
         .eq('foundry_id', foundryId)
         .eq('is_active', true),
+
+      // INTENT: Won funding opportunities are one-time cash inflows that belong in
+      // the forecast. Without them, early-stage companies see an unrealistically
+      // pessimistic runway when they have confirmed grants or investments.
+      supabase
+        .from('finance_funding_opportunities')
+        .select('name, amount, deadline')
+        .eq('foundry_id', foundryId)
+        .eq('stage', 'won'),
     ])
 
     const currentBalance = balanceResult.data?.balance_amount ?? 0
@@ -124,6 +140,31 @@ export async function getCashFlowData(
       }
     }
 
+    // Build one-time inflows from won funding opportunities.
+    // Use deadline date as the expected receipt month; fall back to next month if absent.
+    const now = new Date()
+    const fundingEvents: FundingEvent[] = []
+    const oneTimeInflows: OneTimeInflow[] = []
+
+    for (const funding of (wonFundingResult.data ?? [])) {
+      const amount = Math.round((funding.amount ?? 0) * 100) // amount stored in pence already — no conversion needed
+      if (amount <= 0) continue
+
+      // Determine which forecast month this inflow lands in
+      let inflowMonth: string
+      if (funding.deadline) {
+        const d = new Date(funding.deadline)
+        inflowMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      } else {
+        // No deadline — assume funds arrive next month
+        const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        inflowMonth = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`
+      }
+
+      fundingEvents.push({ label: funding.name ?? 'Funding', amount, month: inflowMonth })
+      oneTimeInflows.push({ label: funding.name ?? 'Funding', amount, month: inflowMonth })
+    }
+
     return {
       data: {
         forecastInput: {
@@ -131,9 +172,11 @@ export async function getCashFlowData(
           recurringRevenue,
           recurringCosts,
           months,
+          oneTimeInflows,
         },
         revenueBreakdown: recurringRevenue,
         costBreakdown: recurringCosts,
+        fundingEvents,
       },
       error: null,
     }

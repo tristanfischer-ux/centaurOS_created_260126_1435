@@ -69,6 +69,8 @@ import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight-card"
+import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
+import type { SpecialistReview } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 import { ModuleCarousel } from "../components/module-carousel"
@@ -84,7 +86,7 @@ type ViewTab = "3d" | "iso" | "exploded" | "front" | "back" | "left" | "right" |
 export default function CadLabBuildPage(): React.ReactNode {
   const router = useRouter()
   const {
-    hasResearch, isAnyLoading,
+    hasResearch, isAnyLoading, activeProjectId,
     subject, editableReport, setEditableReport,
     referenceModel,
     modelId, setModelId,
@@ -119,6 +121,16 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [codeCopied, setCodeCopied] = useState(false)
   const [isConfirmRemapOpen, setIsConfirmRemapOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null)
+
+  // Specialist reviews (keyed by moduleId → array of reviews)
+  const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
+  const handleReviewComplete = useCallback((moduleId: string, review: SpecialistReview) => {
+    setModuleReviews(prev => {
+      const existing = prev[moduleId] ?? []
+      const filtered = existing.filter(r => r.specialistId !== review.specialistId)
+      return { ...prev, [moduleId]: [...filtered, review] }
+    })
+  }, [])
 
   // Register screen context so specialists can see what the user is working on
   useRegisterScreenContext(
@@ -1108,6 +1120,20 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Questions for Your Factory</p>
                         <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                       </div>
+
+                      {/* Specialist Reviews */}
+                      {activeProjectId && (mod.status === "generated" || mod.result) && (
+                        <SpecialistReviewPanel
+                          module={mod}
+                          allModules={modules}
+                          reviews={moduleReviews[mod.id] ?? []}
+                          projectId={activeProjectId}
+                          projectSubject={subject}
+                          designBrief={designBrief}
+                          diagnosticAnswers={diagnosticAnswers}
+                          onReviewComplete={(review) => handleReviewComplete(mod.id, review)}
+                        />
+                      )}
 
                       {/* IO Flow */}
                       <div className="flex items-center gap-4 text-xs">

@@ -9,8 +9,10 @@ import { MarketplaceDetailDialog } from './MarketplaceDetailDialog'
 import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
+import { MarketplaceStatsSection } from './MarketplaceStatsSection'
 import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
 import { dismissRecommendation } from '@/actions/marketplace'
+import type { MarketplaceStats } from '@/actions/marketplace-stats'
 import { toast } from 'sonner'
 import {
     LayoutGrid,
@@ -47,6 +49,8 @@ interface MarketplaceBrowseProps {
     pageTitle?: string
     /** Page subtitle displayed below the title. */
     pageSubtitle?: string
+    /** Aggregate stats for the analytics section. */
+    stats?: MarketplaceStats
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -74,6 +78,7 @@ export function MarketplaceBrowse({
     allowedCategories,
     pageTitle = 'Marketplace',
     pageSubtitle = 'Find expert talent, products, and services to grow your business',
+    stats,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -256,6 +261,9 @@ export function MarketplaceBrowse({
             {/* Browse tab content */}
             {activeTab === 'browse' && (
                 <>
+                    {/* Analytics section */}
+                    {stats && <MarketplaceStatsSection stats={stats} />}
+
                     {/* AI + Gap Recommendations (compact, dismissible) */}
                     <MarketplaceRecommendations
                         recommendations={localRecommendations}

@@ -39,9 +39,11 @@ export interface Budget {
 
 export interface BudgetVsActual {
   budget: Budget
-  actual: number       // actual spend in pence (from cost items)
-  variance: number     // budget - actual (positive = under budget)
-  variancePct: number  // variance as % of budget
+  actual: number           // total actual spend in pence (recurring + expenses)
+  recurringActual: number  // from money_map_cost_items (normalised monthly)
+  expenseActual: number    // from approved/paid finance_expenses this month
+  variance: number         // budget - actual (positive = under budget)
+  variancePct: number      // variance as % of budget
 }
 
 export interface CreateBudgetInput {
@@ -111,8 +113,13 @@ export async function getBudgetsVsActual(): Promise<FinanceActionResult<BudgetVs
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { data: null, error: 'Not authenticated' }
 
-    // Parallel fetches: budgets + cost items
-    const [budgetsResult, costsResult] = await Promise.all([
+    // Month boundaries for expense aggregation
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+
+    // Parallel fetches: budgets + cost items + this month's approved expenses
+    const [budgetsResult, costsResult, expensesResult] = await Promise.all([
       supabase
         .from('finance_budgets')
         .select('*')
@@ -126,6 +133,16 @@ export async function getBudgetsVsActual(): Promise<FinanceActionResult<BudgetVs
         .select('amount, period, category, is_active')
         .eq('foundry_id', foundryId)
         .eq('is_active', true),
+
+      // INTENT: Include approved/paid expenses in budget actuals so the
+      // budget variance reflects real spend, not just recurring cost items.
+      supabase
+        .from('finance_expenses')
+        .select('amount, category')
+        .eq('foundry_id', foundryId)
+        .in('status', ['approved', 'paid'])
+        .gte('expense_date', monthStart)
+        .lte('expense_date', monthEnd),
     ])
 
     if (budgetsResult.error) {
@@ -133,23 +150,31 @@ export async function getBudgetsVsActual(): Promise<FinanceActionResult<BudgetVs
       return { data: null, error: 'Failed to load budgets' }
     }
 
-    // Compute actual spend per category (normalised to monthly pence)
-    const actualByCategory: Record<string, number> = {}
+    // Compute recurring actual per category (normalised to monthly pence from money map)
+    const recurringByCategory: Record<string, number> = {}
     for (const cost of (costsResult.data ?? [])) {
       const cat = cost.category ?? 'other'
       const monthlyPence = normaliseToMonthlyPence(Number(cost.amount), cost.period ?? 'monthly')
-      actualByCategory[cat] = (actualByCategory[cat] ?? 0) + monthlyPence
+      recurringByCategory[cat] = (recurringByCategory[cat] ?? 0) + monthlyPence
+    }
+
+    // Compute expense actual per category (approved/paid expenses this month, already in pence)
+    const expenseByCategory: Record<string, number> = {}
+    for (const exp of (expensesResult.data ?? [])) {
+      const cat = exp.category ?? 'other'
+      expenseByCategory[cat] = (expenseByCategory[cat] ?? 0) + Number(exp.amount)
     }
 
     const results: BudgetVsActual[] = (budgetsResult.data ?? []).map(row => {
       const budget = mapBudget(row)
-      // Normalise budget to monthly for comparison
       const monthlyBudget = normaliseToMonthlyPence(budget.amount, budget.period)
-      const actual = actualByCategory[budget.category] ?? 0
+      const recurringActual = recurringByCategory[budget.category] ?? 0
+      const expenseActual = expenseByCategory[budget.category] ?? 0
+      const actual = recurringActual + expenseActual
       const variance = monthlyBudget - actual
       const variancePct = monthlyBudget > 0 ? Math.round((variance / monthlyBudget) * 100) : 0
 
-      return { budget, actual, variance, variancePct }
+      return { budget, actual, recurringActual, expenseActual, variance, variancePct }
     })
 
     return { data: results, error: null }

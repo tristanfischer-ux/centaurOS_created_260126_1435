@@ -321,3 +321,60 @@ export interface MashupPlanResult {
 
 /** Result of the executeMashupPlan phase (code gen + Modal + upload) */
 export type MashupExecuteResult = MashupResult
+
+// ─── Specialist Review Types ─────────────────────────────────────────
+
+/** Verdict from a specialist review */
+export type ReviewVerdict = "pass" | "warn" | "fail"
+
+/** A single issue found during specialist review */
+export interface ReviewIssue {
+  /** Severity of the issue */
+  severity: "critical" | "warning" | "info"
+  /** Short category label (e.g., "Wall Thickness", "Tolerance", "Material") */
+  category: string
+  /** Human-readable description of the issue */
+  message: string
+  /** Suggested fix, if any */
+  suggestion?: string
+}
+
+/** A calculation performed during the review (for transparency) */
+export interface ReviewCalculation {
+  /** Tool that was called (e.g., "calculate_stress", "lookup_material") */
+  tool: string
+  /** Brief description of what was computed */
+  description: string
+  /** Key result value (e.g., "Safety factor: 2.3") */
+  result: string
+}
+
+/**
+ * Structured result from a specialist reviewing a CAD Lab module.
+ *
+ * @description Specialists review modules for manufacturability (Fang),
+ * engineering soundness (Jian), system integration (Max), and supply chain
+ * viability (Chase). Reviews are stored per-module in the DB.
+ */
+export interface SpecialistReview {
+  /** Which specialist performed the review */
+  specialistId: string
+  /** Specialist's display name */
+  specialistName: string
+  /** Overall verdict */
+  verdict: ReviewVerdict
+  /** One-sentence summary of the review */
+  summary: string
+  /** Detailed issues found */
+  issues: ReviewIssue[]
+  /** Actionable recommendations */
+  recommendations: string[]
+  /** Calculations performed (for auditability) */
+  calculations: ReviewCalculation[]
+  /** Full markdown review text from the specialist */
+  reviewMarkdown: string
+  /** When the review was performed */
+  reviewedAt: string
+  /** Time taken in ms */
+  reviewTimeMs: number
+}
