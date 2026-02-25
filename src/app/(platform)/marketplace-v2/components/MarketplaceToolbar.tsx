@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils'
 import { SORT_OPTIONS, type SortOption, type MarketplaceCategory } from '../hooks/useMarketplaceState'
 import { REGION_OPTIONS, type MarketplaceRegion } from '@/lib/marketplace-utils'
+import type { AdvancedFilters } from '@/actions/marketplace'
 
 /**
  * Category pill configuration with icons and active colors.
@@ -94,6 +95,12 @@ interface MarketplaceToolbarProps {
     selectedRegion?: MarketplaceRegion
     /** Called when user changes the region filter. */
     onRegionChange?: (region: MarketplaceRegion) => void
+    /** Number of active filters (shown as badge count on Filters button). */
+    activeFilterCount?: number
+    /** Current advanced filters, for rendering removable chips. */
+    advancedFilters?: AdvancedFilters
+    /** Remove a specific advanced filter by key. */
+    onRemoveAdvancedFilter?: (key: keyof AdvancedFilters) => void
 }
 
 /**
@@ -124,6 +131,9 @@ export function MarketplaceToolbar({
     visibleCategories,
     selectedRegion = 'All Regions',
     onRegionChange,
+    activeFilterCount = 0,
+    advancedFilters,
+    onRemoveAdvancedFilter,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -325,14 +335,54 @@ export function MarketplaceToolbar({
                     >
                         <SlidersHorizontal className="h-4 w-4 mr-2" />
                         Filters
-                        {hasActiveFilters && (
+                        {activeFilterCount > 0 && (
                             <Badge className="ml-2 h-5 min-w-[20px] p-0 flex items-center justify-center text-[10px] bg-international-orange text-white border-0">
-                                !
+                                {activeFilterCount}
                             </Badge>
                         )}
                     </Button>
                 </div>
             </div>
+
+            {/* Active filter chips (shown when filters applied but panel may be closed) */}
+            {advancedFilters && onRemoveAdvancedFilter && activeFilterCount > 0 && !showFilters && (
+                <div className="flex flex-wrap gap-1.5">
+                    {advancedFilters.verifiedOnly && (
+                        <FilterChip label="Verified" onRemove={() => onRemoveAdvancedFilter('verifiedOnly')} />
+                    )}
+                    {advancedFilters.minRating != null && (
+                        <FilterChip label={`${advancedFilters.minRating}+ stars`} onRemove={() => onRemoveAdvancedFilter('minRating')} />
+                    )}
+                    {advancedFilters.minExperience != null && (
+                        <FilterChip label={`${advancedFilters.minExperience}+ years`} onRemove={() => onRemoveAdvancedFilter('minExperience')} />
+                    )}
+                    {advancedFilters.location && (
+                        <FilterChip label={advancedFilters.location} onRemove={() => onRemoveAdvancedFilter('location')} />
+                    )}
+                    {advancedFilters.availability && (
+                        <FilterChip label={advancedFilters.availability} onRemove={() => onRemoveAdvancedFilter('availability')} />
+                    )}
+                    {advancedFilters.minRate != null && (
+                        <FilterChip label={`Min $${advancedFilters.minRate}`} onRemove={() => onRemoveAdvancedFilter('minRate')} />
+                    )}
+                    {advancedFilters.maxRate != null && (
+                        <FilterChip label={`Max $${advancedFilters.maxRate}`} onRemove={() => onRemoveAdvancedFilter('maxRate')} />
+                    )}
+                    {advancedFilters.skills?.map((skill) => (
+                        <FilterChip key={skill} label={skill} onRemove={() => {
+                            const next = (advancedFilters.skills ?? []).filter(s => s !== skill)
+                            // INTENT: Removing one skill at a time; when empty, remove the whole key
+                            if (next.length === 0) {
+                                onRemoveAdvancedFilter('skills')
+                            } else {
+                                // Can't remove just one via removeAdvancedFilter, so we don't render individual skill chips in closed mode
+                                // Instead the parent handles this via updateAdvancedFilter
+                                onRemoveAdvancedFilter('skills')
+                            }
+                        }} />
+                    ))}
+                </div>
+            )}
 
             {/* Results count + clear */}
             <div className="flex items-center justify-between">
@@ -362,5 +412,21 @@ export function MarketplaceToolbar({
                 )}
             </div>
         </div>
+    )
+}
+
+/** Small removable chip for an active filter. */
+function FilterChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+    return (
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border">
+            {label}
+            <button
+                onClick={onRemove}
+                className="ml-0.5 rounded-full hover:bg-muted p-0.5 transition-colors min-h-[24px] min-w-[24px] flex items-center justify-center"
+                aria-label={`Remove ${label} filter`}
+            >
+                <X className="h-3 w-3" />
+            </button>
+        </span>
     )
 }

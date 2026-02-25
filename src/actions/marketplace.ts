@@ -185,11 +185,8 @@ export interface MarketplaceListing {
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 
-/** When full-text result count is below this, semantic (embedding) fallback is used. */
-const SEMANTIC_FALLBACK_THRESHOLD = 5
-
-/** Max semantic results to fetch when doing hybrid fallback. */
-const SEMANTIC_FALLBACK_MATCH_COUNT = 50
+/** Max semantic results to fetch during hybrid search. */
+const SEMANTIC_MATCH_COUNT = 50
 
 /** Sort options for marketplace search. */
 export type MarketplaceSortOption =
@@ -199,6 +196,17 @@ export type MarketplaceSortOption =
     | 'price_desc'
     | 'newest'
     | 'verified'
+
+export interface AdvancedFilters {
+    verifiedOnly?: boolean
+    minRating?: number
+    minExperience?: number
+    minRate?: number
+    maxRate?: number
+    location?: string
+    availability?: string
+    skills?: string[]
+}
 
 export interface SearchMarketplaceListingsParams {
     query?: string
@@ -213,6 +221,8 @@ export interface SearchMarketplaceListingsParams {
     sort?: MarketplaceSortOption
     page?: number
     pageSize?: number
+    /** Advanced attribute-based filters. */
+    advancedFilters?: AdvancedFilters
 }
 
 export interface SearchMarketplaceListingsResult {
@@ -242,7 +252,6 @@ export async function searchMarketplaceListings(
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let query = supabase.from('marketplace_listings').select('*', { count: 'exact' })
 
     const queryTrimmed = params.query?.trim()
@@ -263,6 +272,34 @@ export async function searchMarketplaceListings(
         query = query.in('subcategory', params.subcategories)
     } else if (params.subcategory) {
         query = query.eq('subcategory', params.subcategory)
+    }
+
+    // Apply advanced filters
+    const af = params.advancedFilters
+    if (af) {
+        if (af.verifiedOnly) {
+            query = query.eq('is_verified', true)
+        }
+        if (af.minRating != null) {
+            query = query.gte('attributes->>rating_average', af.minRating)
+        }
+        if (af.minExperience != null) {
+            query = query.gte('attributes->>years_experience', af.minExperience)
+        }
+        if (af.location) {
+            query = query.ilike('attributes->>location', `%${af.location}%`)
+        }
+        if (af.availability) {
+            query = query.ilike('attributes->>availability', `%${af.availability}%`)
+        }
+        if (af.skills && af.skills.length > 0) {
+            // INTENT: Filter by overlap with attributes.expertise array using JSONB containment.
+            // Each skill is checked individually with OR logic.
+            const skillFilters = af.skills.map(
+                (skill) => `attributes->expertise.cs.["${skill}"]`
+            ).join(',')
+            query = query.or(skillFilters)
+        }
     }
 
     const sort = params.sort ?? 'verified'
@@ -292,7 +329,15 @@ export async function searchMarketplaceListings(
 
     query = query.range(from, to)
 
-    const { data, error, count } = await query
+    // INTENT: Always run semantic search in parallel with FTS when a query is present.
+    // This promotes semantic matching from a fallback to a first-class hybrid search.
+    const embeddingPromise = queryTrimmed && page === 1
+        ? embedText(queryTrimmed)
+        : Promise.resolve(null)
+
+    const [ftsResult, embedding] = await Promise.all([query, embeddingPromise])
+
+    const { data, error, count } = ftsResult
 
     if (error) {
         console.error('[Marketplace] searchMarketplaceListings error:', error)
@@ -303,52 +348,65 @@ export async function searchMarketplaceListings(
     let listings = (data || []) as MarketplaceListing[]
     let hasMore = from + listings.length < totalCount
 
-    // Hybrid search: when full-text returns few results and we have a query, add semantic matches
-    if (
-        queryTrimmed &&
-        page === 1 &&
-        listings.length < SEMANTIC_FALLBACK_THRESHOLD
-    ) {
-        const embedding = await embedText(queryTrimmed)
-        if (embedding) {
-            const { data: semanticData } = await supabase.rpc('match_marketplace_listings', {
-                query_embedding: JSON.stringify(embedding),
-                match_threshold: 0.4,
-                match_count: SEMANTIC_FALLBACK_MATCH_COUNT,
-            })
-            const semanticRows = (semanticData ?? []) as { id: string }[]
-            const semanticIds = semanticRows.map((r) => r.id)
-            if (semanticIds.length > 0) {
+    // Merge semantic results (deduplicated) when embedding was generated
+    if (embedding && page === 1) {
+        const { data: semanticData } = await supabase.rpc('match_marketplace_listings', {
+            query_embedding: JSON.stringify(embedding),
+            match_threshold: 0.4,
+            match_count: SEMANTIC_MATCH_COUNT,
+        })
+        const semanticRows = (semanticData ?? []) as { id: string }[]
+        const semanticIds = semanticRows.map((r) => r.id)
+        if (semanticIds.length > 0) {
+            let semQuery = supabase.from('marketplace_listings').select('*').in('id', semanticIds)
+            if (params.categories?.length) {
+                semQuery = semQuery.in('category', params.categories as ("People" | "Products" | "Services")[])
+            } else if (params.category) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                let semQuery = supabase.from('marketplace_listings').select('*').in('id', semanticIds)
-                if (params.categories?.length) {
-                    semQuery = semQuery.in('category', params.categories as ("People" | "Products" | "Services")[])
-                } else if (params.category) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    semQuery = semQuery.eq('category', params.category as any)
-                }
-                if (params.subcategories?.length) {
-                    semQuery = semQuery.in('subcategory', params.subcategories)
-                } else if (params.subcategory) {
-                    semQuery = semQuery.eq('subcategory', params.subcategory)
-                }
-                const { data: semanticListings } = await semQuery
-                const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
-                const idToIndex = new Map(semanticIds.map((id, i) => [id, i]))
-                fullSemantic.sort((a, b) => (idToIndex.get(a.id) ?? 999) - (idToIndex.get(b.id) ?? 999))
-                const ftIds = new Set(listings.map((l) => l.id))
-                const semanticOnly = fullSemantic.filter((l) => !ftIds.has(l.id))
-                const merged = [...listings, ...semanticOnly].slice(0, pageSize)
-                listings = merged
-                totalCount = totalCount + semanticOnly.length
-                hasMore = totalCount > pageSize
+                semQuery = semQuery.eq('category', params.category as any)
             }
+            if (params.subcategories?.length) {
+                semQuery = semQuery.in('subcategory', params.subcategories)
+            } else if (params.subcategory) {
+                semQuery = semQuery.eq('subcategory', params.subcategory)
+            }
+            // Apply same advanced filters to semantic results
+            if (af) {
+                if (af.verifiedOnly) semQuery = semQuery.eq('is_verified', true)
+                if (af.minRating != null) semQuery = semQuery.gte('attributes->>rating_average', af.minRating)
+                if (af.minExperience != null) semQuery = semQuery.gte('attributes->>years_experience', af.minExperience)
+                if (af.location) semQuery = semQuery.ilike('attributes->>location', `%${af.location}%`)
+                if (af.availability) semQuery = semQuery.ilike('attributes->>availability', `%${af.availability}%`)
+            }
+            const { data: semanticListings } = await semQuery
+            const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
+            const idToIndex = new Map(semanticIds.map((id, i) => [id, i]))
+            fullSemantic.sort((a, b) => (idToIndex.get(a.id) ?? 999) - (idToIndex.get(b.id) ?? 999))
+            const ftIds = new Set(listings.map((l) => l.id))
+            const semanticOnly = fullSemantic.filter((l) => !ftIds.has(l.id))
+            const merged = [...listings, ...semanticOnly].slice(0, pageSize)
+            listings = merged
+            totalCount = totalCount + semanticOnly.length
+            hasMore = totalCount > pageSize
         }
+    }
+
+    // Post-filter rate range client-side (rates stored as inconsistent strings like "1,200/day")
+    if (af && (af.minRate != null || af.maxRate != null)) {
+        listings = listings.filter((l) => {
+            const rateStr = (l.attributes as Record<string, unknown>)?.rate
+            if (typeof rateStr !== 'string') return af.minRate == null
+            const numeric = parseFloat(rateStr.replace(/[^0-9.]/g, ''))
+            if (isNaN(numeric)) return af.minRate == null
+            if (af.minRate != null && numeric < af.minRate) return false
+            if (af.maxRate != null && numeric > af.maxRate) return false
+            return true
+        })
     }
 
     // INTENT: Fetch per-category counts so the UI pills show real totals, not just
     // the count from the loaded page. Uses the same text-search filter but grouped
-    // by category, scoped to the allowed categories.
+    // by category, scoped to the allowed categories. Also applies advanced filters.
     const countCategories = params.categories ?? ['People', 'Products', 'Services']
     const categoryCountPromises = countCategories.map(async (cat) => {
         let cq = supabase.from('marketplace_listings').select('id', { count: 'exact', head: true })
@@ -359,6 +417,14 @@ export async function searchMarketplaceListings(
             cq = cq.in('subcategory', params.subcategories)
         } else if (params.subcategory) {
             cq = cq.eq('subcategory', params.subcategory)
+        }
+        // Apply advanced filters to counts too
+        if (af) {
+            if (af.verifiedOnly) cq = cq.eq('is_verified', true)
+            if (af.minRating != null) cq = cq.gte('attributes->>rating_average', af.minRating)
+            if (af.minExperience != null) cq = cq.gte('attributes->>years_experience', af.minExperience)
+            if (af.location) cq = cq.ilike('attributes->>location', `%${af.location}%`)
+            if (af.availability) cq = cq.ilike('attributes->>availability', `%${af.availability}%`)
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         cq = cq.eq('category', cat as any)

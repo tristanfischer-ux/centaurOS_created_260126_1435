@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
-import type { MarketplaceListing, MarketplaceSortOption } from '@/actions/marketplace'
+import type { MarketplaceListing, MarketplaceSortOption, AdvancedFilters } from '@/actions/marketplace'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { safeParseAttributes, safeStringArray, deriveRegion, type MarketplaceRegion } from '@/lib/marketplace-utils'
@@ -121,6 +121,48 @@ export function useMarketplaceState({
     const [aiInterpretation, setAIInterpretation] = useState<string | null>(null)
     const [selectedRegion, setSelectedRegion] = useState<MarketplaceRegion>('All Regions')
 
+    // Advanced filter state
+    const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(() => {
+        const initial: AdvancedFilters = {}
+        if (searchParams?.get('v') === '1') initial.verifiedOnly = true
+        const mr = searchParams?.get('mr')
+        if (mr) initial.minRating = Number(mr)
+        const exp = searchParams?.get('exp')
+        if (exp) initial.minExperience = Number(exp)
+        const loc = searchParams?.get('loc')
+        if (loc) initial.location = loc
+        const avail = searchParams?.get('avail')
+        if (avail) initial.availability = avail
+        const sk = searchParams?.get('sk')
+        if (sk) initial.skills = sk.split(',').filter(Boolean)
+        const rmin = searchParams?.get('rmin')
+        if (rmin) initial.minRate = Number(rmin)
+        const rmax = searchParams?.get('rmax')
+        if (rmax) initial.maxRate = Number(rmax)
+        return initial
+    })
+
+    const updateAdvancedFilter = useCallback(<K extends keyof AdvancedFilters>(key: K, value: AdvancedFilters[K]) => {
+        setAdvancedFilters(prev => {
+            const next = { ...prev }
+            if (value === undefined || value === null || value === '' || value === false || (Array.isArray(value) && value.length === 0)) {
+                delete next[key]
+            } else {
+                next[key] = value
+            }
+            return next
+        })
+        setAIInterpretation(null)
+    }, [])
+
+    const removeAdvancedFilter = useCallback((key: keyof AdvancedFilters) => {
+        setAdvancedFilters(prev => {
+            const next = { ...prev }
+            delete next[key]
+            return next
+        })
+    }, [])
+
     // Server-driven listing state
     const [listings, setListings] = useState<MarketplaceListing[]>(initialListings)
     const [totalCount, setTotalCount] = useState(initialTotalCount)
@@ -159,19 +201,28 @@ export function useMarketplaceState({
             return
         }
         fetchPage(1, false)
-    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories, advancedFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const updateURL = useCallback((query: string, category: MarketplaceCategory) => {
-        const params = new URLSearchParams()
-        if (query) params.set('q', query)
-        if (category !== 'All') params.set('cat', category)
-        const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
+    const updateURL = useCallback((query: string, category: MarketplaceCategory, filters?: AdvancedFilters) => {
+        const p = new URLSearchParams()
+        if (query) p.set('q', query)
+        if (category !== 'All') p.set('cat', category)
+        const f = filters ?? advancedFilters
+        if (f.verifiedOnly) p.set('v', '1')
+        if (f.minRating != null) p.set('mr', String(f.minRating))
+        if (f.minExperience != null) p.set('exp', String(f.minExperience))
+        if (f.location) p.set('loc', f.location)
+        if (f.availability) p.set('avail', f.availability)
+        if (f.skills && f.skills.length > 0) p.set('sk', f.skills.join(','))
+        if (f.minRate != null) p.set('rmin', String(f.minRate))
+        if (f.maxRate != null) p.set('rmax', String(f.maxRate))
+        const newURL = p.toString() ? `${pathname}?${p.toString()}` : pathname
         router.push(newURL, { scroll: false })
-    }, [pathname, router])
+    }, [pathname, router, advancedFilters])
 
     useEffect(() => {
-        updateURL(debouncedQuery, activeCategory)
-    }, [debouncedQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+        updateURL(debouncedQuery, activeCategory, advancedFilters)
+    }, [debouncedQuery, advancedFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const buildSearchParams = useCallback(
         (page: number) => {
@@ -181,6 +232,8 @@ export function useMarketplaceState({
                     : undefined
             const category =
                 activeCategory !== 'All' ? (activeCategory as string) : undefined
+            // Only include advancedFilters if at least one key is set
+            const hasAdvanced = Object.keys(advancedFilters).length > 0
             return {
                 query: debouncedQuery.trim() || undefined,
                 categories: category ? undefined : categories,
@@ -192,6 +245,7 @@ export function useMarketplaceState({
                 sort: toApiSort(sortBy),
                 page,
                 pageSize: MARKETPLACE_PAGE_SIZE,
+                advancedFilters: hasAdvanced ? advancedFilters : undefined,
             }
         },
         [
@@ -200,6 +254,7 @@ export function useMarketplaceState({
             debouncedQuery,
             selectedSubcategories,
             sortBy,
+            advancedFilters,
         ]
     )
 
@@ -243,11 +298,11 @@ export function useMarketplaceState({
     )
 
     useEffect(() => {
-        if (currentPage === 1 && listings === initialListings && !debouncedQuery && activeCategory === defaultCategory && selectedSubcategories.size === 0) {
+        if (currentPage === 1 && listings === initialListings && !debouncedQuery && activeCategory === defaultCategory && selectedSubcategories.size === 0 && advancedFilterCount === 0) {
             return
         }
         fetchPage(1, false)
-    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories, advancedFilters]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const loadMore = useCallback(() => {
         if (isLoadingMore || !hasMore) return
@@ -305,6 +360,7 @@ export function useMarketplaceState({
         setSortBy('relevance')
         setAIInterpretation(null)
         setSelectedRegion('All Regions')
+        setAdvancedFilters({})
         if (techniqueSlug) {
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.delete('technique')
@@ -313,15 +369,25 @@ export function useMarketplaceState({
         }
     }, [techniqueSlug, searchParams, pathname, router])
 
+    const advancedFilterCount = useMemo(() => Object.keys(advancedFilters).length, [advancedFilters])
+
     const hasActiveFilters = useMemo(
         () =>
             debouncedQuery.trim() !== '' ||
             selectedSubcategories.size > 0 ||
             sortBy !== 'relevance' ||
             activeTechnique !== null ||
-            selectedRegion !== 'All Regions',
-        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique, selectedRegion]
+            selectedRegion !== 'All Regions' ||
+            advancedFilterCount > 0,
+        [debouncedQuery, selectedSubcategories.size, sortBy, activeTechnique, selectedRegion, advancedFilterCount]
     )
+
+    const activeFilterCount = useMemo(() => {
+        let count = 0
+        if (selectedSubcategories.size > 0) count += selectedSubcategories.size
+        count += advancedFilterCount
+        return count
+    }, [selectedSubcategories.size, advancedFilterCount])
 
     const filteredListings = useMemo(() => {
         let result = listings
@@ -401,6 +467,7 @@ export function useMarketplaceState({
         availableSubcategories,
         categoryCounts,
         hasActiveFilters,
+        activeFilterCount,
         visibleCategories,
         totalCount,
         hasMore,
@@ -421,5 +488,8 @@ export function useMarketplaceState({
         aiInterpretation,
         applyAIFilters,
         clearAIInterpretation,
+        advancedFilters,
+        updateAdvancedFilter,
+        removeAdvancedFilter,
     }
 }

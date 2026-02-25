@@ -288,6 +288,9 @@ export function MarketplaceBrowse({
                         visibleCategories={state.visibleCategories}
                         selectedRegion={state.selectedRegion}
                         onRegionChange={state.setSelectedRegion}
+                        activeFilterCount={state.activeFilterCount}
+                        advancedFilters={state.advancedFilters}
+                        onRemoveAdvancedFilter={state.removeAdvancedFilter}
                     />
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}
@@ -352,6 +355,8 @@ export function MarketplaceBrowse({
                                     }
                                 })
                             }}
+                            advancedFilters={state.advancedFilters}
+                            onAdvancedFilterChange={state.updateAdvancedFilter}
                         />
                     )}
 
