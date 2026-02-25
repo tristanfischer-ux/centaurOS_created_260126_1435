@@ -243,11 +243,23 @@ export function SpecialistReviewPanel({
         setError(null)
 
         try {
+            // Strip SVG/binary display data before sending to server action.
+            // Module results include base64 SVG views (svgIso, svgTop, etc.) used
+            // for rendering, which can be several MB total and exceed Next.js's
+            // 1MB server action body limit. The review context only needs structural
+            // text data (geometry dimensions, DFM results, etc.) — not the images.
+            const slimModules = allModules.map(m => {
+                if (!m.result) return m
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { svgIso, svgTop, svgFront, svgBack, svgRight, svgLeft, svgExploded, ...rest } = m.result
+                return { ...m, result: rest }
+            })
+
             const req: ReviewRequest = {
                 projectId,
                 moduleId: module.id,
                 specialistId,
-                allModules,
+                allModules: slimModules,
                 designBrief,
                 diagnosticAnswers,
                 projectSubject,
