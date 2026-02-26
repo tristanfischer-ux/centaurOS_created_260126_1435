@@ -582,6 +582,19 @@ export default function CadLabReviewPage(): React.ReactNode {
               </div>
               <div id="bill-of-materials">
                 <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
+                {modules.length > 0 && (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-7 gap-1.5"
+                      onClick={() => router.push(FORGE_ROUTES.cadLabPartsBom)}
+                    >
+                      <Layers className="h-3 w-3" />
+                      View Structured BOM
+                    </Button>
+                  </div>
+                )}
               </div>
               <div id="raw-materials">
                 <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />

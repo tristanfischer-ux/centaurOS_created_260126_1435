@@ -433,3 +433,113 @@ export interface DecompositionCheckpoint {
   /** Time taken in ms */
   checkpointTimeMs: number
 }
+
+// ─── Assembly & Fulfillment Types ────────────────────────────────────
+
+/** Manufacturing process types matching the manufacturing_process_type enum */
+export type ManufacturingProcessType =
+  | "cnc"
+  | "injection_molding"
+  | "sheet_metal"
+  | "3d_print_fdm"
+  | "3d_print_sla"
+  | "3d_print_sls"
+  | "casting"
+  | "forging"
+  | "machining"
+  | "purchased_cots"
+  | "other"
+
+/** A structured part definition with specs, costs, and CAD URLs */
+export interface StructuredPart {
+  /** Database ID (set after save) */
+  id?: string
+  /** Part number unique within the project (e.g., FRAME-001) */
+  partNumber: string
+  /** Human-readable name */
+  name: string
+  /** Description of the part's function */
+  description?: string
+  /** Module ID this part was derived from */
+  sourceModuleId?: string
+  /** Manufacturing process */
+  process?: ManufacturingProcessType
+  /** Material family (e.g., "6061 Aluminium") */
+  material?: string
+  /** Material specification (e.g., "6061-T6") */
+  materialSpec?: string
+  /** Surface finish (e.g., "anodised black") */
+  finish?: string
+  /** Tolerance requirement (e.g., "±0.1mm") */
+  tolerance?: string
+  /** Mass in kilograms */
+  massKg?: number
+  /** Bounding box X in mm */
+  envelopeXMm?: number
+  /** Bounding box Y in mm */
+  envelopeYMm?: number
+  /** Bounding box Z in mm */
+  envelopeZMm?: number
+  /** Estimated unit cost in GBP */
+  estimatedUnitCostGbp?: number
+  /** STEP file URL */
+  stepUrl?: string
+  /** STL file URL */
+  stlUrl?: string
+  /** Drawing URL */
+  drawingUrl?: string
+  /** Whether this part was AI-generated */
+  aiGenerated?: boolean
+  /** AI confidence score (0–1) */
+  aiConfidence?: number
+  /** Whether this is a purchased/COTS part */
+  isPurchased?: boolean
+}
+
+/** A BOM line linking a parent assembly to a child part with quantity */
+export interface BomLine {
+  /** Database ID (set after save) */
+  id?: string
+  /** Project this line belongs to */
+  cadLabProjectId?: string
+  /** Parent assembly part ID (null = top-level) */
+  parentPartId?: string | null
+  /** Child part ID */
+  childPartId: string
+  /** Quantity of child required per parent */
+  quantity: number
+  /** Reference designator (e.g., "M3x8-1") */
+  referenceDesignator?: string
+  /** Notes */
+  notes?: string
+  /** Display order */
+  sortOrder?: number
+}
+
+/** Computed tree node for UI rendering with rollup costs and mass */
+export interface BomTreeNode {
+  /** The part at this node */
+  part: StructuredPart
+  /** BOM line connecting this to its parent (null for root) */
+  bomLine?: BomLine
+  /** Child nodes */
+  children: BomTreeNode[]
+  /** Depth in the tree (0 = root assembly) */
+  depth: number
+  /** Rolled-up total cost (this part × qty + sum of children) */
+  totalCost: number
+  /** Rolled-up total mass (this part × qty + sum of children) */
+  totalMass: number
+}
+
+/** Return type from the AI BOM generation action */
+export interface BomGenerationResult {
+  success: boolean
+  error?: string
+  /** Structured parts created */
+  parts?: StructuredPart[]
+  /** BOM lines created */
+  bomLines?: BomLine[]
+  /** Time taken in ms */
+  generationTimeMs?: number
+}

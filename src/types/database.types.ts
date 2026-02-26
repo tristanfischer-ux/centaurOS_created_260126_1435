@@ -2543,6 +2543,133 @@ export type Database = {
           },
         ]
       }
+      assembly_job_parts: {
+        Row: {
+          assembly_job_id: string
+          created_at: string
+          expected_quantity: number
+          id: string
+          order_line_id: string
+          qc_notes: string | null
+          qc_status: Database["public"]["Enums"]["qc_status"]
+          received_at: string | null
+          received_quantity: number
+          updated_at: string
+        }
+        Insert: {
+          assembly_job_id: string
+          created_at?: string
+          expected_quantity?: number
+          id?: string
+          order_line_id: string
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          received_at?: string | null
+          received_quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          assembly_job_id?: string
+          created_at?: string
+          expected_quantity?: number
+          id?: string
+          order_line_id?: string
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          received_at?: string | null
+          received_quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assembly_job_parts_assembly_job_id_fkey"
+            columns: ["assembly_job_id"]
+            isOneToOne: false
+            referencedRelation: "assembly_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assembly_job_parts_order_line_id_fkey"
+            columns: ["order_line_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_order_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assembly_jobs: {
+        Row: {
+          assembler_id: string
+          assembly_part_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          manufacturing_order_id: string
+          notes: string | null
+          qc_notes: string | null
+          qc_status: Database["public"]["Enums"]["qc_status"]
+          shipped_at: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["assembly_job_status"]
+          tracking_reference: string | null
+          updated_at: string
+        }
+        Insert: {
+          assembler_id: string
+          assembly_part_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          manufacturing_order_id: string
+          notes?: string | null
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          shipped_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assembly_job_status"]
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assembler_id?: string
+          assembly_part_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          manufacturing_order_id?: string
+          notes?: string | null
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          shipped_at?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["assembly_job_status"]
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assembly_jobs_assembler_id_fkey"
+            columns: ["assembler_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_capabilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assembly_jobs_assembly_part_id_fkey"
+            columns: ["assembly_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assembly_jobs_manufacturing_order_id_fkey"
+            columns: ["manufacturing_order_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assembly_templates: {
         Row: {
           category: string
@@ -3260,6 +3387,67 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "blueprint_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bom_lines: {
+        Row: {
+          cad_lab_project_id: string
+          child_part_id: string
+          created_at: string
+          id: string
+          notes: string | null
+          parent_part_id: string | null
+          quantity: number
+          reference_designator: string | null
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          cad_lab_project_id: string
+          child_part_id: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_part_id?: string | null
+          quantity?: number
+          reference_designator?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          cad_lab_project_id?: string
+          child_part_id?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          parent_part_id?: string | null
+          quantity?: number
+          reference_designator?: string | null
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bom_lines_cad_lab_project_id_fkey"
+            columns: ["cad_lab_project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_lines_child_part_id_fkey"
+            columns: ["child_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bom_lines_parent_part_id_fkey"
+            columns: ["parent_part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
             referencedColumns: ["id"]
           },
         ]
@@ -6965,6 +7153,82 @@ export type Database = {
           },
         ]
       }
+      fulfillment_capabilities: {
+        Row: {
+          capability: Database["public"]["Enums"]["fulfillment_capability_type"]
+          certifications: string[] | null
+          created_at: string
+          id: string
+          is_active: boolean
+          location_country: string | null
+          location_postcode: string | null
+          materials: string[] | null
+          max_concurrent_jobs: number | null
+          processes:
+            | Database["public"]["Enums"]["manufacturing_process_type"][]
+            | null
+          provider_profile_id: string
+          typical_lead_days: number | null
+          updated_at: string
+        }
+        Insert: {
+          capability: Database["public"]["Enums"]["fulfillment_capability_type"]
+          certifications?: string[] | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_country?: string | null
+          location_postcode?: string | null
+          materials?: string[] | null
+          max_concurrent_jobs?: number | null
+          processes?:
+            | Database["public"]["Enums"]["manufacturing_process_type"][]
+            | null
+          provider_profile_id: string
+          typical_lead_days?: number | null
+          updated_at?: string
+        }
+        Update: {
+          capability?: Database["public"]["Enums"]["fulfillment_capability_type"]
+          certifications?: string[] | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          location_country?: string | null
+          location_postcode?: string | null
+          materials?: string[] | null
+          max_concurrent_jobs?: number | null
+          processes?:
+            | Database["public"]["Enums"]["manufacturing_process_type"][]
+            | null
+          provider_profile_id?: string
+          typical_lead_days?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fulfillment_capabilities_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fulfillment_capabilities_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "fulfillment_capabilities_provider_profile_id_fkey"
+            columns: ["provider_profile_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+        ]
+      }
       funding_requirements: {
         Row: {
           amount_usd: number | null
@@ -7876,6 +8140,162 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      manufacturing_order_lines: {
+        Row: {
+          assigned_provider_id: string | null
+          created_at: string
+          destination_node_id: string | null
+          id: string
+          manufacturing_order_id: string
+          part_id: string
+          qc_notes: string | null
+          qc_status: Database["public"]["Enums"]["qc_status"]
+          quantity: number
+          quoted_lead_days: number | null
+          quoted_unit_price_gbp: number | null
+          received_at: string | null
+          shipped_at: string | null
+          status: Database["public"]["Enums"]["order_line_status"]
+          tracking_reference: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          destination_node_id?: string | null
+          id?: string
+          manufacturing_order_id: string
+          part_id: string
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          quantity?: number
+          quoted_lead_days?: number | null
+          quoted_unit_price_gbp?: number | null
+          received_at?: string | null
+          shipped_at?: string | null
+          status?: Database["public"]["Enums"]["order_line_status"]
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_provider_id?: string | null
+          created_at?: string
+          destination_node_id?: string | null
+          id?: string
+          manufacturing_order_id?: string
+          part_id?: string
+          qc_notes?: string | null
+          qc_status?: Database["public"]["Enums"]["qc_status"]
+          quantity?: number
+          quoted_lead_days?: number | null
+          quoted_unit_price_gbp?: number | null
+          received_at?: string | null
+          shipped_at?: string | null
+          status?: Database["public"]["Enums"]["order_line_status"]
+          tracking_reference?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturing_order_lines_assigned_provider_id_fkey"
+            columns: ["assigned_provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturing_order_lines_assigned_provider_id_fkey"
+            columns: ["assigned_provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_stats"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "manufacturing_order_lines_assigned_provider_id_fkey"
+            columns: ["assigned_provider_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["provider_id"]
+          },
+          {
+            foreignKeyName: "manufacturing_order_lines_destination_node_id_fkey"
+            columns: ["destination_node_id"]
+            isOneToOne: false
+            referencedRelation: "fulfillment_capabilities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturing_order_lines_manufacturing_order_id_fkey"
+            columns: ["manufacturing_order_id"]
+            isOneToOne: false
+            referencedRelation: "manufacturing_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manufacturing_order_lines_part_id_fkey"
+            columns: ["part_id"]
+            isOneToOne: false
+            referencedRelation: "parts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manufacturing_orders: {
+        Row: {
+          cad_lab_project_id: string | null
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          notes: string | null
+          order_number: string
+          required_by: string | null
+          shipping_address: Json | null
+          status: Database["public"]["Enums"]["manufacturing_order_status"]
+          title: string | null
+          total_estimated_cost_gbp: number | null
+          updated_at: string
+        }
+        Insert: {
+          cad_lab_project_id?: string | null
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          id?: string
+          notes?: string | null
+          order_number: string
+          required_by?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["manufacturing_order_status"]
+          title?: string | null
+          total_estimated_cost_gbp?: number | null
+          updated_at?: string
+        }
+        Update: {
+          cad_lab_project_id?: string | null
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          id?: string
+          notes?: string | null
+          order_number?: string
+          required_by?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["manufacturing_order_status"]
+          title?: string | null
+          total_estimated_cost_gbp?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manufacturing_orders_cad_lab_project_id_fkey"
+            columns: ["cad_lab_project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -10247,6 +10667,101 @@ export type Database = {
             columns: ["pack_id"]
             isOneToOne: false
             referencedRelation: "objective_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      parts: {
+        Row: {
+          ai_confidence: number | null
+          ai_generated: boolean
+          cad_lab_project_id: string
+          created_at: string
+          description: string | null
+          drawing_url: string | null
+          envelope_x_mm: number | null
+          envelope_y_mm: number | null
+          envelope_z_mm: number | null
+          estimated_unit_cost_gbp: number | null
+          finish: string | null
+          id: string
+          is_purchased: boolean
+          mass_kg: number | null
+          material: string | null
+          material_spec: string | null
+          name: string
+          part_number: string
+          process:
+            | Database["public"]["Enums"]["manufacturing_process_type"]
+            | null
+          source_module_id: string | null
+          step_url: string | null
+          stl_url: string | null
+          tolerance: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_confidence?: number | null
+          ai_generated?: boolean
+          cad_lab_project_id: string
+          created_at?: string
+          description?: string | null
+          drawing_url?: string | null
+          envelope_x_mm?: number | null
+          envelope_y_mm?: number | null
+          envelope_z_mm?: number | null
+          estimated_unit_cost_gbp?: number | null
+          finish?: string | null
+          id?: string
+          is_purchased?: boolean
+          mass_kg?: number | null
+          material?: string | null
+          material_spec?: string | null
+          name: string
+          part_number: string
+          process?:
+            | Database["public"]["Enums"]["manufacturing_process_type"]
+            | null
+          source_module_id?: string | null
+          step_url?: string | null
+          stl_url?: string | null
+          tolerance?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_confidence?: number | null
+          ai_generated?: boolean
+          cad_lab_project_id?: string
+          created_at?: string
+          description?: string | null
+          drawing_url?: string | null
+          envelope_x_mm?: number | null
+          envelope_y_mm?: number | null
+          envelope_z_mm?: number | null
+          estimated_unit_cost_gbp?: number | null
+          finish?: string | null
+          id?: string
+          is_purchased?: boolean
+          mass_kg?: number | null
+          material?: string | null
+          material_spec?: string | null
+          name?: string
+          part_number?: string
+          process?:
+            | Database["public"]["Enums"]["manufacturing_process_type"]
+            | null
+          source_module_id?: string | null
+          step_url?: string | null
+          stl_url?: string | null
+          tolerance?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "parts_cad_lab_project_id_fkey"
+            columns: ["cad_lab_project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -18108,6 +18623,14 @@ export type Database = {
         | "support"
         | "finance"
         | "readonly"
+      assembly_job_status:
+        | "awaiting_parts"
+        | "parts_received"
+        | "in_assembly"
+        | "qc_check"
+        | "packed"
+        | "shipped"
+        | "delivered"
       conversation_type:
         | "direct"
         | "task"
@@ -18131,6 +18654,7 @@ export type Database = {
         | "refunded"
         | "partial_refund"
       feedback_category: "bug" | "idea" | "confusion" | "praise"
+      fulfillment_capability_type: "make" | "assemble" | "kit_and_ship"
       funding_stage:
         | "Pre-Seed"
         | "Seed"
@@ -18139,6 +18663,27 @@ export type Database = {
         | "Growth"
         | "Bridge"
       legal_structure: "Ltd" | "Inc" | "LLC" | "GmbH" | "PLC" | "Other"
+      manufacturing_order_status:
+        | "draft"
+        | "quoting"
+        | "confirmed"
+        | "in_production"
+        | "assembling"
+        | "shipping"
+        | "delivered"
+        | "cancelled"
+      manufacturing_process_type:
+        | "cnc"
+        | "injection_molding"
+        | "sheet_metal"
+        | "3d_print_fdm"
+        | "3d_print_sla"
+        | "3d_print_sls"
+        | "casting"
+        | "forging"
+        | "machining"
+        | "purchased_cots"
+        | "other"
       marketplace_category:
         | "People"
         | "Products"
@@ -18149,6 +18694,15 @@ export type Database = {
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
       offboarding_action: "reassign_delete" | "soft_delete" | "anonymize"
+      order_line_status:
+        | "pending_quote"
+        | "quoted"
+        | "accepted"
+        | "in_production"
+        | "shipped"
+        | "received_at_node"
+        | "rejected"
+        | "cancelled"
       order_status:
         | "pending"
         | "accepted"
@@ -18174,6 +18728,7 @@ export type Database = {
         | "Fabrication"
       qa_test_environment: "staging" | "production"
       qa_test_status: "pending" | "running" | "passed" | "failed" | "cancelled"
+      qc_status: "pending" | "passed" | "failed" | "waived"
       rfq_status:
         | "Open"
         | "Bidding"
@@ -18340,6 +18895,15 @@ export const Constants = {
         "finance",
         "readonly",
       ],
+      assembly_job_status: [
+        "awaiting_parts",
+        "parts_received",
+        "in_assembly",
+        "qc_check",
+        "packed",
+        "shipped",
+        "delivered",
+      ],
       conversation_type: [
         "direct",
         "task",
@@ -18366,6 +18930,7 @@ export const Constants = {
         "partial_refund",
       ],
       feedback_category: ["bug", "idea", "confusion", "praise"],
+      fulfillment_capability_type: ["make", "assemble", "kit_and_ship"],
       funding_stage: [
         "Pre-Seed",
         "Seed",
@@ -18375,11 +18940,44 @@ export const Constants = {
         "Bridge",
       ],
       legal_structure: ["Ltd", "Inc", "LLC", "GmbH", "PLC", "Other"],
+      manufacturing_order_status: [
+        "draft",
+        "quoting",
+        "confirmed",
+        "in_production",
+        "assembling",
+        "shipping",
+        "delivered",
+        "cancelled",
+      ],
+      manufacturing_process_type: [
+        "cnc",
+        "injection_molding",
+        "sheet_metal",
+        "3d_print_fdm",
+        "3d_print_sla",
+        "3d_print_sls",
+        "casting",
+        "forging",
+        "machining",
+        "purchased_cots",
+        "other",
+      ],
       marketplace_category: ["People", "Products", "Services", "AI", "Finance"],
       member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],
       offboarding_action: ["reassign_delete", "soft_delete", "anonymize"],
+      order_line_status: [
+        "pending_quote",
+        "quoted",
+        "accepted",
+        "in_production",
+        "shipped",
+        "received_at_node",
+        "rejected",
+        "cancelled",
+      ],
       order_status: [
         "pending",
         "accepted",
@@ -18408,6 +19006,7 @@ export const Constants = {
       ],
       qa_test_environment: ["staging", "production"],
       qa_test_status: ["pending", "running", "passed", "failed", "cancelled"],
+      qc_status: ["pending", "passed", "failed", "waived"],
       rfq_status: [
         "Open",
         "Bidding",
