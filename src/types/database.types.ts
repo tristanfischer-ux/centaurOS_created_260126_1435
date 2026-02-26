@@ -13200,7 +13200,7 @@ export type Database = {
           foundry_id: string
           id: string
           row_number: number
-          sheet_tab_gid: number
+          sheet_tab_gid: string
           sheet_tab_name: string
           spreadsheet_id: string
           updated_at: string | null
@@ -13212,7 +13212,7 @@ export type Database = {
           foundry_id: string
           id?: string
           row_number: number
-          sheet_tab_gid: number
+          sheet_tab_gid: string
           sheet_tab_name: string
           spreadsheet_id: string
           updated_at?: string | null
@@ -13224,7 +13224,7 @@ export type Database = {
           foundry_id?: string
           id?: string
           row_number?: number
-          sheet_tab_gid?: number
+          sheet_tab_gid?: string
           sheet_tab_name?: string
           spreadsheet_id?: string
           updated_at?: string | null
@@ -17009,6 +17009,10 @@ export type Database = {
       increment_search_count: {
         Args: { search_query: string }
         Returns: undefined
+      }
+      increment_sync_version: {
+        Args: { p_foundry_id: string; p_service_type: string }
+        Returns: number
       }
       insert_agent_insight: {
         Args: {
