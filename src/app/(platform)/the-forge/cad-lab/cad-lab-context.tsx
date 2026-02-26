@@ -26,6 +26,7 @@ import { createClient } from "@/lib/supabase/client"
 import {
   runCadLabResearch,
   generateCadLabInterface,
+  prepareDecomposition,
   decomposeIntoModules,
   prefillDiagnostics,
   generateSystemAssembly,
@@ -557,24 +558,41 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (!editableReport.trim()) return
     setIsDecomposing(true)
     setProgressLines([])
-    addProgressLine("Parsing research report for engineering constraints...")
 
-    // Timed micro-steps that reveal the decomposition work in progress.
-    // Each fires only if the operation is still running (cleared on completion).
-    const timers: ReturnType<typeof setTimeout>[] = []
-    timers.push(setTimeout(() => addProgressLine("Identifying physical interfaces and thermal boundaries..."), 2500))
-    timers.push(setTimeout(() => addProgressLine("Mapping sub-assembly dependencies and critical-path components..."), 5000))
-    timers.push(setTimeout(() => addProgressLine("Classifying modules by manufacturing process (CNC, molding, sheet metal, 3D print)..."), 8000))
-    timers.push(setTimeout(() => addProgressLine("Estimating lead times and sourcing complexity per sub-assembly..."), 12000))
-    timers.push(setTimeout(() => addProgressLine("Analysing failure modes and unknown risk areas..."), 16000))
-    timers.push(setTimeout(() => addProgressLine("Determining parallel manufacturing splits for schedule optimisation..."), 20000))
-    timers.push(setTimeout(() => addProgressLine("Finalising bill of materials and key part specifications..."), 25000))
-    timers.push(setTimeout(() => addProgressLine("Structuring module hierarchy for parametric CAD generation..."), 30000))
+    // ── Phase 1: Preparation (real ~1-2s Claude call for domain detection) ──
+    addProgressLine("Analysing research report to detect engineering domain...")
+
+    let domainHint: Parameters<typeof decomposeIntoModules>[3]
+    try {
+      const prep = await prepareDecomposition(subject, editableReport)
+      domainHint = prep.domain
+      addProgressLine(`Engineering domain: ${prep.domainLabel}`)
+      addProgressLine(`Decomposition prompt prepared — ~${prep.estimatedInputTokens.toLocaleString()} input tokens`)
+    } catch {
+      // Non-fatal — proceed without domain hint, decomposeIntoModules will detect itself
+      addProgressLine("Domain detection skipped — proceeding with auto-detect")
+    }
+
+    // ── Phase 2: API call (real wait, with truthful padding timers) ──
+    addProgressLine(`Applied ${domainHint ?? "auto-detected"} domain constraints to analysis`)
+    addProgressLine("Claude is decomposing into physical sub-assemblies...")
+
+    // INTENT: These timers describe what the prompt actually instructs Claude to do.
+    // They are truthful statements, not fake completion steps.
+    const paddingTimers: ReturnType<typeof setTimeout>[] = []
+    paddingTimers.push(setTimeout(() => addProgressLine("Targeting 4–8 independent modules optimised for parallel manufacturing"), 5000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Each module assessed for: interfaces, key parts, lead times, failure modes"), 10000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, 3D print"), 16000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Mapping input/output dependencies between sub-assemblies"), 22000))
+
+    const apiStart = Date.now()
 
     try {
-      const res = await decomposeIntoModules(subject, editableReport, modelId)
-      // Clear any pending timers now that the real result is in
-      timers.forEach(clearTimeout)
+      const res = await decomposeIntoModules(subject, editableReport, modelId, domainHint)
+      // Clear any pending padding timers now that the real result is in
+      paddingTimers.forEach(clearTimeout)
+
+      const elapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
 
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
@@ -600,12 +618,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const totalRisks = res.modules.reduce((s, m) => s + m.failureModes.length + m.unknowns.length, 0)
         const criticalModule = res.modules.find(m => m.leadWeeks === criticalPath)
 
+        // ── Phase 3: Real results ──
         setProgressLines([
-          `Identified ${res.modules.length} sub-assemblies from systems engineering analysis`,
-          `${totalParts} components mapped with specifications and sourcing data`,
+          `Response received in ${elapsed}s (${res.tokensOut.toLocaleString()} tokens generated)`,
+          `Parsed ${res.modules.length} physical modules from response`,
+          `${totalParts} components mapped across all sub-assemblies`,
           `Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`,
           ...(totalRisks > 0 ? [`${totalRisks} risk items flagged for engineering review`] : []),
-          `${res.modules.filter(m => m.unknowns.length > 0).length} modules have open questions to resolve before manufacturing`,
         ])
         if (activeProjectId) {
           await saveCadLabModules(activeProjectId, res.modules)
@@ -709,7 +728,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         }
       }
     } catch (err) {
-      timers.forEach(clearTimeout)
+      paddingTimers.forEach(clearTimeout)
       console.error("[CAD-LAB] Decomposition failed:", err)
       setProgressLines(["Decomposition failed — see error above"])
     } finally {

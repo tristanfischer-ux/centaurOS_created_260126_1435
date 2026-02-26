@@ -12,6 +12,30 @@ export type CadLabDomain = "electronics" | "mechanical" | "electromechanical" | 
 
 const DOMAIN_VALUES: CadLabDomain[] = ["electronics", "mechanical", "electromechanical", "fluid"]
 
+// ─── Human-readable domain labels & descriptions ─────────────────────
+
+const DOMAIN_LABELS: Record<CadLabDomain, string> = {
+  electronics: "Electronics & PCB",
+  mechanical: "Mechanical & Structural",
+  electromechanical: "Electromechanical & Robotics",
+  fluid: "Fluid Systems",
+}
+
+const DOMAIN_DESCRIPTIONS: Record<CadLabDomain, string> = {
+  electronics: "Component footprints, thermal specs, EMC constraints, and connector positions",
+  mechanical: "Structural loads, material selection, DFM, and machining constraints",
+  electromechanical: "Motor/actuator dimensions, power budgets, wire routing, and structural interfaces",
+  fluid: "Port sizes, pressure ratings, sealing surfaces, and flow-path analysis",
+}
+
+export function getDomainLabel(domain: CadLabDomain): string {
+  return DOMAIN_LABELS[domain]
+}
+
+export function getDomainDescription(domain: CadLabDomain): string {
+  return DOMAIN_DESCRIPTIONS[domain]
+}
+
 const DETECT_FROM_REPORT_PROMPT = `You are classifying an engineering research report into exactly one domain. Reply with ONLY one word from this list: electronics, mechanical, electromechanical, fluid.
 
 - electronics: PCB design, component selection, thermal management, EMC, ICs, connectors, power supplies

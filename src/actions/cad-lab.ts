@@ -44,6 +44,8 @@ import {
   getResearchSynthesisPrompt,
   getModuleDecompositionPrompt,
   getDiagnosticsSystemPrompt,
+  getDomainLabel,
+  getDomainDescription,
 } from "@/lib/cad-lab/domain-prompts"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
 import {
@@ -1429,6 +1431,48 @@ Generate CadQuery Python code that:
       tokensOut: totalTokensOut,
       modelUsed: modelId,
     }
+  }
+}
+
+// ─── Decomposition Preparation (exported) ────────────────────────────
+
+/**
+ * Prepares for module decomposition by detecting domain and estimating tokens.
+ *
+ * @description Surfaces the domain-detection Claude call as a visible progress
+ * step so the UI can report real status instead of fake timers.
+ *
+ * @param description - Product description
+ * @param researchReport - Research report from Step 1
+ * @returns Domain info and estimated input token count
+ */
+export async function prepareDecomposition(
+  description: string,
+  researchReport: string,
+): Promise<{
+  domain: CadLabDomain
+  domainLabel: string
+  domainDescription: string
+  estimatedInputTokens: number
+}> {
+  // AUTH: Verify user is authenticated (no rate limit — that stays in decomposeIntoModules)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error("Unauthorized")
+
+  const domain = await detectDomainFromResearchReport(researchReport)
+  const prompt = getModuleDecompositionPrompt(domain)
+
+  // INTENT: Rough token estimate so the UI can display an honest number.
+  // ~4 chars per token is a standard approximation for English text.
+  const userPrompt = `Product: ${description}\n\nResearch Report:\n${researchReport}\n\nDecompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
+  const estimatedInputTokens = Math.round((prompt.length + userPrompt.length) / 4)
+
+  return {
+    domain,
+    domainLabel: getDomainLabel(domain),
+    domainDescription: getDomainDescription(domain),
+    estimatedInputTokens,
   }
 }
 

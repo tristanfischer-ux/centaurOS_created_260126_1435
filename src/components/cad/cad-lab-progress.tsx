@@ -29,9 +29,9 @@ const OPERATION_EXPLAINERS: Record<string, string[]> = {
     "Identifying material candidates, manufacturing constraints, and dimensional tolerances from industry data.",
   ],
   breakdown: [
-    "Running systems engineering analysis — identifying physical interfaces, thermal boundaries, and manufacturing splits.",
-    "Mapping sub-assembly dependencies, lead times, and critical-path components for parallel manufacturing.",
-    "Classifying each module by manufacturing process: CNC, injection molding, sheet metal, 3D printing, or COTS.",
+    "Detecting engineering domain from your research report, then building a domain-specific decomposition prompt.",
+    "Claude is analysing the full research report to identify 4–8 independent physical sub-assemblies with realistic lead times.",
+    "Each module is assessed for interfaces, key parts, failure modes, and manufacturing process compatibility.",
   ],
   generate: [
     "Writing parametric CadQuery code. Unlike static STEP files, parametric models rebuild automatically when any dimension changes.",
