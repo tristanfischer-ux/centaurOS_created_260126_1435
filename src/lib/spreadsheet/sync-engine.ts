@@ -23,7 +23,7 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import type { SpreadsheetProvider, CellColor, ProviderType } from './provider'
+import type { SpreadsheetProvider, CellColor } from './provider'
 
 // ============================================================
 // Types
@@ -59,7 +59,7 @@ interface TaskRow {
 // ============================================================
 
 // DECISION: Task ID is in column A (hidden) to enable row mapping from Sheets back to ForgeOS.
-const MASTER_HEADERS = [
+export const MASTER_HEADERS = [
     'Task ID', 'Task #', 'Strategic Goal', 'Objective', 'Task Title',
     'Description', 'Assignee', 'Status', 'Start Date', 'End Date',
     'Progress %', 'Risk Level',
@@ -78,17 +78,6 @@ const VALID_RISK_LEVELS = ['Low', 'Medium', 'High']
 // Read-only column indices (0-based) — Task ID, Task #, Strategic Goal, Objective
 const MASTER_READONLY_COLS = [0, 1, 2, 3]
 const PERSON_READONLY_COLS = [0, 1, 2, 3]
-
-// ============================================================
-// Provider Resolution
-// ============================================================
-
-/**
- * Get the service_type used in foundry_integrations for a given provider.
- */
-export function serviceTypeForProvider(providerType: ProviderType): string {
-    return providerType // 'google_sheets' or 'microsoft_excel'
-}
 
 // ============================================================
 // Spreadsheet Lifecycle
@@ -821,31 +810,23 @@ async function rebuildGanttTab(
 // ============================================================
 
 /**
- * Increment the sync version counter.
+ * Atomically increment the sync version counter via database RPC.
+ * Uses SELECT ... FOR UPDATE to prevent race conditions.
  */
 export async function incrementSyncVersion(foundryId: string, serviceType: string): Promise<number> {
     const admin = createAdminClient()
 
-    const { data } = await admin
-        .from('foundry_integrations')
-        .select('config')
-        .eq('foundry_id', foundryId)
-        .eq('service_type', serviceType)
-        .single()
+    const { data, error } = await admin.rpc('increment_sync_version', {
+        p_foundry_id: foundryId,
+        p_service_type: serviceType,
+    })
 
-    const config = (data?.config as Record<string, unknown>) || {}
-    const currentVersion = (config.sync_version as number) || 0
-    const newVersion = currentVersion + 1
+    if (error) {
+        console.error('[SyncEngine] increment_sync_version RPC failed:', { foundryId, serviceType, error: error.message })
+        throw new Error(`Failed to increment sync version: ${error.message}`)
+    }
 
-    await admin
-        .from('foundry_integrations')
-        .update({
-            config: { ...config, sync_version: newVersion },
-        })
-        .eq('foundry_id', foundryId)
-        .eq('service_type', serviceType)
-
-    return newVersion
+    return data as number
 }
 
 /**

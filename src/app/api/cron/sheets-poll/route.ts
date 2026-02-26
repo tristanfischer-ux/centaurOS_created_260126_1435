@@ -32,12 +32,6 @@ const EDITABLE_COLUMNS = [
     'Start Date', 'End Date', 'Progress %', 'Risk Level',
 ]
 
-const MASTER_HEADERS = [
-    'Task ID', 'Task #', 'Strategic Goal', 'Objective', 'Task Title',
-    'Description', 'Assignee', 'Status', 'Start Date', 'End Date',
-    'Progress %', 'Risk Level',
-]
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
     // SECURITY: Validate cron secret
     const authHeader = req.headers.get('authorization')
