@@ -12,6 +12,7 @@ import {
     Bell,
     Shield,
     Mail,
+    FileSpreadsheet,
 } from 'lucide-react'
 
 /**
@@ -99,6 +100,22 @@ export default async function SettingsPage() {
                         </CardHeader>
                         <CardContent>
                             <CardDescription>Exercise your GDPR rights: access, export, or delete your data.</CardDescription>
+                        </CardContent>
+                    </Card>
+                </Link>
+
+                <Link href="/settings/integrations" className="block">
+                    <Card className="h-full hover:shadow-md transition-shadow">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center gap-2">
+                                <div className="p-2 rounded-lg bg-success/10 text-success">
+                                    <FileSpreadsheet className="h-5 w-5" />
+                                </div>
+                                <CardTitle className="text-base">Integrations</CardTitle>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <CardDescription>Sync tasks and objectives to Google Sheets for your whole team.</CardDescription>
                         </CardContent>
                     </Card>
                 </Link>

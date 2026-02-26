@@ -24,6 +24,11 @@ export const GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.send',
 ] as const
 
+/** Scopes needed for Google Sheets read/write (used by Service Account) */
+export const SHEETS_SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+] as const
+
 /** Base profile scopes always requested */
 export const BASE_SCOPES = [
     'openid',
@@ -37,6 +42,7 @@ export const ALL_SCOPES = [
     ...CALENDAR_SCOPES,
     ...DRIVE_SCOPES,
     ...GMAIL_SCOPES,
+    ...SHEETS_SCOPES,
 ] as const
 
 /**
@@ -46,7 +52,7 @@ export const ALL_SCOPES = [
  * @returns Combined scope array with no duplicates
  */
 export function getScopesForFeatures(
-    features: ('calendar' | 'drive' | 'gmail')[]
+    features: ('calendar' | 'drive' | 'gmail' | 'sheets')[]
 ): string[] {
     const scopes = new Set<string>([...BASE_SCOPES])
 
@@ -60,6 +66,9 @@ export function getScopesForFeatures(
                 break
             case 'gmail':
                 GMAIL_SCOPES.forEach(s => scopes.add(s))
+                break
+            case 'sheets':
+                SHEETS_SCOPES.forEach(s => scopes.add(s))
                 break
         }
     }
@@ -76,7 +85,7 @@ export function getScopesForFeatures(
  */
 export function hasRequiredScopes(
     grantedScopes: string[],
-    requiredFeature: 'calendar' | 'drive' | 'gmail'
+    requiredFeature: 'calendar' | 'drive' | 'gmail' | 'sheets'
 ): boolean {
     const required = getScopesForFeatures([requiredFeature])
     return required.every(scope => grantedScopes.includes(scope))
