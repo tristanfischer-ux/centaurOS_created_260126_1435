@@ -95,6 +95,29 @@ export function MarketplaceBrowse({
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
+    // Shared compare selection state (lifted from MarketplaceListingGrid)
+    const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
+
+    const toggleCompareSelection = useCallback((id: string) => {
+        setSelectedForCompare(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) {
+                next.delete(id)
+            } else {
+                if (next.size >= 4) {
+                    toast.error('Compare up to 4 items at a time')
+                    return prev
+                }
+                next.add(id)
+            }
+            return next
+        })
+    }, [])
+
+    const clearCompareSelection = useCallback(() => {
+        setSelectedForCompare(new Set())
+    }, [])
+
     // Handle recommendation click
     const handleApplyRecommendation = useCallback((category: MarketplaceCategory, searchTerm?: string) => {
         if (category !== 'All') {
@@ -158,16 +181,17 @@ export function MarketplaceBrowse({
         }
     }, [state])
 
-    // Enter compare mode from browse
-    const handleCompareFromBrowse = useCallback((listings: MarketplaceListing[]) => {
-        if (listings.length < 2) {
+    // Enter compare mode from browse (reads from shared selection state)
+    const handleCompareFromBrowse = useCallback(() => {
+        const selected = state.filteredListings.filter(l => selectedForCompare.has(l.id))
+        if (selected.length < 2) {
             toast.error('Select at least 2 items to compare')
             return
         }
-        setCompareListings(listings)
+        setCompareListings(selected)
         setCompareOrigin('browse')
         setActiveTab('compare')
-    }, [])
+    }, [state.filteredListings, selectedForCompare])
 
     // Enter compare mode from saved
     const handleCompareFromSaved = useCallback((listings: MarketplaceListing[]) => {
@@ -420,6 +444,9 @@ export function MarketplaceBrowse({
                         onCompare={handleCompareFromBrowse}
                         hasActiveFilters={state.hasActiveFilters}
                         onClearFilters={state.clearFilters}
+                        selectedForCompare={selectedForCompare}
+                        onToggleCompare={toggleCompareSelection}
+                        onClearCompareSelection={clearCompareSelection}
                         hasMore={state.hasMore}
                         isLoadingMore={state.isLoadingMore}
                         onLoadMore={state.loadMore}
@@ -451,6 +478,9 @@ export function MarketplaceBrowse({
             <MarketplaceDetailDialog
                 listing={state.selectedListing}
                 onClose={() => state.setSelectedListing(null)}
+                isSelectedForCompare={state.selectedListing ? selectedForCompare.has(state.selectedListing.id) : false}
+                onToggleCompare={toggleCompareSelection}
+                compareCount={selectedForCompare.size}
             />
         </div>
     )

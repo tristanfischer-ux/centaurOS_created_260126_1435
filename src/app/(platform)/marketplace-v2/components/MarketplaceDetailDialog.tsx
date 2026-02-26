@@ -40,6 +40,7 @@ import {
     Calendar,
     Globe,
     Mail,
+    Scale,
 } from 'lucide-react'
 import Link from 'next/link'
 import { ActOnThisButton } from '@/components/smart/act-on-this-button'
@@ -52,6 +53,12 @@ import type { MarketplaceListing } from '@/actions/marketplace'
 interface MarketplaceDetailDialogProps {
     listing: MarketplaceListing | null
     onClose: () => void
+    /** Whether this listing is currently in the compare selection. */
+    isSelectedForCompare?: boolean
+    /** Toggle a listing in/out of the compare selection. */
+    onToggleCompare?: (id: string) => void
+    /** Number of items currently selected for compare. */
+    compareCount?: number
 }
 
 function getAIIcon(subcategory: string): React.ComponentType<{ className?: string }> {
@@ -131,7 +138,7 @@ function CompanyDetailsSection({ attrs }: { attrs: Record<string, unknown> }) {
     )
 }
 
-export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailDialogProps) {
+export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare, onToggleCompare, compareCount = 0 }: MarketplaceDetailDialogProps) {
     const [isSendingEnquiry, setIsSendingEnquiry] = useState(false)
 
     if (!listing) return null
@@ -333,6 +340,39 @@ export function MarketplaceDetailDialog({ listing, onClose }: MarketplaceDetailD
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-3">
+                                {/* Compare toggle */}
+                                {onToggleCompare && (
+                                    <Button
+                                        variant={isSelectedForCompare ? 'default' : 'outline'}
+                                        className={cn(
+                                            'gap-2 h-12',
+                                            isSelectedForCompare
+                                                ? 'bg-international-orange hover:bg-international-orange/90 text-white'
+                                                : 'border-international-orange/30 text-international-orange hover:bg-international-orange/5'
+                                        )}
+                                        onClick={() => {
+                                            onToggleCompare(listing.id)
+                                            if (isSelectedForCompare) {
+                                                toast('Removed from compare')
+                                            } else {
+                                                toast(`Added to compare (${compareCount + 1} of 4)`)
+                                            }
+                                        }}
+                                    >
+                                        <Scale className={cn('w-4 h-4', isSelectedForCompare && 'fill-current')} />
+                                        {isSelectedForCompare ? (
+                                            <>
+                                                In Compare List
+                                                <Badge variant="secondary" className="ml-1 bg-white/20 text-white border-0 text-[10px] px-1.5 py-0">
+                                                    {compareCount}
+                                                </Badge>
+                                            </>
+                                        ) : (
+                                            'Add to Compare'
+                                        )}
+                                    </Button>
+                                )}
+
                                 {/* Invite to Company — shown to Founders for real People listings */}
                                 <InviteToCompanyButton listing={listing} />
 

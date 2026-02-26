@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { MarketCardV2 } from './MarketCardV2'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
@@ -42,9 +42,16 @@ interface MarketplaceListingGridProps {
     savedIds: Set<string>
     onSaveToggle: (id: string) => void
     onViewDetail: (listing: MarketplaceListing) => void
-    onCompare: (listings: MarketplaceListing[]) => void
+    /** Triggers compare view — parent builds the listing list from shared state. */
+    onCompare: () => void
     hasActiveFilters: boolean
     onClearFilters: () => void
+    /** Shared compare selection state (lifted to parent). */
+    selectedForCompare: Set<string>
+    /** Toggle a listing in/out of the compare selection. */
+    onToggleCompare: (id: string) => void
+    /** Clear all compare selections. */
+    onClearCompareSelection: () => void
     /** Whether more results are available (for infinite scroll). */
     hasMore?: boolean
     /** True while the next page is loading. */
@@ -266,37 +273,14 @@ export function MarketplaceListingGrid({
     onCompare,
     hasActiveFilters,
     onClearFilters,
+    selectedForCompare,
+    onToggleCompare,
+    onClearCompareSelection,
     hasMore = false,
     isLoadingMore = false,
     onLoadMore,
 }: MarketplaceListingGridProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('cards')
-    const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
-
-    const toggleCompare = useCallback((id: string) => {
-        setSelectedForCompare(prev => {
-            const next = new Set(prev)
-            if (next.has(id)) {
-                next.delete(id)
-            } else {
-                if (next.size >= 4) {
-                    toast.error('Compare up to 4 items at a time')
-                    return prev
-                }
-                next.add(id)
-            }
-            return next
-        })
-    }, [])
-
-    const handleCompare = useCallback(() => {
-        const selected = listings.filter(l => selectedForCompare.has(l.id))
-        onCompare(selected)
-    }, [listings, selectedForCompare, onCompare])
-
-    const clearCompareSelection = useCallback(() => {
-        setSelectedForCompare(new Set())
-    }, [])
 
     if (listings.length === 0) {
         return (
@@ -331,7 +315,7 @@ export function MarketplaceListingGrid({
                             </Badge>
                             <Button
                                 size="sm"
-                                onClick={handleCompare}
+                                onClick={onCompare}
                                 disabled={selectedForCompare.size < 2}
                                 className="gap-1.5 h-7 text-xs"
                             >
@@ -341,7 +325,7 @@ export function MarketplaceListingGrid({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={clearCompareSelection}
+                                onClick={onClearCompareSelection}
                                 className="gap-1 h-7 text-xs text-muted-foreground"
                             >
                                 <X className="w-3 h-3" />
@@ -371,7 +355,7 @@ export function MarketplaceListingGrid({
                             isSelectedForCompare={selectedForCompare.has(listing.id)}
                             onSaveToggle={onSaveToggle}
                             onViewDetail={onViewDetail}
-                            onToggleCompare={toggleCompare}
+                            onToggleCompare={onToggleCompare}
                         />
                     ))}
                 </div>
@@ -388,7 +372,7 @@ export function MarketplaceListingGrid({
                             isSelectedForCompare={selectedForCompare.has(listing.id)}
                             onSaveToggle={onSaveToggle}
                             onViewDetail={onViewDetail}
-                            onToggleCompare={toggleCompare}
+                            onToggleCompare={onToggleCompare}
                         />
                     ))}
                 </div>
@@ -438,14 +422,14 @@ export function MarketplaceListingGrid({
                         </span>
                         <Button
                             size="sm"
-                            onClick={handleCompare}
+                            onClick={onCompare}
                             className="gap-1.5 h-9 rounded-xl bg-background text-international-orange hover:bg-background/90 font-semibold"
                         >
                             Compare Now
                             <ArrowRight className="w-4 h-4" />
                         </Button>
                         <button
-                            onClick={clearCompareSelection}
+                            onClick={onClearCompareSelection}
                             className="min-w-[44px] min-h-[44px] w-7 h-7 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
                             aria-label="Clear selection"
                         >
