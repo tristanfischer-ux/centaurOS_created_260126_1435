@@ -164,18 +164,21 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         tabNames: string[],
         hiddenTabs: string[] = []
     ): Promise<SpreadsheetInfo> {
-        // FLOW: Step 1 — Create a blank .xlsx file in OneDrive root
+        // FLOW: Step 1 — Create a blank .xlsx file in OneDrive root via PUT upload.
+        // DECISION: Using PUT /me/drive/root:/<name>.xlsx:/content with the xlsx MIME type
+        // ensures Graph API creates a proper workbook. The previous POST /children approach
+        // created a file metadata entry but not a valid workbook.
         const driveItem = await withRetry(
-            () => this.graphFetch<GraphDriveItem>('/me/drive/root/children', {
-                method: 'POST',
-                body: JSON.stringify({
-                    name: `${title}.xlsx`,
-                    // DECISION: Using empty file content type to create a valid empty workbook.
-                    // The Graph API creates a proper .xlsx when the extension is provided.
-                    file: {},
-                    '@microsoft.graph.conflictBehavior': 'rename',
-                }),
-            }),
+            () => this.graphFetch<GraphDriveItem>(
+                `/me/drive/root:/${encodeURIComponent(`${title}.xlsx`)}:/content`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    },
+                    body: '',
+                }
+            ),
             { maxRetries: 3, shouldRetry: isRetryableError }
         )
 
@@ -329,7 +332,7 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
     ): Promise<void> {
         await withRetry(
             () => this.graphFetch(
-                `/me/drive/items/${spreadsheetId}/workbook/worksheets('${encodeURIComponent(tabName)}')/range(address='A${startRow}:Z10000')/clear`,
+                `/me/drive/items/${spreadsheetId}/workbook/worksheets('${encodeURIComponent(tabName)}')/range(address='A${startRow}:ZZ10000')/clear`,
                 {
                     method: 'POST',
                     body: JSON.stringify({ applyTo: 'Contents' }),
@@ -350,7 +353,7 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         for (const range of ranges) {
             await withRetry(
                 () => this.graphFetch(
-                    `/me/drive/items/${spreadsheetId}/workbook/worksheets('${encodeURIComponent(range.tabName)}')/range(address='A${range.rowNumber}:Z${range.rowNumber}')/clear`,
+                    `/me/drive/items/${spreadsheetId}/workbook/worksheets('${encodeURIComponent(range.tabName)}')/range(address='A${range.rowNumber}:ZZ${range.rowNumber}')/clear`,
                     {
                         method: 'POST',
                         body: JSON.stringify({ applyTo: 'Contents' }),
@@ -401,6 +404,22 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
             { maxRetries: 3, shouldRetry: isRetryableError }
         )
 
+        // FLOW: Step 3 — Verify the write landed (Excel can silently drop writes)
+        try {
+            const verifyRange = await withRetry(
+                () => this.graphFetch<GraphRange>(
+                    `/me/drive/items/${spreadsheetId}/workbook/worksheets('${encodeURIComponent(tabName)}')/range(address='A${nextRow}:A${nextRow}')`
+                ),
+                { maxRetries: 2, shouldRetry: isRetryableError }
+            )
+            const written = verifyRange.values?.[0]?.[0]
+            if (written == null || String(written).trim() === '') {
+                console.warn('[ExcelOnlineProvider] appendRow verify failed — row may be empty:', { nextRow })
+            }
+        } catch {
+            // INTENT: Verify is best-effort. If it fails, we still return the row number.
+        }
+
         return nextRow
     }
 
@@ -440,6 +459,13 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         console.info('[ExcelOnlineProvider] formatGantt is a no-op — Graph API has limited formatting support')
     }
 
+    /**
+     * Protect the header row of a tab.
+     *
+     * KNOWN LIMITATION vs Google: Graph API does not support range-level protection.
+     * We apply sheet-level protection as a best-effort fallback, which protects all
+     * cells (not just the header). Users with edit access can still unprotect the sheet.
+     */
     async protectHeaders(
         spreadsheetId: string,
         tabName: string
@@ -478,6 +504,13 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         }
     }
 
+    /**
+     * Protect specific columns in a tab.
+     *
+     * KNOWN LIMITATION vs Google: Graph API does not support column-level protection.
+     * Falls back to sheet-level protection. True column-level protection requires the
+     * Excel JavaScript API via an Office Add-in.
+     */
     async protectColumns(
         spreadsheetId: string,
         tabName: string,
@@ -510,6 +543,13 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         }
     }
 
+    /**
+     * Protect an entire tab (make it fully read-only).
+     *
+     * KNOWN LIMITATION vs Google: Graph API protection is advisory — users with
+     * sheet edit access can unprotect via the Excel UI. Google Sheets' protection
+     * is enforced by the API regardless of the user's UI.
+     */
     async protectTab(
         spreadsheetId: string,
         tabName: string

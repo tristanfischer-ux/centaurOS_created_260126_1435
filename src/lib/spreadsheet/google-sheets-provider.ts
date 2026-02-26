@@ -42,13 +42,20 @@ function colLetter(index: number): string {
     return result
 }
 
+/** SECURITY: Escape single quotes in tab names to prevent A1 notation injection */
+function escapeTabName(name: string): string {
+    return name.replace(/'/g, "''")
+}
+
 function isRetryableError(error: Error): boolean {
     const msg = error.message.toLowerCase()
     return (
         msg.includes('429') ||
         msg.includes('rate limit') ||
         msg.includes('500') ||
+        msg.includes('502') ||
         msg.includes('503') ||
+        msg.includes('504') ||
         msg.includes('timeout') ||
         msg.includes('econnreset') ||
         msg.includes('network')
@@ -148,7 +155,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         await withRetry(
             () => sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `'${tabName}'!A1:${colLetter(headers.length - 1)}1`,
+                range: `'${escapeTabName(tabName)}'!A1:${colLetter(headers.length - 1)}1`,
                 valueInputOption: 'RAW',
                 requestBody: { values: [headers] },
             }),
@@ -171,7 +178,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         await withRetry(
             () => sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `'${tabName}'!A${startRow}:${colLetter(maxCol)}${endRow}`,
+                range: `'${escapeTabName(tabName)}'!A${startRow}:${colLetter(maxCol)}${endRow}`,
                 valueInputOption: 'RAW',
                 requestBody: { values: rows },
             }),
@@ -185,7 +192,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         const response = await withRetry(
             () => sheets.spreadsheets.values.get({
                 spreadsheetId,
-                range: `'${tabName}'`,
+                range: `'${escapeTabName(tabName)}'`,
             }),
             { maxRetries: 3, shouldRetry: isRetryableError }
         )
@@ -199,7 +206,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         await withRetry(
             () => sheets.spreadsheets.values.clear({
                 spreadsheetId,
-                range: `'${tabName}'!A${startRow}:Z10000`,
+                range: `'${escapeTabName(tabName)}'!A${startRow}:ZZ10000`,
             }),
             { maxRetries: 3, shouldRetry: isRetryableError }
         )
@@ -213,7 +220,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         const sheets = await this.getClient()
 
         const clearRanges = ranges.map(r =>
-            `'${r.tabName}'!A${r.rowNumber}:Z${r.rowNumber}`
+            `'${escapeTabName(r.tabName)}'!A${r.rowNumber}:ZZ${r.rowNumber}`
         )
 
         await withRetry(
@@ -235,7 +242,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         const result = await withRetry(
             () => sheets.spreadsheets.values.append({
                 spreadsheetId,
-                range: `'${tabName}'!A:${colLetter(row.length - 1)}`,
+                range: `'${escapeTabName(tabName)}'!A:${colLetter(row.length - 1)}`,
                 valueInputOption: 'RAW',
                 insertDataOption: 'INSERT_ROWS',
                 requestBody: { values: [row] },
@@ -245,7 +252,10 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
 
         const updatedRange = result.data.updates?.updatedRange || ''
         const rowMatch = updatedRange.match(/(\d+)$/)
-        return rowMatch ? parseInt(rowMatch[1], 10) : 0
+        if (!rowMatch) {
+            throw new Error(`appendRow: could not determine row number from updatedRange: "${updatedRange}"`)
+        }
+        return parseInt(rowMatch[1], 10)
     }
 
     async updateRow(
@@ -259,7 +269,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         await withRetry(
             () => sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `'${tabName}'!A${rowNumber}:${colLetter(row.length - 1)}${rowNumber}`,
+                range: `'${escapeTabName(tabName)}'!A${rowNumber}:${colLetter(row.length - 1)}${rowNumber}`,
                 valueInputOption: 'RAW',
                 requestBody: { values: [row] },
             }),
@@ -579,7 +589,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         await withRetry(
             () => sheets.spreadsheets.values.update({
                 spreadsheetId,
-                range: `'${tabName}'!${cell}`,
+                range: `'${escapeTabName(tabName)}'!${cell}`,
                 valueInputOption: 'RAW',
                 requestBody: { values: [[value]] },
             }),
