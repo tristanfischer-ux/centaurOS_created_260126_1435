@@ -23,9 +23,11 @@ import {
     CheckCircle2,
     AlertTriangle,
     AlertOctagon,
+    Info,
 } from "lucide-react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import type { DecompositionCheckpoint, CheckpointSentiment } from "@/lib/cad-lab-types"
 
@@ -46,6 +48,10 @@ const SENTIMENT_CONFIG: Record<CheckpointSentiment, {
 interface DecompositionCheckpointCardProps {
     checkpoints: Record<string, DecompositionCheckpoint> | null
     isCheckpointing: boolean
+    /** Called when the user acknowledges specialist concerns */
+    onAcknowledge?: () => void
+    /** Whether concerns have already been acknowledged */
+    acknowledged?: boolean
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -53,11 +59,17 @@ interface DecompositionCheckpointCardProps {
 export function DecompositionCheckpointCard({
     checkpoints,
     isCheckpointing,
+    onAcknowledge,
+    acknowledged = false,
 }: DecompositionCheckpointCardProps) {
     const [isExpanded, setIsExpanded] = useState(true)
 
     const entries = checkpoints ? Object.values(checkpoints) : []
     const hasCheckpoints = entries.length > 0
+    const hasConcerns = entries.some(
+        (c) => c.sentiment === "cautious" || c.sentiment === "concerned",
+    )
+    const hasFlaggedModules = entries.some((c) => c.flaggedModules.length > 0)
 
     if (!isCheckpointing && !hasCheckpoints) return null
 
@@ -94,13 +106,44 @@ export function DecompositionCheckpointCard({
                     {isCheckpointing && !hasCheckpoints && (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Max and Fang are reviewing the decomposition...
+                            Max (CTO) and Fang (VP Manufacturing) are reviewing the decomposition...
                         </div>
                     )}
 
                     {entries.map((checkpoint) => (
                         <CheckpointEntry key={checkpoint.specialistId} checkpoint={checkpoint} />
                     ))}
+
+                    {/* Impact messaging — shown when any modules are flagged */}
+                    {hasCheckpoints && hasFlaggedModules && (
+                        <div className="flex items-start gap-2 pt-2 border-t border-border">
+                            <Info className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-muted-foreground" />
+                            <p className="text-xs text-muted-foreground">
+                                Flagged modules will have specialist feedback applied during CAD generation.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Acknowledge button — shown when concerns exist and not yet acknowledged */}
+                    {hasCheckpoints && hasConcerns && !acknowledged && onAcknowledge && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={onAcknowledge}
+                            className="w-full mt-1"
+                        >
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                            I&apos;ve reviewed these concerns
+                        </Button>
+                    )}
+
+                    {/* Acknowledged confirmation */}
+                    {hasCheckpoints && hasConcerns && acknowledged && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-border">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                            <span className="text-xs text-muted-foreground">Concerns reviewed</span>
+                        </div>
+                    )}
                 </CardContent>
             )}
         </Card>
@@ -138,6 +181,9 @@ function CheckpointEntry({ checkpoint }: { checkpoint: DecompositionCheckpoint }
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-foreground">
                         {checkpoint.specialistName}
+                        {specialist?.title && (
+                            <span className="text-muted-foreground font-normal">, {specialist.title}</span>
+                        )}
                     </span>
                     <Badge variant={config.badgeVariant} className="text-xs">
                         <SentimentIcon className="h-3 w-3 mr-1" />

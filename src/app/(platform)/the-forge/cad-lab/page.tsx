@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo } from "react"
+import { useMemo, useState, useCallback } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -61,6 +61,17 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
+
+  // Checkpoint acknowledgment gating
+  const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
+  const handleAcknowledge = useCallback(() => setCheckpointAcknowledged(true), [])
+
+  const checkpointEntries = checkpoints ? Object.values(checkpoints) : []
+  const hasConcerns = checkpointEntries.some(
+    (c) => c.sentiment === "cautious" || c.sentiment === "concerned",
+  )
+  const checkpointsReady = checkpointEntries.length > 0 && !isCheckpointing
+  const canContinueToBuild = allModulesRevealed && (!checkpointsReady || !hasConcerns || checkpointAcknowledged)
 
   // Helper: open module detail dialog from flow diagram click
   const handleModuleClick = (moduleId: string): void => {
@@ -253,11 +264,18 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <DecompositionCheckpointCard
                   checkpoints={checkpoints}
                   isCheckpointing={isCheckpointing}
+                  onAcknowledge={handleAcknowledge}
+                  acknowledged={checkpointAcknowledged}
                 />
               )}
 
-              {/* Continue to Build CTA — only after all modules are revealed */}
-              {allModulesRevealed && (
+              {/* Continue to Build CTA — gated on modules revealed + checkpoint acknowledgment */}
+              {allModulesRevealed && !canContinueToBuild && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  Review specialist feedback above before continuing.
+                </p>
+              )}
+              {canContinueToBuild && (
                 <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
