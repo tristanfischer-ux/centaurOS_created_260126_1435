@@ -104,10 +104,7 @@ export function DecompositionCheckpointCard({
             {isExpanded && (
                 <CardContent className="pt-0 space-y-4">
                     {isCheckpointing && !hasCheckpoints && (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Max (CTO) and Fang (VP Manufacturing) are reviewing the decomposition...
-                        </div>
+                        <LoadingText />
                     )}
 
                     {entries.map((checkpoint) => (
@@ -147,6 +144,28 @@ export function DecompositionCheckpointCard({
                 </CardContent>
             )}
         </Card>
+    )
+}
+
+// ─── Loading Text ────────────────────────────────────────────────────
+
+/** IDs must match CHECKPOINT_SPECIALISTS in src/actions/cad-lab-reviews.ts */
+const CHECKPOINT_SPECIALIST_IDS = ["cto", "vp-manufacturing"] as const
+
+function LoadingText() {
+    const names = CHECKPOINT_SPECIALIST_IDS.map((id) => {
+        const s = getSpecialistById(id)
+        return s ? `${s.name} (${s.title})` : id
+    })
+    const label = names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : names.join(", ")
+
+    return (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {label} are reviewing the decomposition...
+        </div>
     )
 }
 

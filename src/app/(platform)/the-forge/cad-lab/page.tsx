@@ -66,12 +66,16 @@ export default function CadLabResearchPage(): React.ReactNode {
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
   const handleAcknowledge = useCallback(() => setCheckpointAcknowledged(true), [])
 
-  const checkpointEntries = checkpoints ? Object.values(checkpoints) : []
-  const hasConcerns = checkpointEntries.some(
-    (c) => c.sentiment === "cautious" || c.sentiment === "concerned",
-  )
-  const checkpointsReady = checkpointEntries.length > 0 && !isCheckpointing
-  const canContinueToBuild = allModulesRevealed && (!checkpointsReady || !hasConcerns || checkpointAcknowledged)
+  // INTENT: Block "Continue to Build" while checkpoints load OR have unacknowledged concerns.
+  // Without the isCheckpointing guard, users could skip past the gate before results arrive.
+  const canContinueToBuild = allModulesRevealed && !isCheckpointing && (() => {
+    const entries = checkpoints ? Object.values(checkpoints) : []
+    if (entries.length === 0) return true
+    const hasConcerns = entries.some(
+      (c) => c.sentiment === "cautious" || c.sentiment === "concerned",
+    )
+    return !hasConcerns || checkpointAcknowledged
+  })()
 
   // Helper: open module detail dialog from flow diagram click
   const handleModuleClick = (moduleId: string): void => {
