@@ -8,8 +8,9 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { TrendingUp, ChevronDown, ChevronRight } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/types/payments'
 import { ItemsSection } from '@/components/cash-burn/items-section'
@@ -186,7 +187,10 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
       </div>
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
       {/* Summary Charts */}

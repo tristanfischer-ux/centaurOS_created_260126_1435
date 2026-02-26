@@ -14,7 +14,7 @@ interface ScenarioPanelProps {
   scenarios: BurnScenario[]
   activeScenario: BurnScenario
   onScenarioChange: (scenario: BurnScenario) => void
-  onSave: (id: string, updates: Partial<CreateScenarioInput>) => void
+  onSave: (id: string, updates: Partial<CreateScenarioInput>) => void | Promise<void>
   onCreate: (input: CreateScenarioInput) => void
   onDelete: (id: string) => void
 }
@@ -38,6 +38,8 @@ export function ScenarioPanel({
   const [revenueDelay, setRevenueDelay] = useState(activeScenario.revenueDelayWeeks)
   const [costDelay, setCostDelay] = useState(activeScenario.costDelayWeeks)
   const [revenueGrowth, setRevenueGrowth] = useState(activeScenario.revenueGrowthPct)
+  const [isSaving, setIsSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Sync local state when active scenario changes (e.g. switching dropdown)
   useEffect(() => {
@@ -45,6 +47,7 @@ export function ScenarioPanel({
     setRevenueDelay(activeScenario.revenueDelayWeeks)
     setCostDelay(activeScenario.costDelayWeeks)
     setRevenueGrowth(activeScenario.revenueGrowthPct)
+    setConfirmDelete(false)
   }, [activeScenario])
 
   // Propagate slider changes for live chart updates
@@ -72,15 +75,17 @@ export function ScenarioPanel({
     propagateChanges({ openingBalance: pence })
   }
 
-  function handleSave() {
+  async function handleSave() {
+    setIsSaving(true)
     const pence = Math.round(parseFloat(openingBalancePounds || '0') * 100)
-    onSave(activeScenario.id, {
+    await onSave(activeScenario.id, {
       name: activeScenario.name,
       opening_balance: pence,
       revenue_delay_weeks: revenueDelay,
       cost_delay_weeks: costDelay,
       revenue_growth_pct: revenueGrowth,
     })
+    setIsSaving(false)
   }
 
   function handleCreate() {
@@ -95,6 +100,12 @@ export function ScenarioPanel({
 
   function handleDelete() {
     if (activeScenario.isDefault) return
+    if (!confirmDelete) {
+      setConfirmDelete(true)
+      setTimeout(() => setConfirmDelete(false), 3000)
+      return
+    }
+    setConfirmDelete(false)
     onDelete(activeScenario.id)
   }
 
@@ -129,11 +140,11 @@ export function ScenarioPanel({
               <Plus className="h-4 w-4" />
             </Button>
             <Button
-              variant="ghost"
+              variant={confirmDelete ? 'destructive' : 'ghost'}
               size="icon"
               onClick={handleDelete}
               disabled={activeScenario.isDefault}
-              aria-label="Delete scenario"
+              aria-label={confirmDelete ? 'Confirm delete scenario' : 'Delete scenario'}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -170,6 +181,7 @@ export function ScenarioPanel({
           <input
             id="revenue-delay"
             type="range"
+            aria-label="Revenue delay in weeks"
             min={-4}
             max={26}
             step={1}
@@ -192,6 +204,7 @@ export function ScenarioPanel({
           <input
             id="cost-delay"
             type="range"
+            aria-label="Cost delay in weeks"
             min={-4}
             max={26}
             step={1}
@@ -214,6 +227,7 @@ export function ScenarioPanel({
           <input
             id="revenue-growth"
             type="range"
+            aria-label="Revenue growth percentage"
             min={-50}
             max={200}
             step={5}
@@ -229,9 +243,9 @@ export function ScenarioPanel({
         </div>
 
         {/* Save button */}
-        <Button onClick={handleSave} className="w-full">
+        <Button onClick={handleSave} disabled={isSaving} className="w-full">
           <Save className="h-4 w-4" />
-          Save Scenario
+          {isSaving ? 'Saving...' : 'Save Scenario'}
         </Button>
       </CardContent>
     </Card>

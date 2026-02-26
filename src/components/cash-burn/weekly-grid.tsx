@@ -19,6 +19,7 @@ interface WeeklyGridProps {
   columns: Column[]
   rows: Array<Record<string, string | number>>
   formatValue?: (value: number) => string
+  title?: string
 }
 
 // ============================================================
@@ -31,7 +32,7 @@ const WEEKS_PER_PAGE = 13
 // Component
 // ============================================================
 
-export function WeeklyGrid({ columns, rows, formatValue = formatCurrency }: WeeklyGridProps) {
+export function WeeklyGrid({ columns, rows, formatValue = formatCurrency, title }: WeeklyGridProps) {
   const [page, setPage] = useState(0)
   const totalPages = Math.ceil(rows.length / WEEKS_PER_PAGE)
   const start = page * WEEKS_PER_PAGE
@@ -41,7 +42,7 @@ export function WeeklyGrid({ columns, rows, formatValue = formatCurrency }: Week
   return (
     <Card>
       <CardHeader className="pb-2">
-        <h3 className="text-lg font-semibold text-foreground">52-Week Breakdown</h3>
+        <h3 className="text-lg font-semibold text-foreground">{title ?? `${rows.length}-Week Breakdown`}</h3>
       </CardHeader>
       <CardContent>
         {rows.length === 0 ? (

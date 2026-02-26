@@ -209,6 +209,7 @@ export function ItemDialog({
               id="item-name"
               type="text"
               required
+              maxLength={100}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={mode === 'cash-out' ? 'e.g. AWS Hosting' : 'e.g. Consulting Revenue'}
@@ -304,6 +305,7 @@ export function ItemDialog({
                 <input
                   id="item-probability"
                   type="range"
+                  aria-label="Probability percentage"
                   min={0}
                   max={100}
                   step={5}

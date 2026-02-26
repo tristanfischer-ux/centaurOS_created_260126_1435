@@ -96,6 +96,7 @@ export function BalanceSheetTable({
           <input
             id="bs-week-slider"
             type="range"
+            aria-label="Balance sheet week selector"
             min={0}
             max={weeks - 1}
             step={1}

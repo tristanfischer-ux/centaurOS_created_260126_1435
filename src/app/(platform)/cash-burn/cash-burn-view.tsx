@@ -9,8 +9,9 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Flame } from 'lucide-react'
+import { Flame, AlertTriangle } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatCurrency } from '@/types/payments'
 import { KpiRow } from '@/components/cash-burn/kpi-row'
 import { RunwayBadge } from '@/components/cash-burn/runway-badge'
@@ -21,7 +22,7 @@ import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { generateCashOutGrid, generateCashInGrid } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
-import { chartColors } from '@/lib/chart-colors'
+import { chartColors, moneyMapColors } from '@/lib/chart-colors'
 import {
   createScenario,
   updateScenario,
@@ -198,8 +199,27 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       </div>
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
+
+      {/* Color legend */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: chartColors[2] }} />
+          <span className="text-xs text-muted-foreground">Cash In / Balance</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: chartColors[0] }} />
+          <span className="text-xs text-muted-foreground">Cash Out</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: moneyMapColors.loss }} />
+          <span className="text-xs text-muted-foreground">Zero Line / Negative</span>
+        </div>
+      </div>
 
       {/* KPI Row */}
       <KpiRow items={[
