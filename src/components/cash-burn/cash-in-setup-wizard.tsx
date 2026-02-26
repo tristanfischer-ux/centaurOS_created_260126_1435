@@ -11,7 +11,7 @@
  * Amounts entered in pounds, converted to pence for the server action.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -38,6 +38,7 @@ import { typography } from '@/lib/design-system'
 import { WizardStepper, useWizardSteps } from '@/components/ui/wizard-stepper'
 import type { WizardStep } from '@/components/ui/wizard-stepper'
 import { formatCurrency } from '@/types/payments'
+import { generateWeekOptions } from '@/lib/cash-burn/weekly-projection'
 import type { CashInItem, CreateCashInInput, Frequency, CashInSourceType } from '@/types/cash-burn'
 
 // ============================================================
@@ -96,6 +97,7 @@ interface FundingRow {
   amountPounds: string
   frequency: Frequency
   probabilityPct: number
+  arrivalWeek: number
 }
 
 // ============================================================
@@ -251,9 +253,10 @@ interface StepFundingProps {
   rows: FundingRow[]
   onToggle: (key: string) => void
   onUpdate: (key: string, field: keyof FundingRow, value: string | number) => void
+  weekOptions: Array<{ weekNumber: number; label: string; dateISO: string }>
 }
 
-function StepFunding({ rows, onToggle, onUpdate }: StepFundingProps) {
+function StepFunding({ rows, onToggle, onUpdate, weekOptions }: StepFundingProps) {
   const enabledRows = rows.filter(r => r.enabled)
   const weeklyTotal = enabledRows.reduce((sum, r) => sum + weightedWeekly(r.amountPounds, r.frequency, r.probabilityPct), 0)
 
@@ -312,6 +315,17 @@ function StepFunding({ rows, onToggle, onUpdate }: StepFundingProps) {
                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
+            <select
+              value={row.arrivalWeek}
+              onChange={(e) => onUpdate(row.key, 'arrivalWeek', Number(e.target.value))}
+              disabled={!row.enabled}
+              className="h-8 w-32 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring shrink-0"
+              aria-label="Arrival week"
+            >
+              {weekOptions.map(w => (
+                <option key={w.weekNumber} value={w.weekNumber}>{w.label}</option>
+              ))}
+            </select>
             <div className="flex items-center gap-1 shrink-0 w-20">
               <input
                 type="range"
@@ -346,9 +360,10 @@ function StepFunding({ rows, onToggle, onUpdate }: StepFundingProps) {
 interface StepReviewProps {
   revenueRows: RevenueRow[]
   fundingRows: FundingRow[]
+  weekOptions: Array<{ weekNumber: number; label: string; dateISO: string }>
 }
 
-function StepReview({ revenueRows, fundingRows }: StepReviewProps) {
+function StepReview({ revenueRows, fundingRows, weekOptions }: StepReviewProps) {
   const validRevenue = revenueRows.filter(r => r.name.trim() && getAmountPence(r.amountPounds) > 0)
   const validFunding = fundingRows.filter(r => r.enabled && getAmountPence(r.amountPounds) > 0)
 
@@ -403,12 +418,15 @@ function StepReview({ revenueRows, fundingRows }: StepReviewProps) {
         {validFunding.length > 0 && (
           <div>
             <p className="font-medium text-foreground mb-1">Other Funding</p>
-            {validFunding.map(r => (
-              <div key={r.key} className="flex justify-between py-0.5">
-                <span className="text-muted-foreground">{r.name} ({r.probabilityPct}%)</span>
-                <span className="font-medium text-foreground">&pound;{r.amountPounds}/{freqLabel(r.frequency)}</span>
-              </div>
-            ))}
+            {validFunding.map(r => {
+              const weekLabel = weekOptions.find(w => w.weekNumber === r.arrivalWeek)?.label ?? `W${r.arrivalWeek}`
+              return (
+                <div key={r.key} className="flex justify-between py-0.5">
+                  <span className="text-muted-foreground">{r.name} ({r.probabilityPct}%) &middot; {weekLabel}</span>
+                  <span className="font-medium text-foreground">&pound;{r.amountPounds}/{freqLabel(r.frequency)}</span>
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -452,8 +470,13 @@ export function CashInSetupWizard({
       amountPounds: '',
       frequency: p.defaultFrequency,
       probabilityPct: p.defaultProbability,
+      arrivalWeek: 1,
     }))
   )
+
+  // INTENT: Stable ref so weekOptions don't regenerate on every render
+  const startDateRef = useRef(new Date())
+  const weekOptions = useMemo(() => generateWeekOptions(startDateRef.current), [])
 
   // Revenue row handlers
   const addRevenueRow = useCallback(() => {
@@ -513,14 +536,18 @@ export function CashInSetupWizard({
           probability_pct: r.probabilityPct,
           effective_from: today,
         })),
-        ...enabledItems.funding.map(r => ({
-          name: r.name,
-          source_type: r.sourceType,
-          amount: getAmountPence(r.amountPounds),
-          frequency: r.frequency,
-          probability_pct: r.probabilityPct,
-          effective_from: today,
-        })),
+        ...enabledItems.funding.map(r => {
+          // INTENT: Use the selected week's Monday as the effective_from date
+          const weekOpt = weekOptions.find(w => w.weekNumber === r.arrivalWeek)
+          return {
+            name: r.name,
+            source_type: r.sourceType,
+            amount: getAmountPence(r.amountPounds),
+            frequency: r.frequency,
+            probability_pct: r.probabilityPct,
+            effective_from: weekOpt?.dateISO ?? today,
+          }
+        }),
       ]
 
       const { batchCreateCashInItems } = await import('@/actions/cash-burn-batch')
@@ -541,6 +568,7 @@ export function CashInSetupWizard({
           amountPounds: '',
           frequency: p.defaultFrequency,
           probabilityPct: p.defaultProbability,
+          arrivalWeek: 1,
         })))
         stepper.reset()
       }
@@ -596,11 +624,12 @@ export function CashInSetupWizard({
               rows={fundingRows}
               onToggle={toggleFunding}
               onUpdate={updateFunding}
+              weekOptions={weekOptions}
             />
           )}
 
           {stepper.currentStep === 'review' && (
-            <StepReview revenueRows={revenueRows} fundingRows={fundingRows} />
+            <StepReview revenueRows={revenueRows} fundingRows={fundingRows} weekOptions={weekOptions} />
           )}
         </ScrollArea>
 

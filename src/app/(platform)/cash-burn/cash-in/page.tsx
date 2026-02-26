@@ -5,6 +5,7 @@
  */
 
 import { getCashInItems } from '@/actions/cash-burn-in'
+import { getDefaultScenario } from '@/actions/cash-burn-scenarios'
 import { CashInView } from './cash-in-view'
 
 export const metadata = {
@@ -13,12 +14,16 @@ export const metadata = {
 }
 
 export default async function CashInPage() {
-  const result = await getCashInItems()
+  const [itemsResult, scenarioResult] = await Promise.all([
+    getCashInItems(),
+    getDefaultScenario(),
+  ])
 
   return (
     <CashInView
-      initialItems={result.data ?? []}
-      hasError={!!result.error}
+      initialItems={itemsResult.data ?? []}
+      defaultScenario={scenarioResult.data ?? null}
+      hasError={!!itemsResult.error}
     />
   )
 }

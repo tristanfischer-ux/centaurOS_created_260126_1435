@@ -7,8 +7,8 @@
 
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
-import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap } from 'lucide-react'
+import { useState, useMemo, useCallback, useRef } from 'react'
+import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -27,10 +27,12 @@ import {
   updateCashInItem,
   deleteCashInItem,
 } from '@/actions/cash-burn-in'
-import type { CashInItem, CashInSourceType, CreateCashInInput } from '@/types/cash-burn'
+import { updateOpeningBalance } from '@/actions/cash-burn-scenarios'
+import type { CashInItem, CashInSourceType, CreateCashInInput, BurnScenario } from '@/types/cash-burn'
 
 interface CashInViewProps {
   initialItems: CashInItem[]
+  defaultScenario: BurnScenario | null
   hasError: boolean
 }
 
@@ -46,13 +48,21 @@ const SOURCE_TYPE_CONFIG: Array<{
   { type: 'other', label: 'Other', color: chartColors[1] },
 ]
 
-export function CashInView({ initialItems, hasError }: CashInViewProps) {
+export function CashInView({ initialItems, defaultScenario, hasError }: CashInViewProps) {
   const [items, setItems] = useState<CashInItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+
+  // Starting balance state
+  const [openingBalancePounds, setOpeningBalancePounds] = useState<string>(
+    defaultScenario ? String(defaultScenario.openingBalance / 100) : '0'
+  )
+  const [balanceSaving, setBalanceSaving] = useState(false)
+  const scenarioId = defaultScenario?.id ?? null
+  const balanceInputRef = useRef<HTMLInputElement>(null)
 
   const weeklyTotal = useMemo(() => items.reduce((s, i) => s + i.weeklyAmount, 0), [items])
   const monthlyTotal = Math.round(weeklyTotal * 52 / 12)
@@ -85,16 +95,47 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
     Other: row.other,
   })), [cashInGrid])
 
-  // Weekly table rows
-  const weeklyTableRows = useMemo(() => cashInGrid.map(row => ({
-    label: row.weekLabel,
-    revenue: row.revenue,
-    loans: row.loans,
-    equity: row.equity,
-    grants: row.grants,
-    other: row.other,
-    total: row.totalIn,
-  })), [cashInGrid])
+  // Opening balance in pence for cumulative calculation
+  const openingBalancePence = useMemo(() => {
+    const parsed = parseFloat(openingBalancePounds)
+    return isNaN(parsed) ? 0 : Math.round(parsed * 100)
+  }, [openingBalancePounds])
+
+  // Weekly table rows with cumulative column
+  const weeklyTableRows = useMemo(() => {
+    let cumulative = openingBalancePence
+    return cashInGrid.map(row => {
+      cumulative += row.totalIn
+      return {
+        label: row.weekLabel,
+        revenue: row.revenue,
+        loans: row.loans,
+        equity: row.equity,
+        grants: row.grants,
+        other: row.other,
+        total: row.totalIn,
+        cumulative,
+      }
+    })
+  }, [cashInGrid, openingBalancePence])
+
+  const saveOpeningBalance = useCallback(async () => {
+    if (!scenarioId) return
+    const parsed = parseFloat(openingBalancePounds)
+    if (isNaN(parsed) || parsed < 0) return
+    const pence = Math.round(parsed * 100)
+    setBalanceSaving(true)
+    const result = await updateOpeningBalance(scenarioId, pence)
+    if (result.error) setError(result.error)
+    setBalanceSaving(false)
+  }, [scenarioId, openingBalancePounds])
+
+  const handleBalanceKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      balanceInputRef.current?.blur()
+    }
+  }, [])
 
   const toggleSection = useCallback((type: string) => {
     setCollapsedSections(prev => {
@@ -208,6 +249,42 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
         </Alert>
       )}
 
+      {/* Starting Cash Balance */}
+      {scenarioId && (
+        <Card>
+          <CardContent className="py-5">
+            <div className="flex items-center gap-4">
+              <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
+                <Banknote className="h-5 w-5 text-international-orange" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                  <p className="text-sm font-medium text-foreground">Starting Cash Balance</p>
+                  {balanceSaving && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cash in the bank today. Feeds into runway calculations on the Burn page.
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-2xl font-semibold text-muted-foreground">&pound;</span>
+                <input
+                  ref={balanceInputRef}
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  value={openingBalancePounds}
+                  onChange={(e) => setOpeningBalancePounds(e.target.value)}
+                  onBlur={saveOpeningBalance}
+                  onKeyDown={handleBalanceKeyDown}
+                  className="w-36 h-10 rounded-md border border-input bg-background px-3 text-2xl font-semibold text-foreground tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <DonutChart
@@ -288,6 +365,7 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
           { key: 'grants', label: 'Grants' },
           { key: 'other', label: 'Other' },
           { key: 'total', label: 'Total' },
+          { key: 'cumulative', label: 'Cumulative' },
         ]}
         rows={weeklyTableRows}
       />

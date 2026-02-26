@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { generateWeekOptions } from '@/lib/cash-burn/weekly-projection'
 import type {
   Frequency,
   CostType,
@@ -110,6 +111,12 @@ export function ItemDialog({
   const [sourceType, setSourceType] = useState<CashInSourceType>('revenue')
   const [probabilityPct, setProbabilityPct] = useState(100)
 
+  // Week picker state for non-revenue cash-in items
+  const [useWeekPicker, setUseWeekPicker] = useState(false)
+  const [selectedWeek, setSelectedWeek] = useState(1)
+  const startDateRef = useRef(new Date())
+  const weekOptions = useMemo(() => generateWeekOptions(startDateRef.current), [])
+
   // INTENT: Track whether category was changed by the user (not initial data load)
   const userChangedCategoryRef = useRef(false)
 
@@ -130,11 +137,27 @@ export function ItemDialog({
         setCostType(initialData?.cost_type ?? 'fixed')
         setPnlCategory(initialData?.pnl_category ?? '')
       } else {
-        setSourceType(initialData?.source_type ?? 'revenue')
+        const st = initialData?.source_type ?? 'revenue'
+        setSourceType(st)
         setProbabilityPct(initialData?.probability_pct ?? 100)
+
+        // INTENT: For non-revenue items, reverse-lookup effective_from to a week number
+        if (st !== 'revenue' && initialData?.effective_from) {
+          const matchedWeek = weekOptions.find(w => w.dateISO === initialData.effective_from)
+          if (matchedWeek) {
+            setUseWeekPicker(true)
+            setSelectedWeek(matchedWeek.weekNumber)
+          } else {
+            setUseWeekPicker(false)
+            setSelectedWeek(1)
+          }
+        } else {
+          setUseWeekPicker(false)
+          setSelectedWeek(1)
+        }
       }
     }
-  }, [open, initialData, mode])
+  }, [open, initialData, mode, weekOptions])
 
   // Auto-set cost type based on category group — only when user changes category
   useEffect(() => {
@@ -363,32 +386,90 @@ export function ItemDialog({
           </div>
 
           {/* Effective dates */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <label htmlFor="item-effective-from" className="text-sm font-medium text-foreground">
-                Effective from
-              </label>
-              <input
-                id="item-effective-from"
-                type="date"
-                required
-                value={effectiveFrom}
-                onChange={(e) => setEffectiveFrom(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="item-effective-to" className="text-sm font-medium text-foreground">
-                Effective to <span className="text-muted-foreground font-normal">(optional)</span>
-              </label>
-              <input
-                id="item-effective-to"
-                type="date"
-                value={effectiveTo}
-                onChange={(e) => setEffectiveTo(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
+          <div className="space-y-2">
+            {/* Toggle between week picker and date picker for non-revenue cash-in */}
+            {mode === 'cash-in' && sourceType !== 'revenue' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !useWeekPicker
+                  setUseWeekPicker(next)
+                  if (next) {
+                    // Switching to week picker — set effectiveFrom from selected week
+                    const weekOpt = weekOptions.find(w => w.weekNumber === selectedWeek)
+                    if (weekOpt) setEffectiveFrom(weekOpt.dateISO)
+                  }
+                }}
+                className="text-xs text-international-orange hover:underline"
+              >
+                {useWeekPicker ? 'Use exact date' : 'Use week picker'}
+              </button>
+            )}
+
+            {useWeekPicker && mode === 'cash-in' && sourceType !== 'revenue' ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="item-arrival-week" className="text-sm font-medium text-foreground">
+                    Arrival week
+                  </label>
+                  <select
+                    id="item-arrival-week"
+                    value={selectedWeek}
+                    onChange={(e) => {
+                      const wk = Number(e.target.value)
+                      setSelectedWeek(wk)
+                      const weekOpt = weekOptions.find(w => w.weekNumber === wk)
+                      if (weekOpt) setEffectiveFrom(weekOpt.dateISO)
+                    }}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {weekOptions.map(w => (
+                      <option key={w.weekNumber} value={w.weekNumber}>{w.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="item-effective-to" className="text-sm font-medium text-foreground">
+                    Effective to <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="item-effective-to"
+                    type="date"
+                    value={effectiveTo}
+                    onChange={(e) => setEffectiveTo(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label htmlFor="item-effective-from" className="text-sm font-medium text-foreground">
+                    Effective from
+                  </label>
+                  <input
+                    id="item-effective-from"
+                    type="date"
+                    required
+                    value={effectiveFrom}
+                    onChange={(e) => setEffectiveFrom(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="item-effective-to" className="text-sm font-medium text-foreground">
+                    Effective to <span className="text-muted-foreground font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="item-effective-to"
+                    type="date"
+                    value={effectiveTo}
+                    onChange={(e) => setEffectiveTo(e.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Notes */}

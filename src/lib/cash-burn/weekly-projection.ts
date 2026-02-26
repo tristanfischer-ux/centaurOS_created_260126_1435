@@ -53,7 +53,7 @@ export function isActiveInWeek(
 /**
  * Get the Monday of the week containing the given date.
  */
-function getMonday(date: Date): Date {
+export function getMonday(date: Date): Date {
   const d = new Date(date)
   const day = d.getDay()
   const diff = d.getDate() - day + (day === 0 ? -6 : 1)
@@ -65,10 +65,34 @@ function getMonday(date: Date): Date {
 /**
  * Format a week start date as "W1 (3 Mar)", "W2 (10 Mar)", etc.
  */
-function formatWeekLabel(weekStart: Date, weekIndex: number): string {
+export function formatWeekLabel(weekStart: Date, weekIndex: number): string {
   const day = weekStart.getDate()
   const month = weekStart.toLocaleDateString('en-GB', { month: 'short' })
   return `W${weekIndex + 1} (${day} ${month})`
+}
+
+/**
+ * Generate an array of week options for W1–W52 dropdowns.
+ * Each option has a weekNumber (1-based), display label, and the Monday ISO date.
+ */
+export function generateWeekOptions(
+  startDate: Date,
+  weeks: number = 52
+): Array<{ weekNumber: number; label: string; dateISO: string }> {
+  const monday = getMonday(startDate)
+  const options: Array<{ weekNumber: number; label: string; dateISO: string }> = []
+
+  for (let w = 0; w < weeks; w++) {
+    const weekStart = new Date(monday)
+    weekStart.setDate(monday.getDate() + w * 7)
+    options.push({
+      weekNumber: w + 1,
+      label: formatWeekLabel(weekStart, w),
+      dateISO: weekStart.toISOString().split('T')[0],
+    })
+  }
+
+  return options
 }
 
 /**

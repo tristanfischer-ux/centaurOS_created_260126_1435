@@ -104,6 +104,36 @@ export async function ensureDefaultScenarios(): Promise<ActionResult<BurnScenari
   }
 }
 
+/**
+ * Get the default (Base Case) scenario, seeding defaults if none exist.
+ */
+export async function getDefaultScenario(): Promise<ActionResult<BurnScenario>> {
+  try {
+    const result = await ensureDefaultScenarios()
+    if (result.error) return { data: null, error: result.error }
+
+    const defaultScenario = (result.data ?? []).find(s => s.isDefault)
+    if (!defaultScenario) return { data: null, error: 'No default scenario found' }
+
+    return { data: defaultScenario, error: null }
+  } catch (err) {
+    console.error('[CashBurn] Failed to get default scenario:', err)
+    return { data: null, error: 'Failed to load default scenario' }
+  }
+}
+
+/**
+ * Update the opening balance on a scenario. Thin wrapper for the Cash In page.
+ * @param scenarioId - The scenario UUID
+ * @param balancePence - Opening balance in pence
+ */
+export async function updateOpeningBalance(
+  scenarioId: string,
+  balancePence: number
+): Promise<ActionResult<BurnScenario>> {
+  return updateScenario(scenarioId, { opening_balance: balancePence })
+}
+
 export async function createScenario(
   input: CreateScenarioInput
 ): Promise<ActionResult<BurnScenario>> {
