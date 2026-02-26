@@ -36,6 +36,7 @@ export interface CadLabProjectSummary {
   status: string
   stage: string
   thumbnailSvg: string | null
+  systemIllustrationUrl: string | null
   createdAt: string
   updatedAt: string
 }
@@ -109,7 +110,7 @@ export async function listCadLabProjects(): Promise<
   return withAuth(async ({ supabase }) => {
     const { data: projects, error } = await supabase
       .from("cad_lab_projects")
-      .select("id, name, subject, status, stage, thumbnail_svg, created_at, updated_at")
+      .select("id, name, subject, status, stage, thumbnail_svg, system_illustration_url, created_at, updated_at")
       .order("updated_at", { ascending: false })
       .limit(50)
 
@@ -126,6 +127,7 @@ export async function listCadLabProjects(): Promise<
         status: p.status,
         stage: p.stage,
         thumbnailSvg: p.thumbnail_svg,
+        systemIllustrationUrl: p.system_illustration_url,
         createdAt: p.created_at,
         updatedAt: p.updated_at,
       })),

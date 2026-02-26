@@ -115,6 +115,14 @@ function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): Reac
               className="object-contain p-4"
               unoptimized
             />
+          ) : project.systemIllustrationUrl ? (
+            <Image
+              src={project.systemIllustrationUrl}
+              alt={`${displayName} overview`}
+              fill
+              className="object-cover"
+              unoptimized
+            />
           ) : (
             <div className="flex items-center justify-center h-full">
               <Flame className="h-10 w-10 text-international-orange/30" />
