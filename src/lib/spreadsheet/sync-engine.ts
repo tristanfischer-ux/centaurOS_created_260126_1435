@@ -348,7 +348,7 @@ export async function fullSync(
 
     const rowMapInserts: Array<{
         foundry_id: string; spreadsheet_id: string; sheet_tab_name: string;
-        sheet_tab_gid: number; entity_type: string; entity_id: string; row_number: number
+        sheet_tab_gid: string; entity_type: string; entity_id: string; row_number: number
     }> = []
     let tabsUpdated = 0
 
@@ -366,7 +366,7 @@ export async function fullSync(
                     foundry_id: foundryId,
                     spreadsheet_id: spreadsheetId,
                     sheet_tab_name: 'Master Task List',
-                    sheet_tab_gid: masterTabGid,
+                    sheet_tab_gid: String(masterTabGid),
                     entity_type: 'task',
                     entity_id: taskRows[i].id,
                     row_number: i + 2,
@@ -398,7 +398,7 @@ export async function fullSync(
                     foundry_id: foundryId,
                     spreadsheet_id: spreadsheetId,
                     sheet_tab_name: personName,
-                    sheet_tab_gid: tabGid,
+                    sheet_tab_gid: String(tabGid),
                     entity_type: 'task',
                     entity_id: personTasks[i].id,
                     row_number: i + 2,
@@ -965,7 +965,7 @@ async function upsertTaskInTab(
                 foundry_id: foundryId,
                 spreadsheet_id: spreadsheetId,
                 sheet_tab_name: tabName,
-                sheet_tab_gid: tabGid,
+                sheet_tab_gid: String(tabGid),
                 entity_type: 'task',
                 entity_id: taskRow.id,
                 row_number: newRowNumber,

@@ -49,21 +49,6 @@ function colLetter(index: number): string {
     return result
 }
 
-/**
- * Generate a stable numeric hash from a string.
- * Used to convert Excel's string worksheet IDs to the numeric IDs
- * required by the SheetTab interface.
- */
-function stringHash(str: string): number {
-    let hash = 0
-    for (let i = 0; i < str.length; i++) {
-        const char = str.charCodeAt(i)
-        hash = ((hash << 5) - hash) + char
-        hash |= 0 // Convert to 32-bit integer
-    }
-    return Math.abs(hash)
-}
-
 function isRetryableError(error: Error): boolean {
     const msg = error.message.toLowerCase()
     return (
@@ -254,10 +239,9 @@ export class ExcelOnlineProvider implements SpreadsheetProvider {
         )
 
         return (response.value || []).map((ws) => ({
-            // DECISION: Excel uses string worksheet IDs. The SheetTab interface requires
-            // numeric IDs. We use a stable hash to convert, since the numeric ID is primarily
-            // used for identification, not for direct API calls.
-            id: stringHash(ws.id),
+            // DECISION: SheetTab.id now accepts string | number. Return the raw
+            // string ID from Excel — no lossy hash needed.
+            id: ws.id,
             title: ws.name,
         }))
     }

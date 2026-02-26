@@ -35,7 +35,7 @@ export interface SpreadsheetInfo {
 }
 
 export interface SheetTab {
-    id: number
+    id: string | number
     title: string
 }
 

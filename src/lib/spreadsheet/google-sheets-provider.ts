@@ -283,7 +283,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         // Header formatting
         requests.push({
             repeatCell: {
-                range: { sheetId: tab.id, startRowIndex: 0, endRowIndex: 1 },
+                range: { sheetId: tab.id as number, startRowIndex: 0, endRowIndex: 1 },
                 cell: {
                     userEnteredFormat: {
                         textFormat: { bold: true },
@@ -298,7 +298,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         requests.push({
             updateSheetProperties: {
                 properties: {
-                    sheetId: tab.id,
+                    sheetId: tab.id as number,
                     gridProperties: { frozenRowCount: 1, frozenColumnCount: headerCount },
                 },
                 fields: 'gridProperties(frozenRowCount,frozenColumnCount)',
@@ -311,7 +311,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
                 requests.push({
                     repeatCell: {
                         range: {
-                            sheetId: tab.id,
+                            sheetId: tab.id as number,
                             startRowIndex: task.rowIndex + 1,
                             endRowIndex: task.rowIndex + 2,
                             startColumnIndex: weekIdx + headerCount,
@@ -353,7 +353,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
                         addProtectedRange: {
                             protectedRange: {
                                 range: {
-                                    sheetId: tab.id,
+                                    sheetId: tab.id as number,
                                     startRowIndex: 0,
                                     endRowIndex: 1,
                                 },
@@ -382,7 +382,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
             addProtectedRange: {
                 protectedRange: {
                     range: {
-                        sheetId: tab.id,
+                        sheetId: tab.id as number,
                         startRowIndex: 1,
                         startColumnIndex: colIdx,
                         endColumnIndex: colIdx + 1,
@@ -417,7 +417,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
                     requests: [{
                         addProtectedRange: {
                             protectedRange: {
-                                range: { sheetId: tab.id },
+                                range: { sheetId: tab.id as number },
                                 description: 'This tab is auto-generated and read-only',
                                 warningOnly: false,
                             },
@@ -472,7 +472,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
                     requests: [{
                         setDataValidation: {
                             range: {
-                                sheetId: tab.id,
+                                sheetId: tab.id as number,
                                 startRowIndex: 1,
                                 startColumnIndex: columnIndex,
                                 endColumnIndex: columnIndex + 1,
@@ -512,7 +512,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
             requests.push({
                 updateSheetProperties: {
                     properties: {
-                        sheetId: tab.id,
+                        sheetId: tab.id as number,
                         gridProperties: {
                             frozenRowCount: options.freezeRows || 0,
                             frozenColumnCount: options.freezeColumns || 0,
@@ -527,7 +527,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
         if (options.boldHeaderRow) {
             requests.push({
                 repeatCell: {
-                    range: { sheetId: tab.id, startRowIndex: 0, endRowIndex: 1 },
+                    range: { sheetId: tab.id as number, startRowIndex: 0, endRowIndex: 1 },
                     cell: {
                         userEnteredFormat: {
                             textFormat: { bold: true },
@@ -545,7 +545,7 @@ export class GoogleSheetsProvider implements SpreadsheetProvider {
                 requests.push({
                     updateDimensionProperties: {
                         range: {
-                            sheetId: tab.id,
+                            sheetId: tab.id as number,
                             dimension: 'COLUMNS',
                             startIndex: colIdx,
                             endIndex: colIdx + 1,
