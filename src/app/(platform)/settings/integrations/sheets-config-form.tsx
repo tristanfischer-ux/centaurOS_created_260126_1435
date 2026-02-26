@@ -11,7 +11,7 @@
  * Apps Script → sync controls) into a 3-click flow: Connect → Create → Share.
  */
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +33,8 @@ import {
 } from '@/actions/sheets-sync'
 import type { SheetsIntegrationConfig } from '@/actions/sheets-sync'
 import type { ProviderType } from '@/lib/spreadsheet/provider'
+
+type PendingAction = 'create' | 'sync' | 'pause' | 'resume' | 'disconnect' | null
 
 interface SheetsConfigFormProps {
     googleConfig: SheetsIntegrationConfig | null
@@ -124,86 +126,123 @@ function ProviderCard({
     connectUrl: string
 }) {
     const [isPending, startTransition] = useTransition()
+    const [pendingAction, setPendingAction] = useState<PendingAction>(null)
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
     const [config, setConfig] = useState(initialConfig)
     const [status, setStatus] = useState(initialStatus)
     const [copied, setCopied] = useState(false)
+    const messageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-    function showMessage(type: 'success' | 'error', text: string) {
+    // Clean up timeouts on unmount
+    useEffect(() => {
+        return () => {
+            if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current)
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+        }
+    }, [])
+
+    const showMessage = useCallback((type: 'success' | 'error', text: string) => {
         setMessage({ type, text })
-        setTimeout(() => setMessage(null), 5000)
-    }
+        if (messageTimeoutRef.current) clearTimeout(messageTimeoutRef.current)
+        messageTimeoutRef.current = setTimeout(() => setMessage(null), 5000)
+    }, [])
 
     function handleCopyLink() {
         if (config?.spreadsheet_url) {
-            navigator.clipboard.writeText(config.spreadsheet_url)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
+            try {
+                navigator.clipboard.writeText(config.spreadsheet_url)
+                setCopied(true)
+                if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current)
+                copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
+            } catch {
+                showMessage('error', 'Failed to copy link')
+            }
         }
     }
 
     function handleCreateSpreadsheet() {
+        setPendingAction('create')
         startTransition(async () => {
-            const result = await createAndInitializeSpreadsheet(providerType)
-            if (result.error) {
-                showMessage('error', result.error)
-            } else {
-                showMessage('success', 'Spreadsheet created and synced!')
-                setConfig(prev => prev ? {
-                    ...prev,
-                    spreadsheet_id: result.spreadsheetId || null,
-                    spreadsheet_url: result.spreadsheetUrl || null,
-                    sync_enabled: true,
-                } : prev)
-                setStatus(prev => ({ ...prev, has_spreadsheet: true, is_connected: true }))
+            try {
+                const result = await createAndInitializeSpreadsheet(providerType)
+                if (result.error) {
+                    showMessage('error', result.error)
+                } else {
+                    showMessage('success', 'Spreadsheet created and synced!')
+                    setConfig(prev => prev ? {
+                        ...prev,
+                        spreadsheet_id: result.spreadsheetId || null,
+                        spreadsheet_url: result.spreadsheetUrl || null,
+                        sync_enabled: true,
+                    } : prev)
+                    setStatus(prev => ({ ...prev, has_spreadsheet: true, is_connected: true }))
+                }
+            } finally {
+                setPendingAction(null)
             }
         })
     }
 
     function handleSyncNow() {
+        setPendingAction('sync')
         startTransition(async () => {
-            const result = await triggerManualSync(providerType)
-            if (result.error) {
-                showMessage('error', result.error)
-            } else {
-                showMessage('success', `Synced ${result.tasksWritten} tasks`)
-                setConfig(prev => prev ? {
-                    ...prev,
-                    last_sync_at: new Date().toISOString(),
-                    sync_errors: [],
-                } : prev)
+            try {
+                const result = await triggerManualSync(providerType)
+                if (result.error) {
+                    showMessage('error', result.error)
+                } else {
+                    showMessage('success', `Synced ${result.tasksWritten} tasks`)
+                    setConfig(prev => prev ? {
+                        ...prev,
+                        last_sync_at: new Date().toISOString(),
+                        sync_errors: [],
+                    } : prev)
+                }
+            } finally {
+                setPendingAction(null)
             }
         })
     }
 
     function handleDisableSync() {
+        setPendingAction('disconnect')
         startTransition(async () => {
-            const result = await disableSync(providerType)
-            if (result.error) {
-                showMessage('error', result.error)
-            } else {
-                setConfig(prev => prev ? {
-                    ...prev,
-                    sync_enabled: false,
-                    spreadsheet_id: null,
-                    spreadsheet_url: null,
-                } : prev)
-                setStatus(prev => ({ ...prev, is_connected: false, has_spreadsheet: false }))
-                showMessage('success', 'Sync disabled')
+            try {
+                const result = await disableSync(providerType)
+                if (result.error) {
+                    showMessage('error', result.error)
+                } else {
+                    setConfig(prev => prev ? {
+                        ...prev,
+                        sync_enabled: false,
+                        spreadsheet_id: null,
+                        spreadsheet_url: null,
+                    } : prev)
+                    setStatus(prev => ({ ...prev, is_connected: false, has_spreadsheet: false }))
+                    showMessage('success', 'Sync disabled')
+                }
+            } finally {
+                setPendingAction(null)
             }
         })
     }
 
     function handleToggleSync() {
         const newEnabled = !config?.sync_enabled
+        setPendingAction(newEnabled ? 'resume' : 'pause')
         startTransition(async () => {
-            const result = await updateSheetsIntegration({ sync_enabled: newEnabled }, providerType)
-            if (result.error) {
-                showMessage('error', result.error)
-            } else {
-                setConfig(prev => prev ? { ...prev, sync_enabled: newEnabled } : prev)
-                setStatus(prev => ({ ...prev, is_connected: newEnabled }))
-                showMessage('success', newEnabled ? 'Sync enabled' : 'Sync paused')
+            try {
+                const result = await updateSheetsIntegration({ sync_enabled: newEnabled }, providerType)
+                if (result.error) {
+                    showMessage('error', result.error)
+                } else {
+                    setConfig(prev => prev ? { ...prev, sync_enabled: newEnabled } : prev)
+                    setStatus(prev => ({ ...prev, is_connected: newEnabled }))
+                    showMessage('success', newEnabled ? 'Sync enabled' : 'Sync paused')
+                }
+            } finally {
+                setPendingAction(null)
             }
         })
     }
@@ -281,7 +320,7 @@ function ProviderCard({
                             disabled={isPending}
                             onClick={handleCreateSpreadsheet}
                         >
-                            {isPending ? (
+                            {pendingAction === 'create' ? (
                                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                             ) : (
                                 <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -354,7 +393,7 @@ function ProviderCard({
                                 onClick={handleSyncNow}
                                 disabled={isPending}
                             >
-                                {isPending ? (
+                                {pendingAction === 'sync' ? (
                                     <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
                                 ) : (
                                     <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
@@ -369,6 +408,9 @@ function ProviderCard({
                                     disabled={isPending}
                                     className="text-muted-foreground"
                                 >
+                                    {pendingAction === 'pause' && (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                    )}
                                     Pause
                                 </Button>
                             ) : (
@@ -379,6 +421,9 @@ function ProviderCard({
                                     disabled={isPending}
                                     className="text-success"
                                 >
+                                    {pendingAction === 'resume' && (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                    )}
                                     Resume
                                 </Button>
                             )}
@@ -389,7 +434,11 @@ function ProviderCard({
                                 disabled={isPending}
                                 className="text-destructive"
                             >
-                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                {pendingAction === 'disconnect' ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                ) : (
+                                    <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                )}
                                 Disconnect
                             </Button>
                         </div>
