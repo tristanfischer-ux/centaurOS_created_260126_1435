@@ -8,7 +8,7 @@ test.describe('CAD Lab Visual Check', () => {
     // Step 1: Navigate to CAD Lab (will redirect to login)
     await page.goto('/the-forge/cad-lab')
     await page.waitForLoadState('networkidle')
-    
+
     if (page.url().includes('/login')) {
       // Take screenshot of login page
       await page.screenshot({ path: 'test-results/cad-lab-1-login.png', fullPage: true })
@@ -25,7 +25,7 @@ test.describe('CAD Lab Visual Check', () => {
       await page.waitForURL(/\/(today|dashboard|updates|new-objectives|new-tasks)/, { timeout: 30000 })
       await page.waitForLoadState('networkidle')
       await page.waitForTimeout(1000)
-      
+
       await page.screenshot({ path: 'test-results/cad-lab-3-after-login.png', fullPage: true })
       console.log('✓ Screenshot 3: After login')
     }
@@ -41,23 +41,26 @@ test.describe('CAD Lab Visual Check', () => {
     await page.screenshot({ path: 'test-results/cad-lab-4-final.png', fullPage: true })
     console.log('✓ Screenshot 4: CAD Lab page')
 
-    // Verify page elements
-    await expect(page.getByText('Parametric CAD from a single sentence')).toBeVisible()
-    
-    // Check for key landing-stage controls
-    await expect(page.getByText('Quick Start — select an engineering template or describe your own product')).toBeVisible()
-    await expect(page.getByRole('button', { name: /Research Product|Re-Research|Researching/ })).toBeVisible()
+    // Verify hero heading
+    await expect(page.getByText('What do you want to build?')).toBeVisible()
 
-    // Check for input field
-    await expect(page.locator('input[placeholder*="CubeSat bus structure"]')).toBeVisible()
+    // Verify description paragraph
+    await expect(page.getByText('Describe any physical product or sub-assembly')).toBeVisible()
 
-    // Check for model selector
-    await expect(page.locator('select#model')).toBeVisible()
+    // Verify Research button (disabled when empty, or Re-Research / Researching if active)
+    await expect(page.getByRole('button', { name: /Research|Re-Research|Researching/ })).toBeVisible()
+
+    // Verify input field with correct placeholder
+    await expect(page.locator('input[placeholder*="1U CubeSat bus structure"]')).toBeVisible()
+
+    // Verify example chips are visible (only when input is empty and no research)
+    await expect(page.getByText('CubeSat frame')).toBeVisible()
+    await expect(page.getByText('Drone arm bracket')).toBeVisible()
 
     console.log('\n=== Page Analysis ===')
-    console.log('✓ Hero and workflow stages present')
-    console.log('✓ Input field visible')
-    console.log('✓ Model selector visible')
-    console.log('\nNote: View tabs and download buttons appear only after generating a model')
+    console.log('✓ Hero heading and description present')
+    console.log('✓ Research button visible')
+    console.log('✓ Input field with placeholder visible')
+    console.log('✓ Example prompt chips visible')
   })
 })

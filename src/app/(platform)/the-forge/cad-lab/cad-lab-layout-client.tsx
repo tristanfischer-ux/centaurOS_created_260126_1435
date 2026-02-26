@@ -25,6 +25,7 @@ import {
   Store,
   X,
   ShieldAlert,
+  AlertCircle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -82,7 +83,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   const {
     // Header
     sector, subject,
-    activeProjectId, isSaving, lastSaved,
+    activeProjectId, isSaving, lastSaved, saveError,
     showProjects, setShowProjects, refreshProjects,
     // Projects
     projects, isLoadingProjects,
@@ -154,6 +155,8 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 {isSaving ? (
                   <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
+                ) : saveError ? (
+                  <><AlertCircle className="h-3 w-3 text-destructive" /> <span className="text-destructive">Save failed</span></>
                 ) : lastSaved ? (
                   <><Save className="h-3 w-3 text-status-success" /> Saved</>
                 ) : null}

@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo, useEffect, useRef } from "react"
+import { useMemo } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -38,18 +38,6 @@ import { ProcessFlowDiagram } from "./components/process-flow-diagram"
 import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
-
-// ─── Extract executive summary from research report markdown ─────────
-
-function extractExecutiveSummary(report: string): string | null {
-  const startMatch = report.match(/^##\s+Executive\s+Summary/im)
-  if (!startMatch || startMatch.index === undefined) return null
-  const afterHeading = report.slice(startMatch.index + startMatch[0].length)
-  const nextHeading = afterHeading.search(/^##\s/m)
-  const body = nextHeading === -1 ? afterHeading : afterHeading.slice(0, nextHeading)
-  const trimmed = body.trim()
-  return trimmed.length > 0 ? trimmed : null
-}
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -73,16 +61,6 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
-  const executiveSummary = useMemo(() => extractExecutiveSummary(editableReport), [editableReport])
-
-  // Seed productOverview from executive summary on first decomposition
-  const seededRef = useRef(false)
-  useEffect(() => {
-    if (executiveSummary && !productOverview && modules.length > 0 && !seededRef.current) {
-      seededRef.current = true
-      setProductOverview(executiveSummary)
-    }
-  }, [executiveSummary, productOverview, modules.length, setProductOverview])
 
   // Helper: open module detail dialog from flow diagram click
   const handleModuleClick = (moduleId: string): void => {
@@ -203,9 +181,9 @@ export default function CadLabResearchPage(): React.ReactNode {
           )}
 
           {/* ── Product overview — always visible after research, editable ── */}
-          {(productOverview || executiveSummary) && (
+          {productOverview && (
             <ProductOverviewCard
-              overview={productOverview || executiveSummary || ""}
+              overview={productOverview}
               onSave={setProductOverview}
             />
           )}

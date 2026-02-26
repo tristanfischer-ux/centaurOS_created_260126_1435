@@ -116,17 +116,27 @@ export default defineConfig({
         storageState: path.join(authDir, 'founder.json'),
       },
     },
+    // CAD Lab Concept Editing (authenticated founder)
+    {
+      name: 'cad-lab-editing',
+      testMatch: /cad-lab-concept-editing\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: path.join(authDir, 'founder.json'),
+      },
+    },
     // General tests (unauthenticated)
     {
       name: 'chromium',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|finance-phase2-crud)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|finance-phase2-crud)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
     // Mobile Delight Audit — iPhone 14 Pro viewport, Founder auth

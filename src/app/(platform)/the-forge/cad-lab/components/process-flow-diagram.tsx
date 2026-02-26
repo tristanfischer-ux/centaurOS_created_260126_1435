@@ -113,6 +113,9 @@ function buildEdges(modules: CadLabModule[]): FlowEdge[] {
   return edges
 }
 
+/** Number of connections shown in collapsed preview before "Show all" toggle. */
+const PREVIEW_COUNT = 6
+
 /* ─── Component ────────────────────────────────────────────────────────── */
 
 export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: ProcessFlowDiagramProps): React.ReactNode {
@@ -366,7 +369,7 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
                 </span>
               </ForgeSectionHeader>
               {/* Collapse toggle when many connections */}
-              {edges.length > 12 && (
+              {edges.length > PREVIEW_COUNT && (
                 <button
                   onClick={() => setConnectionsExpanded((prev) => !prev)}
                   className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -379,7 +382,7 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
                   ) : (
                     <>
                       <ChevronDown className="h-3 w-3" />
-                      Show all
+                      Show all {edges.length} connections
                     </>
                   )}
                 </button>
@@ -389,8 +392,8 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
               Matched by shared inputs and outputs between modules
             </p>
 
-            {/* Render connections (collapsed by default when > 12) */}
-            {(edges.length <= 12 || connectionsExpanded) && (
+            {/* Render connections (preview when collapsed, all when expanded) */}
+            {(edges.length <= PREVIEW_COUNT || connectionsExpanded) ? (
               <div className="space-y-4">
                 {groupedEdges.map((group) => (
                   <div key={group.sourceId}>
@@ -421,6 +424,57 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
                               isEdgeDimmed && "border-border bg-muted/10 opacity-40",
                               !hoveredModuleId && "border-border bg-muted/20 hover:bg-muted/40",
                             )}
+                          >
+                            <div className="flex items-center gap-2 text-xs">
+                              <div className={cn("h-2 w-2 rounded-full flex-shrink-0", config.dot)} />
+                              <span className={cn("flex-shrink-0", config.text)}>&rarr;</span>
+                              {onModuleClick ? (
+                                <button
+                                  className="font-medium text-foreground underline hover:text-international-orange transition-colors"
+                                  onClick={() => onModuleClick(edge.to)}
+                                >
+                                  {edge.toName}
+                                </button>
+                              ) : (
+                                <span className="font-medium text-foreground">{edge.toName}</span>
+                              )}
+                            </div>
+                            {edge.label && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5 ml-7">
+                                {edge.label}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {groupedEdges.slice(0, PREVIEW_COUNT).map((group) => (
+                  <div key={group.sourceId}>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                      From{" "}
+                      {onModuleClick ? (
+                        <button
+                          className="underline hover:text-foreground transition-colors"
+                          onClick={() => onModuleClick(group.sourceId)}
+                        >
+                          {group.sourceName}
+                        </button>
+                      ) : (
+                        group.sourceName
+                      )}
+                    </p>
+                    <div className="space-y-1.5">
+                      {group.edges.map((edge, i) => {
+                        const config = SIGNAL_CONFIG[edge.signalType]
+                        return (
+                          <div
+                            key={i}
+                            className="rounded-md px-3 py-2 border border-border bg-muted/20 hover:bg-muted/40 transition-all duration-200"
                           >
                             <div className="flex items-center gap-2 text-xs">
                               <div className={cn("h-2 w-2 rounded-full flex-shrink-0", config.dot)} />

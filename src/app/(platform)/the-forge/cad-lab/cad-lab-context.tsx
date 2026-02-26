@@ -68,6 +68,18 @@ const CAD_LAB_DRAFT_SUBJECT_KEY = "forgeos:cad-lab:draft-subject"
 /** Maximum number of concurrent module generation requests */
 const MAX_CONCURRENCY = 3
 
+// ─── Extract executive summary from research report markdown ─────────
+
+function extractExecutiveSummary(report: string): string | null {
+  const startMatch = report.match(/^##\s+Executive\s+Summary/im)
+  if (!startMatch || startMatch.index === undefined) return null
+  const afterHeading = report.slice(startMatch.index + startMatch[0].length)
+  const nextHeading = afterHeading.search(/^##\s/m)
+  const body = nextHeading === -1 ? afterHeading : afterHeading.slice(0, nextHeading)
+  const trimmed = body.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
 // ─── Context Shape ───────────────────────────────────────────────────
 
 type MilestoneType = "research" | "breakdown" | "generate" | "batch" | null
@@ -82,6 +94,7 @@ export interface CadLabContextValue {
   isLoadingProjects: boolean
   isSaving: boolean
   lastSaved: string | null
+  saveError: boolean
   refreshProjects: () => Promise<void>
   handleLoadProject: (projectId: string) => Promise<void>
   handleDeleteProject: (projectId: string) => Promise<void>
@@ -212,6 +225,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState(false)
 
   // ── Foundry sector ──
   const [sector, setSector] = useState<Sector | null>(null)
@@ -391,9 +405,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
   }, [])
 
-  // ── Debounced DB save for modules (prevents overlapping writes during concurrency) ──
+  // ── Refs to read current state without stale closures ──
   const modulesRef = useRef<CadLabModule[]>(modules)
   useEffect(() => { modulesRef.current = modules }, [modules])
+
+  const productOverviewRef = useRef(productOverview)
+  useEffect(() => { productOverviewRef.current = productOverview }, [productOverview])
 
   const savePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -404,9 +421,22 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       savePendingRef.current = null
       try {
         await saveCadLabModules(activeProjectId, modulesRef.current)
+        setSaveError(false)
         setLastSaved(new Date().toISOString())
       } catch {
         console.error("[CAD-LAB] Debounced save failed")
+        setSaveError(true)
+        // Retry once after 2s
+        setTimeout(async () => {
+          try {
+            await saveCadLabModules(activeProjectId, modulesRef.current)
+            setSaveError(false)
+            setLastSaved(new Date().toISOString())
+          } catch {
+            setSaveError(true)
+            toast.error("Changes couldn't be saved — check your connection")
+          }
+        }, 2000)
       }
     }, 500)
   }, [activeProjectId])
@@ -421,9 +451,22 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       overviewPendingRef.current = null
       try {
         await saveCadLabProductOverview(activeProjectId, text)
+        setSaveError(false)
         setLastSaved(new Date().toISOString())
       } catch {
         console.error("[CAD-LAB] Debounced overview save failed")
+        setSaveError(true)
+        // Retry once after 2s
+        setTimeout(async () => {
+          try {
+            await saveCadLabProductOverview(activeProjectId, text)
+            setSaveError(false)
+            setLastSaved(new Date().toISOString())
+          } catch {
+            setSaveError(true)
+            toast.error("Changes couldn't be saved — check your connection")
+          }
+        }, 2000)
       }
     }, 800)
   }, [activeProjectId])
@@ -534,6 +577,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setModules(res.modules)
         setRevealedModuleIds(new Set()) // Reset so counter starts fresh on re-decompose
         setMilestone("breakdown")
+
+        // Seed product overview from executive summary (fires exactly once — on decomposition)
+        if (!productOverviewRef.current) {
+          const summary = extractExecutiveSummary(editableReport)
+          if (summary) {
+            setProductOverview(summary)
+            if (activeProjectId) {
+              saveCadLabProductOverview(activeProjectId, summary).catch(() => {
+                console.error("[CAD-LAB] Failed to persist seeded overview")
+              })
+            }
+          }
+        }
 
         // Build a rich summary from the actual result data
         const totalParts = res.modules.reduce((s, m) => s + m.keyParts.length, 0)
@@ -1494,7 +1550,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Context value ──
   const value: CadLabContextValue = {
     projects, activeProjectId, linkedRfqId, showProjects, setShowProjects,
-    isLoadingProjects, isSaving, lastSaved,
+    isLoadingProjects, isSaving, lastSaved, saveError,
     refreshProjects, handleLoadProject, handleDeleteProject, linkRfqToProject,
     sector,
     referenceModel,
