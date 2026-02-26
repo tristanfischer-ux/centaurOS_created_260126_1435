@@ -133,10 +133,5 @@ function computeRunway(
   const netBurnPerWeek = (totalOut - totalIn) / rows.length
   const monthlyBurn = Math.round(netBurnPerWeek * (52 / 12))
 
-  // INTENT: If openingBalance is 0 and we're net negative, runway is 0
-  if (openingBalance <= 0 && monthlyBurn > 0) {
-    return { weeks: 0, monthlyBurn }
-  }
-
   return { weeks: runwayWeeks, monthlyBurn }
 }

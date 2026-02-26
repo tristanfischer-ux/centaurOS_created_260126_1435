@@ -12,7 +12,7 @@ import {
   Legend,
 } from 'recharts'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
-import { chartColors } from '@/lib/chart-colors'
+import { chartColors, moneyMapColors } from '@/lib/chart-colors'
 import { formatCurrency } from '@/types/payments'
 import type { BurnWeekRow } from '@/types/cash-burn'
 
@@ -25,13 +25,9 @@ interface BurnAreaChartProps {
   comparisonData?: Array<{ name: string; weeks: BurnWeekRow[] }>
 }
 
-// ============================================================
-// Semantic colors matching chart-colors.ts palette
-// ============================================================
-
-// INTENT: Success = positive balance, destructive = nearing zero
-const COLOR_SUCCESS = 'hsl(160, 84%, 39%)'   // Emerald (chart-3)
-const COLOR_DESTRUCTIVE = 'hsl(0, 84%, 60%)'  // Red
+// Semantic colors from centralised palette
+const COLOR_SUCCESS = chartColors[2]      // Emerald
+const COLOR_DESTRUCTIVE = moneyMapColors.loss // Red
 
 // ============================================================
 // Component

@@ -145,7 +145,7 @@ export function buildBalanceSheet(
   const monday = getMonday(new Date())
   const weeksBetween = Math.max(0, Math.floor((asOfDate.getTime() - monday.getTime()) / (7 * 24 * 60 * 60 * 1000)))
 
-  let totalRevenue = 0
+  let totalOperatingIncome = 0
   let totalCosts = 0
   let totalEquityInvested = 0
   let totalLoans = 0
@@ -176,8 +176,10 @@ export function buildBalanceSheet(
         totalEquityInvested += amount
       } else if (item.sourceType === 'loan') {
         totalLoans += amount
+      } else {
+        // INTENT: Operating income = revenue + grants + other (not loans/equity)
+        totalOperatingIncome += amount
       }
-      totalRevenue += amount
     }
 
     // Cash out
@@ -200,12 +202,15 @@ export function buildBalanceSheet(
     }
   }
 
-  const cash = openingBalance + totalRevenue - totalCosts
+  // INTENT: Assets = Liabilities + Equity (accounting equation)
+  // Cash = opening + operating income + equity + loans - costs
+  // RetainedEarnings = operating income - (costs excluding capex)
+  const cash = openingBalance + totalOperatingIncome + totalEquityInvested + totalLoans - totalCosts
   const equipment = totalCapex // Simplified: no depreciation
   const totalAssets = cash + equipment
   const totalLiabilities = totalLoans
-  const retainedEarnings = cash - openingBalance - totalEquityInvested + totalLoans
-  const totalEquity = totalEquityInvested + retainedEarnings + openingBalance
+  const retainedEarnings = totalOperatingIncome - (totalCosts - totalCapex)
+  const totalEquity = openingBalance + totalEquityInvested + retainedEarnings
 
   return {
     cash,

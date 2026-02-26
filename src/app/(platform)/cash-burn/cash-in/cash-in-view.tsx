@@ -48,6 +48,7 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
 
   const weeklyTotal = useMemo(() => items.reduce((s, i) => s + i.weeklyAmount, 0), [items])
   const monthlyTotal = Math.round(weeklyTotal * 52 / 12)
@@ -114,21 +115,29 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
   }, [items])
 
   const handleDelete = useCallback(async (id: string) => {
+    setError(null)
     const result = await deleteCashInItem(id)
-    if (!result.error) {
+    if (result.error) {
+      setError(result.error)
+    } else {
       setItems(prev => prev.filter(i => i.id !== id))
     }
   }, [])
 
   const handleSave = useCallback(async (data: CreateCashInInput) => {
+    setError(null)
     if (editingItem) {
       const result = await updateCashInItem(editingItem.id, data)
-      if (result.data) {
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
         setItems(prev => prev.map(i => i.id === editingItem.id ? result.data! : i))
       }
     } else {
       const result = await createCashInItem(data)
-      if (result.data) {
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
         setItems(prev => [...prev, result.data!])
       }
     }
@@ -175,6 +184,10 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
           <Badge variant="secondary" size="sm">{formatCurrency(monthlyTotal)}/mo</Badge>
         </div>
       </div>
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
 
       {/* Summary Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -271,7 +284,7 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
         initialData={editingItem ? {
           name: editingItem.name,
           source_type: editingItem.sourceType,
-          amount: editingItem.amount / 100,
+          amount: editingItem.amount,
           frequency: editingItem.frequency,
           probability_pct: editingItem.probabilityPct,
           effective_from: editingItem.effectiveFrom,

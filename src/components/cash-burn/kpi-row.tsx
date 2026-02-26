@@ -6,7 +6,6 @@ interface KpiItem {
   label: string
   value: string
   detail?: string
-  trend?: 'up' | 'down' | 'neutral'
 }
 
 interface KpiRowProps {

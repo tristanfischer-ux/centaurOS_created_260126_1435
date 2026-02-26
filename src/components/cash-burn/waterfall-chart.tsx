@@ -11,16 +11,14 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { chartColors, moneyMapColors } from '@/lib/chart-colors'
 import { formatCurrency } from '@/types/payments'
 import type { IncomeStatementRow } from '@/types/cash-burn'
 
-// ============================================================
-// Semantic colors
-// ============================================================
-
-const COLOR_SUCCESS = 'hsl(160, 84%, 39%)'    // Revenue / profit
-const COLOR_DESTRUCTIVE = 'hsl(0, 84%, 60%)'   // Cost bars
-const COLOR_INFO = 'hsl(217, 91%, 60%)'         // Subtotals
+// Semantic colors from centralised palette
+const COLOR_SUCCESS = chartColors[2]        // Emerald
+const COLOR_DESTRUCTIVE = moneyMapColors.loss // Red
+const COLOR_INFO = chartColors[1]           // Electric Blue
 
 // ============================================================
 // Types

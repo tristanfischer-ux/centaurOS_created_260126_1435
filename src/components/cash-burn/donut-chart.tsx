@@ -34,6 +34,11 @@ export function DonutChart({ data, title, height = 250 }: DonutChartProps) {
         <h3 className="text-lg font-semibold text-foreground">{title}</h3>
       </CardHeader>
       <CardContent>
+        {filteredData.length === 0 ? (
+          <div className="flex items-center justify-center" style={{ height }}>
+            <p className="text-sm text-muted-foreground">No data yet</p>
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
             <Pie
@@ -71,6 +76,7 @@ export function DonutChart({ data, title, height = 250 }: DonutChartProps) {
             />
           </PieChart>
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   )

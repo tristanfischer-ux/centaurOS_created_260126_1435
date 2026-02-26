@@ -1,16 +1,14 @@
 'use client'
 
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
+import { chartColors, moneyMapColors } from '@/lib/chart-colors'
 import { formatCurrency } from '@/types/payments'
 import type { BalanceSheet } from '@/types/cash-burn'
 
-// ============================================================
-// Semantic colors
-// ============================================================
-
-const COLOR_SUCCESS = 'hsl(160, 84%, 39%)'    // Assets / equity
-const COLOR_WARNING = 'hsl(38, 92%, 50%)'      // Liabilities
-const COLOR_INFO = 'hsl(217, 91%, 60%)'         // Invested capital
+// Semantic colors from centralised palette
+const COLOR_SUCCESS = chartColors[2]        // Emerald — assets / equity
+const COLOR_WARNING = chartColors[3]        // Amber — liabilities
+const COLOR_INFO = chartColors[1]           // Electric Blue — invested capital
 
 // ============================================================
 // Types
@@ -84,7 +82,7 @@ export function HorizontalBar({ data }: HorizontalBarProps) {
                   className="h-full rounded-full transition-all duration-300"
                   style={{
                     width: `${widthPct}%`,
-                    backgroundColor: isNegative ? 'hsl(0, 84%, 60%)' : row.color,
+                    backgroundColor: isNegative ? moneyMapColors.loss : row.color,
                   }}
                 />
               </div>

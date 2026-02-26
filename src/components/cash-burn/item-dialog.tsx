@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -110,9 +110,13 @@ export function ItemDialog({
   const [sourceType, setSourceType] = useState<CashInSourceType>('revenue')
   const [probabilityPct, setProbabilityPct] = useState(100)
 
+  // INTENT: Track whether category was changed by the user (not initial data load)
+  const userChangedCategoryRef = useRef(false)
+
   // Reset form when dialog opens or initialData changes
   useEffect(() => {
     if (open) {
+      userChangedCategoryRef.current = false
       setName(initialData?.name ?? '')
       // INTENT: initialData.amount is in pence — convert to pounds for display
       setAmountPounds(initialData?.amount != null ? String(initialData.amount / 100) : '')
@@ -132,9 +136,9 @@ export function ItemDialog({
     }
   }, [open, initialData, mode])
 
-  // Auto-set cost type based on category group
+  // Auto-set cost type based on category group — only when user changes category
   useEffect(() => {
-    if (mode === 'cash-out') {
+    if (mode === 'cash-out' && userChangedCategoryRef.current) {
       const cat = CASH_OUT_CATEGORIES.find((c) => c.value === category)
       if (cat) {
         setCostType(cat.group as CostType)
@@ -145,8 +149,15 @@ export function ItemDialog({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
+    // Guard against NaN from empty or invalid input
+    const parsed = parseFloat(amountPounds)
+    if (isNaN(parsed) || parsed < 0) return
+
+    // Validate date range when both dates are set
+    if (effectiveTo && effectiveTo < effectiveFrom) return
+
     // Convert pounds to pence
-    const amountPence = Math.round(parseFloat(amountPounds) * 100)
+    const amountPence = Math.round(parsed * 100)
 
     if (mode === 'cash-out') {
       const data: CreateCashOutInput = {
@@ -216,7 +227,7 @@ export function ItemDialog({
                 <select
                   id="item-category"
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => { userChangedCategoryRef.current = true; setCategory(e.target.value) }}
                   className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <optgroup label="Fixed Costs">

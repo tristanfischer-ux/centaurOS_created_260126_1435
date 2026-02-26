@@ -47,6 +47,7 @@ const WEEKS = 52
 
 export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const [scenarios, setScenarios] = useState<BurnScenario[]>(initialData?.scenarios ?? [])
+  const [error, setError] = useState<string | null>(null)
   const [activeScenario, setActiveScenario] = useState<BurnScenario>(
     () => scenarios.find(s => s.isDefault) ?? scenarios[0] ?? {
       id: '', name: 'Base Case', openingBalance: 0,
@@ -119,8 +120,11 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   }, [])
 
   const handleSave = useCallback(async (id: string, updates: Partial<CreateScenarioInput>) => {
+    setError(null)
     const result = await updateScenario(id, updates)
-    if (result.data) {
+    if (result.error) {
+      setError(result.error)
+    } else if (result.data) {
       setScenarios(prev => prev.map(s => s.id === id ? result.data! : s))
       if (activeScenario.id === id) {
         setActiveScenario(result.data)
@@ -129,16 +133,22 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   }, [activeScenario.id])
 
   const handleCreate = useCallback(async (input: CreateScenarioInput) => {
+    setError(null)
     const result = await createScenario(input)
-    if (result.data) {
+    if (result.error) {
+      setError(result.error)
+    } else if (result.data) {
       setScenarios(prev => [...prev, result.data!])
       setActiveScenario(result.data)
     }
   }, [])
 
   const handleDelete = useCallback(async (id: string) => {
+    setError(null)
     const result = await deleteScenario(id)
-    if (!result.error) {
+    if (result.error) {
+      setError(result.error)
+    } else {
       setScenarios(prev => {
         const remaining = prev.filter(s => s.id !== id)
         if (activeScenario.id === id && remaining.length > 0) {
@@ -186,6 +196,10 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           </p>
         </div>
       </div>
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
 
       {/* KPI Row */}
       <KpiRow items={[

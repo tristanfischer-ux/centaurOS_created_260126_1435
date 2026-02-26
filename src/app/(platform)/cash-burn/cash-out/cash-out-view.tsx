@@ -35,6 +35,7 @@ export function CashOutView({ initialItems, hasError }: CashOutViewProps) {
   const [items, setItems] = useState<CashOutItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashOutItem | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const fixedItems = useMemo(() => items.filter(i => i.costType === 'fixed'), [items])
   const variableItems = useMemo(() => items.filter(i => i.costType === 'variable'), [items])
@@ -81,21 +82,29 @@ export function CashOutView({ initialItems, hasError }: CashOutViewProps) {
   }, [items])
 
   const handleDelete = useCallback(async (id: string) => {
+    setError(null)
     const result = await deleteCashOutItem(id)
-    if (!result.error) {
+    if (result.error) {
+      setError(result.error)
+    } else {
       setItems(prev => prev.filter(i => i.id !== id))
     }
   }, [])
 
   const handleSave = useCallback(async (data: CreateCashOutInput) => {
+    setError(null)
     if (editingItem) {
       const result = await updateCashOutItem(editingItem.id, data)
-      if (result.data) {
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
         setItems(prev => prev.map(i => i.id === editingItem.id ? result.data! : i))
       }
     } else {
       const result = await createCashOutItem(data)
-      if (result.data) {
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
         setItems(prev => [...prev, result.data!])
       }
     }
@@ -143,6 +152,10 @@ export function CashOutView({ initialItems, hasError }: CashOutViewProps) {
           <Badge variant="secondary" size="sm">{formatCurrency(annualTotal)}/yr</Badge>
         </div>
       </div>
+
+      {error && (
+        <p className="text-sm text-destructive">{error}</p>
+      )}
 
       {/* Summary Charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -222,7 +235,7 @@ export function CashOutView({ initialItems, hasError }: CashOutViewProps) {
           category: editingItem.category,
           cost_type: editingItem.costType,
           pnl_category: editingItem.pnlCategory,
-          amount: editingItem.amount / 100,
+          amount: editingItem.amount,
           frequency: editingItem.frequency,
           effective_from: editingItem.effectiveFrom,
           effective_to: editingItem.effectiveTo ?? undefined,
