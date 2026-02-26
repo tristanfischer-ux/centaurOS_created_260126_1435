@@ -266,6 +266,69 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
   },
 ]
 
+// ─── Intelligent Defaults ────────────────────────────────────────────
+
+/**
+ * Infers recommended diagnostics per module based on its name, purpose,
+ * description, and key parts instead of using static FDM/PLA defaults.
+ *
+ * @param mod - The module to analyze
+ * @returns Record of questionId → suggested answer
+ */
+function inferRecommendations(mod: CadLabModule): Record<string, string> {
+  const text = [mod.name, mod.purpose, mod.description, ...mod.keyParts]
+    .join(" ")
+    .toLowerCase()
+
+  // ── Manufacturing process ──
+  const metalKw = ["aluminium", "aluminum", "housing", "chassis", "shaft", "gear", "axle", "spindle", "block"]
+  const electronicsKw = ["pcb", "circuit", "motor", "driver", "battery", "sensor", "controller", "wire", "led"]
+  const structuralKw = ["frame", "bracket", "panel", "enclosure", "rail", "plate"]
+  const precisionKw = ["servo", "kinematic", "bearing", "linear", "leadscrew", "ball screw"]
+  const castKw = ["casting", "foundry", "cast"]
+
+  let mfgProcess = "FDM 3D Print"
+  let material = "PLA/PETG"
+  let tolerance = "Standard (±0.5mm)"
+  let finish = "As-manufactured"
+
+  if (electronicsKw.some((kw) => text.includes(kw))) {
+    mfgProcess = "Manual/Assembly"
+    material = "Other"
+    tolerance = "Standard (±0.5mm)"
+    finish = "N/A"
+  } else if (precisionKw.some((kw) => text.includes(kw))) {
+    mfgProcess = "CNC Machining"
+    material = "Aluminum 6061"
+    tolerance = "Precision (±0.1mm)"
+    finish = "Anodized"
+  } else if (metalKw.some((kw) => text.includes(kw))) {
+    mfgProcess = "CNC Machining"
+    material = "Aluminum 6061"
+    tolerance = "Standard (±0.5mm)"
+    finish = "Sanded/Deburred"
+  } else if (structuralKw.some((kw) => text.includes(kw))) {
+    mfgProcess = "Sheet Metal"
+    material = "Steel (mild)"
+    tolerance = "Standard (±0.5mm)"
+    finish = "Painted/Coated"
+  } else if (castKw.some((kw) => text.includes(kw))) {
+    mfgProcess = "Casting"
+    material = "Aluminum 6061"
+    tolerance = "Loose (±1mm)"
+    finish = "Sanded/Deburred"
+  }
+
+  return {
+    mfg_process: mfgProcess,
+    material,
+    tolerance,
+    finish,
+    batch_size: "Prototype (1–5)",
+    environment: "Indoor (office)",
+  }
+}
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 /** Map of moduleId → { questionId: answer } */
@@ -343,13 +406,10 @@ export function CadLabDiagnostics({
   }
 
   const handleUseRecommended = (moduleId: string): void => {
-    const recommended = DIAGNOSTIC_QUESTIONS.reduce<Record<string, string>>(
-      (acc, q) => {
-        acc[q.id] = q.recommended
-        return acc
-      },
-      {}
-    )
+    const mod = modules.find((m) => m.id === moduleId)
+    const recommended = mod
+      ? inferRecommendations(mod)
+      : DIAGNOSTIC_QUESTIONS.reduce<Record<string, string>>((acc, q) => { acc[q.id] = q.recommended; return acc }, {})
     onAnswersChange({
       ...answers,
       [moduleId]: {
@@ -464,9 +524,11 @@ export function CadLabDiagnostics({
                 </button>
 
                 {/* Expanded questionnaire */}
-                {isExpanded && (
+                {isExpanded && (() => {
+                  const modRecs = inferRecommendations(mod)
+                  return (
                   <div className="border-t p-4 space-y-5 bg-muted/10">
-                    {/* "Use recommended answers" button — only when unanswered questions remain */}
+                    {/* "Use suggested answers" button — only when unanswered questions remain */}
                     {!isComplete && (
                       <div className="flex justify-end">
                         <Button
@@ -477,7 +539,7 @@ export function CadLabDiagnostics({
                           type="button"
                         >
                           <Lightbulb className="h-3.5 w-3.5" />
-                          Use recommended answers
+                          Use suggested answers
                         </Button>
                       </div>
                     )}
@@ -497,7 +559,7 @@ export function CadLabDiagnostics({
                           <div className="flex flex-wrap gap-1.5">
                             {q.options.map((opt) => {
                               const isSelected = currentAnswer === opt
-                              const isRecommended = q.recommended === opt
+                              const isSuggested = modRecs[q.id] === opt
                               return (
                                 <Tooltip key={opt}>
                                   <TooltipTrigger asChild>
@@ -506,7 +568,7 @@ export function CadLabDiagnostics({
                                       size="sm"
                                       className={cn(
                                         "text-xs h-7",
-                                        !isSelected && isRecommended &&
+                                        !isSelected && isSuggested &&
                                           "ring-1 ring-international-orange/40"
                                       )}
                                       onClick={() =>
@@ -514,7 +576,7 @@ export function CadLabDiagnostics({
                                       }
                                       type="button"
                                     >
-                                      {!isSelected && isRecommended && (
+                                      {!isSelected && isSuggested && (
                                         <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
                                       )}
                                       {opt}
@@ -536,7 +598,8 @@ export function CadLabDiagnostics({
                       )
                     })}
                   </div>
-                )}
+                  )
+                })()}
               </div>
             )
           })}
