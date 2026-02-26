@@ -50,6 +50,7 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import {
   MATERIAL_COST_PER_KG,
+  MATERIAL_COST_CONFIDENCE,
   PROCESS_HOURLY_RATE,
   HOURS_PER_KG,
   TOOLING_COST,
@@ -87,6 +88,8 @@ interface ModuleCost {
   batchSize: number
   /** Whether this is an estimate with low data confidence */
   isEstimated: boolean
+  /** Whether the material cost is an estimate (not backed by engineering DB) */
+  isCostEstimated: boolean
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -127,6 +130,7 @@ export function CadLabCostEstimate({
       )
 
       const materialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
+      const isCostEstimated = (MATERIAL_COST_CONFIDENCE[material] ?? "estimate") === "estimate"
       const materialCost = massKg * materialCostPerKg
 
       const hourlyRate = PROCESS_HOURLY_RATE[process] ?? 50
@@ -150,6 +154,7 @@ export function CadLabCostEstimate({
         material,
         batchSize,
         isEstimated,
+        isCostEstimated,
       }
     })
   }, [modules, diagnosticAnswers])
@@ -321,7 +326,16 @@ export function CadLabCostEstimate({
                         {c.process} · {c.material} · {(c.massKg * 1000).toFixed(0)}g
                       </div>
                     </td>
-                    <td className="p-2 text-right font-mono text-foreground">£{c.materialCost.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono text-foreground">
+                      <span className="inline-flex items-center gap-1 justify-end">
+                        £{c.materialCost.toFixed(2)}
+                        {c.isCostEstimated && (
+                          <span title="Cost is approximate — material not in engineering database">
+                            <Info className="h-3 w-3 text-muted-foreground" />
+                          </span>
+                        )}
+                      </span>
+                    </td>
                     <td className="p-2 text-right font-mono text-foreground">£{c.processCost.toFixed(2)}</td>
                     <td className="p-2 text-right font-mono text-foreground">
                       {c.toolingCostPerUnit > 0 ? `£${c.toolingCostPerUnit.toFixed(2)}` : "—"}

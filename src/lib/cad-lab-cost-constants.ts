@@ -23,7 +23,7 @@ const MATERIAL_CLASS_TO_DB_IDS: Record<string, string[]> = {
   // Diagnostic UI options (exact match to cad-lab-diagnostics.tsx)
   "PLA/PETG": ["pla", "petg"],
   "ABS/Nylon": ["abs", "nylon-pa6"],
-  "Resin (standard)": ["pla"],                  // SLA resin cost ≈ PLA filament
+  "Resin (standard)": ["resin-standard", "resin-tough"],
   "Aluminum 6061": ["al-6061-t6"],
   "Steel (mild)": ["steel-1018"],
   "Stainless Steel": ["ss-304", "ss-316"],
@@ -79,6 +79,45 @@ function buildMaterialCostMap(): Record<string, number> {
  * Falls back to estimates for materials not in the DB.
  */
 export const MATERIAL_COST_PER_KG: Record<string, number> = buildMaterialCostMap()
+
+// ─── Cost Confidence ─────────────────────────────────────────────────
+
+/**
+ * Indicates whether a material's cost comes from the engineering database
+ * or is a rough estimate.
+ */
+export type CostConfidence = "database" | "estimate"
+
+/**
+ * Build a map of material class → cost confidence level.
+ * DB-backed materials get "database", fallback materials get "estimate".
+ */
+function buildCostConfidenceMap(): Record<string, CostConfidence> {
+  const materialIndex = new Map(MATERIALS.map(m => [m.id, m]))
+  const result: Record<string, CostConfidence> = {}
+
+  for (const [className, dbIds] of Object.entries(MATERIAL_CLASS_TO_DB_IDS)) {
+    const hasDbData = dbIds.some(id => materialIndex.has(id))
+    result[className] = hasDbData ? "database" : "estimate"
+  }
+
+  // Fallback materials are always estimates
+  const fallbackKeys = [
+    "Wood/Plywood", "Glass/Ceramic", "PCB/Electronic", "Concrete",
+    "Timber", "Copper Wire", "Glass", "Zinc", "Lead", "Nickel", "Other",
+  ]
+  for (const key of fallbackKeys) {
+    result[key] = "estimate"
+  }
+
+  return result
+}
+
+/**
+ * Cost confidence per material class — "database" when backed by engineering
+ * data, "estimate" when using a hardcoded approximation.
+ */
+export const MATERIAL_COST_CONFIDENCE: Record<string, CostConfidence> = buildCostConfidenceMap()
 
 // ─── Process Cost Tables ────────────────────────────────────────────
 
@@ -147,6 +186,7 @@ export const SUPPLIER_CATEGORY_MAP: Record<string, string[]> = {
   "CNC Machining|Copper/Brass": ["CNC Machine Shop", "Specialty Metals"],
   "FDM 3D Print|PLA/PETG": ["3D Print Service Bureau", "Rapid Prototyping"],
   "FDM 3D Print|ABS/Nylon": ["3D Print Service Bureau", "Rapid Prototyping"],
+  "SLA/Resin Print|Resin (standard)": ["SLA Print Service", "Rapid Prototyping"],
   "SLA/Resin Print|ABS/Nylon": ["SLA Print Service", "Rapid Prototyping"],
   "SLA/Resin Print|Silicone/Rubber": ["SLA Print Service", "Specialty Prototyping"],
   "SLS/Powder Print|ABS/Nylon": ["SLS Print Service", "Industrial Prototyping"],

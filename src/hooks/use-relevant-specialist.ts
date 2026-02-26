@@ -74,17 +74,21 @@ const DOMAIN_RULES: DomainRule[] = [
     primaryKeywords: [
       'manufacturing', 'production', 'factory', 'dfm', 'yield', 'tooling',
       'mold', 'injection', 'casting', 'cnc', 'assembly', 'bom',
-      'oem', 'throughput',
+      'oem', 'throughput', 'material', 'alloy', 'resin', 'filament',
     ],
     secondaryKeywords: [
       'quality', 'qc', 'qa', 'tolerance', 'supplier', 'vendor',
       'contract manufacturer', 'cm', 'capacity', 'operations',
       'bottleneck', 'process', 'efficiency', 'pilot', 'scale up',
+      'pla', 'abs', 'petg', 'nylon', 'aluminum', 'titanium',
+      'stainless', 'carbon fiber', 'composite', 'polymer', 'plastic',
+      'metal', 'printable', 'machinable',
     ],
     bigrams: [
       'design for manufacturing', 'bill of materials', 'first article',
       'contract manufacturer', 'production planning', 'scale up',
-      'manufacturing engineer',
+      'manufacturing engineer', 'material selection', '3d print',
+      'additive manufacturing', 'surface finish',
     ],
     negativeKeywords: ['marketing', 'sales', 'fundraise', 'legal'],
   },

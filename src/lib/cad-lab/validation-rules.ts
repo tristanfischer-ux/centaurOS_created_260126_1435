@@ -17,6 +17,11 @@
 import { PROCESSES } from "@/lib/engineering-data/processes"
 import { MATERIALS } from "@/lib/engineering-data/materials"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import {
+  DIAG_PROCESS_TO_DB_IDS,
+  DIAG_MATERIAL_TO_DB_IDS,
+  DIAG_TOLERANCE_TO_MM,
+} from "./diagnostic-mappings"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -66,54 +71,6 @@ export interface ValidationSummary {
 
 /** Diagnostic answers for a single module (questionId → answer string) */
 type ModuleDiagnostics = Record<string, string>
-
-// ─── Diagnostic-to-DB Mapping ───────────────────────────────────────
-
-/**
- * Maps diagnostic process selection strings to engineering DB process IDs.
- *
- * INTENT: The diagnostics UI uses human-friendly names ("FDM 3D Print").
- * The engineering DB uses machine IDs ("fdm"). This bridges them.
- */
-const DIAG_PROCESS_TO_DB_IDS: Record<string, string[]> = {
-  "FDM 3D Print": ["fdm"],
-  "SLA/Resin Print": ["sla"],
-  "SLS/Powder Print": ["sls", "mjf"],
-  "CNC Machining": ["cnc-3axis", "cnc-5axis"],
-  "Sheet Metal": ["sheet-metal"],
-  "Injection Molding": ["injection-molding"],
-  "Casting": ["die-casting", "investment-casting", "sand-casting"],
-  "Manual/Assembly": [],
-  "Other": [],
-}
-
-/**
- * Maps diagnostic material selection strings to engineering DB material IDs.
- */
-const DIAG_MATERIAL_TO_DB_IDS: Record<string, string[]> = {
-  "PLA/PETG": ["pla", "petg"],
-  "ABS/Nylon": ["abs", "nylon-pa6", "nylon-pa12"],
-  "Resin (standard)": [], // DECISION: No matching IDs in materials DB for resins
-  "Aluminum 6061": ["al-6061-t6"],
-  "Steel (mild)": ["steel-1018", "steel-4140"],
-  "Stainless Steel": ["ss-304", "ss-316"],
-  "Titanium": ["ti-6al-4v"],
-  "Copper/Brass": ["cu-c110", "brass-c360"],
-  "Carbon Fiber": ["cf-unidirectional", "cf-woven-3k", "cf-chopped-sls"],
-  "Wood/Plywood": [],
-  "Other": [],
-}
-
-/**
- * Maps diagnostic tolerance class to a numeric value in mm.
- */
-const DIAG_TOLERANCE_TO_MM: Record<string, number> = {
-  "Loose (±1mm)": 1.0,
-  "Standard (±0.5mm)": 0.5,
-  "Precision (±0.1mm)": 0.1,
-  "Tight (±0.05mm)": 0.05,
-  "Ultra-tight (±0.01mm)": 0.01,
-}
 
 // ─── Rule Definitions ───────────────────────────────────────────────
 
@@ -389,6 +346,73 @@ function validateMaterialProcessCompatibility(
 }
 
 /**
+ * Validate material printability against the selected additive process.
+ *
+ * INTENT: The `printability` field on each material records whether it's
+ * compatible with FDM/SLA/SLS/DMLS. This cross-checks that field against
+ * the user's selected process. Only fires for additive processes.
+ */
+function validatePrintabilityMatch(
+  _module: CadLabModule,
+  diagnostics: ModuleDiagnostics,
+): ValidationResult[] {
+  const results: ValidationResult[] = []
+
+  const processName = diagnostics.mfg_process
+  const materialName = diagnostics.material
+  if (!processName || !materialName) return results
+
+  // INTENT: Map diagnostic process names to printability keys
+  const PROCESS_TO_PRINTABILITY_KEY: Record<string, keyof typeof MATERIALS[number]["printability"]> = {
+    "FDM 3D Print": "fdm",
+    "SLA/Resin Print": "sla",
+    "SLS/Powder Print": "sls",
+  }
+
+  const printKey = PROCESS_TO_PRINTABILITY_KEY[processName]
+  if (!printKey) return results // Not an additive process we track
+
+  const materialIds = DIAG_MATERIAL_TO_DB_IDS[materialName] ?? []
+  if (materialIds.length === 0) return results
+
+  const materialIndex = new Map(MATERIALS.map(m => [m.id, m]))
+  const mats = materialIds
+    .map(id => materialIndex.get(id))
+    .filter(Boolean) as (typeof MATERIALS)[number][]
+
+  if (mats.length === 0) return results
+
+  // INTENT: If ANY of the mapped materials are printable on this process, it's OK
+  const anyPrintable = mats.some(m => m.printability[printKey])
+
+  if (!anyPrintable) {
+    // Find which additive processes DO work for this material
+    const altProcesses: string[] = []
+    const allKeys = ["fdm", "sla", "sls", "dmls"] as const
+    for (const key of allKeys) {
+      if (mats.some(m => m.printability[key])) {
+        const names: Record<string, string> = { fdm: "FDM", sla: "SLA", sls: "SLS", dmls: "DMLS" }
+        altProcesses.push(names[key])
+      }
+    }
+
+    results.push({
+      ruleId: "compat-printability",
+      category: "material-process",
+      severity: "critical",
+      message: `${materialName} is not printable via ${processName}`,
+      suggestion: altProcesses.length > 0
+        ? `This material is printable via: ${altProcesses.join(", ")}. Or choose a material designed for ${processName}.`
+        : `This material is not printable via any additive process. Consider CNC machining or another subtractive/formative process.`,
+      measuredValue: `${materialName} + ${processName}`,
+      threshold: `Material printability.${printKey} must be true`,
+    })
+  }
+
+  return results
+}
+
+/**
  * Validate that the requested tolerance class is achievable with the
  * selected manufacturing process.
  */
@@ -560,6 +584,104 @@ function validateEnvironmentCompatibility(
     })
   }
 
+  // INTENT: Wood in wet/marine/outdoor environments — moisture damage, rot, swell
+  if (
+    (environment === "Wet/Marine" || environment.includes("Outdoor") || environment === "Corrosive") &&
+    materialName === "Wood/Plywood"
+  ) {
+    results.push({
+      ruleId: "env-material-wood-moisture",
+      category: "environment",
+      severity: "critical",
+      message: `Wood/Plywood is not suitable for ${environment} — susceptible to moisture damage, rot, and dimensional swelling`,
+      suggestion: "Use moisture-resistant materials: aluminum, stainless steel, or UV-stable polymers (ASA, HDPE) for outdoor/wet environments",
+      measuredValue: materialName,
+      threshold: `Moisture-resistant material for ${environment}`,
+    })
+  }
+
+  // INTENT: ABS outdoor — UV degradation
+  if (
+    environment.includes("Outdoor") &&
+    materialName === "ABS/Nylon"
+  ) {
+    results.push({
+      ruleId: "env-material-outdoor-abs",
+      category: "environment",
+      severity: "warning",
+      message: `ABS degrades under UV exposure — yellows and becomes brittle outdoors. Nylon is more UV-resistant but absorbs moisture.`,
+      suggestion: "Use ASA (UV-stable ABS alternative) for outdoor applications, or apply a UV-protective coating",
+      measuredValue: materialName,
+      threshold: "UV-stable material for outdoor use",
+    })
+  }
+
+  // INTENT: Carbon Fiber outdoor — epoxy matrix UV degradation
+  if (
+    environment.includes("Outdoor") &&
+    materialName === "Carbon Fiber"
+  ) {
+    results.push({
+      ruleId: "env-material-outdoor-cf",
+      category: "environment",
+      severity: "warning",
+      message: "Carbon fiber epoxy matrix degrades under prolonged UV exposure — fibers are fine but the resin yellows and weakens",
+      suggestion: "Apply UV-protective clear coat or paint. Vinyl ester matrix resists UV better than epoxy for outdoor structural use.",
+      measuredValue: materialName,
+      threshold: "UV-protected composite for outdoor use",
+    })
+  }
+
+  // INTENT: Copper/Brass in corrosive environments — galvanic/chemical attack
+  if (
+    environment === "Corrosive" &&
+    materialName === "Copper/Brass"
+  ) {
+    results.push({
+      ruleId: "env-material-corrosion-copper",
+      category: "environment",
+      severity: "warning",
+      message: "Copper and brass are vulnerable to galvanic corrosion and chemical attack in corrosive environments",
+      suggestion: "Use stainless steel 316 or nickel alloy for corrosive environments. If copper is required for conductivity, apply protective coating.",
+      measuredValue: materialName,
+      threshold: "Chemical-resistant material for corrosive environment",
+    })
+  }
+
+  // INTENT: Aluminum 6061 in corrosive environments — pitting from chlorides/acids
+  if (
+    environment === "Corrosive" &&
+    materialName === "Aluminum 6061"
+  ) {
+    results.push({
+      ruleId: "env-material-corrosion-aluminum",
+      category: "environment",
+      severity: "warning",
+      message: "Aluminum 6061 is susceptible to pitting corrosion from chlorides and acids in corrosive environments",
+      suggestion: "Anodize for mild exposure. For harsh chemical contact, use stainless steel 316 or HDPE/PTFE.",
+      measuredValue: materialName,
+      threshold: "Chemical-resistant material for corrosive environment",
+    })
+  }
+
+  // INTENT: Polymers in industrial environments — limited fatigue life under vibration
+  if (environment === "Indoor (industrial)") {
+    for (const mat of mats) {
+      if (mat.category === "polymer") {
+        results.push({
+          ruleId: "env-material-industrial-polymer",
+          category: "environment",
+          severity: "info",
+          message: `${mat.name} may have limited fatigue life in industrial environments with vibration, dust, and oil exposure`,
+          suggestion: "Consider engineering-grade polymers (Nylon, POM, PEEK) or metals for high-vibration industrial applications",
+          measuredValue: materialName,
+          threshold: "Fatigue-resistant material for industrial use",
+        })
+        break // One info per material group is enough
+      }
+    }
+  }
+
   // INTENT: High temperature + polymers — check HDT
   if (environment === "High temperature") {
     for (const mat of mats) {
@@ -575,6 +697,61 @@ function validateEnvironmentCompatibility(
         })
       }
     }
+  }
+
+  return results
+}
+
+/**
+ * Warn when the selected material has no engineering database entries.
+ *
+ * INTENT: "Other" and "Wood/Plywood" map to empty DB ID arrays, which means
+ * all material-based validation silently skips. Tell the user so they know
+ * coverage is limited.
+ */
+function validateUnmappedMaterial(
+  _module: CadLabModule,
+  diagnostics: ModuleDiagnostics,
+): ValidationResult[] {
+  const results: ValidationResult[] = []
+
+  const materialName = diagnostics.material
+  if (!materialName) return results
+
+  const materialIds = DIAG_MATERIAL_TO_DB_IDS[materialName] ?? []
+  if (materialIds.length > 0) return results // Mapped — no issue
+
+  // Material-specific messaging
+  if (materialName === "Other") {
+    results.push({
+      ruleId: "data-unmapped-material",
+      category: "material-process",
+      severity: "info",
+      message: `"Other" material is outside the engineering database — validation and cost estimates are limited`,
+      suggestion: "Cost uses a $20/kg placeholder. For accurate estimates, select a specific material class or describe the material in notes for specialist review.",
+      measuredValue: materialName,
+      threshold: "Material in engineering database",
+    })
+  } else if (materialName === "Wood/Plywood") {
+    results.push({
+      ruleId: "data-unmapped-material",
+      category: "material-process",
+      severity: "info",
+      message: "Wood/Plywood properties vary widely by species — engineering validation is limited",
+      suggestion: "Cost uses a $3/kg average. Plywood (birch) is ~$5/kg, softwood framing lumber ~$0.50/kg. Specify species in notes for specialist review.",
+      measuredValue: materialName,
+      threshold: "Material in engineering database",
+    })
+  } else {
+    results.push({
+      ruleId: "data-unmapped-material",
+      category: "material-process",
+      severity: "info",
+      message: `${materialName} is not mapped to the engineering database — material-specific validation is unavailable`,
+      suggestion: "Some validation rules and cost estimates may be inaccurate. Add notes about the specific grade for specialist review.",
+      measuredValue: materialName,
+      threshold: "Material in engineering database",
+    })
   }
 
   return results
@@ -802,6 +979,8 @@ type ValidationRule = (
 ) => ValidationResult[]
 
 export const VALIDATION_RULES: ValidationRule[] = [
+  // Data coverage
+  validateUnmappedMaterial,
   // Geometry rules
   validateBoundingBox,
   validateFillRatio,
@@ -812,6 +991,7 @@ export const VALIDATION_RULES: ValidationRule[] = [
   validateDraftAngles,
   // Material-process compatibility
   validateMaterialProcessCompatibility,
+  validatePrintabilityMatch,
   // Tolerance feasibility
   validateToleranceFeasibility,
   // Structural sanity

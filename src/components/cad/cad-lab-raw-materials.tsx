@@ -23,7 +23,7 @@
 "use client"
 
 import { useMemo, useCallback } from "react"
-import { Download, Gem, Factory, AlertTriangle } from "lucide-react"
+import { Download, Gem, Factory, AlertTriangle, Info } from "lucide-react"
 import {
   PieChart,
   Pie,
@@ -43,6 +43,7 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import {
   MATERIAL_COST_PER_KG,
+  MATERIAL_COST_CONFIDENCE,
   PROCESS_HOURLY_RATE,
   HOURS_PER_KG,
   TOOLING_COST,
@@ -568,7 +569,14 @@ export function CadLabRawMaterials({
                         {r.totalKg.toFixed(3)}
                       </td>
                       <td className="p-2 text-right font-mono text-foreground">
-                        £{r.costPerKg.toFixed(2)}
+                        <span className="inline-flex items-center gap-1 justify-end">
+                          £{r.costPerKg.toFixed(2)}
+                          {(MATERIAL_COST_CONFIDENCE[r.material] ?? "estimate") === "estimate" && (
+                            <span title="Cost is approximate — material not in engineering database">
+                              <Info className="h-3 w-3 text-muted-foreground" />
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="p-2 text-right font-mono font-semibold text-foreground">
                         {fmt(r.totalCost)}

@@ -42,6 +42,11 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"
+import {
+  getMaterialCompatibilityForProcess,
+  getProcessCompatibilityForMaterial,
+} from "@/lib/cad-lab/diagnostic-mappings"
+import type { CompatibilityStatus } from "@/lib/cad-lab/diagnostic-mappings"
 
 // ─── Diagnostic Questions ───────────────────────────────────────────
 
@@ -596,6 +601,15 @@ export function CadLabDiagnostics({
 
                     {DIAGNOSTIC_QUESTIONS.map((q) => {
                       const currentAnswer = modAnswers[q.id]
+
+                      // INTENT: Compute compatibility map for cross-question guidance
+                      let compatMap: Record<string, CompatibilityStatus> | null = null
+                      if (q.id === "material" && modAnswers.mfg_process) {
+                        compatMap = getMaterialCompatibilityForProcess(modAnswers.mfg_process)
+                      } else if (q.id === "mfg_process" && modAnswers.material) {
+                        compatMap = getProcessCompatibilityForMaterial(modAnswers.material)
+                      }
+
                       return (
                         <div key={q.id} className="space-y-2">
                           <div>
@@ -610,6 +624,18 @@ export function CadLabDiagnostics({
                             {q.options.map((opt) => {
                               const isSelected = currentAnswer === opt
                               const isSuggested = modRecs[q.id] === opt
+                              const compat = compatMap?.[opt]
+                              const isIncompat = compat === "incompatible" && !isSelected
+
+                              // Build tooltip text with compatibility note
+                              let tooltipText = q.optionDescriptions[opt] ?? opt
+                              if (isIncompat) {
+                                const crossField = q.id === "material"
+                                  ? modAnswers.mfg_process
+                                  : modAnswers.material
+                                tooltipText += ` — Not typically used with ${crossField}`
+                              }
+
                               return (
                                 <Tooltip key={opt}>
                                   <TooltipTrigger asChild>
@@ -619,14 +645,18 @@ export function CadLabDiagnostics({
                                       className={cn(
                                         "text-xs h-7",
                                         !isSelected && isSuggested &&
-                                          "ring-1 ring-international-orange/40"
+                                          "ring-1 ring-international-orange/40",
+                                        isIncompat && "opacity-40",
                                       )}
                                       onClick={() =>
                                         handleAnswer(mod.id, q.id, opt)
                                       }
                                       type="button"
                                     >
-                                      {!isSelected && isSuggested && (
+                                      {isIncompat && (
+                                        <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
+                                      )}
+                                      {!isIncompat && !isSelected && isSuggested && (
                                         <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
                                       )}
                                       {opt}
@@ -637,7 +667,7 @@ export function CadLabDiagnostics({
                                     className="max-w-[250px] z-[300]"
                                   >
                                     <p className="text-xs leading-relaxed">
-                                      {q.optionDescriptions[opt] ?? opt}
+                                      {tooltipText}
                                     </p>
                                   </TooltipContent>
                                 </Tooltip>
