@@ -30,6 +30,7 @@ import type {
   MashupResult,
   MashupExecuteResult,
   MashupSuggestion,
+  DecompositionCheckpoint,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -55,6 +56,57 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+
+// ─── Checkpoint → Prompt Injection ───────────────────────────────────
+
+/**
+ * Builds a prompt section from specialist checkpoint feedback for a given module.
+ *
+ * @description Flagged modules get a strong directive to address each concern.
+ * Non-flagged modules get lighter general context if any specialist expressed
+ * system-level concerns. All-positive checkpoints return empty string (no bloat).
+ *
+ * @param checkpoints - Record of specialist checkpoints (keyed by specialist ID)
+ * @param moduleId - The module being generated
+ * @returns Prompt section string, or empty string if nothing to inject
+ */
+export function buildCheckpointPromptSection(
+  checkpoints: Record<string, DecompositionCheckpoint> | null | undefined,
+  moduleId: string,
+): string {
+  if (!checkpoints || Object.keys(checkpoints).length === 0) return ""
+
+  const entries = Object.values(checkpoints)
+  const isFlagged = entries.some((cp) => cp.flaggedModules.includes(moduleId))
+
+  if (isFlagged) {
+    // Strong directive — this module was specifically called out
+    const lines = entries
+      .filter((cp) => cp.flaggedModules.includes(moduleId))
+      .map((cp) => {
+        const suggestions = cp.suggestions.length > 0
+          ? `\n   Suggestions: ${cp.suggestions.join("; ")}`
+          : ""
+        return `- ${cp.specialistName} (${cp.sentiment}): ${cp.summary}${suggestions}`
+      })
+
+    return `\n\n=== SPECIALIST FEEDBACK (THIS MODULE WAS FLAGGED — ADDRESS THESE CONCERNS) ===
+${lines.join("\n")}
+You MUST address each suggestion in your design. If a suggestion conflicts with research dimensions, prefer the research but note the trade-off.`
+  }
+
+  // Check for system-level concerns from non-positive specialists
+  const concerned = entries.filter((cp) => cp.sentiment !== "positive")
+  if (concerned.length === 0) return ""
+
+  const lines = concerned.map(
+    (cp) => `- ${cp.specialistName}: ${cp.summary}`,
+  )
+
+  return `\n\n=== SPECIALIST NOTES (general system-level concerns — apply where relevant) ===
+${lines.join("\n")}
+Consider these during your design. No action required unless directly applicable.`
+}
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -656,6 +708,7 @@ export async function generateCadLabInterface(
   description: string,
   researchReport: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
+  checkpointContext?: string,
 ): Promise<CadLabInterfaceResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -750,7 +803,7 @@ Extract the real-world scale from the research report and preserve it exactly:
 - Convert: 6m = 6000mm, 2.4m = 2400mm, etc.
 - Even if modeling a MODULE of a large system, respect the overall system proportions
 - Large structural components should remain large, not be scaled to desktop size
-
+${checkpointContext ?? ""}
 Generate the complete interface definition following the exact 4-section format.`
 
     const { text, tokensIn, tokensOut } = await callClaude(
@@ -813,6 +866,7 @@ export async function generateCadLabModel(
   researchReport: string,
   interfaceDefinition: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
+  checkpointContext?: string,
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -880,7 +934,7 @@ ${researchReport}
 
 === INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
-
+${checkpointContext ?? ""}
 SCALE PRESERVATION CRITICAL:
 - Use the EXACT scale from the research report and interface definition
 - Large systems (shipping containers, buildings, vehicles) must be modeled at FULL SIZE
@@ -1331,6 +1385,7 @@ export async function generateCadLabModelSmart(
   researchReport: string,
   interfaceDefinition: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
+  checkpointContext?: string,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -1355,7 +1410,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

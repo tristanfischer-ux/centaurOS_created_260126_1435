@@ -16,9 +16,9 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
+import { generateCadLabInterface, generateCadLabModelSmart, buildCheckpointPromptSection } from "@/actions/cad-lab"
 import { rateLimit } from "@/lib/security/rate-limit"
-import type { CadLabModule, ClaudeModelId } from "@/lib/cad-lab-types"
+import type { CadLabModule, ClaudeModelId, DecompositionCheckpoint } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
 export const runtime = "nodejs"
@@ -160,7 +160,7 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
   // Load project (RLS ensures foundry isolation)
   const { data: project, error: loadError } = await supabase
     .from("cad_lab_projects")
-    .select("id, foundry_id, created_by, subject, model_id, modules, research")
+    .select("id, foundry_id, created_by, subject, model_id, modules, research, checkpoints")
     .eq("id", projectId)
     .single()
 
@@ -193,6 +193,12 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
 
   let localMod = { ...targetModule }
 
+  // Build checkpoint context for prompt injection
+  const checkpointContext = buildCheckpointPromptSection(
+    project.checkpoints as Record<string, DecompositionCheckpoint> | null,
+    moduleId,
+  )
+
   const moduleResearchText =
     localMod.moduleResearch ||
     `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
@@ -204,6 +210,7 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
         `${localMod.name} — ${localMod.purpose}`,
         moduleResearchText,
         modelIdVal,
+        checkpointContext || undefined,
       )
       if (res.success) {
         localMod = {
@@ -240,6 +247,7 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
       cadResearch,
       localMod.interfaceDefinition || "",
       modelIdVal,
+      checkpointContext || undefined,
     )
     const { stlData, stepData, ...resultWithoutBinary } = res
 

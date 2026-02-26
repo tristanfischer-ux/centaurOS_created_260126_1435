@@ -29,6 +29,7 @@ import {
   decomposeIntoModules,
   prefillDiagnostics,
   generateSystemAssembly,
+  buildCheckpointPromptSection,
 } from "@/actions/cad-lab"
 import { matchReferenceModel } from "@/actions/reference-models"
 import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle } from "@/actions/cad-lab-projects"
@@ -833,7 +834,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (step === "interface") {
         try {
           addProgressLine(`Planning dimensions for ${mod.name}...`)
-          const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
+          const cpContext = buildCheckpointPromptSection(checkpoints, moduleId) || undefined
+          const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId, cpContext)
           if (res.success) {
             let updated: CadLabModule[] | null = null
             setModules((prev) => {
@@ -889,7 +891,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
 
   /**
    * Single-click handler that runs the full pipeline for one module
@@ -923,7 +925,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       let latestModules: CadLabModule[] | null = null
       if (mod.status === "pending") {
         addProgressLine(`Planning dimensions for ${mod.name}...`)
-        const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId)
+        const cpContext = buildCheckpointPromptSection(checkpoints, moduleId) || undefined
+        const res = await generateCadLabInterface(`${mod.name} — ${mod.purpose}`, moduleResearchText, modelId, cpContext)
         if (res.success) {
           setModules((prev) => {
             latestModules = prev.map((m) =>
@@ -975,7 +978,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
 
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
