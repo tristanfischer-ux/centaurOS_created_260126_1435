@@ -161,7 +161,7 @@ export interface CadLabContextValue {
 
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
-  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec) => Promise<void>
+  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceImageUrl?: string) => Promise<void>
 
   // Progressive module reveal
   revealedModuleIds: Set<string>
@@ -631,7 +631,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Generate shared visual style for cohesive illustrations (~1-2s),
         // then trigger image generation with it. Non-blocking overall.
         const imagesPipeline = async () => {
-          // FLOW: visual style → module images + system illustration (parallel)
+          // FLOW: visual style → system illustration (Pass 1) → module images (Pass 2, uses reference)
           let visualStyle: VisualStyleSpec | undefined
           try {
             const styleRes = await generateVisualStyleAction(
@@ -650,40 +650,42 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             // Non-critical — images still generate, just without coordinated style
           }
 
-          // Pass activeProjectId explicitly to avoid stale closure issues
-          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle)
-            .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
-
-          // Also trigger system illustration for research report
+          // FLOW: Pass 1 — generate system illustration FIRST, then use it
+          // as a reference image for module images (Pass 2) to guarantee
+          // spatial consistency of ghost outlines across all subassembly images.
+          let referenceImageUrl: string | undefined
           if (activeProjectId) {
             setSystemIllustrationStatus("generating")
             setSystemIllustrationError(null)
-            generateCadLabSystemIllustrationAction(
-              activeProjectId,
-              subject,
-              res.modules.map((m) => m.name),
-              res.modules.map((m) => m.purpose),
-              visualStyle,
-            )
-              .then((illRes) => {
-                if ("url" in illRes) {
-                  setSystemIllustrationUrl(illRes.url)
-                  setSystemIllustrationStatus("complete")
-                  // Persist to DB so the image survives page reloads
-                  saveCadLabSystemIllustration(activeProjectId!, illRes.url)
-                    .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
-                } else {
-                  console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
-                  setSystemIllustrationStatus("failed")
-                  setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
-                }
-              })
-              .catch((e) => {
-                console.error("[CAD-LAB] System illustration failed:", e)
+            try {
+              const illRes = await generateCadLabSystemIllustrationAction(
+                activeProjectId,
+                subject,
+                res.modules.map((m) => m.name),
+                res.modules.map((m) => m.purpose),
+                visualStyle,
+              )
+              if ("url" in illRes) {
+                setSystemIllustrationUrl(illRes.url)
+                setSystemIllustrationStatus("complete")
+                referenceImageUrl = illRes.url
+                saveCadLabSystemIllustration(activeProjectId!, illRes.url)
+                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+              } else {
+                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
                 setSystemIllustrationStatus("failed")
-                setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
-              })
+                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
+              }
+            } catch (e) {
+              console.error("[CAD-LAB] System illustration failed:", e)
+              setSystemIllustrationStatus("failed")
+              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+            }
           }
+
+          // Pass 2 — module images, with reference URL if available
+          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceImageUrl)
+            .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
         }
         imagesPipeline()
           .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
@@ -716,7 +718,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec) => {
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceImageUrl?: string) => {
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
@@ -765,7 +767,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
-        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle)
+        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle, referenceImageUrl)
         if ("module" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),

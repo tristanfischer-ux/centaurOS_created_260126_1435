@@ -18,13 +18,33 @@
 
 import type { CadLabModule, VisualStyleSpec } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
-import { generateModuleImage, generateResearchIllustration } from "@/app/(platform)/the-forge/services/image-generator"
+import { generateModuleImage, generateModuleImageWithReference, generateResearchIllustration, cropReferenceFor3x2 } from "@/app/(platform)/the-forge/services/image-generator"
 import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 /** Concurrency limit — matches xray.ts batch size */
 const BATCH_SIZE = 3
+
+/**
+ * Fetches the system illustration from its public URL and crops it to 3:2
+ * at 1536×1024 for use as an OpenAI images.edit() reference.
+ *
+ * @param url - Supabase public URL of the system illustration (16:9 PNG)
+ * @returns Base64 PNG string cropped to 3:2, or null on any failure
+ */
+async function fetchAndCropReference(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+    if (!response.ok) return null
+    const arrayBuf = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuf).toString("base64")
+    return await cropReferenceFor3x2(base64)
+  } catch (err) {
+    console.warn("[CAD-LAB-IMAGES] Failed to fetch/crop reference image:", err instanceof Error ? err.message : err)
+    return null
+  }
+}
 
 interface GenerateImagesResult {
   /** Updated modules with imageUrl/imageStatus filled in */
@@ -38,20 +58,40 @@ interface GenerateImagesResult {
 /**
  * Generates Gemini blueprint images for a single CAD Lab module.
  *
+ * When referenceImageUrl is provided, uses the two-pass approach:
+ * fetch the system illustration, crop to 3:2, and pass to OpenAI images.edit()
+ * for spatially consistent ghost-outline rendering. Falls back to the text-only
+ * path if fetch/crop fails or OPENAI_API_KEY is unavailable.
+ *
  * @param projectId - The CAD Lab project ID (used as storage namespace)
  * @param module - The module to generate an image for
  * @param visualStyle - Optional shared visual style for cross-module cohesion
+ * @param referenceImageUrl - Optional URL of system illustration for reference-based editing
  * @returns Updated module with imageUrl/imageStatus set
  */
 export async function generateCadLabSingleImageAction(
   projectId: string,
   module: CadLabModule,
   visualStyle?: VisualStyleSpec,
+  referenceImageUrl?: string,
 ): Promise<{ module: CadLabModule } | { error: string }> {
   return withAuth(async () => {
     try {
       const adapted = cadLabModuleToModuleSpec(module)
-      const url = await generateModuleImage(projectId, adapted, undefined, visualStyle)
+
+      let url: string
+      if (referenceImageUrl && visualStyle) {
+        // Two-pass: try reference-based editing with graceful fallback
+        const croppedRef = await fetchAndCropReference(referenceImageUrl)
+        if (croppedRef) {
+          url = await generateModuleImageWithReference(projectId, adapted, croppedRef, visualStyle)
+        } else {
+          // Fetch/crop failed — fall back to text-only path
+          url = await generateModuleImage(projectId, adapted, undefined, visualStyle)
+        }
+      } else {
+        url = await generateModuleImage(projectId, adapted, undefined, visualStyle)
+      }
 
       return {
         module: {

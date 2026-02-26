@@ -16,6 +16,7 @@
  * - Error classification: src/lib/agents/error-classification.ts (retryable error detection)
  */
 
+import sharp from "sharp"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 import { overlayModuleLabels, overlaySystemLegend } from "./image-overlay"
@@ -412,6 +413,105 @@ async function uploadToStorage(
   return urlData.publicUrl
 }
 
+// ─── Reference Image Editing (Two-Pass) ─────────────────────────────
+
+/**
+ * Center-crops a 16:9 PNG to 3:2, then resizes to 1536×1024 (OpenAI max landscape).
+ * Used to convert the system illustration into a reference image for images.edit().
+ *
+ * @param base64Png - Base64-encoded 16:9 PNG from system illustration
+ * @returns Base64-encoded 3:2 PNG at 1536×1024
+ */
+export async function cropReferenceFor3x2(base64Png: string): Promise<string> {
+  const buf = Buffer.from(base64Png, "base64")
+  const meta = await sharp(buf).metadata()
+  const w = meta.width ?? 1920
+  const h = meta.height ?? 1080
+
+  // Target 3:2 aspect — crop from center of 16:9
+  const targetRatio = 3 / 2
+  const currentRatio = w / h
+
+  let cropWidth = w
+  let cropHeight = h
+  if (currentRatio > targetRatio) {
+    // Wider than 3:2 — crop sides
+    cropWidth = Math.round(h * targetRatio)
+  } else {
+    // Taller than 3:2 — crop top/bottom
+    cropHeight = Math.round(w / targetRatio)
+  }
+
+  const left = Math.round((w - cropWidth) / 2)
+  const top = Math.round((h - cropHeight) / 2)
+
+  const cropped = await sharp(buf)
+    .extract({ left, top, width: cropWidth, height: cropHeight })
+    .resize(1536, 1024)
+    .png()
+    .toBuffer()
+
+  return cropped.toString("base64")
+}
+
+/**
+ * Builds a prompt for OpenAI images.edit() that desaturates the reference
+ * image except for the target module's subassembly region.
+ */
+function buildReferenceEditPrompt(module: ModuleSpec, visualStyle: VisualStyleSpec): string {
+  return enforceNoText(`Edit this technical engineering illustration to create a focused subassembly highlight view.
+
+DESATURATION: Convert the entire image to a very faint, low-contrast grayscale (10-15% opacity feel) — like a ghost/wireframe outline of the complete product.
+
+HIGHLIGHT: Keep ONLY the "${module.name}" section in full vivid color at its original position. This component is: ${module.detail.whatItIs}. It should stand out dramatically against the faded background — the viewer's eye should immediately go to this highlighted region.
+
+The highlighted region should use this color palette: ${visualStyle.colorPalette}.
+Material rendering: ${visualStyle.materialRendering}.
+
+Style: Clean engineering diagram aesthetic. Maintain the isometric perspective. The ghost outline provides spatial context showing where this subassembly fits within the complete product.${COHESIVE_STYLE_SUFFIX}`)
+}
+
+/**
+ * Attempts to generate a module image using OpenAI images.edit() with the
+ * system illustration as a reference. Returns null on any failure so the
+ * caller can fall back to the text-only path.
+ */
+async function tryOpenAIEdit(
+  module: ModuleSpec,
+  referenceBase64: string,
+  visualStyle: VisualStyleSpec,
+): Promise<{ mimeType: string; data: string } | null> {
+  if (!process.env.OPENAI_API_KEY) return null
+
+  try {
+    const openaiModule = await import("openai")
+    const OpenAI = openaiModule.default
+    const { toFile } = openaiModule
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+    const prompt = buildReferenceEditPrompt(module, visualStyle)
+    const imageFile = await toFile(Buffer.from(referenceBase64, "base64"), "reference.png", { type: "image/png" })
+
+    const response = await client.images.edit({
+      model: OPENAI_IMAGE_MODEL,
+      image: imageFile,
+      prompt,
+      size: "1536x1024",
+    })
+
+    const b64Data = response.data?.[0]?.b64_json
+    if (!b64Data) return null
+
+    return { mimeType: "image/png", data: b64Data }
+  } catch (err) {
+    console.warn(
+      "[XRayImageGen] OpenAI images.edit() failed, will fall back to text-only:",
+      err instanceof Error ? err.message : err,
+    )
+    return null
+  }
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
@@ -436,6 +536,58 @@ export async function generateModuleImage(
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
   })
+
+  // Post-process: add engineering annotation frame with labels
+  const labeledData = await overlayModuleLabels(imageData.data, {
+    name: module.name,
+    purpose: module.purpose,
+    keyParts: module.keyParts,
+    io: module.io,
+  })
+
+  const url = await uploadToStorage(
+    scanId,
+    `module-${module.id}.png`,
+    labeledData,
+    imageData.mimeType,
+  )
+
+  return url
+}
+
+/**
+ * Generates a module image using the system illustration as a reference.
+ * Two-pass approach: the system illustration (Pass 1) is fed into OpenAI
+ * images.edit() so each module image starts from the same base — guaranteeing
+ * spatial consistency of the ghost outline across all module images.
+ *
+ * Falls back gracefully to the existing text-only ghost prompt when:
+ * - OPENAI_API_KEY is not set
+ * - images.edit() call fails for any reason
+ *
+ * @param scanId - The scan ID for storage namespacing
+ * @param module - The module to generate an image for
+ * @param referenceBase64 - Base64 PNG of the system illustration (cropped to 3:2)
+ * @param visualStyle - Shared visual style for cross-module cohesion
+ * @returns The public URL of the generated image
+ */
+export async function generateModuleImageWithReference(
+  scanId: string,
+  module: ModuleSpec,
+  referenceBase64: string,
+  visualStyle: VisualStyleSpec,
+): Promise<string> {
+  // FLOW: tryOpenAIEdit → [fail] → text-only ghost prompt (existing path)
+  const editResult = await tryOpenAIEdit(module, referenceBase64, visualStyle)
+
+  let imageData: { mimeType: string; data: string }
+  if (editResult) {
+    imageData = editResult
+  } else {
+    // Fallback to text-only ghost prompt
+    const prompt = buildModulePrompt(module, undefined, visualStyle)
+    imageData = await callImageWithFallback(prompt, { aspectRatio: "3:2" })
+  }
 
   // Post-process: add engineering annotation frame with labels
   const labeledData = await overlayModuleLabels(imageData.data, {
