@@ -9,7 +9,7 @@
  * (from sheets_row_map + DB), and applies changes.
  *
  * @security
- * - Secured with CRON_SECRET header (standard Vercel cron pattern)
+ * - Secured with CRON_SECRET header (timing-safe comparison)
  * - Uses admin client for DB operations (runs server-side without user context)
  * - Foundry isolation maintained per-integration
  *
@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { timingSafeEqual } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ProviderType } from '@/lib/spreadsheet/provider'
 import { getSyncVersion } from '@/lib/spreadsheet/sync-engine'
@@ -33,8 +34,11 @@ const EDITABLE_COLUMNS = [
     'Start Date', 'End Date', 'Progress %', 'Risk Level',
 ]
 
+/** Batch size for parallel foundry polling */
+const POLL_BATCH_SIZE = 5
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
-    // SECURITY: Validate cron secret
+    // SECURITY: Validate cron secret with timing-safe comparison
     const authHeader = req.headers.get('authorization')
     const cronSecret = process.env.CRON_SECRET
 
@@ -43,7 +47,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: 'Not configured' }, { status: 500 })
     }
 
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    const expected = `Bearer ${cronSecret}`
+    if (
+        !authHeader ||
+        authHeader.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    ) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -65,163 +74,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ message: 'No active integrations', polled: 0 })
     }
 
-    const results: Array<{ foundryId: string; provider: string; applied: number; errors: number }> = []
-
-    for (const integration of integrations) {
+    // Filter to integrations that have sync enabled and a spreadsheet
+    const pollable = integrations.filter(integration => {
         const config = integration.config as Record<string, unknown> | null
-        if (!config?.sync_enabled || !config?.spreadsheet_id) continue
+        return config?.sync_enabled && config?.spreadsheet_id && config?.oauth_user_id
+    })
 
-        const foundryId = integration.foundry_id as string
-        const serviceType = integration.service_type as ProviderType
-        const spreadsheetId = config.spreadsheet_id as string
-        const oauthUserId = config.oauth_user_id as string | undefined
+    // Process in batches using Promise.allSettled for parallelism
+    const results: Array<{ provider: string; applied: number; errors: number }> = []
 
-        if (!oauthUserId) {
-            console.warn('[SheetsPoll] No oauth_user_id for:', { foundryId, serviceType })
-            continue
-        }
+    for (let i = 0; i < pollable.length; i += POLL_BATCH_SIZE) {
+        const batch = pollable.slice(i, i + POLL_BATCH_SIZE)
+        const batchResults = await Promise.allSettled(
+            batch.map(integration => pollFoundry(admin, integration))
+        )
 
-        try {
-            const provider = await resolveProvider(serviceType, oauthUserId, foundryId)
-            if (!provider) continue
-
-            // SECURITY: Check sync version to prevent applying stale inbound changes
-            // while an outbound sync is in flight.
-            try {
-                const syncTabRows = await provider.readAllRows(spreadsheetId, '_sync')
-                const sheetSyncVersion = syncTabRows?.[0]?.[0] != null
-                    ? Number(syncTabRows[0][0])
-                    : null
-                const dbSyncVersion = await getSyncVersion(foundryId, serviceType)
-
-                if (sheetSyncVersion !== null && sheetSyncVersion !== dbSyncVersion) {
-                    console.info('[SheetsPoll] Sync version mismatch, skipping (outbound in flight):', {
-                        foundryId, sheetSyncVersion, dbSyncVersion,
-                    })
-                    continue
-                }
-            } catch {
-                // INTENT: _sync tab unreadable — fail-safe, skip this foundry
-                console.info('[SheetsPoll] Could not read _sync tab, skipping:', { foundryId })
-                continue
+        for (const settled of batchResults) {
+            if (settled.status === 'fulfilled' && settled.value) {
+                results.push(settled.value)
+            } else if (settled.status === 'rejected') {
+                // INTENT: Individual foundry failures don't stop the batch
+                console.error('[SheetsPoll] Batch item rejected:', settled.reason)
             }
-
-            // Read the Master Task List tab
-            const rows = await provider.readAllRows(spreadsheetId, 'Master Task List')
-            if (!rows || rows.length <= 1) continue // No data rows
-
-            // Build header index map from the actual first row
-            const headerRow = rows[0] as string[]
-            const headerIndex = new Map<string, number>()
-            headerRow.forEach((h, i) => headerIndex.set(String(h).trim(), i))
-
-            const taskIdCol = headerIndex.get('Task ID')
-            if (taskIdCol === undefined) {
-                console.warn('[SheetsPoll] No Task ID column found:', { foundryId })
-                continue
-            }
-
-            // Fetch current DB state for all tasks in this foundry
-            const { data: dbTasks } = await admin
-                .from('tasks')
-                .select('id, title, description, status, start_date, end_date, progress, risk_level, assignee_id')
-                .eq('foundry_id', foundryId)
-                .is('deleted_at', null)
-
-            if (!dbTasks) continue
-
-            // Fetch profiles for assignee resolution
-            const { data: profiles } = await admin
-                .from('profiles')
-                .select('id, full_name')
-                .eq('foundry_id', foundryId)
-                .eq('is_active', true)
-
-            const profileById = new Map((profiles || []).map(p => [p.id, p.full_name || 'Unnamed']))
-
-            const taskMap = new Map(dbTasks.map(t => [t.id, {
-                ...t,
-                assignee_name: t.assignee_id ? (profileById.get(t.assignee_id) || '') : '',
-            }]))
-
-            // Diff each data row against DB
-            const changes: InboundChange[] = []
-
-            for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
-                const row = rows[rowIdx] as string[]
-                const entityId = String(row[taskIdCol] || '').trim()
-                if (!entityId) continue
-
-                const dbTask = taskMap.get(entityId)
-                if (!dbTask) continue // Task not found in DB — skip
-
-                for (const colName of EDITABLE_COLUMNS) {
-                    const colIdx = headerIndex.get(colName)
-                    if (colIdx === undefined) continue
-
-                    const sheetValue = String(row[colIdx] ?? '').trim()
-                    const dbValue = getDbValueForColumn(colName, dbTask)
-
-                    if (sheetValue !== dbValue) {
-                        changes.push({
-                            tabName: 'Master Task List',
-                            rowNumber: rowIdx + 1,
-                            column: colName,
-                            oldValue: dbValue,
-                            newValue: sheetValue,
-                            entityId,
-                        })
-                    }
-                }
-            }
-
-            if (changes.length === 0) {
-                results.push({ foundryId, provider: serviceType, applied: 0, errors: 0 })
-                continue
-            }
-
-            // Apply changes
-            const { applyInboundChanges } = await import('@/lib/spreadsheet/sync-engine')
-            const result = await applyInboundChanges(foundryId, changes)
-
-            // Log summary
-            if (result.errors.length > 0) {
-                console.warn('[SheetsPoll] Inbound sync had errors:', {
-                    foundryId,
-                    applied: result.applied,
-                    errors: result.errors.slice(0, 5),
-                })
-            }
-
-            results.push({
-                foundryId,
-                provider: serviceType,
-                applied: result.applied,
-                errors: result.errors.length,
-            })
-        } catch (err) {
-            console.error('[SheetsPoll] Poll failed for foundry:', {
-                foundryId,
-                serviceType,
-                error: err instanceof Error ? err.message : 'Unknown error',
-            })
-
-            // Log failure (best-effort)
-            try {
-                await admin.from('sheets_sync_log').insert({
-                    foundry_id: foundryId,
-                    direction: 'inbound',
-                    entity_type: 'batch',
-                    operation: 'full_sync',
-                    status: 'failed',
-                    error_message: err instanceof Error ? err.message : 'Unknown error',
-                    metadata: { provider: serviceType, source: 'cron_poll' },
-                })
-            } catch {
-                // Double failure — nothing more we can do
-            }
-
-            results.push({ foundryId, provider: serviceType, applied: 0, errors: 1 })
         }
     }
 
@@ -230,6 +104,162 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         polled: results.length,
         results,
     })
+}
+
+// ============================================================
+// Core poll logic for a single foundry
+// ============================================================
+
+async function pollFoundry(
+    admin: ReturnType<typeof createAdminClient>,
+    integration: { foundry_id: unknown; service_type: unknown; config: unknown }
+): Promise<{ provider: string; applied: number; errors: number } | null> {
+    const config = integration.config as Record<string, unknown>
+    const foundryId = integration.foundry_id as string
+    const serviceType = integration.service_type as ProviderType
+    const spreadsheetId = config.spreadsheet_id as string
+    const oauthUserId = config.oauth_user_id as string
+
+    try {
+        const provider = await resolveProvider(serviceType, oauthUserId, foundryId)
+        if (!provider) return null
+
+        // SECURITY: Check sync version to prevent applying stale inbound changes
+        // while an outbound sync is in flight.
+        try {
+            const syncTabRows = await provider.readAllRows(spreadsheetId, '_sync')
+            const sheetSyncVersion = syncTabRows?.[0]?.[0] != null
+                ? Number(syncTabRows[0][0])
+                : null
+            const dbSyncVersion = await getSyncVersion(foundryId, serviceType)
+
+            if (sheetSyncVersion !== null && sheetSyncVersion !== dbSyncVersion) {
+                console.info('[SheetsPoll] Sync version mismatch, skipping (outbound in flight):', {
+                    foundryId, sheetSyncVersion, dbSyncVersion,
+                })
+                return null
+            }
+        } catch {
+            // INTENT: _sync tab unreadable — fail-safe, skip this foundry
+            console.info('[SheetsPoll] Could not read _sync tab, skipping:', { foundryId })
+            return null
+        }
+
+        // Read the Master Task List tab
+        const rows = await provider.readAllRows(spreadsheetId, 'Master Task List')
+        if (!rows || rows.length <= 1) return null // No data rows
+
+        // Build header index map from the actual first row
+        const headerRow = rows[0] as string[]
+        const headerIndex = new Map<string, number>()
+        headerRow.forEach((h, i) => headerIndex.set(String(h).trim(), i))
+
+        const taskIdCol = headerIndex.get('Task ID')
+        if (taskIdCol === undefined) {
+            console.warn('[SheetsPoll] No Task ID column found:', { foundryId })
+            return null
+        }
+
+        // Fetch current DB state for all tasks in this foundry
+        const { data: dbTasks } = await admin
+            .from('tasks')
+            .select('id, title, description, status, start_date, end_date, progress, risk_level, assignee_id')
+            .eq('foundry_id', foundryId)
+            .is('deleted_at', null)
+
+        if (!dbTasks) return null
+
+        // Fetch profiles for assignee resolution
+        const { data: profiles } = await admin
+            .from('profiles')
+            .select('id, full_name')
+            .eq('foundry_id', foundryId)
+            .eq('is_active', true)
+
+        const profileById = new Map((profiles || []).map(p => [p.id, p.full_name || 'Unnamed']))
+
+        const taskMap = new Map(dbTasks.map(t => [t.id, {
+            ...t,
+            assignee_name: t.assignee_id ? (profileById.get(t.assignee_id) || '') : '',
+        }]))
+
+        // Diff each data row against DB
+        const changes: InboundChange[] = []
+
+        for (let rowIdx = 1; rowIdx < rows.length; rowIdx++) {
+            const row = rows[rowIdx] as string[]
+            const entityId = String(row[taskIdCol] || '').trim()
+            if (!entityId) continue
+
+            const dbTask = taskMap.get(entityId)
+            if (!dbTask) continue // Task not found in DB — skip
+
+            for (const colName of EDITABLE_COLUMNS) {
+                const colIdx = headerIndex.get(colName)
+                if (colIdx === undefined) continue
+
+                const sheetValue = String(row[colIdx] ?? '').trim()
+                const dbValue = getDbValueForColumn(colName, dbTask)
+
+                if (sheetValue !== dbValue) {
+                    changes.push({
+                        tabName: 'Master Task List',
+                        rowNumber: rowIdx + 1,
+                        column: colName,
+                        oldValue: dbValue,
+                        newValue: sheetValue,
+                        entityId,
+                    })
+                }
+            }
+        }
+
+        if (changes.length === 0) {
+            return { provider: serviceType, applied: 0, errors: 0 }
+        }
+
+        // Apply changes
+        const { applyInboundChanges } = await import('@/lib/spreadsheet/sync-engine')
+        const result = await applyInboundChanges(foundryId, changes)
+
+        // Log summary
+        if (result.errors.length > 0) {
+            console.warn('[SheetsPoll] Inbound sync had errors:', {
+                foundryId,
+                applied: result.applied,
+                errors: result.errors.slice(0, 5),
+            })
+        }
+
+        return {
+            provider: serviceType,
+            applied: result.applied,
+            errors: result.errors.length,
+        }
+    } catch (err) {
+        console.error('[SheetsPoll] Poll failed for foundry:', {
+            foundryId,
+            serviceType,
+            error: err instanceof Error ? err.message : 'Unknown error',
+        })
+
+        // Log failure (best-effort)
+        try {
+            await admin.from('sheets_sync_log').insert({
+                foundry_id: foundryId,
+                direction: 'inbound',
+                entity_type: 'batch',
+                operation: 'full_sync',
+                status: 'failed',
+                error_message: err instanceof Error ? err.message : 'Unknown error',
+                metadata: { provider: serviceType, source: 'cron_poll' },
+            })
+        } catch {
+            // Double failure — nothing more we can do
+        }
+
+        return { provider: serviceType, applied: 0, errors: 1 }
+    }
 }
 
 // ============================================================
