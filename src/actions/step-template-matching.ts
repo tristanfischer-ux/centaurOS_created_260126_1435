@@ -242,4 +242,3 @@ export async function matchTemplatesForModule(
   return { topMatches, seedTemplate }
 }
 
-export { MAX_STEP_FILE_SIZE }

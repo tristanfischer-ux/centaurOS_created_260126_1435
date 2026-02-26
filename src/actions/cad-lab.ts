@@ -60,7 +60,11 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
-import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl, MAX_STEP_FILE_SIZE } from "@/actions/step-template-matching"
+import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
+
+/** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
+ * because "use server" files cannot export non-function values */
+const MAX_STEP_FILE_SIZE = 50 * 1024 * 1024
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 

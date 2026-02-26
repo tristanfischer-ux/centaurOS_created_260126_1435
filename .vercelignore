@@ -1,0 +1,28 @@
+# Large untracked directories (root-anchored to avoid matching src/**/data/)
+screenshots/
+e2e/
+e2e-results/
+_archive/
+/data/
+mobile-strategy-screenshots/
+mobile-team-screenshots/
+mobile-verification/
+settings-verification/
+scripts/extracted_datasheet_specs/
+
+# Test/debug artifacts (NOT public/ — those are production assets)
+screenshots/*.png
+e2e-results/*.png
+mobile-strategy-screenshots/*.png
+mobile-team-screenshots/*.png
+mobile-verification/*.png
+settings-verification/*.png
+*.html
+get-profile-html.ts
+test-*.ts
+verify-*.ts
+
+# Supabase migration markers
+supabase/migrations/*.applied
+supabase/migrations/*.done
+supabase/migrations/*.skip
