@@ -506,12 +506,14 @@ export async function saveCadLabVisualStyle(
  * @param projectId - Project to update
  * @param stlUrl - URL to combined assembly STL
  * @param stepUrl - URL to combined assembly STEP
+ * @param assemblyCode - Optional CadQuery Python code used for the assembly (for debugging)
  * @returns Success or error
  */
 export async function saveCadLabIntegratedAssembly(
   projectId: string,
   stlUrl: string,
   stepUrl: string,
+  assemblyCode?: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId) return { error: "Project ID required" }
@@ -521,6 +523,7 @@ export async function saveCadLabIntegratedAssembly(
       .update({
         integrated_assembly_stl_url: stlUrl,
         integrated_assembly_step_url: stepUrl,
+        integrated_assembly_code: assemblyCode ?? null,
       })
       .eq("id", projectId)
 

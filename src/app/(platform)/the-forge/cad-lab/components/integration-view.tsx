@@ -28,6 +28,8 @@ interface IntegrationViewProps {
   /** Last error from integration (e.g. "Not yet implemented") */
   integrationError: string | null
   onClearError?: () => void
+  /** CadQuery Python code generated for the assembly (for debugging) */
+  assemblyCode?: string | null
 }
 
 /**
@@ -42,6 +44,7 @@ export function IntegrationView({
   onGenerateIntegration,
   integrationError,
   onClearError,
+  assemblyCode,
 }: IntegrationViewProps): React.ReactNode {
   if (!allModulesGenerated) return null
 
@@ -80,6 +83,16 @@ export function IntegrationView({
               <p className="text-sm text-muted-foreground rounded-md bg-muted/50 p-3">
                 {integrationError}
               </p>
+            )}
+            {integrationError && assemblyCode && (
+              <details className="mt-2">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                  View generated code
+                </summary>
+                <pre className="mt-2 text-xs bg-muted rounded-md p-3 overflow-x-auto max-h-64 overflow-y-auto">
+                  <code>{assemblyCode}</code>
+                </pre>
+              </details>
             )}
           </>
         ) : (

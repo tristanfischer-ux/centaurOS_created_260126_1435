@@ -3592,6 +3592,7 @@ export type Database = {
           foundry_id: string
           generated_code: string | null
           id: string
+          integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
           interface_definition: string | null
@@ -3619,6 +3620,7 @@ export type Database = {
           foundry_id: string
           generated_code?: string | null
           id?: string
+          integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_definition?: string | null
@@ -3646,6 +3648,7 @@ export type Database = {
           foundry_id?: string
           generated_code?: string | null
           id?: string
+          integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
           interface_definition?: string | null

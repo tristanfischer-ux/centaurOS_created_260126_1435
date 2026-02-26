@@ -180,6 +180,7 @@ export interface CadLabContextValue {
   integratedAssemblyStepUrl: string | null
   isIntegrating: boolean
   integrationError: string | null
+  integrationAssemblyCode: string | null
   setIntegrationError: (v: string | null) => void
   handleGenerateIntegration: () => Promise<void>
 
@@ -358,6 +359,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [integratedAssemblyStepUrl, setIntegratedAssemblyStepUrl] = useState<string | null>(null)
   const [isIntegrating, setIsIntegrating] = useState(false)
   const [integrationError, setIntegrationError] = useState<string | null>(null)
+  const [integrationAssemblyCode, setIntegrationAssemblyCode] = useState<string | null>(null)
 
   // ── Decomposition checkpoints ──
   const [checkpoints, setCheckpoints] = useState<Record<string, DecompositionCheckpoint> | null>(null)
@@ -1510,11 +1512,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleGenerateIntegration = useCallback(async () => {
     if (!activeProjectId) return
     setIntegrationError(null)
+    setIntegrationAssemblyCode(null)
     setIsIntegrating(true)
     try {
       const res = await generateSystemAssembly(activeProjectId)
+      setIntegrationAssemblyCode(res.assemblyCode ?? null)
       if (res.success) {
-        const saveRes = await saveCadLabIntegratedAssembly(activeProjectId, res.stlUrl, res.stepUrl)
+        const saveRes = await saveCadLabIntegratedAssembly(activeProjectId, res.stlUrl, res.stepUrl, res.assemblyCode)
         if (!("error" in saveRes)) {
           setIntegratedAssemblyStlUrl(res.stlUrl)
           setIntegratedAssemblyStepUrl(res.stepUrl)
@@ -1575,7 +1579,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
-    integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,
+    integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, integrationAssemblyCode, setIntegrationError, handleGenerateIntegration,
     checkpoints, isCheckpointing,
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,

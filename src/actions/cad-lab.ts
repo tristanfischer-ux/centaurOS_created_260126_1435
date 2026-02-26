@@ -52,9 +52,15 @@ import {
   getMashupCodeGenSystemPrompt,
   getMashupCodeGenUserPrompt,
 } from "@/lib/cad-lab/mashup-prompts"
+import {
+  getAssemblyCodeGenSystemPrompt,
+  getAssemblyCodeGenUserPrompt,
+  type AssemblyModuleInfo,
+} from "@/lib/cad-lab/assembly-prompts"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl, MAX_STEP_FILE_SIZE } from "@/actions/step-template-matching"
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -681,6 +687,22 @@ export async function generateCadLabInterface(
         "\n\nWhen a product component matches a library slug, mark it as \"LIBRARY: slug_name\" in the Source column."
       : ""
 
+    // FLOW: Match step_templates for prompt enrichment — tells Claude what proven geometry exists
+    const descWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
+    const templateMatch = await matchTemplatesForModule(
+      description,
+      researchReport.slice(0, 200),
+      descWords.slice(0, 10),
+    )
+    // SECURITY: Sanitise template metadata before prompt injection to prevent indirect prompt injection
+    const templateSection = templateMatch.topMatches.length > 0
+      ? "\n\nMATCHED STEP TEMPLATES (proven reference geometry from template library):\n" +
+        templateMatch.topMatches.map((m) =>
+          `  - ${sanitiseForPrompt(m.name)} [${sanitiseForPrompt(m.category)}${m.subcategory ? `/${sanitiseForPrompt(m.subcategory)}` : ""}] (score: ${m.score})`
+        ).join("\n") +
+        "\n\nThese templates represent real-world parts with accurate geometry. When planning components, consider using dimensions and proportions from these references where relevant."
+      : ""
+
     const systemPrompt = `You are an engineering planner for parametric CAD models. You are NOT writing code — this is pure engineering planning.
 
 Your job is to produce a text-only interface definition that will be used to generate CadQuery Python code. Every dimension must be a specific number in millimetres. The numbers must sum correctly — show ALL arithmetic step-by-step.
@@ -738,7 +760,7 @@ CRITICAL RULES:
 - ALWAYS check the component library FIRST before planning custom geometry
 - Prefer library components over custom geometry — they produce recognisable, detailed parts
 - If the research report contains unanswered clarifying questions (e.g. "Key Clarifications Required"), DO NOT repeat them or ask your own. Instead, answer each one yourself using the best engineering judgment based on standard industry practice. Document each decision clearly, e.g.: "RESOLVED: Veranda is within the 12×6m footprint (standard for transportable homes in AU)"
-- Your output must be complete and ready for code generation with zero follow-up needed${librarySection}`
+- Your output must be complete and ready for code generation with zero follow-up needed${librarySection}${templateSection}`
 
     const userPrompt = `Product: ${description}
 
@@ -832,6 +854,35 @@ export async function generateCadLabModel(
   try {
     // ── Generate code with Claude ──
     console.info("[THE-FORGE] Step 3: Generating complete CadQuery code with Claude...")
+
+    // ── Seed-geometry routing: check for matching step_templates ──
+    // INTENT: Strong matches route to the mashup endpoint with real STEP geometry
+    // as a starting point, producing better results than scratch generation.
+    try {
+      const moduleWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
+      const seedMatch = await matchTemplatesForModule(
+        description,
+        interfaceDefinition.slice(0, 200),
+        moduleWords.slice(0, 10),
+      )
+      if (seedMatch.seedTemplate) {
+        console.info(
+          `[THE-FORGE] Step 3: Seed template found: ${seedMatch.seedTemplate.slug} (score: ${seedMatch.seedTemplate.score})`,
+        )
+        const seedResult = await generateCadLabModelWithSeed(
+          description, researchReport, interfaceDefinition,
+          seedMatch.seedTemplate, modelId, checkpointContext,
+        )
+        if (seedResult.success) return seedResult
+        // FLOW: Seed path failed — propagate consumed tokens, then fall through to scratch
+        totalTokensIn += seedResult.tokensIn ?? 0
+        totalTokensOut += seedResult.tokensOut ?? 0
+        console.warn("[THE-FORGE] Step 3: Seed path failed, falling back to scratch:", seedResult.error)
+      }
+    } catch (seedErr) {
+      // Silent fallback — seed matching is best-effort
+      console.warn("[THE-FORGE] Step 3: Seed matching error, continuing with scratch:", seedErr instanceof Error ? seedErr.message : seedErr)
+    }
 
     // Look up user's sector and fetch filtered library for prompt injection
     const sector = await lookupUserSector(supabase, user.id)
@@ -1068,6 +1119,304 @@ If the research report or interface definition contains any unresolved questions
       error: modalResult.error ?? undefined,
     }
   } catch (err) {
+    return {
+      success: false,
+      error: sanitizeErrorMessage(err),
+      generationTime: Date.now() - pipelineStart,
+      tokensIn: totalTokensIn,
+      tokensOut: totalTokensOut,
+      modelUsed: modelId,
+    }
+  }
+}
+
+// ─── Seed-Geometry Generation (private) ──────────────────────────────
+
+/**
+ * Generates a CAD model using a matched step_template as seed geometry.
+ *
+ * @description Instead of generating from scratch, this path:
+ * 1. Fetches the seed template's STEP file
+ * 2. Prompts Claude with hybrid instructions (CAD_INSTRUCTIONS + mashup-style seed loading)
+ * 3. Executes via the /mashup Modal endpoint with the seed as a source
+ * 4. Falls back to scratch generation on any failure
+ *
+ * INTENT: Templates have proven, detailed geometry. Starting from real parts
+ * produces significantly better results than scratch CadQuery for modules
+ * that closely match existing templates.
+ *
+ * @param description - Product/module description
+ * @param researchReport - Research report from Step 1
+ * @param interfaceDefinition - Interface definition from Step 2
+ * @param seedTemplate - Matched template with step URL and metadata
+ * @param modelId - Claude model to use
+ * @param checkpointContext - Optional specialist checkpoint context
+ * @returns CadLabResult with seedTemplateSlug/Score set
+ */
+async function generateCadLabModelWithSeed(
+  description: string,
+  researchReport: string,
+  interfaceDefinition: string,
+  seedTemplate: { slug: string; name: string; category: string; stepUrl: string; score: number },
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  checkpointContext?: string,
+): Promise<CadLabResult> {
+  const pipelineStart = Date.now()
+  let totalTokensIn = 0
+  let totalTokensOut = 0
+
+  try {
+    // SECURITY: Validate URL before fetching (SSRF protection)
+    if (!isAllowedStepUrl(seedTemplate.stepUrl)) {
+      throw new Error(`Seed template URL blocked by allowlist: ${seedTemplate.slug}`)
+    }
+
+    // ── Fetch seed STEP file with size guard ──
+    console.info(`[THE-FORGE] Seed path: Fetching STEP from ${seedTemplate.slug}...`)
+    const stepResponse = await fetch(seedTemplate.stepUrl, {
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!stepResponse.ok) {
+      throw new Error(`Failed to fetch seed STEP (${stepResponse.status})`)
+    }
+
+    // SECURITY: Check Content-Length to prevent memory exhaustion
+    const contentLength = stepResponse.headers.get("content-length")
+    if (contentLength && parseInt(contentLength, 10) > MAX_STEP_FILE_SIZE) {
+      throw new Error(`Seed STEP file too large (${contentLength} bytes, max ${MAX_STEP_FILE_SIZE})`)
+    }
+
+    const stepBuffer = await stepResponse.arrayBuffer()
+
+    // Runtime size check (Content-Length header can be missing or spoofed)
+    if (stepBuffer.byteLength > MAX_STEP_FILE_SIZE) {
+      throw new Error(`Seed STEP file too large (${stepBuffer.byteLength} bytes)`)
+    }
+
+    const stepB64 = Buffer.from(stepBuffer).toString("base64")
+    if (!stepB64 || stepB64.length < 100) {
+      throw new Error("Seed STEP file is empty or too small")
+    }
+
+    const seedFileName = `${seedTemplate.slug.replace(/[^a-zA-Z0-9_-]/g, "_")}.step`
+
+    // ── Look up library for prompt injection ──
+    // DECISION: Re-using the caller's auth context would be ideal but createClient()
+    // reads from the same cookie, so the overhead is minimal (~1ms, no network call).
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const sector = user ? await lookupUserSector(supabase, user.id) : null
+    const librarySummary = await fetchLibrarySummary(sector)
+    const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
+
+    // SECURITY: Sanitise template metadata before prompt injection
+    const safeName = sanitiseForPrompt(seedTemplate.name)
+    const safeCategory = sanitiseForPrompt(seedTemplate.category)
+
+    // ── Build hybrid system prompt ──
+    const systemPrompt = `You are generating a CadQuery parametric CAD model that starts from an existing STEP file as seed geometry. Follow the methodology in this document:
+
+${CAD_INSTRUCTIONS}
+
+${libraryPromptSection}
+
+SEED GEOMETRY INSTRUCTIONS:
+You have access to a seed STEP file: "${seedFileName}" (from template: "${safeName}" [${safeCategory}])
+- Load it with: seed = cq.importers.importStep(SOURCE_DIR + "/${seedFileName}")
+- The seed is a STARTING POINT, not gospel — modify, extend, cut, or adapt as needed
+- If the seed geometry is close to what's needed, use it directly with modifications
+- If parts of the seed don't match the interface definition, cut them away and add new geometry
+- The final result MUST match the interface definition — the seed just gives you a head start
+
+EXECUTION ENVIRONMENT RULES:
+- SOURCE_DIR is pre-defined — do NOT define it yourself
+- The final variable MUST be called "result" and be a cq.Workplane or cq.Compound object
+- Do NOT include any cq.exporters calls — the execution environment handles export
+- Do NOT include any print() statements
+- Do NOT import os, sys, or use open(). Only import cadquery and math.
+- After assembling "result", also create "result_exploded" — wrap in try/except so it never blocks the main result.
+- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
+
+SELF-CONTAINED CODE (CRITICAL):
+- Your script MUST be executable with no unresolved names.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call.`
+
+    const userPrompt = `Build a parametric CAD model of: ${description}
+
+=== SEED TEMPLATE ===
+Name: ${safeName}
+Category: ${safeCategory}
+Match score: ${seedTemplate.score}
+Load with: seed = cq.importers.importStep(SOURCE_DIR + "/${seedFileName}")
+Use this as your starting geometry — modify/extend to match the interface definition below.
+
+=== RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
+${researchReport}
+
+=== INTERFACE DEFINITION (implement EVERY component listed here) ===
+${interfaceDefinition}
+${checkpointContext ?? ""}
+Generate CadQuery Python code that:
+1. Loads the seed STEP as a starting point
+2. Modifies/extends it to match the interface definition
+3. Assigns the final assembly to "result"
+4. Creates "result_exploded" (wrap in try/except)`
+
+    console.info("[THE-FORGE] Seed path: Generating hybrid CadQuery code...")
+    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
+    totalTokensIn += codeResult.tokensIn
+    totalTokensOut += codeResult.tokensOut
+
+    let finalCode = extractCode(codeResult.text)
+    const assumptions = extractAssumptions(interfaceDefinition, finalCode)
+
+    // Safety: strip unsafe calls
+    finalCode = finalCode
+      .split("\n")
+      .filter((line: string) => {
+        const s = line.trim()
+        if (/^print\s*\(/.test(s)) return false
+        if (s.startsWith("import os") || s.startsWith("from os")) return false
+        if (s.includes("cq.exporters")) return false
+        return true
+      })
+      .join("\n")
+
+    const codeLines = finalCode.split("\n").length
+    console.info(`[THE-FORGE] Seed path: Code generated (${codeLines} lines)`)
+
+    // ── Prepend library function definitions ──
+    const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(finalCode)
+    if (libraryComponents.length > 0) {
+      console.info("[THE-FORGE] Seed path: Library components prepended:", libraryComponents)
+    }
+
+    // ── Execute via mashup endpoint (supports SOURCE_DIR with STEP files) ──
+    console.info("[THE-FORGE] Seed path: Executing on Modal (mashup endpoint)...")
+    const modalStart = Date.now()
+    const modalResult = await executeMashupOnModal(
+      [{ name: seedFileName, step_b64: stepB64 }],
+      combinedCode,
+    )
+    const modalTime = Date.now() - modalStart
+
+    if (modalResult.error && !modalResult.svg_iso) {
+      throw new Error(`Modal execution failed: ${modalResult.error}`)
+    }
+
+    // ── Extract metrics ──
+    // GOTCHA: MashupModalResponse types `analysis` as `unknown`. We safely extract
+    // nested properties with optional chaining — no unsafe `as` cast needed.
+    const rawAnalysis = modalResult.analysis as Record<string, unknown> | null | undefined
+    const mp = rawAnalysis?.mass_properties as ModalResponse["analysis"] extends infer A
+      ? A extends { mass_properties?: infer MP } ? MP : undefined
+      : undefined
+    const bb = mp?.bounding_box
+    const vol = mp?.volume_mm3 ?? 0
+    const bbVol = bb ? bb.xLen * bb.yLen * bb.zLen : 0
+    const stepSizeKb = modalResult.step
+      ? Math.round(atob(modalResult.step).length / 1024)
+      : undefined
+    const fillRatio = bbVol > 0
+      ? Math.round((vol / bbVol) * 1000) / 10
+      : undefined
+    const bboxResult = bb
+      ? { xLen: Math.round(bb.xLen), yLen: Math.round(bb.yLen), zLen: Math.round(bb.zLen) }
+      : undefined
+
+    // Post-execution validation
+    const warnings: string[] = []
+    if (bboxResult) {
+      if (bboxResult.xLen < 1 || bboxResult.yLen < 1 || bboxResult.zLen < 1) {
+        warnings.push(`BBox has degenerate dimension(s): ${bboxResult.xLen}×${bboxResult.yLen}×${bboxResult.zLen}mm`)
+      }
+      const maxDim = Math.max(bboxResult.xLen, bboxResult.yLen, bboxResult.zLen)
+      const minDim = Math.min(bboxResult.xLen, bboxResult.yLen, bboxResult.zLen)
+      if (maxDim / minDim > 50) {
+        warnings.push(`Extreme aspect ratio ${(maxDim / minDim).toFixed(1)}:1`)
+      }
+    }
+    if (fillRatio != null && fillRatio > 15) {
+      warnings.push(`Fill ratio ${fillRatio}% is high`)
+    }
+    if (stepSizeKb != null && stepSizeKb < 100) {
+      warnings.push(`STEP size ${stepSizeKb}KB is small`)
+    }
+
+    // DFM
+    const dfmRaw = rawAnalysis?.dfm as ModalResponse["analysis"] extends infer A
+      ? A extends { dfm?: infer D } ? D : undefined
+      : undefined
+    const dfmResult = dfmRaw && !dfmRaw.error
+      ? {
+          printable: dfmRaw.printable ?? false,
+          issues: dfmRaw.issues ?? [],
+          estimatedPrintTimeMin: dfmRaw.estimated_print_time_min ?? 0,
+          estimatedMaterialG: dfmRaw.estimated_material_g ?? 0,
+          supportVolumePct: dfmRaw.support_volume_pct ?? 0,
+          compatiblePrinters: dfmRaw.compatible_printers ?? [],
+        }
+      : undefined
+
+    // Mass properties
+    const massPropsResult = mp && !mp.error
+      ? {
+          massKg: mp.mass_kg ?? 0,
+          volumeMm3: mp.volume_mm3 ?? 0,
+          surfaceAreaMm2: mp.surface_area_mm2 ?? 0,
+          centerOfGravity: (mp.center_of_gravity ?? [0, 0, 0]) as [number, number, number],
+          materialDensityKgM3: mp.material_density_kg_m3 ?? 1240,
+        }
+      : undefined
+
+    const svgUri = (b64: string | null | undefined): string | undefined =>
+      b64 ? `data:image/svg+xml;base64,${b64}` : undefined
+
+    // GOTCHA: MashupModalResponse only types svg_iso, but the Modal endpoint may
+    // return additional SVG views. Extract any extra views from the raw response.
+    const rawResult = modalResult as Record<string, unknown>
+
+    console.info(
+      `[THE-FORGE] Seed path complete: ${seedTemplate.slug}, ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms`,
+    )
+
+    return {
+      success: true,
+      code: finalCode,
+      codeLines,
+      generationTime: Date.now() - pipelineStart,
+      modalTime,
+      svgIso: svgUri(modalResult.svg_iso),
+      svgTop: svgUri(rawResult.svg_top as string | null),
+      svgFront: svgUri(rawResult.svg_front as string | null),
+      svgBack: svgUri(rawResult.svg_back as string | null),
+      svgRight: svgUri(rawResult.svg_right as string | null),
+      svgLeft: svgUri(rawResult.svg_left as string | null),
+      svgExploded: svgUri(rawResult.svg_exploded as string | null),
+      stepData: modalResult.step || undefined,
+      stepSize: stepSizeKb,
+      stlData: modalResult.stl || undefined,
+      stlSize: modalResult.stl ? Math.round(atob(modalResult.stl).length / 1024) : undefined,
+      bbox: bboxResult,
+      fillRatio,
+      massGrams: mp?.mass_kg ? Math.round(mp.mass_kg * 1000 * 10) / 10 : undefined,
+      volumeMm3: vol ? Math.round(vol) : undefined,
+      dfm: dfmResult,
+      massProperties: massPropsResult,
+      tokensIn: totalTokensIn,
+      tokensOut: totalTokensOut,
+      modelUsed: modelId,
+      interfaceDefinition,
+      validationWarnings: warnings.length > 0 ? warnings : undefined,
+      assumptions: assumptions.length > 0 ? assumptions : undefined,
+      seedTemplateSlug: seedTemplate.slug,
+      seedTemplateScore: seedTemplate.score,
+      error: modalResult.error ?? undefined,
+    }
+  } catch (err) {
+    console.warn("[THE-FORGE] Seed path error:", err instanceof Error ? err.message : err)
     return {
       success: false,
       error: sanitizeErrorMessage(err),
@@ -1818,29 +2167,273 @@ export async function executeMashupPlan(
 /**
  * Generates a combined system assembly from all generated module STEP files.
  *
- * @description When all modules have CAD, this step acts as a "systems architect":
- * combines module STEPs into a single assembly (e.g. via CadQuery import/position).
- * Currently a stub; full implementation will call Modal with an assembly script.
+ * @description Components-first assembly: template components (real parts from the
+ * 7,400+ library) are positioned as anchors, then generated geometry (chassis,
+ * adapters, mounting plates) is positioned relative to them. Uses interface
+ * definitions with placement tables and connection maps for spatial context.
+ *
+ * FLOW: Auth → Load project → Validate modules → Fetch STEPs → Classify →
+ *       Claude code gen → Sanitise → Execute on Modal → Upload → Return URLs
  *
  * @param projectId - CAD Lab project ID (must have all modules generated)
  * @returns Assembly STL/STEP URLs on success, or error
  *
- * @security Requires authenticated user; project must belong to user's foundry.
+ * @security Requires authenticated user; rate-limited; SSRF + size guards on STEP fetches.
  */
 export async function generateSystemAssembly(
   projectId: string,
 ): Promise<
-  | { success: true; stlUrl: string; stepUrl: string }
-  | { success: false; error: string }
+  | { success: true; stlUrl: string; stepUrl: string; assemblyCode?: string }
+  | { success: false; error: string; assemblyCode?: string }
 > {
-  // Stub: assembly generation not yet implemented.
-  // TODO: Load project and modules, fetch each module STEP URL, generate
-  // a CadQuery script that imports and positions them, run on Modal, upload result.
-  console.info("[THE-FORGE] generateSystemAssembly called (stub)", { projectId })
-  return {
-    success: false,
-    error:
-      "Assembly generation is not yet implemented. It will combine all module STEP files into a single system assembly.",
+  // VALIDATION: Check UUID format to prevent path traversal in storage paths
+  if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+    return { success: false, error: "Invalid project ID" }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  // SECURITY: Rate limit AI calls to prevent cost abuse
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { success: false, error: rateLimitError }
+
+  const startTime = Date.now()
+
+  // DECISION: 12 modules is safe — cq.Assembly() has linear memory cost (no booleans).
+  // Modal allocates 8GB + 600s timeout, plenty for 12 STEP imports.
+  const ASSEMBLY_MAX_MODULES = 12
+
+  try {
+    // ── Load project with modules ──
+    const { data: project, error: loadErr } = await supabase
+      .from("cad_lab_projects")
+      .select("id, subject, modules")
+      .eq("id", projectId)
+      .single()
+
+    if (loadErr || !project) {
+      return { success: false, error: "Project not found" }
+    }
+
+    const modules = (project.modules as CadLabModule[] | null) ?? []
+    if (modules.length === 0) {
+      return { success: false, error: "No modules found in project" }
+    }
+
+    // SECURITY: Modal /mashup endpoint limits source count
+    if (modules.length > ASSEMBLY_MAX_MODULES) {
+      return {
+        success: false,
+        error: `Assembly supports up to ${ASSEMBLY_MAX_MODULES} modules (this project has ${modules.length}).`,
+      }
+    }
+
+    // ── Validate all modules are generated with STEP URLs ──
+    const incomplete = modules.filter((m) => m.status !== "generated" || !m.result?.stepUrl)
+    if (incomplete.length > 0) {
+      const names = incomplete.map((m) => m.name).join(", ")
+      return { success: false, error: `Modules not ready: ${names}. All modules must be generated before assembly.` }
+    }
+
+    // ── Fetch all module STEPs sequentially (with SSRF + size guards) ──
+    const MAX_CUMULATIVE_SIZE = 200 * 1024 * 1024 // 200MB total
+    let cumulativeSize = 0
+    const resolvedSources: Array<{ name: string; step_b64: string }> = []
+
+    for (const mod of modules) {
+      const stepUrl = mod.result!.stepUrl!
+      const safeName = mod.id.replace(/[^a-z0-9_-]/g, "_")
+
+      // SECURITY: Validate URL before fetching (SSRF protection)
+      if (!isAllowedStepUrl(stepUrl)) {
+        return { success: false, error: `Module "${mod.name}" STEP URL blocked by allowlist` }
+      }
+
+      const stepResponse = await fetch(stepUrl, { signal: AbortSignal.timeout(60_000) })
+      if (!stepResponse.ok) {
+        return { success: false, error: `Failed to fetch STEP for module "${mod.name}" (${stepResponse.status})` }
+      }
+
+      // SECURITY: Check Content-Length to prevent memory exhaustion
+      const contentLength = stepResponse.headers.get("content-length")
+      if (contentLength && parseInt(contentLength, 10) > MAX_STEP_FILE_SIZE) {
+        return { success: false, error: `STEP file too large for module "${mod.name}" (${contentLength} bytes)` }
+      }
+
+      const stepBuffer = await stepResponse.arrayBuffer()
+
+      // Runtime size check (Content-Length header can be missing or spoofed)
+      if (stepBuffer.byteLength > MAX_STEP_FILE_SIZE) {
+        return { success: false, error: `STEP file too large for module "${mod.name}" (${stepBuffer.byteLength} bytes)` }
+      }
+
+      cumulativeSize += stepBuffer.byteLength
+      if (cumulativeSize > MAX_CUMULATIVE_SIZE) {
+        return { success: false, error: `Cumulative STEP file size exceeds 200MB limit` }
+      }
+
+      resolvedSources.push({
+        name: safeName,
+        step_b64: Buffer.from(stepBuffer).toString("base64"),
+      })
+    }
+
+    // ── Classify modules and build AssemblyModuleInfo ──
+    let templateCount = 0
+    const assemblyModules: AssemblyModuleInfo[] = modules.map((mod, i) => {
+      const safeName = resolvedSources[i].name
+      const isTemplate = !!(mod.seedTemplateSlug || mod.result?.seedTemplateSlug)
+      if (isTemplate) templateCount++
+
+      const massProps = mod.result?.massProperties
+      const cog = massProps?.centerOfGravity
+
+      return {
+        name: safeName,
+        displayName: mod.name,
+        isTemplateComponent: isTemplate,
+        seedTemplateSlug: mod.seedTemplateSlug || mod.result?.seedTemplateSlug,
+        bbox: mod.result?.bbox,
+        centerOfGravity: cog,
+        massGrams: mod.result?.massGrams,
+        purpose: mod.purpose,
+        keyParts: mod.keyParts ?? [],
+        inputs: mod.inputs ?? [],
+        outputs: mod.outputs ?? [],
+        interfaceDefinition: mod.interfaceDefinition || mod.result?.interfaceDefinition,
+      }
+    })
+
+    console.info("[THE-FORGE] Assembly: sources resolved", {
+      moduleCount: modules.length,
+      templateCount,
+      cumulativeSizeMB: (cumulativeSize / (1024 * 1024)).toFixed(1),
+    })
+
+    // ── Generate assembly CadQuery code via Claude (with retry) ──
+    const sourceNames = resolvedSources.map((s) => s.name)
+    const systemPrompt = getAssemblyCodeGenSystemPrompt(sourceNames)
+    const baseUserPrompt = getAssemblyCodeGenUserPrompt(assemblyModules, project.subject ?? "product")
+
+    const MAX_ATTEMPTS = 2
+    let lastCode: string | undefined
+    let lastError: string | undefined
+
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      let userPrompt = baseUserPrompt
+      if (attempt > 1 && lastError && lastCode) {
+        console.info(`[THE-FORGE] Assembly: attempt ${attempt - 1} failed, retrying with error context`)
+        userPrompt += `\n\nPREVIOUS ATTEMPT FAILED:\nError: ${lastError}\nCode:\n\`\`\`python\n${lastCode}\n\`\`\`\nFix the issue.`
+      }
+
+      const codeResult = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6", 16384)
+
+      let assemblyCode = extractCode(codeResult.text)
+
+      // ── Sanitise code — strip dangerous patterns before sending to Modal ──
+      // SECURITY: Defence-in-depth. Modal's validate_code() catches these too,
+      // but stripping here avoids wasting a Modal call on obviously bad code.
+      assemblyCode = assemblyCode
+        .split("\n")
+        .filter((line: string) => {
+          const t = line.trim()
+          if (/^print\s*\(/.test(t)) return false
+          if (t.startsWith("import os") || t.startsWith("from os")) return false
+          if (t.startsWith("import sys") || t.startsWith("from sys")) return false
+          if (t.startsWith("import subprocess") || t.startsWith("from subprocess")) return false
+          if (t.startsWith("import shutil") || t.startsWith("from shutil")) return false
+          if (t.startsWith("import socket") || t.startsWith("from socket")) return false
+          if (t.includes("cq.exporters")) return false
+          if (/\b(__import__|exec|eval|compile)\s*\(/.test(t)) return false
+          if (/\bopen\s*\(/.test(t)) return false
+          return true
+        })
+        .join("\n")
+
+      lastCode = assemblyCode
+
+      // Pre-flight: generated code must assign final geometry to "result"
+      if (!/\bresult\s*=/.test(assemblyCode)) {
+        lastError = "Generated assembly code does not assign the final model to 'result'."
+        if (attempt < MAX_ATTEMPTS) continue
+        return {
+          success: false,
+          error: lastError,
+          assemblyCode: lastCode,
+        }
+      }
+
+      // ── Execute on Modal ──
+      const modalResult = await executeMashupOnModal(resolvedSources, assemblyCode)
+
+      if (modalResult.error && !modalResult.step) {
+        lastError = `Modal execution failed: ${modalResult.error}`
+        if (attempt < MAX_ATTEMPTS) continue
+        return { success: false, error: lastError, assemblyCode: lastCode }
+      }
+
+      // ── Upload STEP + STL to Supabase Storage ──
+      const pathPrefix = `cad-lab/assembly/${projectId}`
+      const bucket = "xray-images"
+      const admin = createAdminClient()
+      let stepUrl = ""
+      let stlUrl = ""
+
+      if (modalResult.step) {
+        const { error: stepErr } = await admin.storage
+          .from(bucket)
+          .upload(`${pathPrefix}/assembly.step`, Buffer.from(modalResult.step, "base64"), {
+            contentType: "application/step",
+            upsert: true,
+          })
+        if (stepErr) {
+          console.error("[THE-FORGE] Assembly STEP upload failed:", stepErr.message)
+        } else {
+          const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/assembly.step`)
+          stepUrl = d.publicUrl
+        }
+      }
+      if (modalResult.stl) {
+        const { error: stlErr } = await admin.storage
+          .from(bucket)
+          .upload(`${pathPrefix}/assembly.stl`, Buffer.from(modalResult.stl, "base64"), {
+            contentType: "model/stl",
+            upsert: true,
+          })
+        if (stlErr) {
+          console.error("[THE-FORGE] Assembly STL upload failed:", stlErr.message)
+        } else {
+          const { data: d } = admin.storage.from(bucket).getPublicUrl(`${pathPrefix}/assembly.stl`)
+          stlUrl = d.publicUrl
+        }
+      }
+
+      if (!stepUrl && !stlUrl) {
+        return { success: false, error: "Assembly executed but no output files were produced", assemblyCode: lastCode }
+      }
+
+      const elapsedMs = Date.now() - startTime
+      console.info("[THE-FORGE] Assembly complete:", {
+        projectId,
+        elapsedMs,
+        moduleCount: modules.length,
+        templateCount,
+        attempts: attempt,
+        tokensIn: codeResult.tokensIn,
+        tokensOut: codeResult.tokensOut,
+      })
+
+      return { success: true, stlUrl, stepUrl, assemblyCode: lastCode }
+    }
+
+    // INTENT: Unreachable — loop always returns. Satisfies TypeScript.
+    return { success: false, error: lastError ?? "Assembly generation failed", assemblyCode: lastCode }
+  } catch (err) {
+    const msg = sanitizeErrorMessage(err)
+    console.error("[THE-FORGE] generateSystemAssembly failed:", msg)
+    return { success: false, error: msg }
   }
 }
 

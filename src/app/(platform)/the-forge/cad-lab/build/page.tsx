@@ -113,6 +113,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     integratedAssemblyStlUrl,
     isIntegrating,
     integrationError,
+    integrationAssemblyCode,
     setIntegrationError,
     handleGenerateIntegration,
     handleDownload,
@@ -324,6 +325,7 @@ export default function CadLabBuildPage(): React.ReactNode {
           onGenerateIntegration={handleGenerateIntegration}
           integrationError={integrationError}
           onClearError={() => setIntegrationError(null)}
+          assemblyCode={integrationAssemblyCode}
         /></div>
       )}
 
