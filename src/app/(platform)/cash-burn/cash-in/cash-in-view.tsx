@@ -61,8 +61,20 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
     defaultScenario ? String(defaultScenario.openingBalance / 100) : '0'
   )
   const [balanceSaving, setBalanceSaving] = useState(false)
+  const [balanceFocused, setBalanceFocused] = useState(false)
   const scenarioId = defaultScenario?.id ?? null
   const balanceInputRef = useRef<HTMLInputElement>(null)
+
+  // Format the balance display with commas when not focused
+  const balanceDisplayValue = useMemo(() => {
+    if (balanceFocused) return openingBalancePounds
+    const parsed = parseFloat(openingBalancePounds)
+    if (isNaN(parsed)) return openingBalancePounds
+    return parsed.toLocaleString('en-GB', {
+      minimumFractionDigits: parsed % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    })
+  }, [openingBalancePounds, balanceFocused])
 
   const weeklyTotal = useMemo(() => items.reduce((s, i) => s + i.weeklyAmount, 0), [items])
   const monthlyTotal = Math.round(weeklyTotal * 52 / 12)
@@ -270,14 +282,21 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                 <span className="text-2xl font-semibold text-muted-foreground">&pound;</span>
                 <input
                   ref={balanceInputRef}
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={openingBalancePounds}
-                  onChange={(e) => setOpeningBalancePounds(e.target.value)}
-                  onBlur={saveOpeningBalance}
+                  type="text"
+                  inputMode="decimal"
+                  value={balanceDisplayValue}
+                  onChange={(e) => {
+                    // Strip commas and non-numeric chars (allow digits and decimal point)
+                    const raw = e.target.value.replace(/[^0-9.]/g, '')
+                    setOpeningBalancePounds(raw)
+                  }}
+                  onFocus={() => setBalanceFocused(true)}
+                  onBlur={() => {
+                    setBalanceFocused(false)
+                    saveOpeningBalance()
+                  }}
                   onKeyDown={handleBalanceKeyDown}
-                  className="w-36 h-10 rounded-md border border-input bg-background px-3 text-2xl font-semibold text-foreground tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-44 h-10 rounded-md border border-input bg-background px-3 text-2xl font-semibold text-foreground tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
             </div>
