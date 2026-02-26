@@ -8,13 +8,15 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react'
+import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/types/payments'
+import { Button } from '@/components/ui/button'
 import { ItemsSection } from '@/components/cash-burn/items-section'
 import { ItemDialog } from '@/components/cash-burn/item-dialog'
+import { CashInSetupWizard } from '@/components/cash-burn/cash-in-setup-wizard'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
@@ -47,6 +49,7 @@ const SOURCE_TYPE_CONFIG: Array<{
 export function CashInView({ initialItems, hasError }: CashInViewProps) {
   const [items, setItems] = useState<CashInItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [wizardOpen, setWizardOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +128,10 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
     }
   }, [])
 
+  const handleWizardComplete = useCallback((newItems: CashInItem[]) => {
+    setItems(prev => [...prev, ...newItems])
+  }, [])
+
   const handleSave = useCallback(async (data: CreateCashInInput) => {
     setError(null)
     if (editingItem) {
@@ -181,6 +188,14 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={items.length < 3 ? 'default' : 'secondary'}
+            size="sm"
+            onClick={() => setWizardOpen(true)}
+          >
+            <Zap className="h-3.5 w-3.5 mr-1.5" />
+            Quick Setup
+          </Button>
           <Badge variant="secondary" size="sm">{formatCurrency(weeklyTotal)}/wk</Badge>
           <Badge variant="secondary" size="sm">{formatCurrency(monthlyTotal)}/mo</Badge>
         </div>
@@ -296,6 +311,14 @@ export function CashInView({ initialItems, hasError }: CashInViewProps) {
           notes: editingItem.notes ?? undefined,
         } : undefined}
         onSave={handleSave as (data: import('@/types/cash-burn').CreateCashOutInput | CreateCashInInput) => void}
+      />
+
+      {/* Quick Setup Wizard */}
+      <CashInSetupWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onComplete={handleWizardComplete}
+        existingItemCount={items.length}
       />
     </div>
   )
