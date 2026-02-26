@@ -238,14 +238,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         })
 
         if (!saveResult.success) {
+            // SECURITY: Log raw error server-side but return opaque code to client
             console.error('[MicrosoftCallback] Failed to save token:', saveResult.error)
-            const saveErrorUrl = new URL('/settings/integrations', origin)
-            saveErrorUrl.searchParams.set('error', 'save_failed')
-            saveErrorUrl.searchParams.set(
-                'detail',
-                (saveResult.error || 'Unknown save error').slice(0, 200)
+            return NextResponse.redirect(
+                new URL('/settings/integrations?error=token_save_error', origin)
             )
-            return NextResponse.redirect(saveErrorUrl)
         }
 
         // AUDIT: Log successful connection
@@ -269,15 +266,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
         return response
     } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+        // SECURITY: Log raw error server-side but return opaque code to client
         console.error('[MicrosoftCallback] Token exchange failed:', {
-            error: errorMessage,
+            error: err instanceof Error ? err.message : 'Unknown error',
             origin,
             redirectUri,
         })
-        const errorUrl = new URL('/settings/integrations', origin)
-        errorUrl.searchParams.set('error', 'exchange_failed')
-        errorUrl.searchParams.set('detail', errorMessage.slice(0, 200))
-        return NextResponse.redirect(errorUrl)
+        return NextResponse.redirect(
+            new URL('/settings/integrations?error=exchange_error', origin)
+        )
     }
 }
