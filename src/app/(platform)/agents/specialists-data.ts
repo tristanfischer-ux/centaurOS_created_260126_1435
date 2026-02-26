@@ -32,6 +32,7 @@
 
 import type { PromptCategory } from "./lib/agent-types"
 import type { AgentPersonality, AgentWritingStyle, AgentCelebrationStyle, StrongOpinion, SpecialistRelationship } from "@/lib/agents/personality"
+import { loadSpecialistOverrides, applyOverrides } from "@/lib/agents/specialist-config"
 
 // ─── Specialist ID Union Type ─────────────────────────────────────────────────
 
@@ -1407,4 +1408,25 @@ export function getRecommendedSpecialists(): Specialist[] {
  */
 export function getSpecialistDisplayName(specialist: Specialist): string {
     return `${specialist.name} (${specialist.title})`
+}
+
+/**
+ * Returns the specialist roster with any runtime overrides applied.
+ *
+ * @description Loads overrides from the SPECIALIST_OVERRIDES environment variable
+ * (JSON string keyed by specialist ID) and shallow-merges them onto the base
+ * TypeScript definitions. If no overrides are configured, returns the raw
+ * SPECIALISTS array with zero overhead.
+ *
+ * Override example (set as env var):
+ * ```json
+ * { "strategist": { "tagline": "Your custom tagline here" } }
+ * ```
+ *
+ * @returns Specialist roster with overrides applied
+ */
+export function getSpecialists(): Specialist[] {
+    const overrides = loadSpecialistOverrides()
+    if (Object.keys(overrides).length === 0) return SPECIALISTS
+    return applyOverrides(SPECIALISTS, overrides)
 }
