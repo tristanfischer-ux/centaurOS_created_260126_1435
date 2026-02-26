@@ -123,22 +123,21 @@ const planNavigation = [
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section 3: "Finance" — Financial overview and management
+// Section 3: "Finance" — Hidden for now, may be restored later
 // ─────────────────────────────────────────────────────────────────────────────
-const financeNavigation = [
-    { name: "Overview", href: "/finance", icon: PoundSterling, tooltip: "Your unified financial dashboard — revenue, expenses, cash flow, and invoices" },
-    { name: "Money Map", href: "/finance/money-map", icon: Map, tooltip: "Visualise revenue streams, costs, and profitability" },
-    { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
-    { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity, tooltip: "Forward-looking cash flow projections with scenario modeling" },
-    { name: "Reports", href: "/finance/reports", icon: BarChart3, tooltip: "Generate P&L, VAT, and Cash Flow Statement reports" },
-    { name: "Budgets", href: "/finance/budgets", icon: PiggyBank, tooltip: "Track budget allocations vs actual spend with variance analysis" },
-    { name: "Projects", href: "/finance/projects", icon: FolderKanban, tooltip: "Per-project profitability tracking and P&L" },
-    { name: "Expenses", href: "/finance/expenses", icon: Receipt, tooltip: "Track and manage business expenses" },
-    { name: "Funding", href: "/finance/funding", icon: Landmark, tooltip: "Track funding opportunities and grant applications" },
-    { name: "Investors", href: "/investors", icon: Building2, tooltip: "Browse 600 UK VC and PE firms — search, filter, and track outreach" },
-    { name: "Integrations", href: "/finance/integrations", icon: Link2, tooltip: "Connect Xero, QuickBooks, or FreeAgent" },
-    { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
-]
+// const financeNavigation = [
+//     { name: "Overview", href: "/finance", icon: PoundSterling, tooltip: "Your unified financial dashboard — revenue, expenses, cash flow, and invoices" },
+//     { name: "Money Map", href: "/finance/money-map", icon: Map, tooltip: "Visualise revenue streams, costs, and profitability" },
+//     { name: "Invoices", href: "/finance/invoices", icon: FileText, tooltip: "Track outstanding payments and aging buckets" },
+//     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity, tooltip: "Forward-looking cash flow projections with scenario modeling" },
+//     { name: "Reports", href: "/finance/reports", icon: BarChart3, tooltip: "Generate P&L, VAT, and Cash Flow Statement reports" },
+//     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank, tooltip: "Track budget allocations vs actual spend with variance analysis" },
+//     { name: "Projects", href: "/finance/projects", icon: FolderKanban, tooltip: "Per-project profitability tracking and P&L" },
+//     { name: "Expenses", href: "/finance/expenses", icon: Receipt, tooltip: "Track and manage business expenses" },
+//     { name: "Funding", href: "/finance/funding", icon: Landmark, tooltip: "Track funding opportunities and grant applications" },
+//     { name: "Integrations", href: "/finance/integrations", icon: Link2, tooltip: "Connect Xero, QuickBooks, or FreeAgent" },
+//     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
+// ]
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Section 3b: "Cash Burn" — Runway and scenario planning
@@ -148,6 +147,7 @@ const cashBurnNavigation = [
     { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown, tooltip: "Fixed and variable cost management" },
     { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp, tooltip: "Revenue, loans, equity, and grants" },
     { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3, tooltip: "Projected Income Statement and Balance Sheet" },
+    { name: "Investors", href: "/investors", icon: Building2, tooltip: "Browse 600 UK VC and PE firms — search, filter, and track outreach" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -219,7 +219,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
     // in the client cache before the user clicks.
     React.useEffect(() => {
-        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports', '/finance']
+        const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports', '/cash-burn']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 
@@ -369,20 +369,13 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
-                {/* Section 3: "Finance" — Financial overview            */}
+                {/* Section 3: "Finance" — Hidden for now               */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
-
-                <SectionHeader label="Finance" introRoute="/finance/intro" hasNew={badges.finance} isOpen={openSections.finance} onToggle={() => toggleSection("finance")} />
-                <Collapsible open={openSections.finance}>
-                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-                        {financeNavigation.map(renderNavItem)}
-                    </CollapsibleContent>
-                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 3b: "Cash Burn" — Runway planning           */}
                 {/* ══════════════════════════════════════════════════ */}
+                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
                 <div className="px-3 pt-2 pb-0.5">
                     <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
                         Cash Burn

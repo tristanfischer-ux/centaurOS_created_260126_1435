@@ -53,6 +53,7 @@ import {
     Link2,
     TrendingDown,
     TrendingUp,
+    Building2,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -97,20 +98,20 @@ const planMoreNavigation = [
     { name: "Outreach", href: "/outreach", icon: Send },
 ]
 
-// "More" dropdown — Finance section
-const financeMoreNavigation = [
-    { name: "Finance", href: "/finance", icon: PoundSterling },
-    { name: "Money Map", href: "/finance/money-map", icon: Map },
-    { name: "Invoices", href: "/finance/invoices", icon: FileText },
-    { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity },
-    { name: "Reports", href: "/finance/reports", icon: BarChart3 },
-    { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
-    { name: "Projects", href: "/finance/projects", icon: FolderKanban },
-    { name: "Expenses", href: "/finance/expenses", icon: Receipt },
-    { name: "Funding", href: "/finance/funding", icon: Landmark },
-    { name: "Integrations", href: "/finance/integrations", icon: Link2 },
-    { name: "Alerts", href: "/finance/settings", icon: BellRing },
-]
+// "More" dropdown — Finance section (hidden for now, may be restored later)
+// const financeMoreNavigation = [
+//     { name: "Finance", href: "/finance", icon: PoundSterling },
+//     { name: "Money Map", href: "/finance/money-map", icon: Map },
+//     { name: "Invoices", href: "/finance/invoices", icon: FileText },
+//     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity },
+//     { name: "Reports", href: "/finance/reports", icon: BarChart3 },
+//     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
+//     { name: "Projects", href: "/finance/projects", icon: FolderKanban },
+//     { name: "Expenses", href: "/finance/expenses", icon: Receipt },
+//     { name: "Funding", href: "/finance/funding", icon: Landmark },
+//     { name: "Integrations", href: "/finance/integrations", icon: Link2 },
+//     { name: "Alerts", href: "/finance/settings", icon: BellRing },
+// ]
 
 // "More" dropdown — Cash Burn section
 const cashBurnNavigation = [
@@ -118,6 +119,7 @@ const cashBurnNavigation = [
     { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown },
     { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp },
     { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3 },
+    { name: "Investors", href: "/investors", icon: Building2 },
 ]
 
 // "More" dropdown — Workshop section
@@ -155,7 +157,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...financeMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     /**
      * Renders a dropdown menu item with active state highlighting.
@@ -251,13 +253,7 @@ export function MobileNav() {
 
                         <DropdownMenuSeparator />
 
-                        {/* Finance section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Finance
-                        </DropdownMenuLabel>
-                        {financeMoreNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
+                        {/* Finance section — hidden for now */}
 
                         {/* Cash Burn section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
