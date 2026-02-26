@@ -29,8 +29,8 @@ import {
   decomposeIntoModules,
   prefillDiagnostics,
   generateSystemAssembly,
-  buildCheckpointPromptSection,
 } from "@/actions/cad-lab"
+import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
 import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
