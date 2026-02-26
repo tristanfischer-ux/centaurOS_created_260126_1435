@@ -1,26 +1,28 @@
 'use client'
 
+/**
+ * @file DataSyncTab.tsx
+ *
+ * @description Admin panel tab for viewing spreadsheet sync status.
+ * Simplified to show connection status and link to the full integrations page.
+ */
+
 import { useState, useEffect, useTransition } from 'react'
-import { 
-    RefreshCw, 
-    Link2,
-    Unlink,
+import {
+    RefreshCw,
     CheckCircle2,
     AlertCircle,
     Loader2,
     ExternalLink,
-    Clock
+    Clock,
+    Settings,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Switch } from '@/components/ui/switch'
-import { 
-    getSheetsIntegration, 
-    updateSheetsIntegration, 
+import {
+    getSheetsIntegration,
     triggerManualSync,
-    type SheetsIntegrationConfig 
+    type SheetsIntegrationConfig
 } from '@/actions/sheets-sync'
 
 interface DataSyncTabProps {
@@ -28,89 +30,32 @@ interface DataSyncTabProps {
     isFounder: boolean
 }
 
-const SYNCABLE_TABLES = [
-    { id: 'tasks', label: 'Tasks' },
-    { id: 'objectives', label: 'Objectives' },
-    { id: 'standups', label: 'Standups' },
-    { id: 'profiles', label: 'Team Members' },
-]
-
 export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
     const [isPending, startTransition] = useTransition()
     const [config, setConfig] = useState<SheetsIntegrationConfig | null>(null)
-    const [sheetId, setSheetId] = useState('')
-    const [tablesToSync, setTablesToSync] = useState<string[]>(['tasks', 'objectives', 'standups'])
-    const [isConnected, setIsConnected] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [success, setSuccess] = useState<string | null>(null)
-    
+
     useEffect(() => {
         async function loadIntegration() {
             setLoading(true)
             const result = await getSheetsIntegration()
             if (result.config) {
                 setConfig(result.config)
-                setSheetId(result.config.sheet_id || '')
-                setTablesToSync(result.config.tables_to_sync || ['tasks', 'objectives', 'standups'])
-                setIsConnected(result.config.sync_enabled || false)
             }
             setLoading(false)
         }
         loadIntegration()
     }, [])
-    
-    const handleConnect = async () => {
-        if (!sheetId.trim()) {
-            setError('Please enter a Google Sheet ID')
-            return
-        }
-        
-        setError(null)
-        setSuccess(null)
-        
-        startTransition(async () => {
-            const result = await updateSheetsIntegration({
-                sheet_id: sheetId.trim(),
-                sync_enabled: true,
-                tables_to_sync: tablesToSync
-            })
-            
-            if (result.error) {
-                setError(result.error)
-            } else {
-                setSuccess('Google Sheets connected successfully')
-                setIsConnected(true)
-                setConfig(result.config || null)
-            }
-        })
-    }
-    
-    const handleDisconnect = async () => {
-        setError(null)
-        setSuccess(null)
-        
-        startTransition(async () => {
-            const result = await updateSheetsIntegration({
-                sync_enabled: false
-            })
-            
-            if (result.error) {
-                setError(result.error)
-            } else {
-                setSuccess('Google Sheets disconnected')
-                setIsConnected(false)
-            }
-        })
-    }
-    
+
     const handleSyncNow = async () => {
         setError(null)
         setSuccess(null)
-        
+
         startTransition(async () => {
             const result = await triggerManualSync()
-            
+
             if (result.error) {
                 setError(result.error)
             } else {
@@ -122,165 +67,94 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
             }
         })
     }
-    
-    const toggleTable = (tableId: string) => {
-        setTablesToSync(prev => 
-            prev.includes(tableId)
-                ? prev.filter(t => t !== tableId)
-                : [...prev, tableId]
-        )
-    }
-    
+
     const formatLastSync = (timestamp: string | null) => {
         if (!timestamp) return 'Never'
         const date = new Date(timestamp)
         return date.toLocaleString()
     }
-    
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-foundry-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
         )
     }
-    
+
+    const isConnected = config?.sync_enabled || false
+    const hasSpreadsheet = !!config?.spreadsheet_id
+
     return (
         <div className="space-y-4">
             {/* Connection status */}
-            <div className="flex items-center justify-between p-3 rounded-lg bg-foundry-50">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted">
                 <div className="flex items-center gap-2">
                     {isConnected ? (
                         <>
-                            <CheckCircle2 className="h-5 w-5 text-status-success" />
-                            <span className="text-sm font-medium text-foundry-900">Connected</span>
+                            <CheckCircle2 className="h-5 w-5 text-success" />
+                            <span className="text-sm font-medium text-foreground">Connected</span>
+                            {config?.oauth_email && (
+                                <span className="text-xs text-muted-foreground">({config.oauth_email})</span>
+                            )}
                         </>
                     ) : (
                         <>
-                            <AlertCircle className="h-5 w-5 text-status-warning" />
-                            <span className="text-sm font-medium text-foundry-900">Not Connected</span>
+                            <AlertCircle className="h-5 w-5 text-warning" />
+                            <span className="text-sm font-medium text-foreground">Not Connected</span>
                         </>
                     )}
                 </div>
                 {isConnected && config?.last_sync_at && (
-                    <div className="flex items-center gap-1 text-xs text-foundry-500">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         Last sync: {formatLastSync(config.last_sync_at)}
                     </div>
                 )}
             </div>
-            
+
             {error && (
-                <div className="p-2 text-xs bg-status-error-light text-destructive rounded-md">
+                <div className="p-2 text-xs bg-destructive/10 text-destructive rounded-md">
                     {error}
                 </div>
             )}
             {success && (
-                <div className="p-2 text-xs bg-status-success-light text-status-success-dark rounded-md">
+                <div className="p-2 text-xs bg-success/10 text-success rounded-md">
                     {success}
                 </div>
             )}
-            
-            {!isConnected ? (
+
+            {hasSpreadsheet ? (
                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="sheetId" className="text-xs font-medium text-foundry-700">
-                            Google Sheet ID
-                        </Label>
-                        <Input
-                            id="sheetId"
-                            value={sheetId}
-                            onChange={(e) => setSheetId(e.target.value)}
-                            placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
-                            className="h-9 text-sm"
-                        />
-                        <p className="text-xs text-foundry-500">
-                            Find the ID in your Google Sheet URL: docs.google.com/spreadsheets/d/<strong>[ID]</strong>/edit
-                        </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-foundry-700">Data to Sync</Label>
-                        <div className="space-y-2">
-                            {SYNCABLE_TABLES.map((table) => (
-                                <div
-                                    key={table.id}
-                                    className="flex items-center justify-between p-2 rounded-lg bg-foundry-50"
-                                >
-                                    <span className="text-sm text-foundry-700">{table.label}</span>
-                                    <Switch
-                                        checked={tablesToSync.includes(table.id)}
-                                        onCheckedChange={() => toggleTable(table.id)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    
-                    <Button
-                        onClick={handleConnect}
-                        disabled={isPending || !sheetId.trim()}
-                        className="w-full"
-                    >
-                        {isPending ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                            <Link2 className="h-4 w-4 mr-2" />
-                        )}
-                        Connect Google Sheets
-                    </Button>
-                    
-                    <div className="text-xs text-foundry-500 text-center">
-                        <a 
-                            href="https://docs.google.com/spreadsheets/create" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-electric-blue hover:underline inline-flex items-center gap-1"
-                        >
-                            Create a new Google Sheet
-                            <ExternalLink className="h-3 w-3" />
-                        </a>
-                    </div>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <div className="p-3 rounded-lg border border-foundry-200 bg-background">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-medium text-foundry-700">Connected Sheet</span>
-                            {/* SECURITY: Validate sheet_id format before building URL */}
-                            {config?.sheet_id && /^[a-zA-Z0-9_-]+$/.test(config.sheet_id) && (
+                    {config?.spreadsheet_url && (
+                        <div className="p-3 rounded-lg border border-border bg-background">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-foreground">Spreadsheet</span>
                                 <a
-                                    href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(config.sheet_id)}`}
+                                    href={config.spreadsheet_url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs text-electric-blue hover:underline inline-flex items-center gap-1"
+                                    className="text-xs text-international-orange hover:underline inline-flex items-center gap-1"
                                 >
                                     Open
                                     <ExternalLink className="h-3 w-3" />
                                 </a>
-                            )}
+                            </div>
                         </div>
-                        <code className="text-xs text-foundry-500 break-all">
-                            {config?.sheet_id}
-                        </code>
-                    </div>
-                    
-                    <div className="space-y-2">
-                        <Label className="text-xs font-medium text-foundry-700">Syncing</Label>
-                        <div className="flex flex-wrap gap-1">
-                            {(config?.tables_to_sync || []).map((table) => (
-                                <Badge key={table} variant="secondary" className="text-xs bg-foundry-100 border-0">
-                                    {SYNCABLE_TABLES.find(t => t.id === table)?.label || table}
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
-                    
+                    )}
+
+                    {isConnected && (
+                        <Badge variant="success" className="text-xs">
+                            Auto-syncing every 3 minutes
+                        </Badge>
+                    )}
+
                     <div className="flex gap-2">
                         <Button
                             onClick={handleSyncNow}
                             disabled={isPending}
                             className="flex-1"
+                            size="sm"
                         >
                             {isPending ? (
                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -289,30 +163,34 @@ export function DataSyncTab({ foundryId, isFounder }: DataSyncTabProps) {
                             )}
                             Sync Now
                         </Button>
-                        
-                        {isFounder && (
-                            <Button
-                                variant="secondary"
-                                onClick={handleDisconnect}
-                                disabled={isPending}
-                            >
-                                <Unlink className="h-4 w-4" />
-                            </Button>
-                        )}
                     </div>
-                    
+
                     {config?.sync_errors && config.sync_errors.length > 0 && (
-                        <div className="p-2 rounded-lg bg-status-warning-light border border-status-warning">
-                            <div className="flex items-center gap-1 text-xs font-medium text-status-warning mb-1">
+                        <div className="p-2 rounded-lg bg-warning/10 border border-warning">
+                            <div className="flex items-center gap-1 text-xs font-medium text-warning mb-1">
                                 <AlertCircle className="h-3 w-3" />
                                 Recent Sync Issues
                             </div>
-                            <ul className="text-xs text-status-warning space-y-1">
+                            <ul className="text-xs text-muted-foreground space-y-1">
                                 {config.sync_errors.slice(0, 3).map((err, i) => (
                                     <li key={i}>{err}</li>
                                 ))}
                             </ul>
                         </div>
+                    )}
+                </div>
+            ) : (
+                <div className="text-center space-y-3 py-4">
+                    <p className="text-sm text-muted-foreground">
+                        No spreadsheet sync configured yet.
+                    </p>
+                    {isFounder && (
+                        <Button asChild variant="outline" size="sm">
+                            <a href="/settings/integrations">
+                                <Settings className="h-4 w-4 mr-2" />
+                                Set up in Integrations
+                            </a>
+                        </Button>
                     )}
                 </div>
             )}

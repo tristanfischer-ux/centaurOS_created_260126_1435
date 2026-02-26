@@ -475,15 +475,39 @@ export function CadLabReviewPackage({
                   </div>
                 </div>
 
-                {/* SVG thumbnail for generated modules */}
+                {/* SVG views for generated modules */}
                 {mod.status === "generated" && mod.result?.svgIso && (
-                  <div className="w-full h-20 rounded-md bg-muted/30 border border-muted overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={mod.result.svgIso}
-                      alt={`${mod.name} isometric view`}
-                      className="w-full h-full object-contain"
-                    />
+                  <div className={`grid gap-2 ${
+                    mod.result.svgTop || mod.result.svgFront ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"
+                  }`}>
+                    <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={mod.result.svgIso}
+                        alt={`${mod.name} isometric view`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    {mod.result.svgTop && (
+                      <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={mod.result.svgTop}
+                          alt={`${mod.name} top view`}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
+                    {mod.result.svgFront && (
+                      <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={mod.result.svgFront}
+                          alt={`${mod.name} front view`}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
 

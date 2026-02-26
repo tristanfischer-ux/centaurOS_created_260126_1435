@@ -302,6 +302,14 @@ export async function createObjective(formData: FormData) {
             }
         }
 
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'objective', objective.id, 'create')
+        } catch (err) {
+            console.error('[ObjectiveService] Failed to sync objective to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
+
         revalidatePath('/objectives')
         revalidatePath('/new-objectives')
         revalidatePath('/tasks')
@@ -413,6 +421,14 @@ export async function updateObjective(
             foundryId,
             fieldsUpdated: Object.keys(updateData).filter(k => k !== 'updated_at')
         })
+
+        // Sync to Google Sheets (fire-and-forget — objective title changes propagate to task rows)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'objective', objectiveId, 'update')
+        } catch (err) {
+            console.error('[ObjectiveService] Failed to sync objective to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
 
         revalidatePath('/objectives')
         revalidatePath('/new-objectives')

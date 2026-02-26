@@ -1,36 +1,41 @@
 /**
  * @file route.ts
  *
- * @description Initiates the Google OAuth flow. Generates an authorization URL
- * and redirects the user to Google's consent screen.
+ * @description Initiates the Microsoft OAuth flow. Generates an authorization URL
+ * and redirects the user to Microsoft's consent screen.
  *
  * @security
  * - Requires authenticated user
- * - Uses state parameter with user/foundry IDs to prevent CSRF
+ * - Uses signed state parameter with user/foundry IDs to prevent CSRF
  * - Requests only scopes needed for enabled features
  * - Forces consent prompt to always get refresh_token
  *
- * @related src/app/api/google/callback/route.ts - Handles the OAuth callback
+ * @related src/app/api/microsoft/callback/route.ts - Handles the OAuth callback
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { createOAuth2Client } from '@/lib/google/client'
-import { getScopesForFeatures } from '@/lib/google/scopes'
+import { MICROSOFT_SCOPES } from '@/lib/microsoft/client'
 import { buildOAuthStatePayload, createSignedOAuthState } from '@/lib/security/oauth-state'
 import { rateLimit } from '@/lib/security/rate-limit'
+
+const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID
+
+/** Microsoft authorization endpoint for the common (multi-tenant) authority */
+const MICROSOFT_AUTH_ENDPOINT =
+    'https://login.microsoftonline.com/common/oauth2/v2.0/authorize'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     const origin = req.nextUrl.origin
 
     /**
-     * Redirect back to the Google Apps page with an error code.
+     * Redirect back to the integrations settings page with an error code.
      * Since this route is navigated to via <a href>, returning JSON
      * would cause the browser to download a file instead of displaying it.
      */
     function redirectWithError(errorCode: string): NextResponse {
-        const redirectUrl = new URL('/google-apps', origin)
+        const redirectUrl = new URL('/settings/integrations', origin)
         redirectUrl.searchParams.set('error', errorCode)
         return NextResponse.redirect(redirectUrl)
     }
@@ -44,7 +49,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
 
     // SECURITY: Limit OAuth connect initiations per user to reduce abuse.
-    const rateLimitResult = await rateLimit('api', `google-connect:${user.id}`, {
+    const rateLimitResult = await rateLimit('api', `microsoft-connect:${user.id}`, {
         limit: 20,
         window: 10 * 60 * 1000,
     })
@@ -57,66 +62,61 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         return redirectWithError('no_foundry')
     }
 
-    // Determine which features to request scopes for
-    const featuresParam = req.nextUrl.searchParams.get('features') || 'calendar'
-    const features = featuresParam.split(',').filter(
-        (f): f is 'calendar' | 'drive' | 'gmail' | 'sheets' => ['calendar', 'drive', 'gmail', 'sheets'].includes(f)
-    )
-
-    const scopes = getScopesForFeatures(features.length > 0 ? features : ['calendar'] as ('calendar' | 'drive' | 'gmail' | 'sheets')[])
-
-    // Build the redirect URI based on the current host
-    const redirectUri = `${origin}/api/google/callback`
-
     // SECURITY: Catch missing env vars gracefully instead of throwing
-    let oauth2Client: ReturnType<typeof createOAuth2Client>
-    try {
-        oauth2Client = createOAuth2Client(redirectUri)
-    } catch (err) {
-        console.error('[GoogleConnect] Failed to create OAuth client:', {
-            error: err instanceof Error ? err.message : 'Unknown error',
-        })
+    if (!MICROSOFT_CLIENT_ID) {
+        console.error('[MicrosoftConnect] Missing MICROSOFT_CLIENT_ID env var')
         return redirectWithError('not_configured')
     }
 
+    // Build the redirect URI based on the current host
+    const redirectUri = `${origin}/api/microsoft/callback`
+
     // SECURITY: Sign OAuth state to prevent tampering between connect and callback.
-    // Prefers a dedicated secret; falls back to GOOGLE_CLIENT_SECRET with a warning
+    // Prefers a dedicated secret; falls back to MICROSOFT_CLIENT_SECRET with a warning
     // so the app stays functional while the dedicated env var is provisioned.
-    const oauthStateSecret = process.env.GOOGLE_OAUTH_STATE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET
-    if (!process.env.GOOGLE_OAUTH_STATE_SECRET && process.env.GOOGLE_CLIENT_SECRET) {
-        console.warn('[SECURITY] GOOGLE_OAUTH_STATE_SECRET not set — falling back to GOOGLE_CLIENT_SECRET. Set a dedicated secret to eliminate this warning.')
+    const oauthStateSecret =
+        process.env.MICROSOFT_OAUTH_STATE_SECRET ?? process.env.MICROSOFT_CLIENT_SECRET
+    if (!process.env.MICROSOFT_OAUTH_STATE_SECRET && process.env.MICROSOFT_CLIENT_SECRET) {
+        console.warn(
+            '[SECURITY] MICROSOFT_OAUTH_STATE_SECRET not set — falling back to MICROSOFT_CLIENT_SECRET. Set a dedicated secret to eliminate this warning.'
+        )
     }
     if (!oauthStateSecret) {
         console.error('[SECURITY] No OAuth state signing secret available')
         return redirectWithError('not_configured')
     }
 
-    const statePayload = buildOAuthStatePayload({ userId: user.id, foundryId, requestedScopes: scopes })
+    const scopes = [...MICROSOFT_SCOPES]
+    const statePayload = buildOAuthStatePayload({
+        userId: user.id,
+        foundryId,
+        requestedScopes: scopes,
+    })
     const stateEncoded = createSignedOAuthState(statePayload, oauthStateSecret)
 
-    console.info('[GoogleConnect] Initiating OAuth flow:', {
+    console.info('[MicrosoftConnect] Initiating OAuth flow:', {
         userId: user.id,
         foundryId,
         redirectUri,
-        features,
         scopeCount: scopes.length,
     })
 
-    const authUrl = oauth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: scopes,
-        state: stateEncoded,
-        prompt: 'consent', // Force consent to always get refresh_token
-        include_granted_scopes: true,
-    })
+    // Build Microsoft authorization URL
+    const authUrl = new URL(MICROSOFT_AUTH_ENDPOINT)
+    authUrl.searchParams.set('client_id', MICROSOFT_CLIENT_ID)
+    authUrl.searchParams.set('redirect_uri', redirectUri)
+    authUrl.searchParams.set('response_type', 'code')
+    authUrl.searchParams.set('scope', scopes.join(' '))
+    authUrl.searchParams.set('state', stateEncoded)
+    authUrl.searchParams.set('prompt', 'consent') // Force consent to always get refresh_token
 
-    const response = NextResponse.redirect(authUrl)
+    const response = NextResponse.redirect(authUrl.toString())
 
     // Store optional post-connect redirect path in a short-lived cookie
     // so the callback route can redirect back to the originating page
     const postConnectRedirect = req.nextUrl.searchParams.get('redirect')
     if (postConnectRedirect && postConnectRedirect.startsWith('/')) {
-        response.cookies.set('google_oauth_redirect', postConnectRedirect, {
+        response.cookies.set('microsoft_oauth_redirect', postConnectRedirect, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',

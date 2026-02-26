@@ -409,6 +409,14 @@ export async function createTask(formData: FormData) {
           // Continue - calendar sync failure shouldn't fail task creation
       }
 
+      // Sync to Google Sheets (fire-and-forget)
+      try {
+          const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+          await dispatchSheetSync(foundryId, 'task', data.id, 'create')
+      } catch (err) {
+          console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+      }
+
       revalidatePath('/tasks')
       revalidatePath('/new-tasks')
       return { success: true, taskId: data.id }
@@ -486,6 +494,15 @@ export async function acceptTask(taskId: string) {
         } catch (logError) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
         revalidatePath('/strategy')
@@ -538,6 +555,15 @@ export async function rejectTask(taskId: string, reason: string) {
         } catch (logError) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
         return { success: true }
@@ -655,6 +681,14 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             // Continue - AI worker failure shouldn't fail forwarding
+        }
+
+        // Sync to Google Sheets (fire-and-forget — assignee changed)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
         }
 
         revalidatePath('/tasks')
@@ -964,6 +998,14 @@ export async function completeTask(taskId: string) {
                 const { addReward } = await import('@/lib/agent-spans')
                 addReward(rid, 1.0, 'task_completed').catch(() => {})
             }
+        }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
         }
 
         revalidatePath('/tasks')
@@ -1400,6 +1442,14 @@ export async function updateTaskDates(taskId: string, startDate: string, endDate
                 // Continue - calendar sync failure shouldn't fail date update
             }
 
+            // Sync to Google Sheets (fire-and-forget)
+            try {
+                const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+                await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+            } catch (err) {
+                console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+            }
+
             revalidatePath('/timeline')
             revalidatePath('/tasks')
             revalidatePath('/new-tasks')
@@ -1489,6 +1539,14 @@ export async function updateTaskProgress(taskId: string, progress: number) {
             .eq('foundry_id', foundryId)
 
         if (error) return { error: sanitizeErrorMessage(error) }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
 
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
@@ -1635,6 +1693,15 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
         } catch (logError) {
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
+        }
+
         revalidatePath('/tasks')
         revalidatePath('/new-tasks')
         return { success: true }
@@ -1879,6 +1946,14 @@ export async function updateTaskStatus(
             } catch {
                 // Non-critical — celebration failure should never block task completion
             }
+        }
+
+        // Sync to Google Sheets (fire-and-forget)
+        try {
+            const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+            await dispatchSheetSync(foundryId, 'task', taskId, 'update')
+        } catch (err) {
+            console.error('[TaskService] Failed to sync task to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
         }
 
         revalidatePath('/tasks')
@@ -2203,6 +2278,17 @@ export async function deleteTasks(taskIds: string[]) {
                 await logSystemEvent(supabase, foundryId, logTaskId, `Bulk deletion: ${deletedCount}/${taskIds.length} tasks deleted`, user.id)
             } catch (logError) {
                 console.error('[TaskService] Failed to log system event:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
+            }
+
+            // Sync deletions to Google Sheets (fire-and-forget)
+            try {
+                const { dispatchSheetSync } = await import('@/lib/spreadsheet/sync-dispatcher')
+                const deletedIds = taskIds.filter(id => !failedIds.includes(id))
+                for (const id of deletedIds) {
+                    await dispatchSheetSync(foundryId, 'task', id, 'delete')
+                }
+            } catch (err) {
+                console.error('[TaskService] Failed to sync task deletions to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
             }
         }
 

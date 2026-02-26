@@ -23,6 +23,10 @@ import {
   ChevronRight,
   Layers,
   FileText,
+  Ruler,
+  Scale,
+  AlertTriangle,
+  HelpCircle,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -62,6 +66,7 @@ export default function CadLabReviewPage(): React.ReactNode {
   } = useCadLab()
 
   const [showBuildContext, setShowBuildContext] = useState(false)
+  const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -353,7 +358,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} bare />
           </div>
         )}
-        {/* Collapsible: module overview */}
+        {/* Collapsible: module overview with expandable detail cards */}
         <button
           onClick={() => setShowBuildContext(!showBuildContext)}
           className="flex items-center justify-between w-full px-5 py-2.5 border-t text-left hover:bg-muted/50 transition-colors"
@@ -366,32 +371,125 @@ export default function CadLabReviewPage(): React.ReactNode {
         </button>
         {showBuildContext && (
           <div className="px-5 pb-4 space-y-2 border-t pt-3">
-            {modules.map((mod) => (
-              <div key={mod.id} className="flex items-center gap-3 text-xs p-2 rounded border border-muted">
-                {mod.imageUrl && mod.imageStatus === "complete" && (
-                  <div className="h-8 w-8 rounded overflow-hidden bg-muted flex-shrink-0">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium text-foreground truncate">{mod.name}</p>
-                  <p className="text-muted-foreground truncate">{mod.purpose}</p>
+            {modules.map((mod) => {
+              const isExpanded = expandedModuleId === mod.id
+              const r = mod.result as CadLabResult | undefined
+              return (
+                <div key={mod.id} className="rounded border border-muted overflow-hidden">
+                  {/* Module row — clickable to expand */}
+                  <button
+                    onClick={() => setExpandedModuleId(isExpanded ? null : mod.id)}
+                    className="flex items-center gap-3 text-xs p-2 w-full text-left hover:bg-muted/30 transition-colors"
+                  >
+                    {mod.imageUrl && mod.imageStatus === "complete" && (
+                      <div className="h-12 w-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-foreground truncate">{mod.name}</p>
+                      <p className="text-muted-foreground truncate">{mod.purpose}</p>
+                    </div>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${
+                      mod.status === "generated"
+                        ? "bg-status-success-light text-status-success"
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {mod.status === "generated" ? "CAD done" : mod.status}
+                    </span>
+                    {mod.result?.bbox && (
+                      <span className="text-muted-foreground font-mono hidden sm:inline">
+                        {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
+                      </span>
+                    )}
+                    {isExpanded
+                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                    }
+                  </button>
+
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <div className="border-t p-3 space-y-3 bg-muted/10">
+                      {/* CAD isometric view */}
+                      {r?.svgIso && (
+                        <div className="w-full h-48 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={r.svgIso} alt={`${mod.name} isometric`} className="w-full h-full object-contain" />
+                        </div>
+                      )}
+
+                      {/* Key parts chips */}
+                      {mod.keyParts.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {mod.keyParts.map((part, i) => (
+                            <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-foreground">
+                              {part}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Dimensions, mass, DFM status */}
+                      {r && (
+                        <div className="flex flex-wrap items-center gap-3 text-xs">
+                          {r.bbox && (
+                            <span className="flex items-center gap-1 text-foreground">
+                              <Ruler className="h-3 w-3 text-muted-foreground" />
+                              {r.bbox.xLen.toFixed(0)}×{r.bbox.yLen.toFixed(0)}×{r.bbox.zLen.toFixed(0)} mm
+                            </span>
+                          )}
+                          {r.massGrams && (
+                            <span className="flex items-center gap-1 text-foreground">
+                              <Scale className="h-3 w-3 text-muted-foreground" />
+                              {r.massGrams.toFixed(1)} g
+                            </span>
+                          )}
+                          {r.dfm && (
+                            <span className={`flex items-center gap-1 ${r.dfm.printable ? "text-status-success" : "text-status-warning"}`}>
+                              {r.dfm.printable
+                                ? <CheckCircle2 className="h-3 w-3" />
+                                : <AlertTriangle className="h-3 w-3" />
+                              }
+                              {r.dfm.printable ? "Printable" : `${r.dfm.issues.length} DFM issues`}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Description */}
+                      {mod.description && (
+                        <p className="text-xs text-muted-foreground leading-relaxed">{mod.description}</p>
+                      )}
+
+                      {/* Failure modes & unknowns (first 3, collapsible) */}
+                      {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
+                        <div className="space-y-1.5">
+                          {mod.failureModes.slice(0, 3).map((fm, i) => (
+                            <div key={`fm-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-warning">
+                              <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                              <span>{fm}</span>
+                            </div>
+                          ))}
+                          {mod.unknowns.slice(0, 3).map((u, i) => (
+                            <div key={`u-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-info">
+                              <HelpCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                              <span>{u}</span>
+                            </div>
+                          ))}
+                          {(mod.failureModes.length > 3 || mod.unknowns.length > 3) && (
+                            <p className="text-[10px] text-muted-foreground">
+                              +{Math.max(0, mod.failureModes.length - 3) + Math.max(0, mod.unknowns.length - 3)} more
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  mod.status === "generated"
-                    ? "bg-status-success-light text-status-success"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {mod.status === "generated" ? "CAD done" : mod.status}
-                </span>
-                {mod.result?.bbox && (
-                  <span className="text-muted-foreground font-mono hidden sm:inline">
-                    {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
-                  </span>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </Card>
