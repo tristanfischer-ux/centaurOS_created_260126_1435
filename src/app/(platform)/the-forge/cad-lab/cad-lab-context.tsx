@@ -1333,6 +1333,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIntegratedAssemblyStepUrl(null)
     setIntegrationError(null)
     setRevealedModuleIds(new Set())
+    setVisualStyle(null)
     setSystemIllustrationUrl(null)
     setSystemIllustrationStatus("idle")
     setCheckpoints(null)

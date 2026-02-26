@@ -11,7 +11,7 @@
  * Always accessible — shows a progressive welcome state when no data exists yet.
  */
 
-import { useState, useMemo, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect, useCallback, useRef } from "react"
 import { useRouter } from "next/navigation"
 import {
   ClipboardCheck,
@@ -103,12 +103,11 @@ export default function CadLabReviewPage(): React.ReactNode {
   // a welcome card when no data exists yet instead of blocking the page.
   const hasAnyData = modules.length > 0 || hasResearch || !!researchResult
 
-  // ── Section navigation state ──
-  const REVIEW_SECTION_GROUPS = useMemo(() => [
+  // ── Tab navigation state ──
+  const TAB_GROUPS = useMemo(() => [
     {
       group: "Engineering",
       sections: [
-        { id: "executive-summary", label: "Summary" },
         { id: "review-package", label: "Review" },
         { id: "dfm-analysis", label: "DFM" },
         { id: "risk-register", label: "Risks" },
@@ -147,42 +146,46 @@ export default function CadLabReviewPage(): React.ReactNode {
     },
   ], [])
 
-  // Flat section list for IntersectionObserver — includes top anchor
-  const REVIEW_SECTIONS = useMemo(
-    () => [{ id: "review-header", label: "Overview" }, ...REVIEW_SECTION_GROUPS.flatMap((g) => g.sections)],
-    [REVIEW_SECTION_GROUPS],
+  const [activeTab, setActiveTab] = useState("Engineering")
+  const [activeSubSection, setActiveSubSection] = useState<string | null>(null)
+  const tabContentRef = useRef<HTMLDivElement>(null)
+
+  // Active tab's sections for sub-nav
+  const activeTabGroup = useMemo(
+    () => TAB_GROUPS.find((g) => g.group === activeTab),
+    [TAB_GROUPS, activeTab],
   )
 
-  const [activeSection, setActiveSection] = useState("review-header")
+  const handleTabClick = useCallback((group: string) => {
+    setActiveTab(group)
+    setActiveSubSection(null)
+    // Scroll to top of tab content
+    tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
 
-  // Derived: which group is currently in view
-  const activeGroup = useMemo(
-    () => REVIEW_SECTION_GROUPS.find((g) => g.sections.some((s) => s.id === activeSection))?.group ?? null,
-    [REVIEW_SECTION_GROUPS, activeSection],
-  )
-
-  const handleSectionClick = useCallback((id: string) => {
+  const handleSubSectionClick = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [])
 
-  // Track active section via IntersectionObserver
+  // Track active sub-section within current tab via IntersectionObserver
   useEffect(() => {
+    if (!activeTabGroup) return
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            setActiveSection(entry.target.id)
+            setActiveSubSection(entry.target.id)
           }
         }
       },
       { rootMargin: "-20% 0px -70% 0px" },
     )
-    for (const section of REVIEW_SECTIONS) {
+    for (const section of activeTabGroup.sections) {
       const el = document.getElementById(section.id)
       if (el) observer.observe(el)
     }
     return () => observer.disconnect()
-  }, [REVIEW_SECTIONS])
+  }, [activeTabGroup])
 
   return (
     <div className="space-y-6">
@@ -198,6 +201,7 @@ export default function CadLabReviewPage(): React.ReactNode {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground mr-0.5">Get advice:</span>
           <AskSpecialistButton
             context={{
               type: "general",
@@ -214,7 +218,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             specialistId="vp-manufacturing"
             specialistName="Fang"
             variant="chip"
-            label="Ask Fang"
+            label="Manufacturing"
           />
           <AskSpecialistButton
             context={{
@@ -232,7 +236,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             specialistId="vp-supply-chain"
             specialistName="Chase"
             variant="chip"
-            label="Ask Chase"
+            label="Supply Chain"
           />
           <AskSpecialistButton
             context={{
@@ -247,7 +251,7 @@ export default function CadLabReviewPage(): React.ReactNode {
             specialistId="cto"
             specialistName="Max"
             variant="chip"
-            label="Ask Max"
+            label="Architecture"
           />
           <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5 text-xs">
             <ArrowLeft className="h-3 w-3" /> Back to Build
@@ -273,17 +277,17 @@ export default function CadLabReviewPage(): React.ReactNode {
         </Card>
       )}
 
-      {/* ── Section navigation ── */}
+      {/* ── Tab navigation ── */}
       {hasAnyData && (
         <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-          {/* Group pills */}
+          {/* Group tab pills */}
           <div className="flex items-center gap-1">
-            {REVIEW_SECTION_GROUPS.map((group) => (
+            {TAB_GROUPS.map((group) => (
               <button
                 key={group.group}
-                onClick={() => handleSectionClick(group.sections[0].id)}
+                onClick={() => handleTabClick(group.group)}
                 className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                  activeGroup === group.group
+                  activeTab === group.group
                     ? "bg-international-orange-light text-international-orange"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
@@ -292,15 +296,15 @@ export default function CadLabReviewPage(): React.ReactNode {
               </button>
             ))}
           </div>
-          {/* Active group child sections */}
-          {activeGroup && (
+          {/* Sub-section pills within active tab */}
+          {activeTabGroup && (
             <div className="flex items-center gap-0.5 mt-1">
-              {REVIEW_SECTION_GROUPS.find((g) => g.group === activeGroup)?.sections.map((section) => (
+              {activeTabGroup.sections.map((section) => (
                 <button
                   key={section.id}
-                  onClick={() => handleSectionClick(section.id)}
+                  onClick={() => handleSubSectionClick(section.id)}
                   className={`px-2 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
-                    activeSection === section.id
+                    activeSubSection === section.id
                       ? "text-international-orange font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                   }`}
@@ -392,90 +396,93 @@ export default function CadLabReviewPage(): React.ReactNode {
         )}
       </Card>
 
-      {/* Engineering review package — quality scorecard, per-module summary */}
-      <div id="review-package">
-        <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
-        <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
-      </div>
+      {/* ── Tab content ── */}
+      <div ref={tabContentRef} className="space-y-6">
+        {/* Engineering tab */}
+        {activeTab === "Engineering" && (
+          <>
+            <div id="review-package">
+              <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
+              <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="dfm-analysis">
+              <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
+              <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+            </div>
+            <div id="risk-register">
+              <CadLabRiskRegister modules={modules} />
+            </div>
+          </>
+        )}
 
-      {/* DFM analysis dashboard — manufacturing grade, risk register */}
-      <div id="dfm-analysis">
-        <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
-        <CadLabAnalysisDashboard modules={modules} projectName={subject} />
-      </div>
+        {/* Manufacturing tab */}
+        {activeTab === "Manufacturing" && (
+          <>
+            <div id="diagnostics">
+              <CadLabDiagnostics
+                modules={modules}
+                answers={diagnosticAnswers}
+                onAnswersChange={setDiagnosticAnswers}
+                aiPrefilled={aiPrefilled}
+              />
+            </div>
+            <div id="requirements-map">
+              <CadLabRequirementsMap modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="bill-of-materials">
+              <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
+            </div>
+            <div id="raw-materials">
+              <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+          </>
+        )}
 
-      {/* Risk register — aggregated failure modes and unknowns by severity */}
-      <div id="risk-register">
-        <CadLabRiskRegister modules={modules} />
-      </div>
+        {/* Commercial tab */}
+        {activeTab === "Commercial" && (
+          <>
+            <div id="cost-estimate">
+              <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="supply-chain">
+              <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="timeline">
+              <CadLabTimeline modules={modules} />
+            </div>
+          </>
+        )}
 
-      {/* Engineering diagnostics — process, material, tolerance, finish, batch, environment */}
-      <div id="diagnostics">
-        <CadLabDiagnostics
-          modules={modules}
-          answers={diagnosticAnswers}
-          onAnswersChange={setDiagnosticAnswers}
-          aiPrefilled={aiPrefilled}
-        />
-      </div>
+        {/* Engagement tab */}
+        {activeTab === "Engagement" && (
+          <>
+            <div id="experts">
+              <p className="text-[11px] text-muted-foreground mb-2">Specialist matching based on Build modules</p>
+              <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="factory-guide">
+              <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
+            </div>
+            <div id="contracting">
+              <CadLabContracting
+                modules={modules}
+                projectName={subject}
+                diagnosticAnswers={diagnosticAnswers}
+                projectId={activeProjectId}
+                linkedRfqId={linkedRfqId}
+                designBrief={designBrief}
+                assumptionNotes={assumptionNotes}
+              />
+            </div>
+          </>
+        )}
 
-      {/* Supply chain specifications per module */}
-      <div id="supply-chain">
-        <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Manufacturing timeline — Gantt with critical path */}
-      <div id="timeline">
-        <CadLabTimeline modules={modules} />
-      </div>
-
-      {/* Requirements mapping with supplier recommendations */}
-      <div id="requirements-map">
-        <CadLabRequirementsMap modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Hierarchical Bill of Materials */}
-      <div id="bill-of-materials">
-        <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
-      </div>
-
-      {/* Raw materials breakdown with charts and value-add analysis */}
-      <div id="raw-materials">
-        <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Cost estimate with charts and tooling breakdown */}
-      <div id="cost-estimate">
-        <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Drawing package exports — JSON, Markdown, CSV */}
-      <div id="drawing-exports">
-        <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Expert discipline matching */}
-      <div id="experts">
-        <p className="text-[11px] text-muted-foreground mb-2">Specialist matching based on Build modules</p>
-        <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Factory conversation guide — what to know before talking to suppliers */}
-      <div id="factory-guide">
-        <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
-      </div>
-
-      {/* Contracting — RFQ, SOW, NDA generation */}
-      <div id="contracting">
-      <CadLabContracting
-        modules={modules}
-        projectName={subject}
-        diagnosticAnswers={diagnosticAnswers}
-        projectId={activeProjectId}
-        linkedRfqId={linkedRfqId}
-        designBrief={designBrief}
-        assumptionNotes={assumptionNotes}
-      />
+        {/* Exports tab */}
+        {activeTab === "Exports" && (
+          <div id="drawing-exports">
+            <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+          </div>
+        )}
       </div>
 
       {/* Pipeline Complete */}

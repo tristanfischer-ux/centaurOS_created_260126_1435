@@ -24,7 +24,6 @@ import {
     AlertTriangle,
     AlertOctagon,
 } from "lucide-react"
-import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
@@ -68,6 +67,7 @@ export function DecompositionCheckpointCard({
                 <button
                     onClick={() => setIsExpanded(!isExpanded)}
                     className="flex items-center justify-between w-full text-left"
+                    aria-expanded={isExpanded}
                 >
                     <div className="flex items-center gap-2">
                         {isCheckpointing ? (
@@ -161,7 +161,7 @@ function CheckpointEntry({ checkpoint }: { checkpoint: DecompositionCheckpoint }
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs text-muted-foreground">Flagged:</span>
                         {checkpoint.flaggedModules.map((moduleId) => (
-                            <Badge key={moduleId} variant="outline" className={cn("text-xs")}>
+                            <Badge key={moduleId} variant="outline" className="text-xs">
                                 {moduleId}
                             </Badge>
                         ))}
