@@ -372,7 +372,7 @@ export function CadLabTimeline({
                   {/* Bar */}
                   <div
                     className={cn(
-                      "absolute top-0 h-full rounded-lg transition-all duration-500 flex items-center px-2",
+                      "absolute top-0 h-full rounded-lg transition-all duration-500 flex items-center px-2 border border-foreground/10",
                       s.isCritical ? "bg-international-orange/80" : "",
                     )}
                     style={{
@@ -380,8 +380,9 @@ export function CadLabTimeline({
                       width: `${Math.max(widthPct, 4)}%`,
                       backgroundColor: s.isCritical
                         ? undefined
-                        : color + "30",
+                        : color + "50",
                     }}
+                    title={`${s.module.name}: Week ${s.startWeek}–${s.endWeek} (${s.module.leadWeeks}w)`}
                   >
                     <span
                       className={cn(
