@@ -8,6 +8,6 @@
     {"path": "/api/cron/specialist-briefings", "schedule": "0 17 * * *"},
     {"path": "/api/cron/reports", "schedule": "0 8 * * *"},
     {"path": "/api/cron/knowledge-decay", "schedule": "0 3 * * *"},
-    {"path": "/api/cron/sheets-poll", "schedule": "0 * * * *"}
+    {"path": "/api/cron/sheets-poll", "schedule": "*/3 * * * *"}
   ]
 }
