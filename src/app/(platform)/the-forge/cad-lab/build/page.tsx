@@ -40,6 +40,8 @@ import {
   ArrowDownRight,
   Search,
   FileText,
+  Pencil,
+  X,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -114,6 +116,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     setIntegrationError,
     handleGenerateIntegration,
     handleDownload,
+    handleUpdateModule,
   } = useCadLab()
 
   // Local UI state for result viewing
@@ -124,6 +127,8 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [codeCopied, setCodeCopied] = useState(false)
   const [isConfirmRemapOpen, setIsConfirmRemapOpen] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null)
+  const [editingSpecModuleId, setEditingSpecModuleId] = useState<string | null>(null)
+  const [specDraft, setSpecDraft] = useState("")
 
   // Specialist reviews (keyed by moduleId → array of reviews)
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
@@ -1290,15 +1295,62 @@ export default function CadLabBuildPage(): React.ReactNode {
                         )}
                       </div>
 
-                      {/* Dimensional Specification — promoted from hidden <details> */}
+                      {/* Dimensional Specification — editable before sending to factory */}
                       {mod.interfaceDefinition && (
                         <div className="border rounded-lg p-3 space-y-2 bg-muted/10">
-                          <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                            <Ruler className="h-3.5 w-3.5 text-international-orange" />
-                            Dimensional Specification
-                            <span className="font-normal text-muted-foreground">— send this to your factory</span>
-                          </p>
-                          <pre className="text-xs font-mono whitespace-pre-wrap text-foreground max-h-[300px] overflow-y-auto">{mod.interfaceDefinition}</pre>
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                              <Ruler className="h-3.5 w-3.5 text-international-orange" />
+                              Dimensional Specification
+                              <span className="font-normal text-muted-foreground">— send this to your factory</span>
+                            </p>
+                            {editingSpecModuleId !== mod.id && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                onClick={() => {
+                                  setEditingSpecModuleId(mod.id)
+                                  setSpecDraft(mod.interfaceDefinition ?? "")
+                                }}
+                              >
+                                <Pencil className="h-3 w-3 mr-1" /> Edit
+                              </Button>
+                            )}
+                          </div>
+                          {editingSpecModuleId === mod.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                className="w-full text-xs font-mono whitespace-pre-wrap text-foreground bg-background border rounded-md p-2 min-h-[120px] max-h-[400px] resize-y focus:outline-none focus:ring-2 focus:ring-international-orange/40"
+                                value={specDraft}
+                                onChange={(e) => setSpecDraft(e.target.value)}
+                                autoFocus
+                              />
+                              <div className="flex items-center gap-2 justify-end">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => setEditingSpecModuleId(null)}
+                                >
+                                  <X className="h-3 w-3 mr-1" /> Cancel
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="h-7 px-3 text-xs"
+                                  onClick={() => {
+                                    handleUpdateModule({ ...mod, interfaceDefinition: specDraft })
+                                    setEditingSpecModuleId(null)
+                                  }}
+                                >
+                                  <Check className="h-3 w-3 mr-1" /> Save
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <pre className="text-xs font-mono whitespace-pre-wrap text-foreground max-h-[300px] overflow-y-auto">{mod.interfaceDefinition}</pre>
+                          )}
                         </div>
                       )}
 
@@ -1505,14 +1557,14 @@ function ProductOverview({
         {/* Lead time distribution bar */}
         {processGroups.length > 0 && (
           <div className="mt-4 space-y-2">
-            <p className="text-xs text-muted-foreground font-medium">Lead Time Distribution</p>
+            <p className="text-xs text-muted-foreground font-medium">Sub-Assemblies by Lead Time</p>
             <div className="flex h-3 rounded-full overflow-hidden border">
               {processGroups.map((g) => (
                 <div
                   key={g.name}
                   className={cn("h-full transition-all duration-500", g.color)}
                   style={{ width: `${(g.count / moduleCount) * 100}%` }}
-                  title={`${g.name}: ${g.count} module${g.count !== 1 ? "s" : ""}`}
+                  title={`${g.name}: ${g.count} of ${moduleCount} sub-assemblies`}
                 />
               ))}
             </div>
@@ -1520,7 +1572,7 @@ function ProductOverview({
               {processGroups.map((g) => (
                 <span key={g.name} className="flex items-center gap-1.5">
                   <div className={cn("h-2 w-6 rounded-full", g.color)} />
-                  {g.name} ({g.count})
+                  {g.name} — {g.count} of {moduleCount}
                 </span>
               ))}
             </div>

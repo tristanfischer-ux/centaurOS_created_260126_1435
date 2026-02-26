@@ -1051,6 +1051,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 }
                 setLastSaved(new Date().toISOString())
                 setIsBatchRunning(false)
+                setBatchProgress({})
                 if (allDone) setMilestone("batch")
               }
             } catch {
@@ -1214,6 +1215,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       setLastSaved(new Date().toISOString())
       setIsBatchRunning(false)
+      setBatchProgress({})
 
       if (errorCount === 0) {
         setMilestone("batch")
