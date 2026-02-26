@@ -423,24 +423,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (savePendingRef.current) clearTimeout(savePendingRef.current)
     savePendingRef.current = setTimeout(async () => {
       savePendingRef.current = null
-      try {
-        await saveCadLabModules(activeProjectId, modulesRef.current)
-        setSaveError(false)
-        setLastSaved(new Date().toISOString())
-      } catch {
-        console.error("[CAD-LAB] Debounced save failed")
+      const res = await saveCadLabModules(activeProjectId, modulesRef.current)
+      if ("error" in res) {
+        console.error("[CAD-LAB] Debounced save failed:", res.error)
         setSaveError(true)
         // Retry once after 2s
         setTimeout(async () => {
-          try {
-            await saveCadLabModules(activeProjectId, modulesRef.current)
-            setSaveError(false)
-            setLastSaved(new Date().toISOString())
-          } catch {
+          const retryRes = await saveCadLabModules(activeProjectId, modulesRef.current)
+          if ("error" in retryRes) {
             setSaveError(true)
             toast.error("Changes couldn't be saved — check your connection")
+          } else {
+            setSaveError(false)
+            setLastSaved(new Date().toISOString())
           }
         }, 2000)
+      } else {
+        setSaveError(false)
+        setLastSaved(new Date().toISOString())
       }
     }, 500)
   }, [activeProjectId])
@@ -627,8 +627,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           ...(totalRisks > 0 ? [`${totalRisks} risk items flagged for engineering review`] : []),
         ])
         if (activeProjectId) {
-          await saveCadLabModules(activeProjectId, res.modules)
-          setLastSaved(new Date().toISOString())
+          const saveRes = await saveCadLabModules(activeProjectId, res.modules)
+          if ("error" in saveRes) {
+            console.error("[CAD-LAB] Failed to save modules:", saveRes.error)
+            toast.error("Modules mapped but failed to save — your changes may be lost on reload")
+          } else {
+            setLastSaved(new Date().toISOString())
+          }
           refreshProjects()
         }
         // Smart diagnostics pre-fill (background)
@@ -726,6 +731,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             .catch((e) => console.error("[CAD-LAB] Checkpoint failed:", e))
             .finally(() => setIsCheckpointing(false))
         }
+      } else {
+        // Decomposition returned but failed — show the user why
+        paddingTimers.forEach(clearTimeout)
+        const errorMsg = res.error
+          ? String(res.error)
+          : "Decomposition returned no modules"
+        setProgressLines([
+          `Response received in ${elapsed}s`,
+          `Decomposition failed: ${errorMsg}`,
+        ])
+        toast.error(errorMsg)
       }
     } catch (err) {
       paddingTimers.forEach(clearTimeout)
