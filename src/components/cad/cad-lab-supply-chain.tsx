@@ -14,7 +14,8 @@
 
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import {
   Factory,
   Box,
@@ -24,10 +25,17 @@ import {
   Scale,
   Clock,
   Package,
+  Search,
+  Loader2,
+  BadgeCheck,
+  ExternalLink,
 } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 
@@ -161,6 +169,7 @@ export function CadLabSupplyChain({
   modules,
   diagnosticAnswers,
 }: CadLabSupplyChainProps): React.ReactNode {
+  const router = useRouter()
   const specs = useMemo(
     () => buildSupplySpecs(modules, diagnosticAnswers),
     [modules, diagnosticAnswers]
@@ -170,6 +179,43 @@ export function CadLabSupplyChain({
   const partialCount = specs.filter(
     (s) => s.readiness > 0 && s.readiness < 3
   ).length
+
+  // ── Supplier matching state ──
+  const [supplierMatches, setSupplierMatches] = useState<Map<string, CadLabSupplierMatch[]>>(new Map())
+  const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set())
+  const [matchAllLoading, setMatchAllLoading] = useState(false)
+
+  const handleMatchModule = useCallback(async (mod: CadLabModule) => {
+    const diag = diagnosticAnswers?.[mod.id] || {}
+    setLoadingModules((prev) => new Set(prev).add(mod.id))
+    try {
+      const results = await matchCadLabModuleSuppliers({
+        id: mod.id,
+        name: mod.name,
+        purpose: mod.purpose,
+        keyParts: mod.keyParts,
+        description: mod.description,
+        process: diag.mfg_process || null,
+        material: diag.material || null,
+      })
+      setSupplierMatches((prev) => new Map(prev).set(mod.id, results))
+    } catch (err) {
+      console.error("[SupplierMatch] Failed:", err)
+    } finally {
+      setLoadingModules((prev) => {
+        const next = new Set(prev)
+        next.delete(mod.id)
+        return next
+      })
+    }
+  }, [diagnosticAnswers])
+
+  const handleMatchAll = useCallback(async () => {
+    setMatchAllLoading(true)
+    // Match all modules in parallel, updating state progressively
+    await Promise.allSettled(modules.map((mod) => handleMatchModule(mod)))
+    setMatchAllLoading(false)
+  }, [modules, handleMatchModule])
 
   return (
     <Card>
@@ -183,11 +229,23 @@ export function CadLabSupplyChain({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        <p className="text-sm text-muted-foreground">
-          Manufacturing specifications per module, derived from diagnostics and
-          CAD analysis. Complete diagnostics and generate CAD for best supplier
-          matching.
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Manufacturing specifications per module, derived from diagnostics and
+            CAD analysis. Complete diagnostics and generate CAD for best supplier
+            matching.
+          </p>
+          <Button
+            variant="default"
+            size="sm"
+            className="gap-1.5 flex-shrink-0"
+            onClick={handleMatchAll}
+            disabled={matchAllLoading || modules.length === 0}
+          >
+            {matchAllLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+            Match All Modules
+          </Button>
+        </div>
 
         {/* Readiness summary */}
         <div className="flex items-center gap-3 text-xs">
@@ -319,6 +377,69 @@ export function CadLabSupplyChain({
                     </span>
                   ))}
                 </div>
+
+                {/* Supplier matching */}
+                {!supplierMatches.has(spec.module.id) ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5 text-xs border-t pt-2"
+                    onClick={() => handleMatchModule(spec.module)}
+                    disabled={loadingModules.has(spec.module.id)}
+                  >
+                    {loadingModules.has(spec.module.id)
+                      ? <Loader2 className="h-3 w-3 animate-spin" />
+                      : <Search className="h-3 w-3" />
+                    }
+                    Find Matching Suppliers
+                  </Button>
+                ) : (
+                  <div className="border-t pt-2 space-y-1.5">
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Matched Suppliers</p>
+                    {supplierMatches.get(spec.module.id)!.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No matching suppliers found. Try completing diagnostics for better matches.</p>
+                    ) : (
+                      supplierMatches.get(spec.module.id)!.map((match) => (
+                        <div key={match.id} className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              onClick={() => router.push(`/the-forge/marketplace?q=${encodeURIComponent(match.name)}`)}
+                              className="font-medium text-foreground hover:text-international-orange transition-colors truncate"
+                            >
+                              {match.name}
+                            </button>
+                            {match.isVerified && (
+                              <BadgeCheck className="h-3 w-3 text-status-success flex-shrink-0" />
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {match.matchScore.toFixed(0)}pts
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
+                              onClick={() => router.push(`/the-forge/marketplace?q=${encodeURIComponent(match.name)}`)}
+                            >
+                              <ExternalLink className="h-2.5 w-2.5 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    {supplierMatches.get(spec.module.id)!.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {supplierMatches.get(spec.module.id)!.flatMap((m) => m.matchReasons).filter((v, i, a) => a.indexOf(v) === i).slice(0, 5).map((reason, i) => (
+                          <span key={i} className="text-[9px] bg-international-orange/10 text-international-orange px-1.5 py-0.5 rounded-full font-mono">
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )
           })}

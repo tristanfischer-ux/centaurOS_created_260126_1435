@@ -15,6 +15,7 @@
 "use client"
 
 import { useMemo } from "react"
+import { useRouter } from "next/navigation"
 import {
   Users,
   Box,
@@ -25,8 +26,10 @@ import {
   Thermometer,
   Zap,
   HardHat,
+  Search,
 } from "lucide-react"
 
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -248,6 +251,7 @@ export function CadLabPeople({
   modules,
   diagnosticAnswers,
 }: CadLabPeopleProps): React.ReactNode {
+  const router = useRouter()
   const disciplineMatches = useMemo(
     () => matchDisciplines(modules, diagnosticAnswers),
     [modules, diagnosticAnswers]
@@ -333,6 +337,20 @@ export function CadLabPeople({
                     )}
                   </div>
                 )}
+
+                {/* Marketplace CTA */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5 text-xs"
+                  onClick={() => {
+                    const q = encodeURIComponent(match.discipline.name)
+                    router.push(`/the-forge/marketplace?tab=people&q=${q}`)
+                  }}
+                >
+                  <Search className="h-3 w-3" />
+                  Find in Marketplace
+                </Button>
               </div>
             )
           })}
