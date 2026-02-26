@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ProviderType } from '@/lib/spreadsheet/provider'
+import { getSyncVersion } from '@/lib/spreadsheet/sync-engine'
 import type { InboundChange } from '@/lib/spreadsheet/sync-engine'
 
 const SUPPORTED_SERVICE_TYPES: ProviderType[] = ['google_sheets', 'microsoft_excel']
@@ -83,6 +84,27 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         try {
             const provider = await resolveProvider(serviceType, oauthUserId, foundryId)
             if (!provider) continue
+
+            // SECURITY: Check sync version to prevent applying stale inbound changes
+            // while an outbound sync is in flight.
+            try {
+                const syncTabRows = await provider.readAllRows(spreadsheetId, '_sync')
+                const sheetSyncVersion = syncTabRows?.[0]?.[0] != null
+                    ? Number(syncTabRows[0][0])
+                    : null
+                const dbSyncVersion = await getSyncVersion(foundryId, serviceType)
+
+                if (sheetSyncVersion !== null && sheetSyncVersion !== dbSyncVersion) {
+                    console.info('[SheetsPoll] Sync version mismatch, skipping (outbound in flight):', {
+                        foundryId, sheetSyncVersion, dbSyncVersion,
+                    })
+                    continue
+                }
+            } catch {
+                // INTENT: _sync tab unreadable — fail-safe, skip this foundry
+                console.info('[SheetsPoll] Could not read _sync tab, skipping:', { foundryId })
+                continue
+            }
 
             // Read the Master Task List tab
             const rows = await provider.readAllRows(spreadsheetId, 'Master Task List')
