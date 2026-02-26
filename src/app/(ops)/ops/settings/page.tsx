@@ -41,9 +41,10 @@ export default function AdminSettingsPage() {
     // Sync status state
     const [syncStatus, setSyncStatus] = useState<{
         is_connected: boolean
+        has_spreadsheet: boolean
         last_sync: string | null
-        tables_count: number
         recent_errors: string[]
+        oauth_email: string | null
     } | null>(null)
     const [syncLoading, setSyncLoading] = useState(true)
 
@@ -237,7 +238,7 @@ export default function AdminSettingsPage() {
                                                 {syncStatus.is_connected ? 'Connected' : 'Not Connected'}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {syncStatus.tables_count} table{syncStatus.tables_count !== 1 ? 's' : ''} configured
+                                                {syncStatus.has_spreadsheet ? 'Spreadsheet configured' : 'No spreadsheet configured'}
                                             </p>
                                         </div>
                                     </div>
