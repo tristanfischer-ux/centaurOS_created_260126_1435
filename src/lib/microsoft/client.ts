@@ -76,17 +76,16 @@ export async function getMicrosoftClient(
     if (isMicrosoftTokenExpired(token)) {
         const refreshed = await refreshMicrosoftToken(token)
         if (!refreshed) {
-            console.warn(
-                '[MicrosoftClient] Token refresh failed, returning stale token:',
+            console.error(
+                '[MicrosoftClient] Token refresh failed, no valid token available:',
                 {
                     userId,
                     foundryId,
                 }
             )
-        } else {
-            // Return the freshly refreshed access token
-            return refreshed
+            return null
         }
+        return refreshed
     }
 
     return token.access_token
