@@ -12,7 +12,9 @@
  */
 
 import { useState, useMemo, useEffect, useCallback, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
+import { toast } from "sonner"
 import {
   ClipboardCheck,
   ArrowLeft,
@@ -51,6 +53,8 @@ import { CadLabExecutiveSummary } from "@/components/cad/cad-lab-executive-summa
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
+import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 
@@ -151,9 +155,52 @@ export default function CadLabReviewPage(): React.ReactNode {
     },
   ], [])
 
-  const [activeTab, setActiveTab] = useState("Engineering")
+  // ── I1: Tab state from URL ──
+  const searchParams = useSearchParams()
+  const validTabs = useMemo(() => TAB_GROUPS.map((g) => g.group), [TAB_GROUPS])
+  const [activeTab, setActiveTab] = useState(() => {
+    const param = searchParams.get("tab")
+    return param && validTabs.includes(param) ? param : "Engineering"
+  })
   const [activeSubSection, setActiveSubSection] = useState<string | null>(null)
   const tabContentRef = useRef<HTMLDivElement>(null)
+
+  // ── B4: Supplier matching state (lifted from CadLabSupplyChain) ──
+  const [supplierMatches, setSupplierMatches] = useState<Map<string, CadLabSupplierMatch[]>>(new Map())
+  const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set())
+  const [matchAllLoading, setMatchAllLoading] = useState(false)
+
+  const handleMatchModule = useCallback(async (mod: { id: string; name: string; purpose: string; keyParts: string[]; description?: string }) => {
+    const diag = diagnosticAnswers?.[mod.id] || {}
+    setLoadingModules((prev) => new Set(prev).add(mod.id))
+    try {
+      const results = await matchCadLabModuleSuppliers({
+        id: mod.id,
+        name: mod.name,
+        purpose: mod.purpose,
+        keyParts: mod.keyParts,
+        description: mod.description,
+        process: diag.mfg_process || null,
+        material: diag.material || null,
+      })
+      setSupplierMatches((prev) => new Map(prev).set(mod.id, results))
+    } catch (err) {
+      console.error("[SupplierMatch] Failed:", err)
+      toast.error("Failed to match suppliers for this module")
+    } finally {
+      setLoadingModules((prev) => {
+        const next = new Set(prev)
+        next.delete(mod.id)
+        return next
+      })
+    }
+  }, [diagnosticAnswers])
+
+  const handleMatchAll = useCallback(async () => {
+    setMatchAllLoading(true)
+    await Promise.allSettled(modules.map((mod) => handleMatchModule(mod)))
+    setMatchAllLoading(false)
+  }, [modules, handleMatchModule])
 
   // Active tab's sections for sub-nav
   const activeTabGroup = useMemo(
@@ -164,9 +211,13 @@ export default function CadLabReviewPage(): React.ReactNode {
   const handleTabClick = useCallback((group: string) => {
     setActiveTab(group)
     setActiveSubSection(null)
+    // Sync tab to URL without pushing history
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", group)
+    router.replace(`?${params.toString()}`, { scroll: false })
     // Scroll to top of tab content
     tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
+  }, [router, searchParams])
 
   const handleSubSectionClick = useCallback((id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
@@ -440,7 +491,7 @@ export default function CadLabReviewPage(): React.ReactNode {
                               {r.bbox.xLen.toFixed(0)}×{r.bbox.yLen.toFixed(0)}×{r.bbox.zLen.toFixed(0)} mm
                             </span>
                           )}
-                          {r.massGrams && (
+                          {r.massGrams != null && (
                             <span className="flex items-center gap-1 text-foreground">
                               <Scale className="h-3 w-3 text-muted-foreground" />
                               {r.massGrams.toFixed(1)} g
@@ -496,91 +547,104 @@ export default function CadLabReviewPage(): React.ReactNode {
 
       {/* ── Tab content ── */}
       <div ref={tabContentRef} className="space-y-6">
-        {/* Engineering tab */}
-        {activeTab === "Engineering" && (
-          <>
-            <div id="review-package">
-              <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
-              <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="dfm-analysis">
-              <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
-              <CadLabAnalysisDashboard modules={modules} projectName={subject} />
-            </div>
-            <div id="risk-register">
-              <CadLabRiskRegister modules={modules} />
-            </div>
-          </>
-        )}
+        <AnimatePresence mode="wait">
+          {/* Engineering tab */}
+          {activeTab === "Engineering" && (
+            <motion.div key="Engineering" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <div id="review-package">
+                <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
+                <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+              <div id="dfm-analysis">
+                <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
+                <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+              </div>
+              <div id="risk-register">
+                <CadLabRiskRegister modules={modules} />
+              </div>
+            </motion.div>
+          )}
 
-        {/* Manufacturing tab */}
-        {activeTab === "Manufacturing" && (
-          <>
-            <div id="diagnostics">
-              <CadLabDiagnostics
-                modules={modules}
-                answers={diagnosticAnswers}
-                onAnswersChange={setDiagnosticAnswers}
-                aiPrefilled={aiPrefilled}
-              />
-            </div>
-            <div id="requirements-map">
-              <CadLabRequirementsMap modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="bill-of-materials">
-              <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
-            </div>
-            <div id="raw-materials">
-              <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-          </>
-        )}
+          {/* Manufacturing tab */}
+          {activeTab === "Manufacturing" && (
+            <motion.div key="Manufacturing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <div id="diagnostics">
+                <CadLabDiagnostics
+                  modules={modules}
+                  answers={diagnosticAnswers}
+                  onAnswersChange={setDiagnosticAnswers}
+                  aiPrefilled={aiPrefilled}
+                  designBrief={designBrief}
+                />
+              </div>
+              <div id="requirements-map">
+                <CadLabRequirementsMap modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+              <div id="bill-of-materials">
+                <CadLabBom modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} />
+              </div>
+              <div id="raw-materials">
+                <CadLabRawMaterials modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+            </motion.div>
+          )}
 
-        {/* Commercial tab */}
-        {activeTab === "Commercial" && (
-          <>
-            <div id="cost-estimate">
-              <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="supply-chain">
-              <CadLabSupplyChain modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="timeline">
-              <CadLabTimeline modules={modules} />
-            </div>
-          </>
-        )}
+          {/* Commercial tab */}
+          {activeTab === "Commercial" && (
+            <motion.div key="Commercial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <div id="cost-estimate">
+                <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+              <div id="supply-chain">
+                <CadLabSupplyChain
+                  modules={modules}
+                  diagnosticAnswers={diagnosticAnswers}
+                  supplierMatches={supplierMatches}
+                  loadingModules={loadingModules}
+                  matchAllLoading={matchAllLoading}
+                  onMatchModule={handleMatchModule}
+                  onMatchAll={handleMatchAll}
+                />
+              </div>
+              <div id="timeline">
+                <CadLabTimeline modules={modules} />
+              </div>
+            </motion.div>
+          )}
 
-        {/* Engagement tab */}
-        {activeTab === "Engagement" && (
-          <>
-            <div id="experts">
-              <p className="text-[11px] text-muted-foreground mb-2">Specialist matching based on Build modules</p>
-              <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="factory-guide">
-              <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
-            </div>
-            <div id="contracting">
-              <CadLabContracting
-                modules={modules}
-                projectName={subject}
-                diagnosticAnswers={diagnosticAnswers}
-                projectId={activeProjectId}
-                linkedRfqId={linkedRfqId}
-                designBrief={designBrief}
-                assumptionNotes={assumptionNotes}
-              />
-            </div>
-          </>
-        )}
+          {/* Engagement tab */}
+          {activeTab === "Engagement" && (
+            <motion.div key="Engagement" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <div id="experts">
+                <p className="text-[11px] text-muted-foreground mb-2">Specialist matching based on Build modules</p>
+                <CadLabPeople modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+              <div id="factory-guide">
+                <CadLabFactoryGuide modules={modules} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+              <div id="contracting">
+                <CadLabContracting
+                  modules={modules}
+                  projectName={subject}
+                  diagnosticAnswers={diagnosticAnswers}
+                  projectId={activeProjectId}
+                  linkedRfqId={linkedRfqId}
+                  designBrief={designBrief}
+                  assumptionNotes={assumptionNotes}
+                />
+              </div>
+            </motion.div>
+          )}
 
-        {/* Exports tab */}
-        {activeTab === "Exports" && (
-          <div id="drawing-exports">
-            <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
-          </div>
-        )}
+          {/* Exports tab */}
+          {activeTab === "Exports" && (
+            <motion.div key="Exports" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              <div id="drawing-exports">
+                <CadLabDrawingPackage modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Pipeline Complete */}

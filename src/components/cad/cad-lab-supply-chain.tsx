@@ -14,7 +14,7 @@
 
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo } from "react"
 import { useRouter } from "next/navigation"
 import {
   Factory,
@@ -31,10 +31,10 @@ import {
   ExternalLink,
 } from "lucide-react"
 
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
@@ -46,6 +46,16 @@ interface CadLabSupplyChainProps {
   modules: CadLabModule[]
   /** Diagnostic answers per module */
   diagnosticAnswers?: DiagnosticAnswers
+  /** Supplier matches per module (lifted state from parent) */
+  supplierMatches: Map<string, CadLabSupplierMatch[]>
+  /** Set of module IDs currently loading */
+  loadingModules: Set<string>
+  /** Whether a match-all operation is in progress */
+  matchAllLoading: boolean
+  /** Callback to match a single module */
+  onMatchModule: (mod: CadLabModule) => void
+  /** Callback to match all modules */
+  onMatchAll: () => void
 }
 
 /** Manufacturing specification for a single module */
@@ -168,6 +178,11 @@ function getReadinessInfo(level: number): {
 export function CadLabSupplyChain({
   modules,
   diagnosticAnswers,
+  supplierMatches,
+  loadingModules,
+  matchAllLoading,
+  onMatchModule,
+  onMatchAll,
 }: CadLabSupplyChainProps): React.ReactNode {
   const router = useRouter()
   const specs = useMemo(
@@ -179,43 +194,6 @@ export function CadLabSupplyChain({
   const partialCount = specs.filter(
     (s) => s.readiness > 0 && s.readiness < 3
   ).length
-
-  // ── Supplier matching state ──
-  const [supplierMatches, setSupplierMatches] = useState<Map<string, CadLabSupplierMatch[]>>(new Map())
-  const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set())
-  const [matchAllLoading, setMatchAllLoading] = useState(false)
-
-  const handleMatchModule = useCallback(async (mod: CadLabModule) => {
-    const diag = diagnosticAnswers?.[mod.id] || {}
-    setLoadingModules((prev) => new Set(prev).add(mod.id))
-    try {
-      const results = await matchCadLabModuleSuppliers({
-        id: mod.id,
-        name: mod.name,
-        purpose: mod.purpose,
-        keyParts: mod.keyParts,
-        description: mod.description,
-        process: diag.mfg_process || null,
-        material: diag.material || null,
-      })
-      setSupplierMatches((prev) => new Map(prev).set(mod.id, results))
-    } catch (err) {
-      console.error("[SupplierMatch] Failed:", err)
-    } finally {
-      setLoadingModules((prev) => {
-        const next = new Set(prev)
-        next.delete(mod.id)
-        return next
-      })
-    }
-  }, [diagnosticAnswers])
-
-  const handleMatchAll = useCallback(async () => {
-    setMatchAllLoading(true)
-    // Match all modules in parallel, updating state progressively
-    await Promise.allSettled(modules.map((mod) => handleMatchModule(mod)))
-    setMatchAllLoading(false)
-  }, [modules, handleMatchModule])
 
   return (
     <Card>
@@ -239,7 +217,7 @@ export function CadLabSupplyChain({
             variant="default"
             size="sm"
             className="gap-1.5 flex-shrink-0"
-            onClick={handleMatchAll}
+            onClick={onMatchAll}
             disabled={matchAllLoading || modules.length === 0}
           >
             {matchAllLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
@@ -380,19 +358,21 @@ export function CadLabSupplyChain({
 
                 {/* Supplier matching */}
                 {!supplierMatches.has(spec.module.id) ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5 text-xs border-t pt-2"
-                    onClick={() => handleMatchModule(spec.module)}
-                    disabled={loadingModules.has(spec.module.id)}
-                  >
-                    {loadingModules.has(spec.module.id)
-                      ? <Loader2 className="h-3 w-3 animate-spin" />
-                      : <Search className="h-3 w-3" />
-                    }
-                    Find Matching Suppliers
-                  </Button>
+                  <div className="border-t pt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5 text-xs"
+                      onClick={() => onMatchModule(spec.module)}
+                      disabled={loadingModules.has(spec.module.id)}
+                    >
+                      {loadingModules.has(spec.module.id)
+                        ? <Loader2 className="h-3 w-3 animate-spin" />
+                        : <Search className="h-3 w-3" />
+                      }
+                      Find Matching Suppliers
+                    </Button>
+                  </div>
                 ) : (
                   <div className="border-t pt-2 space-y-1.5">
                     <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Matched Suppliers</p>

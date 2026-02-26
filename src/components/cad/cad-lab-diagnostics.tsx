@@ -41,7 +41,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"
 
 // ─── Diagnostic Questions ───────────────────────────────────────────
 
@@ -268,55 +268,102 @@ const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
 
 // ─── Intelligent Defaults ────────────────────────────────────────────
 
+/** Check whether `kw` appears as a whole word in `text`. */
+function matchWord(text: string, kw: string): boolean {
+  return new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text)
+}
+
+interface InferCategory {
+  keywords: string[]
+  mfgProcess: string
+  material: string
+  tolerance: string
+  finish: string
+}
+
+const INFER_CATEGORIES: InferCategory[] = [
+  {
+    keywords: ["pcb", "circuit", "motor", "driver", "battery", "sensor", "controller", "wire", "led"],
+    mfgProcess: "Manual/Assembly",
+    material: "Other",
+    tolerance: "Standard (±0.5mm)",
+    finish: "N/A",
+  },
+  {
+    keywords: ["servo", "kinematic", "bearing", "linear", "leadscrew", "ball screw"],
+    mfgProcess: "CNC Machining",
+    material: "Aluminum 6061",
+    tolerance: "Precision (±0.1mm)",
+    finish: "Anodized",
+  },
+  {
+    keywords: ["aluminium", "aluminum", "housing", "chassis", "shaft", "gear", "axle", "spindle"],
+    mfgProcess: "CNC Machining",
+    material: "Aluminum 6061",
+    tolerance: "Standard (±0.5mm)",
+    finish: "Sanded/Deburred",
+  },
+  {
+    keywords: ["frame", "bracket", "panel", "enclosure", "rail", "plate"],
+    mfgProcess: "Sheet Metal",
+    material: "Steel (mild)",
+    tolerance: "Standard (±0.5mm)",
+    finish: "Painted/Coated",
+  },
+  {
+    keywords: ["casting", "foundry"],
+    mfgProcess: "Casting",
+    material: "Aluminum 6061",
+    tolerance: "Loose (±1mm)",
+    finish: "Sanded/Deburred",
+  },
+]
+
 /**
- * Infers recommended diagnostics per module based on its name, purpose,
- * description, and key parts instead of using static FDM/PLA defaults.
+ * Infers recommended diagnostics per module using a scoring approach.
+ *
+ * Each category earns one point per keyword hit (word-boundary matched).
+ * The highest-scoring category wins. Ties fall to the first category.
+ * If the design brief specifies a target process or material that matches
+ * a diagnostic option, those are used directly.
  *
  * @param mod - The module to analyze
+ * @param designBrief - Optional design brief with user-specified targets
  * @returns Record of questionId → suggested answer
  */
-function inferRecommendations(mod: CadLabModule): Record<string, string> {
+function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief): Record<string, string> {
   const text = [mod.name, mod.purpose, mod.description, ...mod.keyParts]
     .join(" ")
     .toLowerCase()
 
-  // ── Manufacturing process ──
-  const metalKw = ["aluminium", "aluminum", "housing", "chassis", "shaft", "gear", "axle", "spindle", "block"]
-  const electronicsKw = ["pcb", "circuit", "motor", "driver", "battery", "sensor", "controller", "wire", "led"]
-  const structuralKw = ["frame", "bracket", "panel", "enclosure", "rail", "plate"]
-  const precisionKw = ["servo", "kinematic", "bearing", "linear", "leadscrew", "ball screw"]
-  const castKw = ["casting", "foundry", "cast"]
+  // Score each category by counting keyword hits
+  let bestScore = 0
+  let bestCat: InferCategory | null = null
+  for (const cat of INFER_CATEGORIES) {
+    const score = cat.keywords.reduce((s, kw) => s + (matchWord(text, kw) ? 1 : 0), 0)
+    if (score > bestScore) {
+      bestScore = score
+      bestCat = cat
+    }
+  }
 
-  let mfgProcess = "FDM 3D Print"
-  let material = "PLA/PETG"
-  let tolerance = "Standard (±0.5mm)"
-  let finish = "As-manufactured"
+  let mfgProcess = bestCat?.mfgProcess ?? "FDM 3D Print"
+  let material = bestCat?.material ?? "PLA/PETG"
+  const tolerance = bestCat?.tolerance ?? "Standard (±0.5mm)"
+  const finish = bestCat?.finish ?? "As-manufactured"
 
-  if (electronicsKw.some((kw) => text.includes(kw))) {
-    mfgProcess = "Manual/Assembly"
-    material = "Other"
-    tolerance = "Standard (±0.5mm)"
-    finish = "N/A"
-  } else if (precisionKw.some((kw) => text.includes(kw))) {
-    mfgProcess = "CNC Machining"
-    material = "Aluminum 6061"
-    tolerance = "Precision (±0.1mm)"
-    finish = "Anodized"
-  } else if (metalKw.some((kw) => text.includes(kw))) {
-    mfgProcess = "CNC Machining"
-    material = "Aluminum 6061"
-    tolerance = "Standard (±0.5mm)"
-    finish = "Sanded/Deburred"
-  } else if (structuralKw.some((kw) => text.includes(kw))) {
-    mfgProcess = "Sheet Metal"
-    material = "Steel (mild)"
-    tolerance = "Standard (±0.5mm)"
-    finish = "Painted/Coated"
-  } else if (castKw.some((kw) => text.includes(kw))) {
-    mfgProcess = "Casting"
-    material = "Aluminum 6061"
-    tolerance = "Loose (±1mm)"
-    finish = "Sanded/Deburred"
+  // Design brief overrides: use directly if they match a diagnostic option
+  if (designBrief?.targetProcess) {
+    const bp = designBrief.targetProcess.toLowerCase()
+    const processQ = DIAGNOSTIC_QUESTIONS.find((q) => q.id === "mfg_process")
+    const match = processQ?.options.find((o) => o.toLowerCase().includes(bp) || bp.includes(o.toLowerCase()))
+    if (match) mfgProcess = match
+  }
+  if (designBrief?.targetMaterial) {
+    const bm = designBrief.targetMaterial.toLowerCase()
+    const materialQ = DIAGNOSTIC_QUESTIONS.find((q) => q.id === "material")
+    const match = materialQ?.options.find((o) => o.toLowerCase().includes(bm) || bm.includes(o.toLowerCase()))
+    if (match) material = match
   }
 
   return {
@@ -343,6 +390,8 @@ interface CadLabDiagnosticsProps {
   onAnswersChange: (answers: DiagnosticAnswers) => void
   /** Whether AI pre-filled answers are present */
   aiPrefilled?: boolean
+  /** Design brief for smarter inference defaults */
+  designBrief?: CadLabDesignBrief
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -360,6 +409,7 @@ export function CadLabDiagnostics({
   answers,
   onAnswersChange,
   aiPrefilled = false,
+  designBrief,
 }: CadLabDiagnosticsProps): React.ReactNode {
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
 
@@ -408,7 +458,7 @@ export function CadLabDiagnostics({
   const handleUseRecommended = (moduleId: string): void => {
     const mod = modules.find((m) => m.id === moduleId)
     const recommended = mod
-      ? inferRecommendations(mod)
+      ? inferRecommendations(mod, designBrief)
       : DIAGNOSTIC_QUESTIONS.reduce<Record<string, string>>((acc, q) => { acc[q.id] = q.recommended; return acc }, {})
     onAnswersChange({
       ...answers,
@@ -525,7 +575,7 @@ export function CadLabDiagnostics({
 
                 {/* Expanded questionnaire */}
                 {isExpanded && (() => {
-                  const modRecs = inferRecommendations(mod)
+                  const modRecs = inferRecommendations(mod, designBrief)
                   return (
                   <div className="border-t p-4 space-y-5 bg-muted/10">
                     {/* "Use suggested answers" button — only when unanswered questions remain */}

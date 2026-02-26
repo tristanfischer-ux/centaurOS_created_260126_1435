@@ -162,5 +162,15 @@ export async function matchCadLabModuleSuppliers(
     }
   }
 
-  return matches.sort((a, b) => b.matchScore - a.matchScore).slice(0, 5)
+  // Deduplicate by name (case-insensitive), keeping the higher-scoring entry
+  const deduped = new Map<string, CadLabSupplierMatch>()
+  for (const m of matches) {
+    const key = m.name.toLowerCase()
+    const existing = deduped.get(key)
+    if (!existing || m.matchScore > existing.matchScore) {
+      deduped.set(key, m)
+    }
+  }
+
+  return [...deduped.values()].sort((a, b) => b.matchScore - a.matchScore).slice(0, 5)
 }
