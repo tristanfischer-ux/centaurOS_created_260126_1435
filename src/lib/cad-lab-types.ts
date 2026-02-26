@@ -396,3 +396,32 @@ export interface SpecialistReview {
   /** Time taken in ms */
   reviewTimeMs: number
 }
+
+// ─── Decomposition Checkpoint Types ──────────────────────────────────
+
+/** Specialist's gut-level sentiment on the decomposition */
+export type CheckpointSentiment = "positive" | "cautious" | "concerned"
+
+/**
+ * A lightweight specialist assessment of the module decomposition,
+ * run before expensive CAD generation to catch architectural or
+ * manufacturability issues early.
+ */
+export interface DecompositionCheckpoint {
+  /** Which specialist performed the checkpoint */
+  specialistId: string
+  /** Specialist's display name */
+  specialistName: string
+  /** Overall sentiment (green/amber/red) */
+  sentiment: CheckpointSentiment
+  /** 1-2 sentence summary of the assessment */
+  summary: string
+  /** 0-5 specific suggestions */
+  suggestions: string[]
+  /** Module IDs that need attention */
+  flaggedModules: string[]
+  /** When the checkpoint was performed */
+  checkpointedAt: string
+  /** Time taken in ms */
+  checkpointTimeMs: number
+}

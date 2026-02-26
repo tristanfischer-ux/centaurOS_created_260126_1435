@@ -8426,6 +8426,53 @@ export type Database = {
           },
         ]
       }
+      microsoft_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          foundry_id: string
+          id: string
+          microsoft_email: string
+          refresh_token: string | null
+          scopes: string[] | null
+          token_expires_at: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          microsoft_email: string
+          refresh_token?: string | null
+          scopes?: string[] | null
+          token_expires_at: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          microsoft_email?: string
+          refresh_token?: string | null
+          scopes?: string[] | null
+          token_expires_at?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "microsoft_oauth_tokens_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_completions: {
         Row: {
           attempts: number | null
@@ -13183,48 +13230,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      sheets_service_credentials: {
-        Row: {
-          created_at: string | null
-          created_by: string
-          encrypted_credentials: string
-          foundry_id: string
-          id: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by: string
-          encrypted_credentials: string
-          foundry_id: string
-          id?: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string
-          encrypted_credentials?: string
-          foundry_id?: string
-          id?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sheets_service_credentials_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "buyer_stats"
-            referencedColumns: ["buyer_id"]
-          },
-          {
-            foreignKeyName: "sheets_service_credentials_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       sheets_sync_log: {
         Row: {

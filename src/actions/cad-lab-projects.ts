@@ -23,6 +23,7 @@ import type {
   ClaudeModelId,
   CadLabDesignBrief,
   VisualStyleSpec,
+  DecompositionCheckpoint,
 } from "@/lib/cad-lab-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -81,6 +82,12 @@ export interface CadLabProjectData {
   /** Integrated system assembly (after all modules generated) */
   integratedAssemblyStlUrl: string | null
   integratedAssemblyStepUrl: string | null
+
+  /** Decomposition checkpoints from specialists (keyed by specialist ID) */
+  checkpoints: Record<string, DecompositionCheckpoint> | null
+
+  /** User-editable product overview (seeded from executive summary) */
+  productOverview: string | null
 
   createdAt: string
   updatedAt: string
@@ -184,6 +191,8 @@ export async function loadCadLabProject(
         systemIllustrationUrl: project.system_illustration_url ?? null,
         integratedAssemblyStlUrl: project.integrated_assembly_stl_url ?? null,
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
+        checkpoints: (project.checkpoints as Record<string, DecompositionCheckpoint> | null) ?? null,
+        productOverview: project.product_overview ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -393,6 +402,36 @@ export async function saveCadLabModules(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save modules:", error.message)
       return { error: `Failed to save modules: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Product Overview ────────────────────────────────────────────
+
+/**
+ * Persists the user-editable product overview text.
+ *
+ * @param projectId - Project to update
+ * @param overview - Product overview text (user-edited executive summary)
+ * @returns Success or error
+ */
+export async function saveCadLabProductOverview(
+  projectId: string,
+  overview: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ product_overview: overview })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save product overview:", error.message)
+      return { error: `Failed to save product overview: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }

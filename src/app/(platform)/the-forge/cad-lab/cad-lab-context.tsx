@@ -39,6 +39,7 @@ import {
   createCadLabProject,
   saveCadLabResearch,
   saveCadLabModules,
+  saveCadLabProductOverview,
   saveCadLabProjectRfq,
   deleteCadLabProject,
   loadCadLabBatchStatus,
@@ -53,7 +54,9 @@ import type {
   ClaudeModelId,
   CadLabDesignBrief,
   VisualStyleSpec,
+  DecompositionCheckpoint,
 } from "@/lib/cad-lab-types"
+import { requestDecompositionCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
 
@@ -165,6 +168,17 @@ export interface CadLabContextValue {
   integrationError: string | null
   setIntegrationError: (v: string | null) => void
   handleGenerateIntegration: () => Promise<void>
+
+  // Decomposition checkpoints
+  checkpoints: Record<string, DecompositionCheckpoint> | null
+  isCheckpointing: boolean
+
+  // Product overview (editable executive summary)
+  productOverview: string
+  setProductOverview: (v: string) => void
+
+  // Module editing
+  handleUpdateModule: (updated: CadLabModule) => void
 
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
@@ -330,6 +344,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isIntegrating, setIsIntegrating] = useState(false)
   const [integrationError, setIntegrationError] = useState<string | null>(null)
 
+  // ── Decomposition checkpoints ──
+  const [checkpoints, setCheckpoints] = useState<Record<string, DecompositionCheckpoint> | null>(null)
+  const [isCheckpointing, setIsCheckpointing] = useState(false)
+
+  // ── Product overview (editable executive summary) ──
+  const [productOverview, setProductOverview] = useState("")
+
   // ── Browser notification helper ──
   const sendNotification = useCallback((title: string, body: string) => {
     try {
@@ -390,12 +411,45 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }, 500)
   }, [activeProjectId])
 
-  // Cleanup pending save on unmount
+  // ── Debounced DB save for product overview ──
+  const overviewPendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const debouncedSaveOverview = useCallback((text: string) => {
+    if (!activeProjectId) return
+    if (overviewPendingRef.current) clearTimeout(overviewPendingRef.current)
+    overviewPendingRef.current = setTimeout(async () => {
+      overviewPendingRef.current = null
+      try {
+        await saveCadLabProductOverview(activeProjectId, text)
+        setLastSaved(new Date().toISOString())
+      } catch {
+        console.error("[CAD-LAB] Debounced overview save failed")
+      }
+    }, 800)
+  }, [activeProjectId])
+
+  // Wrapped setter that also triggers debounced save
+  const setProductOverviewAndSave = useCallback((text: string) => {
+    setProductOverview(text)
+    debouncedSaveOverview(text)
+  }, [debouncedSaveOverview])
+
+  // ── Update a single module (for inline editing) ──
+  const handleUpdateModule = useCallback((updated: CadLabModule) => {
+    setModules((prev) => prev.map((m) => m.id === updated.id ? updated : m))
+    debouncedSaveModules()
+  }, [debouncedSaveModules])
+
+  // Cleanup pending saves on unmount
   useEffect(() => {
     return () => {
       if (savePendingRef.current) {
         clearTimeout(savePendingRef.current)
         savePendingRef.current = null
+      }
+      if (overviewPendingRef.current) {
+        clearTimeout(overviewPendingRef.current)
+        overviewPendingRef.current = null
       }
     }
   }, [])
@@ -574,6 +628,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         }
         imagesPipeline()
           .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+
+        // Decomposition checkpoints — non-blocking (same pattern as imagesPipeline)
+        if (activeProjectId) {
+          setIsCheckpointing(true)
+          requestDecompositionCheckpoints({
+            projectId: activeProjectId,
+            projectSubject: subject,
+            modules: res.modules,
+            researchReport: editableReport,
+          })
+            .then((checkpointRes) => {
+              if ("checkpoints" in checkpointRes) {
+                setCheckpoints(checkpointRes.checkpoints)
+              }
+            })
+            .catch((e) => console.error("[CAD-LAB] Checkpoint failed:", e))
+            .finally(() => setIsCheckpointing(false))
+        }
       }
     } catch (err) {
       timers.forEach(clearTimeout)
@@ -1263,6 +1335,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setRevealedModuleIds(new Set())
     setSystemIllustrationUrl(null)
     setSystemIllustrationStatus("idle")
+    setCheckpoints(null)
+    setProductOverview("")
   }, [])
 
   // ── Load a saved project ──
@@ -1330,6 +1404,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setSystemIllustrationError(null)
       setIntegratedAssemblyStlUrl(p.integratedAssemblyStlUrl ?? null)
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
+      setCheckpoints(p.checkpoints ?? null)
+      setProductOverview(p.productOverview ?? "")
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }
@@ -1438,6 +1514,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     progressLines, milestone, setMilestone,
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, setIntegrationError, handleGenerateIntegration,
+    checkpoints, isCheckpointing,
+    productOverview, setProductOverview: setProductOverviewAndSave,
+    handleUpdateModule,
     handleDownload,
   }
 

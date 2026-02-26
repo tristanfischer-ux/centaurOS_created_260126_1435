@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo } from "react"
+import { useMemo, useEffect, useRef } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -35,7 +35,9 @@ import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
 import { ProcessFlowDiagram } from "./components/process-flow-diagram"
+import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
+import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
 
 // ─── Extract executive summary from research report markdown ─────────
 
@@ -65,10 +67,27 @@ export default function CadLabResearchPage(): React.ReactNode {
     revealedModuleIds,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines,
+    checkpoints, isCheckpointing,
+    productOverview, setProductOverview,
+    handleUpdateModule,
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
   const executiveSummary = useMemo(() => extractExecutiveSummary(editableReport), [editableReport])
+
+  // Seed productOverview from executive summary on first decomposition
+  const seededRef = useRef(false)
+  useEffect(() => {
+    if (executiveSummary && !productOverview && modules.length > 0 && !seededRef.current) {
+      seededRef.current = true
+      setProductOverview(executiveSummary)
+    }
+  }, [executiveSummary, productOverview, modules.length, setProductOverview])
+
+  // Helper: open module detail dialog from flow diagram click
+  const handleModuleClick = (moduleId: string): void => {
+    setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)
+  }
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -183,16 +202,12 @@ export default function CadLabResearchPage(): React.ReactNode {
             </Card>
           )}
 
-          {/* ── Executive summary (extracted from research report) ── */}
-          {executiveSummary && modules.length === 0 && (
-            <Card>
-              <CardContent className="pt-5 pb-5">
-                <h3 className="text-sm font-semibold text-foreground mb-2">Product Overview</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-                  {executiveSummary}
-                </p>
-              </CardContent>
-            </Card>
+          {/* ── Product overview — always visible after research, editable ── */}
+          {(productOverview || executiveSummary) && (
+            <ProductOverviewCard
+              overview={productOverview || executiveSummary || ""}
+              onSave={setProductOverview}
+            />
           )}
 
           {/* ── Continue button: triggers decomposition ── */}
@@ -249,10 +264,19 @@ export default function CadLabResearchPage(): React.ReactNode {
                 revealedModuleIds={revealedModuleIds}
                 expandedModuleId={expandedModuleId}
                 onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
+                onModuleSave={handleUpdateModule}
               />
 
               {/* Process flow — how modules connect via inputs and outputs */}
-              <ProcessFlowDiagram modules={modules} />
+              <ProcessFlowDiagram modules={modules} onModuleClick={handleModuleClick} />
+
+              {/* Specialist checkpoint — early feedback before generation */}
+              {(isCheckpointing || (checkpoints && Object.keys(checkpoints).length > 0)) && (
+                <DecompositionCheckpointCard
+                  checkpoints={checkpoints}
+                  isCheckpointing={isCheckpointing}
+                />
+              )}
 
               {/* Continue to Build CTA — only after all modules are revealed */}
               {allModulesRevealed && (

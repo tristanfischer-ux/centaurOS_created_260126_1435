@@ -27,6 +27,8 @@ import type {
     ReviewVerdict,
     ReviewIssue,
     ReviewCalculation,
+    DecompositionCheckpoint,
+    CheckpointSentiment,
 } from "@/lib/cad-lab-types"
 import { buildCadLabReviewContext } from "@/lib/ai-context/cad-lab-context"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
@@ -34,6 +36,15 @@ import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
 import { loadDomainKnowledge } from "@/lib/agents/domain-knowledge"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { getOrCreateSpecialistThread, getRecentSpecialistOutputs } from "@/actions/agent-memory"
+import {
+    getMemoryContext,
+    formatObservationsForPrompt,
+    getConversationHistory,
+    addMemoryMessage,
+    processMemory,
+} from "@/lib/agent-memory"
+import type { ConversationMessage } from "@/lib/agent-memory"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -130,12 +141,44 @@ export async function requestSpecialistReview(
             req.specialistId,
         )
 
-        const systemPrompt = `${personalityPrompt}
+        let systemPrompt = `${personalityPrompt}
 
 ## Current Task: Design Review
 You are performing a structured design review of a CAD Lab module. Use your tools to verify claims with real data — never guess material properties or process constraints.
 
 ${reviewContext}`
+
+        // ── Bridge specialist memory (Tier 1) ──
+        // Memory is additive — if it fails, reviews still work as before.
+        let memoryThreadId: string | null = null
+        let memoryHistory: ConversationMessage[] = []
+        try {
+            const threadRes = await getOrCreateSpecialistThread(req.specialistId)
+            memoryThreadId = threadRes.threadId
+
+            if (memoryThreadId) {
+                const memoryContext = await getMemoryContext(memoryThreadId, foundryId)
+                const observationsBlock = formatObservationsForPrompt(memoryContext)
+                memoryHistory = getConversationHistory(memoryContext, 10)
+
+                // Cross-specialist awareness: what other specialists have recently said
+                const crossRes = await getRecentSpecialistOutputs(req.specialistId, 3)
+                let crossSpecialistBlock = ""
+                if (crossRes.data && crossRes.data.length > 0) {
+                    crossSpecialistBlock = "\n## Recent Work by Other Specialists\n" +
+                        crossRes.data.map(o => `- **${o.specialistId}**: ${o.summary}`).join("\n") +
+                        "\n"
+                }
+
+                // Inject into system prompt
+                if (observationsBlock || crossSpecialistBlock) {
+                    systemPrompt += "\n" + observationsBlock + crossSpecialistBlock
+                }
+            }
+        } catch (err) {
+            // INTENT: Memory is enhancement, not requirement. If it fails, proceed without it.
+            console.warn("[CAD-REVIEWS] Memory bridge failed (non-fatal):", err instanceof Error ? err.message : "Unknown")
+        }
 
         // ── Get tools for this specialist ──
         const tools = getToolsForSpecialist(req.specialistId)
@@ -159,6 +202,8 @@ ${reviewContext}`
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const messages: Array<{ role: "user" | "assistant"; content: string | any[] }> = [
+            // Prepend memory history as multi-turn messages for continuity
+            ...memoryHistory.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
             {
                 role: "user",
                 content: `Review the module "${targetModule.name}" and provide your structured assessment. Use your tools to verify engineering claims with real calculations and data lookups.`,
@@ -270,6 +315,33 @@ ${reviewContext}`
         } catch (err) {
             console.error("[CAD-REVIEWS] Failed to save review:", err)
             // Non-fatal — still return the review
+        }
+
+        // ── Write review to specialist memory thread ──
+        if (memoryThreadId) {
+            try {
+                // Record the request as a user message
+                await addMemoryMessage(
+                    memoryThreadId,
+                    foundryId,
+                    "user",
+                    `[CAD Lab Review] Reviewed module "${targetModule.name}" (${targetModule.purpose}) in project "${req.projectSubject}"`,
+                )
+                // Record the result as an assistant message (compact summary, not full markdown)
+                const issuesSummary = review.issues.length > 0
+                    ? review.issues.map(i => `${i.severity}: ${i.category}`).join(", ")
+                    : "none"
+                await addMemoryMessage(
+                    memoryThreadId,
+                    foundryId,
+                    "assistant",
+                    `[CAD Lab Review Result] Verdict: ${review.verdict.toUpperCase()} | Module: ${targetModule.name} | Issues: ${issuesSummary} | Summary: ${review.summary}`,
+                )
+                // Fire-and-forget observation compression
+                processMemory(memoryThreadId, foundryId).catch(() => {})
+            } catch {
+                // INTENT: Memory write is non-critical — review is already saved
+            }
         }
 
         return { review }
@@ -395,5 +467,243 @@ function describeToolCall(toolName: string, input?: Record<string, unknown>): st
             return `Engineering calculation: ${(input?.description as string) ?? "custom"}`
         default:
             return `${toolName} call`
+    }
+}
+
+// ─── Decomposition Checkpoints (Tier 2) ─────────────────────────────
+
+/** Max tokens for checkpoint calls — lightweight gut-level assessment */
+const CHECKPOINT_MAX_TOKENS = 2048
+
+/** Specialists that run decomposition checkpoints */
+const CHECKPOINT_SPECIALISTS = ["cto", "vp-manufacturing"] as const
+
+export interface CheckpointRequest {
+    projectId: string
+    projectSubject: string
+    modules: CadLabModule[]
+    researchReport: string
+}
+
+export type CheckpointResult =
+    | { checkpoints: Record<string, DecompositionCheckpoint> }
+    | { error: string }
+
+/**
+ * Runs lightweight decomposition checkpoints with Max (CTO) and Fang (VP Mfg)
+ * in parallel before expensive CAD generation begins.
+ *
+ * @description Each specialist gets a fast gut-level assessment prompt focused
+ * on their domain. No tools — this is pure reasoning. Results are saved to the
+ * project's checkpoints JSONB column and to each specialist's memory thread.
+ */
+export async function requestDecompositionCheckpoints(
+    req: CheckpointRequest,
+): Promise<CheckpointResult> {
+    return withAuth(async ({ supabase, foundryId }) => {
+        if (!req.projectId || !/^[0-9a-f-]{36}$/.test(req.projectId)) {
+            return { error: "Invalid project ID" }
+        }
+        if (req.modules.length === 0) {
+            return { error: "No modules to checkpoint" }
+        }
+
+        const apiKey = process.env.ANTHROPIC_API_KEY
+        if (!apiKey) {
+            return { error: "Anthropic API key not configured" }
+        }
+
+        const Anthropic = (await import("@anthropic-ai/sdk")).default
+        const client = new Anthropic({ apiKey })
+
+        // Build module summary for the prompt
+        const moduleSummary = req.modules.map((m, i) =>
+            `${i + 1}. **${m.name}** (id: ${m.id}): ${m.purpose}\n   Key parts: ${m.keyParts.join(", ")}\n   Lead: ${m.leadWeeks}wk | Inputs: ${m.inputs.join(", ")} | Outputs: ${m.outputs.join(", ")}`
+        ).join("\n")
+
+        // Run all checkpoint specialists in parallel
+        const results = await Promise.allSettled(
+            CHECKPOINT_SPECIALISTS.map(async (specialistId) => {
+                const startTime = Date.now()
+                const specialist = getSpecialistById(specialistId)
+                if (!specialist) throw new Error(`Unknown specialist: ${specialistId}`)
+
+                // Build specialist system prompt
+                const domainContext = loadDomainKnowledge(specialistId, specialist.description)
+                const personalityPrompt = compilePersonalityPrompt(
+                    `${specialist.name}, the ${specialist.title} specialist`,
+                    specialist.personality,
+                    domainContext,
+                    specialistId,
+                )
+
+                // Inject memory observations if available
+                let memoryBlock = ""
+                let memoryThreadId: string | null = null
+                try {
+                    const threadRes = await getOrCreateSpecialistThread(specialistId)
+                    memoryThreadId = threadRes.threadId
+                    if (memoryThreadId) {
+                        const memoryContext = await getMemoryContext(memoryThreadId, foundryId)
+                        memoryBlock = formatObservationsForPrompt(memoryContext)
+                    }
+                } catch {
+                    // Non-critical
+                }
+
+                const domainFocus = specialistId === "cto"
+                    ? "Focus on: module boundaries, interface clarity, missing modules, integration risks, overall architecture quality."
+                    : "Focus on: manufacturability, process compatibility, material choices, sizing for manufacturing, DFM concerns."
+
+                const systemPrompt = `${personalityPrompt}
+
+## Current Task: Decomposition Checkpoint
+You are performing a quick assessment of a product decomposition BEFORE CAD generation begins. This is a gut-level check — be concise and direct.
+
+${domainFocus}
+${memoryBlock}
+
+## Response Format (STRICT — follow exactly)
+SENTIMENT: positive | cautious | concerned
+SUMMARY: <1-2 sentences>
+SUGGESTIONS: <comma-separated list, or "none">
+FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
+
+                const response = await client.messages.create({
+                    model: REVIEW_MODEL,
+                    max_tokens: CHECKPOINT_MAX_TOKENS,
+                    system: systemPrompt,
+                    messages: [{
+                        role: "user",
+                        content: `Assess this module decomposition for "${req.projectSubject}":\n\n${moduleSummary}\n\nResearch context (first 2000 chars):\n${req.researchReport.slice(0, 2000)}`,
+                    }],
+                })
+
+                const text = response.content
+                    .filter(b => b.type === "text")
+                    .map(b => b.type === "text" ? b.text : "")
+                    .join("")
+
+                const checkpoint = parseCheckpointResponse(
+                    text,
+                    specialistId,
+                    specialist.name,
+                    Date.now() - startTime,
+                    req.modules.map(m => m.id),
+                )
+
+                // Write to specialist memory thread
+                if (memoryThreadId) {
+                    try {
+                        await addMemoryMessage(
+                            memoryThreadId,
+                            foundryId,
+                            "user",
+                            `[CAD Lab Checkpoint] Assessed decomposition for "${req.projectSubject}" (${req.modules.length} modules)`,
+                        )
+                        await addMemoryMessage(
+                            memoryThreadId,
+                            foundryId,
+                            "assistant",
+                            `[CAD Lab Checkpoint Result] Sentiment: ${checkpoint.sentiment} | ${checkpoint.summary}${checkpoint.flaggedModules.length > 0 ? ` | Flagged: ${checkpoint.flaggedModules.join(", ")}` : ""}`,
+                        )
+                        processMemory(memoryThreadId, foundryId).catch(() => {})
+                    } catch {
+                        // Non-critical
+                    }
+                }
+
+                return checkpoint
+            }),
+        )
+
+        // Collect results, using defaults for failures
+        const checkpoints: Record<string, DecompositionCheckpoint> = {}
+        for (let i = 0; i < CHECKPOINT_SPECIALISTS.length; i++) {
+            const specialistId = CHECKPOINT_SPECIALISTS[i]
+            const result = results[i]
+            if (result.status === "fulfilled") {
+                checkpoints[specialistId] = result.value
+            } else {
+                console.error(`[CAD-REVIEWS] Checkpoint failed for ${specialistId}:`, result.reason)
+                const specialist = getSpecialistById(specialistId)
+                checkpoints[specialistId] = {
+                    specialistId,
+                    specialistName: specialist?.name ?? specialistId,
+                    sentiment: "cautious",
+                    summary: "Checkpoint assessment unavailable — proceeding with standard review.",
+                    suggestions: [],
+                    flaggedModules: [],
+                    checkpointedAt: new Date().toISOString(),
+                    checkpointTimeMs: 0,
+                }
+            }
+        }
+
+        // Save to project
+        try {
+            const { error: saveError } = await supabase
+                .from("cad_lab_projects")
+                .update({ checkpoints: checkpoints as unknown as Json })
+                .eq("id", req.projectId)
+
+            if (saveError) {
+                console.error("[CAD-REVIEWS] Failed to save checkpoints:", saveError)
+            }
+        } catch (err) {
+            console.error("[CAD-REVIEWS] Failed to save checkpoints:", err)
+        }
+
+        return { checkpoints }
+    })
+}
+
+/**
+ * Parse the specialist's checkpoint response into a structured DecompositionCheckpoint.
+ *
+ * @description Uses line-by-line parsing with generous fallbacks — LLMs sometimes
+ * deviate slightly from the format. Invalid module IDs are silently dropped.
+ */
+function parseCheckpointResponse(
+    text: string,
+    specialistId: string,
+    specialistName: string,
+    checkpointTimeMs: number,
+    validModuleIds: string[],
+): DecompositionCheckpoint {
+    // Parse sentiment
+    const sentimentMatch = text.match(/SENTIMENT:\s*(positive|cautious|concerned)/i)
+    const sentiment: CheckpointSentiment = sentimentMatch
+        ? sentimentMatch[1].toLowerCase() as CheckpointSentiment
+        : "cautious"
+
+    // Parse summary
+    const summaryMatch = text.match(/SUMMARY:\s*(.+?)(?:\n|$)/i)
+    const summary = summaryMatch?.[1]?.trim() || `Checkpoint completed by ${specialistName}.`
+
+    // Parse suggestions
+    const suggestionsMatch = text.match(/SUGGESTIONS:\s*(.+?)(?:\n|$)/i)
+    const suggestionsRaw = suggestionsMatch?.[1]?.trim() || ""
+    const suggestions = suggestionsRaw.toLowerCase() === "none" || !suggestionsRaw
+        ? []
+        : suggestionsRaw.split(",").map(s => s.trim()).filter(Boolean).slice(0, 5)
+
+    // Parse flagged modules — only keep valid IDs
+    const flaggedMatch = text.match(/FLAGGED_MODULES:\s*(.+?)(?:\n|$)/i)
+    const flaggedRaw = flaggedMatch?.[1]?.trim() || ""
+    const validIdSet = new Set(validModuleIds)
+    const flaggedModules = flaggedRaw.toLowerCase() === "none" || !flaggedRaw
+        ? []
+        : flaggedRaw.split(",").map(s => s.trim()).filter(id => validIdSet.has(id))
+
+    return {
+        specialistId,
+        specialistName,
+        sentiment,
+        summary,
+        suggestions,
+        flaggedModules,
+        checkpointedAt: new Date().toISOString(),
+        checkpointTimeMs,
     }
 }
