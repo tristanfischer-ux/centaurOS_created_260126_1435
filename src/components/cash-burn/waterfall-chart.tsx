@@ -9,6 +9,7 @@ import {
   Tooltip,
   Cell,
   ResponsiveContainer,
+  ReferenceLine,
 } from 'recharts'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
@@ -21,18 +22,25 @@ const COLOR_DESTRUCTIVE = moneyMapColors.loss // Red
 const COLOR_INFO = chartColors[1]           // Electric Blue
 
 // ============================================================
+// Helpers
+// ============================================================
+
+/** Compact currency for Y-axis labels (values arrive in pence) */
+function formatCompactCurrency(pence: number): string {
+  const pounds = pence / 100
+  const abs = Math.abs(pounds)
+  const sign = pounds < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}£${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${sign}£${(abs / 1_000).toFixed(0)}k`
+  return `${sign}£${abs.toFixed(0)}`
+}
+
+// ============================================================
 // Types
 // ============================================================
 
 interface WaterfallChartProps {
   data: IncomeStatementRow
-}
-
-interface WaterfallBar {
-  name: string
-  value: number
-  base: number
-  fill: string
 }
 
 // ============================================================
@@ -41,53 +49,59 @@ interface WaterfallBar {
 
 export function WaterfallChart({ data }: WaterfallChartProps) {
   // INTENT: Build waterfall bars — Revenue -> -COGS -> Gross Profit -> -OpEx -> -R&D -> EBITDA
-  const bars: WaterfallBar[] = [
+  //
+  // Recharts stacked-bar trick: invisible "base" bar (0 → base) positions the
+  // visible "value" bar (base → base+value).  For bars that hang below zero
+  // the base is negative so the invisible bar extends downward and the visible
+  // bar stacks back upward from there.
+  //
+  // Total bars (Revenue, Gross Profit, EBITDA) span from 0 to their total.
+  // Delta bars (COGS, OpEx, R&D) float between successive running totals.
+
+  const chartData = [
     {
       name: 'Revenue',
-      value: data.revenue,
-      base: 0,
+      base: Math.min(0, data.revenue),
+      value: Math.abs(data.revenue),
       fill: COLOR_SUCCESS,
+      rawValue: data.revenue,
     },
     {
       name: 'COGS',
-      value: data.cogs,
-      base: data.revenue - data.cogs,
+      base: Math.min(data.revenue, data.grossProfit),
+      value: Math.abs(data.cogs),
       fill: COLOR_DESTRUCTIVE,
+      rawValue: -data.cogs,
     },
     {
       name: 'Gross Profit',
-      value: data.grossProfit,
-      base: 0,
+      base: Math.min(0, data.grossProfit),
+      value: Math.abs(data.grossProfit),
       fill: COLOR_INFO,
+      rawValue: data.grossProfit,
     },
     {
       name: 'OpEx',
-      value: data.opex,
-      base: data.grossProfit - data.opex,
+      base: Math.min(data.grossProfit, data.grossProfit - data.opex),
+      value: Math.abs(data.opex),
       fill: COLOR_DESTRUCTIVE,
+      rawValue: -data.opex,
     },
     {
       name: 'R&D',
-      value: data.rnd,
-      base: data.grossProfit - data.opex - data.rnd,
+      base: Math.min(data.grossProfit - data.opex, data.ebitda),
+      value: Math.abs(data.rnd),
       fill: COLOR_DESTRUCTIVE,
+      rawValue: -data.rnd,
     },
     {
       name: 'EBITDA',
-      value: data.ebitda,
-      base: 0,
+      base: Math.min(0, data.ebitda),
+      value: Math.abs(data.ebitda),
       fill: data.ebitda >= 0 ? COLOR_SUCCESS : COLOR_DESTRUCTIVE,
+      rawValue: data.ebitda,
     },
   ]
-
-  // Recharts stacked bar trick: base (invisible) + value (visible)
-  const chartData = bars.map((bar) => ({
-    name: bar.name,
-    base: Math.max(0, bar.base),
-    value: Math.abs(bar.value),
-    fill: bar.fill,
-    rawValue: bar.value,
-  }))
 
   return (
     <Card>
@@ -112,8 +126,9 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
               tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => formatCurrency(v)}
+              tickFormatter={formatCompactCurrency}
             />
+            <ReferenceLine y={0} stroke="hsl(var(--border))" />
             <Tooltip
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
