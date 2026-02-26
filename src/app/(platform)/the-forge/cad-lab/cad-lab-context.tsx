@@ -1308,12 +1308,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setResearchResult(res)
       setEditableReport(res.report)
 
+      // Seed product overview immediately so it's visible while illustration generates
+      if (!productOverviewRef.current) {
+        const summary = extractExecutiveSummary(res.report)
+        if (summary) {
+          setProductOverview(summary)
+        }
+      }
+
       if (res.success) {
         setMilestone("research")
         const projId = await ensureProject()
         if (projId) {
           setIsSaving(true)
           await saveCadLabResearch(projId, res)
+          // Persist seeded overview alongside research
+          if (!productOverviewRef.current) {
+            const summary = extractExecutiveSummary(res.report)
+            if (summary) {
+              setProductOverview(summary)
+              saveCadLabProductOverview(projId, summary).catch(() => {
+                console.error("[CAD-LAB] Failed to persist seeded overview")
+              })
+            }
+          }
           setLastSaved(new Date().toISOString())
           setIsSaving(false)
           refreshProjects()
