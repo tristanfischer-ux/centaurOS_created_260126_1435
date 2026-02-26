@@ -3264,6 +3264,62 @@ export type Database = {
           },
         ]
       }
+      burn_scenarios: {
+        Row: {
+          cost_delay_weeks: number
+          created_at: string
+          created_by: string
+          foundry_id: string
+          id: string
+          is_default: boolean
+          item_overrides: Json
+          name: string
+          opening_balance: number
+          revenue_delay_weeks: number
+          revenue_growth_pct: number
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          cost_delay_weeks?: number
+          created_at?: string
+          created_by: string
+          foundry_id: string
+          id?: string
+          is_default?: boolean
+          item_overrides?: Json
+          name: string
+          opening_balance?: number
+          revenue_delay_weeks?: number
+          revenue_growth_pct?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          cost_delay_weeks?: number
+          created_at?: string
+          created_by?: string
+          foundry_id?: string
+          id?: string
+          is_default?: boolean
+          item_overrides?: Json
+          name?: string
+          opening_balance?: number
+          revenue_delay_weeks?: number
+          revenue_growth_pct?: number
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "burn_scenarios_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_functions: {
         Row: {
           category: string
@@ -3530,6 +3586,7 @@ export type Database = {
         Row: {
           batch_started_at: string | null
           batch_status: string
+          checkpoints: Json | null
           created_at: string
           created_by: string
           foundry_id: string
@@ -3541,6 +3598,7 @@ export type Database = {
           model_id: string
           modules: Json | null
           name: string
+          product_overview: string | null
           research: Json | null
           result: Json | null
           reviews: Json | null
@@ -3555,6 +3613,7 @@ export type Database = {
         Insert: {
           batch_started_at?: string | null
           batch_status?: string
+          checkpoints?: Json | null
           created_at?: string
           created_by: string
           foundry_id: string
@@ -3566,6 +3625,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          product_overview?: string | null
           research?: Json | null
           result?: Json | null
           reviews?: Json | null
@@ -3580,6 +3640,7 @@ export type Database = {
         Update: {
           batch_started_at?: string | null
           batch_status?: string
+          checkpoints?: Json | null
           created_at?: string
           created_by?: string
           foundry_id?: string
@@ -3591,6 +3652,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          product_overview?: string | null
           research?: Json | null
           result?: Json | null
           reviews?: Json | null
@@ -3751,6 +3813,139 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_search_ranking"
             referencedColumns: ["provider_id"]
+          },
+        ]
+      }
+      cash_in_items: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string
+          currency: string
+          effective_from: string
+          effective_to: string | null
+          foundry_id: string
+          frequency: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          probability_pct: number
+          sort_order: number
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by: string
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          probability_pct?: number
+          sort_order?: number
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          probability_pct?: number
+          sort_order?: number
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_in_items_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_out_items: {
+        Row: {
+          amount: number
+          category: string
+          cost_type: string
+          created_at: string
+          created_by: string
+          currency: string
+          effective_from: string
+          effective_to: string | null
+          foundry_id: string
+          frequency: string
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          pnl_category: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category: string
+          cost_type: string
+          created_at?: string
+          created_by: string
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          pnl_category?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          cost_type?: string
+          created_at?: string
+          created_by?: string
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          foundry_id?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          pnl_category?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_out_items_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -12949,6 +13144,126 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sheets_row_map: {
+        Row: {
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id: string
+          row_number: number
+          sheet_tab_gid: number
+          sheet_tab_name: string
+          spreadsheet_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          foundry_id: string
+          id?: string
+          row_number: number
+          sheet_tab_gid: number
+          sheet_tab_name: string
+          spreadsheet_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          foundry_id?: string
+          id?: string
+          row_number?: number
+          sheet_tab_gid?: number
+          sheet_tab_name?: string
+          spreadsheet_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sheets_service_credentials: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          encrypted_credentials: string
+          foundry_id: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          encrypted_credentials: string
+          foundry_id: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          encrypted_credentials?: string
+          foundry_id?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sheets_service_credentials_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "sheets_service_credentials_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sheets_sync_log: {
+        Row: {
+          created_at: string | null
+          direction: string
+          entity_id: string | null
+          entity_type: string
+          error_message: string | null
+          foundry_id: string
+          id: string
+          metadata: Json | null
+          operation: string
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          direction: string
+          entity_id?: string | null
+          entity_type: string
+          error_message?: string | null
+          foundry_id: string
+          id?: string
+          metadata?: Json | null
+          operation: string
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          direction?: string
+          entity_id?: string | null
+          entity_type?: string
+          error_message?: string | null
+          foundry_id?: string
+          id?: string
+          metadata?: Json | null
+          operation?: string
+          status?: string
+        }
+        Relationships: []
       }
       signup_intents: {
         Row: {

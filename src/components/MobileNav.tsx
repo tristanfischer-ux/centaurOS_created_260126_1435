@@ -51,6 +51,8 @@ import {
     Receipt,
     Landmark,
     Link2,
+    TrendingDown,
+    TrendingUp,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -110,6 +112,14 @@ const financeMoreNavigation = [
     { name: "Alerts", href: "/finance/settings", icon: BellRing },
 ]
 
+// "More" dropdown — Cash Burn section
+const cashBurnNavigation = [
+    { name: "Cash Burn", href: "/cash-burn", icon: Flame },
+    { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown },
+    { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp },
+    { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3 },
+]
+
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
@@ -145,7 +155,7 @@ export function MobileNav() {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
-    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...financeMoreNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...financeMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     /**
      * Renders a dropdown menu item with active state highlighting.
@@ -246,6 +256,14 @@ export function MobileNav() {
                             Finance
                         </DropdownMenuLabel>
                         {financeMoreNavigation.map(renderDropdownItem)}
+
+                        <DropdownMenuSeparator />
+
+                        {/* Cash Burn section */}
+                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Cash Burn
+                        </DropdownMenuLabel>
+                        {cashBurnNavigation.map(renderDropdownItem)}
 
                         <DropdownMenuSeparator />
 

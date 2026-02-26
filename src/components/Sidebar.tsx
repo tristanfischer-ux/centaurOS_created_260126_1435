@@ -62,6 +62,8 @@ import {
     Landmark,
     Link2,
     Building2,
+    TrendingDown,
+    TrendingUp,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -136,6 +138,16 @@ const financeNavigation = [
     { name: "Investors", href: "/investors", icon: Building2, tooltip: "Browse 600 UK VC and PE firms — search, filter, and track outreach" },
     { name: "Integrations", href: "/finance/integrations", icon: Link2, tooltip: "Connect Xero, QuickBooks, or FreeAgent" },
     { name: "Alerts", href: "/finance/settings", icon: BellRing, tooltip: "Configure financial alert thresholds and digest preferences" },
+]
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 3b: "Cash Burn" — Runway and scenario planning
+// ─────────────────────────────────────────────────────────────────────────────
+const cashBurnNavigation = [
+    { name: "Cash Burn", href: "/cash-burn", icon: Flame, tooltip: "52-week runway analysis with scenario modelling" },
+    { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown, tooltip: "Fixed and variable cost management" },
+    { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp, tooltip: "Revenue, loans, equity, and grants" },
+    { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3, tooltip: "Projected Income Statement and Balance Sheet" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -367,6 +379,16 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                         {financeNavigation.map(renderNavItem)}
                     </CollapsibleContent>
                 </Collapsible>
+
+                {/* ══════════════════════════════════════════════════ */}
+                {/* Section 3b: "Cash Burn" — Runway planning           */}
+                {/* ══════════════════════════════════════════════════ */}
+                <div className="px-3 pt-2 pb-0.5">
+                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
+                        Cash Burn
+                    </p>
+                </div>
+                {cashBurnNavigation.map(renderNavItem)}
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 4: "Workshop" — Where the work happens     */}
