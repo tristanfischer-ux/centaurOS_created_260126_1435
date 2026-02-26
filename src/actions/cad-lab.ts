@@ -697,9 +697,9 @@ export async function generateCadLabInterface(
     // SECURITY: Sanitise template metadata before prompt injection to prevent indirect prompt injection
     const templateSection = templateMatch.topMatches.length > 0
       ? "\n\nMATCHED STEP TEMPLATES (proven reference geometry from template library):\n" +
-        templateMatch.topMatches.map((m) =>
-          `  - ${sanitiseForPrompt(m.name)} [${sanitiseForPrompt(m.category)}${m.subcategory ? `/${sanitiseForPrompt(m.subcategory)}` : ""}] (score: ${m.score})`
-        ).join("\n") +
+        (await Promise.all(templateMatch.topMatches.map(async (m) =>
+          `  - ${await sanitiseForPrompt(m.name)} [${await sanitiseForPrompt(m.category)}${m.subcategory ? `/${await sanitiseForPrompt(m.subcategory)}` : ""}] (score: ${m.score})`
+        ))).join("\n") +
         "\n\nThese templates represent real-world parts with accurate geometry. When planning components, consider using dimensions and proportions from these references where relevant."
       : ""
 
@@ -1167,7 +1167,7 @@ async function generateCadLabModelWithSeed(
 
   try {
     // SECURITY: Validate URL before fetching (SSRF protection)
-    if (!isAllowedStepUrl(seedTemplate.stepUrl)) {
+    if (!(await isAllowedStepUrl(seedTemplate.stepUrl))) {
       throw new Error(`Seed template URL blocked by allowlist: ${seedTemplate.slug}`)
     }
 
@@ -1210,8 +1210,8 @@ async function generateCadLabModelWithSeed(
     const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
     // SECURITY: Sanitise template metadata before prompt injection
-    const safeName = sanitiseForPrompt(seedTemplate.name)
-    const safeCategory = sanitiseForPrompt(seedTemplate.category)
+    const safeName = await sanitiseForPrompt(seedTemplate.name)
+    const safeCategory = await sanitiseForPrompt(seedTemplate.category)
 
     // ── Build hybrid system prompt ──
     const systemPrompt = `You are generating a CadQuery parametric CAD model that starts from an existing STEP file as seed geometry. Follow the methodology in this document:
@@ -2247,7 +2247,7 @@ export async function generateSystemAssembly(
       const safeName = mod.id.replace(/[^a-z0-9_-]/g, "_")
 
       // SECURITY: Validate URL before fetching (SSRF protection)
-      if (!isAllowedStepUrl(stepUrl)) {
+      if (!(await isAllowedStepUrl(stepUrl))) {
         return { success: false, error: `Module "${mod.name}" STEP URL blocked by allowlist` }
       }
 
