@@ -517,6 +517,38 @@ export async function syncTaskToSheet(
         strategic_goal_title: strategicGoalTitle,
     }
 
+    // Clean up stale assignee tab rows (issue 8: reassigned tasks leave orphan rows)
+    const { data: existingMappings } = await admin
+        .from('sheets_row_map')
+        .select('sheet_tab_name, row_number')
+        .eq('foundry_id', foundryId)
+        .eq('spreadsheet_id', spreadsheetId)
+        .eq('entity_id', taskId)
+
+    if (existingMappings) {
+        const staleMappings = existingMappings.filter(m =>
+            m.sheet_tab_name !== 'Master Task List' &&
+            m.sheet_tab_name !== (assigneeName || '')
+        )
+
+        if (staleMappings.length > 0) {
+            await provider.clearSpecificRows(
+                spreadsheetId,
+                staleMappings.map(m => ({ tabName: m.sheet_tab_name, rowNumber: m.row_number }))
+            )
+
+            for (const stale of staleMappings) {
+                await admin
+                    .from('sheets_row_map')
+                    .delete()
+                    .eq('foundry_id', foundryId)
+                    .eq('spreadsheet_id', spreadsheetId)
+                    .eq('sheet_tab_name', stale.sheet_tab_name)
+                    .eq('entity_id', taskId)
+            }
+        }
+    }
+
     // Update Master Task List
     await upsertTaskInTab(
         provider, admin, foundryId, spreadsheetId,
@@ -630,9 +662,11 @@ async function applyOneChange(
     switch (column) {
         case 'Task Title':
             if (!newValue.trim()) return { success: false, error: 'Title cannot be empty' }
+            if (newValue.length > 500) return { success: false, error: 'Title exceeds 500 characters' }
             updateData.title = newValue.trim()
             break
         case 'Description':
+            if (newValue.length > 10_000) return { success: false, error: 'Description exceeds 10,000 characters' }
             updateData.description = newValue || null
             break
         case 'Status':
@@ -895,7 +929,10 @@ function getGanttColor(status: string, riskLevel: string | null): CellColor {
     return { red: 0.604, green: 0.627, blue: 0.651 }
 }
 
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 function isValidDate(value: string): boolean {
+    if (!ISO_DATE_REGEX.test(value)) return false
     const d = new Date(value)
     return !isNaN(d.getTime())
 }
