@@ -89,7 +89,7 @@ export function IncomeStatementTable({ rows, periodType }: IncomeStatementTableP
                           def.isBold ? 'font-semibold' : ''
                         } ${isNegativeValue ? 'text-destructive' : 'text-foreground'}`}
                       >
-                        {def.isNegative && value > 0 ? `(${formatCurrency(value)})` : formatCurrency(value)}
+                        {def.isNegative && value > 0 ? `(${formatCurrency(value, 'GBP', 0)})` : formatCurrency(value, 'GBP', 0)}
                       </td>
                     )
                   })}

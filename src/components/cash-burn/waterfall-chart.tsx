@@ -19,7 +19,6 @@ import type { IncomeStatementRow } from '@/types/cash-burn'
 // Semantic colors from centralised palette
 const COLOR_SUCCESS = chartColors[2]        // Emerald
 const COLOR_DESTRUCTIVE = moneyMapColors.loss // Red
-const COLOR_INFO = chartColors[1]           // Electric Blue
 
 // ============================================================
 // Helpers
@@ -50,54 +49,45 @@ interface WaterfallChartProps {
 export function WaterfallChart({ data }: WaterfallChartProps) {
   // INTENT: Build waterfall bars — Revenue -> -COGS -> Gross Profit -> -OpEx -> -R&D -> EBITDA
   //
-  // Recharts stacked-bar trick: invisible "base" bar (0 → base) positions the
-  // visible "value" bar (base → base+value).  For bars that hang below zero
-  // the base is negative so the invisible bar extends downward and the visible
-  // bar stacks back upward from there.
-  //
-  // Total bars (Revenue, Gross Profit, EBITDA) span from 0 to their total.
-  // Delta bars (COGS, OpEx, R&D) float between successive running totals.
+  // Uses Recharts range bars: each bar value is [low, high] so the bar renders
+  // between those two Y-axis positions. Total bars (Revenue, Gross Profit, EBITDA)
+  // span from 0 to their total. Delta bars (COGS, OpEx, R&D) float between
+  // successive running totals.
 
   const chartData = [
     {
       name: 'Revenue',
-      base: Math.min(0, data.revenue),
-      value: Math.abs(data.revenue),
-      fill: COLOR_SUCCESS,
+      value: [0, data.revenue] as [number, number],
+      fill: data.revenue >= 0 ? COLOR_SUCCESS : COLOR_DESTRUCTIVE,
       rawValue: data.revenue,
     },
     {
       name: 'COGS',
-      base: Math.min(data.revenue, data.grossProfit),
-      value: Math.abs(data.cogs),
+      value: [data.grossProfit, data.revenue] as [number, number],
       fill: COLOR_DESTRUCTIVE,
       rawValue: -data.cogs,
     },
     {
       name: 'Gross Profit',
-      base: Math.min(0, data.grossProfit),
-      value: Math.abs(data.grossProfit),
-      fill: COLOR_INFO,
+      value: [0, data.grossProfit] as [number, number],
+      fill: data.grossProfit >= 0 ? COLOR_SUCCESS : COLOR_DESTRUCTIVE,
       rawValue: data.grossProfit,
     },
     {
       name: 'OpEx',
-      base: Math.min(data.grossProfit, data.grossProfit - data.opex),
-      value: Math.abs(data.opex),
+      value: [data.grossProfit - data.opex, data.grossProfit] as [number, number],
       fill: COLOR_DESTRUCTIVE,
       rawValue: -data.opex,
     },
     {
       name: 'R&D',
-      base: Math.min(data.grossProfit - data.opex, data.ebitda),
-      value: Math.abs(data.rnd),
+      value: [data.ebitda, data.grossProfit - data.opex] as [number, number],
       fill: COLOR_DESTRUCTIVE,
       rawValue: -data.rnd,
     },
     {
       name: 'EBITDA',
-      base: Math.min(0, data.ebitda),
-      value: Math.abs(data.ebitda),
+      value: [0, data.ebitda] as [number, number],
       fill: data.ebitda >= 0 ? COLOR_SUCCESS : COLOR_DESTRUCTIVE,
       rawValue: data.ebitda,
     },
@@ -137,13 +127,10 @@ export function WaterfallChart({ data }: WaterfallChartProps) {
                 fontSize: '12px',
               }}
               formatter={((_value: number, _name: string, props: { payload: { rawValue: number } }) => {
-                return [formatCurrency(props.payload.rawValue), 'Amount']
+                return [formatCurrency(props.payload.rawValue, 'GBP', 0), 'Amount']
               }) as never}
             />
-            {/* Invisible base bar */}
-            <Bar dataKey="base" stackId="waterfall" fill="transparent" />
-            {/* Visible value bar */}
-            <Bar dataKey="value" stackId="waterfall" radius={[2, 2, 0, 0]}>
+            <Bar dataKey="value" radius={[2, 2, 0, 0]}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.fill} />
               ))}

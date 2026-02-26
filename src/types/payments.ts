@@ -273,11 +273,12 @@ export function calculateFeeBreakdown(
 /**
  * Format currency amount for display
  */
-export function formatCurrency(amount: number, currency: string = 'GBP'): string {
+export function formatCurrency(amount: number, currency: string = 'GBP', decimals: number = 2): string {
   const formatter = new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: currency.toUpperCase(),
-    minimumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })
 
   // Convert from smallest unit (pence) to main unit (pounds)
