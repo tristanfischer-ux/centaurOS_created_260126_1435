@@ -11,8 +11,8 @@
  *       cards + connection rows rendered with hover-highlight traceability.
  */
 
-import { useMemo, useState } from "react"
-import { ArrowDownToLine, ArrowUpFromLine, Box } from "lucide-react"
+import { useMemo, useState, type KeyboardEvent } from "react"
+import { ArrowDownToLine, ArrowUpFromLine, Box, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import { hasKeywordOverlap } from "@/lib/cad-lab/keyword-matching"
 import { cn } from "@/lib/utils"
@@ -23,6 +23,7 @@ import { ForgeSectionHeader } from "../../components/forge-hover-explanations"
 interface ProcessFlowDiagramProps {
   modules: CadLabModule[]
   className?: string
+  onModuleClick?: (moduleId: string) => void
 }
 
 interface FlowNode {
@@ -114,8 +115,9 @@ function buildEdges(modules: CadLabModule[]): FlowEdge[] {
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
-export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagramProps): React.ReactNode {
+export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: ProcessFlowDiagramProps): React.ReactNode {
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null)
+  const [connectionsExpanded, setConnectionsExpanded] = useState(false)
 
   const nodes: FlowNode[] = useMemo(
     () =>
@@ -158,14 +160,24 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
 
   /** Edges grouped by source module for the connections list. */
   const groupedEdges = useMemo(() => {
-    const groups = new Map<string, { sourceName: string; edges: (FlowEdge & { toName: string })[] }>()
+    const groups = new Map<string, { sourceId: string; sourceName: string; edges: (FlowEdge & { toName: string })[] }>()
     for (const edge of edges) {
       const sourceName = nodes.find((n) => n.id === edge.from)?.name ?? edge.from
       const toName = nodes.find((n) => n.id === edge.to)?.name ?? edge.to
-      if (!groups.has(edge.from)) groups.set(edge.from, { sourceName, edges: [] })
+      if (!groups.has(edge.from)) groups.set(edge.from, { sourceId: edge.from, sourceName, edges: [] })
       groups.get(edge.from)!.edges.push({ ...edge, toName })
     }
     return Array.from(groups.values())
+  }, [edges, nodes])
+
+  /** Modules with zero connections (orphans). */
+  const orphanModules = useMemo(() => {
+    const connectedIds = new Set<string>()
+    for (const edge of edges) {
+      connectedIds.add(edge.from)
+      connectedIds.add(edge.to)
+    }
+    return nodes.filter((n) => !connectedIds.has(n.id))
   }, [edges, nodes])
 
   /** Signal types actually present in the current data (for legend filtering). */
@@ -213,14 +225,22 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
               <div
                 key={node.id}
                 tabIndex={0}
-                role="group"
-                aria-label={node.name}
+                role="button"
+                aria-label={`${node.name} — click to view details`}
                 onMouseEnter={() => setHoveredModuleId(node.id)}
                 onMouseLeave={() => setHoveredModuleId(null)}
                 onFocus={() => setHoveredModuleId(node.id)}
                 onBlur={() => setHoveredModuleId(null)}
+                onClick={() => onModuleClick?.(node.id)}
+                onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    onModuleClick?.(node.id)
+                  }
+                }}
                 className={cn(
-                  "rounded-lg border bg-card p-3 space-y-2 transition-all duration-200 cursor-default",
+                  "rounded-lg border bg-card p-3 space-y-2 transition-all duration-200",
+                  onModuleClick ? "cursor-pointer" : "cursor-default",
                   "hover:-translate-y-0.5 active:scale-[0.99]",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-international-orange/40",
                   !hoveredModuleId && "border-border",
@@ -299,10 +319,43 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
           </p>
         )}
 
+        {/* ── Orphan module callout ────────────────────────────────────── */}
+        {orphanModules.length > 0 && edges.length > 0 && (
+          <div className="mt-4 rounded-md border border-status-warning/30 bg-warning/10 px-3 py-2 flex items-start gap-2">
+            <AlertCircle className="h-3.5 w-3.5 text-status-warning flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-foreground">
+              <span className="font-medium">{orphanModules.length} module{orphanModules.length !== 1 ? "s" : ""} not connected:</span>{" "}
+              {orphanModules.map((m, i) => (
+                <span key={m.id}>
+                  {onModuleClick ? (
+                    <button
+                      className="underline text-international-orange hover:text-international-orange-hover"
+                      onClick={() => onModuleClick(m.id)}
+                    >
+                      {m.name}
+                    </button>
+                  ) : (
+                    m.name
+                  )}
+                  {i < orphanModules.length - 1 ? ", " : ""}
+                </span>
+              ))}
+              . Review inputs/outputs to identify integration points.
+            </p>
+          </div>
+        )}
+
+        {/* ── All modules connected callout ─────────────────────────────── */}
+        {orphanModules.length === 0 && edges.length > 0 && (
+          <p className="text-xs text-muted-foreground mt-4">
+            All {modules.length} modules are connected — integration coverage looks good.
+          </p>
+        )}
+
         {/* ── Connections grouped by source module ────────────────────── */}
         {edges.length > 0 && (
           <div className="mt-5 pt-4 border-t border-border">
-            <div className="mb-1">
+            <div className="mb-1 flex items-center justify-between">
               <ForgeSectionHeader
                 title="Module Connections"
                 description="Shows where one module's output feeds into another module's input. If a connection is missing or mismatched, it signals a potential integration gap in your design."
@@ -312,49 +365,90 @@ export function ProcessFlowDiagram({ modules, className = "" }: ProcessFlowDiagr
                   Connections <span className="text-muted-foreground font-normal">({edges.length})</span>
                 </span>
               </ForgeSectionHeader>
+              {/* Collapse toggle when many connections */}
+              {edges.length > 12 && (
+                <button
+                  onClick={() => setConnectionsExpanded((prev) => !prev)}
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {connectionsExpanded ? (
+                    <>
+                      <ChevronUp className="h-3 w-3" />
+                      Collapse
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="h-3 w-3" />
+                      Show all
+                    </>
+                  )}
+                </button>
+              )}
             </div>
             <p className="text-[10px] text-muted-foreground mb-3">
               Matched by shared inputs and outputs between modules
             </p>
 
-            <div className="space-y-4">
-              {groupedEdges.map((group) => (
-                <div key={group.sourceName}>
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
-                    From {group.sourceName}
-                  </p>
-                  <div className="space-y-1.5">
-                    {group.edges.map((edge, i) => {
-                      const config = SIGNAL_CONFIG[edge.signalType]
-                      const isHighlighted = hoveredModuleId === edge.from || hoveredModuleId === edge.to
-                      const isEdgeDimmed = hoveredModuleId !== null && !isHighlighted
-                      return (
-                        <div
-                          key={i}
-                          className={cn(
-                            "rounded-md px-3 py-2 border transition-all duration-200",
-                            isHighlighted && [config.activeBorder, config.activeBg],
-                            isEdgeDimmed && "border-border bg-muted/10 opacity-40",
-                            !hoveredModuleId && "border-border bg-muted/20 hover:bg-muted/40",
-                          )}
+            {/* Render connections (collapsed by default when > 12) */}
+            {(edges.length <= 12 || connectionsExpanded) && (
+              <div className="space-y-4">
+                {groupedEdges.map((group) => (
+                  <div key={group.sourceId}>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+                      From{" "}
+                      {onModuleClick ? (
+                        <button
+                          className="underline hover:text-foreground transition-colors"
+                          onClick={() => onModuleClick(group.sourceId)}
                         >
-                          <div className="flex items-center gap-2 text-xs">
-                            <div className={cn("h-2 w-2 rounded-full flex-shrink-0", config.dot)} />
-                            <span className={cn("flex-shrink-0", config.text)}>&rarr;</span>
-                            <span className="font-medium text-foreground">{edge.toName}</span>
+                          {group.sourceName}
+                        </button>
+                      ) : (
+                        group.sourceName
+                      )}
+                    </p>
+                    <div className="space-y-1.5">
+                      {group.edges.map((edge, i) => {
+                        const config = SIGNAL_CONFIG[edge.signalType]
+                        const isHighlighted = hoveredModuleId === edge.from || hoveredModuleId === edge.to
+                        const isEdgeDimmed = hoveredModuleId !== null && !isHighlighted
+                        return (
+                          <div
+                            key={i}
+                            className={cn(
+                              "rounded-md px-3 py-2 border transition-all duration-200",
+                              isHighlighted && [config.activeBorder, config.activeBg],
+                              isEdgeDimmed && "border-border bg-muted/10 opacity-40",
+                              !hoveredModuleId && "border-border bg-muted/20 hover:bg-muted/40",
+                            )}
+                          >
+                            <div className="flex items-center gap-2 text-xs">
+                              <div className={cn("h-2 w-2 rounded-full flex-shrink-0", config.dot)} />
+                              <span className={cn("flex-shrink-0", config.text)}>&rarr;</span>
+                              {onModuleClick ? (
+                                <button
+                                  className="font-medium text-foreground underline hover:text-international-orange transition-colors"
+                                  onClick={() => onModuleClick(edge.to)}
+                                >
+                                  {edge.toName}
+                                </button>
+                              ) : (
+                                <span className="font-medium text-foreground">{edge.toName}</span>
+                              )}
+                            </div>
+                            {edge.label && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5 ml-7">
+                                {edge.label}
+                              </p>
+                            )}
                           </div>
-                          {edge.label && (
-                            <p className="text-[10px] text-muted-foreground mt-0.5 ml-7">
-                              {edge.label}
-                            </p>
-                          )}
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Signal type legend — only shows types present in current data */}
             {presentSignalTypes.size > 1 && (
