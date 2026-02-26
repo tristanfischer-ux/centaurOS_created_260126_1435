@@ -4,7 +4,7 @@
  * @description Fetches active cost items and passes to the client view.
  */
 
-import { getCashOutItems } from '@/actions/cash-burn-out'
+import { getCashOutItems, getFoundryHumanProfiles } from '@/actions/cash-burn-out'
 import { CashOutView } from './cash-out-view'
 
 export const metadata = {
@@ -13,12 +13,16 @@ export const metadata = {
 }
 
 export default async function CashOutPage() {
-  const result = await getCashOutItems()
+  const [itemsResult, profilesResult] = await Promise.all([
+    getCashOutItems(),
+    getFoundryHumanProfiles(),
+  ])
 
   return (
     <CashOutView
-      initialItems={result.data ?? []}
-      hasError={!!result.error}
+      initialItems={itemsResult.data ?? []}
+      hasError={!!itemsResult.error}
+      humanProfiles={profilesResult.data ?? []}
     />
   )
 }

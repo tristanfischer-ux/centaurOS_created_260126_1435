@@ -37,6 +37,41 @@ import { WizardStepper, useWizardSteps } from '@/components/ui/wizard-stepper'
 import type { WizardStep } from '@/components/ui/wizard-stepper'
 import { formatCurrency } from '@/types/payments'
 import type { CashOutItem, CreateCashOutInput, Frequency, CostType } from '@/types/cash-burn'
+import type { WizardProfile } from '@/actions/cash-burn-out'
+
+// ============================================================
+// Number formatting helpers
+// ============================================================
+
+function formatWithCommas(value: string): string {
+  const stripped = value.replace(/,/g, '')
+  const parts = stripped.split('.')
+  const intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return parts.length > 1 ? `${intPart}.${parts[1]}` : intPart
+}
+
+function stripCommas(value: string): string {
+  return value.replace(/,/g, '')
+}
+
+// ============================================================
+// Smart defaults — scales with team size
+// ============================================================
+
+function computeSmartDefaults(teamSize: number): Record<string, string> {
+  const n = Math.max(teamSize, 1)
+  return {
+    rent: String(500 * n),
+    benefits_insurance: String(100 * n),
+    phone_internet: String(50 * n),
+    ai_llm: String(100 * n),
+    saas_subscriptions: String(50 * n),
+    insurance: String(300 * n),
+    accounting: String(125 * n),
+    legal_retainer: String(75 * n),
+    bank_fees: String(Math.round(12.5 * n)),
+  }
+}
 
 // ============================================================
 // Step definitions
@@ -62,7 +97,7 @@ interface CategoryPreset {
 
 const FIXED_COST_PRESETS: CategoryPreset[] = [
   { key: 'rent', category: 'rent', defaultName: 'Office Rent', costType: 'fixed', defaultFrequency: 'monthly' },
-  { key: 'salaries', category: 'salaries', defaultName: 'Salaries', costType: 'fixed', defaultFrequency: 'monthly' },
+  // INTENT: Individual salary rows are generated per team member — see buildFixedRows()
   { key: 'benefits_insurance', category: 'benefits_insurance', defaultName: 'Benefits & Insurance', costType: 'fixed', defaultFrequency: 'monthly' },
   { key: 'phone_internet', category: 'phone_internet', defaultName: 'Phone & Internet', costType: 'fixed', defaultFrequency: 'monthly' },
   { key: 'ai_llm', category: 'ai_llm', defaultName: 'AI / LLM', costType: 'fixed', defaultFrequency: 'monthly' },
@@ -109,16 +144,48 @@ interface WizardRow {
   frequency: Frequency
 }
 
-function createRow(preset: CategoryPreset, enabled: boolean): WizardRow {
+function createRow(preset: CategoryPreset, enabled: boolean, defaultAmount?: string): WizardRow {
   return {
     key: preset.key,
     enabled,
     name: preset.defaultName,
     category: preset.category,
     costType: preset.costType,
-    amountPounds: '',
+    amountPounds: defaultAmount ?? '',
     frequency: preset.defaultFrequency,
   }
+}
+
+function buildFixedRows(profiles: WizardProfile[], defaults: Record<string, string>): WizardRow[] {
+  const rows: WizardRow[] = []
+
+  // Office Rent (first preset)
+  rows.push(createRow(FIXED_COST_PRESETS[0], true, defaults[FIXED_COST_PRESETS[0].key]))
+
+  // Individual salary rows per human team member
+  for (const profile of profiles) {
+    rows.push({
+      key: `salary_${profile.id}`,
+      enabled: true,
+      name: `${profile.fullName} — Salary`,
+      category: 'salaries',
+      costType: 'fixed',
+      amountPounds: '',
+      frequency: 'monthly',
+    })
+  }
+
+  // Remaining presets (everything after rent)
+  for (let i = 1; i < FIXED_COST_PRESETS.length; i++) {
+    const preset = FIXED_COST_PRESETS[i]
+    rows.push(createRow(preset, true, defaults[preset.key]))
+  }
+
+  return rows
+}
+
+function buildVariableRows(): WizardRow[] {
+  return VARIABLE_COST_PRESETS.map(p => createRow(p, false))
 }
 
 function getAmountPence(row: WizardRow): number {
@@ -147,6 +214,7 @@ interface CashOutSetupWizardProps {
   onOpenChange: (open: boolean) => void
   onComplete: (items: CashOutItem[]) => void
   existingItemCount: number
+  humanProfiles: WizardProfile[]
 }
 
 // ============================================================
@@ -198,14 +266,18 @@ function StepCategories({ title, description, rows, onToggle, onUpdate }: StepCa
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-sm text-muted-foreground">&pound;</span>
               <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={row.amountPounds}
-                onChange={(e) => onUpdate(row.key, 'amountPounds', e.target.value)}
+                type="text"
+                inputMode="decimal"
+                value={row.amountPounds ? formatWithCommas(row.amountPounds) : ''}
+                onChange={(e) => {
+                  const raw = stripCommas(e.target.value)
+                  if (raw === '' || /^\d*\.?\d{0,2}$/.test(raw)) {
+                    onUpdate(row.key, 'amountPounds', raw)
+                  }
+                }}
                 disabled={!row.enabled}
                 placeholder="0"
-                className="w-24 h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-28 h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <select
@@ -293,7 +365,7 @@ function StepReview({ fixedRows, variableRows }: StepReviewProps) {
             {enabledFixed.map(r => (
               <div key={r.key} className="flex justify-between py-0.5">
                 <span className="text-muted-foreground">{r.name}</span>
-                <span className="font-medium text-foreground">&pound;{r.amountPounds}/{r.frequency === 'weekly' ? 'wk' : r.frequency === 'monthly' ? 'mo' : r.frequency === 'annual' ? 'yr' : 'once'}</span>
+                <span className="font-medium text-foreground">&pound;{formatWithCommas(r.amountPounds)}/{r.frequency === 'weekly' ? 'wk' : r.frequency === 'monthly' ? 'mo' : r.frequency === 'annual' ? 'yr' : 'once'}</span>
               </div>
             ))}
           </div>
@@ -304,7 +376,7 @@ function StepReview({ fixedRows, variableRows }: StepReviewProps) {
             {enabledVariable.map(r => (
               <div key={r.key} className="flex justify-between py-0.5">
                 <span className="text-muted-foreground">{r.name}</span>
-                <span className="font-medium text-foreground">&pound;{r.amountPounds}/{r.frequency === 'weekly' ? 'wk' : r.frequency === 'monthly' ? 'mo' : r.frequency === 'annual' ? 'yr' : 'once'}</span>
+                <span className="font-medium text-foreground">&pound;{formatWithCommas(r.amountPounds)}/{r.frequency === 'weekly' ? 'wk' : r.frequency === 'monthly' ? 'mo' : r.frequency === 'annual' ? 'yr' : 'once'}</span>
               </div>
             ))}
           </div>
@@ -332,17 +404,20 @@ export function CashOutSetupWizard({
   onOpenChange,
   onComplete,
   existingItemCount,
+  humanProfiles,
 }: CashOutSetupWizardProps) {
   const stepper = useWizardSteps(STEPS)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  // INTENT: Fixed costs pre-checked, variable costs unchecked
+  const defaults = useMemo(() => computeSmartDefaults(humanProfiles.length), [humanProfiles.length])
+
+  // INTENT: Fixed costs pre-checked with smart defaults + salary rows; variable costs unchecked
   const [fixedRows, setFixedRows] = useState<WizardRow[]>(() =>
-    FIXED_COST_PRESETS.map(p => createRow(p, true))
+    buildFixedRows(humanProfiles, defaults)
   )
   const [variableRows, setVariableRows] = useState<WizardRow[]>(() =>
-    VARIABLE_COST_PRESETS.map(p => createRow(p, false))
+    buildVariableRows()
   )
 
   const toggleRow = useCallback((rows: WizardRow[], setRows: React.Dispatch<React.SetStateAction<WizardRow[]>>, key: string) => {
@@ -398,8 +473,8 @@ export function CashOutSetupWizard({
         onComplete(result.data)
         onOpenChange(false)
         // Reset for next use
-        setFixedRows(FIXED_COST_PRESETS.map(p => createRow(p, true)))
-        setVariableRows(VARIABLE_COST_PRESETS.map(p => createRow(p, false)))
+        setFixedRows(buildFixedRows(humanProfiles, defaults))
+        setVariableRows(buildVariableRows())
         stepper.reset()
       }
     } catch (e) {
@@ -408,7 +483,7 @@ export function CashOutSetupWizard({
     } finally {
       setIsSaving(false)
     }
-  }, [enabledItems, onComplete, onOpenChange, stepper])
+  }, [enabledItems, onComplete, onOpenChange, stepper, humanProfiles, defaults])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

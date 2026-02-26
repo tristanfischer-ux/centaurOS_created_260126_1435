@@ -21,6 +21,54 @@ import type {
 import { normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 
 // ============================================================
+// Wizard profile type (lightweight for client)
+// ============================================================
+
+export interface WizardProfile {
+  id: string
+  fullName: string
+  role: string
+}
+
+// ============================================================
+// Fetch human team members for wizard salary rows
+// ============================================================
+
+export async function getFoundryHumanProfiles(): Promise<ActionResult<WizardProfile[]>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .eq('foundry_id', foundryId)
+      .in('role', ['Founder', 'Executive', 'Apprentice'])
+      .eq('is_active', true)
+      .order('role')
+      .order('full_name')
+
+    if (error) {
+      console.error('[CashBurn] Failed to fetch human profiles:', error)
+      return { data: null, error: 'Failed to load team profiles' }
+    }
+
+    return {
+      data: (data ?? []).map(p => ({
+        id: p.id,
+        fullName: p.full_name ?? 'Team Member',
+        role: p.role,
+      })),
+      error: null,
+    }
+  } catch (err) {
+    console.error('[CashBurn] Failed to fetch human profiles:', err)
+    return { data: null, error: 'Failed to load team profiles' }
+  }
+}
+
+// ============================================================
 // Default pnl_category by expense category
 // ============================================================
 
