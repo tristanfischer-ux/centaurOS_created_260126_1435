@@ -24,7 +24,8 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getGoogleToken } from '@/lib/google/tokens'
+import { getGoogleToken, deleteGoogleToken } from '@/lib/google/tokens'
+import { deleteMicrosoftToken } from '@/lib/microsoft/tokens'
 import type { ProviderType } from '@/lib/spreadsheet/provider'
 
 export interface SheetsIntegrationConfig {
@@ -62,6 +63,18 @@ async function requireAdmin(): Promise<{
 
     const foundryId = await getFoundryIdCached()
     if (!foundryId) return { foundryId: '', userId: '', error: 'User not in a foundry' }
+
+    // SECURITY: Verify user actually belongs to this foundry via membership table
+    const { data: membership } = await supabase
+        .from('foundry_memberships')
+        .select('foundry_id')
+        .eq('user_id', user.id)
+        .eq('foundry_id', foundryId)
+        .maybeSingle()
+
+    if (!membership) {
+        return { foundryId: '', userId: '', error: 'Not a member of this foundry' }
+    }
 
     const { data: profile } = await supabase
         .from('profiles')
@@ -261,7 +274,7 @@ export async function createAndInitializeSpreadsheet(
 
         const existingConfig = (existing?.config as Record<string, unknown>) || {}
 
-        await admin
+        const { error: upsertError } = await admin
             .from('foundry_integrations')
             .upsert({
                 foundry_id: foundryId,
@@ -278,6 +291,11 @@ export async function createAndInitializeSpreadsheet(
                 },
                 is_active: true,
             }, { onConflict: 'foundry_id,service_type' })
+
+        if (upsertError) {
+            console.error('[SheetsSync] Failed to save integration config:', upsertError)
+            return { error: sanitizeErrorMessage(upsertError) }
+        }
 
         console.info('[SheetsSync] Spreadsheet created:', {
             foundryId,
@@ -340,7 +358,10 @@ export async function triggerManualSync(
 
         const existingConfig = (existing?.config as Record<string, unknown>) || {}
 
-        await admin
+        // GOTCHA: This is a read-modify-write for last_sync_at and sync_errors,
+        // which are informational fields. An atomic RPC is not worth the complexity
+        // here since these fields are non-critical and only updated by manual sync.
+        const { error: updateError } = await admin
             .from('foundry_integrations')
             .update({
                 config: {
@@ -351,6 +372,10 @@ export async function triggerManualSync(
             })
             .eq('foundry_id', foundryId)
             .eq('service_type', providerType)
+
+        if (updateError) {
+            console.error('[SheetsSync] Failed to update sync timestamp:', updateError)
+        }
 
         return { success: true, tasksWritten: result.tasksWritten }
     } catch (err) {
@@ -438,7 +463,7 @@ export async function updateSheetsIntegration(
 export async function disableSync(
     providerType: ProviderType = 'google_sheets'
 ): Promise<{ error?: string }> {
-    const { foundryId, error: authError } = await requireAdmin()
+    const { foundryId, userId, error: authError } = await requireAdmin()
     if (authError) return { error: authError }
 
     const admin = createAdminClient()
@@ -454,7 +479,7 @@ export async function disableSync(
 
     const existingConfig = (existing.config as Record<string, unknown>) || {}
 
-    await admin
+    const { error: updateError } = await admin
         .from('foundry_integrations')
         .update({
             config: { ...existingConfig, sync_enabled: false },
@@ -462,6 +487,18 @@ export async function disableSync(
         })
         .eq('foundry_id', foundryId)
         .eq('service_type', providerType)
+
+    if (updateError) {
+        console.error('[SheetsSync] Failed to disable sync:', updateError)
+        return { error: sanitizeErrorMessage(updateError) }
+    }
+
+    // Clean up OAuth tokens for the disconnected provider
+    if (providerType === 'google_sheets') {
+        await deleteGoogleToken(userId, foundryId)
+    } else if (providerType === 'microsoft_excel') {
+        await deleteMicrosoftToken(userId, foundryId)
+    }
 
     return {}
 }
