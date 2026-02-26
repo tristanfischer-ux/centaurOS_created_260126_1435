@@ -132,6 +132,7 @@ export interface CadLabContextValue {
 
   // Module decomposition
   isDecomposing: boolean
+  decompositionError: string | null
   modules: CadLabModule[]
   setModules: Dispatch<SetStateAction<CadLabModule[]>>
   expandedModuleId: string | null
@@ -294,6 +295,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Module state ──
   const [isDecomposing, setIsDecomposing] = useState(false)
+  const [decompositionError, setDecompositionError] = useState<string | null>(null)
   const [modules, setModules] = useState<CadLabModule[]>([])
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
   const [generatingModuleIds, setGeneratingModuleIds] = useState<Set<string>>(new Set())
@@ -557,6 +559,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const handleDecompose = useCallback(async () => {
     if (!editableReport.trim()) return
     setIsDecomposing(true)
+    setDecompositionError(null)
     setProgressLines([])
 
     // ── Phase 1: Preparation (real ~1-2s Claude call for domain detection) ──
@@ -741,12 +744,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           `Response received in ${elapsed}s`,
           `Decomposition failed: ${errorMsg}`,
         ])
+        setDecompositionError(errorMsg)
         toast.error(errorMsg)
       }
     } catch (err) {
       paddingTimers.forEach(clearTimeout)
       console.error("[CAD-LAB] Decomposition failed:", err)
-      setProgressLines(["Decomposition failed — see error above"])
+      const catchMsg = err instanceof Error ? err.message : "Decomposition failed"
+      setDecompositionError(catchMsg)
+      setProgressLines([`Decomposition failed: ${catchMsg}`])
     } finally {
       setIsDecomposing(false)
     }
@@ -1623,7 +1629,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources, hasResearch,
     handleResearch, handleReset,
-    isDecomposing, modules, setModules,
+    isDecomposing, decompositionError, modules, setModules,
     expandedModuleId, setExpandedModuleId, generatingModuleIds,
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,

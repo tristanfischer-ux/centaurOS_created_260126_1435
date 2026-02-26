@@ -25,6 +25,7 @@ import {
   Layers,
   ImageIcon,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -49,7 +50,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     isResearching, editableReport,
     hasResearch, isAnyLoading,
     handleResearch, handleDecompose,
-    modules, isDecomposing,
+    modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
     revealedModuleIds,
@@ -204,7 +205,7 @@ export default function CadLabResearchPage(): React.ReactNode {
           )}
 
           {/* ── Continue button: triggers decomposition ── */}
-          {modules.length === 0 && !isDecomposing && (
+          {modules.length === 0 && !isDecomposing && !decompositionError && (
             <Card className="border-international-orange/20">
               <CardContent className="pt-6 space-y-3">
                 <p className="text-sm text-muted-foreground">
@@ -233,6 +234,24 @@ export default function CadLabResearchPage(): React.ReactNode {
               operationType="breakdown"
               subject={subject}
             />
+          )}
+
+          {/* ── Decomposition failed — persistent error card with retry ── */}
+          {modules.length === 0 && !isDecomposing && decompositionError && (
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardContent className="pt-6 space-y-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">Sub-assembly mapping failed</p>
+                    <p className="text-sm text-muted-foreground">{decompositionError}</p>
+                  </div>
+                </div>
+                <Button onClick={handleDecompose} variant="secondary" size="sm">
+                  Try again
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
           {/* ── Modules: progressive reveal grid (name + image + purpose only) ── */}
