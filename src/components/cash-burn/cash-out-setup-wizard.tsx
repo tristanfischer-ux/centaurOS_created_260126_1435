@@ -11,7 +11,7 @@
  * Amounts entered in pounds, converted to pence for the server action.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -37,7 +37,7 @@ import { WizardStepper, useWizardSteps } from '@/components/ui/wizard-stepper'
 import type { WizardStep } from '@/components/ui/wizard-stepper'
 import { formatCurrency } from '@/types/payments'
 import type { CashOutItem, CreateCashOutInput, Frequency, CostType } from '@/types/cash-burn'
-import type { WizardProfile } from '@/actions/cash-burn-out'
+import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
 
 // ============================================================
 // Number formatting helpers
@@ -52,6 +52,28 @@ function formatWithCommas(value: string): string {
 
 function stripCommas(value: string): string {
   return value.replace(/,/g, '')
+}
+
+// ============================================================
+// Employer's NI calculation (UK 2025/26)
+// ============================================================
+
+const EMPLOYER_NI_RATE = 0.15
+const EMPLOYER_NI_SECONDARY_THRESHOLD = 5000 // £5,000/year
+
+function annualiseAmount(amountPounds: string, frequency: Frequency): number {
+  const parsed = parseFloat(amountPounds)
+  if (isNaN(parsed) || parsed < 0) return 0
+  switch (frequency) {
+    case 'weekly': return parsed * 52
+    case 'monthly': return parsed * 12
+    case 'annual': return parsed
+    case 'one_time': return parsed
+  }
+}
+
+function computeEmployerNI(annualGross: number): number {
+  return Math.max(0, annualGross - EMPLOYER_NI_SECONDARY_THRESHOLD) * EMPLOYER_NI_RATE
 }
 
 // ============================================================
@@ -71,6 +93,109 @@ function computeSmartDefaults(teamSize: number): Record<string, string> {
     legal_retainer: String(75 * n),
     bank_fees: String(Math.round(12.5 * n)),
   }
+}
+
+// ============================================================
+// Variable cost smart defaults — category selection by business model
+// ============================================================
+
+// INTENT: Maps business_model → which variable categories to pre-check.
+// Categories not listed here default to unchecked.
+const VARIABLE_CATEGORY_BY_MODEL: Record<string, Set<string>> = {
+  hardware:     new Set(['contractors', 'hardware_components', 'prototyping', 'manufacturing', 'shipping', 'marketing', 'r_and_d', 'equipment_purchase']),
+  saas:         new Set(['contractors', 'marketing', 'cloud_infrastructure', 'r_and_d']),
+  marketplace:  new Set(['contractors', 'marketing', 'cloud_infrastructure', 'r_and_d']),
+  services:     new Set(['contractors', 'marketing', 'travel']),
+  hybrid:       new Set(['contractors', 'hardware_components', 'marketing', 'cloud_infrastructure', 'r_and_d']),
+}
+
+// INTENT: Certain sectors add categories regardless of business model
+const SECTOR_CATEGORY_ADDITIONS: Record<string, string[]> = {
+  robotics:             ['hardware_components', 'prototyping', 'r_and_d', 'equipment_purchase'],
+  aerospace:            ['hardware_components', 'prototyping', 'r_and_d', 'equipment_purchase'],
+  defence:              ['hardware_components', 'prototyping', 'r_and_d', 'equipment_purchase'],
+  automotive:           ['hardware_components', 'prototyping', 'manufacturing'],
+  consumer_electronics: ['hardware_components', 'prototyping', 'manufacturing', 'shipping'],
+  medical:              ['prototyping', 'r_and_d', 'equipment_purchase'],
+  energy:               ['hardware_components', 'r_and_d', 'equipment_purchase'],
+  marine:               ['hardware_components', 'prototyping', 'r_and_d'],
+}
+
+// INTENT: Conservative base monthly amounts in GBP per category
+const VARIABLE_BASE_AMOUNTS: Record<string, number> = {
+  contractors: 2000,
+  hardware_components: 500,
+  prototyping: 1000,
+  manufacturing: 2000,
+  shipping: 300,
+  marketing: 500,
+  travel: 300,
+  events: 2000,            // annual — will be adjusted by frequency
+  cloud_infrastructure: 200,
+  r_and_d: 1000,
+  equipment_purchase: 3000, // one-time
+}
+
+// INTENT: Stage multiplier derived from revenue range (primary) → funding status (fallback)
+function getStageMultiplier(ctx: WizardCompanyContext | null): number {
+  if (!ctx) return 1
+
+  // Revenue range is the strongest signal
+  if (ctx.revenueRange) {
+    switch (ctx.revenueRange) {
+      case 'pre_revenue': return 1
+      case 'under_100k': return 1.5
+      case '100k_500k': return 2.5
+      case '500k_1m': return 3.5
+      case '1m_5m': return 5
+      case '5m_plus': return 8
+    }
+  }
+
+  // Funding status as fallback
+  if (ctx.fundingStatus) {
+    switch (ctx.fundingStatus) {
+      case 'bootstrapped': return 1
+      case 'pre_seed': return 1
+      case 'seed': return 2
+      case 'series_a': return 4
+      case 'series_b_plus': return 6
+      case 'profitable': return 3
+    }
+  }
+
+  return 1
+}
+
+function getVariableDefaults(
+  ctx: WizardCompanyContext | null,
+  teamSize: number,
+): { enabledKeys: Set<string>; amounts: Record<string, string> } {
+  if (!ctx?.businessModel) return { enabledKeys: new Set(), amounts: {} }
+
+  // Build enabled set from business model
+  const enabledKeys = new Set(VARIABLE_CATEGORY_BY_MODEL[ctx.businessModel] ?? [])
+
+  // Layer on sector additions
+  if (ctx.sector) {
+    const additions = SECTOR_CATEGORY_ADDITIONS[ctx.sector]
+    if (additions) additions.forEach(k => enabledKeys.add(k))
+  }
+
+  // Compute amounts for enabled categories only
+  const multiplier = getStageMultiplier(ctx)
+  // INTENT: Team size gives a small bump (sqrt) so costs don't scale linearly with headcount
+  const teamFactor = Math.max(1, Math.sqrt(teamSize))
+  const amounts: Record<string, string> = {}
+
+  for (const key of enabledKeys) {
+    const base = VARIABLE_BASE_AMOUNTS[key]
+    if (base !== undefined) {
+      amounts[key] = String(Math.round(base * multiplier * teamFactor))
+    }
+  }
+
+  return { enabledKeys, amounts }
 }
 
 // ============================================================
@@ -167,10 +292,23 @@ function buildFixedRows(profiles: WizardProfile[], defaults: Record<string, stri
     rows.push({
       key: `salary_${profile.id}`,
       enabled: true,
-      name: `${profile.fullName} — Salary`,
+      name: `${profile.fullName} — Gross Salary`,
       category: 'salaries',
       costType: 'fixed',
       amountPounds: '',
+      frequency: 'monthly',
+    })
+  }
+
+  // Employer's NI — auto-calculated from salary rows, submitted as a real cost item
+  if (profiles.length > 0) {
+    rows.push({
+      key: 'employer_ni',
+      enabled: true,
+      name: "Employer's National Insurance",
+      category: 'employer_ni',
+      costType: 'fixed',
+      amountPounds: '0',
       frequency: 'monthly',
     })
   }
@@ -184,8 +322,14 @@ function buildFixedRows(profiles: WizardProfile[], defaults: Record<string, stri
   return rows
 }
 
-function buildVariableRows(): WizardRow[] {
-  return VARIABLE_COST_PRESETS.map(p => createRow(p, false))
+function buildVariableRows(
+  ctx: WizardCompanyContext | null,
+  teamSize: number,
+): WizardRow[] {
+  const { enabledKeys, amounts } = getVariableDefaults(ctx, teamSize)
+  return VARIABLE_COST_PRESETS.map(p =>
+    createRow(p, enabledKeys.has(p.key), amounts[p.key])
+  )
 }
 
 function getAmountPence(row: WizardRow): number {
@@ -215,6 +359,7 @@ interface CashOutSetupWizardProps {
   onComplete: (items: CashOutItem[]) => void
   existingItemCount: number
   humanProfiles: WizardProfile[]
+  companyContext: WizardCompanyContext | null
 }
 
 // ============================================================
@@ -275,10 +420,13 @@ function StepCategories({ title, description, rows, onToggle, onUpdate }: StepCa
                     onUpdate(row.key, 'amountPounds', raw)
                   }
                 }}
-                disabled={!row.enabled}
+                disabled={!row.enabled || row.key === 'employer_ni'}
                 placeholder="0"
                 className="w-28 h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-ring"
               />
+              {row.key === 'employer_ni' && (
+                <span className="text-xs text-muted-foreground">(auto)</span>
+              )}
             </div>
             <select
               value={row.frequency}
@@ -293,6 +441,12 @@ function StepCategories({ title, description, rows, onToggle, onUpdate }: StepCa
           </div>
         ))}
       </div>
+
+      {rows.some(r => r.key.startsWith('salary_')) && (
+        <p className="text-xs text-muted-foreground">
+          Employee&apos;s NI is deducted from gross salary — it doesn&apos;t increase your costs.
+        </p>
+      )}
 
       {/* Running total */}
       <div className="flex justify-between items-center pt-2 border-t border-border">
@@ -405,6 +559,7 @@ export function CashOutSetupWizard({
   onComplete,
   existingItemCount,
   humanProfiles,
+  companyContext,
 }: CashOutSetupWizardProps) {
   const stepper = useWizardSteps(STEPS)
   const [error, setError] = useState<string | null>(null)
@@ -417,8 +572,28 @@ export function CashOutSetupWizard({
     buildFixedRows(humanProfiles, defaults)
   )
   const [variableRows, setVariableRows] = useState<WizardRow[]>(() =>
-    buildVariableRows()
+    buildVariableRows(companyContext, humanProfiles.length)
   )
+
+  // INTENT: Auto-recalculate Employer's NI whenever salary amounts/frequencies change
+  useEffect(() => {
+    const salaryRows = fixedRows.filter(r => r.key.startsWith('salary_'))
+    if (salaryRows.length === 0) return
+
+    const totalAnnualNI = salaryRows.reduce((sum, r) => {
+      if (!r.enabled) return sum
+      const annual = annualiseAmount(r.amountPounds, r.frequency)
+      return sum + computeEmployerNI(annual)
+    }, 0)
+
+    const monthlyNI = (totalAnnualNI / 12).toFixed(2)
+
+    setFixedRows(prev => {
+      const niRow = prev.find(r => r.key === 'employer_ni')
+      if (!niRow || niRow.amountPounds === monthlyNI) return prev
+      return prev.map(r => r.key === 'employer_ni' ? { ...r, amountPounds: monthlyNI } : r)
+    })
+  }, [fixedRows])
 
   const toggleRow = useCallback((rows: WizardRow[], setRows: React.Dispatch<React.SetStateAction<WizardRow[]>>, key: string) => {
     setRows(rows.map(r => r.key === key ? { ...r, enabled: !r.enabled } : r))
@@ -474,7 +649,7 @@ export function CashOutSetupWizard({
         onOpenChange(false)
         // Reset for next use
         setFixedRows(buildFixedRows(humanProfiles, defaults))
-        setVariableRows(buildVariableRows())
+        setVariableRows(buildVariableRows(companyContext, humanProfiles.length))
         stepper.reset()
       }
     } catch (e) {
@@ -483,7 +658,7 @@ export function CashOutSetupWizard({
     } finally {
       setIsSaving(false)
     }
-  }, [enabledItems, onComplete, onOpenChange, stepper, humanProfiles, defaults])
+  }, [enabledItems, onComplete, onOpenChange, stepper, humanProfiles, defaults, companyContext])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

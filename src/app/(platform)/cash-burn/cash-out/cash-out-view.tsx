@@ -28,15 +28,16 @@ import {
   deleteCashOutItem,
 } from '@/actions/cash-burn-out'
 import type { CashOutItem, CreateCashOutInput } from '@/types/cash-burn'
-import type { WizardProfile } from '@/actions/cash-burn-out'
+import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
 
 interface CashOutViewProps {
   initialItems: CashOutItem[]
   hasError: boolean
   humanProfiles: WizardProfile[]
+  companyContext: WizardCompanyContext | null
 }
 
-export function CashOutView({ initialItems, hasError, humanProfiles }: CashOutViewProps) {
+export function CashOutView({ initialItems, hasError, humanProfiles, companyContext }: CashOutViewProps) {
   const [items, setItems] = useState<CashOutItem[]>(initialItems)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -272,6 +273,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles }: CashOutVi
         onComplete={handleWizardComplete}
         existingItemCount={items.length}
         humanProfiles={humanProfiles}
+        companyContext={companyContext}
       />
     </div>
   )

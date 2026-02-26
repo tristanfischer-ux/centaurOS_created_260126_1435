@@ -18,7 +18,20 @@ import type {
   CostType,
   PnlCategory,
 } from '@/types/cash-burn'
+import type { BusinessModel, Sector, FundingStatus, RevenueRange, EmployeeCount } from '@/types/foundry'
 import { normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
+
+// ============================================================
+// Wizard company context (lightweight for variable-cost defaults)
+// ============================================================
+
+export interface WizardCompanyContext {
+  businessModel: BusinessModel | null
+  sector: Sector | null
+  fundingStatus: FundingStatus | null
+  revenueRange: RevenueRange | null
+  employeeCount: EmployeeCount | null
+}
 
 // ============================================================
 // Wizard profile type (lightweight for client)
@@ -65,6 +78,46 @@ export async function getFoundryHumanProfiles(): Promise<ActionResult<WizardProf
   } catch (err) {
     console.error('[CashBurn] Failed to fetch human profiles:', err)
     return { data: null, error: 'Failed to load team profiles' }
+  }
+}
+
+// ============================================================
+// Fetch company context for wizard smart defaults
+// ============================================================
+
+export async function getCompanyContextForWizard(): Promise<ActionResult<WizardCompanyContext>> {
+  try {
+    const supabase = await createClient()
+    const foundryId = await getFoundryIdCached()
+    if (!foundryId) return { data: null, error: 'No active foundry' }
+
+    const { data, error } = await supabase
+      .from('foundries')
+      .select('company_profile, sector')
+      .eq('id', foundryId)
+      .single()
+
+    if (error) {
+      console.error('[CashBurn] Failed to fetch company context:', error)
+      return { data: null, error: 'Failed to load company context' }
+    }
+
+    // INTENT: company_profile is JSONB — extract only the fields the wizard needs
+    const profile = data?.company_profile as Record<string, unknown> | null
+
+    return {
+      data: {
+        businessModel: (profile?.business_model as BusinessModel) ?? null,
+        sector: (data?.sector as Sector) ?? null,
+        fundingStatus: (profile?.funding_status as FundingStatus) ?? null,
+        revenueRange: (profile?.revenue_range as RevenueRange) ?? null,
+        employeeCount: (profile?.employee_count as EmployeeCount) ?? null,
+      },
+      error: null,
+    }
+  } catch (err) {
+    console.error('[CashBurn] Failed to fetch company context:', err)
+    return { data: null, error: 'Failed to load company context' }
   }
 }
 

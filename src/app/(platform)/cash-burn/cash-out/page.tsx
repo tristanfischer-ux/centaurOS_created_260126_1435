@@ -4,7 +4,7 @@
  * @description Fetches active cost items and passes to the client view.
  */
 
-import { getCashOutItems, getFoundryHumanProfiles } from '@/actions/cash-burn-out'
+import { getCashOutItems, getFoundryHumanProfiles, getCompanyContextForWizard } from '@/actions/cash-burn-out'
 import { CashOutView } from './cash-out-view'
 
 export const metadata = {
@@ -13,9 +13,10 @@ export const metadata = {
 }
 
 export default async function CashOutPage() {
-  const [itemsResult, profilesResult] = await Promise.all([
+  const [itemsResult, profilesResult, contextResult] = await Promise.all([
     getCashOutItems(),
     getFoundryHumanProfiles(),
+    getCompanyContextForWizard(),
   ])
 
   return (
@@ -23,6 +24,7 @@ export default async function CashOutPage() {
       initialItems={itemsResult.data ?? []}
       hasError={!!itemsResult.error}
       humanProfiles={profilesResult.data ?? []}
+      companyContext={contextResult.data ?? null}
     />
   )
 }
