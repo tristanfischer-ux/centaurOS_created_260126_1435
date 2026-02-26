@@ -125,6 +125,10 @@ export interface CadLabResult {
   validationWarnings?: string[]
   /** Assumptions inferred or resolved during generation */
   assumptions?: string[]
+  /** Slug of the step_template used as seed geometry (if any) */
+  seedTemplateSlug?: string
+  /** Normalised match score of the seed template (0–1) */
+  seedTemplateScore?: number
   /** Optional drawing/package metadata for procurement handoff */
   drawingPackage?: {
     revision: string
@@ -169,6 +173,8 @@ export interface VisualStyleSpec {
   materialRendering: string
   /** Shared context that ties modules together (e.g. "sub-assemblies of a compact quadrotor drone frame") */
   unifyingContext: string
+  /** Purely geometric description of the complete product's physical shape/silhouette (60-120 words). Used to render a faint ghost outline behind each subassembly so every module image shows spatial context within the whole product. */
+  productFormDescription?: string
 }
 
 // ─── Module Types ────────────────────────────────────────────────────
@@ -227,6 +233,8 @@ export interface CadLabModule {
   imageError?: string
   /** AI-crafted image prompt (set during decomposition or generated on-the-fly) */
   moduleImagePrompt?: string
+  /** Slug of the step_template matched as seed geometry for this module */
+  seedTemplateSlug?: string
 }
 
 /** Result from module decomposition */

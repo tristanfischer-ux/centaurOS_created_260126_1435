@@ -204,7 +204,7 @@ export async function generateVisualStyleAction(
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 256,
+          max_tokens: 512,
           system: getVisualStyleSystemPrompt(),
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -232,6 +232,7 @@ export async function generateVisualStyleAction(
       console.log("[CAD-LAB-IMAGES] Generated visual style:", {
         colorPalette: parsed.colorPalette.slice(0, 60),
         unifyingContext: parsed.unifyingContext.slice(0, 60),
+        hasProductForm: !!parsed.productFormDescription,
       })
 
       return { visualStyle: parsed }

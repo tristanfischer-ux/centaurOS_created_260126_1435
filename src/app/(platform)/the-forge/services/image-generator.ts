@@ -77,9 +77,37 @@ Rendering rules (mandatory for visual consistency across all illustrations in th
 // ─── Prompt Templates ────────────────────────────────────────────────
 
 /**
+ * Builds a ghost-outline prompt that renders the complete product as a faint
+ * wireframe/ghost with only the target subassembly highlighted in full color.
+ *
+ * @param module - The module (subassembly) to highlight
+ * @param visualStyle - The visual style spec (must have productFormDescription)
+ * @returns A narrative prompt for the ghost-outline rendering approach
+ */
+function buildGhostOutlinePrompt(module: ModuleSpec, visualStyle: VisualStyleSpec): string {
+  return `Create a professional technical engineering illustration using a ghost-outline technique.
+
+GHOST OUTLINE (faint background):
+Draw the complete product as a very faint, semi-transparent gray wireframe outline showing its full shape: ${visualStyle.productFormDescription}
+The ghost should be rendered at roughly 10-15% opacity — just enough to show the overall product silhouette and spatial context, but clearly receded into the background.
+
+HIGHLIGHTED SUBASSEMBLY (full color, foreground):
+Within that ghost outline, render the "${module.name}" subassembly in full vivid color at its correct physical position inside the product. This is: ${module.detail.whatItIs}. It contains ${module.keyParts.length} key components shown through visual differentiation (color coding, positioning, distinct shapes).
+
+The contrast between the faint ghost and the vivid highlighted section should be dramatic — the viewer's eye should immediately go to the highlighted subassembly while understanding exactly where it sits within the overall product.
+
+Color palette: use ${visualStyle.colorPalette} for the highlighted subassembly.
+Material rendering: ${visualStyle.materialRendering}.
+Context: ${visualStyle.unifyingContext}.
+
+Style: Modern industrial engineering diagram on a white background with thin, precise lines. Isometric view. No decorative elements — this should look like a page from a professional engineering specification document. Subtle light gray grid lines in the background. Do NOT include any text, labels, words, or annotations anywhere in the image.${COHESIVE_STYLE_SUFFIX}`
+}
+
+/**
  * Builds a descriptive prompt for generating a module blueprint image.
  * Uses the structural brief from Opus when available for consistency
- * with the 3D CAD model.
+ * with the 3D CAD model. When productFormDescription is present, uses
+ * ghost-outline technique to show spatial context within the product.
  *
  * @param module - The module to generate an image for
  * @param brief - Optional structural brief from Opus orchestrator
@@ -96,7 +124,14 @@ function buildModulePrompt(module: ModuleSpec, brief?: StructuralBrief, visualSt
     return prompt + COHESIVE_STYLE_SUFFIX
   }
 
-  // Fallback: build prompt directly from module spec
+  // DECISION: When productFormDescription is available, use ghost-outline
+  // technique so each module image shows spatial context within the product.
+  // Otherwise fall back to the legacy isolated-module prompt.
+  if (visualStyle?.productFormDescription) {
+    return buildGhostOutlinePrompt(module, visualStyle)
+  }
+
+  // Fallback: build prompt directly from module spec (legacy isolated-module)
   // DECISION: Avoid naming specific components/IOs — image models render
   // them as garbled text.  Describe visually instead.
   const styleContext = visualStyle
@@ -119,11 +154,17 @@ Style: Modern industrial engineering diagram on a white background with thin, pr
 
 /**
  * Injects VisualStyleSpec directives into an existing prompt string.
+ * When productFormDescription is available, adds ghost-outline framing
+ * so the brief-based path also benefits from spatial context.
  */
 function injectVisualStyle(prompt: string, style: VisualStyleSpec): string {
+  const ghostDirective = style.productFormDescription
+    ? `\nProduct form (render as faint 10-15% opacity ghost/wireframe behind the highlighted subassembly): ${style.productFormDescription}\n`
+    : ""
+
   return `Context: This is a detailed sub-view of ${style.unifyingContext}.
 Color palette: ${style.colorPalette}.
-Material rendering: ${style.materialRendering}.
+Material rendering: ${style.materialRendering}.${ghostDirective}
 
 ${prompt}`
 }
