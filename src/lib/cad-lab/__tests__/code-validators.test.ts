@@ -10,6 +10,7 @@ import {
   checkFunctionInvocations,
   checkLibraryUsage,
   categorizeModalError,
+  stripUnsafeCode,
 } from "../code-validators"
 
 // ─── R4: checkPythonSyntax ──────────────────────────────────────────
@@ -627,12 +628,140 @@ describe("categorizeModalError", () => {
   })
 
   it("returns null for unrecognized errors", () => {
-    const result = categorizeModalError("ValueError: some random error")
+    const result = categorizeModalError("UnknownWeirdError: something unexpected")
     expect(result).toBeNull()
   })
 
   it("returns null for empty input", () => {
     const result = categorizeModalError("")
     expect(result).toBeNull()
+  })
+
+  // H2: Expanded error patterns
+  it("categorizes TypeError", () => {
+    const result = categorizeModalError("TypeError: unsupported operand type(s) for +: 'int' and 'str'")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("TypeError")
+    expect(result!.guidance).toContain("argument types")
+  })
+
+  it("categorizes ValueError", () => {
+    const result = categorizeModalError("ValueError: math domain error")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("ValueError")
+    expect(result!.guidance).toContain("out of range")
+  })
+
+  it("categorizes AttributeError", () => {
+    const result = categorizeModalError("AttributeError: 'Workplane' object has no attribute 'boxz'")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("AttributeError")
+    expect(result!.guidance).toContain("CadQuery API")
+  })
+
+  it("categorizes ImportError", () => {
+    const result = categorizeModalError("ImportError: No module named 'numpy'")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("ImportError")
+    expect(result!.guidance).toContain("cadquery and math")
+  })
+
+  it("categorizes ModuleNotFoundError", () => {
+    const result = categorizeModalError("ModuleNotFoundError: No module named 'scipy'")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("ImportError")
+  })
+
+  it("categorizes MemoryError", () => {
+    const result = categorizeModalError("MemoryError: unable to allocate array")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("MemoryError")
+    expect(result!.guidance).toContain("complexity")
+  })
+
+  it("categorizes killed process as MemoryError", () => {
+    const result = categorizeModalError("Process killed by OOM killer")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("MemoryError")
+  })
+
+  it("categorizes IndentationError", () => {
+    const result = categorizeModalError("IndentationError: unexpected indent (line 15)")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("IndentationError")
+    expect(result!.guidance).toContain("4-space")
+  })
+})
+
+// ─── H1: stripUnsafeCode ──────────────────────────────────────────────
+
+describe("stripUnsafeCode", () => {
+  it("strips print() statements", () => {
+    const code = `import cadquery as cq
+print("debug")
+result = cq.Workplane("XY").box(10, 10, 10)
+print( "more debug" )`
+    const result = stripUnsafeCode(code)
+    expect(result).not.toContain("print(")
+    expect(result).toContain("import cadquery as cq")
+    expect(result).toContain("result =")
+  })
+
+  it("strips os and sys imports", () => {
+    const code = `import cadquery as cq
+import os
+from os import path
+import sys
+from sys import argv
+result = cq.Workplane("XY").box(10, 10, 10)`
+    const result = stripUnsafeCode(code)
+    expect(result).not.toContain("import os")
+    expect(result).not.toContain("from os")
+    expect(result).not.toContain("import sys")
+    expect(result).not.toContain("from sys")
+    expect(result).toContain("import cadquery")
+  })
+
+  it("strips cq.exporters calls", () => {
+    const code = `import cadquery as cq
+result = cq.Workplane("XY").box(10, 10, 10)
+cq.exporters.export(result, "output.step")`
+    const result = stripUnsafeCode(code)
+    expect(result).not.toContain("cq.exporters")
+  })
+
+  it("strips dangerous builtins", () => {
+    const code = `import cadquery as cq
+exec("print('hello')")
+eval("1+1")
+__import__("os")
+result = cq.Workplane("XY").box(10, 10, 10)`
+    const result = stripUnsafeCode(code)
+    expect(result).not.toContain("exec(")
+    expect(result).not.toContain("eval(")
+    expect(result).not.toContain("__import__(")
+  })
+
+  it("strips open() calls", () => {
+    const code = `import cadquery as cq
+f = open("/etc/passwd", "r")
+result = cq.Workplane("XY").box(10, 10, 10)`
+    const result = stripUnsafeCode(code)
+    expect(result).not.toContain("open(")
+  })
+
+  it("preserves clean code unchanged", () => {
+    const code = `import cadquery as cq
+import math
+
+width = 100
+height = 50
+
+def make_box():
+    return cq.Workplane("XY").box(width, height, 30)
+
+result = make_box()`
+    const result = stripUnsafeCode(code)
+    expect(result).toBe(code)
   })
 })

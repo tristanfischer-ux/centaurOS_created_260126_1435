@@ -561,6 +561,31 @@ export function categorizeModalError(
     return { category: "OCP_Crash", guidance: "Simplify geometry — avoid .shell(), .sweep(), and complex boolean chains" }
   }
 
+  // H2: Expanded error patterns
+  if (/TypeError/i.test(errorText)) {
+    return { category: "TypeError", guidance: "Check argument types — ensure numbers not strings, correct method signatures" }
+  }
+
+  if (/ValueError/i.test(errorText)) {
+    return { category: "ValueError", guidance: "A value is out of range — check dimensions are positive, angles valid" }
+  }
+
+  if (/AttributeError/i.test(errorText)) {
+    return { category: "AttributeError", guidance: "Method or property does not exist — check CadQuery API spelling" }
+  }
+
+  if (/ImportError|ModuleNotFoundError/i.test(errorText)) {
+    return { category: "ImportError", guidance: "Only cadquery and math are available — remove other imports" }
+  }
+
+  if (/MemoryError|killed/i.test(errorText)) {
+    return { category: "MemoryError", guidance: "Reduce geometry complexity — fewer boolean ops, simpler sketches" }
+  }
+
+  if (/IndentationError/i.test(errorText)) {
+    return { category: "IndentationError", guidance: "Fix Python indentation — use consistent 4-space indents" }
+  }
+
   return null
 }
 
