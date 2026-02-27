@@ -625,6 +625,7 @@ export async function generateResearchIllustration(
   moduleNames: string[],
   modulePurposes: string[],
   visualStyle?: VisualStyleSpec,
+  researchExcerpt?: string,
 ): Promise<string> {
   const hasModules = moduleNames.length > 0
 
@@ -634,11 +635,27 @@ export async function generateResearchIllustration(
     ? `\n\nThis is an engineering overview showing the complete system with its ${moduleNames.length} major sub-assemblies.`
     : ""
 
+  // INTENT: productFormDescription is the geometric shape description from the visual style step.
+  // It turns "draw a quadrotor drone" into "draw a product with a low rectangular chassis,
+  // four cylindrical motor housings..." — the single highest-impact prompt enrichment.
+  // Falls back to raw research excerpt when no visual style is available (Trigger A).
+  const formDescription = visualStyle?.productFormDescription
+    ? `\n\nPhysical form: ${visualStyle.productFormDescription}`
+    : researchExcerpt
+      ? `\n\nProduct description: ${researchExcerpt}`
+      : ""
+
+  // DECISION: Module purposes give the image model functional context about what the
+  // sub-assemblies do, without listing names that would render as garbled text.
+  const structuralContext = hasModules && modulePurposes.length > 0
+    ? `\n\nThe sub-assemblies handle: ${modulePurposes.join("; ")}.`
+    : ""
+
   const styleDirective = visualStyle
     ? `\n\nColor palette: use ${visualStyle.colorPalette} as the dominant colors. Material rendering: ${visualStyle.materialRendering}. Context: ${visualStyle.unifyingContext}.`
     : ""
 
-  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}${styleDirective}
+  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}${formDescription}${structuralContext}${styleDirective}
 
 Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Do NOT include any text, labels, words, or annotations anywhere in the image. Generous whitespace around the illustration.${COHESIVE_STYLE_SUFFIX}`
 

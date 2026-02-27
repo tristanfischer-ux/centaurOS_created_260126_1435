@@ -664,6 +664,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             const styleRes = await generateVisualStyleAction(
               subject,
               res.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
+              extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
             )
             if ("visualStyle" in styleRes) {
               visualStyle = styleRes.visualStyle
@@ -691,6 +692,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 res.modules.map((m) => m.name),
                 res.modules.map((m) => m.purpose),
                 visualStyle,
+                extractExecutiveSummary(editableReport)?.slice(0, 600),
               )
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
@@ -1382,7 +1384,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           // When handleDecompose runs later it overwrites with a richer module-aware image.
           setSystemIllustrationStatus("generating")
           setSystemIllustrationError(null)
-          generateCadLabSystemIllustrationAction(projId, subject, [], [])
+          generateCadLabSystemIllustrationAction(projId, subject, [], [], undefined, extractExecutiveSummary(res.report)?.slice(0, 600))
             .then((illRes) => {
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)

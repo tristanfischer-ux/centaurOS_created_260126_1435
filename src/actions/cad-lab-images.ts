@@ -196,10 +196,11 @@ export async function generateCadLabSystemIllustrationAction(
   moduleNames: string[],
   modulePurposes: string[],
   visualStyle?: VisualStyleSpec,
+  researchExcerpt?: string,
 ): Promise<{ url: string } | { error: string }> {
   return withAuth(async () => {
     try {
-      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle)
+      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt)
       return { url }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
@@ -223,6 +224,7 @@ export async function generateCadLabSystemIllustrationAction(
 export async function generateVisualStyleAction(
   subject: string,
   modules: Array<{ name: string; purpose: string }>,
+  researchExcerpt?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAuth(async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY
@@ -232,7 +234,8 @@ export async function generateVisualStyleAction(
     }
 
     const moduleList = modules.map((m) => `- ${m.name}: ${m.purpose}`).join("\n")
-    const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}`
+    const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
+    const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}`
 
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
