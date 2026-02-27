@@ -60,6 +60,7 @@ import type {
   DecompositionCheckpoint,
   EarlyCostEstimate,
   InterfaceContract,
+  SpecialistReview,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -213,6 +214,12 @@ export interface CadLabContextValue {
   // P1: Interface contracts
   interfaceContracts: InterfaceContract[]
   isExtractingContracts: boolean
+
+  // Pipeline stage tracking (4-stage flow)
+  specifiedModuleCount: number
+  manufacturingOrderCount: number
+  isSpecificationComplete: boolean
+  projectReviewVerdicts: Record<string, Record<string, SpecialistReview>>
 
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
@@ -423,6 +430,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const designReadinessPct = Math.round((readinessFields.filter((v) => v.trim().length > 0).length / readinessFields.length) * 100)
   const isAnyLoading = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0 || isGeneratingImages
   const generatedModuleCount = modules.filter((m) => m.status === "generated").length
+  const specifiedModuleCount = modules.filter((m) => m.status === "specified" || m.status === "generated").length
+  // INTENT: manufacturingOrderCount will be populated once Source stage is wired up.
+  // For now it's 0, which correctly locks the Assemble stage.
+  const manufacturingOrderCount = 0
+  const isSpecificationComplete = specifiedModuleCount > 0 && specifiedModuleCount === modules.length
+  const projectReviewVerdicts: Record<string, Record<string, SpecialistReview>> = {}
   const riskCount = modules.reduce(
     (sum, m) => sum + m.failureModes.length + m.unknowns.length + (m.result?.dfm?.issues?.length ?? 0),
     0,
@@ -1818,6 +1831,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     earlyCostEstimates,
     interfaceContracts,
     isExtractingContracts,
+    specifiedModuleCount,
+    manufacturingOrderCount,
+    isSpecificationComplete,
+    projectReviewVerdicts,
     handleDownload,
   }
 

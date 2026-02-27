@@ -92,10 +92,10 @@ export default function SupplyFlowPage(): React.ReactNode {
           variant="ghost"
           size="sm"
           className="text-xs gap-1.5"
-          onClick={() => router.push(FORGE_ROUTES.cadLabReview)}
+          onClick={() => router.push(FORGE_ROUTES.cadLabSource)}
         >
           <ArrowLeft className="h-3 w-3" />
-          Back to Review
+          Back to Source
         </Button>
       </div>
 
@@ -165,10 +165,10 @@ export default function SupplyFlowPage(): React.ReactNode {
           variant="ghost"
           size="sm"
           className="text-xs gap-1.5"
-          onClick={() => router.push(FORGE_ROUTES.cadLabReview)}
+          onClick={() => router.push(FORGE_ROUTES.cadLabSource)}
         >
           <ArrowLeft className="h-3 w-3" />
-          Back to Review
+          Back to Source
         </Button>
       </div>
     </div>

@@ -65,14 +65,12 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleUpdateModule,
   } = useCadLab()
 
-  // TEMPORARY: deploy verification — remove after confirming new code is live
-  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T5") }, [])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
-  // INTENT: Block "Continue to Build" while checkpoints load OR have unacknowledged concerns.
+  // INTENT: Block "Continue to Specify" while checkpoints load OR have unacknowledged concerns.
   // Without the isCheckpointing guard, users could skip past the gate before results arrive.
-  const canContinueToBuild = allModulesRevealed && !isCheckpointing && !isRevising && !isGeneratingImages && systemIllustrationStatus !== "generating" && (() => {
+  const canContinueToSpecify = allModulesRevealed && !isCheckpointing && !isRevising && !isGeneratingImages && systemIllustrationStatus !== "generating" && (() => {
     const entries = checkpoints ? Object.values(checkpoints) : []
     if (entries.length === 0) return true
     const hasConcerns = entries.some(
@@ -209,7 +207,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                       <CardContent className="pt-4 pb-4">
                         <h2 className="text-base font-semibold text-foreground">{subject}</h2>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          System overview — full research report available in the Build stage.
+                          System overview — full research report available in the Specify stage.
                         </p>
                       </CardContent>
                     </Card>
@@ -364,25 +362,25 @@ export default function CadLabResearchPage(): React.ReactNode {
               )}
 
               {/* Continue to Build CTA — gated on modules revealed + checkpoint acknowledgment */}
-              {allModulesRevealed && !canContinueToBuild && (
+              {allModulesRevealed && !canContinueToSpecify && (
                 <p className="text-xs text-muted-foreground text-center py-2">
                   Review specialist feedback above before continuing.
                 </p>
               )}
-              {canContinueToBuild && (
+              {canContinueToSpecify && (
                 <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          Ready to build
+                          Ready to specify
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Continue to the Build stage for full research report, detailed engineering, and parametric CAD.
+                          Continue to the Specify stage for detailed specs, diagnostics, and specialist review.
                         </p>
                       </div>
-                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabBuild)} className="gap-1.5">
-                        Continue to Build
+                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)} className="gap-1.5">
+                        Continue to Specify
                         <ArrowRight className="h-4 w-4" />
                       </Button>
                     </div>

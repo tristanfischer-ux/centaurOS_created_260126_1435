@@ -15,8 +15,9 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   Search,
-  Box,
-  ClipboardCheck,
+  ClipboardList,
+  ShoppingCart,
+  Package,
   CheckCircle2,
   Lock,
   type LucideIcon,
@@ -51,9 +52,9 @@ interface StageDefinition {
 
 export const STAGES: StageDefinition[] = [
   {
-    id: "research",
-    label: "Concept",
-    mobileLabel: "C",
+    id: "design",
+    label: "Design",
+    mobileLabel: "D",
     icon: Search,
     href: FORGE_ROUTES.cadLab,
     description: "Describe your product. Get research, module decomposition, and AI blueprint illustrations.",
@@ -61,24 +62,34 @@ export const STAGES: StageDefinition[] = [
     features: ["Engineering research report", "Module decomposition", "AI blueprint illustrations", "Source citations"],
   },
   {
-    id: "build",
-    label: "Build",
-    mobileLabel: "B",
-    icon: Box,
-    href: FORGE_ROUTES.cadLabBuild,
-    description: "Parametric CadQuery model generation for each sub-assembly.",
-    unlockHint: "Complete the Concept stage first",
-    features: ["Parametric CAD code", "7 orthographic views", "STEP + STL exports", "DFM analysis"],
+    id: "specify",
+    label: "Specify",
+    mobileLabel: "S",
+    icon: ClipboardList,
+    href: FORGE_ROUTES.cadLabSpecify,
+    description: "Detailed specs per module with specialist review gate.",
+    unlockHint: "Complete the Design stage first",
+    features: ["Per-module diagnostics & specs", "Interface contracts", "Specialist review gate", "Early cost estimates"],
   },
   {
-    id: "review",
-    label: "Review",
-    mobileLabel: "R",
-    icon: ClipboardCheck,
-    href: FORGE_ROUTES.cadLabReview,
-    description: "Supplier-ready engineering review package.",
-    unlockHint: "Always available — content builds as you progress",
-    features: ["Bill of Materials & raw materials breakdown", "Supplier mapping & cost visualizations", "Expert discipline matching", "RFQ package & full report downloads"],
+    id: "source",
+    label: "Source",
+    mobileLabel: "$",
+    icon: ShoppingCart,
+    href: FORGE_ROUTES.cadLabSource,
+    description: "Match suppliers, create RFQs, compare quotes, and award contracts.",
+    unlockHint: "Specify at least one module with specialist approval",
+    features: ["Supplier matching", "RFQ creation & broadcast", "Quote comparison", "Contract award"],
+  },
+  {
+    id: "assemble",
+    label: "Assemble",
+    mobileLabel: "A",
+    icon: Package,
+    href: FORGE_ROUTES.cadLabAssemble,
+    description: "Track manufacturing orders, receive parts, and manage assembly.",
+    unlockHint: "Award at least one supplier contract in Source",
+    features: ["Manufacturing order tracking", "Parts receiving & QC", "Assembly job management", "Shipping & delivery"],
   },
 ]
 
@@ -87,18 +98,21 @@ export const STAGES: StageDefinition[] = [
  *
  * @param hasResearch - Whether research has been completed
  * @param moduleCount - Total number of decomposed modules
- * @param generatedCount - Number of modules with generated CAD
+ * @param specifiedModuleCount - Number of modules with complete diagnostics + specialist review
+ * @param manufacturingOrderCount - Number of active manufacturing orders
  * @returns Access map with enabled/completed per stage
  */
 export function getStageAccess(
   hasResearch: boolean,
   moduleCount: number,
-  generatedCount: number,
+  specifiedModuleCount: number,
+  manufacturingOrderCount: number,
 ): Record<string, { enabled: boolean; completed: boolean }> {
   return {
-    research: { enabled: true, completed: hasResearch },
-    build: { enabled: hasResearch && moduleCount > 0, completed: generatedCount > 0 && generatedCount === moduleCount },
-    review: { enabled: true, completed: generatedCount > 0 && generatedCount === moduleCount },
+    design: { enabled: true, completed: hasResearch && moduleCount > 0 },
+    specify: { enabled: hasResearch && moduleCount > 0, completed: specifiedModuleCount > 0 && specifiedModuleCount === moduleCount },
+    source: { enabled: specifiedModuleCount > 0, completed: manufacturingOrderCount > 0 },
+    assemble: { enabled: manufacturingOrderCount > 0, completed: false },
   }
 }
 
@@ -112,10 +126,10 @@ export function getStageAccess(
  */
 export function CadLabBottomNav(): React.ReactNode {
   const pathname = usePathname()
-  const { hasResearch, modules, generatedModuleCount } = useCadLab()
+  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount } = useCadLab()
   const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
-  const access = getStageAccess(hasResearch, modules.length, generatedModuleCount)
+  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount)
   const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
 
   return (
@@ -216,10 +230,10 @@ export function CadLabBottomNav(): React.ReactNode {
  */
 export function CadLabNav({ className }: { className?: string }): React.ReactNode {
   const pathname = usePathname()
-  const { hasResearch, modules, generatedModuleCount } = useCadLab()
+  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount } = useCadLab()
   const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
-  const access = getStageAccess(hasResearch, modules.length, generatedModuleCount)
+  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount)
   const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
 
   return (
@@ -282,10 +296,10 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                       <span className="sm:hidden">{stage.mobileLabel}</span>
                       <span className="hidden sm:inline">
                         {stage.label}
-                        {/* Module count badge for Build stage */}
-                        {stage.id === "build" && generatedModuleCount > 0 && modules.length > 0 && (
+                        {/* Module count badge for Specify stage */}
+                        {stage.id === "specify" && specifiedModuleCount > 0 && modules.length > 0 && (
                           <span className="ml-1 text-xs font-mono opacity-75">
-                            {generatedModuleCount}/{modules.length}
+                            {specifiedModuleCount}/{modules.length}
                           </span>
                         )}
                       </span>

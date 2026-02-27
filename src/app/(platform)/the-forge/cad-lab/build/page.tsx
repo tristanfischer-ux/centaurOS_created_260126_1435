@@ -83,8 +83,20 @@ import { ConceptBuildDiff } from "../components/concept-build-diff"
 
 // ─── Page Component ──────────────────────────────────────────────────
 
+// INTENT: Build page is now behind a feature flag. When CAD generation is disabled,
+// redirect to the Specify page which replaces Build in the new 4-stage pipeline.
+const CAD_GENERATION_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CAD_GENERATION === "true"
+
 export default function CadLabBuildPage(): React.ReactNode {
   const router = useRouter()
+
+  // Redirect to Specify when CAD generation is disabled
+  useEffect(() => {
+    if (!CAD_GENERATION_ENABLED) {
+      router.replace(FORGE_ROUTES.cadLabSpecify)
+    }
+  }, [router])
+
   const {
     hasResearch, isAnyLoading, activeProjectId,
     subject, editableReport, setEditableReport,
@@ -468,8 +480,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
-                          <ClipboardCheck className="h-3 w-3" /> Review Package
+                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)}>
+                          <ClipboardCheck className="h-3 w-3" /> Continue to Specify
                         </Button>
                       </div>
                     </div>
@@ -522,8 +534,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                         </Button>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
-                          <ClipboardCheck className="h-3 w-3" /> Review Package
+                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)}>
+                          <ClipboardCheck className="h-3 w-3" /> Continue to Specify
                         </Button>
                         <Button
                           variant="outline"

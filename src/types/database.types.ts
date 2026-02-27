@@ -3865,6 +3865,7 @@ export type Database = {
           model_id: string
           modules: Json | null
           name: string
+          pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
           product_overview: string | null
           quality_ratings: Json | null
           research: Json | null
@@ -3895,6 +3896,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
           quality_ratings?: Json | null
           research?: Json | null
@@ -3925,6 +3927,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
           quality_ratings?: Json | null
           research?: Json | null
@@ -18814,6 +18817,7 @@ export type Database = {
         | "disputed"
         | "cancelled"
       order_type: "people_booking" | "product_rfq" | "service" | "trial"
+      pipeline_stage: "design" | "specify" | "source" | "assemble" | "complete"
       pitch_prep_status:
         | "draft"
         | "submitted"
@@ -19090,6 +19094,7 @@ export const Constants = {
         "cancelled",
       ],
       order_type: ["people_booking", "product_rfq", "service", "trial"],
+      pipeline_stage: ["design", "specify", "source", "assemble", "complete"],
       pitch_prep_status: [
         "draft",
         "submitted",

@@ -11,7 +11,7 @@
  * Always accessible — shows a progressive welcome state when no data exists yet.
  */
 
-import { useState, useMemo, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
@@ -59,8 +59,15 @@ import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 
+// INTENT: Review page is replaced by Source in the new 4-stage pipeline.
+// Redirect to Source to avoid dead-end bookmarks.
 export default function CadLabReviewPage(): React.ReactNode {
   const router = useRouter()
+
+  useEffect(() => {
+    router.replace(FORGE_ROUTES.cadLabSource)
+  }, [router])
+
   const {
     modules, generatedModuleCount, subject, hasResearch,
     editableReport, diagnosticAnswers, setDiagnosticAnswers,

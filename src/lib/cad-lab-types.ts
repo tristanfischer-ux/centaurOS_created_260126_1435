@@ -331,7 +331,7 @@ export interface CadLabModule {
   /** Generated CadQuery code */
   code?: string
   /** Pipeline status */
-  status: "pending" | "researched" | "interface_ready" | "generated" | "failed"
+  status: "pending" | "researched" | "interface_ready" | "specified" | "generated" | "failed"
   /** Persisted SVG view URLs from Supabase storage (P3) */
   svgUrls?: Record<string, string>
 
@@ -661,6 +661,9 @@ export interface BomTreeNode {
   /** Rolled-up total mass (this part × qty + sum of children) */
   totalMass: number
 }
+
+/** Pipeline stage for the 4-stage product development flow */
+export type PipelineStage = "design" | "specify" | "source" | "assemble" | "complete"
 
 /** Return type from the AI BOM generation action */
 export interface BomGenerationResult {

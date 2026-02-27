@@ -13,10 +13,10 @@ import { FORGE_ROUTES } from "@/lib/forge-routes"
 
 export default function CadLabProcurementRedirect(): React.ReactNode {
   const router = useRouter()
-  useEffect(() => { router.replace(FORGE_ROUTES.cadLabReview) }, [router])
+  useEffect(() => { router.replace(FORGE_ROUTES.cadLabSource) }, [router])
   return (
     <div className="py-12 text-center text-sm text-muted-foreground">
-      Redirecting to Review stage...
+      Redirecting to Source stage...
     </div>
   )
 }
