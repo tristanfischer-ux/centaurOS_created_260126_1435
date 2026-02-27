@@ -29,7 +29,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   CheckCircle2,
   XCircle,
@@ -199,7 +198,7 @@ export function DesignChangesDialog({
         </div>
 
         {/* Change list */}
-        <ScrollArea className="max-h-[50vh]">
+        <div className="max-h-[50vh] overflow-y-auto">
           <div className="space-y-3 pr-4">
             {changes.map((change, idx) => {
               const review = reviews.get(idx)
@@ -231,7 +230,7 @@ export function DesignChangesDialog({
               )
             })}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <DialogFooter>

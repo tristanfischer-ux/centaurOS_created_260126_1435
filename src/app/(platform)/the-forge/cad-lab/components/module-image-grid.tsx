@@ -32,7 +32,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { EditableList } from "../../components/editable-list"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
@@ -150,7 +149,7 @@ function ModuleDetailDialog({
           )}
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-2">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-2">
           <div className="space-y-6">
             {/* Illustration (view-only in both modes) */}
             {module.imageStatus === "complete" && module.imageUrl && !isEditing && (
@@ -361,7 +360,7 @@ function ModuleDetailDialog({
               </div>
             ) : null}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Edit mode footer */}
         {isEditing && (

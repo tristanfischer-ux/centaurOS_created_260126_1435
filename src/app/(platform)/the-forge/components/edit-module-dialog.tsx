@@ -27,7 +27,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import {
   Loader2,
@@ -195,7 +194,7 @@ export function EditModuleDialog({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
-      <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+      <DialogContent size="lg" className="max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Box className="h-5 w-5 text-international-orange" />
@@ -203,7 +202,7 @@ export function EditModuleDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[65vh] pr-4">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-4">
           <div className="space-y-6 pb-4">
 
             {/* Section 1: Basic Info */}
@@ -376,7 +375,7 @@ export function EditModuleDialog({
             </div>
 
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter>
           <div className="flex w-full items-center justify-between">
