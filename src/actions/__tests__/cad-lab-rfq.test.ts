@@ -36,7 +36,7 @@ describe("createCadLabRfqAction", () => {
     })
 
     expect(res).toEqual({
-      error: "At least one generated module is required before creating an RFQ.",
+      error: "At least one specified or generated module is required before creating an RFQ.",
     })
     expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
   })
@@ -68,7 +68,7 @@ describe("createCadLabRfqAction", () => {
 
     expect(res).toEqual({
       error:
-        "RFQ package is incomplete — Module 1: missing STEP, STL, manifest. Generate CAD with drawing packages before creating an RFQ.",
+        "RFQ package is incomplete — fill in module diagnostics or generate CAD with drawing packages before creating an RFQ.",
     })
     expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
   })
@@ -113,7 +113,7 @@ describe("createCadLabRfqAction", () => {
 
     expect(res).toEqual({
       error:
-        "RFQ package is incomplete — Module 1: missing STL. Generate CAD with drawing packages before creating an RFQ.",
+        "RFQ package is incomplete — fill in module diagnostics or generate CAD with drawing packages before creating an RFQ.",
     })
     expect(mockedCreateNewRFQ).not.toHaveBeenCalled()
   })
