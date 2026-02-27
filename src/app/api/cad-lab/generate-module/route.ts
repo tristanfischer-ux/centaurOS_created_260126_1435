@@ -20,7 +20,7 @@ import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { estimateEarlyCost } from "@/lib/cad-lab/early-cost-estimator"
-import type { CadLabModule, ClaudeModelId, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
+import type { CadLabModule, CadLabResult, ClaudeModelId, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
 export const runtime = "nodejs"
@@ -273,6 +273,7 @@ export async function POST(request: Request): Promise<Response> {
 
       // ── CAD generation step ──
       emit({ type: "status", step: "codegen", attempt: 1 })
+      let cadResult: CadLabResult | undefined
       try {
         const cadResearch =
           localMod.moduleResearch ||
@@ -300,11 +301,14 @@ export async function POST(request: Request): Promise<Response> {
           checkpointContext || undefined,
           localMod.templateMatchResult || undefined,
         )
+        cadResult = res
 
         if (!res.success) {
           console.error("[CAD-LAB-MODULE] CAD generation returned failure:", localMod.name, res.error)
           localMod = { ...localMod, status: "failed" as const, code: res.code }
           await saveModuleToProject(supabase, projectId, allModules, localMod)
+          // R3: Fire-and-forget metrics for failed generation
+          recordGenerationMetrics(projectId, moduleId, false, res).catch(() => {})
           emit({ type: "error", message: res.error || "CAD generation failed" })
           controller.close()
           return
@@ -439,6 +443,9 @@ export async function POST(request: Request): Promise<Response> {
       // ── Persist completed module ──
       await saveModuleToProject(supabase, projectId, allModules, localMod)
 
+      // R3: Fire-and-forget metrics for successful generation
+      if (cadResult) recordGenerationMetrics(projectId, moduleId, true, cadResult).catch(() => {})
+
       const elapsedMs = Date.now() - startTime
 
       // AUDIT: Log module generation complete
@@ -501,6 +508,46 @@ export async function POST(request: Request): Promise<Response> {
     { error: lastError || "Generation failed", moduleId } satisfies GenerateModuleError,
     { status: 500 },
   )
+}
+
+// ─── R3: Quality Metrics Persistence ──────────────────────────────────
+
+/**
+ * Fire-and-forget insert of generation quality metrics.
+ *
+ * @description Non-blocking — never delays module delivery to the client.
+ * Records both success and failure outcomes for trend analysis.
+ *
+ * @param projectId - CAD Lab project ID
+ * @param moduleId - Module ID within the project
+ * @param success - Whether generation succeeded
+ * @param res - The CadLabResult with generation metadata
+ */
+async function recordGenerationMetrics(
+  projectId: string,
+  moduleId: string,
+  success: boolean,
+  res: CadLabResult,
+): Promise<void> {
+  const admin = createAdminClient()
+  const { error } = await admin
+    .from("cad_lab_generation_metrics")
+    .insert({
+      project_id: projectId,
+      module_id: moduleId,
+      success,
+      model_used: res.modelUsed ?? null,
+      seed_template_slug: res.seedTemplateSlug ?? null,
+      first_attempt_success: res.firstAttemptSuccess ?? null,
+      repair_attempts: res.repairAttempts ?? null,
+      vision_score: res.visionScore ?? null,
+      generation_time_ms: res.generationTime ?? null,
+      tokens_in: res.tokensIn ?? null,
+      tokens_out: res.tokensOut ?? null,
+    })
+  if (error) {
+    console.warn("[CAD-LAB-MODULE] Metrics insert failed:", error.message)
+  }
 }
 
 // ─── Helper: Atomic module save ──────────────────────────────────────

@@ -3770,6 +3770,62 @@ export type Database = {
           },
         ]
       }
+      cad_lab_generation_metrics: {
+        Row: {
+          created_at: string
+          first_attempt_success: boolean | null
+          generation_time_ms: number | null
+          id: string
+          model_used: string | null
+          module_id: string
+          project_id: string
+          repair_attempts: number | null
+          seed_template_slug: string | null
+          success: boolean
+          tokens_in: number | null
+          tokens_out: number | null
+          vision_score: number | null
+        }
+        Insert: {
+          created_at?: string
+          first_attempt_success?: boolean | null
+          generation_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          module_id: string
+          project_id: string
+          repair_attempts?: number | null
+          seed_template_slug?: string | null
+          success: boolean
+          tokens_in?: number | null
+          tokens_out?: number | null
+          vision_score?: number | null
+        }
+        Update: {
+          created_at?: string
+          first_attempt_success?: boolean | null
+          generation_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          module_id?: string
+          project_id?: string
+          repair_attempts?: number | null
+          seed_template_slug?: string | null
+          success?: boolean
+          tokens_in?: number | null
+          tokens_out?: number | null
+          vision_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_generation_metrics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_lab_projects: {
         Row: {
           batch_started_at: string | null
