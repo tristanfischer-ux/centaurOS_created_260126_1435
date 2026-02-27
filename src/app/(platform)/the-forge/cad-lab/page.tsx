@@ -65,7 +65,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   // TEMPORARY: deploy verification — remove after confirming new code is live
-  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T2") }, [])
+  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T3") }, [])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
@@ -175,8 +175,7 @@ export default function CadLabResearchPage(): React.ReactNode {
               )}
 
               {/* ── System illustration failed — show error with retry ── */}
-              {(systemIllustrationStatus === "failed" ||
-                (systemIllustrationStatus === "idle" && !systemIllustrationUrl)) && (
+              {systemIllustrationStatus === "failed" && (
                 <Card className="overflow-hidden border-dashed">
                   <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
                     <div className="flex flex-col items-center gap-3">
