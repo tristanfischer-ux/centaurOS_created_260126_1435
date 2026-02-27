@@ -49,6 +49,7 @@ import {
   getDiagnosticsSystemPrompt,
   getDomainLabel,
   getDomainDescription,
+  getCodeGenDomainHints,
 } from "@/lib/cad-lab/domain-prompts"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
 import {
@@ -922,6 +923,16 @@ export async function generateCadLabModel(
     // ── Generate code with Claude ──
     console.info("[THE-FORGE] Step 3: Generating complete CadQuery code with Claude...")
 
+    // H5: Detect domain for code-gen-specific hints (best-effort, fallback to empty)
+    let domainHints = ""
+    try {
+      const domain = await detectDomainFromResearchReport(researchReport)
+      domainHints = getCodeGenDomainHints(domain)
+      if (domainHints) console.info(`[THE-FORGE] Step 3: Domain detected: ${domain}, injecting code gen hints`)
+    } catch {
+      // Silent — domain hints are best-effort enrichment
+    }
+
     // ── Seed-geometry routing: check for matching step_templates ──
     // INTENT: Strong matches route to the mashup endpoint with real STEP geometry
     // as a starting point, producing better results than scratch generation.
@@ -1010,7 +1021,7 @@ ASSEMBLY STRATEGY FOR COMPLEX MODELS:
 - .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
 - Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
 - The final line should be: result = assy.toCompound()
-- For simpler models (<15 components), the .union() chain pattern is fine.`
+- For simpler models (<15 components), the .union() chain pattern is fine.${domainHints ? `\n\n${domainHints}` : ""}`
 
     // ── #10: Build reference template dimension section for prompt injection ──
     let referenceSection = ""

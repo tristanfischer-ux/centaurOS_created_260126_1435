@@ -287,3 +287,52 @@ const DIAGNOSTICS_ROLE: Record<CadLabDomain, string> = {
 export function getDiagnosticsSystemPrompt(domain: CadLabDomain): string {
   return `${DIAGNOSTICS_ROLE[domain]}\n\n${BASE_DIAGNOSTICS}`
 }
+
+// ─── H5: Domain-specific CadQuery code generation hints ─────────────
+
+const CODE_GEN_DOMAIN_HINTS: Record<CadLabDomain, string> = {
+  electronics: `DOMAIN-SPECIFIC GUIDANCE (Electronics & PCB):
+- Use .rect() and .extrude() for PCB boards — typical thicknesses: 1.6mm (standard), 0.8mm (flex)
+- Model component footprints as extruded rectangles with correct pin pitch (2.54mm DIP, 0.5/0.65mm SMD)
+- Include standoff mounting holes at standard positions (M3 at corners, 3.2mm clearance holes)
+- Heat sinks: use .rect() grid of .extrude() fins — 1-2mm thick, 5-15mm tall, 2-3mm spacing
+- Connector cutouts: model to exact footprint dimensions (USB-C: 8.94×3.26mm, RJ45: 15.88×13.08mm)
+- Edge clearances: 1mm minimum from board edge to copper, 5mm for connectors`,
+
+  mechanical: `DOMAIN-SPECIFIC GUIDANCE (Mechanical & Structural):
+- Wall thickness minimums: FDM 1.2mm (3 perimeters), CNC 0.8mm, sheet metal per gauge table
+- Fillet all internal corners (min 0.5mm) to reduce stress concentrations — use .fillet() on individual parts BEFORE .union()
+- Bolt holes: clearance = nominal + 0.5mm (M3→3.5mm, M4→4.5mm, M5→5.5mm)
+- Counterbore pockets: head_diameter + 1mm clearance, head_height + 0.5mm depth
+- Draft angles for injection molding: 1-2° on vertical walls
+- Chamfer sharp external edges (0.5mm) for deburring and safety`,
+
+  electromechanical: `DOMAIN-SPECIFIC GUIDANCE (Electromechanical & Robotics):
+- NEMA motor mounting patterns: NEMA17 = 31mm square, M3 holes; NEMA23 = 47.14mm, M5 holes
+- Bearing seats: use .circle().extrude() with press-fit tolerance (hole = bearing OD + 0.01mm)
+- Shaft holes: clearance fit = shaft + 0.1mm, press fit = shaft - 0.02mm
+- Wire routing channels: minimum 2× cable diameter width, smooth radii (no sharp bends < 5× cable dia)
+- Motor mount bolt circles: match NEMA standard hole patterns exactly
+- Battery compartments: add 1mm clearance per dimension, include cable egress notch`,
+
+  fluid: `DOMAIN-SPECIFIC GUIDANCE (Fluid Systems):
+- Pipe threads: model tap drill diameter (G1/4 = 11.5mm, G1/2 = 18.6mm, G3/4 = 24.1mm)
+- O-ring grooves: use .circle().cut() with groove width = 1.4× cord dia, depth = 0.7× cord dia
+- Sealing surfaces: must be flat — no .fillet() across seal faces
+- Flow channels: minimum 2mm wall between adjacent channels for pressure integrity
+- Port boss height: minimum 8mm for G1/4, 10mm for G1/2 to allow thread engagement
+- Drain features: 1-2° slope on internal floors toward drain port`,
+}
+
+/**
+ * Returns domain-specific CadQuery tips for code generation.
+ *
+ * @description Covers geometry patterns typical of each domain. Returns
+ * empty string for unrecognised domains so callers can unconditionally append.
+ *
+ * @param domain - Detected CAD Lab domain
+ * @returns Domain-specific hint text, or empty string
+ */
+export function getCodeGenDomainHints(domain: CadLabDomain): string {
+  return CODE_GEN_DOMAIN_HINTS[domain] ?? ""
+}
