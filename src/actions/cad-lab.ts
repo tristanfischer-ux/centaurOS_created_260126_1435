@@ -1627,6 +1627,16 @@ async function generateCadLabModelWithSeed(
     const safeName = await sanitiseForPrompt(seedTemplate.name)
     const safeCategory = await sanitiseForPrompt(seedTemplate.category)
 
+    // J2: Detect domain for seed path hints (use cached hint or detect)
+    let seedDomainHints = ""
+    try {
+      const seedDomain = domainHint ?? await detectDomainFromResearchReport(researchReport)
+      seedDomainHints = getCodeGenDomainHints(seedDomain)
+      if (seedDomainHints) console.info(`[THE-FORGE] Seed path: Domain ${seedDomain}${domainHint ? " (cached)" : ""}, injecting hints`)
+    } catch {
+      // Silent — domain hints are best-effort enrichment
+    }
+
     // ── Build hybrid system prompt ──
     const systemPrompt = `You are generating a CadQuery parametric CAD model that starts from an existing STEP file as seed geometry. Follow the methodology in this document:
 
@@ -1655,7 +1665,7 @@ SELF-CONTAINED CODE (CRITICAL):
 - Your script MUST be executable with no unresolved names.
 - You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
 - Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
-- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call.`
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call.${seedDomainHints ? `\n\n${seedDomainHints}` : ""}`
 
     const userPrompt = `Build a parametric CAD model of: ${description}
 
