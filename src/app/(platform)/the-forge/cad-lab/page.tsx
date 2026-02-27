@@ -65,7 +65,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   // TEMPORARY: deploy verification — remove after confirming new code is live
-  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T4") }, [])
+  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T5") }, [])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 

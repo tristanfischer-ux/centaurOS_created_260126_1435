@@ -2,11 +2,11 @@
  * @file image-generator.ts — Image generation for X-Ray blueprints
  *
  * @description Image generation with automatic provider fallback:
- * - Primary: Imagen 4 (imagen-4.0-generate-001) — 2K resolution, best for technical diagrams
- * - Fallback: OpenAI gpt-image-1 — activated on any Imagen failure
+ * - Primary: Nano Banana 2 (gemini-3.1-flash-image-preview) — 2K resolution, native 3:2 support
+ * - Fallback: OpenAI gpt-image-1 — activated on any Nano Banana failure
  *
- * Uses Imagen 4 predict API for high-quality technical illustrations.
- * Falls back to OpenAI SDK when Imagen is unavailable.
+ * Uses Nano Banana 2 generateContent API for high-quality technical illustrations.
+ * Falls back to OpenAI SDK when Nano Banana is unavailable.
  *
  * @security Requires GOOGLE_AI_API_KEY; optionally OPENAI_API_KEY for fallback
  *
@@ -27,16 +27,19 @@ import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 // ─── Constants ───────────────────────────────────────────────────────
 
 const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
-const IMAGEN_MODEL = "imagen-4.0-generate-001" // Imagen 4 — 2K resolution, best text/label rendering
+const NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview" // Nano Banana 2 — 2K resolution, native 3:2 support
 const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
 const STORAGE_BUCKET = "xray-images"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-interface ImagenResponse {
-  predictions?: Array<{
-    bytesBase64Encoded?: string
-    mimeType?: string
+interface NanoBananaResponse {
+  candidates?: Array<{
+    content?: {
+      parts?: Array<{
+        inline_data?: { mime_type?: string; data?: string }
+      }>
+    }
   }>
   error?: { code: number; message: string; status: string }
 }
@@ -193,40 +196,27 @@ This system is composed of ${spec.modules.length} connected subsystems arranged 
 Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. Do NOT include any text, labels, words, annotations, title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
 }
 
-// ─── Imagen 4 API Caller ────────────────────────────────────────────
+// ─── Nano Banana 2 API Caller ────────────────────────────────────────
 
 /**
- * Maps caller aspect ratios to Imagen 4 supported ratios.
- * Imagen 4 supports: "1:1", "3:4", "4:3", "9:16", "16:9".
- * Note: "3:2" is NOT supported — maps to "4:3" (closest landscape).
+ * Maps caller aspect ratios to Nano Banana 2 supported ratios.
+ * Nano Banana 2 supports: "1:1", "3:4", "4:3", "9:16", "16:9", "3:2", "2:3".
  */
-function toImagenAspectRatio(aspectRatio?: string): string {
-  switch (aspectRatio) {
-    case "16:9":
-      return "16:9"
-    case "9:16":
-      return "9:16"
-    case "3:2":
-    case "4:3":
-      return "4:3"
-    case "2:3":
-    case "3:4":
-      return "3:4"
-    default:
-      return "1:1"
-  }
+function toNanoBananaAspectRatio(aspectRatio?: string): string {
+  const SUPPORTED = new Set(["1:1", "3:4", "4:3", "9:16", "16:9", "3:2", "2:3"])
+  return aspectRatio && SUPPORTED.has(aspectRatio) ? aspectRatio : "1:1"
 }
 
 /**
- * Calls the Imagen 4 predict API to generate an image.
+ * Calls the Nano Banana 2 generateContent API to generate an image.
  *
  * @param prompt - The text prompt
- * @param aspectRatio - Aspect ratio (mapped to Imagen 4 supported values)
+ * @param aspectRatio - Aspect ratio (mapped to Nano Banana 2 supported values)
  * @returns Base64 image data and mime type
  *
  * @throws Error if GOOGLE_AI_API_KEY is missing or API call fails
  */
-async function callImagenImage(
+async function callNanoBananaImage(
   prompt: string,
   aspectRatio?: string,
 ): Promise<{ mimeType: string; data: string }> {
@@ -236,15 +226,14 @@ async function callImagenImage(
   }
 
   // SECURITY: Use x-goog-api-key header instead of URL query param
-  const url = `${GOOGLE_AI_API_BASE}/${IMAGEN_MODEL}:predict`
+  const url = `${GOOGLE_AI_API_BASE}/${NANO_BANANA_MODEL}:generateContent`
 
   const body = {
-    instances: [{ prompt }],
-    parameters: {
-      sampleCount: 1,
-      aspectRatio: toImagenAspectRatio(aspectRatio),
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: {
+      responseModalities: ["IMAGE"],
+      aspectRatio: toNanoBananaAspectRatio(aspectRatio),
       imageSize: "2K",
-      negativePrompt: "text, words, letters, labels, annotations, writing, captions, titles, numbers, measurements, dimensions, handwriting, typography, font",
     },
   }
 
@@ -257,30 +246,35 @@ async function callImagenImage(
     })
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
-    console.error("[XRayImageGen] Fetch failed:", { model: IMAGEN_MODEL, error: msg })
-    throw new Error(`[XRayImageGen] Network error calling Imagen 4: ${msg}`)
+    console.error("[XRayImageGen] Fetch failed:", { model: NANO_BANANA_MODEL, error: msg })
+    throw new Error(`[XRayImageGen] Network error calling Nano Banana 2: ${msg}`)
   }
 
   if (!response.ok) {
     const errText = await response.text()
-    console.error("[XRayImageGen] Imagen 4 API error:", { status: response.status, body: errText.slice(0, 500) })
-    throw new Error(`[XRayImageGen] Imagen 4 API error (${response.status}): ${errText.slice(0, 200)}`)
+    console.error("[XRayImageGen] Nano Banana 2 API error:", { status: response.status, body: errText.slice(0, 500) })
+    throw new Error(`[XRayImageGen] Nano Banana 2 API error (${response.status}): ${errText.slice(0, 200)}`)
   }
 
-  const data = (await response.json()) as ImagenResponse
+  const data = (await response.json()) as NanoBananaResponse
 
   if (data.error) {
-    console.error("[XRayImageGen] Imagen 4 returned error:", { error: data.error.message })
-    throw new Error(`[XRayImageGen] Imagen 4 error: ${data.error.message}`)
+    console.error("[XRayImageGen] Nano Banana 2 returned error:", { error: data.error.message })
+    throw new Error(`[XRayImageGen] Nano Banana 2 error: ${data.error.message}`)
   }
 
-  const b64Data = data.predictions?.[0]?.bytesBase64Encoded
+  // DECISION: Walk candidates[0].content.parts[] to find the first inline_data with image data.
+  // Nano Banana 2 may return text parts alongside image parts.
+  const parts = data.candidates?.[0]?.content?.parts
+  const imagePart = parts?.find((p) => p.inline_data?.data)
+  const b64Data = imagePart?.inline_data?.data
   if (!b64Data) {
-    console.error("[XRayImageGen] No image in Imagen 4 response:", { predictionsCount: data.predictions?.length ?? 0 })
-    throw new Error("[XRayImageGen] No image data returned from Imagen 4")
+    console.error("[XRayImageGen] No image in Nano Banana 2 response:", { candidatesCount: data.candidates?.length ?? 0, partsCount: parts?.length ?? 0 })
+    throw new Error("[XRayImageGen] No image data returned from Nano Banana 2")
   }
 
-  return { mimeType: "image/png", data: b64Data }
+  const mimeType = imagePart?.inline_data?.mime_type ?? "image/png"
+  return { mimeType, data: b64Data }
 }
 
 // ─── OpenAI Fallback ─────────────────────────────────────────────────
@@ -308,7 +302,7 @@ function geminiAspectToOpenAISize(
  * Calls the OpenAI gpt-image-1 API to generate an image.
  * Used as a fallback when Gemini is unavailable.
  *
- * @returns Base64 image data and mime type (same shape as callImagenImage)
+ * @returns Base64 image data and mime type (same shape as callNanoBananaImage)
  * @throws Error if OPENAI_API_KEY is missing or API call fails
  */
 async function callOpenAIImage(
@@ -342,11 +336,11 @@ async function callOpenAIImage(
 }
 
 /**
- * Generates an image using Imagen 4 with automatic OpenAI fallback.
+ * Generates an image using Nano Banana 2 with automatic OpenAI fallback.
  *
- * FLOW: callImagenImage() → [any error] → callOpenAIImage() → result
+ * FLOW: callNanoBananaImage() → [any error] → callOpenAIImage() → result
  *
- * Falls back to OpenAI on ANY Imagen failure as long as OPENAI_API_KEY is set.
+ * Falls back to OpenAI on ANY Nano Banana failure as long as OPENAI_API_KEY is set.
  */
 async function callImageWithFallback(
   prompt: string,
@@ -355,17 +349,17 @@ async function callImageWithFallback(
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
   try {
-    return await callImagenImage(safePrompt, imageConfig.aspectRatio)
-  } catch (imagenError) {
-    const errorMessage = imagenError instanceof Error ? imagenError.message : String(imagenError)
+    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio)
+  } catch (nanoBananaError) {
+    const errorMessage = nanoBananaError instanceof Error ? nanoBananaError.message : String(nanoBananaError)
 
     if (!process.env.OPENAI_API_KEY) {
-      console.warn("[XRayImageGen] Imagen 4 failed and OPENAI_API_KEY is not set — no fallback available")
-      throw imagenError
+      console.warn("[XRayImageGen] Nano Banana 2 failed and OPENAI_API_KEY is not set — no fallback available")
+      throw nanoBananaError
     }
 
     console.warn(
-      "[XRayImageGen] Imagen 4 failed, falling back to OpenAI gpt-image-1:",
+      "[XRayImageGen] Nano Banana 2 failed, falling back to OpenAI gpt-image-1:",
       { error: errorMessage.slice(0, 200) },
     )
 
