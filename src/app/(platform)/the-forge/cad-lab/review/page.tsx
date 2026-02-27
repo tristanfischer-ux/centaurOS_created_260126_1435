@@ -463,11 +463,11 @@ export default function CadLabReviewPage(): React.ReactNode {
                   {/* Expanded detail panel */}
                   {isExpanded && (
                     <div className="border-t p-3 space-y-3 bg-muted/10">
-                      {/* CAD isometric view */}
-                      {r?.svgIso && (
+                      {/* CAD isometric view — prefer persisted svgUrls, fall back to result data URI */}
+                      {(mod.svgUrls?.iso || r?.svgIso) && (
                         <div className="w-full h-48 rounded-md bg-muted/30 border border-muted overflow-hidden">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={r.svgIso} alt={`${mod.name} isometric`} className="w-full h-full object-contain" />
+                          <img src={mod.svgUrls?.iso ?? r?.svgIso} alt={`${mod.name} isometric`} className="w-full h-full object-contain" />
                         </div>
                       )}
 
@@ -497,15 +497,20 @@ export default function CadLabReviewPage(): React.ReactNode {
                               {r.massGrams.toFixed(1)} g
                             </span>
                           )}
-                          {r.dfm && (
-                            <span className={`flex items-center gap-1 ${r.dfm.printable ? "text-status-success" : "text-status-warning"}`}>
-                              {r.dfm.printable
-                                ? <CheckCircle2 className="h-3 w-3" />
-                                : <AlertTriangle className="h-3 w-3" />
-                              }
-                              {r.dfm.printable ? "Printable" : `${r.dfm.issues.length} DFM issues`}
-                            </span>
-                          )}
+                          {r.dfm && (() => {
+                            const process = diagnosticAnswers?.[mod.id]?.mfg_process
+                            const isPrint = !process || process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
+                            if (!isPrint) return null
+                            return (
+                              <span className={`flex items-center gap-1 ${r.dfm.printable ? "text-status-success" : "text-status-warning"}`}>
+                                {r.dfm.printable
+                                  ? <CheckCircle2 className="h-3 w-3" />
+                                  : <AlertTriangle className="h-3 w-3" />
+                                }
+                                {r.dfm.printable ? "Printable" : `${r.dfm.issues.length} DFM issues`}
+                              </span>
+                            )
+                          })()}
                         </div>
                       )}
 
@@ -557,7 +562,7 @@ export default function CadLabReviewPage(): React.ReactNode {
               </div>
               <div id="dfm-analysis">
                 <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
-                <CadLabAnalysisDashboard modules={modules} projectName={subject} />
+                <CadLabAnalysisDashboard modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
               </div>
               <div id="risk-register">
                 <CadLabRiskRegister modules={modules} />

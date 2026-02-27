@@ -475,34 +475,34 @@ export function CadLabReviewPackage({
                   </div>
                 </div>
 
-                {/* SVG views for generated modules */}
-                {mod.status === "generated" && mod.result?.svgIso && (
+                {/* SVG views for generated modules — prefer persisted svgUrls, fall back to result data URIs */}
+                {mod.status === "generated" && (mod.svgUrls?.iso || mod.result?.svgIso) && (
                   <div className={`grid gap-2 ${
-                    mod.result.svgTop || mod.result.svgFront ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"
+                    (mod.svgUrls?.top || mod.result?.svgTop || mod.svgUrls?.front || mod.result?.svgFront) ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-1"
                   }`}>
                     <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={mod.result.svgIso}
+                        src={mod.svgUrls?.iso ?? mod.result?.svgIso}
                         alt={`${mod.name} isometric view`}
                         className="w-full h-full object-contain"
                       />
                     </div>
-                    {mod.result.svgTop && (
+                    {(mod.svgUrls?.top || mod.result?.svgTop) && (
                       <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={mod.result.svgTop}
+                          src={mod.svgUrls?.top ?? mod.result?.svgTop}
                           alt={`${mod.name} top view`}
                           className="w-full h-full object-contain"
                         />
                       </div>
                     )}
-                    {mod.result.svgFront && (
+                    {(mod.svgUrls?.front || mod.result?.svgFront) && (
                       <div className="w-full h-48 sm:h-56 rounded-md bg-muted/30 border border-muted overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={mod.result.svgFront}
+                          src={mod.svgUrls?.front ?? mod.result?.svgFront}
                           alt={`${mod.name} front view`}
                           className="w-full h-full object-contain"
                         />
@@ -533,25 +533,30 @@ export function CadLabReviewPackage({
                         {mod.result.massGrams.toFixed(1)} g
                       </span>
                     )}
-                    {mod.result.dfm && (
-                      <span
-                        className={cn(
-                          "flex items-center gap-1",
-                          mod.result.dfm.printable
-                            ? "text-status-success"
-                            : "text-status-warning"
-                        )}
-                      >
-                        {mod.result.dfm.printable ? (
-                          <CheckCircle2 className="h-3 w-3" />
-                        ) : (
-                          <AlertTriangle className="h-3 w-3" />
-                        )}
-                        {mod.result.dfm.printable
-                          ? "Printable"
-                          : `${mod.result.dfm.issues.length} DFM issues`}
-                      </span>
-                    )}
+                    {mod.result.dfm && (() => {
+                      const process = modDiag?.mfg_process
+                      const isPrint = !process || process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
+                      if (!isPrint) return null
+                      return (
+                        <span
+                          className={cn(
+                            "flex items-center gap-1",
+                            mod.result.dfm.printable
+                              ? "text-status-success"
+                              : "text-status-warning"
+                          )}
+                        >
+                          {mod.result.dfm.printable ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : (
+                            <AlertTriangle className="h-3 w-3" />
+                          )}
+                          {mod.result.dfm.printable
+                            ? "Printable"
+                            : `${mod.result.dfm.issues.length} DFM issues`}
+                        </span>
+                      )
+                    })()}
                   </div>
                 )}
 
