@@ -68,7 +68,7 @@ import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
-import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
+import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
 
@@ -1173,6 +1173,7 @@ ${finalCode}
 
       // ── Pre-execution validation (#2, #3, #4, #5, #8, A2, B1) ──
       allPreExecResults = [
+        ...checkPythonSyntax(finalCode),
         ...checkComponentCoverage(interfaceDefinition, finalCode),
         ...scanParametricIntegrity(finalCode),
         ...validateZStack(finalCode, interfaceDefinition),
@@ -1259,12 +1260,12 @@ ${finalCode}
       // B4: Post-Modal quality-triggered repair — check for degenerate geometry
       // even on "success". Only degenerate bbox and extreme aspect ratio — fill ratio
       // and STEP size checks are too noisy.
+      const qualityIssues: string[] = []
       const postModalBbox = modalResult.analysis?.mass_properties?.bounding_box
       if (postModalBbox && attempt < MAX_REPAIR_ATTEMPTS - 1) {
         const { xLen, yLen, zLen } = postModalBbox
         const minDim = Math.min(xLen, yLen, zLen)
         const maxDim = Math.max(xLen, yLen, zLen)
-        const qualityIssues: string[] = []
 
         if (minDim < 1) {
           qualityIssues.push(`Degenerate bbox dimension: ${xLen.toFixed(1)}×${yLen.toFixed(1)}×${zLen.toFixed(1)}mm (min axis <1mm)`)
@@ -1331,34 +1332,34 @@ ${finalCode}
             repairHint: "The model's center of gravity is below the Z=0 plane, suggesting it may be upside-down. Check that the base is at Z=0 and components build upward.",
           })
         }
+      }
 
-        // P2: Vision-based render scoring — check if SVG matches description
-        if (modalResult.svg_iso) {
-          const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
-          if (vr) {
-            visionScoreResult = vr
-            if (vr.score < 5) {
-              qualityIssues.push(`Vision score ${vr.score}/10: ${vr.summary}`)
-              allPreExecResults.push({
-                ruleId: "postmodal-vision",
-                severity: "warning",
-                message: `Vision: ${vr.summary}`,
-                repairHint: `The render doesn't match the product description. Missing features: ${vr.issues.join(", ")}`,
-              })
-            }
+      // R6: Vision scoring runs independently of bbox — only needs SVG
+      if (modalResult.svg_iso && attempt < MAX_REPAIR_ATTEMPTS - 1) {
+        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
+        if (vr) {
+          visionScoreResult = vr
+          if (vr.score < 5) {
+            qualityIssues.push(`Vision score ${vr.score}/10: ${vr.summary}`)
+            allPreExecResults.push({
+              ruleId: "postmodal-vision",
+              severity: "warning",
+              message: `Vision: ${vr.summary}`,
+              repairHint: `The render doesn't match the product description. Missing features: ${vr.issues.join(", ")}`,
+            })
           }
         }
+      }
 
-        if (qualityIssues.length > 0) {
-          lastModalError = qualityIssues.join("; ")
-          allPreExecResults.push({
-            ruleId: "postmodal-quality",
-            severity: "warning",
-            message: qualityIssues.join("; "),
-          })
-          console.warn(`[THE-FORGE] Step 4: Post-Modal quality issue on attempt ${attempt + 1}: ${qualityIssues.join("; ")}`)
-          continue
-        }
+      if (qualityIssues.length > 0 && attempt < MAX_REPAIR_ATTEMPTS - 1) {
+        lastModalError = qualityIssues.join("; ")
+        allPreExecResults.push({
+          ruleId: "postmodal-quality",
+          severity: "warning",
+          message: qualityIssues.join("; "),
+        })
+        console.warn(`[THE-FORGE] Step 4: Post-Modal quality issue on attempt ${attempt + 1}: ${qualityIssues.join("; ")}`)
+        continue
       }
 
       // Success — break out of repair loop
@@ -1693,38 +1694,103 @@ Generate CadQuery Python code that:
       })
       .join("\n")
 
-    // ── Pre-execution validation (same checks as main path) ──
-    const preExecResults: PreExecValidationResult[] = [
-      ...analyzeCadQueryCode(finalCode),
-      ...checkComponentCoverage(interfaceDefinition, finalCode),
-      ...scanParametricIntegrity(finalCode),
-      ...validateZStack(finalCode, interfaceDefinition),
-      ...checkFunctionInvocations(finalCode),
-      ...validateInterfaceStructure(interfaceDefinition),
-    ]
-    const dimEstimate = estimateDimensions(finalCode)
-    preExecResults.push(...validateEstimatedDimensions(dimEstimate, interfaceDefinition))
+    // R2: 2-attempt repair loop for seed path pre-exec validation
+    const SEED_MAX_ATTEMPTS = 2
+    let preExecResults: PreExecValidationResult[] = []
 
-    const criticalCount = preExecResults.filter((r) => r.severity === "critical").length
-    if (criticalCount > 0) {
-      // INTENT: No repair loop for seed path (single-shot), but don't waste Modal on critical issues
-      console.warn(`[THE-FORGE] Seed path: ${criticalCount} critical pre-exec issue(s):`,
-        preExecResults.filter((r) => r.severity === "critical").map((r) => r.ruleId))
-      return {
-        success: false,
-        error: `Seed path pre-execution validation failed: ${preExecResults.filter((r) => r.severity === "critical").map((r) => r.message).join("; ")}`,
-        code: finalCode,
-        codeLines: finalCode.split("\n").length,
-        generationTime: Date.now() - pipelineStart,
-        interfaceDefinition,
-        tokensIn: totalTokensIn,
-        tokensOut: totalTokensOut,
-        modelUsed: modelId,
-        assumptions: assumptions.length > 0 ? assumptions : undefined,
-        preExecValidation: preExecResults,
-        seedTemplateSlug: seedTemplate.slug,
-        seedTemplateScore: seedTemplate.score,
+    for (let seedAttempt = 0; seedAttempt < SEED_MAX_ATTEMPTS; seedAttempt++) {
+      preExecResults = [
+        ...checkPythonSyntax(finalCode),
+        ...analyzeCadQueryCode(finalCode),
+        ...checkComponentCoverage(interfaceDefinition, finalCode),
+        ...scanParametricIntegrity(finalCode),
+        ...validateZStack(finalCode, interfaceDefinition),
+        ...checkFunctionInvocations(finalCode),
+        ...validateInterfaceStructure(interfaceDefinition),
+      ]
+      const dimEstimate = estimateDimensions(finalCode)
+      preExecResults.push(...validateEstimatedDimensions(dimEstimate, interfaceDefinition))
+
+      const criticalIssues = preExecResults.filter((r) => r.severity === "critical")
+      if (criticalIssues.length === 0) break // Validation passed
+
+      console.warn(`[THE-FORGE] Seed path: ${criticalIssues.length} critical pre-exec issue(s) on attempt ${seedAttempt + 1}:`,
+        criticalIssues.map((r) => r.ruleId))
+
+      if (seedAttempt >= SEED_MAX_ATTEMPTS - 1) {
+        // Final attempt — return failure
+        return {
+          success: false,
+          error: `Seed path pre-execution validation failed after ${SEED_MAX_ATTEMPTS} attempts: ${criticalIssues.map((r) => r.message).join("; ")}`,
+          code: finalCode,
+          codeLines: finalCode.split("\n").length,
+          generationTime: Date.now() - pipelineStart,
+          interfaceDefinition,
+          tokensIn: totalTokensIn,
+          tokensOut: totalTokensOut,
+          modelUsed: modelId,
+          assumptions: assumptions.length > 0 ? assumptions : undefined,
+          preExecValidation: preExecResults,
+          seedTemplateSlug: seedTemplate.slug,
+          seedTemplateScore: seedTemplate.score,
+        }
       }
+
+      // ── Attempt repair via Claude ──
+      const failureSummary = criticalIssues
+        .map((r) => `[${r.ruleId}] ${r.message}${r.repairHint ? ` — Fix: ${r.repairHint}` : ""}`)
+        .join("\n")
+
+      const repairPrompt = `The following CadQuery code has critical issues that must be fixed before execution:
+
+ISSUES:
+${failureSummary}
+
+ORIGINAL CODE:
+\`\`\`python
+${finalCode}
+\`\`\`
+
+Fix ALL listed issues and output the corrected Python code inside a single \`\`\`python code fence. Preserve all working logic — only fix the listed issues.`
+
+      console.info("[THE-FORGE] Seed path: Attempting repair...")
+      const repairResult = await callClaude(systemPrompt, repairPrompt, modelId, 64000)
+      totalTokensIn += repairResult.tokensIn
+      totalTokensOut += repairResult.tokensOut
+
+      const repairedCode = extractCode(repairResult.text)
+
+      // Divergence check: if repaired code is identical, stop — repair didn't help
+      if (repairedCode.trim() === finalCode.trim()) {
+        console.warn("[THE-FORGE] Seed path: Repair produced identical code, stopping")
+        return {
+          success: false,
+          error: `Seed path repair produced identical code: ${criticalIssues.map((r) => r.message).join("; ")}`,
+          code: finalCode,
+          codeLines: finalCode.split("\n").length,
+          generationTime: Date.now() - pipelineStart,
+          interfaceDefinition,
+          tokensIn: totalTokensIn,
+          tokensOut: totalTokensOut,
+          modelUsed: modelId,
+          assumptions: assumptions.length > 0 ? assumptions : undefined,
+          preExecValidation: preExecResults,
+          seedTemplateSlug: seedTemplate.slug,
+          seedTemplateScore: seedTemplate.score,
+        }
+      }
+
+      // Apply same safety strip to repaired code
+      finalCode = repairedCode
+        .split("\n")
+        .filter((line: string) => {
+          const s = line.trim()
+          if (/^print\s*\(/.test(s)) return false
+          if (s.startsWith("import os") || s.startsWith("from os")) return false
+          if (s.includes("cq.exporters")) return false
+          return true
+        })
+        .join("\n")
     }
 
     const codeLines = finalCode.split("\n").length
@@ -2814,7 +2880,7 @@ export async function generateSystemAssembly(
     // ── Load project with modules ──
     const { data: project, error: loadErr } = await supabase
       .from("cad_lab_projects")
-      .select("id, subject, modules")
+      .select("id, subject, modules, interface_contracts")
       .eq("id", projectId)
       .single()
 
@@ -2823,6 +2889,8 @@ export async function generateSystemAssembly(
     }
 
     const modules = (project.modules as CadLabModule[] | null) ?? []
+    // R1: Extract validated interface contracts for richer assembly positioning
+    const interfaceContracts = (project.interface_contracts as InterfaceContractResult | null)?.contracts ?? []
     if (modules.length === 0) {
       return { success: false, error: "No modules found in project" }
     }
@@ -2920,7 +2988,7 @@ export async function generateSystemAssembly(
     // ── Generate assembly CadQuery code via Claude (with retry) ──
     const sourceNames = resolvedSources.map((s) => s.name)
     const systemPrompt = getAssemblyCodeGenSystemPrompt(sourceNames)
-    const baseUserPrompt = getAssemblyCodeGenUserPrompt(assemblyModules, project.subject ?? "product")
+    const baseUserPrompt = getAssemblyCodeGenUserPrompt(assemblyModules, project.subject ?? "product", interfaceContracts)
 
     const MAX_ATTEMPTS = 2
     let lastCode: string | undefined

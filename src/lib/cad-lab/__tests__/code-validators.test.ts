@@ -3,6 +3,7 @@
  */
 
 import {
+  checkPythonSyntax,
   scanParametricIntegrity,
   validateZStack,
   analyzeCadQueryCode,
@@ -10,6 +11,82 @@ import {
   checkLibraryUsage,
   categorizeModalError,
 } from "../code-validators"
+
+// ─── R4: checkPythonSyntax ──────────────────────────────────────────
+
+describe("checkPythonSyntax", () => {
+  it("returns no issues for valid code", () => {
+    const code = `import cadquery as cq
+
+def make_body():
+    return cq.Workplane("XY").box(100, 100, 50)
+
+result = make_body()
+`
+    const results = checkPythonSyntax(code)
+    expect(results).toHaveLength(0)
+  })
+
+  it("flags unmatched closing paren as critical", () => {
+    const code = `import cadquery as cq
+result = cq.Workplane("XY").box(100, 100, 50))
+`
+    const results = checkPythonSyntax(code)
+    const unmatched = results.find((r) => r.ruleId === "syntax-unmatched-bracket")
+    expect(unmatched).toBeDefined()
+    expect(unmatched!.severity).toBe("critical")
+  })
+
+  it("flags unclosed opening paren as critical", () => {
+    const code = `import cadquery as cq
+result = (
+    cq.Workplane("XY")
+    .box(100, 100, 50)
+`
+    const results = checkPythonSyntax(code)
+    const unclosed = results.find((r) => r.ruleId === "syntax-unclosed-bracket")
+    expect(unclosed).toBeDefined()
+    expect(unclosed!.severity).toBe("critical")
+  })
+
+  it("flags missing cq import as critical", () => {
+    const code = `result = cq.Workplane("XY").box(100, 100, 50)
+`
+    const results = checkPythonSyntax(code)
+    const missing = results.find((r) => r.ruleId === "syntax-missing-cq-import")
+    expect(missing).toBeDefined()
+    expect(missing!.severity).toBe("critical")
+  })
+
+  it("ignores brackets inside strings and comments", () => {
+    const code = `import cadquery as cq
+# This comment has unmatched brackets: ( [ {
+label = "opening bracket: ("
+label2 = 'closing bracket: )'
+result = cq.Workplane("XY").box(100, 100, 50)
+`
+    const results = checkPythonSyntax(code)
+    expect(results).toHaveLength(0)
+  })
+
+  it("handles triple-quoted strings with brackets", () => {
+    const code = `import cadquery as cq
+doc = """This has brackets ( [ { inside triple quotes"""
+result = cq.Workplane("XY").box(100, 100, 50)
+`
+    const results = checkPythonSyntax(code)
+    expect(results).toHaveLength(0)
+  })
+
+  it("accepts 'from cadquery import' as valid import", () => {
+    const code = `from cadquery import Workplane
+result = Workplane("XY").box(100, 100, 50)
+`
+    const results = checkPythonSyntax(code)
+    const missing = results.find((r) => r.ruleId === "syntax-missing-cq-import")
+    expect(missing).toBeUndefined()
+  })
+})
 
 // ─── #3: scanParametricIntegrity ─────────────────────────────────────
 
