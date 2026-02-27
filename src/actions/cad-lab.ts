@@ -1394,6 +1394,17 @@ ${finalCode}
       }
     }
 
+    // J4: Always score the final result for metrics, even if loop is done
+    // Runs only when the loop didn't already produce a vision score (avoids double-scoring on success)
+    if (modalResult.svg_iso && !visionScoreResult) {
+      try {
+        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
+        if (vr) visionScoreResult = vr
+      } catch {
+        // Silent — vision scoring is best-effort enrichment
+      }
+    }
+
     // INTENT: .translate() and .rotate() are forbidden by CadQuery methodology — they corrupt
     // workplane chains and shift geometry off-origin. Flag as warnings, not blocking errors.
     const translateCount = (finalCode.match(/\.translate\s*\(/g) || []).length

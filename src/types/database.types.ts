@@ -3785,6 +3785,7 @@ export type Database = {
           pre_exec_critical_count: number | null
           pre_exec_warning_count: number | null
           project_id: string
+          quality_failure: boolean | null
           repair_attempts: number | null
           seed_template_slug: string | null
           success: boolean
@@ -3806,6 +3807,7 @@ export type Database = {
           pre_exec_critical_count?: number | null
           pre_exec_warning_count?: number | null
           project_id: string
+          quality_failure?: boolean | null
           repair_attempts?: number | null
           seed_template_slug?: string | null
           success: boolean
@@ -3827,6 +3829,7 @@ export type Database = {
           pre_exec_critical_count?: number | null
           pre_exec_warning_count?: number | null
           project_id?: string
+          quality_failure?: boolean | null
           repair_attempts?: number | null
           seed_template_slug?: string | null
           success?: boolean

@@ -605,6 +605,8 @@ async function recordGenerationMetrics(
       pre_exec_warning_count: warningCount || null,
       has_design_brief: enrichment?.hasDesignBrief ?? null,
       domain: enrichment?.domain ?? null,
+      // J4: Quality failure flag — vision score exists but below threshold
+      quality_failure: res.visionScore != null && res.visionScore < 5 ? true : null,
     })
   if (error) {
     console.warn("[CAD-LAB-MODULE] Metrics insert failed:", error.message)
