@@ -11,7 +11,8 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Loader2,
   Box,
@@ -202,40 +203,39 @@ export default function CadLabBuildPage(): React.ReactNode {
   const viewingModule = viewingModuleId ? modules.find((m) => m.id === viewingModuleId) : null
   const viewingResult = viewingModule?.result as CadLabResult | undefined
 
-  // ── Section navigation for Build page ──
-  const BUILD_SECTIONS = useMemo(() => {
-    const sections: { id: string; label: string }[] = []
-    if (modules.length > 0 && generatedModuleCount === modules.length) sections.push({ id: "build-integration", label: "Assembly" })
-    if (modules.length > 0) sections.push({ id: "build-overview", label: "Overview" })
-    if (hasResearch) sections.push({ id: "build-research", label: "Research" })
-    if (hasResearch) sections.push({ id: "build-mfg-context", label: "Mfg Context" })
-    if (modules.length > 0) sections.push({ id: "build-architecture", label: "Architecture" })
-    if (modules.length > 0) sections.push({ id: "build-modules", label: "Modules" })
-    return sections
-  }, [modules, generatedModuleCount, hasResearch])
-
-  const [activeBuildSection, setActiveBuildSection] = useState("")
-
-  const handleBuildSectionClick = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
-
-  useEffect(() => {
-    if (BUILD_SECTIONS.length === 0) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActiveBuildSection(entry.target.id)
-        }
-      },
-      { rootMargin: "-20% 0px -70% 0px" },
-    )
-    for (const section of BUILD_SECTIONS) {
-      const el = document.getElementById(section.id)
-      if (el) observer.observe(el)
+  // ── Tab navigation for Build page ──
+  const BUILD_TABS = useMemo(() => {
+    const tabs: { id: string; label: string; sections: { id: string; label: string }[] }[] = [
+      { id: "overview", label: "Overview", sections: [{ id: "build-overview", label: "Product" }, { id: "build-research", label: "Research" }] },
+      { id: "manufacturing", label: "Manufacturing", sections: [{ id: "build-mfg-context", label: "Context" }] },
+    ]
+    if (modules.length > 0) {
+      tabs.push({ id: "architecture", label: "Architecture", sections: [{ id: "build-architecture", label: "System Graph" }] })
+      tabs.push({ id: "modules", label: "Modules", sections: [{ id: "build-modules", label: "Module List" }] })
     }
-    return () => observer.disconnect()
-  }, [BUILD_SECTIONS])
+    return tabs
+  }, [modules.length])
+
+  const searchParams = useSearchParams()
+  const validTabIds = useMemo(() => BUILD_TABS.map((t) => t.id), [BUILD_TABS])
+  const [activeTab, setActiveTab] = useState(() => {
+    const param = searchParams.get("tab")
+    return param && validTabIds.includes(param) ? param : "overview"
+  })
+  const tabContentRef = useRef<HTMLDivElement>(null)
+
+  // Fallback to "overview" if active tab becomes hidden (e.g. modules removed)
+  useEffect(() => {
+    if (!validTabIds.includes(activeTab)) setActiveTab("overview")
+  }, [validTabIds, activeTab])
+
+  const handleTabClick = useCallback((tabId: string) => {
+    setActiveTab(tabId)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", tabId)
+    router.replace(`?${params.toString()}`, { scroll: false })
+    tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [router, searchParams])
 
   if (!hasResearch) {
     return (
@@ -256,326 +256,326 @@ export default function CadLabBuildPage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
-      {/* ── Section navigation ── */}
-      {BUILD_SECTIONS.length > 1 && (
-        <nav className="sticky top-12 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-          <div className="flex flex-wrap items-center gap-1">
-            {BUILD_SECTIONS.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => handleBuildSectionClick(section.id)}
-                className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
-                  activeBuildSection === section.id
-                    ? "bg-international-orange-light text-international-orange"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                {section.label}
-              </button>
-            ))}
-            <div className="ml-auto flex items-center gap-1.5">
-              <AskSpecialistButton
-                context={{
-                  type: "general",
-                  title: subject,
-                  description: "Product in Build stage of The Forge CAD Lab",
-                  metadata: {
-                    status: isBatchRunning ? "batch generating" : `${generatedModuleCount}/${modules.length} generated`,
-                    notes: [
-                      designBrief.useCase && `Use case: ${designBrief.useCase}`,
-                      designBrief.targetProcess && `Process: ${designBrief.targetProcess}`,
-                      designBrief.targetMaterial && `Material: ${designBrief.targetMaterial}`,
-                      `${modules.reduce((s, m) => s + m.failureModes.length, 0)} failure modes, ${modules.reduce((s, m) => s + m.unknowns.length, 0)} unknowns`,
-                    ].filter(Boolean).join(". "),
-                  },
-                }}
-                specialistId="cto"
-                specialistName="Max"
-                variant="chip"
-                label="Ask Max about design"
-              />
-              <AskSpecialistButton
-                context={{
-                  type: "general",
-                  title: subject,
-                  description: "Product in Build stage — DFM and manufacturing questions",
-                  metadata: {
-                    status: `${generatedModuleCount}/${modules.length} modules generated`,
-                    notes: [
-                      designBrief.targetProcess && `Target process: ${designBrief.targetProcess}`,
-                      designBrief.targetMaterial && `Target material: ${designBrief.targetMaterial}`,
-                      `${modules.length} sub-assemblies`,
-                    ].filter(Boolean).join(". "),
-                  },
-                }}
-                specialistId="vp-manufacturing"
-                specialistName="Fang"
-                variant="chip"
-                label="Ask Fang about DFM"
-              />
-            </div>
-          </div>
-        </nav>
-      )}
-
-      {/* ── Integration: combined system assembly (when all modules generated) ── */}
-      {modules.length > 0 && generatedModuleCount === modules.length && (
-        <div id="build-integration"><IntegrationView
-          allModulesGenerated
-          referenceModel={referenceModel ?? null}
-          integratedAssemblyStlUrl={integratedAssemblyStlUrl}
-          isIntegrating={isIntegrating}
-          onGenerateIntegration={handleGenerateIntegration}
-          integrationError={integrationError}
-          onClearError={() => setIntegrationError(null)}
-          assemblyCode={integrationAssemblyCode}
-        /></div>
-      )}
-
-      {/* ── All modules generated celebration ── */}
-      {generatedModuleCount > 0 && generatedModuleCount === modules.length && (
-        <div className="rounded-xl border border-status-success/30 bg-gradient-to-r from-status-success-light/20 via-background to-status-info-light/10 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 h-12 w-12 rounded-full bg-status-success-light flex items-center justify-center">
-              <Zap className="h-6 w-6 text-status-success" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-3">
-              <div>
-                <h3 className="text-base font-semibold text-foreground">All {modules.length} Modules Generated</h3>
-                {/* Download All — triggers individual STEP + STL downloads for every generated module */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs mt-2"
-                  onClick={() => {
-                    for (const mod of modules) {
-                      const r = mod.result as CadLabResult | undefined
-                      if (!r) continue
-                      if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
-                      else if (r.stepUrl) {
-                        const link = document.createElement("a")
-                        link.href = r.stepUrl
-                        link.download = `${mod.name}.step`
-                        link.click()
-                      }
-                      if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
-                      else if (r.stlUrl) {
-                        const link = document.createElement("a")
-                        link.href = r.stlUrl
-                        link.download = `${mod.name}.stl`
-                        link.click()
-                      }
-                    }
-                  }}
-                >
-                  <Download className="h-3 w-3" />
-                  Download All STEP + STL
-                </Button>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Your product is manufacturing-ready. Continue to the Review stage for supplier-ready documentation and expert matching.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
-                  <ClipboardCheck className="h-3 w-3" /> Review Package
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Partial completion with failures ── */}
-      {generatedModuleCount > 0 && generatedModuleCount < modules.length && (
-        <div className="rounded-xl border border-warning/30 bg-gradient-to-r from-warning/10 via-background to-info-light/10 p-5">
-          <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 h-12 w-12 rounded-full bg-warning/20 flex items-center justify-center">
-              <AlertTriangle className="h-6 w-6 text-warning" />
-            </div>
-            <div className="flex-1 min-w-0 space-y-3">
-              <div>
-                <h3 className="text-base font-semibold text-foreground">
-                  {generatedModuleCount} of {modules.length} Modules Generated
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Some modules failed during generation. You can proceed to Review with available modules or retry the failed ones.
-                </p>
-
-                {/* Download Generated — only successful modules */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs mt-2"
-                  onClick={() => {
-                    for (const mod of modules.filter(m => m.status === "generated")) {
-                      const r = mod.result as CadLabResult | undefined
-                      if (!r) continue
-                      if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
-                      else if (r.stepUrl) {
-                        const link = document.createElement("a")
-                        link.href = r.stepUrl
-                        link.download = `${mod.name}.step`
-                        link.click()
-                      }
-                      if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
-                      else if (r.stlUrl) {
-                        const link = document.createElement("a")
-                        link.href = r.stlUrl
-                        link.download = `${mod.name}.stl`
-                        link.click()
-                      }
-                    }
-                  }}
-                >
-                  <Download className="h-3 w-3" />
-                  Download Generated ({generatedModuleCount})
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
-                  <ClipboardCheck className="h-3 w-3" /> Review Package
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs border-warning/40 text-warning hover:bg-warning/20"
-                  onClick={handleGenerateAllModules}
-                  disabled={isAnyLoading}
-                >
-                  <RotateCcw className="h-3 w-3" /> Retry Failed Modules
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Sticky Generate All action bar (visible when ungenerated modules exist) ── */}
-      {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
-        <div className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{subject}</p>
-              <p className="text-xs text-muted-foreground">
-                {generatedModuleCount} of {modules.length} modules generated
-                {/* P9: System cost total */}
-                {Object.keys(earlyCostEstimates).length > 0 && (() => {
-                  const estimates = Object.values(earlyCostEstimates)
-                  const totalLow = estimates.reduce((s, e) => s + e.totalLow, 0)
-                  const totalHigh = estimates.reduce((s, e) => s + e.totalHigh, 0)
-                  return (
-                    <span className="font-mono ml-2" title="Rough system cost estimate from interface specs">
-                      ~${Math.round(totalLow)} – ${Math.round(totalHigh)}
-                    </span>
-                  )
-                })()}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} size="sm" className="gap-1.5">
-                {isBatchRunning ? (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating...</>
-                ) : (
-                  <><Play className="h-3.5 w-3.5" />Generate All Modules</>
-                )}
-              </Button>
-              <span className="text-xs text-muted-foreground hidden sm:block">~2-5 min</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Product Overview ── */}
-      {modules.length > 0 && (
-        <div id="build-overview"><ProductOverview
-          subject={subject}
-          report={editableReport}
-          modules={modules}
-          moduleCount={modules.length}
-          totalComponents={modules.reduce((s, m) => s + m.keyParts.length, 0)}
-          criticalPathWeeks={Math.max(...modules.map((m) => m.leadWeeks))}
-          totalRisks={modules.reduce((s, m) => s + m.failureModes.length, 0)}
-          totalUnknowns={modules.reduce((s, m) => s + m.unknowns.length, 0)}
-          systemIllustrationUrl={systemIllustrationUrl}
-        /></div>
-      )}
-
-      {/* ── Research Report — collapsed by default once modules exist (reference material) ── */}
-      {hasResearch && (
-        <div id="build-research">
-          <CollapsibleSection
-            title="Research Report"
-            subtitle={editableReport
-              ? editableReport.slice(0, 100).replace(/\n/g, " ").trim() + (editableReport.length > 100 ? "…" : "")
-              : "Market analysis and technical overview"}
-            icon={<FileText className="h-4 w-4" />}
-            defaultOpen={modules.length === 0}
-          >
-            <ResearchSection
-              hasResearch={hasResearch}
-              isAnyLoading={isAnyLoading}
-              researchResult={researchResult}
-              editableReport={editableReport}
-              setEditableReport={setEditableReport}
-              showSources={showSources}
-              setShowSources={setShowSources}
-              handleReset={handleReset}
-              onRetryResearch={handleResearch}
-              systemIllustrationUrl={systemIllustrationUrl}
-              systemIllustrationStatus={systemIllustrationStatus}
+      {/* ── Tab navigation ── */}
+      <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
+        <div className="flex items-center gap-1">
+          {BUILD_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                activeTab === tab.id
+                  ? "bg-international-orange-light text-international-orange"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <div className="ml-auto flex items-center gap-1.5">
+            <AskSpecialistButton
+              context={{
+                type: "general",
+                title: subject,
+                description: "Product in Build stage of The Forge CAD Lab",
+                metadata: {
+                  status: isBatchRunning ? "batch generating" : `${generatedModuleCount}/${modules.length} generated`,
+                  notes: [
+                    designBrief.useCase && `Use case: ${designBrief.useCase}`,
+                    designBrief.targetProcess && `Process: ${designBrief.targetProcess}`,
+                    designBrief.targetMaterial && `Material: ${designBrief.targetMaterial}`,
+                    `${modules.reduce((s, m) => s + m.failureModes.length, 0)} failure modes, ${modules.reduce((s, m) => s + m.unknowns.length, 0)} unknowns`,
+                  ].filter(Boolean).join(". "),
+                },
+              }}
+              specialistId="cto"
+              specialistName="Max"
+              variant="chip"
+              label="Ask Max about design"
             />
-          </CollapsibleSection>
+            <AskSpecialistButton
+              context={{
+                type: "general",
+                title: subject,
+                description: "Product in Build stage — DFM and manufacturing questions",
+                metadata: {
+                  status: `${generatedModuleCount}/${modules.length} modules generated`,
+                  notes: [
+                    designBrief.targetProcess && `Target process: ${designBrief.targetProcess}`,
+                    designBrief.targetMaterial && `Target material: ${designBrief.targetMaterial}`,
+                    `${modules.length} sub-assemblies`,
+                  ].filter(Boolean).join(". "),
+                },
+              }}
+              specialistId="vp-manufacturing"
+              specialistName="Fang"
+              variant="chip"
+              label="Ask Fang about DFM"
+            />
+          </div>
         </div>
-      )}
+      </nav>
 
-      {/* ── Manufacturing Context (moved from Concept) ── */}
-      {hasResearch && (
-        <div id="build-mfg-context"><CollapsibleSection
-          title="Manufacturing Context"
-          subtitle={
-            designBrief.useCase && designBrief.targetProcess && designBrief.targetMaterial
-              ? `${designBrief.targetProcess} · ${designBrief.targetMaterial} · ${designBrief.useCase}`
-              : "Process, material, tolerance, and compliance preferences"
-          }
-          icon={<Ruler className="h-4 w-4" />}
-          defaultOpen={!(designBrief.useCase && designBrief.targetProcess && designBrief.targetMaterial)}
-        >
-          <DesignIntakeForm
-            modelId={modelId}
-            setModelId={setModelId}
-            designBrief={designBrief}
-            setDesignBrief={setDesignBrief}
-            assumptionNotes={assumptionNotes}
-            setAssumptionNotes={setAssumptionNotes}
-            designReadinessPct={designReadinessPct}
-            isAnyLoading={isAnyLoading}
-          />
-        </CollapsibleSection></div>
-      )}
+      {/* ── Tab content ── */}
+      <div ref={tabContentRef} className="space-y-6">
+        <AnimatePresence mode="wait">
+          {/* ── Overview tab ── */}
+          {activeTab === "overview" && (
+            <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              {modules.length > 0 && (
+                <ProductOverview
+                  subject={subject}
+                  report={editableReport}
+                  modules={modules}
+                  moduleCount={modules.length}
+                  totalComponents={modules.reduce((s, m) => s + m.keyParts.length, 0)}
+                  criticalPathWeeks={Math.max(...modules.map((m) => m.leadWeeks))}
+                  totalRisks={modules.reduce((s, m) => s + m.failureModes.length, 0)}
+                  totalUnknowns={modules.reduce((s, m) => s + m.unknowns.length, 0)}
+                  systemIllustrationUrl={systemIllustrationUrl}
+                />
+              )}
+              {hasResearch && (
+                <CollapsibleSection
+                  title="Research Report"
+                  subtitle={editableReport
+                    ? editableReport.slice(0, 100).replace(/\n/g, " ").trim() + (editableReport.length > 100 ? "…" : "")
+                    : "Market analysis and technical overview"}
+                  icon={<FileText className="h-4 w-4" />}
+                  defaultOpen={modules.length === 0}
+                >
+                  <ResearchSection
+                    hasResearch={hasResearch}
+                    isAnyLoading={isAnyLoading}
+                    researchResult={researchResult}
+                    editableReport={editableReport}
+                    setEditableReport={setEditableReport}
+                    showSources={showSources}
+                    setShowSources={setShowSources}
+                    handleReset={handleReset}
+                    onRetryResearch={handleResearch}
+                    systemIllustrationUrl={systemIllustrationUrl}
+                    systemIllustrationStatus={systemIllustrationStatus}
+                  />
+                </CollapsibleSection>
+              )}
+            </motion.div>
+          )}
 
-      {/* ── System Architecture ── */}
-      {modules.length > 0 && (
-        <div id="build-architecture"><SystemArchitecture
-          subject={subject}
-          modules={modules}
-          earlyCostEstimates={earlyCostEstimates}
-          onModuleClick={(moduleId) => {
-            const isCollapsing = expandedModuleId === moduleId
-            setExpandedModuleId(isCollapsing ? null : moduleId)
-            if (!isCollapsing) {
-              // Scroll to the module detail after React renders the expanded section
-              setTimeout(() => {
-                document.getElementById(`module-${moduleId}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }, 50)
-            }
-          }}
-        /></div>
-      )}
+          {/* ── Manufacturing tab ── */}
+          {activeTab === "manufacturing" && (
+            <motion.div key="manufacturing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <CollapsibleSection
+                title="Manufacturing Context"
+                subtitle={
+                  designBrief.useCase && designBrief.targetProcess && designBrief.targetMaterial
+                    ? `${designBrief.targetProcess} · ${designBrief.targetMaterial} · ${designBrief.useCase}`
+                    : "Process, material, tolerance, and compliance preferences"
+                }
+                icon={<Ruler className="h-4 w-4" />}
+                defaultOpen
+              >
+                <DesignIntakeForm
+                  modelId={modelId}
+                  setModelId={setModelId}
+                  designBrief={designBrief}
+                  setDesignBrief={setDesignBrief}
+                  assumptionNotes={assumptionNotes}
+                  setAssumptionNotes={setAssumptionNotes}
+                  designReadinessPct={designReadinessPct}
+                  isAnyLoading={isAnyLoading}
+                />
+              </CollapsibleSection>
+            </motion.div>
+          )}
 
-      {/* Module Integration Flow removed — IO info is now shown inline in System Architecture cards */}
+          {/* ── Architecture tab ── */}
+          {activeTab === "architecture" && modules.length > 0 && (
+            <motion.div key="architecture" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <SystemArchitecture
+                subject={subject}
+                modules={modules}
+                earlyCostEstimates={earlyCostEstimates}
+                onModuleClick={(moduleId) => {
+                  // Cross-tab navigation: switch to Modules tab + expand module
+                  setExpandedModuleId(moduleId)
+                  handleTabClick("modules")
+                  setTimeout(() => {
+                    document.getElementById(`module-${moduleId}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }, 200)
+                }}
+              />
+            </motion.div>
+          )}
 
-      {/* ── Progressive module carousel: visible during batch generation for read-ahead ── */}
-      {modules.length > 0 && isBatchRunning && (
+          {/* ── Modules tab ── */}
+          {activeTab === "modules" && (
+            <motion.div key="modules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              {/* Integration: combined system assembly (when all modules generated) */}
+              {modules.length > 0 && generatedModuleCount === modules.length && (
+                <IntegrationView
+                  allModulesGenerated
+                  referenceModel={referenceModel ?? null}
+                  integratedAssemblyStlUrl={integratedAssemblyStlUrl}
+                  isIntegrating={isIntegrating}
+                  onGenerateIntegration={handleGenerateIntegration}
+                  integrationError={integrationError}
+                  onClearError={() => setIntegrationError(null)}
+                  assemblyCode={integrationAssemblyCode}
+                />
+              )}
+
+              {/* All modules generated celebration */}
+              {generatedModuleCount > 0 && generatedModuleCount === modules.length && (
+                <div className="rounded-xl border border-status-success/30 bg-gradient-to-r from-status-success-light/20 via-background to-status-info-light/10 p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 h-12 w-12 rounded-full bg-status-success-light flex items-center justify-center">
+                      <Zap className="h-6 w-6 text-status-success" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">All {modules.length} Modules Generated</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs mt-2"
+                          onClick={() => {
+                            for (const mod of modules) {
+                              const r = mod.result as CadLabResult | undefined
+                              if (!r) continue
+                              if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
+                              else if (r.stepUrl) {
+                                const link = document.createElement("a")
+                                link.href = r.stepUrl
+                                link.download = `${mod.name}.step`
+                                link.click()
+                              }
+                              if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
+                              else if (r.stlUrl) {
+                                const link = document.createElement("a")
+                                link.href = r.stlUrl
+                                link.download = `${mod.name}.stl`
+                                link.click()
+                              }
+                            }
+                          }}
+                        >
+                          <Download className="h-3 w-3" />
+                          Download All STEP + STL
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Your product is manufacturing-ready. Continue to the Review stage for supplier-ready documentation and expert matching.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
+                          <ClipboardCheck className="h-3 w-3" /> Review Package
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Partial completion with failures */}
+              {generatedModuleCount > 0 && generatedModuleCount < modules.length && (
+                <div className="rounded-xl border border-warning/30 bg-gradient-to-r from-warning/10 via-background to-info-light/10 p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 h-12 w-12 rounded-full bg-warning/20 flex items-center justify-center">
+                      <AlertTriangle className="h-6 w-6 text-warning" />
+                    </div>
+                    <div className="flex-1 min-w-0 space-y-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">
+                          {generatedModuleCount} of {modules.length} Modules Generated
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Some modules failed during generation. You can proceed to Review with available modules or retry the failed ones.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs mt-2"
+                          onClick={() => {
+                            for (const mod of modules.filter(m => m.status === "generated")) {
+                              const r = mod.result as CadLabResult | undefined
+                              if (!r) continue
+                              if (r.stepData) handleDownload(`${mod.name}.step`, r.stepData, false)
+                              else if (r.stepUrl) {
+                                const link = document.createElement("a")
+                                link.href = r.stepUrl
+                                link.download = `${mod.name}.step`
+                                link.click()
+                              }
+                              if (r.stlData) handleDownload(`${mod.name}.stl`, r.stlData, true)
+                              else if (r.stlUrl) {
+                                const link = document.createElement("a")
+                                link.href = r.stlUrl
+                                link.download = `${mod.name}.stl`
+                                link.click()
+                              }
+                            }
+                          }}
+                        >
+                          <Download className="h-3 w-3" />
+                          Download Generated ({generatedModuleCount})
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="default" size="sm" className="gap-1.5 text-xs" onClick={() => router.push(FORGE_ROUTES.cadLabReview)}>
+                          <ClipboardCheck className="h-3 w-3" /> Review Package
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs border-warning/40 text-warning hover:bg-warning/20"
+                          onClick={handleGenerateAllModules}
+                          disabled={isAnyLoading}
+                        >
+                          <RotateCcw className="h-3 w-3" /> Retry Failed Modules
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sticky Generate All action bar */}
+              {modules.length > 0 && modules.some((m) => m.status !== "generated") && (
+                <div className="sticky top-[52px] z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{subject}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {generatedModuleCount} of {modules.length} modules generated
+                        {Object.keys(earlyCostEstimates).length > 0 && (() => {
+                          const estimates = Object.values(earlyCostEstimates)
+                          const totalLow = estimates.reduce((s, e) => s + e.totalLow, 0)
+                          const totalHigh = estimates.reduce((s, e) => s + e.totalHigh, 0)
+                          return (
+                            <span className="font-mono ml-2" title="Rough system cost estimate from interface specs">
+                              ~${Math.round(totalLow)} – ${Math.round(totalHigh)}
+                            </span>
+                          )
+                        })()}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} size="sm" className="gap-1.5">
+                        {isBatchRunning ? (
+                          <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating...</>
+                        ) : (
+                          <><Play className="h-3.5 w-3.5" />Generate All Modules</>
+                        )}
+                      </Button>
+                      <span className="text-xs text-muted-foreground hidden sm:block">~2-5 min</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Module carousel during batch generation */}
+              {modules.length > 0 && isBatchRunning && (
         <ModuleCarousel
           modules={modules}
           batchProgress={batchProgress}
@@ -1457,6 +1457,10 @@ export default function CadLabBuildPage(): React.ReactNode {
           )}
         </CardContent>
       </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* ── Fullscreen overlay ── */}
       {fullscreenView && viewingResult && (
