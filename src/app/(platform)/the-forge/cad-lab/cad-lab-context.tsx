@@ -64,6 +64,7 @@ import type {
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
+import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
 
 // ─── Persistence key for last active project (restore on return) ─────
 
@@ -312,6 +313,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Module state ──
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [decompositionError, setDecompositionError] = useState<string | null>(null)
+  // J6: Cache detected domain so per-module generation reuses it (no redundant Claude calls)
+  const [detectedDomain, setDetectedDomain] = useState<CadLabDomain | null>(null)
   const [modules, setModules] = useState<CadLabModule[]>([])
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
   const [generatingModuleIds, setGeneratingModuleIds] = useState<Set<string>>(new Set())
@@ -595,6 +598,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     try {
       const prep = await prepareDecomposition(subject, editableReport)
       domainHint = prep.domain
+      // J6: Cache domain for reuse in per-module generation requests
+      setDetectedDomain(prep.domain)
       addProgressLine(`Engineering domain: ${prep.domainLabel}`)
       addProgressLine(`Decomposition prompt prepared — ~${prep.estimatedInputTokens.toLocaleString()} input tokens`)
     } catch {
@@ -951,6 +956,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           addProgressLine(`Generating CAD model for ${mod.name}...`)
 
           // P5: Request SSE stream for live progress updates
+          // J6: Pass cached domain to avoid redundant Claude detection calls
           const response = await fetch("/api/cad-lab/generate-module", {
             method: "POST",
             headers: {
@@ -960,6 +966,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             body: JSON.stringify({
               projectId: activeProjectId,
               moduleId,
+              ...(detectedDomain && { domainHint: detectedDomain }),
             }),
           })
 
@@ -1036,7 +1043,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain])
 
   /**
    * Single-click handler that runs the full pipeline for one module
@@ -1088,11 +1095,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       // Step 2: CAD generation
+      // J6: Pass cached domain to avoid redundant Claude detection calls
       addProgressLine(`Generating CAD model for ${mod.name}...`)
       const response = await fetch("/api/cad-lab/generate-module", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: activeProjectId, moduleId }),
+        body: JSON.stringify({
+          projectId: activeProjectId,
+          moduleId,
+          ...(detectedDomain && { domainHint: detectedDomain }),
+        }),
       })
 
       if (!response.ok) {
@@ -1123,7 +1135,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain])
 
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
@@ -1287,12 +1299,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const MAX_ATTEMPTS = 2
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
           try {
+            // J6: Pass cached domain to avoid redundant Claude detection calls
             const res = await fetch("/api/cad-lab/generate-module", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 projectId: activeProjectId,
                 moduleId: mod.id,
+                ...(detectedDomain && { domainHint: detectedDomain }),
               }),
             })
 
@@ -1383,7 +1397,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         sendNotification("The Forge — Batch Finished", `${errorCount} module(s) failed for "${subject}". Check results.`)
       }
     }
-  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot])
+  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot, detectedDomain])
 
   // ── Retry system illustration ──
   const handleRetryIllustration = useCallback(() => {
