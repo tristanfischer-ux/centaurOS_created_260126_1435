@@ -16,6 +16,7 @@
  * @security Server-side only, uses admin API keys.
  */
 
+import { createHash } from "crypto"
 import type {
   ClaudeModelId,
   CadLabResult,
@@ -1132,8 +1133,8 @@ ${finalCode}
 
       finalCode = extractCode(codeResult.text)
 
-      // B3: Divergence detection — if same code hash seen twice, the model is stuck
-      const codeHash = `${finalCode.length}:${finalCode.slice(0, 200)}`
+      // B3/H3: Divergence detection — if same code hash seen twice, the model is stuck
+      const codeHash = createHash("sha256").update(finalCode).digest("hex")
       if (seenCodeHashes.has(codeHash)) {
         console.warn(`[THE-FORGE] Step 3: Divergence detected on attempt ${attempt + 1} — same code generated twice, breaking`)
         break
