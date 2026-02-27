@@ -22,6 +22,7 @@ import { rateLimit } from "@/lib/security/rate-limit"
 import { estimateEarlyCost } from "@/lib/cad-lab/early-cost-estimator"
 import { categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { detectDomainFromResearchReport } from "@/lib/cad-lab/domain-prompts"
+import { refitSvgViewBox } from "@/lib/cad-lab/svg-refit"
 import type { CadLabModule, CadLabResult, ClaudeModelId, CadLabDesignBrief, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
@@ -420,7 +421,9 @@ export async function POST(request: Request): Promise<Response> {
           Object.entries(svgViewMap).map(async ([viewName, dataUri]) => {
             if (!dataUri) return
             try {
-              const base64Data = dataUri.replace(/^data:image\/svg\+xml;base64,/, "")
+              const rawBase64 = dataUri.replace(/^data:image\/svg\+xml;base64,/, "")
+              // K4: Refit viewBox to tightly frame geometry before upload
+              const base64Data = refitSvgViewBox(rawBase64)
               const uploaded = await uploadCadAsset(
                 projectId,
                 localMod.id,
