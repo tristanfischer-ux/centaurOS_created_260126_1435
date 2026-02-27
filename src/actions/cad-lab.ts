@@ -903,6 +903,7 @@ export async function generateCadLabModel(
   checkpointContext?: string,
   interfaceWarnings?: PreExecValidationResult[],
   cachedTemplateMatch?: TemplateMatchResult,
+  designBrief?: CadLabDesignBrief,
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -949,7 +950,7 @@ export async function generateCadLabModel(
         )
         const seedResult = await generateCadLabModelWithSeed(
           description, researchReport, interfaceDefinition,
-          seedMatch.seedTemplate, modelId, checkpointContext,
+          seedMatch.seedTemplate, modelId, checkpointContext, designBrief,
         )
         if (seedResult.success) return seedResult
         // FLOW: Seed path failed — propagate consumed tokens, then fall through to scratch
@@ -1027,6 +1028,9 @@ ${refLines.join("\n")}
 Use these as dimensional cross-references. If your dimensions differ significantly, verify.`
     }
 
+    // H4: Build manufacturing constraints section from design brief
+    const manufacturingConstraints = designBrief ? formatDesignBriefForPrompt(designBrief) : ""
+
     const baseUserPrompt = `Build a parametric CAD model of: ${description}
 
 === MODULE CONTEXT (engineering intent — use this to guide design decisions) ===
@@ -1038,7 +1042,7 @@ ${researchReport}
 === INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
 ${referenceSection}
-${checkpointContext ?? ""}
+${checkpointContext ?? ""}${manufacturingConstraints ? `\n\n=== MANUFACTURING CONSTRAINTS ===\n${manufacturingConstraints}\nApply these constraints when choosing wall thicknesses, tolerances, fillet radii, and assembly clearances.\n` : ""}
 SCALE PRESERVATION CRITICAL:
 - Use the EXACT scale from the research report and interface definition
 - Large systems (shipping containers, buildings, vehicles) must be modeled at FULL SIZE
@@ -1556,6 +1560,7 @@ async function generateCadLabModelWithSeed(
   seedTemplate: { slug: string; name: string; category: string; stepUrl: string; score: number },
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
+  designBrief?: CadLabDesignBrief,
 ): Promise<CadLabResult> {
   const pipelineStart = Date.now()
   let totalTokensIn = 0
@@ -1653,7 +1658,7 @@ ${researchReport}
 
 === INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
-${checkpointContext ?? ""}
+${checkpointContext ?? ""}${designBrief ? `\n\n=== MANUFACTURING CONSTRAINTS ===\n${formatDesignBriefForPrompt(designBrief)}\nApply these constraints when choosing wall thicknesses, tolerances, fillet radii, and assembly clearances.\n` : ""}
 Generate CadQuery Python code that:
 1. Loads the seed STEP as a starting point
 2. Modifies/extends it to match the interface definition
@@ -2315,6 +2320,7 @@ export async function generateCadLabModelSmart(
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
+  designBrief?: CadLabDesignBrief,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -2354,7 +2360,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

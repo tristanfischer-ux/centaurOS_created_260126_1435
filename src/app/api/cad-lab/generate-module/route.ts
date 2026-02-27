@@ -20,7 +20,7 @@ import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { estimateEarlyCost } from "@/lib/cad-lab/early-cost-estimator"
-import type { CadLabModule, CadLabResult, ClaudeModelId, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
+import type { CadLabModule, CadLabResult, ClaudeModelId, CadLabDesignBrief, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
 export const runtime = "nodejs"
@@ -182,7 +182,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const modelIdVal = (project.model_id || "claude-sonnet-4-6") as ClaudeModelId
-  const researchReport = (project.research as { report?: string } | null)?.report ?? ""
+  const researchData = project.research as { report?: string; designBrief?: CadLabDesignBrief } | null
+  const researchReport = researchData?.report ?? ""
+  // H4: Extract design brief from research for manufacturing constraints injection
+  const designBrief = researchData?.designBrief
 
   // P5: Check if client wants SSE (Accept: text/event-stream) or classic JSON
   const acceptsSSE = request.headers.get("accept")?.includes("text/event-stream")
@@ -293,6 +296,7 @@ export async function POST(request: Request): Promise<Response> {
         emit({ type: "status", step: "modal" })
 
         // QW3: Pass cached template match to avoid redundant DB + semantic scoring
+        // H4: Pass design brief for manufacturing constraints in code gen prompt
         const res = await generateCadLabModelSmart(
           enrichedDescription,
           cadResearch,
@@ -300,6 +304,7 @@ export async function POST(request: Request): Promise<Response> {
           modelIdVal,
           checkpointContext || undefined,
           localMod.templateMatchResult || undefined,
+          designBrief,
         )
         cadResult = res
 
