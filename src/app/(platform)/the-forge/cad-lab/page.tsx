@@ -65,13 +65,13 @@ export default function CadLabResearchPage(): React.ReactNode {
   } = useCadLab()
 
   // TEMPORARY: deploy verification — remove after confirming new code is live
-  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T3") }, [])
+  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T4") }, [])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
   // INTENT: Block "Continue to Build" while checkpoints load OR have unacknowledged concerns.
   // Without the isCheckpointing guard, users could skip past the gate before results arrive.
-  const canContinueToBuild = allModulesRevealed && !isCheckpointing && !isRevising && (() => {
+  const canContinueToBuild = allModulesRevealed && !isCheckpointing && !isRevising && !isGeneratingImages && systemIllustrationStatus !== "generating" && (() => {
     const entries = checkpoints ? Object.values(checkpoints) : []
     if (entries.length === 0) return true
     const hasConcerns = entries.some(

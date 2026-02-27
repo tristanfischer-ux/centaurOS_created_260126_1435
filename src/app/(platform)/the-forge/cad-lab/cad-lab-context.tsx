@@ -418,7 +418,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     designBrief.quantityTarget,
   ]
   const designReadinessPct = Math.round((readinessFields.filter((v) => v.trim().length > 0).length / readinessFields.length) * 100)
-  const isAnyLoading = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
+  const isAnyLoading = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0 || isGeneratingImages
   const generatedModuleCount = modules.filter((m) => m.status === "generated").length
   const riskCount = modules.reduce(
     (sum, m) => sum + m.failureModes.length + m.unknowns.length + (m.result?.dfm?.issues?.length ?? 0),
@@ -625,7 +625,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       if (res.success && res.modules.length > 0) {
         setModules(res.modules)
-        setRevealedModuleIds(new Set()) // Reset so counter starts fresh on re-decompose
+        setRevealedModuleIds(new Set(res.modules.map(m => m.id))) // Reveal immediately so text is visible while images generate
         setMilestone("breakdown")
 
         // Seed product overview from executive summary (fires exactly once — on decomposition)
