@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
 
   // Required for Docker runner image (copies .next/standalone)
   output: "standalone",
+
+  // DECISION: Skip TypeScript checking during next build — CI (.github/workflows/ci.yml)
+  // runs `tsc --noEmit` on every push/PR, so type safety is enforced before merge.
+  // The in-build checker OOMs on Vercel's 8GB container with our codebase size.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
   
   // Disable X-Powered-By header for security
   poweredByHeader: false,
