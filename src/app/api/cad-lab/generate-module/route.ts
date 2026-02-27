@@ -250,6 +250,20 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
       modelIdVal,
       checkpointContext || undefined,
     )
+
+    // INTENT: Modal execution can fail (CadQuery errors, union timeouts) and return
+    // { success: false } without throwing. Without this check, broken geometry gets
+    // silently marked as "generated" and the batch counts it as complete.
+    if (!res.success) {
+      console.error("[CAD-LAB-MODULE] CAD generation returned failure:", localMod.name, res.error)
+      localMod = { ...localMod, status: "failed" as const, code: res.code }
+      await saveModuleToProject(supabase, projectId, allModules, localMod)
+      return NextResponse.json(
+        { error: res.error || "CAD generation failed", moduleId },
+        { status: 500 },
+      )
+    }
+
     const { stlData, stepData, ...resultWithoutBinary } = res
 
     const packageFiles: UploadedCadAsset[] = []

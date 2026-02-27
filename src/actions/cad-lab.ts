@@ -127,8 +127,6 @@ async function callClaude(
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
-  const FALLBACK_MODEL: ClaudeModelId = "claude-haiku-4-5-20251001"
-
   const makeRequest = async (model: ClaudeModelId) => {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -161,27 +159,19 @@ async function callClaude(
     }
   }
 
-  // INTENT: Retry on transient API errors (rate limit, overloaded), then fall back to a smaller model
-  try {
-    return await withRetry(() => makeRequest(modelId), {
-      maxRetries: 3,
-      baseDelay: 2000,
-      shouldRetry: (error) => {
-        const msg = error.message
-        return msg.includes("429") || msg.includes("529")
-      },
-    })
-  } catch (primaryError) {
-    // Primary model exhausted retries — try fallback model once
-    if (modelId !== FALLBACK_MODEL) {
-      console.warn(
-        `[callClaude] Primary model ${modelId} failed after retries, falling back to ${FALLBACK_MODEL}:`,
-        primaryError instanceof Error ? primaryError.message : primaryError,
-      )
-      return await makeRequest(FALLBACK_MODEL)
-    }
-    throw primaryError
-  }
+  // INTENT: Retry on transient API errors (rate limit, overloaded), then throw.
+  // DECISION: No Haiku fallback — Haiku produces unusable CadQuery code that wastes
+  // Modal execution time and (before the res.success fix) got silently marked as "generated".
+  // Better to throw and let client-side retry handle it after rate limits cool down.
+  return await withRetry(() => makeRequest(modelId), {
+    maxRetries: 3,
+    baseDelay: 4000,
+    maxDelay: 30000,
+    shouldRetry: (error) => {
+      const msg = error.message
+      return msg.includes("429") || msg.includes("529") || msg.includes("overloaded")
+    },
+  })
 }
 
 // ─── Gemini API Call with Google Search Grounding ────────────────────

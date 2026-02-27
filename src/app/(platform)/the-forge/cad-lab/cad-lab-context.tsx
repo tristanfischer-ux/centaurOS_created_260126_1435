@@ -68,7 +68,7 @@ const CAD_LAB_ACTIVE_PROJECT_KEY = "forgeos:cad-lab:active-project"
 const CAD_LAB_DRAFT_SUBJECT_KEY = "forgeos:cad-lab:draft-subject"
 
 /** Maximum number of concurrent module generation requests */
-const MAX_CONCURRENCY = 3
+const MAX_CONCURRENCY = 2
 
 // ─── Extract executive summary from research report markdown ─────────
 
@@ -1183,7 +1183,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const RETRYABLE_STATUSES = new Set([500, 502, 503, 529])
 
-    const generateOne = async (mod: CadLabModule): Promise<void> => {
+    const generateOne = async (mod: CadLabModule, index: number): Promise<void> => {
+      // INTENT: Stagger launches to avoid API burst pressure (429 cascades).
+      // With MAX_CONCURRENCY=2 and 2 Claude calls per module, this keeps us
+      // within standard Anthropic rate limits.
+      if (index > 0) await new Promise((r) => setTimeout(r, 1500 * index))
       await waitForSlot()
       activeModuleCountRef.current++
 
@@ -1256,7 +1260,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     // Fire all module generations (concurrency limited by waitForSlot)
     try {
-      await Promise.allSettled(pending.map((mod) => generateOne(mod)))
+      await Promise.allSettled(pending.map((mod, i) => generateOne(mod, i)))
     } finally {
       // Mark batch as complete in DB
       try {
