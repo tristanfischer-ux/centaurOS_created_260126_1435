@@ -564,6 +564,37 @@ export function categorizeModalError(
   return null
 }
 
+// ─── H1: Shared Safety Stripping ──────────────────────────────────────
+
+/**
+ * Strips unsafe code patterns from generated CadQuery Python code.
+ *
+ * @description Defence-in-depth: Modal's validate_code() also catches these,
+ * but stripping here avoids wasting a Modal call on obviously bad code.
+ * Consolidated from 6 inline filter blocks in cad-lab.ts.
+ *
+ * @param code - Generated Python code to sanitise
+ * @returns Code with unsafe lines removed
+ */
+export function stripUnsafeCode(code: string): string {
+  return code
+    .split("\n")
+    .filter((line: string) => {
+      const t = line.trim()
+      if (/^print\s*\(/.test(t)) return false
+      if (t.startsWith("import os") || t.startsWith("from os")) return false
+      if (t.startsWith("import sys") || t.startsWith("from sys")) return false
+      if (t.startsWith("import subprocess") || t.startsWith("from subprocess")) return false
+      if (t.startsWith("import shutil") || t.startsWith("from shutil")) return false
+      if (t.startsWith("import socket") || t.startsWith("from socket")) return false
+      if (t.includes("cq.exporters")) return false
+      if (/\b(__import__|exec|eval|compile)\s*\(/.test(t)) return false
+      if (/\bopen\s*\(/.test(t)) return false
+      return true
+    })
+    .join("\n")
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Counts regex occurrences in text */

@@ -68,7 +68,7 @@ import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
-import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
+import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
 
@@ -1160,16 +1160,7 @@ ${finalCode}
       assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
       // Safety: strip any export/print/os calls that slipped through
-      finalCode = finalCode
-        .split("\n")
-        .filter((line: string) => {
-          const s = line.trim()
-          if (/^print\s*\(/.test(s)) return false
-          if (s.startsWith("import os") || s.startsWith("from os")) return false
-          if (s.includes("cq.exporters")) return false
-          return true
-        })
-        .join("\n")
+      finalCode = stripUnsafeCode(finalCode)
 
       // ── Pre-execution validation (#2, #3, #4, #5, #8, A2, B1) ──
       allPreExecResults = [
@@ -1683,16 +1674,7 @@ Generate CadQuery Python code that:
     const assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
     // Safety: strip unsafe calls
-    finalCode = finalCode
-      .split("\n")
-      .filter((line: string) => {
-        const s = line.trim()
-        if (/^print\s*\(/.test(s)) return false
-        if (s.startsWith("import os") || s.startsWith("from os")) return false
-        if (s.includes("cq.exporters")) return false
-        return true
-      })
-      .join("\n")
+    finalCode = stripUnsafeCode(finalCode)
 
     // R2: 2-attempt repair loop for seed path pre-exec validation
     const SEED_MAX_ATTEMPTS = 2
@@ -1781,16 +1763,7 @@ Fix ALL listed issues and output the corrected Python code inside a single \`\`\
       }
 
       // Apply same safety strip to repaired code
-      finalCode = repairedCode
-        .split("\n")
-        .filter((line: string) => {
-          const s = line.trim()
-          if (/^print\s*\(/.test(s)) return false
-          if (s.startsWith("import os") || s.startsWith("from os")) return false
-          if (s.includes("cq.exporters")) return false
-          return true
-        })
-        .join("\n")
+      finalCode = stripUnsafeCode(repairedCode)
     }
 
     const codeLines = finalCode.split("\n").length
@@ -2502,16 +2475,7 @@ export async function generateMashup(
     tokensOut += codeResult.tokensOut
 
     let mashupCode = extractCode(codeResult.text)
-    mashupCode = mashupCode
-      .split("\n")
-      .filter((line: string) => {
-        const t = line.trim()
-        if (/^print\s*\(/.test(t)) return false
-        if (t.startsWith("import os") || t.startsWith("from os")) return false
-        if (t.includes("cq.exporters")) return false
-        return true
-      })
-      .join("\n")
+    mashupCode = stripUnsafeCode(mashupCode)
 
     // ── Step 3: Execute on Modal ──
     const modalResult = await executeMashupOnModal(modalSources, mashupCode, materialDensity)
@@ -2730,16 +2694,7 @@ export async function executeMashupPlan(
     tokensOut += codeResult.tokensOut
 
     let mashupCode = extractCode(codeResult.text)
-    mashupCode = mashupCode
-      .split("\n")
-      .filter((line: string) => {
-        const t = line.trim()
-        if (/^print\s*\(/.test(t)) return false
-        if (t.startsWith("import os") || t.startsWith("from os")) return false
-        if (t.includes("cq.exporters")) return false
-        return true
-      })
-      .join("\n")
+    mashupCode = stripUnsafeCode(mashupCode)
 
     // Pre-flight: generated code must assign final geometry to "result"
     if (!/\bresult\s*=/.test(mashupCode)) {
@@ -3005,25 +2960,9 @@ export async function generateSystemAssembly(
 
       let assemblyCode = extractCode(codeResult.text)
 
-      // ── Sanitise code — strip dangerous patterns before sending to Modal ──
       // SECURITY: Defence-in-depth. Modal's validate_code() catches these too,
       // but stripping here avoids wasting a Modal call on obviously bad code.
-      assemblyCode = assemblyCode
-        .split("\n")
-        .filter((line: string) => {
-          const t = line.trim()
-          if (/^print\s*\(/.test(t)) return false
-          if (t.startsWith("import os") || t.startsWith("from os")) return false
-          if (t.startsWith("import sys") || t.startsWith("from sys")) return false
-          if (t.startsWith("import subprocess") || t.startsWith("from subprocess")) return false
-          if (t.startsWith("import shutil") || t.startsWith("from shutil")) return false
-          if (t.startsWith("import socket") || t.startsWith("from socket")) return false
-          if (t.includes("cq.exporters")) return false
-          if (/\b(__import__|exec|eval|compile)\s*\(/.test(t)) return false
-          if (/\bopen\s*\(/.test(t)) return false
-          return true
-        })
-        .join("\n")
+      assemblyCode = stripUnsafeCode(assemblyCode)
 
       lastCode = assemblyCode
 
