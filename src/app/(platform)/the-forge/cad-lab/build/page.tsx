@@ -1512,6 +1512,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                           moduleId={mod.id}
                           onDownload={handleDownload}
                           svgUrls={mod.svgUrls}
+                          mfgProcess={diagnosticAnswers?.[mod.id]?.mfg_process}
                         />
                       )}
 
@@ -1775,6 +1776,7 @@ function ModuleResultsView({
   moduleId,
   onDownload,
   svgUrls,
+  mfgProcess,
 }: {
   result: CadLabResult
   moduleName: string
@@ -1790,6 +1792,8 @@ function ModuleResultsView({
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
   /** P3: Persisted SVG URLs from Supabase storage — preferred over data URIs */
   svgUrls?: Record<string, string>
+  /** Diagnostic manufacturing process — when non-3D-printing, FDM metrics are hidden */
+  mfgProcess?: string
 }): React.ReactNode {
   // Render high-quality orthographic views from STL using Three.js
   const { views: renderedViews, loading: renderedLoading } = useRenderedViews(result.stlData)
@@ -1865,7 +1869,7 @@ function ModuleResultsView({
   return (
     <div className="space-y-4 pt-2">
       {/* Views */}
-      {(result.stlData || result.svgIso || result.svgFront || result.svgTop) && (
+      {(result.stlData || resolveSvg("iso") || resolveSvg("front") || resolveSvg("top")) && (
         <div className="border rounded-md">
           <div className="flex items-center justify-between p-3 border-b">
             <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
@@ -1978,8 +1982,8 @@ function ModuleResultsView({
         </div>
       )}
 
-      {/* DFM */}
-      {result.dfm && (
+      {/* DFM — only show FDM-specific metrics when the module's mfg_process is a 3D printing variant */}
+      {result.dfm && (!mfgProcess || mfgProcess.startsWith("FDM") || mfgProcess.startsWith("SLA") || mfgProcess.startsWith("SLS")) && (
         <div className="border rounded-md p-3 space-y-3">
           <div className="flex items-center gap-2">
             <Printer className="h-3.5 w-3.5 text-muted-foreground" />
