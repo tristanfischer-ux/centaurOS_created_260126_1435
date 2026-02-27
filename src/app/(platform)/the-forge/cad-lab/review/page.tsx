@@ -29,6 +29,7 @@ import {
   Scale,
   AlertTriangle,
   HelpCircle,
+  GitBranch,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -623,6 +624,19 @@ export default function CadLabReviewPage(): React.ReactNode {
                   onMatchModule={handleMatchModule}
                   onMatchAll={handleMatchAll}
                 />
+                {modules.length > 0 && (
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs gap-1.5"
+                      onClick={() => router.push(FORGE_ROUTES.cadLabSupplyFlow)}
+                    >
+                      <GitBranch className="h-3 w-3" />
+                      View Supply Flow
+                    </Button>
+                  </div>
+                )}
               </div>
               <div id="timeline">
                 <CadLabTimeline modules={modules} />

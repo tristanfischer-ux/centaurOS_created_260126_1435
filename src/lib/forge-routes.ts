@@ -13,6 +13,7 @@ export const FORGE_ROUTES = {
   cadLabTemplates: "/the-forge/cad-lab/templates",
   cadLabMashup: "/the-forge/cad-lab/mashup",
   cadLabPartsBom: "/the-forge/cad-lab/parts-bom",
+  cadLabSupplyFlow: "/the-forge/cad-lab/supply-flow",
 } as const
 
 export function cadLabProjectUrl(projectId: string): string {
