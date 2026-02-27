@@ -905,6 +905,7 @@ export async function generateCadLabModel(
   interfaceWarnings?: PreExecValidationResult[],
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
+  domainHint?: CadLabDomain,
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -923,12 +924,12 @@ export async function generateCadLabModel(
     // ── Generate code with Claude ──
     console.info("[THE-FORGE] Step 3: Generating complete CadQuery code with Claude...")
 
-    // H5: Detect domain for code-gen-specific hints (best-effort, fallback to empty)
+    // H5/J1: Use cached domain hint if available, otherwise detect (best-effort)
     let domainHints = ""
     try {
-      const domain = await detectDomainFromResearchReport(researchReport)
+      const domain = domainHint ?? await detectDomainFromResearchReport(researchReport)
       domainHints = getCodeGenDomainHints(domain)
-      if (domainHints) console.info(`[THE-FORGE] Step 3: Domain detected: ${domain}, injecting code gen hints`)
+      if (domainHints) console.info(`[THE-FORGE] Step 3: Domain detected: ${domain}${domainHint ? " (cached)" : ""}, injecting code gen hints`)
     } catch {
       // Silent — domain hints are best-effort enrichment
     }
@@ -961,7 +962,7 @@ export async function generateCadLabModel(
         )
         const seedResult = await generateCadLabModelWithSeed(
           description, researchReport, interfaceDefinition,
-          seedMatch.seedTemplate, modelId, checkpointContext, designBrief,
+          seedMatch.seedTemplate, modelId, checkpointContext, designBrief, domainHint,
         )
         if (seedResult.success) return seedResult
         // FLOW: Seed path failed — propagate consumed tokens, then fall through to scratch
@@ -1572,6 +1573,7 @@ async function generateCadLabModelWithSeed(
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
   designBrief?: CadLabDesignBrief,
+  domainHint?: CadLabDomain,
 ): Promise<CadLabResult> {
   const pipelineStart = Date.now()
   let totalTokensIn = 0
@@ -2332,6 +2334,7 @@ export async function generateCadLabModelSmart(
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
+  domainHint?: CadLabDomain,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -2371,7 +2374,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief, domainHint)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

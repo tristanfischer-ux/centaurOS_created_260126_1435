@@ -32,6 +32,8 @@ export const maxDuration = 300 // 5 min — ample for a single module (interface
 interface GenerateModuleBody {
   projectId?: string
   moduleId?: string
+  /** J1/J6: Cached domain from client-side prepareDecomposition — avoids redundant Claude call */
+  domainHint?: string
 }
 
 /** Response on success */
@@ -147,6 +149,7 @@ export async function POST(request: Request): Promise<Response> {
   // VALIDATION: Parse request body
   let projectId: string
   let moduleId: string
+  let clientDomainHint: string | undefined
   try {
     const body = (await request.json()) as GenerateModuleBody
     if (!body.projectId || !/^[0-9a-f-]{36}$/.test(body.projectId)) {
@@ -157,6 +160,11 @@ export async function POST(request: Request): Promise<Response> {
     }
     projectId = body.projectId
     moduleId = body.moduleId
+    // J1/J6: Accept cached domain from client to avoid redundant Claude call
+    if (body.domainHint && typeof body.domainHint === "string" &&
+        ["electronics", "mechanical", "electromechanical", "fluid"].includes(body.domainHint)) {
+      clientDomainHint = body.domainHint
+    }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
@@ -223,11 +231,19 @@ export async function POST(request: Request): Promise<Response> {
         moduleId,
       )
 
-      // H6: Detect domain for metrics enrichment (best-effort)
+      // J1: Use cached domain from client hint or research JSON — avoids redundant Claude call
+      // Falls back to detection only if neither cache source is available
       let detectedDomain: string | undefined
-      try {
-        detectedDomain = await detectDomainFromResearchReport(researchReport)
-      } catch { /* silent — domain is enrichment only */ }
+      const researchDomain = (researchData as Record<string, unknown> | null)?.detected_domain as string | undefined
+      if (clientDomainHint) {
+        detectedDomain = clientDomainHint
+      } else if (researchDomain && ["electronics", "mechanical", "electromechanical", "fluid"].includes(researchDomain)) {
+        detectedDomain = researchDomain
+      } else {
+        try {
+          detectedDomain = await detectDomainFromResearchReport(researchReport)
+        } catch { /* silent — domain is enrichment only */ }
+      }
 
       const metricsEnrichment: MetricsEnrichment = {
         hasDesignBrief: !!designBrief,
@@ -310,6 +326,7 @@ export async function POST(request: Request): Promise<Response> {
 
         // QW3: Pass cached template match to avoid redundant DB + semantic scoring
         // H4: Pass design brief for manufacturing constraints in code gen prompt
+        // J1: Pass cached domain to eliminate redundant Claude detection call
         const res = await generateCadLabModelSmart(
           enrichedDescription,
           cadResearch,
@@ -318,6 +335,7 @@ export async function POST(request: Request): Promise<Response> {
           checkpointContext || undefined,
           localMod.templateMatchResult || undefined,
           designBrief,
+          detectedDomain as import("@/lib/cad-lab/domain-prompts").CadLabDomain | undefined,
         )
         cadResult = res
 
