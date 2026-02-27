@@ -116,11 +116,28 @@ export default function CadLabReviewPage(): React.ReactNode {
   // ── Tab navigation state ──
   const TAB_GROUPS = useMemo(() => [
     {
+      group: "Review",
+      sections: [
+        { id: "executive-summary", label: "Executive Summary" },
+        { id: "module-overview", label: "Module Overview" },
+      ],
+    },
+    {
       group: "Engineering",
       sections: [
-        { id: "review-package", label: "Review" },
-        { id: "dfm-analysis", label: "DFM" },
-        { id: "risk-register", label: "Risks" },
+        { id: "review-package", label: "Review Package" },
+      ],
+    },
+    {
+      group: "DFM",
+      sections: [
+        { id: "dfm-analysis", label: "Analysis" },
+      ],
+    },
+    {
+      group: "Risks",
+      sections: [
+        { id: "risk-register", label: "Register" },
       ],
     },
     {
@@ -161,7 +178,7 @@ export default function CadLabReviewPage(): React.ReactNode {
   const validTabs = useMemo(() => TAB_GROUPS.map((g) => g.group), [TAB_GROUPS])
   const [activeTab, setActiveTab] = useState(() => {
     const param = searchParams.get("tab")
-    return param && validTabs.includes(param) ? param : "Engineering"
+    return param && validTabs.includes(param) ? param : "Review"
   })
   const [activeSubSection, setActiveSubSection] = useState<string | null>(null)
   const tabContentRef = useRef<HTMLDivElement>(null)
@@ -374,197 +391,202 @@ export default function CadLabReviewPage(): React.ReactNode {
         </nav>
       )}
 
-      {/* ── Project Overview — system context + key metrics merged into one card ── */}
-      <Card id="executive-summary" className="overflow-hidden">
-        <div className="flex items-start gap-4 p-5">
-          {/* System illustration thumbnail */}
-          {systemIllustrationUrl && (
-            <div className="w-24 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 hidden sm:block border">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={systemIllustrationUrl} alt="System overview" className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div className="flex-1 min-w-0">
-            <h3 className="text-base font-semibold text-foreground">{subject}</h3>
-            <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Layers className="h-3 w-3" /> {modules.length} modules
-              </span>
-              <span className="flex items-center gap-1">
-                <Box className="h-3 w-3" /> {generatedModuleCount} generated
-              </span>
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-status-success" /> {modules.reduce((s, m) => s + m.keyParts.length, 0)} components
-              </span>
-              {researchResult?.sources && (
-                <span className="flex items-center gap-1">
-                  <FileText className="h-3 w-3" /> {researchResult.sources.length} research sources
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        {/* Executive metrics row */}
-        {modules.length > 0 && (
-          <div className="px-5 pb-5 border-t pt-4">
-            <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} bare />
-          </div>
-        )}
-        {/* Collapsible: module overview with expandable detail cards */}
-        <button
-          onClick={() => setShowBuildContext(!showBuildContext)}
-          className="flex items-center justify-between w-full px-5 py-2.5 border-t text-left hover:bg-muted/50 transition-colors"
-        >
-          <span className="text-xs font-medium text-muted-foreground">Module Overview</span>
-          {showBuildContext
-            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-          }
-        </button>
-        {showBuildContext && (
-          <div className="px-5 pb-4 space-y-2 border-t pt-3">
-            {modules.map((mod) => {
-              const isExpanded = expandedModuleId === mod.id
-              const r = mod.result as CadLabResult | undefined
-              return (
-                <div key={mod.id} className="rounded border border-muted overflow-hidden">
-                  {/* Module row — clickable to expand */}
-                  <button
-                    onClick={() => setExpandedModuleId(isExpanded ? null : mod.id)}
-                    className="flex items-center gap-3 text-xs p-2 w-full text-left hover:bg-muted/30 transition-colors"
-                  >
-                    {mod.imageUrl && mod.imageStatus === "complete" && (
-                      <div className="h-12 w-12 rounded overflow-hidden bg-muted flex-shrink-0">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-foreground truncate">{mod.name}</p>
-                      <p className="text-muted-foreground truncate">{mod.purpose}</p>
-                    </div>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      mod.status === "generated"
-                        ? "bg-status-success-light text-status-success"
-                        : "bg-muted text-muted-foreground"
-                    }`}>
-                      {mod.status === "generated" ? "CAD done" : mod.status}
-                    </span>
-                    {mod.result?.bbox && (
-                      <span className="text-muted-foreground font-mono hidden sm:inline">
-                        {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
-                      </span>
-                    )}
-                    {isExpanded
-                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                    }
-                  </button>
-
-                  {/* Expanded detail panel */}
-                  {isExpanded && (
-                    <div className="border-t p-3 space-y-3 bg-muted/10">
-                      {/* CAD isometric view — prefer persisted svgUrls, fall back to result data URI */}
-                      {(mod.svgUrls?.iso || r?.svgIso) && (
-                        <div className="w-full h-48 rounded-md bg-muted/30 border border-muted overflow-hidden">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mod.svgUrls?.iso ?? r?.svgIso} alt={`${mod.name} isometric`} className="w-full h-full object-contain" />
-                        </div>
-                      )}
-
-                      {/* Key parts chips */}
-                      {mod.keyParts.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {mod.keyParts.map((part, i) => (
-                            <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-foreground">
-                              {part}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Dimensions, mass, DFM status */}
-                      {r && (
-                        <div className="flex flex-wrap items-center gap-3 text-xs">
-                          {r.bbox && (
-                            <span className="flex items-center gap-1 text-foreground">
-                              <Ruler className="h-3 w-3 text-muted-foreground" />
-                              {r.bbox.xLen.toFixed(0)}×{r.bbox.yLen.toFixed(0)}×{r.bbox.zLen.toFixed(0)} mm
-                            </span>
-                          )}
-                          {r.massGrams != null && (
-                            <span className="flex items-center gap-1 text-foreground">
-                              <Scale className="h-3 w-3 text-muted-foreground" />
-                              {r.massGrams.toFixed(1)} g
-                            </span>
-                          )}
-                          {r.dfm && (() => {
-                            const process = diagnosticAnswers?.[mod.id]?.mfg_process
-                            const isPrint = !process || process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
-                            if (!isPrint) return null
-                            return (
-                              <span className={`flex items-center gap-1 ${r.dfm.printable ? "text-status-success" : "text-status-warning"}`}>
-                                {r.dfm.printable
-                                  ? <CheckCircle2 className="h-3 w-3" />
-                                  : <AlertTriangle className="h-3 w-3" />
-                                }
-                                {r.dfm.printable ? "Printable" : `${r.dfm.issues.length} DFM issues`}
-                              </span>
-                            )
-                          })()}
-                        </div>
-                      )}
-
-                      {/* Description */}
-                      {mod.description && (
-                        <p className="text-xs text-muted-foreground leading-relaxed">{mod.description}</p>
-                      )}
-
-                      {/* Failure modes & unknowns (first 3, collapsible) */}
-                      {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
-                        <div className="space-y-1.5">
-                          {mod.failureModes.slice(0, 3).map((fm, i) => (
-                            <div key={`fm-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-warning">
-                              <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                              <span>{fm}</span>
-                            </div>
-                          ))}
-                          {mod.unknowns.slice(0, 3).map((u, i) => (
-                            <div key={`u-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-info">
-                              <HelpCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                              <span>{u}</span>
-                            </div>
-                          ))}
-                          {(mod.failureModes.length > 3 || mod.unknowns.length > 3) && (
-                            <p className="text-[10px] text-muted-foreground">
-                              +{Math.max(0, mod.failureModes.length - 3) + Math.max(0, mod.unknowns.length - 3)} more
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </Card>
-
       {/* ── Tab content ── */}
       <div ref={tabContentRef} className="space-y-6">
         <AnimatePresence mode="wait">
-          {/* Engineering tab */}
+          {/* Review tab — executive summary + module overview */}
+          {activeTab === "Review" && (
+            <motion.div key="Review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <Card id="executive-summary" className="overflow-hidden">
+                <div className="flex items-start gap-4 p-5">
+                  {systemIllustrationUrl && (
+                    <div className="w-24 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 hidden sm:block border">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={systemIllustrationUrl} alt="System overview" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-foreground">{subject}</h3>
+                    <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Layers className="h-3 w-3" /> {modules.length} modules
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Box className="h-3 w-3" /> {generatedModuleCount} generated
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-status-success" /> {modules.reduce((s, m) => s + m.keyParts.length, 0)} components
+                      </span>
+                      {researchResult?.sources && (
+                        <span className="flex items-center gap-1">
+                          <FileText className="h-3 w-3" /> {researchResult.sources.length} research sources
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {modules.length > 0 && (
+                  <div className="px-5 pb-5 border-t pt-4">
+                    <CadLabExecutiveSummary modules={modules} diagnosticAnswers={diagnosticAnswers} projectName={subject} bare />
+                  </div>
+                )}
+              </Card>
+              <div id="module-overview">
+                <Card>
+                  <button
+                    onClick={() => setShowBuildContext(!showBuildContext)}
+                    className="flex items-center justify-between w-full px-5 py-2.5 text-left hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="text-xs font-medium text-muted-foreground">Module Overview</span>
+                    {showBuildContext
+                      ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    }
+                  </button>
+                  {showBuildContext && (
+                    <div className="px-5 pb-4 space-y-2 border-t pt-3">
+                      {modules.map((mod) => {
+                        const isExpanded = expandedModuleId === mod.id
+                        const r = mod.result as CadLabResult | undefined
+                        return (
+                          <div key={mod.id} className="rounded border border-muted overflow-hidden">
+                            <button
+                              onClick={() => setExpandedModuleId(isExpanded ? null : mod.id)}
+                              className="flex items-center gap-3 text-xs p-2 w-full text-left hover:bg-muted/30 transition-colors"
+                            >
+                              {mod.imageUrl && mod.imageStatus === "complete" && (
+                                <div className="h-12 w-12 rounded overflow-hidden bg-muted flex-shrink-0">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={mod.imageUrl} alt="" className="h-full w-full object-cover" />
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-foreground truncate">{mod.name}</p>
+                                <p className="text-muted-foreground truncate">{mod.purpose}</p>
+                              </div>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                mod.status === "generated"
+                                  ? "bg-status-success-light text-status-success"
+                                  : "bg-muted text-muted-foreground"
+                              }`}>
+                                {mod.status === "generated" ? "CAD done" : mod.status}
+                              </span>
+                              {mod.result?.bbox && (
+                                <span className="text-muted-foreground font-mono hidden sm:inline">
+                                  {mod.result.bbox.xLen}×{mod.result.bbox.yLen}×{mod.result.bbox.zLen}mm
+                                </span>
+                              )}
+                              {isExpanded
+                                ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                              }
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t p-3 space-y-3 bg-muted/10">
+                                {(mod.svgUrls?.iso || r?.svgIso) && (
+                                  <div className="w-full h-48 rounded-md bg-muted/30 border border-muted overflow-hidden">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={mod.svgUrls?.iso ?? r?.svgIso} alt={`${mod.name} isometric`} className="w-full h-full object-contain" />
+                                  </div>
+                                )}
+                                {mod.keyParts.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {mod.keyParts.map((part, i) => (
+                                      <span key={i} className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono text-foreground">
+                                        {part}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {r && (
+                                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                                    {r.bbox && (
+                                      <span className="flex items-center gap-1 text-foreground">
+                                        <Ruler className="h-3 w-3 text-muted-foreground" />
+                                        {r.bbox.xLen.toFixed(0)}×{r.bbox.yLen.toFixed(0)}×{r.bbox.zLen.toFixed(0)} mm
+                                      </span>
+                                    )}
+                                    {r.massGrams != null && (
+                                      <span className="flex items-center gap-1 text-foreground">
+                                        <Scale className="h-3 w-3 text-muted-foreground" />
+                                        {r.massGrams.toFixed(1)} g
+                                      </span>
+                                    )}
+                                    {r.dfm && (() => {
+                                      const process = diagnosticAnswers?.[mod.id]?.mfg_process
+                                      const isPrint = !process || process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
+                                      if (!isPrint) return null
+                                      return (
+                                        <span className={`flex items-center gap-1 ${r.dfm.printable ? "text-status-success" : "text-status-warning"}`}>
+                                          {r.dfm.printable
+                                            ? <CheckCircle2 className="h-3 w-3" />
+                                            : <AlertTriangle className="h-3 w-3" />
+                                          }
+                                          {r.dfm.printable ? "Printable" : `${r.dfm.issues.length} DFM issues`}
+                                        </span>
+                                      )
+                                    })()}
+                                  </div>
+                                )}
+                                {mod.description && (
+                                  <p className="text-xs text-muted-foreground leading-relaxed">{mod.description}</p>
+                                )}
+                                {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
+                                  <div className="space-y-1.5">
+                                    {mod.failureModes.slice(0, 3).map((fm, i) => (
+                                      <div key={`fm-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-warning">
+                                        <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                                        <span>{fm}</span>
+                                      </div>
+                                    ))}
+                                    {mod.unknowns.slice(0, 3).map((u, i) => (
+                                      <div key={`u-${i}`} className="flex items-start gap-1.5 text-[11px] text-status-info">
+                                        <HelpCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                                        <span>{u}</span>
+                                      </div>
+                                    ))}
+                                    {(mod.failureModes.length > 3 || mod.unknowns.length > 3) && (
+                                      <p className="text-[10px] text-muted-foreground">
+                                        +{Math.max(0, mod.failureModes.length - 3) + Math.max(0, mod.unknowns.length - 3)} more
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </Card>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Engineering tab — review package only */}
           {activeTab === "Engineering" && (
             <motion.div key="Engineering" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div id="review-package">
                 <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
                 <CadLabReviewPackage modules={modules} projectName={subject} researchReport={editableReport} diagnosticAnswers={diagnosticAnswers} />
               </div>
+            </motion.div>
+          )}
+
+          {/* DFM tab */}
+          {activeTab === "DFM" && (
+            <motion.div key="DFM" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div id="dfm-analysis">
                 <p className="text-[11px] text-muted-foreground mb-2">Analysis carried forward from Build stage</p>
                 <CadLabAnalysisDashboard modules={modules} projectName={subject} diagnosticAnswers={diagnosticAnswers} />
               </div>
+            </motion.div>
+          )}
+
+          {/* Risks tab */}
+          {activeTab === "Risks" && (
+            <motion.div key="Risks" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div id="risk-register">
                 <CadLabRiskRegister modules={modules} />
               </div>
