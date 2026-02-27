@@ -112,6 +112,7 @@ describe("computeCadLabQualityScorecard", () => {
       ],
       validationPassCount: 2,
       validationFailCount: 0,
+      firstAttemptSuccessPct: 0,
     })
   })
 })

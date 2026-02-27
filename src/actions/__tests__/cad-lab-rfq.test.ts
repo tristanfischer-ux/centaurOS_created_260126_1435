@@ -249,6 +249,7 @@ describe("createCadLabRfqAction", () => {
       ],
       validationPassCount: 1,
       validationFailCount: 0,
+      firstAttemptSuccessPct: 0,
     })
     expect(payload.specifications?.custom_fields?.readiness_checks).toEqual([
       {
@@ -536,6 +537,7 @@ describe("createCadLabRfqAction", () => {
       ],
       validationPassCount: 2,
       validationFailCount: 0,
+      firstAttemptSuccessPct: 0,
     })
   })
 })
