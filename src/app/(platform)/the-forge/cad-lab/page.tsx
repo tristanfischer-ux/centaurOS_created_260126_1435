@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo, useState, useCallback } from "react"
+import { useMemo } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -39,6 +39,7 @@ import { ProcessFlowDiagram } from "./components/process-flow-diagram"
 import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
+import { CheckpointRevisionDiffs } from "./components/checkpoint-revision-diffs"
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -57,19 +58,16 @@ export default function CadLabResearchPage(): React.ReactNode {
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines,
     checkpoints, isCheckpointing,
+    isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
     productOverview, setProductOverview,
     handleUpdateModule,
   } = useCadLab()
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
-  // Checkpoint acknowledgment gating
-  const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
-  const handleAcknowledge = useCallback(() => setCheckpointAcknowledged(true), [])
-
   // INTENT: Block "Continue to Build" while checkpoints load OR have unacknowledged concerns.
   // Without the isCheckpointing guard, users could skip past the gate before results arrive.
-  const canContinueToBuild = allModulesRevealed && !isCheckpointing && (() => {
+  const canContinueToBuild = allModulesRevealed && !isCheckpointing && !isRevising && (() => {
     const entries = checkpoints ? Object.values(checkpoints) : []
     if (entries.length === 0) return true
     const hasConcerns = entries.some(
@@ -287,9 +285,16 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <DecompositionCheckpointCard
                   checkpoints={checkpoints}
                   isCheckpointing={isCheckpointing}
-                  onAcknowledge={handleAcknowledge}
+                  onAcknowledge={handleAcknowledgeCheckpoints}
                   acknowledged={checkpointAcknowledged}
+                  isRevising={isRevising}
+                  revisedModuleCount={revisedModuleIds.size}
                 />
+              )}
+
+              {/* Checkpoint revision diffs — shown after modules are revised */}
+              {revisedModuleIds.size > 0 && (
+                <CheckpointRevisionDiffs modules={modules} revisedModuleIds={revisedModuleIds} />
               )}
 
               {/* Continue to Build CTA — gated on modules revealed + checkpoint acknowledgment */}

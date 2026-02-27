@@ -58,7 +58,7 @@ import type {
   VisualStyleSpec,
   DecompositionCheckpoint,
 } from "@/lib/cad-lab-types"
-import { requestDecompositionCheckpoints } from "@/actions/cad-lab-reviews"
+import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
 
@@ -189,6 +189,12 @@ export interface CadLabContextValue {
   // Decomposition checkpoints
   checkpoints: Record<string, DecompositionCheckpoint> | null
   isCheckpointing: boolean
+
+  // Checkpoint revision (auto-revise flagged modules after acknowledgment)
+  isRevising: boolean
+  revisedModuleIds: Set<string>
+  checkpointAcknowledged: boolean
+  handleAcknowledgeCheckpoints: () => void
 
   // Product overview (editable executive summary)
   productOverview: string
@@ -367,6 +373,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Decomposition checkpoints ──
   const [checkpoints, setCheckpoints] = useState<Record<string, DecompositionCheckpoint> | null>(null)
   const [isCheckpointing, setIsCheckpointing] = useState(false)
+  const [isRevising, setIsRevising] = useState(false)
+  const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
+  const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
 
   // ── Product overview (editable executive summary) ──
   const [productOverview, setProductOverview] = useState("")
@@ -1517,9 +1526,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setModules(p.modules)
         // All loaded modules are immediately revealed (no progressive reveal for saved projects)
         setRevealedModuleIds(new Set(p.modules.map((m) => m.id)))
+        // Recompute revisedModuleIds and acknowledgment from persisted conceptSnapshot
+        const modulesWithSnapshots = p.modules.filter((m) => m.conceptSnapshot)
+        setRevisedModuleIds(new Set(modulesWithSnapshots.map((m) => m.id)))
+        setCheckpointAcknowledged(modulesWithSnapshots.length > 0)
       } else {
         setModules([])
         setRevealedModuleIds(new Set())
+        setRevisedModuleIds(new Set())
+        setCheckpointAcknowledged(false)
       }
 
       setLastSaved(p.updatedAt)
@@ -1600,6 +1615,65 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [activeProjectId, refreshProjects])
 
+  // ── Checkpoint acknowledgment + auto-revision ──
+  // DECISION: Combined into one context-level handler so acknowledgment persists
+  // across page navigation and double-revision is prevented by checking conceptSnapshot.
+  const handleAcknowledgeCheckpoints = useCallback(() => {
+    if (checkpointAcknowledged || isRevising) return
+    setCheckpointAcknowledged(true)
+
+    // Fire-and-forget revision — UI shows spinner via isRevising
+    if (!checkpoints) return
+    // Guard: if modules already have snapshots, revision already happened (e.g. loaded from DB)
+    const alreadyRevised = modulesRef.current.some((m) => m.conceptSnapshot)
+    if (alreadyRevised) return
+
+    setIsRevising(true)
+    reviseModulesFromCheckpoints({
+      modules: modulesRef.current,
+      checkpoints,
+      researchReport: editableReport,
+      projectSubject: subject,
+    }).then((revised) => {
+      const revisedIds = Object.keys(revised)
+      if (revisedIds.length === 0) return
+
+      setModules((prev) =>
+        prev.map((mod) => {
+          const fields = revised[mod.id]
+          if (!fields) return mod
+          // GUARD: Never overwrite an existing snapshot (prevents double-revision)
+          if (mod.conceptSnapshot) return { ...mod, ...fields }
+          return {
+            ...mod,
+            conceptSnapshot: {
+              purpose: mod.purpose,
+              description: mod.description,
+              keyParts: [...mod.keyParts],
+              whyItMatters: mod.whyItMatters,
+              failureModes: [...mod.failureModes],
+              unknowns: [...mod.unknowns],
+            },
+            purpose: fields.purpose,
+            description: fields.description,
+            keyParts: fields.keyParts,
+            whyItMatters: fields.whyItMatters,
+            failureModes: fields.failureModes,
+            unknowns: fields.unknowns,
+          }
+        }),
+      )
+      debouncedSaveModules()
+      setRevisedModuleIds(new Set(revisedIds))
+      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback`)
+    }).catch((err) => {
+      console.error("[CAD-LAB] Checkpoint revision failed:", err)
+      toast.error("Module revision failed — proceeding with original descriptions")
+    }).finally(() => {
+      setIsRevising(false)
+    })
+  }, [checkpointAcknowledged, isRevising, checkpoints, editableReport, subject, debouncedSaveModules])
+
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
     try {
@@ -1646,6 +1720,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isAnyLoading, generatedModuleCount, riskCount, diagCompletedCount,
     integratedAssemblyStlUrl, integratedAssemblyStepUrl, isIntegrating, integrationError, integrationAssemblyCode, setIntegrationError, handleGenerateIntegration,
     checkpoints, isCheckpointing,
+    isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
     handleDownload,

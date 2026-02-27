@@ -235,6 +235,16 @@ export interface CadLabModule {
   moduleImagePrompt?: string
   /** Slug of the step_template matched as seed geometry for this module */
   seedTemplateSlug?: string
+
+  /** Snapshot of text fields before checkpoint revision, for redline diff display */
+  conceptSnapshot?: {
+    purpose: string
+    description: string
+    keyParts: string[]
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+  }
 }
 
 /** Result from module decomposition */

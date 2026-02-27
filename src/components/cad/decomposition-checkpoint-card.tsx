@@ -52,6 +52,10 @@ interface DecompositionCheckpointCardProps {
     onAcknowledge?: () => void
     /** Whether concerns have already been acknowledged */
     acknowledged?: boolean
+    /** Whether modules are currently being revised from checkpoint feedback */
+    isRevising?: boolean
+    /** Number of modules that were revised */
+    revisedModuleCount?: number
 }
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -61,6 +65,8 @@ export function DecompositionCheckpointCard({
     isCheckpointing,
     onAcknowledge,
     acknowledged = false,
+    isRevising = false,
+    revisedModuleCount = 0,
 }: DecompositionCheckpointCardProps) {
     const [isExpanded, setIsExpanded] = useState(true)
 
@@ -134,11 +140,29 @@ export function DecompositionCheckpointCard({
                         </Button>
                     )}
 
-                    {/* Acknowledged confirmation */}
+                    {/* Post-acknowledgment states: revising → revised → fallback */}
                     {hasCheckpoints && hasConcerns && acknowledged && (
                         <div className="flex items-center gap-2 pt-2 border-t border-border">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                            <span className="text-xs text-muted-foreground">Concerns reviewed</span>
+                            {isRevising ? (
+                                <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">
+                                        Applying specialist feedback to flagged modules...
+                                    </span>
+                                </>
+                            ) : revisedModuleCount > 0 ? (
+                                <>
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                                    <span className="text-xs text-muted-foreground">
+                                        Specialist feedback applied — {revisedModuleCount} module{revisedModuleCount === 1 ? "" : "s"} revised
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                                    <span className="text-xs text-muted-foreground">Concerns reviewed</span>
+                                </>
+                            )}
                         </div>
                     )}
                 </CardContent>

@@ -56,6 +56,7 @@ import { EmptyState } from "@/components/ui/empty-state"
 import { ResearchSection } from "../components/research-section"
 import { DesignIntakeForm } from "../components/design-intake-form"
 import { RedlineDiff, type RedlineItem } from "../components/redline-diff"
+import { buildRevisionItems } from "../components/checkpoint-revision-diffs"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -1111,6 +1112,12 @@ export default function CadLabBuildPage(): React.ReactNode {
                           <p className="text-[10px] text-muted-foreground text-center py-1 bg-muted/50">Click to zoom</p>
                         </button>
                       )}
+
+                      {/* Checkpoint revision diffs (Original Concept → Revised) */}
+                      {mod.conceptSnapshot && (() => {
+                        const revItems = buildRevisionItems(mod)
+                        return revItems.length > 0 ? <RedlineDiff fromStage="Original Concept" toStage="Revised" items={revItems} /> : null
+                      })()}
 
                       {/* Concept → Build redline diffs */}
                       <ConceptBuildDiff module={mod} />

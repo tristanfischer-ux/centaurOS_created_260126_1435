@@ -707,3 +707,181 @@ function parseCheckpointResponse(
         checkpointTimeMs,
     }
 }
+
+// ─── Module Revision from Checkpoint Feedback (Tier 3) ──────────────
+
+export interface RevisedModuleFields {
+    purpose: string
+    description: string
+    keyParts: string[]
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+}
+
+export interface RevisionRequest {
+    modules: CadLabModule[]
+    checkpoints: Record<string, DecompositionCheckpoint>
+    researchReport: string
+    projectSubject: string
+}
+
+/**
+ * Revises flagged modules' text fields to address checkpoint specialist concerns.
+ *
+ * @description After the user acknowledges checkpoint feedback, this action calls
+ * Claude (in parallel, one call per flagged module) to revise the module's text
+ * fields so they visibly address the specialist concerns. Uses Promise.allSettled
+ * for graceful partial failure — if a module revision fails, it's silently skipped.
+ *
+ * @returns Record of moduleId → revised fields, only for successfully revised modules
+ */
+export async function reviseModulesFromCheckpoints(
+    req: RevisionRequest,
+): Promise<Record<string, RevisedModuleFields>> {
+    // SECURITY: Authenticate caller to prevent unauthenticated API credit burn
+    return withAuth(async () => {
+        const apiKey = process.env.ANTHROPIC_API_KEY
+        if (!apiKey) {
+            console.error("[CAD-REVIEWS] No API key for module revision")
+            return {}
+        }
+
+        // Collect flagged module IDs from all checkpoints
+        const flaggedIds = new Set<string>()
+        const concernsByModule = new Map<string, string[]>()
+
+        for (const checkpoint of Object.values(req.checkpoints)) {
+            for (const moduleId of checkpoint.flaggedModules) {
+                flaggedIds.add(moduleId)
+                const existing = concernsByModule.get(moduleId) ?? []
+                existing.push(
+                    `**${checkpoint.specialistName}** (${checkpoint.sentiment}): ${checkpoint.summary}` +
+                    (checkpoint.suggestions.length > 0
+                        ? "\n  Suggestions: " + checkpoint.suggestions.join("; ")
+                        : ""),
+                )
+                concernsByModule.set(moduleId, existing)
+            }
+        }
+
+        if (flaggedIds.size === 0) return {}
+
+        const flaggedModules = req.modules.filter((m) => flaggedIds.has(m.id))
+        if (flaggedModules.length === 0) return {}
+
+        const Anthropic = (await import("@anthropic-ai/sdk")).default
+        const client = new Anthropic({ apiKey })
+
+        const results = await Promise.allSettled(
+            flaggedModules.map(async (mod) => {
+                const concerns = concernsByModule.get(mod.id) ?? []
+
+                const response = await client.messages.create({
+                    model: REVIEW_MODEL,
+                    max_tokens: 2048,
+                    system: `You revise product module descriptions to address specialist concerns from a design checkpoint review. Rules:
+- Preserve the original intent and level of detail
+- Only change what's needed to address the specific concerns raised
+- Keep the same writing style and tone
+- Return ALL fields (even unchanged ones) as valid JSON
+- Do NOT add disclaimers or meta-commentary — just return the revised content`,
+                    messages: [{
+                        role: "user",
+                        content: `Product: "${req.projectSubject}"
+
+Module: "${mod.name}" (id: ${mod.id})
+
+Current fields:
+- Purpose: ${mod.purpose}
+- Description: ${mod.description}
+- Key Parts: ${JSON.stringify(mod.keyParts)}
+- Why It Matters: ${mod.whyItMatters}
+- Failure Modes: ${JSON.stringify(mod.failureModes)}
+- Unknowns: ${JSON.stringify(mod.unknowns)}
+
+Specialist concerns for this module:
+${concerns.join("\n")}
+
+Research context (first 1500 chars):
+${req.researchReport.slice(0, 1500)}
+
+Revise the module fields to address the specialist concerns. Return a JSON object with keys: purpose, description, keyParts, whyItMatters, failureModes, unknowns.`,
+                    }],
+                })
+
+                const text = response.content
+                    .filter((b) => b.type === "text")
+                    .map((b) => b.type === "text" ? b.text : "")
+                    .join("")
+
+                // Extract JSON — find the outermost balanced braces to avoid greedy regex issues
+                const parsed = extractAndParseJson(text)
+                if (!parsed) {
+                    throw new Error(`No valid JSON found in revision response for module ${mod.id}`)
+                }
+
+                // Validate required fields exist with correct types
+                if (
+                    typeof parsed.purpose !== "string" ||
+                    typeof parsed.description !== "string" ||
+                    !Array.isArray(parsed.keyParts) || !parsed.keyParts.every((s: unknown) => typeof s === "string") ||
+                    typeof parsed.whyItMatters !== "string" ||
+                    !Array.isArray(parsed.failureModes) || !parsed.failureModes.every((s: unknown) => typeof s === "string") ||
+                    !Array.isArray(parsed.unknowns) || !parsed.unknowns.every((s: unknown) => typeof s === "string")
+                ) {
+                    throw new Error(`Invalid revision shape for module ${mod.id}`)
+                }
+
+                return { moduleId: mod.id, fields: parsed as unknown as RevisedModuleFields }
+            }),
+        )
+
+        // Collect successful revisions
+        const revised: Record<string, RevisedModuleFields> = {}
+        for (const result of results) {
+            if (result.status === "fulfilled") {
+                revised[result.value.moduleId] = result.value.fields
+            } else {
+                console.warn("[CAD-REVIEWS] Module revision failed:", result.reason)
+            }
+        }
+
+        return revised
+    })
+}
+
+/**
+ * Extract and parse the first balanced JSON object from LLM output.
+ *
+ * DECISION: Brace-counting instead of greedy regex — handles cases where the
+ * LLM wraps JSON in markdown fences or adds trailing commentary with braces.
+ */
+function extractAndParseJson(text: string): Record<string, unknown> | null {
+    const start = text.indexOf("{")
+    if (start === -1) return null
+
+    let depth = 0
+    let inString = false
+    let escaped = false
+
+    for (let i = start; i < text.length; i++) {
+        const ch = text[i]
+        if (escaped) { escaped = false; continue }
+        if (ch === "\\") { escaped = true; continue }
+        if (ch === '"') { inString = !inString; continue }
+        if (inString) continue
+        if (ch === "{") depth++
+        if (ch === "}") {
+            depth--
+            if (depth === 0) {
+                try {
+                    return JSON.parse(text.slice(start, i + 1))
+                } catch {
+                    return null
+                }
+            }
+        }
+    }
+    return null
+}
