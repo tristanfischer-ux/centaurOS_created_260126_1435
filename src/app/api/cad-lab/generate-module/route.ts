@@ -20,6 +20,8 @@ import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { estimateEarlyCost } from "@/lib/cad-lab/early-cost-estimator"
+import { categorizeModalError } from "@/lib/cad-lab/code-validators"
+import { detectDomainFromResearchReport } from "@/lib/cad-lab/domain-prompts"
 import type { CadLabModule, CadLabResult, ClaudeModelId, CadLabDesignBrief, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
@@ -221,6 +223,17 @@ export async function POST(request: Request): Promise<Response> {
         moduleId,
       )
 
+      // H6: Detect domain for metrics enrichment (best-effort)
+      let detectedDomain: string | undefined
+      try {
+        detectedDomain = await detectDomainFromResearchReport(researchReport)
+      } catch { /* silent — domain is enrichment only */ }
+
+      const metricsEnrichment: MetricsEnrichment = {
+        hasDesignBrief: !!designBrief,
+        domain: detectedDomain,
+      }
+
       const moduleResearchText =
         localMod.moduleResearch ||
         `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
@@ -313,7 +326,7 @@ export async function POST(request: Request): Promise<Response> {
           localMod = { ...localMod, status: "failed" as const, code: res.code }
           await saveModuleToProject(supabase, projectId, allModules, localMod)
           // R3: Fire-and-forget metrics for failed generation
-          recordGenerationMetrics(projectId, moduleId, false, res).catch(() => {})
+          recordGenerationMetrics(projectId, moduleId, false, res, metricsEnrichment).catch(() => {})
           emit({ type: "error", message: res.error || "CAD generation failed" })
           controller.close()
           return
@@ -449,7 +462,7 @@ export async function POST(request: Request): Promise<Response> {
       await saveModuleToProject(supabase, projectId, allModules, localMod)
 
       // R3: Fire-and-forget metrics for successful generation
-      if (cadResult) recordGenerationMetrics(projectId, moduleId, true, cadResult).catch(() => {})
+      if (cadResult) recordGenerationMetrics(projectId, moduleId, true, cadResult, metricsEnrichment).catch(() => {})
 
       const elapsedMs = Date.now() - startTime
 
@@ -517,6 +530,12 @@ export async function POST(request: Request): Promise<Response> {
 
 // ─── R3: Quality Metrics Persistence ──────────────────────────────────
 
+/** H6: Enrichment context for diagnostic metrics columns */
+interface MetricsEnrichment {
+  hasDesignBrief?: boolean
+  domain?: string
+}
+
 /**
  * Fire-and-forget insert of generation quality metrics.
  *
@@ -527,13 +546,25 @@ export async function POST(request: Request): Promise<Response> {
  * @param moduleId - Module ID within the project
  * @param success - Whether generation succeeded
  * @param res - The CadLabResult with generation metadata
+ * @param enrichment - H6: Additional diagnostic context
  */
 async function recordGenerationMetrics(
   projectId: string,
   moduleId: string,
   success: boolean,
   res: CadLabResult,
+  enrichment?: MetricsEnrichment,
 ): Promise<void> {
+  // H6: Derive error category from the error string
+  const errorCat = !success && res.error
+    ? categorizeModalError(res.error)
+    : null
+
+  // H6: Count pre-exec validation severities
+  const preExec = res.preExecValidation ?? []
+  const criticalCount = preExec.filter((r) => r.severity === "critical").length
+  const warningCount = preExec.filter((r) => r.severity === "warning").length
+
   const admin = createAdminClient()
   const { error } = await admin
     .from("cad_lab_generation_metrics")
@@ -549,6 +580,13 @@ async function recordGenerationMetrics(
       generation_time_ms: res.generationTime ?? null,
       tokens_in: res.tokensIn ?? null,
       tokens_out: res.tokensOut ?? null,
+      // H6: Enrichment columns
+      error_category: errorCat?.category ?? null,
+      modal_error_snippet: !success && res.error ? res.error.slice(0, 500) : null,
+      pre_exec_critical_count: criticalCount || null,
+      pre_exec_warning_count: warningCount || null,
+      has_design_brief: enrichment?.hasDesignBrief ?? null,
+      domain: enrichment?.domain ?? null,
     })
   if (error) {
     console.warn("[CAD-LAB-MODULE] Metrics insert failed:", error.message)

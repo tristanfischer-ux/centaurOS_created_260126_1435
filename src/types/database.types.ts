@@ -3773,11 +3773,17 @@ export type Database = {
       cad_lab_generation_metrics: {
         Row: {
           created_at: string
+          domain: string | null
+          error_category: string | null
           first_attempt_success: boolean | null
           generation_time_ms: number | null
+          has_design_brief: boolean | null
           id: string
+          modal_error_snippet: string | null
           model_used: string | null
           module_id: string
+          pre_exec_critical_count: number | null
+          pre_exec_warning_count: number | null
           project_id: string
           repair_attempts: number | null
           seed_template_slug: string | null
@@ -3788,11 +3794,17 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          domain?: string | null
+          error_category?: string | null
           first_attempt_success?: boolean | null
           generation_time_ms?: number | null
+          has_design_brief?: boolean | null
           id?: string
+          modal_error_snippet?: string | null
           model_used?: string | null
           module_id: string
+          pre_exec_critical_count?: number | null
+          pre_exec_warning_count?: number | null
           project_id: string
           repair_attempts?: number | null
           seed_template_slug?: string | null
@@ -3803,11 +3815,17 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          domain?: string | null
+          error_category?: string | null
           first_attempt_success?: boolean | null
           generation_time_ms?: number | null
+          has_design_brief?: boolean | null
           id?: string
+          modal_error_snippet?: string | null
           model_used?: string | null
           module_id?: string
+          pre_exec_critical_count?: number | null
+          pre_exec_warning_count?: number | null
           project_id?: string
           repair_attempts?: number | null
           seed_template_slug?: string | null
