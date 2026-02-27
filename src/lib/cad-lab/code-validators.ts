@@ -67,11 +67,12 @@ export function scanParametricIntegrity(
   }
 
   if (hardcodedLines.length > 0) {
+    const varNames = hardcodedLines.map((l) => l.split(" = ")[0])
     results.push({
       ruleId: "param-hardcoded-derived",
       severity: "warning",
       message: `${hardcodedLines.length} derived value(s) appear hardcoded instead of computed from parameters: ${hardcodedLines.slice(0, 5).join("; ")}`,
-      repairHint: `Replace hardcoded derived values with expressions using primary parameters. For example, "total_width = 315" should be "total_width = capsule_count * capsule_h + (capsule_count - 1) * gap".`,
+      repairHint: `Replace these hardcoded derived values with expressions: ${varNames.slice(0, 5).join(", ")}. Each must be computed from primary parameters, not bare numbers. E.g. "${varNames[0]} = param_a * param_b + offset" instead of a literal.`,
       autoFixable: true,
     })
   }
@@ -144,11 +145,12 @@ export function validateZStack(
     : expectedHeight >= 1000 ? 0.1
     : 0.2 - (0.1 * (expectedHeight - 100) / 900)
   if (ratio > 1 + tolerance || ratio < 1 - tolerance) {
+    const sortedZ = [...zValues].sort((a, b) => a - b).slice(0, 8)
     results.push({
       ruleId: "zstack-height-mismatch",
       severity: "warning",
       message: `Z span in code (${zSpan.toFixed(0)}mm) differs from space budget total (${expectedHeight.toFixed(0)}mm) by ${((Math.abs(ratio - 1)) * 100).toFixed(0)}%`,
-      repairHint: `The Z-span in the code doesn't match the space budget. The space budget total is ${expectedHeight}mm but the Z span in code is ${zSpan.toFixed(0)}mm. Check for doubled heights or missing offsets.`,
+      repairHint: `The Z-span in the code (min=${minZ.toFixed(0)}, max=${maxZ.toFixed(0)}, span=${zSpan.toFixed(0)}mm) doesn't match the space budget total (${expectedHeight}mm). Z offsets found: [${sortedZ.map((z) => z.toFixed(0)).join(", ")}]. Check for doubled heights or missing offsets.`,
     })
   }
 
@@ -323,6 +325,122 @@ export function checkFunctionInvocations(
   }
 
   return results
+}
+
+// ─── F3: Library Usage Validator ─────────────────────────────────────
+
+/**
+ * Detects custom make_*() functions that duplicate available library components.
+ * Uses keyword overlap matching between function names and library slugs.
+ *
+ * @param pythonCode - Generated CadQuery Python code
+ * @param librarySlugs - Available library component slugs (e.g. ["hex_bolt", "nema17_motor"])
+ * @returns Validation results (info severity — advisory only, does not trigger repair)
+ */
+export function checkLibraryUsage(
+  pythonCode: string,
+  librarySlugs: string[],
+): PreExecValidationResult[] {
+  if (librarySlugs.length === 0) return []
+
+  const results: PreExecValidationResult[] = []
+
+  // Extract custom make_*() function names
+  const defPattern = /def\s+(make_\w+)\s*\(/g
+  const customFuncs: string[] = []
+  let defMatch: RegExpExecArray | null
+  while ((defMatch = defPattern.exec(pythonCode)) !== null) {
+    customFuncs.push(defMatch[1])
+  }
+
+  if (customFuncs.length === 0) return results
+
+  // Check if any library slug is already called in the code (direct usage)
+  const usedSlugs = new Set<string>()
+  for (const slug of librarySlugs) {
+    // Library functions are called as `library_slug_name(` in the code
+    if (new RegExp(`\\b${slug.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\(`).test(pythonCode)) {
+      usedSlugs.add(slug)
+    }
+  }
+
+  // For each custom function, check keyword overlap with library slugs
+  const duplicates: { func: string; slug: string }[] = []
+  for (const func of customFuncs) {
+    const funcWords = new Set(
+      func.replace(/^make_/, "").split("_").filter((w) => w.length > 1),
+    )
+    if (funcWords.size === 0) continue
+
+    for (const slug of librarySlugs) {
+      if (usedSlugs.has(slug)) continue // Already using this library component
+      const slugWords = new Set(slug.split("_").filter((w) => w.length > 1))
+      if (slugWords.size === 0) continue
+
+      // Compute overlap
+      let shared = 0
+      for (const w of funcWords) {
+        if (slugWords.has(w)) shared++
+      }
+      const overlap = shared / Math.min(funcWords.size, slugWords.size)
+      if (overlap >= 0.5) {
+        duplicates.push({ func, slug })
+        break // One match per function is enough
+      }
+    }
+  }
+
+  if (duplicates.length > 0) {
+    results.push({
+      ruleId: "library-unused-duplicate",
+      severity: "info",
+      message: `${duplicates.length} custom function(s) may duplicate library components: ${duplicates.map((d) => `${d.func} → ${d.slug}`).join(", ")}`,
+      repairHint: `Consider using library components instead of custom functions: ${duplicates.map((d) => `replace ${d.func}() with ${d.slug}()`).join("; ")}. Library components produce more detailed, recognisable geometry.`,
+    })
+  }
+
+  return results
+}
+
+// ─── F6: Modal Error Categorizer ─────────────────────────────────────
+
+/**
+ * Pattern-matches Modal execution errors into categories with actionable guidance.
+ * Returns null if the error doesn't match any known pattern.
+ *
+ * @param errorText - Raw error text from Modal execution
+ * @returns Category + guidance, or null if unrecognized
+ */
+export function categorizeModalError(
+  errorText: string,
+): { category: string; guidance: string } | null {
+  if (!errorText) return null
+
+  if (/SyntaxError/i.test(errorText)) {
+    return { category: "SyntaxError", guidance: "Fix the Python syntax error — check for missing colons, brackets, or indentation" }
+  }
+
+  const nameMatch = errorText.match(/NameError:\s*name\s*'(\w+)'/i)
+  if (nameMatch) {
+    return { category: "NameError", guidance: `Name '${nameMatch[1]}' is not defined — add import or define it before use` }
+  }
+  if (/NameError/i.test(errorText)) {
+    return { category: "NameError", guidance: "A name is not defined — add the missing import or function definition" }
+  }
+
+  if (/Standard_DomainError|StdFail_NotDone/i.test(errorText)) {
+    return { category: "Standard_DomainError", guidance: "A dimension is zero or negative — add max() guards on computed values" }
+  }
+
+  if (/TimeoutError|timed?\s*out|execution.*exceed/i.test(errorText)) {
+    return { category: "TimeoutError", guidance: "Reduce .union() chain length, use cq.Assembly() for many components" }
+  }
+
+  if (/OCP|OCCT|BRep_API|TopExp|ShapeFix/i.test(errorText)) {
+    return { category: "OCP_Crash", guidance: "Simplify geometry — avoid .shell(), .sweep(), and complex boolean chains" }
+  }
+
+  return null
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

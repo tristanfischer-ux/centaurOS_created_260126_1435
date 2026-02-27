@@ -7,6 +7,7 @@ import {
   checkComponentCoverage,
   trackDimensionProvenance,
   validateInterfaceStructure,
+  detectDimensionConflicts,
 } from "../interface-validators"
 
 // ─── #1: verifyInterfaceArithmetic ───────────────────────────────────
@@ -289,5 +290,40 @@ Some content`
     const results = validateInterfaceStructure("Just some random text")
     expect(results.length).toBeGreaterThan(0)
     expect(results[0].message).toContain("4 required section(s)")
+  })
+})
+
+// ─── F5: detectDimensionConflicts ───────────────────────────────────
+
+describe("detectDimensionConflicts", () => {
+  it("flags conflicting values for the same dimension label", () => {
+    const research = `motor diameter: 30mm according to source A.
+Further testing shows motor diameter: 34mm from vendor specs.`
+
+    const results = detectDimensionConflicts(research)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("research-dimension-conflict")
+    expect(results[0].severity).toBe("info")
+    expect(results[0].message).toContain("motor diameter")
+  })
+
+  it("returns empty when no conflicts exist", () => {
+    const research = `The motor diameter is 30mm. The housing width is 100mm.`
+
+    const results = detectDimensionConflicts(research)
+    expect(results).toHaveLength(0)
+  })
+
+  it("ignores differences within 5%", () => {
+    const research = `The bracket width: 100mm in one spec.
+The bracket width: 104mm in another spec.`
+
+    const results = detectDimensionConflicts(research)
+    expect(results).toHaveLength(0)
+  })
+
+  it("returns empty for empty input", () => {
+    const results = detectDimensionConflicts("")
+    expect(results).toHaveLength(0)
   })
 })

@@ -269,6 +269,67 @@ export function validateInterfaceStructure(
   return results
 }
 
+// ─── F5: Dimension Conflict Detector ──────────────────────────────────
+
+/**
+ * Scans a research report for same-label dimensions with conflicting values.
+ * E.g. "motor diameter: 30mm" vs "motor diameter: 34mm" — >5% difference
+ * indicates ambiguous sources that may confuse code generation.
+ *
+ * @param researchReport - Research report text from Step 1
+ * @returns Validation results (info severity — advisory only)
+ */
+export function detectDimensionConflicts(
+  researchReport: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+  if (!researchReport) return results
+
+  // INTENT: Extract labeled dimensions — "label: Nmm" or "label = Nmm" patterns
+  // Labels are 1–4 words (prevents greedy capture of preceding prose)
+  const dimPattern = /([a-z][a-z0-9_]*(?:[\s_-][a-z][a-z0-9_]*){0,3})\s*(?::|=|is)\s*(?:~|≈|about|approximately)?\s*(\d+(?:\.\d+)?)\s*mm\b/gi
+  const labelMap = new Map<string, number[]>()
+
+  let match: RegExpExecArray | null
+  while ((match = dimPattern.exec(researchReport)) !== null) {
+    const rawLabel = match[1].trim().toLowerCase().replace(/[\s_-]+/g, " ")
+    // INTENT: Normalize to last 3 words to avoid capturing preceding prose
+    // "testing shows motor diameter" → "shows motor diameter" → still noisy
+    // Take last 2 words as canonical label for comparison
+    const words = rawLabel.split(" ")
+    const label = words.length > 2 ? words.slice(-2).join(" ") : rawLabel
+    const value = parseFloat(match[2])
+    if (value < 1) continue // Skip sub-mm values
+    const existing = labelMap.get(label) ?? []
+    existing.push(value)
+    labelMap.set(label, existing)
+  }
+
+  // Find labels with conflicting values (>5% difference between min and max)
+  const conflicts: string[] = []
+  for (const [label, values] of labelMap) {
+    if (values.length < 2) continue
+    const unique = [...new Set(values)]
+    if (unique.length < 2) continue
+    const min = Math.min(...unique)
+    const max = Math.max(...unique)
+    if (min > 0 && (max - min) / min > 0.05) {
+      conflicts.push(`"${label}": ${unique.map((v) => `${v}mm`).join(" vs ")}`)
+    }
+  }
+
+  if (conflicts.length > 0) {
+    results.push({
+      ruleId: "research-dimension-conflict",
+      severity: "info",
+      message: `${conflicts.length} dimension label(s) have conflicting values in research: ${conflicts.slice(0, 5).join("; ")}`,
+      repairHint: `The research report contains conflicting values for the same dimension. Verify which value is correct before using in the interface definition: ${conflicts.slice(0, 5).join("; ")}`,
+    })
+  }
+
+  return results
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Extracts significant words from a string for fuzzy matching */

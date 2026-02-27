@@ -64,8 +64,8 @@ import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
-import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure } from "@/lib/cad-lab/interface-validators"
-import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations } from "@/lib/cad-lab/code-validators"
+import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts } from "@/lib/cad-lab/interface-validators"
+import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import type { TemplateMatch } from "@/actions/step-template-matching"
 
@@ -742,9 +742,11 @@ Example:
 Rule: if the numbers don't add up in text, they won't add up in 3D.
 
 === b) COMPONENT PLACEMENT TABLE ===
-| Component        | Qty | Dimensions (mm)     | Position (x,y,z)  | Notes              |
-|------------------|-----|---------------------|--------------------|--------------------|
+| Component        | Qty | Dimensions (mm)     | Position (x,y,z)  | Material   | Source         | Notes              |
+|------------------|-----|---------------------|--------------------|-----------:|----------------|--------------------|
 One row per unique component type. Position is the centre point.
+Material: primary material (PLA, aluminium, steel, etc.) — gives DFM context to code generation.
+Source: "LIBRARY: slug_name" if a library component matches, otherwise "CUSTOM".
 Minimum 6 unique component types for any model.
 
 === c) CONNECTION MAP ===
@@ -800,6 +802,7 @@ Generate the complete interface definition following the exact 4-section format.
       ...verifyInterfaceArithmetic(text),
       ...trackDimensionProvenance(researchReport, text),
       ...validateInterfaceStructure(text),
+      ...detectDimensionConflicts(researchReport),
     ]
     if (interfaceWarnings.length > 0) {
       console.info(`[THE-FORGE] Step 2: ${interfaceWarnings.length} interface warning(s):`,
@@ -915,6 +918,7 @@ export async function generateCadLabModel(
     // Look up user's sector and fetch filtered library for prompt injection
     const sector = await lookupUserSector(supabase, user.id)
     const librarySummary = await fetchLibrarySummary(sector)
+    const librarySlugs = librarySummary.map((c) => c.slug)
     const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
     const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
@@ -1054,7 +1058,12 @@ If the research report or interface definition contains any unresolved questions
           .filter((r) => r.severity === "critical" || r.severity === "warning")
           .map((r) => `- [${r.severity}] ${r.ruleId}: ${r.message}${r.repairHint ? `\n  Fix: ${r.repairHint}` : ""}`)
           .join("\n")
-        const modalErrorSection = lastModalError ? `\nModal execution error: ${lastModalError}` : ""
+        // F6: Categorize Modal error for targeted repair guidance
+        const errorCategory = lastModalError ? categorizeModalError(lastModalError) : null
+        const categorizedError = errorCategory
+          ? `\n[${errorCategory.category}]: ${errorCategory.guidance}\nRaw error: ${lastModalError}`
+          : lastModalError ? `\nModal execution error: ${lastModalError}` : ""
+        const modalErrorSection = categorizedError
         userPrompt = `${baseUserPrompt}
 
 === REPAIR REQUIRED (attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}) ===
@@ -1121,6 +1130,7 @@ ${finalCode}
         ...analyzeCadQueryCode(finalCode),
         ...checkFunctionInvocations(finalCode),
         ...validateInterfaceStructure(interfaceDefinition),
+        ...checkLibraryUsage(finalCode, librarySlugs),
       ]
 
       // #8: Dimension estimation
@@ -1258,6 +1268,19 @@ ${finalCode}
               })
             }
           }
+        }
+
+        // F7: COG orientation check — model may be upside-down
+        const cog = modalResult.analysis?.mass_properties?.center_of_gravity as number[] | undefined
+        if (cog && cog[2] < 0 && postModalBbox.zLen > 10) {
+          const cogMsg = `Model center of gravity below Z=0 (COG z=${cog[2].toFixed(1)}mm) — may render upside-down`
+          qualityIssues.push(cogMsg)
+          allPreExecResults.push({
+            ruleId: "postmodal-cog-orientation",
+            severity: "warning",
+            message: cogMsg,
+            repairHint: "The model's center of gravity is below the Z=0 plane, suggesting it may be upside-down. Check that the base is at Z=0 and components build upward.",
+          })
         }
 
         if (qualityIssues.length > 0) {

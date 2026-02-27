@@ -7,6 +7,8 @@ import {
   validateZStack,
   analyzeCadQueryCode,
   checkFunctionInvocations,
+  checkLibraryUsage,
+  categorizeModalError,
 } from "../code-validators"
 
 // ─── #3: scanParametricIntegrity ─────────────────────────────────────
@@ -423,5 +425,137 @@ result = cq.Workplane("XY").box(100, 100, 50)
 `
     const results = checkFunctionInvocations(code)
     expect(results).toHaveLength(0)
+  })
+})
+
+// ─── F2: Code-specific repair hints ─────────────────────────────────
+
+describe("scanParametricIntegrity repairHint (F2)", () => {
+  it("includes actual variable names in repairHint", () => {
+    const code = `
+# Derived values
+total_height = 315
+total_width = 290
+`
+    const results = scanParametricIntegrity(code)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].repairHint).toContain("total_height")
+    expect(results[0].repairHint).toContain("total_width")
+  })
+})
+
+describe("validateZStack repairHint (F2)", () => {
+  it("includes actual Z offsets in repairHint", () => {
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(100, 100, 10)
+    .workplane(offset=500)
+    .workplane(offset=200)
+    .box(80, 80, 40)
+)
+`
+    const iface = `=== a) SPACE BUDGET ===
+  Base:   10mm
+  Body:   40mm
+  ─────
+  Total: 100mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].repairHint).toMatch(/min=/)
+    expect(results[0].repairHint).toMatch(/max=/)
+    expect(results[0].repairHint).toContain("200")
+    expect(results[0].repairHint).toContain("500")
+  })
+})
+
+// ─── F3: checkLibraryUsage ──────────────────────────────────────────
+
+describe("checkLibraryUsage", () => {
+  it("flags custom functions that duplicate library components", () => {
+    const code = `
+def make_hex_bolt():
+    return cq.Workplane("XY").cylinder(10, 3)
+
+result = make_hex_bolt()
+`
+    const results = checkLibraryUsage(code, ["hex_bolt", "nema17_motor"])
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("library-unused-duplicate")
+    expect(results[0].severity).toBe("info")
+    expect(results[0].message).toContain("hex_bolt")
+  })
+
+  it("skips when library component is already called directly", () => {
+    const code = `
+bolt = hex_bolt(length=20)
+result = bolt
+`
+    const results = checkLibraryUsage(code, ["hex_bolt"])
+    expect(results).toHaveLength(0)
+  })
+
+  it("skips unrelated custom functions", () => {
+    const code = `
+def make_custom_bracket():
+    return cq.Workplane("XY").box(30, 20, 5)
+
+result = make_custom_bracket()
+`
+    const results = checkLibraryUsage(code, ["hex_bolt", "nema17_motor"])
+    expect(results).toHaveLength(0)
+  })
+
+  it("returns empty when no library slugs provided", () => {
+    const code = `
+def make_hex_bolt():
+    return cq.Workplane("XY").cylinder(10, 3)
+
+result = make_hex_bolt()
+`
+    const results = checkLibraryUsage(code, [])
+    expect(results).toHaveLength(0)
+  })
+})
+
+// ─── F6: categorizeModalError ───────────────────────────────────────
+
+describe("categorizeModalError", () => {
+  it("categorizes SyntaxError", () => {
+    const result = categorizeModalError("SyntaxError: invalid syntax (line 42)")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("SyntaxError")
+  })
+
+  it("categorizes NameError with variable name", () => {
+    const result = categorizeModalError("NameError: name 'make_frame' is not defined")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("NameError")
+    expect(result!.guidance).toContain("make_frame")
+  })
+
+  it("categorizes Standard_DomainError", () => {
+    const result = categorizeModalError("OCC.Core.Standard: Standard_DomainError")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("Standard_DomainError")
+  })
+
+  it("categorizes timeout errors", () => {
+    const result = categorizeModalError("TimeoutError: execution timed out after 120s")
+    expect(result).not.toBeNull()
+    expect(result!.category).toBe("TimeoutError")
+  })
+
+  it("returns null for unrecognized errors", () => {
+    const result = categorizeModalError("ValueError: some random error")
+    expect(result).toBeNull()
+  })
+
+  it("returns null for empty input", () => {
+    const result = categorizeModalError("")
+    expect(result).toBeNull()
   })
 })

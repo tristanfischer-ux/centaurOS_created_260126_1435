@@ -101,11 +101,11 @@ Total internal height: 2590mm  ← ISO standard height
 Flat table. Every component. Quantity, dimensions, position.
 
 \`\`\`
-| Component        | Qty | Dimensions (mm)     | Position (x,y,z)  | Notes              |
-|------------------|-----|---------------------|--------------------|--------------------|
-| Magazine tube    | 1   | Ø45 OD × 315 tall  | (0, 0, 70)        | ID=39mm            |
-| Gate housing     | 1   | 65×65×22            | (0, 0, 50)        | Spring pockets     |
-| Capsule          | 10  | Ø37 × 29           | (0, 0, 70+29*i)   | Stacked in tube    |
+| Component        | Qty | Dimensions (mm)     | Position (x,y,z)  | Material   | Source         | Notes              |
+|------------------|-----|---------------------|--------------------|-----------:|----------------|--------------------|
+| Magazine tube    | 1   | Ø45 OD × 315 tall  | (0, 0, 70)        | PLA        | CUSTOM         | ID=39mm            |
+| Gate housing     | 1   | 65×65×22            | (0, 0, 50)        | PLA        | CUSTOM         | Spring pockets     |
+| Capsule          | 10  | Ø37 × 29           | (0, 0, 70+29*i)   | aluminium  | CUSTOM         | Stacked in tube    |
 \`\`\`
 
 This table becomes your build checklist. Cross off each component as you model it.
@@ -336,6 +336,47 @@ leg_ht = max(leg_top - leg_bot, 10)  # never zero
 **Cause:** Used \`.translate()\` or \`.rotate()\` which doesn't work reliably in chains.
 
 **Fix:** Always use \`.workplane(offset=z).transformed(offset=(x, y, 0))\` for positioning.
+
+---
+
+## CRITICAL ANTI-PATTERNS (hallucination traps)
+
+These are the #1 source of first-attempt failures. Check your code against every one.
+
+### Anti-pattern 1: Hardcoded derived values
+\`\`\`python
+# BAD — breaks when capsule_count changes
+tube_height = 315
+
+# GOOD — always recomputes
+tube_height = capsule_count * cap_h + (capsule_count - 1) * gap + margin
+\`\`\`
+If a value SHOULD change when a parameter changes, it MUST be an expression.
+
+### Anti-pattern 2: Z-stack height doubling
+\`\`\`python
+# BAD — wall_h is counted in BOTH the .extrude() AND the next offset
+wall = wp.box(w, d, wall_h)
+roof = cq.Workplane("XY").workplane(offset=base_h + wall_h + wall_h).box(w, d, roof_h)
+
+# GOOD — each height used exactly once in the Z chain
+wall = wp.box(w, d, wall_h)
+roof = cq.Workplane("XY").workplane(offset=base_h + wall_h).box(w, d, roof_h)
+\`\`\`
+Trace every Z offset back to the space budget. Each height must appear exactly once.
+
+### Anti-pattern 3: Defined but never called
+\`\`\`python
+# BAD — function exists but is never added to assembly
+def make_handle():
+    return cq.Workplane("XY").box(20, 5, 40)
+
+result = make_body().union(make_cap())  # handle missing!
+
+# GOOD — every make_*() is called and union'd
+result = make_body().union(make_cap()).union(make_handle())
+\`\`\`
+Cross-check: every \`def make_*()\` must appear as a call in the assembly section.
 
 ---
 
