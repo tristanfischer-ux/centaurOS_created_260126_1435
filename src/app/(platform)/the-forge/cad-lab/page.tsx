@@ -136,63 +136,65 @@ export default function CadLabResearchPage(): React.ReactNode {
           ══════════════════════════════════════════════════════════════════ */}
       {hasResearch && (
         <div className="space-y-6">
-          {/* ── System overview illustration (silently hidden on failure — enhancement, not blocker) ── */}
-          {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
-            <Card className="overflow-hidden">
-              <div className="aspect-[16/9] w-full bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={systemIllustrationUrl}
-                  alt={`System overview: ${subject}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { (e.target as HTMLImageElement).parentElement!.parentElement!.style.display = "none" }}
-                />
-              </div>
-              <CardContent className="pt-4 pb-4">
-                <h2 className="text-base font-semibold text-foreground">{subject}</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {modules.length === 0
-                    ? "Concept illustration — this will be refined when sub-assemblies are mapped."
-                    : "System overview — full research report available in the Build stage."}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          {/* ── System overview illustration — only shown once decomposition starts ── */}
+          {(modules.length > 0 || isDecomposing) && (
+            <>
+              {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
+                <Card className="overflow-hidden">
+                  <div className="aspect-[16/9] w-full bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={systemIllustrationUrl}
+                      alt={`System overview: ${subject}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { (e.target as HTMLImageElement).parentElement!.parentElement!.style.display = "none" }}
+                    />
+                  </div>
+                  <CardContent className="pt-4 pb-4">
+                    <h2 className="text-base font-semibold text-foreground">{subject}</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      System overview — full research report available in the Build stage.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
-          {/* ── System illustration generating ── */}
-          {systemIllustrationStatus === "generating" && (
-            <Card className="overflow-hidden">
-              <div className="aspect-[16/9] w-full bg-muted animate-pulse flex items-center justify-center">
-                <div className="flex flex-col items-center gap-2">
-                  <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-                  <span className="text-xs text-muted-foreground">Generating concept illustration...</span>
-                </div>
-              </div>
-            </Card>
-          )}
+              {/* ── System illustration generating ── */}
+              {systemIllustrationStatus === "generating" && (
+                <Card className="overflow-hidden">
+                  <div className="aspect-[16/9] w-full bg-muted animate-pulse flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                      <span className="text-xs text-muted-foreground">Generating concept illustration...</span>
+                    </div>
+                  </div>
+                </Card>
+              )}
 
-          {/* ── System illustration failed — show error with retry ── */}
-          {(systemIllustrationStatus === "failed" ||
-            (systemIllustrationStatus === "idle" && !systemIllustrationUrl)) && (
-            <Card className="overflow-hidden border-dashed">
-              <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
-                  <span className="text-xs text-muted-foreground">
-                    {systemIllustrationError ?? "Concept illustration unavailable"}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRetryIllustration}
-                    className="text-xs gap-1.5"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    Retry
-                  </Button>
-                </div>
-              </div>
-            </Card>
+              {/* ── System illustration failed — show error with retry ── */}
+              {(systemIllustrationStatus === "failed" ||
+                (systemIllustrationStatus === "idle" && !systemIllustrationUrl)) && (
+                <Card className="overflow-hidden border-dashed">
+                  <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                      <span className="text-xs text-muted-foreground">
+                        {systemIllustrationError ?? "Concept illustration unavailable"}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleRetryIllustration}
+                        className="text-xs gap-1.5"
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        Retry
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </>
           )}
 
           {/* ── Product overview — always visible after research, editable ── */}

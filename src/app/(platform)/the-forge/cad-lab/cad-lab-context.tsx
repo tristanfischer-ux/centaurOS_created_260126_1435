@@ -1481,30 +1481,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsSaving(false)
           refreshProjects()
 
-          // Fire concept illustration immediately after research (non-blocking).
-          // Empty module arrays → image-generator uses "detailed isometric view" prompt.
-          // When handleDecompose runs later it overwrites with a richer module-aware image.
-          setSystemIllustrationStatus("generating")
-          setSystemIllustrationError(null)
-          generateCadLabSystemIllustrationAction(projId, subject, [], [], undefined, extractExecutiveSummary(res.report)?.slice(0, 600))
-            .then((illRes) => {
-              if ("url" in illRes) {
-                setSystemIllustrationUrl(illRes.url)
-                setSystemIllustrationStatus("complete")
-                // Persist to DB so the image survives page reloads
-                saveCadLabSystemIllustration(projId, illRes.url)
-                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
-              } else {
-                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
-                setSystemIllustrationStatus("failed")
-                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
-              }
-            })
-            .catch((e) => {
-              console.error("[CAD-LAB] System illustration failed:", e)
-              setSystemIllustrationStatus("failed")
-              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
-            })
+          // DECISION: No illustration here — wait until handleDecompose runs so the
+          // system illustration is generated with full module context (names + purposes).
+          // The image pipeline in handleDecompose already handles: visual style → system
+          // illustration (with modules) → module images (referencing hero).
         }
       }
     } catch (err) {
