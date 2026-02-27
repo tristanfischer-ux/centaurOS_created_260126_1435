@@ -330,6 +330,58 @@ export function detectDimensionConflicts(
   return results
 }
 
+// ─── QW4: Interface Completeness Checker ──────────────────────────────
+
+/**
+ * Checks that the Component Placement Table has at least 6 data rows.
+ * A well-specified engineering interface should define ≥6 physical components —
+ * below this threshold, the model is likely missing structural or fastener parts.
+ *
+ * @param interfaceDefinition - Full interface definition text from Step 2
+ * @returns Validation results (warning if fewer than 6 rows)
+ */
+export function checkInterfaceCompleteness(
+  interfaceDefinition: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+
+  // Extract the Component Placement Table section
+  const tableMatch = interfaceDefinition.match(
+    /===\s*b\)\s*COMPONENT\s*PLACEMENT\s*TABLE\s*===\s*([\s\S]*?)(?:===\s*c\)|$)/i,
+  )
+  if (!tableMatch) return results
+
+  const tableText = tableMatch[1]
+
+  // Count data rows (rows starting with | that aren't headers or separators)
+  let dataRowCount = 0
+  const rowPattern = /^\s*\|\s*([^|]+?)\s*\|/gm
+  let rowMatch: RegExpExecArray | null
+  while ((rowMatch = rowPattern.exec(tableText)) !== null) {
+    const cell = rowMatch[1].trim()
+    // Skip header rows, separator rows, and empty cells
+    if (
+      cell.toLowerCase() === "component" ||
+      cell.startsWith("-") ||
+      cell.startsWith("=") ||
+      cell.length === 0
+    ) continue
+    dataRowCount++
+  }
+
+  const MIN_COMPONENTS = 6
+  if (dataRowCount > 0 && dataRowCount < MIN_COMPONENTS) {
+    results.push({
+      ruleId: "iface-incomplete-placement",
+      severity: "warning",
+      message: `Component Placement Table has only ${dataRowCount} component(s) — expected at least ${MIN_COMPONENTS}. The model may be missing structural, fastener, or accessory parts.`,
+      repairHint: `Add more components to the placement table. Consider adding: mounting hardware, fasteners, gaskets/seals, structural supports, connectors, and any sub-components that were listed in the research report but not yet included.`,
+    })
+  }
+
+  return results
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Extracts significant words from a string for fuzzy matching */

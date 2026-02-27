@@ -92,6 +92,18 @@ export interface DimensionEstimate {
   unresolvedVars: string[]
 }
 
+// ─── Generation Streaming Types (P5) ─────────────────────────────────
+
+/** SSE event types for streaming module generation progress */
+export type GenerationEvent =
+  | { type: "status"; step: "interface" | "codegen" | "modal" | "upload"; attempt?: number }
+  | { type: "validation"; findings: PreExecValidationResult[] }
+  | { type: "progress"; message: string }
+  | { type: "complete"; module: CadLabModule }
+  | { type: "error"; message: string }
+
+// ─── Result Types ────────────────────────────────────────────────────
+
 /** Result from the main CAD generation pipeline */
 export interface CadLabResult {
   success: boolean
@@ -156,6 +168,8 @@ export interface CadLabResult {
   assumptions?: string[]
   /** Number of repair loop iterations (0 = first attempt succeeded) */
   repairAttempts?: number
+  /** Whether the model was generated successfully on the first attempt (no repairs) */
+  firstAttemptSuccess?: boolean
   /** Pre-execution validation results from deterministic validators */
   preExecValidation?: PreExecValidationResult[]
   /** Slug of the step_template used as seed geometry (if any) */
@@ -257,6 +271,8 @@ export interface CadLabModule {
   code?: string
   /** Pipeline status */
   status: "pending" | "researched" | "interface_ready" | "generated" | "failed"
+  /** Persisted SVG view URLs from Supabase storage (P3) */
+  svgUrls?: Record<string, string>
 
   // ── Image generation (Gemini blueprint illustrations) ──
 
@@ -270,6 +286,12 @@ export interface CadLabModule {
   moduleImagePrompt?: string
   /** Slug of the step_template matched as seed geometry for this module */
   seedTemplateSlug?: string
+  /** Cached template match result — avoids re-running expensive DB + semantic scoring on regeneration */
+  templateMatchResult?: {
+    topMatches: Array<{ slug: string; name: string; category: string; subcategory: string | null; description: string | null; stepUrl: string; score: number; tags?: string[] | null }>
+    seedTemplate: { slug: string; name: string; category: string; subcategory: string | null; description: string | null; stepUrl: string; score: number; tags?: string[] | null } | null
+    referenceTemplates: Array<{ slug: string; name: string; category: string; subcategory: string | null; description: string | null; stepUrl: string; score: number; tags?: string[] | null }>
+  }
 
   /** Snapshot of text fields before checkpoint revision, for redline diff display */
   conceptSnapshot?: {

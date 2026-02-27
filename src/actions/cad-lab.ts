@@ -65,7 +65,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
-import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts } from "@/lib/cad-lab/interface-validators"
+import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness } from "@/lib/cad-lab/interface-validators"
 import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 
@@ -835,6 +835,7 @@ Generate the complete interface definition following the exact 4-section format.
       ...trackDimensionProvenance(researchReport, text),
       ...validateInterfaceStructure(text),
       ...detectDimensionConflicts(researchReport),
+      ...checkInterfaceCompleteness(text),
     ]
     if (interfaceWarnings.length > 0) {
       console.info(`[THE-FORGE] Step 2: ${interfaceWarnings.length} interface warning(s):`,

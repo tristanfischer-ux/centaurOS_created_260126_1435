@@ -1,24 +1,33 @@
 "use server"
 
 /**
- * @file step-template-matching.ts — Keyword-based matching of step_templates to Build modules.
+ * @file step-template-matching.ts — Hybrid keyword + semantic matching of step_templates.
  *
- * @description Follows the scoring pattern from reference-models.ts:
- * tokenize the module context (name + purpose + keyParts), then score each
- * template's name/category/subcategory/description/tags by keyword overlap.
+ * @description Combines two scoring signals to find the best STEP template for a module:
  *
- * Uses RAW scores (not normalised) — same as reference-models.ts — so templates
- * with richer metadata that match more keywords rank higher, not lower.
+ * 1. **Keyword scoring** (original): tokenize module context, score each template by
+ *    keyword overlap in name/category/subcategory/description/tags. Fast, no API call.
  *
- * Strong matches (rawScore >= SEED_THRESHOLD) are eligible for seed-geometry routing,
- * where the template's actual STEP file is used as a starting point for
- * code generation via the /mashup Modal endpoint.
+ * 2. **Semantic scoring** (new): embed the module description via OpenAI, query the
+ *    `match_step_templates` RPC for cosine similarity. Catches conceptual matches that
+ *    keyword overlap misses (e.g. "motor mount" ↔ "stepper bracket").
+ *
+ * Hybrid formula: `hybridScore = keywordNorm * 0.4 + semanticScore * 0.6`
+ *
+ * Three tiers:
+ * - **Seed** (≥ HYBRID_SEED_THRESHOLD): STEP file loaded as starting geometry
+ * - **Reference** (≥ HYBRID_REFERENCE_THRESHOLD): dimensions/description injected into prompt
+ * - **Below threshold**: not used
+ *
+ * Graceful degradation: if embedText() returns null (no API key, rate limit),
+ * falls back to pure keyword scoring with original SEED_THRESHOLD.
  *
  * @security Server-side only. Reads from step_templates (public read).
  * Template metadata is sanitised before prompt injection (see sanitiseForPrompt).
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { embedText } from "@/lib/search/semantic-search"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -29,30 +38,34 @@ export interface TemplateMatch {
   subcategory: string | null
   description: string | null
   stepUrl: string
-  /** Raw keyword match score (higher = more keyword overlap) */
+  /** Combined hybrid score (0–1) or raw keyword score in fallback mode */
   score: number
+  /** Tags from template metadata */
+  tags?: string[] | null
 }
 
 export interface TemplateMatchResult {
   /** Top 3 matches by score (may be empty) */
   topMatches: TemplateMatch[]
-  /** Best match if score >= SEED_THRESHOLD, otherwise null */
+  /** Best match if score >= seed threshold, otherwise null */
   seedTemplate: TemplateMatch | null
+  /** Templates above reference threshold but below seed — dimensions/description for prompt */
+  referenceTemplates: TemplateMatch[]
 }
 
 // ─── Constants ───────────────────────────────────────────────────────
 
 /**
- * Minimum raw keyword score for a template to be used as seed geometry.
- * A score of 6 means at least 2 keywords matched with full substring + word hits,
- * which indicates strong relevance.
- *
- * DECISION: Using raw scores (like reference-models.ts) instead of normalised.
- * Normalised scores penalise templates with richer metadata — a template with
- * 50 keywords and 10 matches (normalised 0.2) would lose to one with 1 keyword
- * and 1 match (normalised 1.0).
+ * Minimum raw keyword score for seed geometry (pure-keyword fallback mode).
+ * Kept for backward compatibility when semantic search is unavailable.
  */
 const SEED_THRESHOLD = 6
+
+/** Hybrid score threshold for seed geometry (STEP file loaded) */
+const HYBRID_SEED_THRESHOLD = 0.55
+
+/** Hybrid score threshold for reference templates (dimensions injected into prompt) */
+const HYBRID_REFERENCE_THRESHOLD = 0.35
 
 /** Allowed URL prefixes for STEP file fetches (SSRF protection) */
 const ALLOWED_STEP_URL_PREFIXES = [
@@ -148,55 +161,42 @@ export async function isAllowedStepUrl(url: string): Promise<boolean> {
   }
 }
 
-// ─── Main Matching Function ──────────────────────────────────────────
+// ─── Keyword Scoring ─────────────────────────────────────────────────
+
+interface KeywordScoredTemplate {
+  slug: string
+  name: string
+  category: string
+  subcategory: string | null
+  description: string | null
+  stepUrl: string
+  tags: string[] | null
+  rawScore: number
+}
 
 /**
- * Matches step_templates to a Build module by keyword scoring.
- *
- * @param moduleName - Module name (e.g. "Stepper Motor Mount")
- * @param modulePurpose - Module purpose sentence
- * @param keyParts - Array of key physical parts
- * @returns Top 3 matches + optional seed template
+ * Scores templates by keyword overlap (original algorithm).
  */
-export async function matchTemplatesForModule(
-  moduleName: string,
-  modulePurpose: string,
-  keyParts: string[],
-): Promise<TemplateMatchResult> {
-  const empty: TemplateMatchResult = { topMatches: [], seedTemplate: null }
-
-  // Build context string from module metadata
-  const contextText = [moduleName, modulePurpose, ...keyParts].join(" ")
-  if (!contextText.trim()) return empty
-
+async function scoreByKeywords(
+  contextText: string,
+  templates: {
+    slug: string
+    name: string
+    category: string
+    subcategory: string | null
+    description: string | null
+    tags: string[] | null
+    step_url: string | null
+  }[],
+): Promise<KeywordScoredTemplate[]> {
   const contextLower = contextText.toLowerCase()
   const contextWords = tokenize(contextText)
-  if (contextWords.length === 0) return empty
+  if (contextWords.length === 0) return []
 
-  // Fetch templates that have STEP geometry available (including tags for scoring)
-  const supabase = await createClient()
-  const { data: templates, error } = await supabase
-    .from("step_templates")
-    .select("slug, name, category, subcategory, description, tags, step_url")
-    .not("step_url", "is", null)
-    .order("name")
-    .limit(500)
-
-  if (error) {
-    console.error("[THE-FORGE] matchTemplatesForModule: DB error:", error.message)
-    return empty
-  }
-
-  if (!templates || templates.length === 0) return empty
-
-  // Score each template using the reference-models keyword pattern (raw scores)
-  const scored: TemplateMatch[] = []
+  const scored: KeywordScoredTemplate[] = []
 
   for (const t of templates) {
-    // Runtime guard for nullable step_url (belt + suspenders with the DB filter)
     if (!t.step_url) continue
-
-    // SECURITY: Validate URL before including in results
     if (!(await isAllowedStepUrl(t.step_url))) continue
 
     const keywords = templateKeywords({
@@ -204,15 +204,13 @@ export async function matchTemplatesForModule(
       category: t.category,
       subcategory: t.subcategory ?? null,
       description: t.description ?? null,
-      tags: Array.isArray(t.tags) ? t.tags as string[] : null,
+      tags: Array.isArray(t.tags) ? t.tags : null,
     })
     if (keywords.length === 0) continue
 
     let rawScore = 0
     for (const kw of keywords) {
-      // +2 for full substring match in context
       if (contextLower.includes(kw)) rawScore += 2
-      // +1 for word-level exact or prefix match
       if (contextWords.some((w) =>
         w === kw ||
         (w.length >= 4 && w.startsWith(kw)) ||
@@ -229,16 +227,181 @@ export async function matchTemplatesForModule(
       subcategory: t.subcategory ?? null,
       description: t.description ?? null,
       stepUrl: t.step_url,
-      score: rawScore,
+      tags: Array.isArray(t.tags) ? t.tags : null,
+      rawScore,
     })
   }
 
-  // Sort descending by raw score (like reference-models.ts), take top 3
-  scored.sort((a, b) => b.score - a.score)
-  const topMatches = scored.slice(0, 3)
-  const best = topMatches[0] ?? null
-  const seedTemplate = best && best.score >= SEED_THRESHOLD ? best : null
-
-  return { topMatches, seedTemplate }
+  return scored
 }
 
+// ─── Semantic Scoring ────────────────────────────────────────────────
+
+interface SemanticScoredTemplate {
+  slug: string
+  name: string
+  category: string
+  subcategory: string | null
+  description: string | null
+  stepUrl: string
+  tags: string[] | null
+  similarity: number
+}
+
+/**
+ * Scores templates by semantic similarity via embedding + RPC.
+ * Returns null if embedding is unavailable (graceful degradation).
+ */
+async function scoreBySemantics(
+  moduleDescription: string,
+): Promise<SemanticScoredTemplate[] | null> {
+  const embedding = await embedText(moduleDescription)
+  if (!embedding) return null
+
+  const supabase = await createClient()
+  const { data, error } = await supabase.rpc("match_step_templates", {
+    query_embedding: JSON.stringify(embedding),
+    match_threshold: HYBRID_REFERENCE_THRESHOLD,
+    match_count: 20,
+  })
+
+  if (error) {
+    console.warn("[THE-FORGE] match_step_templates RPC error:", error.message)
+    return null
+  }
+
+  if (!data || !Array.isArray(data)) return null
+
+  return data
+    .filter((r) => r.step_url)
+    .map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      category: r.category,
+      subcategory: r.subcategory,
+      description: r.description,
+      stepUrl: r.step_url,
+      tags: r.tags,
+      similarity: r.similarity,
+    }))
+}
+
+// ─── Main Matching Function ──────────────────────────────────────────
+
+/**
+ * Matches step_templates to a Build module using hybrid keyword + semantic scoring.
+ *
+ * @param moduleName - Module name (e.g. "Stepper Motor Mount")
+ * @param modulePurpose - Module purpose sentence
+ * @param keyParts - Array of key physical parts
+ * @param moduleDescription - Optional full module description for semantic matching
+ * @returns Top 3 matches + optional seed template + reference templates
+ */
+export async function matchTemplatesForModule(
+  moduleName: string,
+  modulePurpose: string,
+  keyParts: string[],
+  moduleDescription?: string,
+): Promise<TemplateMatchResult> {
+  const empty: TemplateMatchResult = { topMatches: [], seedTemplate: null, referenceTemplates: [] }
+
+  // Build context string from module metadata
+  const contextText = [moduleName, modulePurpose, ...keyParts].join(" ")
+  if (!contextText.trim()) return empty
+
+  // Fetch templates that have STEP geometry available
+  const supabase = await createClient()
+  const { data: templates, error } = await supabase
+    .from("step_templates")
+    .select("slug, name, category, subcategory, description, tags, step_url")
+    .not("step_url", "is", null)
+    .order("name")
+    .limit(500)
+
+  if (error) {
+    console.error("[THE-FORGE] matchTemplatesForModule: DB error:", error.message)
+    return empty
+  }
+
+  if (!templates || templates.length === 0) return empty
+
+  // Run keyword scoring and semantic scoring in parallel
+  const semanticQuery = moduleDescription || contextText
+  const [keywordResults, semanticResults] = await Promise.all([
+    scoreByKeywords(contextText, templates),
+    scoreBySemantics(semanticQuery),
+  ])
+
+  // ── Fallback: pure keyword mode if semantic scoring is unavailable ──
+  if (!semanticResults) {
+    keywordResults.sort((a, b) => b.rawScore - a.rawScore)
+    const topMatches = keywordResults.slice(0, 3).map((t) => ({
+      slug: t.slug,
+      name: t.name,
+      category: t.category,
+      subcategory: t.subcategory,
+      description: t.description,
+      stepUrl: t.stepUrl,
+      score: t.rawScore,
+      tags: t.tags,
+    }))
+    const best = topMatches[0] ?? null
+    const seedTemplate = best && best.score >= SEED_THRESHOLD ? best : null
+    return { topMatches, seedTemplate, referenceTemplates: [] }
+  }
+
+  // ── Hybrid mode: combine keyword + semantic scores ──
+
+  // Normalise keyword scores to 0–1 range
+  const maxKeywordScore = keywordResults.reduce((max, t) => Math.max(max, t.rawScore), 0)
+
+  // Build lookup maps
+  const keywordMap = new Map(keywordResults.map((t) => [t.slug, t]))
+  const semanticMap = new Map(semanticResults.map((t) => [t.slug, t]))
+
+  // Union all candidate slugs
+  const allSlugs = new Set([...keywordMap.keys(), ...semanticMap.keys()])
+
+  const hybridScored: TemplateMatch[] = []
+
+  for (const slug of allSlugs) {
+    const kw = keywordMap.get(slug)
+    const sem = semanticMap.get(slug)
+
+    const keywordNorm = kw && maxKeywordScore > 0 ? kw.rawScore / maxKeywordScore : 0
+    const semanticScore = sem?.similarity ?? 0
+
+    const hybridScore = keywordNorm * 0.4 + semanticScore * 0.6
+
+    // Use whichever source has the metadata
+    const source = kw ?? sem!
+
+    hybridScored.push({
+      slug: source.slug,
+      name: source.name,
+      category: source.category,
+      subcategory: source.subcategory,
+      description: source.description,
+      stepUrl: source.stepUrl,
+      score: Math.round(hybridScore * 1000) / 1000,
+      tags: source.tags,
+    })
+  }
+
+  hybridScored.sort((a, b) => b.score - a.score)
+
+  const topMatches = hybridScored.slice(0, 3)
+  const best = topMatches[0] ?? null
+  const seedTemplate = best && best.score >= HYBRID_SEED_THRESHOLD ? best : null
+
+  // Reference templates: above reference threshold but not the seed
+  const referenceTemplates = hybridScored
+    .filter((t) =>
+      t.score >= HYBRID_REFERENCE_THRESHOLD &&
+      t.score < HYBRID_SEED_THRESHOLD &&
+      t.slug !== seedTemplate?.slug
+    )
+    .slice(0, 5)
+
+  return { topMatches, seedTemplate, referenceTemplates }
+}

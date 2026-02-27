@@ -3788,6 +3788,7 @@ export type Database = {
           modules: Json | null
           name: string
           product_overview: string | null
+          quality_ratings: Json | null
           research: Json | null
           result: Json | null
           reviews: Json | null
@@ -3816,6 +3817,7 @@ export type Database = {
           modules?: Json | null
           name?: string
           product_overview?: string | null
+          quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
           reviews?: Json | null
@@ -3844,6 +3846,7 @@ export type Database = {
           modules?: Json | null
           name?: string
           product_overview?: string | null
+          quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
           reviews?: Json | null
@@ -14205,6 +14208,7 @@ export type Database = {
           category: string
           created_at: string | null
           description: string | null
+          embedding: string | null
           file_size_bytes: number | null
           foundry_id: string | null
           id: string
@@ -14226,6 +14230,7 @@ export type Database = {
           category: string
           created_at?: string | null
           description?: string | null
+          embedding?: string | null
           file_size_bytes?: number | null
           foundry_id?: string | null
           id?: string
@@ -14247,6 +14252,7 @@ export type Database = {
           category?: string
           created_at?: string | null
           description?: string | null
+          embedding?: string | null
           file_size_bytes?: number | null
           foundry_id?: string | null
           id?: string
@@ -17684,6 +17690,23 @@ export type Database = {
           similarity: number
           slug: string
           title: string
+        }[]
+      }
+      match_step_templates: {
+        Args: {
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          description: string
+          name: string
+          similarity: number
+          slug: string
+          step_url: string
+          subcategory: string
+          tags: string[]
         }[]
       }
       match_suppliers_semantic: {

@@ -914,9 +914,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           if (!activeProjectId) throw new Error("Project not initialized")
 
           addProgressLine(`Generating CAD model for ${mod.name}...`)
+
+          // P5: Request SSE stream for live progress updates
           const response = await fetch("/api/cad-lab/generate-module", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "text/event-stream",
+            },
             body: JSON.stringify({
               projectId: activeProjectId,
               moduleId,
@@ -928,15 +933,61 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             throw new Error(errBody.error || `HTTP ${response.status}`)
           }
 
-          const data = await response.json() as { done: boolean; module: CadLabModule }
-          let updated: CadLabModule[] | null = null
-          setModules((prev) => {
-            updated = prev.map((m) => (m.id === moduleId ? data.module : m))
-            return updated
-          })
-          debouncedSaveModules()
-          addProgressLine(`${mod.name} generated successfully!`)
-          setExpandedModuleId(moduleId)
+          // P5: Read SSE stream and update batchProgress at each event
+          if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+            const reader = response.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ""
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+
+              // Parse complete SSE messages from buffer
+              const messages = buffer.split("\n\n")
+              buffer = messages.pop() ?? "" // Keep incomplete message in buffer
+
+              for (const msg of messages) {
+                for (const line of msg.split("\n")) {
+                  if (!line.startsWith("data: ")) continue
+                  try {
+                    const event = JSON.parse(line.slice(6)) as { type: string; step?: string; module?: CadLabModule; message?: string }
+                    if (event.type === "status") {
+                      const stepLabel = event.step === "interface" ? "interface" as const
+                        : event.step === "upload" ? "generating" as const
+                        : "generating" as const
+                      setBatchProgress((prev) => ({ ...prev, [moduleId]: stepLabel }))
+                      if (event.step === "interface") addProgressLine(`Planning dimensions for ${mod.name}...`)
+                      else if (event.step === "codegen") addProgressLine(`Generating code for ${mod.name}...`)
+                      else if (event.step === "modal") addProgressLine(`Executing CAD for ${mod.name}...`)
+                      else if (event.step === "upload") addProgressLine(`Uploading files for ${mod.name}...`)
+                    } else if (event.type === "complete" && event.module) {
+                      setModules((prev) => prev.map((m) => (m.id === moduleId ? event.module! : m)))
+                      debouncedSaveModules()
+                      addProgressLine(`${mod.name} generated successfully!`)
+                      setExpandedModuleId(moduleId)
+                    } else if (event.type === "error") {
+                      throw new Error(event.message || "Generation failed")
+                    }
+                  } catch (parseErr) {
+                    if (parseErr instanceof Error && parseErr.message !== "Generation failed") {
+                      // JSON parse error — skip this line
+                    } else {
+                      throw parseErr
+                    }
+                  }
+                }
+              }
+            }
+          } else {
+            // Fallback: non-SSE response (backward compat)
+            const data = await response.json() as { done: boolean; module: CadLabModule }
+            setModules((prev) => prev.map((m) => (m.id === moduleId ? data.module : m)))
+            debouncedSaveModules()
+            addProgressLine(`${mod.name} generated successfully!`)
+            setExpandedModuleId(moduleId)
+          }
         } catch (err) {
           console.error("[CAD-LAB] Module CAD generation failed:", err)
           addProgressLine(`Failed to generate ${mod.name}: ${err instanceof Error ? err.message : "Unknown error"}`)

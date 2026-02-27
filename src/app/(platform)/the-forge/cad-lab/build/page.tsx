@@ -42,6 +42,8 @@ import {
   FileText,
   Pencil,
   X,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -68,7 +70,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import type { CadLabResult, CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabResult, CadLabModule, PreExecValidationResult } from "@/lib/cad-lab-types"
+import { Badge } from "@/components/ui/badge"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
@@ -76,6 +79,7 @@ import { ManufacturingInsightCard } from "@/components/cad/manufacturing-insight
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ValidationSummary } from "@/components/cad/validation-summary"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
+import { rateModuleQuality } from "@/actions/cad-lab-projects"
 import { useCadLab } from "../cad-lab-context"
 import { Metric, SvgView, RenderedView, FullscreenOverlay, extractProductSummary } from "../cad-lab-utils"
 import { useRenderedViews } from "@/hooks/use-rendered-views"
@@ -86,6 +90,69 @@ import { IntegrationView } from "../components/integration-view"
 // ─── View Tab Type ───────────────────────────────────────────────────
 
 type ViewTab = "3d" | "iso" | "exploded" | "front" | "back" | "left" | "right" | "top"
+
+// ─── Pre-Execution Validation Alerts (QW5) ──────────────────────────
+
+/** Collapsible alert cards showing pre-execution validation findings per module */
+function PreExecValidationAlerts({ findings }: { findings: PreExecValidationResult[] }) {
+  const [expanded, setExpanded] = useState(false)
+
+  const criticalCount = findings.filter((f) => f.severity === "critical").length
+  const warningCount = findings.filter((f) => f.severity === "warning").length
+  const infoCount = findings.filter((f) => f.severity === "info").length
+
+  const severityVariant = (s: PreExecValidationResult["severity"]) =>
+    s === "critical" ? "destructive" as const : s === "warning" ? "warning" as const : "info" as const
+
+  return (
+    <div className="border rounded-lg overflow-hidden">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between p-3 text-left hover:bg-muted/50 transition-colors"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2">
+          <ClipboardCheck className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">Pre-execution Checks</span>
+          <div className="flex items-center gap-1">
+            {criticalCount > 0 && <Badge variant="destructive" size="sm">{criticalCount} critical</Badge>}
+            {warningCount > 0 && <Badge variant="warning" size="sm">{warningCount} warning</Badge>}
+            {infoCount > 0 && <Badge variant="info" size="sm">{infoCount} info</Badge>}
+          </div>
+        </div>
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+      </button>
+      {expanded && (
+        <div className="border-t px-3 pb-3 pt-2 space-y-2">
+          {findings.map((finding, idx) => (
+            <div
+              key={idx}
+              className={cn(
+                "flex items-start gap-2 p-2 rounded text-xs",
+                finding.severity === "critical" ? "bg-destructive/10" : finding.severity === "warning" ? "bg-status-warning-light/30" : "bg-status-info-light/30",
+              )}
+            >
+              {finding.severity === "critical" ? (
+                <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0 mt-0.5" />
+              ) : finding.severity === "warning" ? (
+                <AlertTriangle className="h-3 w-3 text-status-warning flex-shrink-0 mt-0.5" />
+              ) : (
+                <Info className="h-3 w-3 text-status-info flex-shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <span className="font-medium text-foreground">{finding.ruleId}</span>
+                <span className="text-muted-foreground ml-1">{finding.message}</span>
+                {finding.repairHint && (
+                  <p className="text-muted-foreground mt-0.5 italic">Fix: {finding.repairHint}</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -131,6 +198,14 @@ export default function CadLabBuildPage(): React.ReactNode {
   const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null)
   const [editingSpecModuleId, setEditingSpecModuleId] = useState<string | null>(null)
   const [specDraft, setSpecDraft] = useState("")
+
+  // P4: Quality ratings — keyed by moduleId → "good" | "bad"
+  const [qualityRatings, setQualityRatings] = useState<Record<string, "good" | "bad">>({})
+  const handleQualityRate = useCallback(async (moduleId: string, rating: "good" | "bad") => {
+    if (!activeProjectId) return
+    setQualityRatings((prev) => ({ ...prev, [moduleId]: rating }))
+    await rateModuleQuality(activeProjectId, moduleId, rating)
+  }, [activeProjectId])
 
   // Specialist reviews (keyed by moduleId → array of reviews)
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
@@ -895,6 +970,11 @@ export default function CadLabBuildPage(): React.ReactNode {
                           <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                         </div>
 
+                        {/* Pre-execution Validator Findings — QW5 */}
+                        {mod.result?.preExecValidation && mod.result.preExecValidation.length > 0 && (
+                          <PreExecValidationAlerts findings={mod.result.preExecValidation} />
+                        )}
+
                         {/* Design Validation */}
                         {(mod.status === "generated" || mod.result) && (
                           <ValidationSummary
@@ -1075,6 +1155,33 @@ export default function CadLabBuildPage(): React.ReactNode {
                           <CheckCircle2 className="h-3 w-3" /> Done
                         </span>
                       )}
+                      {/* P4: Quality rating — thumbs up/down */}
+                      {mod.status === "generated" && (
+                        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            className={cn(
+                              "h-6 w-6 rounded flex items-center justify-center transition-colors",
+                              qualityRatings[mod.id] === "good" ? "bg-status-success-light text-status-success" : "text-muted-foreground hover:text-status-success hover:bg-status-success-light/50"
+                            )}
+                            onClick={() => handleQualityRate(mod.id, "good")}
+                            title="Good quality"
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                          </button>
+                          <button
+                            type="button"
+                            className={cn(
+                              "h-6 w-6 rounded flex items-center justify-center transition-colors",
+                              qualityRatings[mod.id] === "bad" ? "bg-destructive/10 text-destructive" : "text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            )}
+                            onClick={() => handleQualityRate(mod.id, "bad")}
+                            title="Poor quality"
+                          >
+                            <ThumbsDown className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
                       {expandedModuleId === mod.id
                         ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
                         : <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -1171,6 +1278,11 @@ export default function CadLabBuildPage(): React.ReactNode {
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Questions for Your Factory</p>
                         <ManufacturingInsightCard moduleAnswers={diagnosticAnswers?.[mod.id]} />
                       </div>
+
+                      {/* Pre-execution Validator Findings — QW5 */}
+                      {mod.result?.preExecValidation && mod.result.preExecValidation.length > 0 && (
+                        <PreExecValidationAlerts findings={mod.result.preExecValidation} />
+                      )}
 
                       {/* Design Validation */}
                       {(mod.status === "generated" || mod.result) && (
@@ -1386,14 +1498,15 @@ export default function CadLabBuildPage(): React.ReactNode {
                           }}
                           moduleId={mod.id}
                           onDownload={handleDownload}
+                          svgUrls={mod.svgUrls}
                         />
                       )}
 
                       {/* SVG preview (fallback for older module data without full result viewer) */}
-                      {mod.result?.svgIso && mod.status === "generated" && !(mod.result as CadLabResult).stlData && (
+                      {(mod.svgUrls?.iso || mod.result?.svgIso) && mod.status === "generated" && !(mod.result as CadLabResult).stlData && (
                         <div className="bg-muted rounded-lg p-2">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mod.result.svgIso} alt={`${mod.name} isometric view`} className="w-full" />
+                          <img src={mod.svgUrls?.iso ?? mod.result?.svgIso} alt={`${mod.name} isometric view`} className="w-full" />
                         </div>
                       )}
                     </div>
@@ -1638,6 +1751,7 @@ function ModuleResultsView({
   onFullscreen,
   moduleId,
   onDownload,
+  svgUrls,
 }: {
   result: CadLabResult
   moduleName: string
@@ -1651,18 +1765,24 @@ function ModuleResultsView({
   onFullscreen: (view: string, moduleId: string) => void
   moduleId: string
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
+  /** P3: Persisted SVG URLs from Supabase storage — preferred over data URIs */
+  svgUrls?: Record<string, string>
 }): React.ReactNode {
   // Render high-quality orthographic views from STL using Three.js
   const { views: renderedViews, loading: renderedLoading } = useRenderedViews(result.stlData)
 
+  // P3: Prefer persisted SVG URLs from Supabase, fall back to data URI from result
+  const resolveSvg = (viewName: string): string | undefined =>
+    svgUrls?.[viewName] ?? (result as unknown as Record<string, unknown>)[`svg${viewName.charAt(0).toUpperCase()}${viewName.slice(1)}`] as string | undefined
+
   // A view tab is available if we have STL (rendered views) OR a CadQuery SVG fallback
-  const hasIso = !!(result.stlData || result.svgIso)
-  const hasExploded = !!result.svgExploded
-  const hasFront = !!(result.stlData || result.svgFront)
-  const hasBack = !!(result.stlData || result.svgBack)
-  const hasLeft = !!(result.stlData || result.svgLeft)
-  const hasRight = !!(result.stlData || result.svgRight)
-  const hasTop = !!(result.stlData || result.svgTop)
+  const hasIso = !!(result.stlData || resolveSvg("iso"))
+  const hasExploded = !!resolveSvg("exploded")
+  const hasFront = !!(result.stlData || resolveSvg("front"))
+  const hasBack = !!(result.stlData || resolveSvg("back"))
+  const hasLeft = !!(result.stlData || resolveSvg("left"))
+  const hasRight = !!(result.stlData || resolveSvg("right"))
+  const hasTop = !!(result.stlData || resolveSvg("top"))
 
   // Auto-select first available tab when current tab has no matching content
   useEffect(() => {
@@ -1693,12 +1813,8 @@ function ModuleResultsView({
   // Renders a single orthographic view tab — prefers Three.js PNG, falls back to CadQuery SVG
   const renderOrthoTab = (viewName: "iso" | "front" | "back" | "left" | "right" | "top", label: string) => {
     const renderedSrc = renderedViews?.[viewName] ?? null
-    const svgSrc = viewName === "iso" ? result.svgIso
-      : viewName === "front" ? result.svgFront
-      : viewName === "back" ? result.svgBack
-      : viewName === "left" ? result.svgLeft
-      : viewName === "right" ? result.svgRight
-      : result.svgTop
+    // P3: Prefer persisted URL from Supabase, fall back to data URI
+    const svgSrc = resolveSvg(viewName)
 
     // Prefer rendered PNG; fall back to CadQuery SVG if rendering failed/unavailable
     if (result.stlData) {

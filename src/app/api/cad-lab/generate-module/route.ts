@@ -19,7 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { rateLimit } from "@/lib/security/rate-limit"
-import type { CadLabModule, ClaudeModelId, DecompositionCheckpoint } from "@/lib/cad-lab-types"
+import type { CadLabModule, ClaudeModelId, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
 export const runtime = "nodejs"
@@ -119,7 +119,7 @@ async function uploadDrawingManifest(
  * @param request - JSON body: { projectId: string, moduleId: string }
  * @returns The completed module data or an error
  */
-export async function POST(request: Request): Promise<NextResponse<GenerateModuleSuccess | GenerateModuleError>> {
+export async function POST(request: Request): Promise<Response> {
   // AUTH: Verify user session
   const supabase = await createClient()
   const {
@@ -183,6 +183,15 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
   const modelIdVal = (project.model_id || "claude-sonnet-4-6") as ClaudeModelId
   const researchReport = (project.research as { report?: string } | null)?.report ?? ""
 
+  // P5: Check if client wants SSE (Accept: text/event-stream) or classic JSON
+  const acceptsSSE = request.headers.get("accept")?.includes("text/event-stream")
+
+  // ── SSE helper ──
+  const encoder = new TextEncoder()
+  function formatSSE(event: GenerationEvent): Uint8Array {
+    return encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
+  }
+
   // AUDIT: Log module generation start
   const startTime = Date.now()
   console.info("[CAD-LAB-MODULE] Generation started:", {
@@ -190,188 +199,295 @@ export async function POST(request: Request): Promise<NextResponse<GenerateModul
     moduleId,
     moduleName: targetModule.name,
     userId: user.id,
+    sse: acceptsSSE,
   })
 
-  let localMod = { ...targetModule }
+  // P5: Wrap pipeline in a ReadableStream for SSE delivery
+  const stream = new ReadableStream({
+    async start(controller) {
+      const emit = (event: GenerationEvent) => {
+        try { controller.enqueue(formatSSE(event)) } catch { /* stream closed */ }
+      }
 
-  // Build checkpoint context for prompt injection
-  const checkpointContext = buildCheckpointPromptSection(
-    project.checkpoints as Record<string, DecompositionCheckpoint> | null,
-    moduleId,
-  )
+      let localMod = { ...targetModule }
 
-  const moduleResearchText =
-    localMod.moduleResearch ||
-    `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
-
-  // ── Interface step (if needed) ──
-  if (localMod.status === "pending") {
-    try {
-      const res = await generateCadLabInterface(
-        `${localMod.name} — ${localMod.purpose}`,
-        moduleResearchText,
-        modelIdVal,
-        checkpointContext || undefined,
+      // Build checkpoint context for prompt injection
+      const checkpointContext = buildCheckpointPromptSection(
+        project.checkpoints as Record<string, DecompositionCheckpoint> | null,
+        moduleId,
       )
-      if (res.success) {
+
+      const moduleResearchText =
+        localMod.moduleResearch ||
+        `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
+
+      // ── Interface step (if needed) ──
+      if (localMod.status === "pending") {
+        emit({ type: "status", step: "interface" })
+        try {
+          // QW3: Pass cached template match if available on module
+          const res = await generateCadLabInterface(
+            `${localMod.name} — ${localMod.purpose}`,
+            moduleResearchText,
+            modelIdVal,
+            checkpointContext || undefined,
+            localMod.templateMatchResult || undefined,
+          )
+          if (res.success) {
+            localMod = {
+              ...localMod,
+              interfaceDefinition: res.interfaceDefinition,
+              status: "interface_ready" as const,
+              // QW3: Cache template match result for reuse in CAD generation step
+              templateMatchResult: res.templateMatchResult ?? localMod.templateMatchResult,
+            }
+            // Save intermediate state so polling clients can see progress
+            await saveModuleToProject(supabase, projectId, allModules, localMod)
+            emit({ type: "progress", message: "Interface definition complete" })
+          } else {
+            console.error("[CAD-LAB-MODULE] Interface failed:", localMod.name)
+            emit({ type: "error", message: `Interface generation failed for ${localMod.name}` })
+            controller.close()
+            return
+          }
+        } catch (err) {
+          console.error("[CAD-LAB-MODULE] Interface error:", localMod.name, err instanceof Error ? err.message : err)
+          emit({ type: "error", message: `Interface error: ${err instanceof Error ? err.message : "Unknown error"}` })
+          controller.close()
+          return
+        }
+      }
+
+      // ── CAD generation step ──
+      emit({ type: "status", step: "codegen", attempt: 1 })
+      try {
+        const cadResearch =
+          localMod.moduleResearch ||
+          `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
+
+        const moduleContext = [
+          `## ${localMod.name}`,
+          `**Purpose:** ${localMod.purpose}`,
+          localMod.description ? `**Technical Description:** ${localMod.description}` : "",
+          localMod.whyItMatters ? `**Why It Matters:** ${localMod.whyItMatters}` : "",
+          localMod.failureModes?.length ? `**Failure Modes:**\n${localMod.failureModes.map(f => `- ${f}`).join("\n")}` : "",
+          localMod.unknowns?.length ? `**Unknowns:**\n${localMod.unknowns.map(u => `- ${u}`).join("\n")}` : "",
+        ].filter(Boolean).join("\n\n")
+
+        const enrichedDescription = `${localMod.name} — ${localMod.purpose}\n\n${moduleContext}`
+
+        emit({ type: "status", step: "modal" })
+
+        // QW3: Pass cached template match to avoid redundant DB + semantic scoring
+        const res = await generateCadLabModelSmart(
+          enrichedDescription,
+          cadResearch,
+          localMod.interfaceDefinition || "",
+          modelIdVal,
+          checkpointContext || undefined,
+          localMod.templateMatchResult || undefined,
+        )
+
+        if (!res.success) {
+          console.error("[CAD-LAB-MODULE] CAD generation returned failure:", localMod.name, res.error)
+          localMod = { ...localMod, status: "failed" as const, code: res.code }
+          await saveModuleToProject(supabase, projectId, allModules, localMod)
+          emit({ type: "error", message: res.error || "CAD generation failed" })
+          controller.close()
+          return
+        }
+
+        // Emit pre-exec validation findings if any
+        if (res.preExecValidation && res.preExecValidation.length > 0) {
+          emit({ type: "validation", findings: res.preExecValidation })
+        }
+
+        emit({ type: "status", step: "upload" })
+
+        const { stlData, stepData, ...resultWithoutBinary } = res
+
+        const packageFiles: UploadedCadAsset[] = []
+        let stepUrl: string | undefined
+        let stlUrl: string | undefined
+
+        if (stepData) {
+          try {
+            const uploaded = await uploadCadAsset(
+              projectId,
+              localMod.id,
+              `${localMod.id}.step`,
+              "application/step",
+              stepData,
+            )
+            stepUrl = uploaded.url
+            packageFiles.push({
+              name: `${localMod.id}.step`,
+              url: uploaded.url,
+              mimeType: "application/step",
+              sizeKb: uploaded.sizeKb,
+            })
+          } catch (uploadErr) {
+            console.warn("[CAD-LAB-MODULE] STEP upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
+          }
+        }
+
+        if (stlData) {
+          try {
+            const uploaded = await uploadCadAsset(
+              projectId,
+              localMod.id,
+              `${localMod.id}.stl`,
+              "model/stl",
+              stlData,
+            )
+            stlUrl = uploaded.url
+            packageFiles.push({
+              name: `${localMod.id}.stl`,
+              url: uploaded.url,
+              mimeType: "model/stl",
+              sizeKb: uploaded.sizeKb,
+            })
+          } catch (uploadErr) {
+            console.warn("[CAD-LAB-MODULE] STL upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
+          }
+        }
+
+        // P3: Persist SVG views to Supabase storage — survives page navigation
+        const svgViewMap: Record<string, string | undefined> = {
+          iso: res.svgIso,
+          top: res.svgTop,
+          front: res.svgFront,
+          back: res.svgBack,
+          right: res.svgRight,
+          left: res.svgLeft,
+          exploded: res.svgExploded,
+        }
+        const svgUrls: Record<string, string> = {}
+        await Promise.all(
+          Object.entries(svgViewMap).map(async ([viewName, dataUri]) => {
+            if (!dataUri) return
+            try {
+              const base64Data = dataUri.replace(/^data:image\/svg\+xml;base64,/, "")
+              const uploaded = await uploadCadAsset(
+                projectId,
+                localMod.id,
+                `${localMod.id}-${viewName}.svg`,
+                "image/svg+xml",
+                base64Data,
+              )
+              svgUrls[viewName] = uploaded.url
+            } catch (svgErr) {
+              console.warn(`[CAD-LAB-MODULE] SVG ${viewName} upload failed:`, svgErr instanceof Error ? svgErr.message : svgErr)
+            }
+          }),
+        )
+
+        const manifestPayload = {
+          projectId,
+          moduleId: localMod.id,
+          moduleName: localMod.name,
+          generatedAt: new Date().toISOString(),
+          revision: "A",
+          envelopeMm: res.bbox,
+          massGrams: res.massGrams,
+          processHints: {
+            printable: res.dfm?.printable ?? null,
+            compatiblePrinters: res.dfm?.compatiblePrinters ?? [],
+          },
+          files: packageFiles,
+        }
+        const manifestUrl = await uploadDrawingManifest(projectId, localMod.id, manifestPayload)
+
         localMod = {
           ...localMod,
-          interfaceDefinition: res.interfaceDefinition,
-          status: "interface_ready" as const,
+          svgUrls: Object.keys(svgUrls).length > 0 ? svgUrls : undefined,
+          result: {
+            ...resultWithoutBinary,
+            stepUrl,
+            stlUrl,
+            drawingPackage: {
+              revision: "A",
+              generatedAt: manifestPayload.generatedAt,
+              title: `${localMod.name} Drawing Package`,
+              manifestUrl,
+              files: packageFiles,
+            },
+          },
+          code: res.code,
+          status: "generated" as const,
         }
-        // Save intermediate state so polling clients can see progress
-        await saveModuleToProject(supabase, projectId, allModules, localMod)
-      } else {
-        console.error("[CAD-LAB-MODULE] Interface failed:", localMod.name)
-        return NextResponse.json(
-          { error: `Interface generation failed for ${localMod.name}`, moduleId },
-          { status: 500 },
-        )
+      } catch (err) {
+        console.error("[CAD-LAB-MODULE] CAD error:", localMod.name, err instanceof Error ? err.message : err)
+        emit({ type: "error", message: `CAD generation error: ${err instanceof Error ? err.message : "Unknown error"}` })
+        controller.close()
+        return
       }
-    } catch (err) {
-      console.error("[CAD-LAB-MODULE] Interface error:", localMod.name, err instanceof Error ? err.message : err)
-      return NextResponse.json(
-        { error: `Interface error: ${err instanceof Error ? err.message : "Unknown error"}`, moduleId },
-        { status: 500 },
-      )
-    }
-  }
 
-  // ── CAD generation step ──
-  try {
-    const cadResearch =
-      localMod.moduleResearch ||
-      `Module: ${localMod.name}\nPurpose: ${localMod.purpose}\nKey Parts: ${localMod.keyParts.join(", ")}\nDescription: ${localMod.description}\n\nFrom parent research:\n${researchReport}`
-
-    const res = await generateCadLabModelSmart(
-      `${localMod.name} — ${localMod.purpose}`,
-      cadResearch,
-      localMod.interfaceDefinition || "",
-      modelIdVal,
-      checkpointContext || undefined,
-    )
-
-    // INTENT: Modal execution can fail (CadQuery errors, union timeouts) and return
-    // { success: false } without throwing. Without this check, broken geometry gets
-    // silently marked as "generated" and the batch counts it as complete.
-    if (!res.success) {
-      console.error("[CAD-LAB-MODULE] CAD generation returned failure:", localMod.name, res.error)
-      localMod = { ...localMod, status: "failed" as const, code: res.code }
+      // ── Persist completed module ──
       await saveModuleToProject(supabase, projectId, allModules, localMod)
-      return NextResponse.json(
-        { error: res.error || "CAD generation failed", moduleId },
-        { status: 500 },
-      )
-    }
 
-    const { stlData, stepData, ...resultWithoutBinary } = res
+      const elapsedMs = Date.now() - startTime
 
-    const packageFiles: UploadedCadAsset[] = []
-    let stepUrl: string | undefined
-    let stlUrl: string | undefined
+      // AUDIT: Log module generation complete
+      console.info("[CAD-LAB-MODULE] Generation complete:", {
+        projectId,
+        moduleId,
+        moduleName: localMod.name,
+        elapsedMs,
+      })
 
-    if (stepData) {
-      try {
-        const uploaded = await uploadCadAsset(
-          projectId,
-          localMod.id,
-          `${localMod.id}.step`,
-          "application/step",
-          stepData,
-        )
-        stepUrl = uploaded.url
-        packageFiles.push({
-          name: `${localMod.id}.step`,
-          url: uploaded.url,
-          mimeType: "application/step",
-          sizeKb: uploaded.sizeKb,
-        })
-      } catch (uploadErr) {
-        console.warn("[CAD-LAB-MODULE] STEP upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
-      }
-    }
+      // P5: Final complete event contains the full module data — backward compat
+      emit({ type: "complete", module: localMod })
+      controller.close()
+    },
+  })
 
-    if (stlData) {
-      try {
-        const uploaded = await uploadCadAsset(
-          projectId,
-          localMod.id,
-          `${localMod.id}.stl`,
-          "model/stl",
-          stlData,
-        )
-        stlUrl = uploaded.url
-        packageFiles.push({
-          name: `${localMod.id}.stl`,
-          url: uploaded.url,
-          mimeType: "model/stl",
-          sizeKb: uploaded.sizeKb,
-        })
-      } catch (uploadErr) {
-        console.warn("[CAD-LAB-MODULE] STL upload failed:", uploadErr instanceof Error ? uploadErr.message : uploadErr)
-      }
-    }
-
-    const manifestPayload = {
-      projectId,
-      moduleId: localMod.id,
-      moduleName: localMod.name,
-      generatedAt: new Date().toISOString(),
-      revision: "A",
-      envelopeMm: res.bbox,
-      massGrams: res.massGrams,
-      processHints: {
-        printable: res.dfm?.printable ?? null,
-        compatiblePrinters: res.dfm?.compatiblePrinters ?? [],
+  // P5: Return SSE stream if client accepts it, otherwise collect and return JSON
+  if (acceptsSSE) {
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
       },
-      files: packageFiles,
-    }
-    const manifestUrl = await uploadDrawingManifest(projectId, localMod.id, manifestPayload)
-
-    localMod = {
-      ...localMod,
-      result: {
-        ...resultWithoutBinary,
-        stepUrl,
-        stlUrl,
-        drawingPackage: {
-          revision: "A",
-          generatedAt: manifestPayload.generatedAt,
-          title: `${localMod.name} Drawing Package`,
-          manifestUrl,
-          files: packageFiles,
-        },
-      },
-      code: res.code,
-      status: "generated" as const,
-    }
-  } catch (err) {
-    console.error("[CAD-LAB-MODULE] CAD error:", localMod.name, err instanceof Error ? err.message : err)
-    return NextResponse.json(
-      { error: `CAD generation error: ${err instanceof Error ? err.message : "Unknown error"}`, moduleId },
-      { status: 500 },
-    )
+    })
   }
 
-  // ── Persist completed module ──
-  await saveModuleToProject(supabase, projectId, allModules, localMod)
+  // Backward compat: Consume the stream and return the final event as JSON
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let lastComplete: GenerationEvent | null = null
+  let lastError: string | null = null
 
-  const elapsedMs = Date.now() - startTime
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const text = decoder.decode(value)
+    // Parse SSE data lines
+    for (const line of text.split("\n")) {
+      if (line.startsWith("data: ")) {
+        try {
+          const event = JSON.parse(line.slice(6)) as GenerationEvent
+          if (event.type === "complete") lastComplete = event
+          if (event.type === "error") lastError = event.message
+        } catch { /* ignore parse errors */ }
+      }
+    }
+  }
 
-  // AUDIT: Log module generation complete
-  console.info("[CAD-LAB-MODULE] Generation complete:", {
-    projectId,
-    moduleId,
-    moduleName: localMod.name,
-    elapsedMs,
-  })
+  if (lastComplete && lastComplete.type === "complete") {
+    return NextResponse.json({
+      done: true,
+      moduleId,
+      module: lastComplete.module,
+      elapsedMs: Date.now() - startTime,
+    } satisfies GenerateModuleSuccess)
+  }
 
-  return NextResponse.json({
-    done: true,
-    moduleId,
-    module: localMod,
-    elapsedMs,
-  })
+  return NextResponse.json(
+    { error: lastError || "Generation failed", moduleId } satisfies GenerateModuleError,
+    { status: 500 },
+  )
 }
 
 // ─── Helper: Atomic module save ──────────────────────────────────────

@@ -116,7 +116,7 @@ function ModuleDetailDialog({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
+      <DialogContent size="lg" className="max-h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader>
           {isEditing ? (
             <>
@@ -150,7 +150,7 @@ function ModuleDetailDialog({
           )}
         </DialogHeader>
 
-        <ScrollArea className="flex-1 max-h-[65vh] pr-2">
+        <ScrollArea className="flex-1 min-h-0 pr-2">
           <div className="space-y-6">
             {/* Illustration (view-only in both modes) */}
             {module.imageStatus === "complete" && module.imageUrl && !isEditing && (

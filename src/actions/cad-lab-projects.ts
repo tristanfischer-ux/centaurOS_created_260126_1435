@@ -749,3 +749,76 @@ export async function deleteCadLabProject(
     return { success: true as const }
   })
 }
+
+// ─── Quality Rating ──────────────────────────────────────────────────
+
+/**
+ * Rates a generated module's quality with thumbs up/down.
+ *
+ * @description P4: Captures user signal on generation quality. Stored as JSONB
+ * on cad_lab_projects.quality_ratings for per-module tracking.
+ *
+ * @param projectId - Project UUID
+ * @param moduleId - Module ID string
+ * @param rating - "good" or "bad"
+ * @param notes - Optional free-text notes
+ * @returns Success or error
+ *
+ * @security Requires authenticated user. RLS enforces foundry isolation.
+ */
+export async function rateModuleQuality(
+  projectId: string,
+  moduleId: string,
+  rating: "good" | "bad",
+  notes?: string,
+): Promise<{ success: boolean; error?: string }> {
+  return withAuth(async ({ supabase, user }) => {
+    // VALIDATION: UUID check
+    if (!/^[0-9a-f-]{36}$/.test(projectId)) {
+      return { success: false, error: "Invalid projectId" }
+    }
+    if (!moduleId || typeof moduleId !== "string") {
+      return { success: false, error: "Invalid moduleId" }
+    }
+
+    // Load current ratings
+    const { data: project, error: loadError } = await supabase
+      .from("cad_lab_projects")
+      .select("quality_ratings")
+      .eq("id", projectId)
+      .single()
+
+    if (loadError || !project) {
+      return { success: false, error: "Project not found" }
+    }
+
+    const currentRatings = (project.quality_ratings as Record<string, unknown>) ?? {}
+    const updatedRatings = {
+      ...currentRatings,
+      [moduleId]: {
+        rating,
+        timestamp: new Date().toISOString(),
+        ...(notes ? { notes } : {}),
+      },
+    }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ quality_ratings: updatedRatings as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save quality rating:", error.message)
+      return { success: false, error: sanitizeErrorMessage(error) }
+    }
+
+    console.info("[THE-FORGE-PROJECTS] Quality rating saved:", {
+      projectId,
+      moduleId,
+      rating,
+      userId: user.id,
+    })
+
+    return { success: true }
+  })
+}

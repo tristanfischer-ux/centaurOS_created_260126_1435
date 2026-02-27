@@ -15,6 +15,8 @@ export interface CadLabQualityScorecard {
   validationPassCount?: number
   /** Number of modules with critical validation failures */
   validationFailCount?: number
+  /** P4: Percentage of modules that succeeded on first attempt (no repairs) */
+  firstAttemptSuccessPct?: number
 }
 
 export type CadLabDiagnosticsByModule = Record<string, Record<string, string>>
@@ -50,6 +52,14 @@ export function computeCadLabQualityScorecard(
       validationFailCount++
     }
   }
+
+  // P4: Compute first-attempt success percentage
+  const firstAttemptSuccessCount = generated.filter(
+    (mod) => mod.result?.firstAttemptSuccess === true,
+  ).length
+  const firstAttemptSuccessPct = generatedCount > 0
+    ? Math.round((firstAttemptSuccessCount / generatedCount) * 100)
+    : undefined
 
   // INTENT: Validation pass rate factors into CAD validity — failing validation
   // means the geometry/config is not ready for manufacturing
@@ -104,5 +114,6 @@ export function computeCadLabQualityScorecard(
     blockers,
     validationPassCount,
     validationFailCount,
+    firstAttemptSuccessPct,
   }
 }

@@ -64,7 +64,7 @@ function ImageSection({ module }: { module: CadLabModule }): React.ReactNode {
         <img
           src={module.imageUrl}
           alt={`Engineering blueprint of ${module.name}`}
-          className="w-full h-full object-cover transition-transform hover:scale-105"
+          className="w-full h-full object-contain transition-transform hover:scale-105"
           loading="lazy"
         />
       </div>
