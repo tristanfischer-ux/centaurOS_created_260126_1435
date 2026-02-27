@@ -63,6 +63,11 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
+import type { PreExecValidationResult } from "@/lib/cad-lab-types"
+import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage } from "@/lib/cad-lab/interface-validators"
+import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode } from "@/lib/cad-lab/code-validators"
+import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
+import type { TemplateMatch } from "@/actions/step-template-matching"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -689,6 +694,7 @@ export async function generateCadLabInterface(
       description,
       researchReport.slice(0, 200),
       descWords.slice(0, 10),
+      description,
     )
     // SECURITY: Sanitise template metadata before prompt injection to prevent indirect prompt injection
     const templateSection = templateMatch.topMatches.length > 0
@@ -781,12 +787,23 @@ Generate the complete interface definition following the exact 4-section format.
 
     console.info(`[THE-FORGE] Step 2 complete: ${Date.now() - start}ms`)
 
+    // ── Deterministic interface validation (#1, #6) ──
+    const interfaceWarnings: PreExecValidationResult[] = [
+      ...verifyInterfaceArithmetic(text),
+      ...trackDimensionProvenance(researchReport, text),
+    ]
+    if (interfaceWarnings.length > 0) {
+      console.info(`[THE-FORGE] Step 2: ${interfaceWarnings.length} interface warning(s):`,
+        interfaceWarnings.map((w) => `${w.severity}/${w.ruleId}: ${w.message}`))
+    }
+
     return {
       success: true,
       interfaceDefinition: text,
       generationTime: Date.now() - start,
       tokensIn,
       tokensOut,
+      interfaceWarnings: interfaceWarnings.length > 0 ? interfaceWarnings : undefined,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 2 failed:", error instanceof Error ? error.message : error)
@@ -854,13 +871,18 @@ export async function generateCadLabModel(
     // ── Seed-geometry routing: check for matching step_templates ──
     // INTENT: Strong matches route to the mashup endpoint with real STEP geometry
     // as a starting point, producing better results than scratch generation.
+    // #10: Also capture referenceTemplates for prompt injection on the scratch path.
+    let referenceTemplatesForPrompt: TemplateMatch[] = []
     try {
       const moduleWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
       const seedMatch = await matchTemplatesForModule(
         description,
         interfaceDefinition.slice(0, 200),
         moduleWords.slice(0, 10),
+        description,
       )
+      // Capture reference templates regardless of seed routing
+      referenceTemplatesForPrompt = seedMatch.referenceTemplates ?? []
       if (seedMatch.seedTemplate) {
         console.info(
           `[THE-FORGE] Step 3: Seed template found: ${seedMatch.seedTemplate.slug} (score: ${seedMatch.seedTemplate.score})`,
@@ -906,6 +928,12 @@ SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
 - If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
 - PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
 
+COMPONENT LIBRARY PRIORITY (CRITICAL):
+- PREFER library components over custom geometry — they are pre-validated and produce correct CadQuery.
+- When a library function exists for a component type, USE IT rather than building from scratch.
+- Library parts include proper features that custom geometry typically omits.
+- Check the COMPONENT LIBRARY list BEFORE writing any make_*() function.
+
 Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
 - When positioning components vertically, use EXACTLY ONE reference frame. Either:
   (a) All z-offsets are ABSOLUTE from z=0 (ground level), OR
@@ -922,13 +950,33 @@ ASSEMBLY STRATEGY FOR COMPLEX MODELS:
 - The final line should be: result = assy.toCompound()
 - For simpler models (<15 components), the .union() chain pattern is fine.`
 
-    const userPrompt = `Build a parametric CAD model of: ${description}
+    // ── #10: Build reference template dimension section for prompt injection ──
+    let referenceSection = ""
+    if (referenceTemplatesForPrompt.length > 0) {
+      const refLines = await Promise.all(
+        referenceTemplatesForPrompt.slice(0, 5).map(async (t) => {
+          const safeName = await sanitiseForPrompt(t.name)
+          const safeCat = await sanitiseForPrompt(t.category)
+          const safeDesc = t.description ? await sanitiseForPrompt(t.description.slice(0, 120)) : ""
+          return `- ${safeName} [${safeCat}] (match: ${t.score.toFixed(2)})${safeDesc ? `: ${safeDesc}` : ""}`
+        }),
+      )
+      referenceSection = `\n\n=== REFERENCE DIMENSIONS (from similar proven templates — use as cross-check) ===
+${refLines.join("\n")}
+Use these as dimensional cross-references. If your dimensions differ significantly, verify.`
+    }
+
+    const baseUserPrompt = `Build a parametric CAD model of: ${description}
+
+=== MODULE CONTEXT (engineering intent — use this to guide design decisions) ===
+${description}
 
 === RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
 ${researchReport}
 
 === INTERFACE DEFINITION (implement EVERY component listed here) ===
 ${interfaceDefinition}
+${referenceSection}
 ${checkpointContext ?? ""}
 SCALE PRESERVATION CRITICAL:
 - Use the EXACT scale from the research report and interface definition
@@ -945,66 +993,184 @@ Generate the complete CadQuery Python code following the methodology. The code m
 5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
 6. For simpler models: use the .union() assembly pattern
 7. CRITICAL: Every function you call MUST either come from the provided component library list OR be defined with \`def\` in your script.
-8. Verify all z-positions add up: the highest point should match the expected total height
-9. Assign the final assembly to a variable called "result"
-10. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
+8. CHECK THE COMPONENT LIBRARY FIRST — for every make_*() function, verify no library equivalent exists before writing custom geometry.
+9. Verify all z-positions add up: the highest point should match the expected total height
+10. Assign the final assembly to a variable called "result"
+11. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
 
 If the research report or interface definition contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
 
-    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
-    totalTokensIn += codeResult.tokensIn
-    totalTokensOut += codeResult.tokensOut
+    // ── #7: Iterative repair loop (max 3 attempts) ──
+    const MAX_REPAIR_ATTEMPTS = 3
+    const TOKEN_OUT_BUDGET = 200_000
+    let finalCode = ""
+    let assumptions: string[] = []
+    let allPreExecResults: PreExecValidationResult[] = []
+    let modalResult: ModalResponse | null = null
+    let modalTime = 0
+    let repairAttempts = 0
+    let lastModalError: string | null = null
 
-    let finalCode = extractCode(codeResult.text)
-    const assumptions = extractAssumptions(interfaceDefinition, finalCode)
+    for (let attempt = 0; attempt < MAX_REPAIR_ATTEMPTS; attempt++) {
+      repairAttempts = attempt
 
-    // Safety: strip any export/print/os calls that slipped through
-    finalCode = finalCode
-      .split("\n")
-      .filter((line: string) => {
-        const s = line.trim()
-        if (/^print\s*\(/.test(s)) return false
-        if (s.startsWith("import os") || s.startsWith("from os")) return false
-        if (s.includes("cq.exporters")) return false
-        return true
-      })
-      .join("\n")
+      // Token budget guard
+      if (totalTokensOut > TOKEN_OUT_BUDGET) {
+        console.warn(`[THE-FORGE] Step 3: Token budget exceeded (${totalTokensOut} > ${TOKEN_OUT_BUDGET}), stopping repair loop`)
+        break
+      }
+
+      // ── Code generation ──
+      let userPrompt: string
+      if (attempt === 0) {
+        userPrompt = baseUserPrompt
+      } else {
+        // Build repair prompt from previous failures
+        const failureSummary = allPreExecResults
+          .filter((r) => r.severity === "critical" || r.severity === "warning")
+          .map((r) => `- [${r.severity}] ${r.ruleId}: ${r.message}${r.repairHint ? `\n  Fix: ${r.repairHint}` : ""}`)
+          .join("\n")
+        const modalErrorSection = lastModalError ? `\nModal execution error: ${lastModalError}` : ""
+        userPrompt = `${baseUserPrompt}
+
+=== REPAIR REQUIRED (attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}) ===
+Previous code failed with ${allPreExecResults.filter((r) => r.severity !== "info").length} issue(s):
+${failureSummary}${modalErrorSection}
+Fix ONLY the listed issues. Previous code attached below.
+
+\`\`\`python
+${finalCode}
+\`\`\``
+        console.info(`[THE-FORGE] Step 3: Repair attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}`)
+      }
+
+      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000)
+      totalTokensIn += codeResult.tokensIn
+      totalTokensOut += codeResult.tokensOut
+
+      finalCode = extractCode(codeResult.text)
+      assumptions = extractAssumptions(interfaceDefinition, finalCode)
+
+      // Safety: strip any export/print/os calls that slipped through
+      finalCode = finalCode
+        .split("\n")
+        .filter((line: string) => {
+          const s = line.trim()
+          if (/^print\s*\(/.test(s)) return false
+          if (s.startsWith("import os") || s.startsWith("from os")) return false
+          if (s.includes("cq.exporters")) return false
+          return true
+        })
+        .join("\n")
+
+      // ── Pre-execution validation (#2, #3, #4, #5, #8) ──
+      allPreExecResults = [
+        ...checkComponentCoverage(interfaceDefinition, finalCode),
+        ...scanParametricIntegrity(finalCode),
+        ...validateZStack(finalCode, interfaceDefinition),
+        ...analyzeCadQueryCode(finalCode),
+      ]
+
+      // #8: Dimension estimation
+      const dimEstimate = estimateDimensions(finalCode)
+      allPreExecResults.push(...validateEstimatedDimensions(dimEstimate, interfaceDefinition))
+
+      const criticalCount = allPreExecResults.filter((r) => r.severity === "critical").length
+      if (criticalCount > 0) {
+        console.warn(`[THE-FORGE] Step 3: ${criticalCount} critical pre-exec issue(s) on attempt ${attempt + 1}:`,
+          allPreExecResults.filter((r) => r.severity === "critical").map((r) => r.ruleId))
+        if (attempt < MAX_REPAIR_ATTEMPTS - 1) continue // Try repair
+        // Final attempt — return failure with code attached
+        return {
+          success: false,
+          error: `Pre-execution validation failed after ${MAX_REPAIR_ATTEMPTS} attempts: ${allPreExecResults.filter((r) => r.severity === "critical").map((r) => r.message).join("; ")}`,
+          code: finalCode,
+          codeLines: finalCode.split("\n").length,
+          generationTime: Date.now() - pipelineStart,
+          interfaceDefinition,
+          tokensIn: totalTokensIn,
+          tokensOut: totalTokensOut,
+          modelUsed: modelId,
+          assumptions: assumptions.length > 0 ? assumptions : undefined,
+          repairAttempts,
+          preExecValidation: allPreExecResults,
+        }
+      }
+
+      if (allPreExecResults.length > 0) {
+        console.info(`[THE-FORGE] Step 3: ${allPreExecResults.length} pre-exec finding(s) (non-critical), proceeding to Modal`)
+      }
+
+      // ── Prepend library function definitions for any used slugs ──
+      const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(finalCode)
+      if (libraryComponents.length > 0) {
+        console.info("[THE-FORGE] Library components prepended for execution:", {
+          count: libraryComponents.length,
+          slugs: libraryComponents,
+        })
+      }
+
+      // ── Execute on Modal ──
+      console.info("[THE-FORGE] Step 4: Executing on Modal...")
+      const modalStart = Date.now()
+      modalResult = await executeOnModal(combinedCode)
+      modalTime = Date.now() - modalStart
+
+      if (modalResult.error && !modalResult.svg_iso) {
+        lastModalError = modalResult.error
+        console.warn(`[THE-FORGE] Step 4: Modal error on attempt ${attempt + 1}: ${modalResult.error.slice(0, 200)}`)
+        if (attempt < MAX_REPAIR_ATTEMPTS - 1) continue // Try repair
+        // Final attempt — return failure with code
+        return {
+          success: false,
+          error: modalResult.error,
+          code: finalCode,
+          codeLines: finalCode.split("\n").length,
+          generationTime: Date.now() - pipelineStart,
+          modalTime,
+          interfaceDefinition,
+          tokensIn: totalTokensIn,
+          tokensOut: totalTokensOut,
+          modelUsed: modelId,
+          assumptions: assumptions.length > 0 ? assumptions : undefined,
+          repairAttempts,
+          preExecValidation: allPreExecResults,
+        }
+      }
+
+      // Success — break out of repair loop
+      break
+    }
+
+    if (!modalResult) {
+      return {
+        success: false,
+        error: "Code generation failed — no Modal result produced",
+        generationTime: Date.now() - pipelineStart,
+        tokensIn: totalTokensIn,
+        tokensOut: totalTokensOut,
+        modelUsed: modelId,
+        repairAttempts,
+        preExecValidation: allPreExecResults,
+      }
+    }
+
+    // INTENT: .translate() and .rotate() are forbidden by CadQuery methodology — they corrupt
+    // workplane chains and shift geometry off-origin. Flag as warnings, not blocking errors.
+    const translateCount = (finalCode.match(/\.translate\s*\(/g) || []).length
+    const rotateCount = (finalCode.match(/\.rotate\s*\(/g) || []).length
+    const codeWarnings: string[] = []
+    if (translateCount > 0) {
+      codeWarnings.push(`.translate() used ${translateCount}x — may shift geometry off-origin`)
+    }
+    if (rotateCount > 0) {
+      codeWarnings.push(`.rotate() used ${rotateCount}x — may shift geometry off-origin`)
+    }
 
     const codeLines = finalCode.split("\n").length
     const generationTime = Date.now() - pipelineStart
 
     console.info(`[THE-FORGE] Step 3: Code generated (${codeLines} lines, ${generationTime}ms)`)
-
-    // ── Prepend library function definitions for any used slugs ──
-    const { combinedCode, libraryComponents } = await prepareCodeWithLibrary(finalCode)
-    if (libraryComponents.length > 0) {
-      console.info("[THE-FORGE] Library components prepended for execution:", {
-        count: libraryComponents.length,
-        slugs: libraryComponents,
-      })
-    }
-
-    // ── Execute on Modal ──
-    console.info("[THE-FORGE] Step 4: Executing on Modal...")
-    const modalStart = Date.now()
-    const modalResult = await executeOnModal(combinedCode)
-    const modalTime = Date.now() - modalStart
-
-    if (modalResult.error && !modalResult.svg_iso) {
-      return {
-        success: false,
-        error: modalResult.error,
-        code: finalCode,
-        codeLines,
-        generationTime,
-        modalTime,
-        interfaceDefinition,
-        tokensIn: totalTokensIn,
-        tokensOut: totalTokensOut,
-        modelUsed: modelId,
-        assumptions,
-      }
-    }
 
     // ── Extract metrics ──
     const mp = modalResult.analysis?.mass_properties
@@ -1051,8 +1217,32 @@ If the research report or interface definition contains any unresolved questions
       )
     }
 
+    // Merge translate/rotate code warnings
+    warnings.push(...codeWarnings)
+
+    // ── Dimensional validation: compare expected vs actual bbox ──
+    // INTENT: Catch gross scale mismatches (e.g. model is 200mm when spec says 6000mm).
+    // Conservative: only warn if parser confidently extracts dimensions AND mismatch is >2×.
+    if (bboxResult && interfaceDefinition) {
+      const dimMatch = interfaceDefinition.match(/Overall[:\s]*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*mm/i)
+      if (dimMatch) {
+        const expectedDims = [parseFloat(dimMatch[1]), parseFloat(dimMatch[2]), parseFloat(dimMatch[3])].sort((a, b) => a - b)
+        const actualDims = [bboxResult.xLen, bboxResult.yLen, bboxResult.zLen].sort((a, b) => a - b)
+        const dimIssues: string[] = []
+        for (let i = 0; i < 3; i++) {
+          const ratio = actualDims[i] / expectedDims[i]
+          if (ratio > 2 || ratio < 0.5) {
+            dimIssues.push(`dim${i}: expected ~${expectedDims[i]}mm, got ${actualDims[i]}mm (${ratio.toFixed(1)}×)`)
+          }
+        }
+        if (dimIssues.length > 0) {
+          warnings.push(`Dimensional mismatch vs interface spec: ${dimIssues.join("; ")}`)
+        }
+      }
+    }
+
     console.info(
-      `[THE-FORGE] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total`,
+      `[THE-FORGE] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total${repairAttempts > 0 ? ` (${repairAttempts} repair(s))` : ""}`,
     )
 
     // ── Extract DFM analysis ──
@@ -1112,6 +1302,8 @@ If the research report or interface definition contains any unresolved questions
       interfaceDefinition,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
       assumptions: assumptions.length > 0 ? assumptions : undefined,
+      repairAttempts: repairAttempts > 0 ? repairAttempts : undefined,
+      preExecValidation: allPreExecResults.length > 0 ? allPreExecResults : undefined,
       error: modalResult.error ?? undefined,
     }
   } catch (err) {

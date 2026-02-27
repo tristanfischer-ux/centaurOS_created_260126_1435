@@ -63,6 +63,35 @@ export interface CadLabMassProperties {
   materialDensityKgM3: number
 }
 
+// ─── Pre-Execution Validation Types ──────────────────────────────────
+
+/** Severity of a pre-execution validation finding */
+export type PreExecSeverity = "critical" | "warning" | "info"
+
+/** Result from a single pre-execution validation rule */
+export interface PreExecValidationResult {
+  /** Unique rule identifier (e.g., "arith-sum-mismatch") */
+  ruleId: string
+  /** Severity level — critical blocks Modal execution */
+  severity: PreExecSeverity
+  /** Human-readable description of the issue */
+  message: string
+  /** Suggested fix for the repair loop prompt */
+  repairHint?: string
+  /** Whether an automated fix is possible */
+  autoFixable?: boolean
+}
+
+/** Estimated bounding box from static code analysis */
+export interface DimensionEstimate {
+  /** Resolved symbol table (variable name → numeric value) */
+  symbols: Record<string, number>
+  /** Predicted bounding box in mm (null if estimation failed) */
+  predictedBbox: { x: number; y: number; z: number } | null
+  /** Variables that could not be resolved */
+  unresolvedVars: string[]
+}
+
 /** Result from the main CAD generation pipeline */
 export interface CadLabResult {
   success: boolean
@@ -125,6 +154,10 @@ export interface CadLabResult {
   validationWarnings?: string[]
   /** Assumptions inferred or resolved during generation */
   assumptions?: string[]
+  /** Number of repair loop iterations (0 = first attempt succeeded) */
+  repairAttempts?: number
+  /** Pre-execution validation results from deterministic validators */
+  preExecValidation?: PreExecValidationResult[]
   /** Slug of the step_template used as seed geometry (if any) */
   seedTemplateSlug?: string
   /** Normalised match score of the seed template (0–1) */
@@ -155,6 +188,8 @@ export interface CadLabInterfaceResult {
   /** Tokens used */
   tokensIn: number
   tokensOut: number
+  /** Pre-execution validation warnings from deterministic interface validators */
+  interfaceWarnings?: PreExecValidationResult[]
 }
 
 // ─── Visual Style Spec ──────────────────────────────────────────────
