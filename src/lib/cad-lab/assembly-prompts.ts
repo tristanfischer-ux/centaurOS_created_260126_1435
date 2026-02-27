@@ -10,6 +10,8 @@
  * generated structure adapts to it.
  */
 
+import type { InterfaceContract } from "@/lib/cad-lab-types"
+
 /** Spatial and semantic metadata for one module in the assembly */
 export interface AssemblyModuleInfo {
   /** Sanitised filename (used as importStep name, e.g. "drive_system") */
@@ -138,11 +140,13 @@ export function computeLayoutHint(modules: AssemblyModuleInfo[]): string {
  *
  * @param modules - Array of module metadata
  * @param productSubject - The product being assembled
+ * @param interfaceContracts - Optional extracted interface contracts (P1) for richer connection data
  * @returns User prompt string
  */
 export function getAssemblyCodeGenUserPrompt(
   modules: AssemblyModuleInfo[],
   productSubject: string,
+  interfaceContracts?: InterfaceContract[],
 ): string {
   const anchors = modules.filter((m) => m.isTemplateComponent)
   const generated = modules.filter((m) => !m.isTemplateComponent)
@@ -164,7 +168,14 @@ export function getAssemblyCodeGenUserPrompt(
     return lines.join("\n")
   }
 
-  const connectionMap = deriveConnectionMap(modules)
+  // R1: Use extracted interface contracts when available, fall back to heuristic
+  const hasContracts = interfaceContracts && interfaceContracts.length > 0
+  const connectionMapText = hasContracts
+    ? formatInterfaceContractsForAssembly(interfaceContracts, modules)
+    : deriveConnectionMap(modules)
+  const connectionLabel = hasContracts
+    ? "CONTRACT-VALIDATED CONNECTION MAP"
+    : "DERIVED CONNECTION MAP"
 
   const sections: string[] = [
     `PRODUCT: ${productSubject}`,
@@ -185,7 +196,7 @@ export function getAssemblyCodeGenUserPrompt(
     )
   }
 
-  sections.push(`\n## DERIVED CONNECTION MAP\n${connectionMap}`)
+  sections.push(`\n## ${connectionLabel}\n${connectionMapText}`)
 
   const layoutHint = computeLayoutHint(modules)
   sections.push(
@@ -204,6 +215,57 @@ export function getAssemblyCodeGenUserPrompt(
   )
 
   return sections.join("\n")
+}
+
+/**
+ * Formats extracted interface contracts into a structured connection map for the assembly prompt.
+ *
+ * @description Replaces the crude `deriveConnectionMap()` heuristic when real contract data
+ * is available. Includes port types, specs, and compatibility warnings so Claude can
+ * position mating faces correctly.
+ *
+ * @param contracts - Validated interface contracts from P1 extraction
+ * @param modules - Assembly module metadata (for resolving module IDs to display names)
+ * @returns Formatted connection map text
+ */
+export function formatInterfaceContractsForAssembly(
+  contracts: InterfaceContract[],
+  modules: AssemblyModuleInfo[],
+): string {
+  if (contracts.length === 0) {
+    return "No interface contracts extracted.\nUse bounding box stacking: place largest module at origin, stack others along Z with 5mm gaps."
+  }
+
+  // Build module ID → display name lookup
+  const nameMap = new Map<string, string>()
+  for (const m of modules) {
+    nameMap.set(m.name, m.displayName)
+  }
+  const resolveName = (id: string) => nameMap.get(id) ?? id
+
+  const lines: string[] = []
+  for (const c of contracts) {
+    const sourceName = resolveName(c.sourceModuleId)
+    const targetName = resolveName(c.targetModuleId)
+    const typeLabel = c.portType.toUpperCase()
+
+    let line = `${sourceName} [${c.sourcePort}] → ${targetName} [${c.targetPort}] (${typeLabel})`
+
+    // Add spec details when available
+    const specs: string[] = []
+    if (c.sourceSpec) specs.push(`source: ${c.sourceSpec}`)
+    if (c.targetSpec) specs.push(`target: ${c.targetSpec}`)
+    if (specs.length > 0) line += ` — ${specs.join(", ")}`
+
+    // Flag incompatible connections
+    if (c.compatible === false) {
+      line += ` ⚠ INCOMPATIBLE: ${c.incompatibilityReason ?? "specs do not match"}`
+    }
+
+    lines.push(line)
+  }
+
+  return lines.join("\n")
 }
 
 /**
