@@ -30,6 +30,16 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+/** Returns true when the module's diagnostic mfg_process is a 3D printing variant */
+function is3DPrintProcess(diagnosticAnswers: DiagnosticAnswers | undefined, moduleId: string): boolean {
+  const process = diagnosticAnswers?.[moduleId]?.mfg_process
+  if (!process) return true // DECISION: default to showing FDM metrics when undiagnosed (conservative)
+  return process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
+}
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -38,6 +48,8 @@ interface CadLabAnalysisDashboardProps {
   modules: CadLabModule[]
   /** Project subject for the dashboard title */
   projectName?: string
+  /** Per-module diagnostic answers — used to filter FDM-specific metrics for non-3D-printed modules */
+  diagnosticAnswers?: DiagnosticAnswers
 }
 
 interface SystemMetrics {
@@ -75,7 +87,7 @@ interface SystemMetrics {
  * @param modules - Array of The Forge modules
  * @returns Aggregated system metrics
  */
-function computeSystemMetrics(modules: CadLabModule[]): SystemMetrics {
+function computeSystemMetrics(modules: CadLabModule[], diagnosticAnswers?: DiagnosticAnswers): SystemMetrics {
   let totalMassG = 0
   let totalVolumeMm3 = 0
   let maxX = 0
@@ -117,9 +129,13 @@ function computeSystemMetrics(modules: CadLabModule[]): SystemMetrics {
       maxZ = Math.max(maxZ, mod.result.bbox.zLen)
     }
 
-    // DFM
+    // DFM — only count print-specific metrics (printable, print time, material)
+    // for modules whose diagnostic mfg_process is a 3D printing variant
     if (mod.result.dfm) {
-      if (mod.result.dfm.printable) printableCount++
+      const isPrint = is3DPrintProcess(diagnosticAnswers, mod.id)
+
+      if (isPrint && mod.result.dfm.printable) printableCount++
+
       const issues = mod.result.dfm.issues || []
       if (issues.length > 0) modulesWithIssues++
       totalDfmIssues += issues.length
@@ -127,10 +143,10 @@ function computeSystemMetrics(modules: CadLabModule[]): SystemMetrics {
         (i) => i.severity === "critical" || i.severity === "error"
       ).length
 
-      if (mod.result.dfm.estimatedPrintTimeMin) {
+      if (isPrint && mod.result.dfm.estimatedPrintTimeMin) {
         totalPrintTimeMin += mod.result.dfm.estimatedPrintTimeMin
       }
-      if (mod.result.dfm.estimatedMaterialG) {
+      if (isPrint && mod.result.dfm.estimatedMaterialG) {
         totalMaterialG += mod.result.dfm.estimatedMaterialG
       }
     }
@@ -258,9 +274,11 @@ function getManufacturingGrade(metrics: SystemMetrics): {
 export function CadLabAnalysisDashboard({
   modules,
   projectName,
+  diagnosticAnswers,
 }: CadLabAnalysisDashboardProps): React.ReactNode {
   const [showPerModule, setShowPerModule] = useState(false)
-  const metrics = computeSystemMetrics(modules)
+  const metrics = computeSystemMetrics(modules, diagnosticAnswers)
+  const has3DPrintModules = modules.some((m) => is3DPrintProcess(diagnosticAnswers, m.id))
   const grade = getManufacturingGrade(metrics)
 
   // Only show modules that have results for the per-module table
@@ -371,12 +389,14 @@ export function CadLabAnalysisDashboard({
               label="Max Lead"
               value={`${metrics.maxLeadWeeks}w`}
             />
-            <MetricPill
-              icon={<Printer className="h-3 w-3" />}
-              label="Printable"
-              value={`${metrics.printableCount}/${metrics.generatedCount}`}
-            />
-            {metrics.totalPrintTimeMin > 0 && (
+            {has3DPrintModules && (
+              <MetricPill
+                icon={<Printer className="h-3 w-3" />}
+                label="Printable"
+                value={`${metrics.printableCount}/${metrics.generatedCount}`}
+              />
+            )}
+            {has3DPrintModules && metrics.totalPrintTimeMin > 0 && (
               <MetricPill
                 icon={<Clock className="h-3 w-3" />}
                 label="Print Time"
@@ -464,12 +484,16 @@ export function CadLabAnalysisDashboard({
                       <th className="pb-2 font-semibold text-muted-foreground pr-4 text-right">
                         Dimensions (mm)
                       </th>
-                      <th className="pb-2 font-semibold text-muted-foreground pr-4 text-center">
-                        Printable
-                      </th>
-                      <th className="pb-2 font-semibold text-muted-foreground pr-4 text-right">
-                        Print Time
-                      </th>
+                      {has3DPrintModules && (
+                        <th className="pb-2 font-semibold text-muted-foreground pr-4 text-center">
+                          Printable
+                        </th>
+                      )}
+                      {has3DPrintModules && (
+                        <th className="pb-2 font-semibold text-muted-foreground pr-4 text-right">
+                          Print Time
+                        </th>
+                      )}
                       <th className="pb-2 font-semibold text-muted-foreground text-right">
                         Lead
                       </th>
@@ -515,22 +539,30 @@ export function CadLabAnalysisDashboard({
                               ? `${r.bbox.xLen.toFixed(0)}×${r.bbox.yLen.toFixed(0)}×${r.bbox.zLen.toFixed(0)}`
                               : "—"}
                           </td>
-                          <td className="py-2 pr-4 text-center">
-                            {dfm ? (
-                              dfm.printable ? (
-                                <CheckCircle2 className="h-3.5 w-3.5 text-status-success mx-auto" />
+                          {has3DPrintModules && (
+                            <td className="py-2 pr-4 text-center">
+                              {is3DPrintProcess(diagnosticAnswers, mod.id) ? (
+                                dfm ? (
+                                  dfm.printable ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-status-success mx-auto" />
+                                  ) : (
+                                    <AlertTriangle className="h-3.5 w-3.5 text-status-warning mx-auto" />
+                                  )
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )
                               ) : (
-                                <AlertTriangle className="h-3.5 w-3.5 text-status-warning mx-auto" />
-                              )
-                            ) : (
-                              <span className="text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="py-2 pr-4 text-right font-mono text-foreground">
-                            {dfm?.estimatedPrintTimeMin
-                              ? formatTime(dfm.estimatedPrintTimeMin)
-                              : "—"}
-                          </td>
+                                <span className="text-[10px] text-muted-foreground">N/A</span>
+                              )}
+                            </td>
+                          )}
+                          {has3DPrintModules && (
+                            <td className="py-2 pr-4 text-right font-mono text-foreground">
+                              {is3DPrintProcess(diagnosticAnswers, mod.id) && dfm?.estimatedPrintTimeMin
+                                ? formatTime(dfm.estimatedPrintTimeMin)
+                                : "—"}
+                            </td>
+                          )}
                           <td className="py-2 text-right font-mono text-foreground">
                             {mod.leadWeeks}w
                           </td>
@@ -557,14 +589,18 @@ export function CadLabAnalysisDashboard({
                           ? `${metrics.systemBbox.xLen.toFixed(0)}×${metrics.systemBbox.yLen.toFixed(0)}×${metrics.systemBbox.zLen.toFixed(0)}`
                           : "—"}
                       </td>
-                      <td className="pt-2 pr-4 text-center font-mono text-foreground">
-                        {metrics.printableCount}/{metrics.generatedCount}
-                      </td>
-                      <td className="pt-2 pr-4 text-right font-mono text-foreground">
-                        {metrics.totalPrintTimeMin > 0
-                          ? formatTime(metrics.totalPrintTimeMin)
-                          : "—"}
-                      </td>
+                      {has3DPrintModules && (
+                        <td className="pt-2 pr-4 text-center font-mono text-foreground">
+                          {metrics.printableCount}/{metrics.generatedCount}
+                        </td>
+                      )}
+                      {has3DPrintModules && (
+                        <td className="pt-2 pr-4 text-right font-mono text-foreground">
+                          {metrics.totalPrintTimeMin > 0
+                            ? formatTime(metrics.totalPrintTimeMin)
+                            : "—"}
+                        </td>
+                      )}
                       <td className="pt-2 text-right font-mono text-foreground">
                         {metrics.maxLeadWeeks}w
                       </td>

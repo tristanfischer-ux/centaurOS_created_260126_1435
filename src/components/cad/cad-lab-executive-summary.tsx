@@ -104,12 +104,16 @@ export function CadLabExecutiveSummary({
       const toolingCostPerUnit = batchSize > 0 ? toolingTotal / batchSize : toolingTotal
       totalCostPerUnit += materialCost + processCost + toolingCostPerUnit
 
-      // DFM issues
-      const dfmIssues = mod.result?.dfm?.issues ?? []
-      dfmIssueCount += dfmIssues.length
-      dfmCriticalCount += dfmIssues.filter(
-        (i) => i.severity === "critical" || i.severity === "high",
-      ).length
+      // DFM issues — only count for modules whose mfg_process is a 3D printing variant,
+      // since Modal's DFM analysis is FDM-centric and misleading for CNC/casting/sheet metal
+      const isPrint = !process || process.startsWith("FDM") || process.startsWith("SLA") || process.startsWith("SLS")
+      if (isPrint) {
+        const dfmIssues = mod.result?.dfm?.issues ?? []
+        dfmIssueCount += dfmIssues.length
+        dfmCriticalCount += dfmIssues.filter(
+          (i) => i.severity === "critical" || i.severity === "high",
+        ).length
+      }
 
       // Risks from failure modes + unknowns
       for (const fm of mod.failureModes) {
