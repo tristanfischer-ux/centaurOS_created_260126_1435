@@ -18,7 +18,7 @@
 
 import { useRouter } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import {
   Loader2,
   ArrowRight,
@@ -63,6 +63,9 @@ export default function CadLabResearchPage(): React.ReactNode {
     productOverview, setProductOverview,
     handleUpdateModule,
   } = useCadLab()
+
+  // TEMPORARY: deploy verification — remove after confirming new code is live
+  useEffect(() => { console.log("[CAD-LAB] page.tsx build: 2026-02-27T2") }, [])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 

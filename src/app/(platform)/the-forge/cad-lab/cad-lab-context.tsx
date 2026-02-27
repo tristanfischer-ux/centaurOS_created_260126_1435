@@ -1426,6 +1426,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setDiagnosticAnswers({})
     setAiPrefilled(false)
     setBatchProgress({})
+    setSystemIllustrationStatus("idle")
+    setSystemIllustrationUrl(null)
+    setSystemIllustrationError(null)
 
     addProgressLine("Searching engineering databases for real-world specifications...")
     const researchTimers: ReturnType<typeof setTimeout>[] = []
