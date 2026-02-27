@@ -1612,23 +1612,11 @@ function ProductOverview({
 }): React.ReactNode {
   const summary = extractProductSummary(report)
 
-  // Group modules by lead-time for a visual weight map
-  const processGroups = useMemo(() => {
-    const groups: Record<string, { name: string; count: number; color: string }> = {}
-    for (const mod of modules) {
-      // Use the module's key parts count as a proxy for complexity
-      const key = mod.leadWeeks <= 2 ? "fast" : mod.leadWeeks <= 4 ? "medium" : "long"
-      if (!groups[key]) {
-        groups[key] = {
-          name: key === "fast" ? "Quick Turn (1-2 wk)" : key === "medium" ? "Standard (3-4 wk)" : "Long Lead (5+ wk)",
-          count: 0,
-          color: key === "fast" ? "bg-status-success" : key === "medium" ? "bg-status-info" : "bg-international-orange",
-        }
-      }
-      groups[key].count++
-    }
-    return Object.values(groups)
-  }, [modules])
+  // Sort modules by lead time (longest first — those need attention earliest)
+  const sortedModules = useMemo(
+    () => [...modules].sort((a, b) => b.leadWeeks - a.leadWeeks),
+    [modules]
+  )
 
   return (
     <Card className="overflow-hidden">
@@ -1689,27 +1677,49 @@ function ProductOverview({
           </div>
         </div>
 
-        {/* Lead time distribution bar */}
-        {processGroups.length > 0 && (
+        {/* Lead time per sub-assembly */}
+        {sortedModules.length > 0 && (
           <div className="mt-4 space-y-2">
             <p className="text-xs text-muted-foreground font-medium">Sub-Assemblies by Lead Time</p>
-            <div className="flex h-3 rounded-full overflow-hidden border">
-              {processGroups.map((g) => (
-                <div
-                  key={g.name}
-                  className={cn("h-full transition-all duration-500", g.color)}
-                  style={{ width: `${(g.count / moduleCount) * 100}%` }}
-                  title={`${g.name}: ${g.count} of ${moduleCount} sub-assemblies`}
-                />
-              ))}
+            <div className="space-y-1.5">
+              {sortedModules.map((mod) => {
+                const barColor =
+                  mod.leadWeeks <= 2
+                    ? "bg-status-success"
+                    : mod.leadWeeks <= 4
+                      ? "bg-status-info"
+                      : "bg-international-orange"
+                return (
+                  <div key={mod.id} className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground truncate w-40 flex-shrink-0">
+                      {mod.name}
+                    </span>
+                    <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-500", barColor)}
+                        style={{ width: `${(mod.leadWeeks / criticalPathWeeks) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-muted-foreground w-8 text-right flex-shrink-0">
+                      {mod.leadWeeks}w
+                    </span>
+                  </div>
+                )
+              })}
             </div>
             <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-              {processGroups.map((g) => (
-                <span key={g.name} className="flex items-center gap-1.5">
-                  <div className={cn("h-2 w-6 rounded-full", g.color)} />
-                  {g.name} — {g.count} of {moduleCount}
-                </span>
-              ))}
+              <span className="flex items-center gap-1.5">
+                <div className="h-2 w-6 rounded-full bg-status-success" />
+                Quick Turn (1-2 wk)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <div className="h-2 w-6 rounded-full bg-status-info" />
+                Standard (3-4 wk)
+              </span>
+              <span className="flex items-center gap-1.5">
+                <div className="h-2 w-6 rounded-full bg-international-orange" />
+                Long Lead (5+ wk)
+              </span>
             </div>
           </div>
         )}
