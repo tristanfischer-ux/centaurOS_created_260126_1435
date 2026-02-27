@@ -138,7 +138,12 @@ export function validateZStack(
   if (expectedHeight === 0) return results
 
   const ratio = zSpan / expectedHeight
-  if (ratio > 1.2 || ratio < 0.8) {
+  // INTENT: Scale tolerance by object size — small objects (≤100mm) get ±20%,
+  // large objects (≥1000mm) get ±10%, linear interpolation between.
+  const tolerance = expectedHeight <= 100 ? 0.2
+    : expectedHeight >= 1000 ? 0.1
+    : 0.2 - (0.1 * (expectedHeight - 100) / 900)
+  if (ratio > 1 + tolerance || ratio < 1 - tolerance) {
     results.push({
       ruleId: "zstack-height-mismatch",
       severity: "warning",

@@ -143,6 +143,100 @@ result = (
     expect(results).toHaveLength(0)
   })
 
+  // E4: Scaled tolerance — small objects get ±20%, large objects get ±10%
+  it("allows ±20% for small objects (≤100mm) (E4)", () => {
+    // 50mm budget, 19% over = 59.5mm → should pass (within 20%)
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(100, 100, 10)
+    .workplane(offset=59)
+    .box(80, 80, 10)
+)
+`
+    const iface = `=== a) SPACE BUDGET ===
+  Base:   10mm
+  Cap:    40mm
+  ─────
+  Total: 50mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results).toHaveLength(0)
+  })
+
+  it("flags >20% mismatch for small objects (E4)", () => {
+    // 50mm budget, 60mm span → 20% over → just at boundary
+    // 50mm budget, 65mm span → 30% over → should flag
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(100, 100, 10)
+    .workplane(offset=65)
+    .box(80, 80, 10)
+)
+`
+    const iface = `=== a) SPACE BUDGET ===
+  Base:   10mm
+  Cap:    40mm
+  ─────
+  Total: 50mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("zstack-height-mismatch")
+  })
+
+  it("uses tighter ±10% tolerance for large objects (≥1000mm) (E4)", () => {
+    // 2000mm budget, 15% over = 2300mm → should flag (exceeds 10%)
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(1000, 1000, 100)
+    .workplane(offset=2300)
+    .box(800, 800, 100)
+)
+`
+    const iface = `=== a) SPACE BUDGET ===
+  Base:   100mm
+  Body:   1800mm
+  Cap:    100mm
+  ─────
+  Total: 2000mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("zstack-height-mismatch")
+  })
+
+  it("allows ±10% for large objects (E4)", () => {
+    // 2000mm budget, 9% over = 2180mm → should pass
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(1000, 1000, 100)
+    .workplane(offset=2180)
+    .box(800, 800, 100)
+)
+`
+    const iface = `=== a) SPACE BUDGET ===
+  Base:   100mm
+  Body:   1800mm
+  Cap:    100mm
+  ─────
+  Total: 2000mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results).toHaveLength(0)
+  })
+
   // A1: Negative Z offsets should be handled correctly via span
   it("handles negative Z offsets correctly (A1)", () => {
     const code = `

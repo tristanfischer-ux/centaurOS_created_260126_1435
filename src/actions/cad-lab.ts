@@ -1169,8 +1169,14 @@ ${finalCode}
       modalTime = Date.now() - modalStart
 
       if (modalResult.error && !modalResult.svg_iso) {
-        // INTENT: Cap error length to prevent multi-KB tracebacks from bloating the repair prompt
-        lastModalError = modalResult.error.slice(0, 500)
+        // INTENT: Python tracebacks put the actual error at the END.
+        // Keep first line (error type) + last 400 chars (actual message).
+        const err = modalResult.error
+        const firstLine = err.split("\n")[0]
+        const tail = err.length > 400 ? err.slice(-400) : err
+        lastModalError = firstLine.length < 100 && err.length > 500
+          ? `${firstLine}\n...\n${tail}`
+          : err.slice(-500)
         console.warn(`[THE-FORGE] Step 4: Modal error on attempt ${attempt + 1}: ${modalResult.error.slice(0, 200)}`)
         if (attempt < MAX_REPAIR_ATTEMPTS - 1) continue // Try repair
         // Final attempt — return failure with code
@@ -1206,6 +1212,52 @@ ${finalCode}
         }
         if (minDim > 0 && maxDim / minDim > 50) {
           qualityIssues.push(`Extreme aspect ratio ${(maxDim / minDim).toFixed(1)}:1 — likely missing components`)
+        }
+
+        // E1: DFM critical issues — if Modal says part isn't printable, trigger repair
+        const dfm = modalResult.analysis?.dfm
+        if (dfm && !dfm.error && dfm.printable === false) {
+          const criticalDfm = (dfm.issues ?? [])
+            .filter((i: { severity?: string }) => i.severity === "critical" || i.severity === "error")
+            .slice(0, 3) // Cap at 3 to avoid prompt bloat
+          if (criticalDfm.length > 0) {
+            const dfmMsg = `DFM: not printable — ${criticalDfm.map((i: { message?: string }) => i.message).join("; ")}`
+            qualityIssues.push(dfmMsg)
+            allPreExecResults.push({
+              ruleId: "postmodal-dfm",
+              severity: "warning",
+              message: dfmMsg,
+              repairHint: "The geometry has manufacturability issues. Increase wall thickness to at least 1mm, reduce overhang angles, and ensure no self-intersecting geometry.",
+            })
+          }
+        }
+
+        // E3: Dimensional mismatch vs interface spec — trigger repair if >2x off
+        if (interfaceDefinition) {
+          const dimMatch = interfaceDefinition.match(
+            /Overall[:\s]*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*mm/i,
+          )
+          if (dimMatch) {
+            const expected = [parseFloat(dimMatch[1]), parseFloat(dimMatch[2]), parseFloat(dimMatch[3])].sort((a, b) => a - b)
+            const actual = [xLen, yLen, zLen].sort((a, b) => a - b)
+            const mismatches: string[] = []
+            for (let i = 0; i < 3; i++) {
+              const ratio = actual[i] / expected[i]
+              if (ratio > 2 || ratio < 0.5) {
+                mismatches.push(`expected ~${expected[i].toFixed(0)}mm, got ${actual[i].toFixed(0)}mm`)
+              }
+            }
+            if (mismatches.length > 0) {
+              const scaleMsg = `Scale mismatch vs interface: ${mismatches.join("; ")}`
+              qualityIssues.push(scaleMsg)
+              allPreExecResults.push({
+                ruleId: "postmodal-scale-mismatch",
+                severity: "warning",
+                message: scaleMsg,
+                repairHint: "The model dimensions don't match the interface specification. Check that primary parameters use the correct scale (mm, not cm or m) and that derived calculations are correct.",
+              })
+            }
+          }
         }
 
         if (qualityIssues.length > 0) {
@@ -1302,26 +1354,8 @@ ${finalCode}
     // Merge translate/rotate code warnings
     warnings.push(...codeWarnings)
 
-    // ── Dimensional validation: compare expected vs actual bbox ──
-    // INTENT: Catch gross scale mismatches (e.g. model is 200mm when spec says 6000mm).
-    // Conservative: only warn if parser confidently extracts dimensions AND mismatch is >2×.
-    if (bboxResult && interfaceDefinition) {
-      const dimMatch = interfaceDefinition.match(/Overall[:\s]*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*mm/i)
-      if (dimMatch) {
-        const expectedDims = [parseFloat(dimMatch[1]), parseFloat(dimMatch[2]), parseFloat(dimMatch[3])].sort((a, b) => a - b)
-        const actualDims = [bboxResult.xLen, bboxResult.yLen, bboxResult.zLen].sort((a, b) => a - b)
-        const dimIssues: string[] = []
-        for (let i = 0; i < 3; i++) {
-          const ratio = actualDims[i] / expectedDims[i]
-          if (ratio > 2 || ratio < 0.5) {
-            dimIssues.push(`dim${i}: expected ~${expectedDims[i]}mm, got ${actualDims[i]}mm (${ratio.toFixed(1)}×)`)
-          }
-        }
-        if (dimIssues.length > 0) {
-          warnings.push(`Dimensional mismatch vs interface spec: ${dimIssues.join("; ")}`)
-        }
-      }
-    }
+    // INTENT: Dimensional mismatch vs interface spec is now handled in the repair loop (E3).
+    // Post-loop warnings only surface if the repair loop exhausted attempts without fixing.
 
     console.info(
       `[THE-FORGE] Pipeline complete: ${codeLines} lines, ${bboxResult?.xLen ?? "?"}×${bboxResult?.yLen ?? "?"}×${bboxResult?.zLen ?? "?"}mm, ${Date.now() - pipelineStart}ms total${repairAttempts > 0 ? ` (${repairAttempts} repair(s))` : ""}`,
