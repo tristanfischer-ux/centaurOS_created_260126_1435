@@ -63,11 +63,11 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
+import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts } from "@/lib/cad-lab/interface-validators"
 import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
-import type { TemplateMatch } from "@/actions/step-template-matching"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -106,6 +106,30 @@ async function lookupUserSector(
     console.warn('[THE-FORGE] Failed to look up user sector, continuing without filter')
     return null
   }
+}
+
+// ─── JSON Extraction Helpers ─────────────────────────────────────────
+
+/** Extract a JSON array from AI text that may contain markdown fences or prose. */
+function extractJsonArray(text: string): string {
+  const trimmed = text.trim()
+  const first = trimmed.indexOf("[")
+  const last = trimmed.lastIndexOf("]")
+  if (first !== -1 && last > first) {
+    return trimmed.slice(first, last + 1)
+  }
+  return trimmed
+}
+
+/** Extract a JSON object from AI text that may contain markdown fences or prose. */
+function extractJsonObject(text: string): string {
+  const trimmed = text.trim()
+  const first = trimmed.indexOf("{")
+  const last = trimmed.lastIndexOf("}")
+  if (first !== -1 && last > first) {
+    return trimmed.slice(first, last + 1)
+  }
+  return trimmed
 }
 
 // ─── Claude API Call ─────────────────────────────────────────────────
@@ -672,7 +696,8 @@ export async function generateCadLabInterface(
   researchReport: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
-): Promise<CadLabInterfaceResult> {
+  cachedTemplateMatch?: TemplateMatchResult,
+): Promise<CadLabInterfaceResult & { templateMatchResult?: TemplateMatchResult }> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -697,13 +722,20 @@ export async function generateCadLabInterface(
       : ""
 
     // FLOW: Match step_templates for prompt enrichment — tells Claude what proven geometry exists
-    const descWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
-    const templateMatch = await matchTemplatesForModule(
-      description,
-      researchReport.slice(0, 200),
-      descWords.slice(0, 10),
-      description,
-    )
+    // QW3: Use cached template match if available, avoiding expensive DB + semantic scoring
+    let templateMatch: TemplateMatchResult
+    if (cachedTemplateMatch) {
+      templateMatch = cachedTemplateMatch
+      console.info("[THE-FORGE] Step 2: Using cached template match result")
+    } else {
+      const descWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
+      templateMatch = await matchTemplatesForModule(
+        description,
+        researchReport.slice(0, 200),
+        descWords.slice(0, 10),
+        description,
+      )
+    }
     // SECURITY: Sanitise template metadata before prompt injection to prevent indirect prompt injection
     const templateSection = templateMatch.topMatches.length > 0
       ? "\n\nMATCHED STEP TEMPLATES (proven reference geometry from template library):\n" +
@@ -816,6 +848,8 @@ Generate the complete interface definition following the exact 4-section format.
       tokensIn,
       tokensOut,
       interfaceWarnings: interfaceWarnings.length > 0 ? interfaceWarnings : undefined,
+      // QW3: Return template match result for caching on the module
+      templateMatchResult: templateMatch,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 2 failed:", error instanceof Error ? error.message : error)
@@ -863,6 +897,7 @@ export async function generateCadLabModel(
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
   interfaceWarnings?: PreExecValidationResult[],
+  cachedTemplateMatch?: TemplateMatchResult,
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -887,13 +922,20 @@ export async function generateCadLabModel(
     // #10: Also capture referenceTemplates for prompt injection on the scratch path.
     let referenceTemplatesForPrompt: TemplateMatch[] = []
     try {
-      const moduleWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
-      const seedMatch = await matchTemplatesForModule(
-        description,
-        interfaceDefinition.slice(0, 200),
-        moduleWords.slice(0, 10),
-        description,
-      )
+      // QW3: Use cached template match if available
+      let seedMatch: TemplateMatchResult
+      if (cachedTemplateMatch) {
+        seedMatch = cachedTemplateMatch
+        console.info("[THE-FORGE] Step 3: Using cached template match result")
+      } else {
+        const moduleWords = description.toLowerCase().split(/\s+/).filter((w) => w.length > 2)
+        seedMatch = await matchTemplatesForModule(
+          description,
+          interfaceDefinition.slice(0, 200),
+          moduleWords.slice(0, 10),
+          description,
+        )
+      }
       // Capture reference templates regardless of seed routing
       referenceTemplatesForPrompt = seedMatch.referenceTemplates ?? []
       if (seedMatch.seedTemplate) {
@@ -1026,8 +1068,9 @@ If the research report or interface definition contains any unresolved questions
       }
     }
 
-    // ── #7: Iterative repair loop (max 3 attempts) ──
-    const MAX_REPAIR_ATTEMPTS = 3
+    // ── #7: Iterative repair loop ──
+    // QW2: Opus gets 4 attempts (better at using repair feedback), others get 3
+    const MAX_REPAIR_ATTEMPTS = modelId.includes("opus") ? 4 : 3
     const TOKEN_OUT_BUDGET = 200_000
     let finalCode = ""
     let assumptions: string[] = []
@@ -1299,6 +1342,13 @@ ${finalCode}
       break
     }
 
+    // QW1: Log first-attempt success rate metric for quality tracking
+    const firstAttemptSuccess = repairAttempts === 0
+    console.info("[THE-FORGE] METRIC first_attempt_success:", firstAttemptSuccess, {
+      repairAttempts,
+      modelId,
+    })
+
     if (!modalResult) {
       return {
         success: false,
@@ -1442,6 +1492,7 @@ ${finalCode}
       validationWarnings: warnings.length > 0 ? warnings : undefined,
       assumptions: assumptions.length > 0 ? assumptions : undefined,
       repairAttempts: repairAttempts > 0 ? repairAttempts : undefined,
+      firstAttemptSuccess,
       preExecValidation: allPreExecResults.length > 0 ? allPreExecResults : undefined,
       error: modalResult.error ?? undefined,
     }
@@ -1888,11 +1939,8 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       8192,
     )
 
-    // Parse JSON from response (strip markdown fences if present)
-    let jsonText = text.trim()
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
-    }
+    // Parse JSON array from response — AI may wrap in markdown fences or add prose
+    const jsonText = extractJsonArray(text)
 
     let rawModules: unknown[]
     try {
@@ -2016,12 +2064,8 @@ Recommend diagnostic answers for each module. Output JSON only.`
 
     const { text } = await callClaude(systemPrompt, userPrompt, modelId, 4096)
 
-    // Parse JSON
-    let jsonText = text.trim()
-    if (jsonText.startsWith("```")) {
-      jsonText = jsonText.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "")
-    }
-
+    // Parse JSON object from response — AI may wrap in markdown fences or add prose
+    const jsonText = extractJsonObject(text)
     const parsed = JSON.parse(jsonText) as Record<string, Record<string, string>>
 
     // VALIDATION: Only keep valid module IDs and valid question IDs
@@ -2093,6 +2137,7 @@ export async function generateCadLabModelSmart(
   interfaceDefinition: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
+  cachedTemplateMatch?: TemplateMatchResult,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -2132,7 +2177,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────
@@ -2223,8 +2268,7 @@ export async function generateMashup(
 
     let plan: MashupPlan
     try {
-      const cleaned = planResult.text.replace(/```json\s*/i, "").replace(/```\s*/g, "").trim()
-      plan = JSON.parse(cleaned) as MashupPlan
+      plan = JSON.parse(extractJsonObject(planResult.text)) as MashupPlan
     } catch {
       return {
         success: false,
@@ -2409,8 +2453,7 @@ export async function planMashup(
 
     let plan: MashupPlan
     try {
-      const cleaned = planResult.text.replace(/```json\s*/i, "").replace(/```\s*/g, "").trim()
-      plan = JSON.parse(cleaned) as MashupPlan
+      plan = JSON.parse(extractJsonObject(planResult.text)) as MashupPlan
     } catch {
       return {
         success: false,
@@ -2950,13 +2993,11 @@ Return 3–4 suggestions as a JSON array.`
     // here for a real-time UX response.
     const { text } = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-5-20250929", 2048)
 
-    const cleaned = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim()
-
     let raw: Array<{ name: string; description: string; concept: string; templateSlugs: string[] }>
     try {
-      raw = JSON.parse(cleaned)
+      raw = JSON.parse(extractJsonArray(text))
     } catch {
-      console.error("[THE-FORGE] suggestMashupCombinations: JSON parse failed:", cleaned.slice(0, 300))
+      console.error("[THE-FORGE] suggestMashupCombinations: JSON parse failed:", text.slice(0, 300))
       return { error: "Failed to parse suggestions from AI response" }
     }
 
