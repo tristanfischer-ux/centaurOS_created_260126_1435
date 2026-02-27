@@ -57,6 +57,7 @@ import type {
   CadLabDesignBrief,
   VisualStyleSpec,
   DecompositionCheckpoint,
+  EarlyCostEstimate,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -202,6 +203,9 @@ export interface CadLabContextValue {
 
   // Module editing
   handleUpdateModule: (updated: CadLabModule) => void
+
+  // P9: Early cost estimates (keyed by moduleId)
+  earlyCostEstimates: Record<string, EarlyCostEstimate>
 
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
@@ -373,6 +377,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Decomposition checkpoints ──
   const [checkpoints, setCheckpoints] = useState<Record<string, DecompositionCheckpoint> | null>(null)
   const [isCheckpointing, setIsCheckpointing] = useState(false)
+
+  // P9: Early cost estimates keyed by moduleId
+  const [earlyCostEstimates, setEarlyCostEstimates] = useState<Record<string, EarlyCostEstimate>>({})
   const [isRevising, setIsRevising] = useState(false)
   const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
@@ -952,7 +959,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 for (const line of msg.split("\n")) {
                   if (!line.startsWith("data: ")) continue
                   try {
-                    const event = JSON.parse(line.slice(6)) as { type: string; step?: string; module?: CadLabModule; message?: string }
+                    const event = JSON.parse(line.slice(6)) as { type: string; step?: string; module?: CadLabModule; message?: string; estimate?: EarlyCostEstimate }
                     if (event.type === "status") {
                       const stepLabel = event.step === "interface" ? "interface" as const
                         : event.step === "upload" ? "generating" as const
@@ -962,6 +969,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                       else if (event.step === "codegen") addProgressLine(`Generating code for ${mod.name}...`)
                       else if (event.step === "modal") addProgressLine(`Executing CAD for ${mod.name}...`)
                       else if (event.step === "upload") addProgressLine(`Uploading files for ${mod.name}...`)
+                    } else if (event.type === "cost_estimate" && event.estimate) {
+                      // P9: Store early cost estimate
+                      setEarlyCostEstimates((prev) => ({ ...prev, [moduleId]: event.estimate! }))
                     } else if (event.type === "complete" && event.module) {
                       setModules((prev) => prev.map((m) => (m.id === moduleId ? event.module! : m)))
                       debouncedSaveModules()
@@ -1778,6 +1788,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
+    earlyCostEstimates,
     handleDownload,
   }
 

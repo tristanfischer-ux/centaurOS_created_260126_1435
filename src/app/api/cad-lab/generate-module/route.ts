@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { rateLimit } from "@/lib/security/rate-limit"
+import { estimateEarlyCost } from "@/lib/cad-lab/early-cost-estimator"
 import type { CadLabModule, ClaudeModelId, DecompositionCheckpoint, GenerationEvent } from "@/lib/cad-lab-types"
 import type { Json } from "@/types/database.types"
 
@@ -244,6 +245,18 @@ export async function POST(request: Request): Promise<Response> {
             // Save intermediate state so polling clients can see progress
             await saveModuleToProject(supabase, projectId, allModules, localMod)
             emit({ type: "progress", message: "Interface definition complete" })
+
+            // P9: Early cost estimation from interface definition
+            if (localMod.interfaceDefinition) {
+              const costEstimate = estimateEarlyCost(
+                localMod.id,
+                localMod.name,
+                localMod.interfaceDefinition,
+              )
+              if (costEstimate) {
+                emit({ type: "cost_estimate", estimate: costEstimate })
+              }
+            }
           } else {
             console.error("[CAD-LAB-MODULE] Interface failed:", localMod.name)
             emit({ type: "error", message: `Interface generation failed for ${localMod.name}` })

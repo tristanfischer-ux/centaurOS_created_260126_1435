@@ -70,7 +70,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
-import type { CadLabResult, CadLabModule, PreExecValidationResult } from "@/lib/cad-lab-types"
+import type { CadLabResult, CadLabModule, PreExecValidationResult, EarlyCostEstimate } from "@/lib/cad-lab-types"
 import { Badge } from "@/components/ui/badge"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -186,6 +186,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     handleGenerateIntegration,
     handleDownload,
     handleUpdateModule,
+    earlyCostEstimates,
   } = useCadLab()
 
   // Local UI state for result viewing
@@ -531,6 +532,17 @@ export default function CadLabBuildPage(): React.ReactNode {
               <p className="text-sm font-semibold text-foreground truncate">{subject}</p>
               <p className="text-xs text-muted-foreground">
                 {generatedModuleCount} of {modules.length} modules generated
+                {/* P9: System cost total */}
+                {Object.keys(earlyCostEstimates).length > 0 && (() => {
+                  const estimates = Object.values(earlyCostEstimates)
+                  const totalLow = estimates.reduce((s, e) => s + e.totalLow, 0)
+                  const totalHigh = estimates.reduce((s, e) => s + e.totalHigh, 0)
+                  return (
+                    <span className="font-mono ml-2" title="Rough system cost estimate from interface specs">
+                      ~${Math.round(totalLow)} – ${Math.round(totalHigh)}
+                    </span>
+                  )
+                })()}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -620,6 +632,7 @@ export default function CadLabBuildPage(): React.ReactNode {
         <div id="build-architecture"><SystemArchitecture
           subject={subject}
           modules={modules}
+          earlyCostEstimates={earlyCostEstimates}
           onModuleClick={(moduleId) => {
             const isCollapsing = expandedModuleId === moduleId
             setExpandedModuleId(isCollapsing ? null : moduleId)
@@ -2107,10 +2120,12 @@ function SystemArchitecture({
   subject,
   modules,
   onModuleClick,
+  earlyCostEstimates = {},
 }: {
   subject: string
   modules: CadLabModule[]
   onModuleClick: (moduleId: string) => void
+  earlyCostEstimates?: Record<string, EarlyCostEstimate>
 }): React.ReactNode {
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null)
 
@@ -2224,6 +2239,16 @@ function SystemArchitecture({
                       </span>
                     )}
                   </div>
+
+                  {/* P9: Early cost estimate badge */}
+                  {earlyCostEstimates[mod.id] && (
+                    <p
+                      className="text-xs text-muted-foreground font-mono mb-1"
+                      title="Rough estimate from interface specs — refines after generation"
+                    >
+                      ~${Math.round(earlyCostEstimates[mod.id].totalLow)} – ${Math.round(earlyCostEstimates[mod.id].totalHigh)}
+                    </p>
+                  )}
 
                   {/* IO summary — inputs & outputs at a glance */}
                   {(mod.outputs.length > 0 || mod.inputs.length > 0) && (

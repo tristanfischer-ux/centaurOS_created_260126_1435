@@ -92,12 +92,40 @@ export interface DimensionEstimate {
   unresolvedVars: string[]
 }
 
+// ─── Early Cost Estimation Types (P9) ────────────────────────────────
+
+/** Parsed component from an interface definition's Component Placement Table */
+export interface ParsedComponent {
+  name: string
+  quantity: number
+  /** Dimensions in mm [x, y, z] */
+  dimensions: [number, number, number] | null
+  material: string | null
+}
+
+/** Early cost estimate computed from interface definition before CAD generation */
+export interface EarlyCostEstimate {
+  moduleId: string
+  moduleName: string
+  material: string
+  estimatedMassKg: number
+  estimatedVolumeMm3: number
+  materialCostLow: number
+  materialCostHigh: number
+  totalLow: number
+  totalHigh: number
+  currency: "USD"
+  confidence: "rough" | "refined"
+  componentCount: number
+}
+
 // ─── Generation Streaming Types (P5) ─────────────────────────────────
 
 /** SSE event types for streaming module generation progress */
 export type GenerationEvent =
   | { type: "status"; step: "interface" | "codegen" | "modal" | "upload"; attempt?: number }
   | { type: "validation"; findings: PreExecValidationResult[] }
+  | { type: "cost_estimate"; estimate: EarlyCostEstimate }
   | { type: "progress"; message: string }
   | { type: "complete"; module: CadLabModule }
   | { type: "error"; message: string }
