@@ -1446,6 +1446,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
     setAssumptionNotes("")
     setModules([])
+    setDecompositionError(null)
     setExpandedModuleId(null)
     setGeneratingModuleIds(new Set())
     setDiagnosticAnswers({})
@@ -1521,6 +1522,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       setLastSaved(p.updatedAt)
       setShowProjects(false)
+      setDecompositionError(null)
       setMilestone(null)
       setProgressLines([])
       setVisualStyle(p.visualStyle ?? null)
