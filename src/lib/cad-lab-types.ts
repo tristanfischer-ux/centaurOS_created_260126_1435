@@ -457,6 +457,8 @@ export interface MashupResult {
   elapsedMs?: number
   tokensIn?: number
   tokensOut?: number
+  /** J3: Error category from categorizeModalError when mashup fails */
+  error_category?: string
 }
 
 /** Result of the planMashup phase (plan only, no execution) */

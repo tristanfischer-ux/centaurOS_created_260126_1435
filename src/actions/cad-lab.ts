@@ -2508,18 +2508,53 @@ export async function generateMashup(
     let mashupCode = extractCode(codeResult.text)
     mashupCode = stripUnsafeCode(mashupCode)
 
-    // ── Step 3: Execute on Modal ──
-    const modalResult = await executeMashupOnModal(modalSources, mashupCode, materialDensity)
+    // J3: Pre-exec validation — catch syntax/CadQuery errors before burning a Modal cold start
+    const preExecResults = [
+      ...checkPythonSyntax(mashupCode),
+      ...analyzeCadQueryCode(mashupCode),
+    ]
+    const criticalPreExec = preExecResults.filter((r) => r.severity === "critical")
+    if (criticalPreExec.length > 0) {
+      console.warn(`[THE-FORGE] Mashup pre-exec: ${criticalPreExec.length} critical issue(s), attempting repair`)
+      const repairPrompt = `The following CadQuery mashup code has critical issues:\n\nISSUES:\n${criticalPreExec.map((r) => `[${r.ruleId}] ${r.message}${r.repairHint ? ` — Fix: ${r.repairHint}` : ""}`).join("\n")}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix ALL listed issues. Output corrected Python code in a single \`\`\`python code fence.`
+      const repairResult = await callClaude(codeSys, repairPrompt, modelId, 16384)
+      tokensIn += repairResult.tokensIn
+      tokensOut += repairResult.tokensOut
+      const repairedCode = extractCode(repairResult.text)
+      if (repairedCode.trim() && repairedCode.trim() !== mashupCode.trim()) {
+        mashupCode = stripUnsafeCode(repairedCode)
+      }
+    }
 
+    // ── Step 3: Execute on Modal (with single retry on failure) ──
+    let modalResult = await executeMashupOnModal(modalSources, mashupCode, materialDensity)
+
+    // J3: Single retry — if Modal fails, categorize error and attempt one repair
     if (modalResult.error && !modalResult.step) {
-      return {
-        success: false,
-        error: modalResult.error,
-        mashup_plan: plan,
-        mashup_code: mashupCode,
-        tokensIn,
-        tokensOut,
-        elapsedMs: Date.now() - startTime,
+      const errorCat = categorizeModalError(modalResult.error)
+      const catLabel = errorCat?.category ?? "unknown"
+      console.warn(`[THE-FORGE] Mashup Modal failed (${catLabel}), attempting single retry`)
+      const retryPrompt = `The following CadQuery mashup code failed during execution:\n\nERROR (${catLabel}): ${modalResult.error}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix the error. Output corrected Python code in a single \`\`\`python code fence.`
+      const retryResult = await callClaude(codeSys, retryPrompt, modelId, 16384)
+      tokensIn += retryResult.tokensIn
+      tokensOut += retryResult.tokensOut
+      const retriedCode = extractCode(retryResult.text)
+      if (retriedCode.trim() && retriedCode.trim() !== mashupCode.trim()) {
+        mashupCode = stripUnsafeCode(retriedCode)
+        modalResult = await executeMashupOnModal(modalSources, mashupCode, materialDensity)
+      }
+
+      if (modalResult.error && !modalResult.step) {
+        return {
+          success: false,
+          error: modalResult.error,
+          mashup_plan: plan,
+          mashup_code: mashupCode,
+          tokensIn,
+          tokensOut,
+          elapsedMs: Date.now() - startTime,
+          error_category: catLabel,
+        }
       }
     }
 
@@ -2741,17 +2776,52 @@ export async function executeMashupPlan(
       }
     }
 
-    const modalResult = await executeMashupOnModal(resolvedSources, mashupCode, materialDensity)
+    // J3: Pre-exec validation — catch syntax/CadQuery errors before Modal
+    const assemblyPreExec = [
+      ...checkPythonSyntax(mashupCode),
+      ...analyzeCadQueryCode(mashupCode),
+    ]
+    const assemblyCritical = assemblyPreExec.filter((r) => r.severity === "critical")
+    if (assemblyCritical.length > 0) {
+      console.warn(`[THE-FORGE] Assembly pre-exec: ${assemblyCritical.length} critical issue(s), attempting repair`)
+      const repairPrompt = `The following CadQuery assembly code has critical issues:\n\nISSUES:\n${assemblyCritical.map((r) => `[${r.ruleId}] ${r.message}${r.repairHint ? ` — Fix: ${r.repairHint}` : ""}`).join("\n")}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix ALL listed issues. Output corrected Python code in a single \`\`\`python code fence.`
+      const repairResult = await callClaude(codeSys, repairPrompt, modelId, 16384)
+      tokensIn += repairResult.tokensIn
+      tokensOut += repairResult.tokensOut
+      const repairedCode = extractCode(repairResult.text)
+      if (repairedCode.trim() && repairedCode.trim() !== mashupCode.trim()) {
+        mashupCode = stripUnsafeCode(repairedCode)
+      }
+    }
 
+    let modalResult = await executeMashupOnModal(resolvedSources, mashupCode, materialDensity)
+
+    // J3: Single retry — if Modal fails, categorize error and attempt one repair
     if (modalResult.error && !modalResult.step) {
-      return {
-        success: false,
-        error: modalResult.error,
-        mashup_plan: plan,
-        mashup_code: mashupCode,
-        tokensIn,
-        tokensOut,
-        elapsedMs: Date.now() - startTime,
+      const errorCat = categorizeModalError(modalResult.error)
+      const catLabel = errorCat?.category ?? "unknown"
+      console.warn(`[THE-FORGE] Assembly Modal failed (${catLabel}), attempting single retry`)
+      const retryPrompt = `The following CadQuery assembly code failed during execution:\n\nERROR (${catLabel}): ${modalResult.error}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix the error. Output corrected Python code in a single \`\`\`python code fence.`
+      const retryResult = await callClaude(codeSys, retryPrompt, modelId, 16384)
+      tokensIn += retryResult.tokensIn
+      tokensOut += retryResult.tokensOut
+      const retriedCode = extractCode(retryResult.text)
+      if (retriedCode.trim() && retriedCode.trim() !== mashupCode.trim()) {
+        mashupCode = stripUnsafeCode(retriedCode)
+        modalResult = await executeMashupOnModal(resolvedSources, mashupCode, materialDensity)
+      }
+
+      if (modalResult.error && !modalResult.step) {
+        return {
+          success: false,
+          error: modalResult.error,
+          mashup_plan: plan,
+          mashup_code: mashupCode,
+          tokensIn,
+          tokensOut,
+          elapsedMs: Date.now() - startTime,
+          error_category: catLabel,
+        }
       }
     }
 
