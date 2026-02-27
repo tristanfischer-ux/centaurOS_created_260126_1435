@@ -100,21 +100,27 @@ export function validateZStack(
   const zValues: number[] = []
 
   // Pattern 1: .workplane(offset=N)
+  // INTENT: Track raw signed values — negative offsets are legitimate (e.g. recessed geometry).
+  // The span (maxZ - minZ) is what matters, not the absolute maximum.
   const wpPattern = /\.workplane\s*\(\s*offset\s*=\s*(-?\d+(?:\.\d+)?)/g
   let match: RegExpExecArray | null
   while ((match = wpPattern.exec(pythonCode)) !== null) {
-    zValues.push(Math.abs(parseFloat(match[1])))
+    zValues.push(parseFloat(match[1]))
   }
 
   // Pattern 2: .transformed(offset=(X, Y, Z)) — extract the Z component
   const tfPattern = /\.transformed\s*\(\s*offset\s*=\s*\(\s*(?:-?\d+(?:\.\d+)?)\s*,\s*(?:-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*\)/g
   while ((match = tfPattern.exec(pythonCode)) !== null) {
-    zValues.push(Math.abs(parseFloat(match[1])))
+    zValues.push(parseFloat(match[1]))
   }
 
   if (zValues.length === 0) return results
 
-  const maxZ = Math.max(...zValues)
+  // INTENT: Include 0 as implicit baseline (geometry always starts at z=0).
+  // Compute span = maxZ - minZ to handle negative offsets correctly.
+  const maxZ = Math.max(0, ...zValues)
+  const minZ = Math.min(0, ...zValues)
+  const zSpan = maxZ - minZ
 
   // INTENT: Extract total height from space budget
   const budgetMatch = interfaceDefinition.match(
@@ -131,13 +137,13 @@ export function validateZStack(
   const expectedHeight = parseFloat(totalMatch[1])
   if (expectedHeight === 0) return results
 
-  const ratio = maxZ / expectedHeight
+  const ratio = zSpan / expectedHeight
   if (ratio > 1.2 || ratio < 0.8) {
     results.push({
       ruleId: "zstack-height-mismatch",
       severity: "warning",
-      message: `Max Z in code (${maxZ.toFixed(0)}mm) differs from space budget total (${expectedHeight.toFixed(0)}mm) by ${((Math.abs(ratio - 1)) * 100).toFixed(0)}%`,
-      repairHint: `The Z-coordinates in the code don't match the space budget. The space budget total is ${expectedHeight}mm but the highest Z position in code is ${maxZ.toFixed(0)}mm. Check for doubled heights or missing offsets.`,
+      message: `Z span in code (${zSpan.toFixed(0)}mm) differs from space budget total (${expectedHeight.toFixed(0)}mm) by ${((Math.abs(ratio - 1)) * 100).toFixed(0)}%`,
+      repairHint: `The Z-span in the code doesn't match the space budget. The space budget total is ${expectedHeight}mm but the Z span in code is ${zSpan.toFixed(0)}mm. Check for doubled heights or missing offsets.`,
     })
   }
 
@@ -194,7 +200,7 @@ export function analyzeCadQueryCode(
   if (loftCount > 0) {
     // Count workplane sections near loft calls
     const loftSections = pythonCode.match(
-      /\.workplane[\s\S]{0,500}?\.loft\s*\(/g,
+      /\.workplane[\s\S]{0,2000}?\.loft\s*\(/g,
     )
     const multiSectionLoft = loftSections?.some((section) => {
       const wpCount = (section.match(/\.workplane/g) || []).length
@@ -232,6 +238,24 @@ export function analyzeCadQueryCode(
     })
   }
 
+  // Check 5b: result = None as final assignment (CRITICAL)
+  // INTENT: Some LLM outputs initialise `result = None` then assign real geometry,
+  // but sometimes the final assignment is still `result = None`. Catch that.
+  if (hasResult) {
+    const resultAssignments = [...pythonCode.matchAll(/^result\s*=\s*(.+)/gm)]
+    if (resultAssignments.length > 0) {
+      const lastRhs = resultAssignments[resultAssignments.length - 1][1].trim()
+      if (/^None\s*(?:#.*)?$/.test(lastRhs)) {
+        results.push({
+          ruleId: "cq-result-none",
+          severity: "critical",
+          message: `Final "result" assignment is None — Modal execution will produce no geometry`,
+          repairHint: `The last "result = " line assigns None instead of a cq.Workplane or cq.Compound object. Ensure result is assigned to the final assembled geometry.`,
+        })
+      }
+    }
+  }
+
   // Check 6: .union() chain >15
   const unionCount = countOccurrences(pythonCode, /\.union\s*\(/g)
   if (unionCount > 15) {
@@ -240,6 +264,55 @@ export function analyzeCadQueryCode(
       severity: "warning",
       message: `.union() called ${unionCount}x — long union chains are O(n²) and may timeout`,
       repairHint: `Use cq.Assembly() for models with many components. Add sub-groups to the assembly with .add() and cq.Location. Convert to solid with assy.toCompound().`,
+      autoFixable: true,
+    })
+  }
+
+  return results
+}
+
+// ─── A2: Function Invocation Checker ────────────────────────────────
+
+/**
+ * Checks that every `def make_*()` function is actually called at least once.
+ * Uncalled functions indicate dead code — the LLM defined a component but
+ * forgot to include it in the assembly.
+ *
+ * @param pythonCode - Generated CadQuery Python code
+ * @returns Validation results (warnings for uncalled make_* functions)
+ */
+export function checkFunctionInvocations(
+  pythonCode: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+
+  // Extract all `def make_*()` function names
+  const defPattern = /def\s+(make_\w+)\s*\(/g
+  const funcNames: string[] = []
+  let defMatch: RegExpExecArray | null
+  while ((defMatch = defPattern.exec(pythonCode)) !== null) {
+    funcNames.push(defMatch[1])
+  }
+
+  if (funcNames.length === 0) return results
+
+  // For each function, count total occurrences of `make_name(` in the code.
+  // One occurrence is the def itself; need ≥2 (1 def + ≥1 call).
+  const uncalled: string[] = []
+  for (const funcName of funcNames) {
+    const callPattern = new RegExp(`${funcName}\\s*\\(`, "g")
+    const occurrences = (pythonCode.match(callPattern) || []).length
+    if (occurrences < 2) {
+      uncalled.push(funcName)
+    }
+  }
+
+  if (uncalled.length > 0) {
+    results.push({
+      ruleId: "cq-uncalled-make-fn",
+      severity: "warning",
+      message: `${uncalled.length} make_*() function(s) defined but never called: ${uncalled.join(", ")}`,
+      repairHint: `These functions are defined but never invoked in the assembly. Add calls to include them in the result: ${uncalled.join(", ")}. Each make_*() function should be called and .union()'d or added to the assembly.`,
       autoFixable: true,
     })
   }
@@ -267,6 +340,21 @@ function isPrimaryParam(name: string): boolean {
     /^tolerance$/,
     /^clearance$/,
     /^wall_t$/,
+    /_diameter$/,
+    /_radius$/,
+    /^diameter$/,
+    /^radius$/,
+    /_spacing$/,
+    /^spacing$/,
+    /_pitch$/,
+    /^pitch$/,
+    /^gap$/,
+    /_gap$/,
+    /_thickness$/,
+    /^thickness$/,
+    /_angle$/,
+    /^angle$/,
+    /_offset$/,
   ]
   return primaryPatterns.some((p) => p.test(name))
 }

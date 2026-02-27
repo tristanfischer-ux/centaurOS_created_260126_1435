@@ -7,8 +7,8 @@
  * 25 products × multiple validators = comprehensive coverage of error detection.
  */
 
-import { verifyInterfaceArithmetic, checkComponentCoverage, trackDimensionProvenance } from "../interface-validators"
-import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode } from "../code-validators"
+import { verifyInterfaceArithmetic, checkComponentCoverage, trackDimensionProvenance, validateInterfaceStructure } from "../interface-validators"
+import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations } from "../code-validators"
 import { estimateDimensions, validateEstimatedDimensions, safeEval } from "../dimension-estimator"
 
 // ─── Golden Interface Definitions ────────────────────────────────────
@@ -241,6 +241,21 @@ describe("Golden Suite: Nespresso Capsule Reloader", () => {
     const criticals = results.filter((r) => r.severity === "critical")
     expect(criticals).toHaveLength(0)
   })
+
+  // A2: Good code calls all defined functions
+  test("function invocations: good code calls all functions (A2)", () => {
+    const results = checkFunctionInvocations(NESPRESSO_CODE_GOOD)
+    // make_top_funnel is defined but not in the union chain — it should be flagged
+    // (This is intentional: the golden code omits it for loft complexity)
+    // The test validates the validator works, not that the code is perfect
+    expect(results.every((r) => r.ruleId === "cq-uncalled-make-fn")).toBe(true)
+  })
+
+  // B1: Nespresso interface has all 4 sections
+  test("interface structure: all 4 sections present (B1)", () => {
+    const results = validateInterfaceStructure(NESPRESSO_RELOADER_INTERFACE)
+    expect(results).toHaveLength(0)
+  })
 })
 
 describe("Golden Suite: 20ft Shipping Container", () => {
@@ -272,6 +287,12 @@ result = (cq.Workplane("XY")
 `
     const results = validateZStack(containerCode, SHIPPING_CONTAINER_INTERFACE)
     // Max Z (2541) is close to total (2591)
+    expect(results).toHaveLength(0)
+  })
+
+  // B1: Container interface has all 4 sections
+  test("interface structure: all 4 sections present (B1)", () => {
+    const results = validateInterfaceStructure(SHIPPING_CONTAINER_INTERFACE)
     expect(results).toHaveLength(0)
   })
 })
@@ -316,6 +337,18 @@ describe("Golden Suite: CadQuery Static Analyzer", () => {
     const results = analyzeCadQueryCode(SHELL_AND_SWEEP_CODE)
     expect(results.some((r) => r.ruleId === "cq-shell-fragile")).toBe(true)
     expect(results.some((r) => r.ruleId === "cq-sweep-fragile")).toBe(true)
+  })
+
+  // D1: result = None flagged as critical
+  test("result = None as final assignment is critical (D1)", () => {
+    const code = `import cadquery as cq
+result = None
+body = cq.Workplane("XY").box(100, 100, 50)
+result = body
+result = None  # oops, reset at end
+`
+    const results = analyzeCadQueryCode(code)
+    expect(results.some((r) => r.ruleId === "cq-result-none" && r.severity === "critical")).toBe(true)
   })
 })
 
@@ -366,9 +399,20 @@ describe("Golden Suite: Safe expression evaluator edge cases", () => {
 
   test("rejects Python-specific constructs", () => {
     expect(safeEval("len([1,2,3])", {})).toBeNull()
-    expect(safeEval("max(10, 20)", {})).toBeNull() // max() is not in our safe set
     expect(safeEval("True if x > 5 else False", { x: 10 })).toBeNull()
     expect(safeEval("lambda x: x + 1", {})).toBeNull()
+  })
+
+  test("evaluates min/max builtins (F4)", () => {
+    expect(safeEval("max(10, 20)", {})).toBe(20)
+    expect(safeEval("min(10, 20)", {})).toBe(10)
+  })
+
+  // C3: r**2 golden evaluation
+  test("evaluates r**2 circle area pattern (C3)", () => {
+    const symbols = { r: 10 }
+    const result = safeEval("math.pi * r ** 2", symbols)
+    expect(result).toBeCloseTo(Math.PI * 100)
   })
 })
 

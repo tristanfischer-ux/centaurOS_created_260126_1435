@@ -64,8 +64,8 @@ import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
-import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage } from "@/lib/cad-lab/interface-validators"
-import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode } from "@/lib/cad-lab/code-validators"
+import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure } from "@/lib/cad-lab/interface-validators"
+import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import type { TemplateMatch } from "@/actions/step-template-matching"
 
@@ -446,12 +446,20 @@ async function executeMashupOnModal(
  * @returns Extracted Python code
  */
 function extractCode(text: string): string {
-  if (text.includes("```python")) {
-    return text.split("```python")[1]?.split("```")[0]?.trim() ?? text.trim()
+  // INTENT: Claude sometimes outputs explanation before/after the real code block.
+  // Use regex matchAll to find ALL fenced blocks, take the LAST python/cadquery one.
+  const pythonBlocks = [...text.matchAll(/```(?:python|cadquery)\s*\n([\s\S]*?)```/g)]
+  if (pythonBlocks.length > 0) {
+    return pythonBlocks[pythonBlocks.length - 1][1].trim()
   }
-  if (text.includes("```")) {
-    return text.split("```")[1]?.split("```")[0]?.trim() ?? text.trim()
+
+  // Fallback: any fenced block (take the last one)
+  const anyBlocks = [...text.matchAll(/```\s*\n([\s\S]*?)```/g)]
+  if (anyBlocks.length > 0) {
+    return anyBlocks[anyBlocks.length - 1][1].trim()
   }
+
+  // Final fallback: raw text
   return text.trim()
 }
 
@@ -787,10 +795,11 @@ Generate the complete interface definition following the exact 4-section format.
 
     console.info(`[THE-FORGE] Step 2 complete: ${Date.now() - start}ms`)
 
-    // ── Deterministic interface validation (#1, #6) ──
+    // ── Deterministic interface validation (#1, #6, B1) ──
     const interfaceWarnings: PreExecValidationResult[] = [
       ...verifyInterfaceArithmetic(text),
       ...trackDimensionProvenance(researchReport, text),
+      ...validateInterfaceStructure(text),
     ]
     if (interfaceWarnings.length > 0) {
       console.info(`[THE-FORGE] Step 2: ${interfaceWarnings.length} interface warning(s):`,
@@ -850,6 +859,7 @@ export async function generateCadLabModel(
   interfaceDefinition: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   checkpointContext?: string,
+  interfaceWarnings?: PreExecValidationResult[],
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1000,6 +1010,18 @@ Generate the complete CadQuery Python code following the methodology. The code m
 
 If the research report or interface definition contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
 
+    // ── A3: Append interface warnings to first-attempt prompt ──
+    let interfaceIssueSection = ""
+    if (interfaceWarnings && interfaceWarnings.length > 0) {
+      const ifaceIssues = interfaceWarnings
+        .filter((w) => w.severity !== "info")
+        .map((w) => `- [${w.severity}] ${w.ruleId}: ${w.message}${w.repairHint ? `\n  Fix: ${w.repairHint}` : ""}`)
+        .join("\n")
+      if (ifaceIssues) {
+        interfaceIssueSection = `\n\n=== INTERFACE ISSUES (address these in your code) ===\n${ifaceIssues}`
+      }
+    }
+
     // ── #7: Iterative repair loop (max 3 attempts) ──
     const MAX_REPAIR_ATTEMPTS = 3
     const TOKEN_OUT_BUDGET = 200_000
@@ -1010,6 +1032,8 @@ If the research report or interface definition contains any unresolved questions
     let modalTime = 0
     let repairAttempts = 0
     let lastModalError: string | null = null
+    // B3: Track code hashes to detect divergence (same code generated twice = stuck)
+    const seenCodeHashes = new Set<string>()
 
     for (let attempt = 0; attempt < MAX_REPAIR_ATTEMPTS; attempt++) {
       repairAttempts = attempt
@@ -1023,7 +1047,7 @@ If the research report or interface definition contains any unresolved questions
       // ── Code generation ──
       let userPrompt: string
       if (attempt === 0) {
-        userPrompt = baseUserPrompt
+        userPrompt = baseUserPrompt + interfaceIssueSection
       } else {
         // Build repair prompt from previous failures
         const failureSummary = allPreExecResults
@@ -1049,6 +1073,32 @@ ${finalCode}
       totalTokensOut += codeResult.tokensOut
 
       finalCode = extractCode(codeResult.text)
+
+      // B3: Divergence detection — if same code hash seen twice, the model is stuck
+      const codeHash = `${finalCode.length}:${finalCode.slice(0, 200)}`
+      if (seenCodeHashes.has(codeHash)) {
+        console.warn(`[THE-FORGE] Step 3: Divergence detected on attempt ${attempt + 1} — same code generated twice, breaking`)
+        break
+      }
+      seenCodeHashes.add(codeHash)
+
+      // INTENT: Guard against empty code — don't waste a Modal run on empty string
+      if (!finalCode.trim()) {
+        if (attempt < MAX_REPAIR_ATTEMPTS - 1) {
+          lastModalError = "Code generation returned empty output"
+          continue
+        }
+        return {
+          success: false,
+          error: "Code generation returned empty output after all attempts",
+          generationTime: Date.now() - pipelineStart,
+          tokensIn: totalTokensIn,
+          tokensOut: totalTokensOut,
+          modelUsed: modelId,
+          repairAttempts: attempt,
+        }
+      }
+
       assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
       // Safety: strip any export/print/os calls that slipped through
@@ -1063,12 +1113,14 @@ ${finalCode}
         })
         .join("\n")
 
-      // ── Pre-execution validation (#2, #3, #4, #5, #8) ──
+      // ── Pre-execution validation (#2, #3, #4, #5, #8, A2, B1) ──
       allPreExecResults = [
         ...checkComponentCoverage(interfaceDefinition, finalCode),
         ...scanParametricIntegrity(finalCode),
         ...validateZStack(finalCode, interfaceDefinition),
         ...analyzeCadQueryCode(finalCode),
+        ...checkFunctionInvocations(finalCode),
+        ...validateInterfaceStructure(interfaceDefinition),
       ]
 
       // #8: Dimension estimation
@@ -1117,7 +1169,8 @@ ${finalCode}
       modalTime = Date.now() - modalStart
 
       if (modalResult.error && !modalResult.svg_iso) {
-        lastModalError = modalResult.error
+        // INTENT: Cap error length to prevent multi-KB tracebacks from bloating the repair prompt
+        lastModalError = modalResult.error.slice(0, 500)
         console.warn(`[THE-FORGE] Step 4: Modal error on attempt ${attempt + 1}: ${modalResult.error.slice(0, 200)}`)
         if (attempt < MAX_REPAIR_ATTEMPTS - 1) continue // Try repair
         // Final attempt — return failure with code
@@ -1135,6 +1188,35 @@ ${finalCode}
           assumptions: assumptions.length > 0 ? assumptions : undefined,
           repairAttempts,
           preExecValidation: allPreExecResults,
+        }
+      }
+
+      // B4: Post-Modal quality-triggered repair — check for degenerate geometry
+      // even on "success". Only degenerate bbox and extreme aspect ratio — fill ratio
+      // and STEP size checks are too noisy.
+      const postModalBbox = modalResult.analysis?.mass_properties?.bounding_box
+      if (postModalBbox && attempt < MAX_REPAIR_ATTEMPTS - 1) {
+        const { xLen, yLen, zLen } = postModalBbox
+        const minDim = Math.min(xLen, yLen, zLen)
+        const maxDim = Math.max(xLen, yLen, zLen)
+        const qualityIssues: string[] = []
+
+        if (minDim < 1) {
+          qualityIssues.push(`Degenerate bbox dimension: ${xLen.toFixed(1)}×${yLen.toFixed(1)}×${zLen.toFixed(1)}mm (min axis <1mm)`)
+        }
+        if (minDim > 0 && maxDim / minDim > 50) {
+          qualityIssues.push(`Extreme aspect ratio ${(maxDim / minDim).toFixed(1)}:1 — likely missing components`)
+        }
+
+        if (qualityIssues.length > 0) {
+          lastModalError = qualityIssues.join("; ")
+          allPreExecResults.push({
+            ruleId: "postmodal-quality",
+            severity: "warning",
+            message: qualityIssues.join("; "),
+          })
+          console.warn(`[THE-FORGE] Step 4: Post-Modal quality issue on attempt ${attempt + 1}: ${qualityIssues.join("; ")}`)
+          continue
         }
       }
 
@@ -1458,6 +1540,12 @@ Generate CadQuery Python code that:
     totalTokensOut += codeResult.tokensOut
 
     let finalCode = extractCode(codeResult.text)
+
+    // INTENT: Guard against empty code — don't waste a Modal run on empty string
+    if (!finalCode.trim()) {
+      throw new Error("Seed path: code generation returned empty output")
+    }
+
     const assumptions = extractAssumptions(interfaceDefinition, finalCode)
 
     // Safety: strip unsafe calls
@@ -1471,6 +1559,40 @@ Generate CadQuery Python code that:
         return true
       })
       .join("\n")
+
+    // ── Pre-execution validation (same checks as main path) ──
+    const preExecResults: PreExecValidationResult[] = [
+      ...analyzeCadQueryCode(finalCode),
+      ...checkComponentCoverage(interfaceDefinition, finalCode),
+      ...scanParametricIntegrity(finalCode),
+      ...validateZStack(finalCode, interfaceDefinition),
+      ...checkFunctionInvocations(finalCode),
+      ...validateInterfaceStructure(interfaceDefinition),
+    ]
+    const dimEstimate = estimateDimensions(finalCode)
+    preExecResults.push(...validateEstimatedDimensions(dimEstimate, interfaceDefinition))
+
+    const criticalCount = preExecResults.filter((r) => r.severity === "critical").length
+    if (criticalCount > 0) {
+      // INTENT: No repair loop for seed path (single-shot), but don't waste Modal on critical issues
+      console.warn(`[THE-FORGE] Seed path: ${criticalCount} critical pre-exec issue(s):`,
+        preExecResults.filter((r) => r.severity === "critical").map((r) => r.ruleId))
+      return {
+        success: false,
+        error: `Seed path pre-execution validation failed: ${preExecResults.filter((r) => r.severity === "critical").map((r) => r.message).join("; ")}`,
+        code: finalCode,
+        codeLines: finalCode.split("\n").length,
+        generationTime: Date.now() - pipelineStart,
+        interfaceDefinition,
+        tokensIn: totalTokensIn,
+        tokensOut: totalTokensOut,
+        modelUsed: modelId,
+        assumptions: assumptions.length > 0 ? assumptions : undefined,
+        preExecValidation: preExecResults,
+        seedTemplateSlug: seedTemplate.slug,
+        seedTemplateScore: seedTemplate.score,
+      }
+    }
 
     const codeLines = finalCode.split("\n").length
     console.info(`[THE-FORGE] Seed path: Code generated (${codeLines} lines)`)
@@ -1599,6 +1721,7 @@ Generate CadQuery Python code that:
       interfaceDefinition,
       validationWarnings: warnings.length > 0 ? warnings : undefined,
       assumptions: assumptions.length > 0 ? assumptions : undefined,
+      preExecValidation: preExecResults.length > 0 ? preExecResults : undefined,
       seedTemplateSlug: seedTemplate.slug,
       seedTemplateScore: seedTemplate.score,
       error: modalResult.error ?? undefined,
@@ -1920,8 +2043,23 @@ export async function generateCadLabModelSmart(
     const grammarResult = await generateFromGrammar(description)
 
     if (grammarResult.success) {
-      console.info(`[THE-FORGE] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
-      return grammarResult
+      // INTENT: Run static analysis on grammar-generated code to catch critical issues
+      // (e.g. missing `result =`) before returning success
+      if (grammarResult.code) {
+        const grammarAnalysis = analyzeCadQueryCode(grammarResult.code)
+        const hasCritical = grammarAnalysis.some((r) => r.severity === "critical")
+        if (hasCritical) {
+          console.warn("[THE-FORGE] Grammar code failed static analysis, falling through to raw pipeline:",
+            grammarAnalysis.filter((r) => r.severity === "critical").map((r) => r.ruleId))
+          // Fall through to raw CadQuery pipeline instead of returning bad grammar result
+        } else {
+          console.info(`[THE-FORGE] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
+          return grammarResult
+        }
+      } else {
+        console.info(`[THE-FORGE] Grammar-based generation succeeded (${grammarResult.grammarUsed})`)
+        return grammarResult
+      }
     }
 
     if (!grammarResult.shouldFallback) {
@@ -1937,7 +2075,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

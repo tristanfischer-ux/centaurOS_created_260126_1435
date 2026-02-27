@@ -55,8 +55,14 @@ function tokenize(
       continue
     }
 
-    // Operators and parentheses
-    if ("+-*/()".includes(s[i])) {
+    // Operators, parentheses, and comma (for min/max args)
+    // INTENT: Check for ** (power) before * to emit as single 2-char token
+    if (s[i] === "*" && i + 1 < s.length && s[i + 1] === "*") {
+      tokens.push({ type: "op", value: "**" })
+      i += 2
+      continue
+    }
+    if ("+-*/(),".includes(s[i])) {
       tokens.push({ type: "op", value: s[i] })
       i++
       continue
@@ -74,9 +80,10 @@ function tokenize(
  * Returns null if expression cannot be safely evaluated.
  *
  * Grammar:
- *   expr   → term (('+' | '-') term)*
- *   term   → unary (('*' | '/') unary)*
- *   unary  → '-' unary | primary
+ *   expr    → term (('+' | '-') term)*
+ *   term    → unary (('*' | '/') unary)*
+ *   unary   → '-' unary | power
+ *   power   → primary ('**' unary)?   (right-associative)
  *   primary → NUMBER | IDENT | '(' expr ')' | 'math.sqrt(' expr ')'
  */
 function evaluate(
@@ -132,7 +139,23 @@ function evaluate(
       const val = parseUnary()
       return val !== null ? -val : null
     }
-    return parsePrimary()
+    return parsePower()
+  }
+
+  // INTENT: Right-associative power operator: 2**3**2 = 2**(3**2) = 512
+  function parsePower(): number | null {
+    const base = parsePrimary()
+    if (base === null) return null
+
+    if (peek()?.type === "op" && peek()!.value === "**") {
+      consume()
+      // Right-associative: exponent is parsed with parseUnary (which recurses into parsePower)
+      const exp = parseUnary()
+      if (exp === null) return null
+      return Math.pow(base, exp)
+    }
+
+    return base
   }
 
   function parsePrimary(): number | null {
@@ -194,6 +217,44 @@ function evaluate(
         return Math.floor(arg)
       }
 
+      // Single-arg math/builtin functions
+      const singleArgFns: Record<string, (x: number) => number> = {
+        "math.sin": Math.sin,
+        "math.cos": Math.cos,
+        "math.tan": Math.tan,
+        "math.radians": (deg) => deg * (Math.PI / 180),
+        "math.degrees": (rad) => rad * (180 / Math.PI),
+        "math.log": Math.log,
+        "math.exp": Math.exp,
+        "int": Math.trunc,
+        "round": Math.round,
+        "abs": Math.abs,
+      }
+      if (name in singleArgFns) {
+        if (peek()?.value !== "(") return null
+        consume() // (
+        const arg = parseExpr()
+        if (arg === null) return null
+        if (peek()?.value !== ")") return null
+        consume() // )
+        return singleArgFns[name](arg)
+      }
+
+      // Two-arg builtins: min(), max()
+      if (name === "min" || name === "max") {
+        if (peek()?.value !== "(") return null
+        consume() // (
+        const a = parseExpr()
+        if (a === null) return null
+        if (peek()?.value !== ",") return null
+        consume() // ,
+        const b = parseExpr()
+        if (b === null) return null
+        if (peek()?.value !== ")") return null
+        consume() // )
+        return name === "min" ? Math.min(a, b) : Math.max(a, b)
+      }
+
       // Variable lookup
       if (name in symbols) return symbols[name]
 
@@ -231,8 +292,6 @@ export function safeEval(
   if (/["']/.test(expr)) return null
   // Reject comparison/boolean operators
   if (/[<>=!&|^~]/.test(expr)) return null
-  // Reject ** (power operator) — too complex for bbox estimation
-  if (/\*\*/.test(expr)) return null
 
   const tokens = tokenize(expr)
   if (tokens.length === 0) return null
@@ -270,6 +329,10 @@ export function estimateDimensions(pythonCode: string): DimensionEstimate {
     if (!assignMatch) continue
 
     const [, varName, exprStr] = assignMatch
+
+    // C4: Skip Python boolean/None literals — they're not numeric dimensions
+    // and would inflate unresolvedVars.
+    if (/^(?:True|False|None)\s*(?:#.*)?$/.test(exprStr)) continue
 
     const value = safeEval(exprStr, symbols)
     if (value !== null && isFinite(value)) {
@@ -334,7 +397,13 @@ export function validateEstimatedDimensions(
 ): PreExecValidationResult[] {
   const results: PreExecValidationResult[] = []
 
-  if (!estimate.predictedBbox) return results
+  if (!estimate.predictedBbox) {
+    return [{
+      ruleId: "dim-estimate-skipped",
+      severity: "info" as const,
+      message: `Dimension estimation skipped — no parseable dimension parameters found (${estimate.unresolvedVars.length} unresolved variables)`,
+    }]
+  }
   const { x, y, z } = estimate.predictedBbox
   if (x === 0 && y === 0 && z === 0) return results
 

@@ -6,6 +6,7 @@ import {
   scanParametricIntegrity,
   validateZStack,
   analyzeCadQueryCode,
+  checkFunctionInvocations,
 } from "../code-validators"
 
 // ─── #3: scanParametricIntegrity ─────────────────────────────────────
@@ -50,6 +51,23 @@ wall_t = 2
 
 # Derived
 length = num_capsules * 29
+`
+    const results = scanParametricIntegrity(code)
+    expect(results).toHaveLength(0)
+  })
+
+  // C1: Expanded primary params should not be flagged
+  it("does not flag expanded primary params (C1)", () => {
+    const code = `
+# Derived
+bolt_diameter = 8
+bolt_radius = 4
+hole_spacing = 31
+fin_pitch = 5
+vent_gap = 2
+plate_thickness = 3
+bracket_angle = 45
+z_offset = 10
 `
     const results = scanParametricIntegrity(code)
     expect(results).toHaveLength(0)
@@ -118,6 +136,32 @@ result = (
   Body: 100mm
   ─────
   Total: 100mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    const results = validateZStack(code, iface)
+    expect(results).toHaveLength(0)
+  })
+
+  // A1: Negative Z offsets should be handled correctly via span
+  it("handles negative Z offsets correctly (A1)", () => {
+    const code = `
+result = (
+    cq.Workplane("XY")
+    .box(100, 100, 10)
+    .workplane(offset=-20)
+    .box(80, 80, 20)
+    .workplane(offset=80)
+    .box(60, 60, 10)
+)
+`
+    // Span: max(0, 80) - min(0, -20) = 80 - (-20) = 100mm
+    const iface = `=== a) SPACE BUDGET ===
+  Below:   20mm
+  Base:    10mm
+  Above:   70mm
+  ─────
+  Total:  100mm
 
 === b) COMPONENT PLACEMENT TABLE ===`
 
@@ -214,5 +258,76 @@ result = make_body().union(make_cap().val())
     // Only checking for no critical issues
     const criticals = results.filter((r) => r.severity === "critical")
     expect(criticals).toHaveLength(0)
+  })
+
+  // D1: result = None as final assignment
+  it("flags result = None as final assignment (D1)", () => {
+    const code = `
+import cadquery as cq
+result = None
+body = cq.Workplane("XY").box(100, 100, 50)
+result = None
+`
+    const results = analyzeCadQueryCode(code)
+    const noneResult = results.find((r) => r.ruleId === "cq-result-none")
+    expect(noneResult).toBeDefined()
+    expect(noneResult!.severity).toBe("critical")
+  })
+
+  it("does not flag result = None when later reassigned (D1)", () => {
+    const code = `
+import cadquery as cq
+result = None  # initialiser
+body = cq.Workplane("XY").box(100, 100, 50)
+result = body
+`
+    const results = analyzeCadQueryCode(code)
+    const noneResult = results.find((r) => r.ruleId === "cq-result-none")
+    expect(noneResult).toBeUndefined()
+  })
+})
+
+// ─── A2: checkFunctionInvocations ────────────────────────────────────
+
+describe("checkFunctionInvocations", () => {
+  it("returns no warnings when all functions are called", () => {
+    const code = `
+def make_body():
+    return cq.Workplane("XY").box(100, 100, 50)
+
+def make_cap():
+    return cq.Workplane("XY").box(80, 80, 10)
+
+result = make_body().union(make_cap())
+`
+    const results = checkFunctionInvocations(code)
+    expect(results).toHaveLength(0)
+  })
+
+  it("flags uncalled make_* functions", () => {
+    const code = `
+def make_body():
+    return cq.Workplane("XY").box(100, 100, 50)
+
+def make_cap():
+    return cq.Workplane("XY").box(80, 80, 10)
+
+def make_handle():
+    return cq.Workplane("XY").box(20, 20, 40)
+
+result = make_body().union(make_cap())
+`
+    const results = checkFunctionInvocations(code)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("cq-uncalled-make-fn")
+    expect(results[0].message).toContain("make_handle")
+  })
+
+  it("returns no warnings when no make_* functions exist", () => {
+    const code = `
+result = cq.Workplane("XY").box(100, 100, 50)
+`
+    const results = checkFunctionInvocations(code)
+    expect(results).toHaveLength(0)
   })
 })

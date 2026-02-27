@@ -59,7 +59,9 @@ export function verifyInterfaceArithmetic(
         const computedSum = pendingValues.reduce((a, b) => a + b, 0)
         const diff = Math.abs(computedSum - statedTotal)
 
-        if (diff > 1) {
+        // INTENT: Scale tolerance with object size — 0.5% of total or 1mm, whichever is larger.
+        // Small objects: 1mm (same as before). Large objects (6058mm container): 30mm.
+        if (diff > Math.max(1, statedTotal * 0.005)) {
           results.push({
             ruleId: "arith-sum-mismatch",
             severity: "warning",
@@ -192,16 +194,19 @@ export function trackDimensionProvenance(
   const interfaceDims = extractDimensions(interfaceDefinition)
   if (interfaceDims.size === 0) return results
 
-  // INTENT: Find interface dimensions that don't appear in research (within 5% tolerance).
-  // Skip small values (<5mm, likely clearances) and very round numbers (100, 500, 1000).
+  // INTENT: Find interface dimensions that don't appear in research (within tolerance).
+  // Skip small values (<5mm, likely clearances).
+  // DECISION (B5): Round numbers (500mm, 1000mm) are NOT skipped — they are exactly
+  // what LLMs hallucinate. Better to flag them and let the user verify.
   const unresearched: number[] = []
   for (const dim of interfaceDims) {
     if (dim < 5) continue // Skip small clearances/gaps
-    if (isVeryRoundNumber(dim)) continue // Skip standard round values
 
     let found = false
     for (const researchDim of researchDims) {
-      const tolerance = researchDim * 0.05
+      // D2: Hybrid tolerance — 2mm absolute minimum / 2% relative.
+      // Large dims get much tighter checks (6000mm: 120mm vs old 300mm).
+      const tolerance = Math.max(2, researchDim * 0.02)
       if (Math.abs(dim - researchDim) <= tolerance) {
         found = true
         break
@@ -218,6 +223,46 @@ export function trackDimensionProvenance(
       severity: "info",
       message: `${unresearched.length} interface dimension(s) not found in research report: ${dimList}${unresearched.length > 10 ? "..." : ""}`,
       repairHint: `Verify these dimensions against the research report. If they are derived values (sums, differences), ensure the source values are correct. If they are new dimensions, add a comment explaining the source.`,
+    })
+  }
+
+  return results
+}
+
+// ─── B1: Interface Structure Validator ────────────────────────────────
+
+/**
+ * Checks that the interface definition contains all 4 required section markers.
+ * Missing sections indicate the LLM skipped part of the template.
+ *
+ * @param interfaceDefinition - Full interface definition text from Step 2
+ * @returns Validation results (warnings for missing sections)
+ */
+export function validateInterfaceStructure(
+  interfaceDefinition: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+
+  const requiredSections = [
+    { marker: /===\s*a\)\s*SPACE\s*BUDGET\s*===/i, label: "a) SPACE BUDGET" },
+    { marker: /===\s*b\)\s*COMPONENT\s*PLACEMENT\s*TABLE\s*===/i, label: "b) COMPONENT PLACEMENT TABLE" },
+    { marker: /===\s*c\)\s*CONNECTION\s*MAP\s*===/i, label: "c) CONNECTION MAP" },
+    { marker: /===\s*d\)\s*VALIDATION\s*CHECKLIST\s*===/i, label: "d) VALIDATION CHECKLIST" },
+  ]
+
+  const missing: string[] = []
+  for (const section of requiredSections) {
+    if (!section.marker.test(interfaceDefinition)) {
+      missing.push(section.label)
+    }
+  }
+
+  if (missing.length > 0) {
+    results.push({
+      ruleId: "iface-missing-section",
+      severity: "warning",
+      message: `Interface definition missing ${missing.length} required section(s): ${missing.join(", ")}`,
+      repairHint: `The interface definition must contain all 4 sections: === a) SPACE BUDGET ===, === b) COMPONENT PLACEMENT TABLE ===, === c) CONNECTION MAP ===, === d) VALIDATION CHECKLIST ===. Add the missing section(s).`,
     })
   }
 
@@ -264,8 +309,3 @@ function extractDimensions(text: string): Set<number> {
   return dims
 }
 
-/** Returns true for very round numbers that are likely standards, not researched */
-function isVeryRoundNumber(n: number): boolean {
-  // Exact multiples of 100 ≥ 100 (100, 200, 500, 1000, etc.)
-  return n >= 100 && n % 100 === 0
-}

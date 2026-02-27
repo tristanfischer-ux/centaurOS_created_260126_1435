@@ -6,6 +6,7 @@ import {
   verifyInterfaceArithmetic,
   checkComponentCoverage,
   trackDimensionProvenance,
+  validateInterfaceStructure,
 } from "../interface-validators"
 
 // ─── #1: verifyInterfaceArithmetic ───────────────────────────────────
@@ -56,6 +57,52 @@ describe("verifyInterfaceArithmetic", () => {
 
     const results = verifyInterfaceArithmetic(iface)
     expect(results).toHaveLength(0)
+  })
+
+  it("scales tolerance for large objects (F1: 0.5% of total)", () => {
+    // 6058mm container: 0.5% = 30mm tolerance
+    const iface = `=== a) SPACE BUDGET ===
+  Floor structure:       100mm
+  Interior height:      2391mm
+  Roof structure:        100mm
+  ────────────────────────────
+  Total height:         2591mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    // 100 + 2391 + 100 = 2591 — exact, should pass
+    const exact = verifyInterfaceArithmetic(iface)
+    expect(exact).toHaveLength(0)
+
+    // Now test with 10mm discrepancy on a 2591mm total (0.39% < 0.5% threshold)
+    const ifaceSmallDiff = `=== a) SPACE BUDGET ===
+  Floor structure:       100mm
+  Interior height:      2391mm
+  Roof structure:        110mm
+  ────────────────────────────
+  Total height:         2591mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    // 100 + 2391 + 110 = 2601 vs stated 2591 — diff is 10mm, tolerance is 12.96mm (0.5% of 2591)
+    const scaled = verifyInterfaceArithmetic(ifaceSmallDiff)
+    expect(scaled).toHaveLength(0)
+  })
+
+  it("still catches large errors on large objects", () => {
+    const iface = `=== a) SPACE BUDGET ===
+  Floor structure:       100mm
+  Interior height:      2391mm
+  Roof structure:        200mm
+  ────────────────────────────
+  Total height:         2591mm
+
+=== b) COMPONENT PLACEMENT TABLE ===`
+
+    // 100 + 2391 + 200 = 2691 vs stated 2591 — diff is 100mm, well over 12.96mm tolerance
+    const results = verifyInterfaceArithmetic(iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("arith-sum-mismatch")
   })
 
   it("returns empty for missing space budget section", () => {
@@ -163,12 +210,22 @@ Random dimension: 77mm`
     expect(results[0].message).toMatch(/40mm|77mm/)
   })
 
-  it("allows 5% tolerance on matching", () => {
+  // D2: Tighter tolerance — 2mm absolute / 2% relative
+  it("allows 2% tolerance on matching (D2)", () => {
     const research = `The housing is 100mm wide.`
-    const iface = `Housing width: 103mm` // 3% over, within tolerance
+    const iface = `Housing width: 102mm` // 2% over, within tolerance
 
     const results = trackDimensionProvenance(research, iface)
     expect(results).toHaveLength(0)
+  })
+
+  it("flags dimensions outside 2% tolerance (D2)", () => {
+    const research = `The housing is 100mm wide.`
+    const iface = `Housing width: 106mm` // 6% over, outside tolerance
+
+    const results = trackDimensionProvenance(research, iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("provenance-unresearched-dim")
   })
 
   it("skips small values (<5mm) as likely clearances", () => {
@@ -181,12 +238,56 @@ Gap: 3mm`
     expect(results).toHaveLength(0)
   })
 
-  it("skips very round numbers (100, 500, 1000)", () => {
+  // B5: Round numbers should NOW be flagged (no longer skipped)
+  it("flags round numbers not in research (B5)", () => {
     const research = `The tube is 45mm diameter.`
     const iface = `Tube OD: 45mm
 Total height: 500mm`
 
     const results = trackDimensionProvenance(research, iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("provenance-unresearched-dim")
+    expect(results[0].message).toContain("500mm")
+  })
+})
+
+// ─── B1: validateInterfaceStructure ──────────────────────────────────
+
+describe("validateInterfaceStructure", () => {
+  it("returns no warnings when all 4 sections present", () => {
+    const iface = `=== a) SPACE BUDGET ===
+Some content
+
+=== b) COMPONENT PLACEMENT TABLE ===
+Some content
+
+=== c) CONNECTION MAP ===
+Some content
+
+=== d) VALIDATION CHECKLIST ===
+Some content`
+
+    const results = validateInterfaceStructure(iface)
     expect(results).toHaveLength(0)
+  })
+
+  it("flags missing sections", () => {
+    const iface = `=== a) SPACE BUDGET ===
+Some content
+
+=== b) COMPONENT PLACEMENT TABLE ===
+Some content`
+
+    const results = validateInterfaceStructure(iface)
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].ruleId).toBe("iface-missing-section")
+    expect(results[0].message).toContain("CONNECTION MAP")
+    expect(results[0].message).toContain("VALIDATION CHECKLIST")
+  })
+
+  it("flags completely empty interface", () => {
+    const results = validateInterfaceStructure("Just some random text")
+    expect(results.length).toBeGreaterThan(0)
+    expect(results[0].message).toContain("4 required section(s)")
   })
 })
