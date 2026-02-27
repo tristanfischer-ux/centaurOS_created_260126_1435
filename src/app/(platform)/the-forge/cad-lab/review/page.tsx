@@ -11,7 +11,7 @@
  * Always accessible — shows a progressive welcome state when no data exists yet.
  */
 
-import { useState, useMemo, useEffect, useCallback, useRef } from "react"
+import { useState, useMemo, useCallback, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
@@ -180,7 +180,6 @@ export default function CadLabReviewPage(): React.ReactNode {
     const param = searchParams.get("tab")
     return param && validTabs.includes(param) ? param : "Review"
   })
-  const [activeSubSection, setActiveSubSection] = useState<string | null>(null)
   const tabContentRef = useRef<HTMLDivElement>(null)
 
   // ── B4: Supplier matching state (lifted from CadLabSupplyChain) ──
@@ -220,15 +219,8 @@ export default function CadLabReviewPage(): React.ReactNode {
     setMatchAllLoading(false)
   }, [modules, handleMatchModule])
 
-  // Active tab's sections for sub-nav
-  const activeTabGroup = useMemo(
-    () => TAB_GROUPS.find((g) => g.group === activeTab),
-    [TAB_GROUPS, activeTab],
-  )
-
   const handleTabClick = useCallback((group: string) => {
     setActiveTab(group)
-    setActiveSubSection(null)
     // Sync tab to URL without pushing history
     const params = new URLSearchParams(searchParams.toString())
     params.set("tab", group)
@@ -236,30 +228,6 @@ export default function CadLabReviewPage(): React.ReactNode {
     // Scroll to top of tab content
     tabContentRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [router, searchParams])
-
-  const handleSubSectionClick = useCallback((id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
-
-  // Track active sub-section within current tab via IntersectionObserver
-  useEffect(() => {
-    if (!activeTabGroup) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveSubSection(entry.target.id)
-          }
-        }
-      },
-      { rootMargin: "-20% 0px -70% 0px" },
-    )
-    for (const section of activeTabGroup.sections) {
-      const el = document.getElementById(section.id)
-      if (el) observer.observe(el)
-    }
-    return () => observer.disconnect()
-  }, [activeTabGroup])
 
   return (
     <div className="space-y-6">
@@ -353,16 +321,15 @@ export default function CadLabReviewPage(): React.ReactNode {
 
       {/* ── Tab navigation ── */}
       {hasAnyData && (
-        <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-          {/* Group tab pills */}
-          <div className="flex items-center gap-1">
+        <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
+          <div className="flex items-center gap-2">
             {TAB_GROUPS.map((group) => (
               <button
                 key={group.group}
                 onClick={() => handleTabClick(group.group)}
-                className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
                   activeTab === group.group
-                    ? "bg-international-orange-light text-international-orange"
+                    ? "bg-international-orange text-primary-foreground font-semibold"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
@@ -370,24 +337,6 @@ export default function CadLabReviewPage(): React.ReactNode {
               </button>
             ))}
           </div>
-          {/* Sub-section pills within active tab */}
-          {activeTabGroup && (
-            <div className="flex items-center gap-0.5 mt-1">
-              {activeTabGroup.sections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => handleSubSectionClick(section.id)}
-                  className={`px-2 py-1 text-xs rounded-md whitespace-nowrap transition-colors ${
-                    activeSubSection === section.id
-                      ? "text-international-orange font-medium"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {section.label}
-                </button>
-              ))}
-            </div>
-          )}
         </nav>
       )}
 

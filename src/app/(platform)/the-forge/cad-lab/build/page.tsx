@@ -257,15 +257,15 @@ export default function CadLabBuildPage(): React.ReactNode {
   return (
     <div className="space-y-6">
       {/* ── Tab navigation ── */}
-      <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2 bg-background border-b border-border overflow-x-auto">
-        <div className="flex items-center gap-1">
+      <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
+        <div className="flex items-center gap-2">
           {BUILD_TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => handleTabClick(tab.id)}
-              className={`px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors ${
+              className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${
                 activeTab === tab.id
-                  ? "bg-international-orange-light text-international-orange"
+                  ? "bg-international-orange text-primary-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >

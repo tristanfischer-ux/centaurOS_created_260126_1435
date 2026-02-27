@@ -225,10 +225,10 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
   return (
     <>
       <nav
-        className={cn("flex items-center py-4 px-2 sm:px-4", className)}
+        className={cn("flex items-center py-6 px-4 sm:px-6", className)}
         aria-label="The Forge pipeline stages"
       >
-        <div className="flex items-start w-full max-w-2xl mx-auto">
+        <div className="flex items-start w-full max-w-3xl mx-auto">
           {STAGES.map((stage, index) => {
             const { enabled, completed } = access[stage.id]
             const isActive = stage.href === FORGE_ROUTES.cadLab
@@ -246,7 +246,7 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                 {index > 0 && (
                   <div
                     className={cn(
-                      "h-0.5 flex-1 mt-[15px] sm:mt-[17px]",
+                      "h-0.5 flex-1 mt-[17px] sm:mt-[19px]",
                       prevCompleted ? "bg-international-orange" : "bg-muted",
                     )}
                     aria-hidden
@@ -257,19 +257,19 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                 {enabled ? (
                   <Link
                     href={stage.href}
-                    className="flex flex-col items-center gap-1.5 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2 rounded-sm"
+                    className="flex flex-col items-center gap-2 transition-opacity hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-international-orange focus:ring-offset-2 rounded-sm"
                     aria-label={`${stage.label}${isActive ? " (current stage)" : ""}${completed ? " (completed)" : ""}`}
                     aria-current={isActive ? "step" : undefined}
                   >
                     <div
                       className={cn(
-                        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-colors",
+                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-full transition-colors",
                         isActive && "bg-international-orange text-white shadow-[0_0_12px_rgba(255,69,0,0.4)]",
                         completed && !isActive && "bg-orange-100 text-international-orange",
                         !isActive && !completed && "bg-muted text-muted-foreground",
                       )}
                     >
-                      {completed && !isActive ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                      {completed && !isActive ? <CheckCircle2 className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
                     </div>
                     <span
                       className={cn(
@@ -294,11 +294,11 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                 ) : (
                   <button
                     onClick={() => setPreviewStageId(stage.id)}
-                    className="flex flex-col items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity"
+                    className="flex flex-col items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"
                     aria-label={`${stage.label} (locked — click for preview)`}
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50">
-                      <Icon className="h-4 w-4" />
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground/50">
+                      <Icon className="h-5 w-5" />
                     </div>
                     <span className="text-xs font-medium text-muted-foreground/50 whitespace-nowrap">
                       <span className="sm:hidden">{stage.mobileLabel}</span>
