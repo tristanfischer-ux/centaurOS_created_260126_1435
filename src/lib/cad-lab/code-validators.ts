@@ -14,6 +14,127 @@
 
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
 
+// ─── R4: Python Syntax Guard ─────────────────────────────────────────
+
+/**
+ * Pre-Modal syntax checks that catch issues which waste expensive Modal runs.
+ *
+ * Check 1: Bracket balance — unmatched `(`, `[`, `{` (skips strings/comments)
+ * Check 2: Missing `import cadquery as cq`
+ *
+ * @param pythonCode - Generated CadQuery Python code
+ * @returns Validation results (critical for syntax issues)
+ */
+export function checkPythonSyntax(
+  pythonCode: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+
+  // ── Check 1: Bracket balance ──
+  const openBrackets = "([{"
+  const closeBrackets = ")]}"
+  const stack: { char: string; line: number }[] = []
+  const lines = pythonCode.split("\n")
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx]
+    let i = 0
+    while (i < line.length) {
+      const ch = line[i]
+
+      // Skip comments (rest of line after #)
+      if (ch === "#") break
+
+      // Skip strings (single, double, triple-quoted)
+      if (ch === '"' || ch === "'") {
+        const triple = line.slice(i, i + 3)
+        if (triple === '"""' || triple === "'''") {
+          // Triple-quoted string — scan for closing triple
+          const closer = triple
+          const j = i + 3
+          let found = false
+          // Search within current line first
+          const closeIdx = line.indexOf(closer, j)
+          if (closeIdx >= 0) {
+            i = closeIdx + 3
+            found = true
+          }
+          if (!found) {
+            // Triple-quote spans multiple lines — skip to end of line
+            // (conservative: we won't track brackets inside multi-line strings)
+            break
+          }
+          continue
+        }
+        // Single-quoted string — find matching close on same line
+        const quote = ch
+        let j = i + 1
+        while (j < line.length) {
+          if (line[j] === "\\" && j + 1 < line.length) {
+            j += 2 // skip escaped char
+            continue
+          }
+          if (line[j] === quote) {
+            j++
+            break
+          }
+          j++
+        }
+        i = j
+        continue
+      }
+
+      const openIdx = openBrackets.indexOf(ch)
+      if (openIdx >= 0) {
+        stack.push({ char: ch, line: lineIdx + 1 })
+        i++
+        continue
+      }
+
+      const closeIdx = closeBrackets.indexOf(ch)
+      if (closeIdx >= 0) {
+        if (stack.length === 0 || stack[stack.length - 1].char !== openBrackets[closeIdx]) {
+          results.push({
+            ruleId: "syntax-unmatched-bracket",
+            severity: "critical",
+            message: `Unmatched closing '${ch}' on line ${lineIdx + 1}`,
+            repairHint: `Remove the unmatched '${ch}' on line ${lineIdx + 1}, or add the corresponding opening bracket.`,
+          })
+          i++
+          continue
+        }
+        stack.pop()
+        i++
+        continue
+      }
+
+      i++
+    }
+  }
+
+  // Any remaining open brackets are unclosed
+  for (const open of stack) {
+    results.push({
+      ruleId: "syntax-unclosed-bracket",
+      severity: "critical",
+      message: `Unclosed '${open.char}' opened on line ${open.line}`,
+      repairHint: `Add the matching closing bracket for '${open.char}' opened on line ${open.line}.`,
+    })
+  }
+
+  // ── Check 2: Missing cadquery import ──
+  if (!/import\s+cadquery|from\s+cadquery/.test(pythonCode)) {
+    results.push({
+      ruleId: "syntax-missing-cq-import",
+      severity: "critical",
+      message: `Missing "import cadquery as cq" — code will fail on Modal`,
+      repairHint: `Add "import cadquery as cq" at the top of the script.`,
+    })
+  }
+
+  return results
+}
+
 // ─── #3: Parametric Integrity Scanner ────────────────────────────────
 
 /**
