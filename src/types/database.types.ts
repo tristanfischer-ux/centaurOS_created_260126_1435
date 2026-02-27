@@ -3783,6 +3783,7 @@ export type Database = {
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
+          interface_contracts: Json | null
           interface_definition: string | null
           model_id: string
           modules: Json | null
@@ -3812,6 +3813,7 @@ export type Database = {
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
+          interface_contracts?: Json | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null
@@ -3841,6 +3843,7 @@ export type Database = {
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
+          interface_contracts?: Json | null
           interface_definition?: string | null
           model_id?: string
           modules?: Json | null

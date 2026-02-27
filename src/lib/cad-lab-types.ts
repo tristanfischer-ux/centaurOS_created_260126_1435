@@ -92,6 +92,35 @@ export interface DimensionEstimate {
   unresolvedVars: string[]
 }
 
+// ─── Interface Contract Types (P1) ───────────────────────────────────
+
+/** Port type classification for module interface connections */
+export type InterfacePortType = "power" | "data" | "mechanical" | "thermal" | "fluid" | "optical" | "other"
+
+/** A single validated connection between two module ports */
+export interface InterfaceContract {
+  sourceModuleId: string
+  sourcePort: string
+  targetModuleId: string
+  targetPort: string
+  portType: InterfacePortType
+  sourceSpec?: string
+  targetSpec?: string
+  compatible: boolean | null
+  incompatibilityReason?: string
+}
+
+/** Result from interface contract extraction and validation */
+export interface InterfaceContractResult {
+  contracts: InterfaceContract[]
+  unmatchedOutputs: Array<{ moduleId: string; portName: string }>
+  unmatchedInputs: Array<{ moduleId: string; portName: string }>
+  warnings: string[]
+  extractionTimeMs: number
+  tokensIn: number
+  tokensOut: number
+}
+
 // ─── Early Cost Estimation Types (P9) ────────────────────────────────
 
 /** Parsed component from an interface definition's Component Placement Table */
@@ -200,6 +229,10 @@ export interface CadLabResult {
   firstAttemptSuccess?: boolean
   /** Pre-execution validation results from deterministic validators */
   preExecValidation?: PreExecValidationResult[]
+  /** P2: Vision-based render quality score (1-10) */
+  visionScore?: number
+  /** P2: Issues identified by vision scoring */
+  visionIssues?: string[]
   /** Slug of the step_template used as seed geometry (if any) */
   seedTemplateSlug?: string
   /** Normalised match score of the seed template (0–1) */

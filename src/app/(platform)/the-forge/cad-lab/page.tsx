@@ -55,6 +55,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
     revealedModuleIds,
+    interfaceContracts, isExtractingContracts,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines,
     checkpoints, isCheckpointing,
@@ -278,7 +279,13 @@ export default function CadLabResearchPage(): React.ReactNode {
               />
 
               {/* Process flow — how modules connect via inputs and outputs */}
-              <ProcessFlowDiagram modules={modules} onModuleClick={handleModuleClick} />
+              {isExtractingContracts && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
+                  Extracting interface contracts...
+                </p>
+              )}
+              <ProcessFlowDiagram modules={modules} onModuleClick={handleModuleClick} interfaceContracts={interfaceContracts} />
 
               {/* Specialist checkpoint — early feedback before generation */}
               {(isCheckpointing || (checkpoints && Object.keys(checkpoints).length > 0)) && (

@@ -30,10 +30,11 @@ import {
   decomposeIntoModules,
   prefillDiagnostics,
   generateSystemAssembly,
+  extractInterfaceContracts,
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -58,6 +59,7 @@ import type {
   VisualStyleSpec,
   DecompositionCheckpoint,
   EarlyCostEstimate,
+  InterfaceContract,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -206,6 +208,10 @@ export interface CadLabContextValue {
 
   // P9: Early cost estimates (keyed by moduleId)
   earlyCostEstimates: Record<string, EarlyCostEstimate>
+
+  // P1: Interface contracts
+  interfaceContracts: InterfaceContract[]
+  isExtractingContracts: boolean
 
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
@@ -380,6 +386,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // P9: Early cost estimates keyed by moduleId
   const [earlyCostEstimates, setEarlyCostEstimates] = useState<Record<string, EarlyCostEstimate>>({})
+
+  // P1: Interface contracts between modules
+  const [interfaceContracts, setInterfaceContracts] = useState<InterfaceContract[]>([])
+  const [isExtractingContracts, setIsExtractingContracts] = useState(false)
   const [isRevising, setIsRevising] = useState(false)
   const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
@@ -670,6 +680,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           })
           .catch(() => { /* Non-critical */ })
+
+        // P1: Extract interface contracts (non-blocking background task)
+        if (res.modules.length >= 2) {
+          setIsExtractingContracts(true)
+          extractInterfaceContracts(res.modules, editableReport, modelId)
+            .then((contractRes) => {
+              setInterfaceContracts(contractRes.contracts)
+              setIsExtractingContracts(false)
+              if (activeProjectId) {
+                saveCadLabInterfaceContracts(activeProjectId, contractRes)
+                  .catch((e) => console.error("[CAD-LAB] Failed to persist interface contracts:", e))
+              }
+            })
+            .catch((e) => {
+              console.error("[CAD-LAB] Interface contract extraction failed:", e)
+              setIsExtractingContracts(false)
+            })
+        }
 
         // Generate shared visual style for cohesive illustrations (~1-2s),
         // then trigger image generation with it. Non-blocking overall.
@@ -1615,6 +1643,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
       setCheckpoints(p.checkpoints ?? null)
       setProductOverview(p.productOverview ?? "")
+      // P1: Load persisted interface contracts
+      setInterfaceContracts(p.interfaceContracts?.contracts ?? [])
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }
@@ -1789,6 +1819,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
     earlyCostEstimates,
+    interfaceContracts,
+    isExtractingContracts,
     handleDownload,
   }
 

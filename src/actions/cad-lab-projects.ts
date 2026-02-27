@@ -24,6 +24,7 @@ import type {
   CadLabDesignBrief,
   VisualStyleSpec,
   DecompositionCheckpoint,
+  InterfaceContractResult,
 } from "@/lib/cad-lab-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -89,6 +90,9 @@ export interface CadLabProjectData {
 
   /** User-editable product overview (seeded from executive summary) */
   productOverview: string | null
+
+  /** P1: Extracted interface contracts between modules */
+  interfaceContracts: InterfaceContractResult | null
 
   createdAt: string
   updatedAt: string
@@ -195,6 +199,7 @@ export async function loadCadLabProject(
         integratedAssemblyStepUrl: project.integrated_assembly_step_url ?? null,
         checkpoints: (project.checkpoints as Record<string, DecompositionCheckpoint> | null) ?? null,
         productOverview: project.product_overview ?? null,
+        interfaceContracts: (project.interface_contracts as InterfaceContractResult | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -531,6 +536,36 @@ export async function saveCadLabIntegratedAssembly(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save integrated assembly:", error.message)
+      return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── P1: Save Interface Contracts ────────────────────────────────────
+
+/**
+ * Persists extracted interface contracts for a Cad Lab project.
+ *
+ * @param projectId - Project to update
+ * @param contracts - Interface contract extraction result
+ * @returns Success or error
+ */
+export async function saveCadLabInterfaceContracts(
+  projectId: string,
+  contracts: InterfaceContractResult,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ interface_contracts: contracts as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save interface contracts:", error.message)
       return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
     }
 

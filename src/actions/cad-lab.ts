@@ -30,6 +30,8 @@ import type {
   MashupResult,
   MashupExecuteResult,
   MashupSuggestion,
+  InterfaceContractResult,
+  InterfaceContract,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -65,7 +67,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { PreExecValidationResult } from "@/lib/cad-lab-types"
-import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness } from "@/lib/cad-lab/interface-validators"
+import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
 import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 
@@ -2006,6 +2008,118 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       error: sanitizeErrorMessage(error),
       modules: [],
       decompositionTime: Date.now() - start,
+      tokensIn: 0,
+      tokensOut: 0,
+    }
+  }
+}
+
+// ─── P1: Interface Contract Extraction ────────────────────────────────
+
+/**
+ * Extracts interface contracts between modules using Claude.
+ *
+ * @description Analyses module inputs/outputs and asks Claude to identify
+ * which ports connect, their types, specs, and compatibility. Then runs
+ * deterministic validation to find unmatched ports.
+ *
+ * @param modules - Decomposed modules with inputs/outputs
+ * @param researchReport - Research report for additional context
+ * @param modelId - Claude model to use (defaults to Sonnet for cost/speed)
+ * @returns Contract extraction result with contracts, unmatched ports, and warnings
+ */
+export async function extractInterfaceContracts(
+  modules: CadLabModule[],
+  researchReport: string,
+  modelId: ClaudeModelId = "claude-sonnet-4-6",
+): Promise<InterfaceContractResult> {
+  const start = Date.now()
+
+  if (modules.length < 2) {
+    return {
+      contracts: [],
+      unmatchedOutputs: [],
+      unmatchedInputs: [],
+      warnings: ["Need at least 2 modules to extract contracts"],
+      extractionTimeMs: Date.now() - start,
+      tokensIn: 0,
+      tokensOut: 0,
+    }
+  }
+
+  // Build module summary for the prompt
+  const moduleSummary = modules.map((m) => [
+    `## ${m.name} (id: ${m.id})`,
+    `Purpose: ${m.purpose}`,
+    `Inputs: ${m.inputs.length > 0 ? m.inputs.join(", ") : "none"}`,
+    `Outputs: ${m.outputs.length > 0 ? m.outputs.join(", ") : "none"}`,
+  ].join("\n")).join("\n\n")
+
+  const systemPrompt = `You are an engineering systems integration specialist. Analyse the module interfaces and identify which output ports connect to which input ports across modules.
+
+For each connection, determine:
+1. The port type: power, data, mechanical, thermal, fluid, optical, or other
+2. Any specs you can infer (e.g., "24V DC", "M8 bolt pattern", "CAN bus")
+3. Whether the connection appears compatible based on the specs
+
+Return a JSON array of contracts. Each contract:
+{
+  "sourceModuleId": "module-id",
+  "sourcePort": "exact output name",
+  "targetModuleId": "module-id",
+  "targetPort": "exact input name",
+  "portType": "power|data|mechanical|thermal|fluid|optical|other",
+  "sourceSpec": "optional spec string",
+  "targetSpec": "optional spec string",
+  "compatible": true|false|null,
+  "incompatibilityReason": "optional reason if compatible=false"
+}
+
+Rules:
+- Match outputs to inputs across different modules (never within same module)
+- Use the EXACT port names from the module definitions
+- Set compatible=null if you cannot determine compatibility
+- Include ALL plausible connections, even if uncertain
+- Return ONLY the JSON array, no markdown fences or explanation`
+
+  const userPrompt = `Here are the modules to analyse:\n\n${moduleSummary}\n\nResearch context (abbreviated):\n${researchReport.slice(0, 3000)}`
+
+  try {
+    const res = await callClaude(systemPrompt, userPrompt, modelId, 4096)
+
+    // Parse JSON from response (handle potential markdown fences)
+    let jsonText = res.text.trim()
+    const fenceMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+    if (fenceMatch) jsonText = fenceMatch[1].trim()
+
+    const rawContracts = JSON.parse(jsonText) as InterfaceContract[]
+
+    // Validate module IDs exist
+    const moduleIds = new Set(modules.map((m) => m.id))
+    const validContracts = rawContracts.filter(
+      (c) => moduleIds.has(c.sourceModuleId) && moduleIds.has(c.targetModuleId),
+    )
+
+    // Run deterministic validation
+    const validation = validateInterfaceContracts(modules, validContracts)
+
+    return {
+      contracts: validContracts,
+      unmatchedOutputs: validation.unmatchedOutputs,
+      unmatchedInputs: validation.unmatchedInputs,
+      warnings: validation.warnings,
+      extractionTimeMs: Date.now() - start,
+      tokensIn: res.tokensIn,
+      tokensOut: res.tokensOut,
+    }
+  } catch (error) {
+    console.error("[THE-FORGE] Interface contract extraction failed:", error instanceof Error ? error.message : error)
+    return {
+      contracts: [],
+      unmatchedOutputs: [],
+      unmatchedInputs: [],
+      warnings: [`Extraction failed: ${error instanceof Error ? error.message : "Unknown error"}`],
+      extractionTimeMs: Date.now() - start,
       tokensIn: 0,
       tokensOut: 0,
     }

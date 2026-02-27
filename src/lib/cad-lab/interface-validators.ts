@@ -13,7 +13,9 @@
  * @security No auth required — pure computation on provided strings.
  */
 
-import type { PreExecValidationResult } from "@/lib/cad-lab-types"
+import type { PreExecValidationResult, InterfaceContract } from "@/lib/cad-lab-types"
+import type { CadLabModule } from "@/lib/cad-lab-types"
+import { hasKeywordOverlap } from "./keyword-matching"
 
 // ─── #1: Interface Arithmetic Verifier ───────────────────────────────
 
@@ -380,6 +382,82 @@ export function checkInterfaceCompleteness(
   }
 
   return results
+}
+
+// ─── P1: Interface Contract Validator ─────────────────────────────────
+
+/**
+ * Validates interface contracts against module inputs/outputs.
+ *
+ * @description Checks that every module output appears as a source in some
+ * contract and every module input appears as a target. Uses keyword overlap
+ * for fuzzy port name matching when exact match fails.
+ *
+ * @param modules - Array of CAD Lab modules with inputs/outputs
+ * @param contracts - Extracted interface contracts from Claude
+ * @returns Unmatched ports and validation warnings
+ */
+export function validateInterfaceContracts(
+  modules: CadLabModule[],
+  contracts: InterfaceContract[],
+): {
+  unmatchedOutputs: Array<{ moduleId: string; portName: string }>
+  unmatchedInputs: Array<{ moduleId: string; portName: string }>
+  warnings: string[]
+} {
+  const unmatchedOutputs: Array<{ moduleId: string; portName: string }> = []
+  const unmatchedInputs: Array<{ moduleId: string; portName: string }> = []
+  const warnings: string[] = []
+
+  // Check every module output appears as source in some contract
+  for (const mod of modules) {
+    for (const output of mod.outputs) {
+      const hasContract = contracts.some(
+        (c) =>
+          c.sourceModuleId === mod.id &&
+          (c.sourcePort === output || hasKeywordOverlap(c.sourcePort, output)),
+      )
+      if (!hasContract) {
+        unmatchedOutputs.push({ moduleId: mod.id, portName: output })
+      }
+    }
+  }
+
+  // Check every module input appears as target in some contract
+  for (const mod of modules) {
+    for (const input of mod.inputs) {
+      const hasContract = contracts.some(
+        (c) =>
+          c.targetModuleId === mod.id &&
+          (c.targetPort === input || hasKeywordOverlap(c.targetPort, input)),
+      )
+      if (!hasContract) {
+        unmatchedInputs.push({ moduleId: mod.id, portName: input })
+      }
+    }
+  }
+
+  // Warn about incompatible contracts
+  const incompatible = contracts.filter((c) => c.compatible === false)
+  if (incompatible.length > 0) {
+    warnings.push(
+      `${incompatible.length} interface(s) flagged as potentially incompatible: ${incompatible.map((c) => `${c.sourcePort} → ${c.targetPort}`).join(", ")}`,
+    )
+  }
+
+  // Warn about unmatched ports
+  if (unmatchedOutputs.length > 0) {
+    warnings.push(
+      `${unmatchedOutputs.length} module output(s) have no matching contract: ${unmatchedOutputs.map((u) => u.portName).join(", ")}`,
+    )
+  }
+  if (unmatchedInputs.length > 0) {
+    warnings.push(
+      `${unmatchedInputs.length} module input(s) have no matching contract: ${unmatchedInputs.map((u) => u.portName).join(", ")}`,
+    )
+  }
+
+  return { unmatchedOutputs, unmatchedInputs, warnings }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────

@@ -13,7 +13,7 @@
 
 import { useMemo, useState, type KeyboardEvent } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, Box, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
 import { hasKeywordOverlap } from "@/lib/cad-lab/keyword-matching"
 import { cn } from "@/lib/utils"
 import { ForgeSectionHeader } from "../../components/forge-hover-explanations"
@@ -24,6 +24,7 @@ interface ProcessFlowDiagramProps {
   modules: CadLabModule[]
   className?: string
   onModuleClick?: (moduleId: string) => void
+  interfaceContracts?: InterfaceContract[]
 }
 
 interface FlowNode {
@@ -40,6 +41,8 @@ interface FlowEdge {
   to: string
   label?: string
   signalType: SignalType
+  incompatible?: boolean
+  incompatibilityReason?: string
 }
 
 /* ─── Signal type classification ───────────────────────────────────────── */
@@ -113,12 +116,46 @@ function buildEdges(modules: CadLabModule[]): FlowEdge[] {
   return edges
 }
 
+/* ─── Edge building (from interface contracts) ─────────────────────── */
+
+/** Maps InterfacePortType → SignalType for display config. */
+function portTypeToSignalType(portType: string): SignalType {
+  if (portType === "power" || portType === "data" || portType === "mechanical" || portType === "thermal") {
+    return portType as SignalType
+  }
+  return "other"
+}
+
+/**
+ * Builds edges from extracted interface contracts instead of keyword overlap.
+ * Each contract becomes an edge with compatibility status preserved.
+ */
+function buildEdgesFromContracts(contracts: InterfaceContract[]): FlowEdge[] {
+  const edges: FlowEdge[] = []
+  for (const contract of contracts) {
+    const isDuplicate = edges.some(
+      (e) => e.from === contract.sourceModuleId && e.to === contract.targetModuleId && e.label === contract.sourcePort,
+    )
+    if (!isDuplicate) {
+      edges.push({
+        from: contract.sourceModuleId,
+        to: contract.targetModuleId,
+        label: contract.sourcePort,
+        signalType: portTypeToSignalType(contract.portType),
+        incompatible: contract.compatible === false,
+        incompatibilityReason: contract.incompatibilityReason,
+      })
+    }
+  }
+  return edges
+}
+
 /** Number of connections shown in collapsed preview before "Show all" toggle. */
 const PREVIEW_COUNT = 6
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
-export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: ProcessFlowDiagramProps): React.ReactNode {
+export function ProcessFlowDiagram({ modules, className = "", onModuleClick, interfaceContracts }: ProcessFlowDiagramProps): React.ReactNode {
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null)
   const [connectionsExpanded, setConnectionsExpanded] = useState(false)
 
@@ -133,7 +170,13 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
     [modules],
   )
 
-  const edges = useMemo(() => buildEdges(modules), [modules])
+  // INTENT: Use contract-based edges when available, fall back to keyword matching
+  const edges = useMemo(
+    () => interfaceContracts && interfaceContracts.length > 0
+      ? buildEdgesFromContracts(interfaceContracts)
+      : buildEdges(modules),
+    [modules, interfaceContracts],
+  )
 
   /** Set of module IDs connected to the currently hovered module. */
   const hoveredConnections = useMemo(() => {
@@ -211,6 +254,7 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
           <p className="text-sm font-semibold text-foreground">Module integration flow</p>
           <p className="text-xs text-muted-foreground">
             Hover a module to trace its connections &middot; {edges.length} interface{edges.length !== 1 ? "s" : ""} mapped
+            {interfaceContracts && interfaceContracts.length > 0 && " (contract-validated)"}
           </p>
         </div>
       </div>
@@ -389,7 +433,9 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
               )}
             </div>
             <p className="text-[10px] text-muted-foreground mb-3">
-              Matched by shared inputs and outputs between modules
+              {interfaceContracts && interfaceContracts.length > 0
+                ? "Validated via extracted interface contracts"
+                : "Matched by shared inputs and outputs between modules"}
             </p>
 
             {/* Render connections (preview when collapsed, all when expanded) */}
@@ -423,6 +469,7 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
                               isHighlighted && [config.activeBorder, config.activeBg],
                               isEdgeDimmed && "border-border bg-muted/10 opacity-40",
                               !hoveredModuleId && "border-border bg-muted/20 hover:bg-muted/40",
+                              edge.incompatible && "border-destructive/40 bg-destructive/5",
                             )}
                           >
                             <div className="flex items-center gap-2 text-xs">
@@ -438,10 +485,20 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick }: P
                               ) : (
                                 <span className="font-medium text-foreground">{edge.toName}</span>
                               )}
+                              {edge.incompatible && (
+                                <span title={edge.incompatibilityReason ?? "Potentially incompatible interface"}>
+                                  <AlertCircle className="h-3 w-3 text-destructive flex-shrink-0" />
+                                </span>
+                              )}
                             </div>
                             {edge.label && (
                               <p className="text-[10px] text-muted-foreground mt-0.5 ml-7">
                                 {edge.label}
+                              </p>
+                            )}
+                            {edge.incompatible && edge.incompatibilityReason && (
+                              <p className="text-[10px] text-destructive mt-0.5 ml-7">
+                                {edge.incompatibilityReason}
                               </p>
                             )}
                           </div>
