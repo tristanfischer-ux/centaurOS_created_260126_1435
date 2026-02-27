@@ -1860,6 +1860,11 @@ function ModuleResultsView({
           <div className="flex items-center justify-between p-3 border-b">
             <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
               <Box className="h-3.5 w-3.5" /> Views — {moduleName}
+              {result.visionScore != null && (
+                <Badge variant={result.visionScore >= 8 ? "success" : result.visionScore >= 5 ? "warning" : "destructive"} className="ml-1 text-[10px]">
+                  Vision {result.visionScore}/10
+                </Badge>
+              )}
             </p>
             <div className="flex items-center gap-1.5">
               {(result.stepData || result.stepUrl) && (
@@ -1920,6 +1925,22 @@ function ModuleResultsView({
             </Tabs>
           </div>
         </div>
+      )}
+
+      {/* Vision issues */}
+      {result.visionIssues && result.visionIssues.length > 0 && (
+        <details className="border rounded-md p-3">
+          <summary className="text-xs font-medium text-muted-foreground cursor-pointer">
+            Vision issues ({result.visionIssues.length})
+          </summary>
+          <ul className="mt-2 space-y-1">
+            {result.visionIssues.map((issue, i) => (
+              <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
+                <span className="text-destructive mt-0.5">•</span> {issue}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
 
       {/* Metrics */}

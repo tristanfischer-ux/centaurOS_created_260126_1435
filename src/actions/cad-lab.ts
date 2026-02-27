@@ -70,6 +70,7 @@ import type { PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
 import { scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
+import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -1082,6 +1083,8 @@ If the research report or interface definition contains any unresolved questions
     let modalTime = 0
     let repairAttempts = 0
     let lastModalError: string | null = null
+    // P2: Vision score captured in outer scope for return value
+    let visionScoreResult: VisionScoreResult | null = null
     // B3: Track code hashes to detect divergence (same code generated twice = stuck)
     const seenCodeHashes = new Set<string>()
 
@@ -1329,6 +1332,23 @@ ${finalCode}
           })
         }
 
+        // P2: Vision-based render scoring — check if SVG matches description
+        if (modalResult.svg_iso) {
+          const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
+          if (vr) {
+            visionScoreResult = vr
+            if (vr.score < 5) {
+              qualityIssues.push(`Vision score ${vr.score}/10: ${vr.summary}`)
+              allPreExecResults.push({
+                ruleId: "postmodal-vision",
+                severity: "warning",
+                message: `Vision: ${vr.summary}`,
+                repairHint: `The render doesn't match the product description. Missing features: ${vr.issues.join(", ")}`,
+              })
+            }
+          }
+        }
+
         if (qualityIssues.length > 0) {
           lastModalError = qualityIssues.join("; ")
           allPreExecResults.push({
@@ -1497,6 +1517,8 @@ ${finalCode}
       repairAttempts: repairAttempts > 0 ? repairAttempts : undefined,
       firstAttemptSuccess,
       preExecValidation: allPreExecResults.length > 0 ? allPreExecResults : undefined,
+      visionScore: visionScoreResult?.score,
+      visionIssues: visionScoreResult?.issues,
       error: modalResult.error ?? undefined,
     }
   } catch (err) {
