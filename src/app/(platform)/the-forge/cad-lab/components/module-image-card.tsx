@@ -17,7 +17,6 @@
  * - Build detail: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { useState } from "react"
 import { ImageIcon, Loader2 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -85,22 +84,13 @@ function ImageSection({ module }: { module: CadLabModule }): React.ReactNode {
 // ─── Main Component ───────────────────────────────────────────────────
 
 export function ModuleImageCard({ module, onToggleExpand }: ModuleImageCardProps): React.ReactNode {
-  const [imgError, setImgError] = useState(false)
-
   return (
     <Card
       className="overflow-hidden border hover:border-international-orange/30 transition-colors cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] duration-200"
       onClick={onToggleExpand}
     >
       {/* Image */}
-      {!imgError ? (
-        <ImageSection module={module} />
-      ) : (
-        <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-1.5">
-          <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-          <span className="text-xs text-muted-foreground/60">Image unavailable</span>
-        </div>
-      )}
+      <ImageSection module={module} />
 
       {/* Content — name + purpose only */}
       <CardContent className="p-4 space-y-1">

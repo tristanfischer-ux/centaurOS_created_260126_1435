@@ -37,7 +37,7 @@ interface NanoBananaResponse {
   candidates?: Array<{
     content?: {
       parts?: Array<{
-        inline_data?: { mime_type?: string; data?: string }
+        inlineData?: { mimeType?: string; data?: string }
       }>
     }
   }>
@@ -231,9 +231,11 @@ async function callNanoBananaImage(
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: {
-      responseModalities: ["IMAGE"],
-      aspectRatio: toNanoBananaAspectRatio(aspectRatio),
-      imageSize: "2K",
+      responseModalities: ["TEXT", "IMAGE"],
+      imageConfig: {
+        aspectRatio: toNanoBananaAspectRatio(aspectRatio),
+        imageSize: "2K",
+      },
     },
   }
 
@@ -263,17 +265,17 @@ async function callNanoBananaImage(
     throw new Error(`[XRayImageGen] Nano Banana 2 error: ${data.error.message}`)
   }
 
-  // DECISION: Walk candidates[0].content.parts[] to find the first inline_data with image data.
+  // DECISION: Walk candidates[0].content.parts[] to find the first inlineData with image data.
   // Nano Banana 2 may return text parts alongside image parts.
   const parts = data.candidates?.[0]?.content?.parts
-  const imagePart = parts?.find((p) => p.inline_data?.data)
-  const b64Data = imagePart?.inline_data?.data
+  const imagePart = parts?.find((p) => p.inlineData?.data)
+  const b64Data = imagePart?.inlineData?.data
   if (!b64Data) {
     console.error("[XRayImageGen] No image in Nano Banana 2 response:", { candidatesCount: data.candidates?.length ?? 0, partsCount: parts?.length ?? 0 })
     throw new Error("[XRayImageGen] No image data returned from Nano Banana 2")
   }
 
-  const mimeType = imagePart?.inline_data?.mime_type ?? "image/png"
+  const mimeType = imagePart?.inlineData?.mimeType ?? "image/png"
   return { mimeType, data: b64Data }
 }
 

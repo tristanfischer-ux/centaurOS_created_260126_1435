@@ -65,6 +65,9 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleUpdateModule,
   } = useCadLab()
 
+  // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
+  const [heroImgError, setHeroImgError] = useState(false)
+  useEffect(() => { setHeroImgError(false) }, [systemIllustrationUrl])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
@@ -196,13 +199,19 @@ export default function CadLabResearchPage(): React.ReactNode {
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
                     <Card className="overflow-hidden">
                       <div className="aspect-[16/9] w-full bg-muted">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={systemIllustrationUrl}
-                          alt={`System overview: ${subject}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).parentElement!.parentElement!.style.display = "none" }}
-                        />
+                        {heroImgError ? (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                          </div>
+                        ) : (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img
+                            src={systemIllustrationUrl}
+                            alt={`System overview: ${subject}`}
+                            className="w-full h-full object-cover"
+                            onError={() => setHeroImgError(true)}
+                          />
+                        )}
                       </div>
                       <CardContent className="pt-4 pb-4">
                         <h2 className="text-base font-semibold text-foreground">{subject}</h2>
