@@ -132,6 +132,7 @@ export interface CadLabContextValue {
   showSources: boolean
   setShowSources: (v: boolean) => void
   hasResearch: boolean
+  freshResearchRef: React.RefObject<boolean>
   handleResearch: () => Promise<void>
   handleReset: () => void
 
@@ -459,6 +460,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   const productOverviewRef = useRef(productOverview)
   useEffect(() => { productOverviewRef.current = productOverview }, [productOverview])
+
+  // INTENT: Tracks whether research JUST completed in this session (vs loaded from a saved project).
+  // Only set to true at the end of handleResearch — never during handleLoadProject.
+  const freshResearchRef = useRef(false)
 
   const savePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -1524,6 +1529,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           // system illustration is generated with full module context (names + purposes).
           // The image pipeline in handleDecompose already handles: visual style → system
           // illustration (with modules) → module images (referencing hero).
+
+          freshResearchRef.current = true
         }
       }
     } catch (err) {
@@ -1819,7 +1826,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     subject, setSubject, modelId, setModelId,
     designBrief, setDesignBrief, assumptionNotes, setAssumptionNotes, designReadinessPct,
     isResearching, researchResult, editableReport, setEditableReport,
-    showSources, setShowSources, hasResearch,
+    showSources, setShowSources, hasResearch, freshResearchRef,
     handleResearch, handleReset,
     isDecomposing, decompositionError, modules, setModules,
     expandedModuleId, setExpandedModuleId, generatingModuleIds,

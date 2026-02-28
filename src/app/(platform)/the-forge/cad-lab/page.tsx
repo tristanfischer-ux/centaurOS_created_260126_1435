@@ -49,8 +49,8 @@ export default function CadLabResearchPage(): React.ReactNode {
   const {
     subject, setSubject,
     referenceModel,
-    isResearching, editableReport,
-    hasResearch, isAnyLoading,
+    isResearching,
+    hasResearch, isAnyLoading, freshResearchRef,
     handleResearch, handleDecompose,
     modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
@@ -149,6 +149,15 @@ export default function CadLabResearchPage(): React.ReactNode {
     prevModuleCount.current = modules.length
   }, [modules.length, prevModuleCount])
 
+  // INTENT: Auto-trigger decomposition after fresh research completes.
+  // freshResearchRef is only set by handleResearch — loading a saved project won't trigger this.
+  useEffect(() => {
+    if (freshResearchRef.current && hasResearch && modules.length === 0 && !isDecomposing) {
+      freshResearchRef.current = false
+      handleDecompose()
+    }
+  }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose])
+
   // Fall back to research if modules tab is active but no modules exist
   useEffect(() => {
     if (activeTab === "modules" && modules.length === 0) {
@@ -199,8 +208,8 @@ export default function CadLabResearchPage(): React.ReactNode {
           {/* ═══ Research tab ═══ */}
           {activeTab === "research" && (
             <motion.div key="research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-              {/* System overview illustration — only shown once decomposition starts */}
-              {(modules.length > 0 || isDecomposing) && (
+              {/* System overview illustration — visible as soon as research completes */}
+              {hasResearch && (
                 <>
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
                     <Card className="overflow-hidden">
@@ -262,7 +271,50 @@ export default function CadLabResearchPage(): React.ReactNode {
                       </div>
                     </Card>
                   )}
+
+                  {/* Idle placeholder — visible before illustration generation starts */}
+                  {systemIllustrationStatus === "idle" && (
+                    <Card className="overflow-hidden border-dashed border-muted-foreground/20">
+                      <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 text-center px-6">
+                          <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                          <span className="text-sm text-muted-foreground">
+                            {isDecomposing
+                              ? "Mapping sub-assemblies — concept illustration will generate once complete"
+                              : "Waiting for sub-assemblies before generating the concept illustration"}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
                 </>
+              )}
+
+              {/* "View Modules" banner — shown when hero image completes and modules exist */}
+              {systemIllustrationStatus === "complete" && modules.length > 0 && activeTab === "research" && (
+                <Card className="border-international-orange/20 bg-international-orange-light/10">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-international-orange shrink-0" />
+                        <p className="text-sm text-foreground">
+                          {isGeneratingImages
+                            ? `Sub-assembly illustrations are being generated — ${modules.filter(m => m.imageStatus === "complete").length} of ${modules.length} ready`
+                            : `${modules.length} sub-assembly illustrations ready`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 border-international-orange text-international-orange hover:bg-international-orange-light/20"
+                        onClick={() => handleTabClick("modules")}
+                      >
+                        View Modules
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Product overview — always visible after research, editable */}
@@ -271,28 +323,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                   overview={productOverview}
                   onSave={setProductOverview}
                 />
-              )}
-
-              {/* Continue button: triggers decomposition */}
-              {modules.length === 0 && !isDecomposing && !decompositionError && (
-                <Card className="border-international-orange/20">
-                  <CardContent className="pt-6 space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      Research complete. Continue to map sub-assemblies and generate concept illustrations.
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        onClick={handleDecompose}
-                        className="gap-2"
-                        disabled={!editableReport.trim() || isAnyLoading}
-                      >
-                        <Layers className="h-4 w-4" />
-                        Map sub-assemblies
-                      </Button>
-                      <span className="text-xs text-muted-foreground">~10-15s</span>
-                    </div>
-                  </CardContent>
-                </Card>
               )}
 
               {/* Decomposing in progress */}
