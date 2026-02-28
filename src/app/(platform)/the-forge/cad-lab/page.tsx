@@ -294,7 +294,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground/50 mt-1">
-                              Concept illustration will generate once complete
+                              This typically takes 5–10 minutes — feel free to grab a coffee
                             </span>
                           </div>
                         </div>
