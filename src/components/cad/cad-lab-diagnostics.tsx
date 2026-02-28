@@ -50,7 +50,7 @@ import type { CompatibilityStatus } from "@/lib/cad-lab/diagnostic-mappings"
 
 // ─── Diagnostic Questions ───────────────────────────────────────────
 
-interface DiagnosticQuestion {
+export interface DiagnosticQuestion {
   /** Unique question identifier */
   id: string
   /** Short question text */
@@ -71,7 +71,7 @@ interface DiagnosticQuestion {
  * These are universal across all hardware modules and directly
  * inform manufacturing feasibility, supplier matching, and quoting.
  */
-const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
+export const DIAGNOSTIC_QUESTIONS: DiagnosticQuestion[] = [
   {
     id: "mfg_process",
     question: "Primary manufacturing process?",
@@ -360,7 +360,7 @@ function inferEnvironment(text: string): { environment: string; matchedKeywords:
 
 // ─── Inference Result with Reasons ──────────────────────────────────
 
-interface InferenceResult {
+export interface InferenceResult {
   /** Suggested answer value */
   value: string
   /** Human-readable reason for the suggestion */
@@ -382,7 +382,7 @@ interface InferenceResult {
  * @param designBrief - Optional design brief with user-specified targets
  * @returns Record of questionId → suggested answer (string form for backward compat)
  */
-function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief): Record<string, string> {
+export function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief): Record<string, string> {
   const result = inferRecommendationsWithReasons(mod, designBrief)
   const plain: Record<string, string> = {}
   for (const [k, v] of Object.entries(result)) {
@@ -394,7 +394,7 @@ function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief
 /**
  * Full inference with reasons — used for tooltip display.
  */
-function inferRecommendationsWithReasons(
+export function inferRecommendationsWithReasons(
   mod: CadLabModule,
   designBrief?: CadLabDesignBrief,
 ): Record<string, InferenceResult> {

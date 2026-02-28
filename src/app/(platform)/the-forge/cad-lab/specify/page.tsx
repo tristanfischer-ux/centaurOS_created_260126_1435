@@ -7,13 +7,16 @@
  * per-module diagnostics (process, material, tolerance, finish, batch, environment),
  * review interface contracts, get specialist reviews, and unlock the Source stage.
  *
+ * Diagnostics are inlined directly into each module card so users can see
+ * description, key parts, editable diagnostics, contracts, failure modes, and
+ * cost estimates all in one place.
+ *
  * 3 tabs: Overview, Module Specs, Specialist Review.
- * Optional 4th tab (CAD Generation) behind NEXT_PUBLIC_ENABLE_CAD_GENERATION flag.
  *
  * Gate: redirects to /the-forge/cad-lab (Design stage) if no research/modules exist.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -27,7 +30,9 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
-  Pencil,
+  FlaskConical,
+  Lightbulb,
+  Zap,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -35,13 +40,27 @@ import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
+  DIAGNOSTIC_QUESTIONS,
+  inferRecommendations,
+  inferRecommendationsWithReasons,
+} from "@/components/cad/cad-lab-diagnostics"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ModuleFlowCanvas } from "../components/module-flow-canvas"
 import { ProductOverviewCard } from "../components/product-overview-card"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import {
+  getMaterialCompatibilityForProcess,
+  getProcessCompatibilityForMaterial,
+} from "@/lib/cad-lab/diagnostic-mappings"
+import type { CompatibilityStatus } from "@/lib/cad-lab/diagnostic-mappings"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 
@@ -127,15 +146,58 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
 
-  // ── State for programmatically expanding a module in the diagnostics accordion ──
-  const [diagnosticsExpandedModuleId, setDiagnosticsExpandedModuleId] = useState<string | null>(null)
-  const diagnosticsRef = useRef<HTMLDivElement>(null)
+  // ── Diagnostic handlers ──
 
-  const handleEditDiagnostics = useCallback((moduleId: string) => {
-    setDiagnosticsExpandedModuleId(moduleId)
-    // Scroll to the diagnostics section
-    diagnosticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }, [])
+  const handleAnswer = useCallback((moduleId: string, questionId: string, value: string) => {
+    setDiagnosticAnswers((prev: DiagnosticAnswers) => ({
+      ...prev,
+      [moduleId]: { ...(prev[moduleId] || {}), [questionId]: value },
+    }))
+  }, [setDiagnosticAnswers])
+
+  const handleUseRecommended = useCallback((moduleId: string) => {
+    const mod = modules.find((m) => m.id === moduleId)
+    if (!mod) return
+    const recommended = inferRecommendations(mod, designBrief)
+    setDiagnosticAnswers((prev: DiagnosticAnswers) => ({
+      ...prev,
+      [moduleId]: { ...(prev[moduleId] || {}), ...recommended },
+    }))
+  }, [modules, designBrief, setDiagnosticAnswers])
+
+  const handleAutoSelectAll = useCallback(() => {
+    setDiagnosticAnswers((prev: DiagnosticAnswers) => {
+      const updated = { ...prev }
+      for (const mod of modules) {
+        const recommended = inferRecommendations(mod, designBrief)
+        updated[mod.id] = { ...(updated[mod.id] || {}), ...recommended }
+      }
+      return updated
+    })
+  }, [modules, designBrief, setDiagnosticAnswers])
+
+  // ── Diagnostic completion stats ──
+  const diagStats = useMemo(() => {
+    const totalQuestions = DIAGNOSTIC_QUESTIONS.length
+    let totalAnswered = 0
+    let modulesComplete = 0
+    for (const mod of modules) {
+      const modAnswers = diagnosticAnswers[mod.id] || {}
+      const answered = DIAGNOSTIC_QUESTIONS.filter((q) => modAnswers[q.id]?.trim()).length
+      totalAnswered += answered
+      if (answered >= totalQuestions) modulesComplete++
+    }
+    const totalPossible = modules.length * totalQuestions
+    return {
+      totalAnswered,
+      totalPossible,
+      modulesComplete,
+      totalModules: modules.length,
+      completionPct: totalPossible > 0 ? Math.round((totalAnswered / totalPossible) * 100) : 0,
+      isAllComplete: modulesComplete === modules.length && modules.length > 0,
+      hasUnanswered: totalAnswered < totalPossible,
+    }
+  }, [modules, diagnosticAnswers])
 
   // ── Computed: module spec statuses ──
   const moduleStatuses = useMemo(() => {
@@ -361,27 +423,94 @@ export default function SpecifyPage(): React.ReactNode {
         {/* ═══ Module Specs tab ═══ */}
         {activeTab === "specs" && (
           <motion.div key="specs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            {/* Diagnostics form for all modules */}
-            <div ref={diagnosticsRef}>
-              <CadLabDiagnostics
-                modules={modules}
-                answers={diagnosticAnswers}
-                onAnswersChange={setDiagnosticAnswers}
-                aiPrefilled={aiPrefilled}
-                designBrief={designBrief}
-                controlledExpandedModuleId={diagnosticsExpandedModuleId}
-                onControlledExpandClear={() => setDiagnosticsExpandedModuleId(null)}
-              />
+            {/* AI pre-fill banner */}
+            {aiPrefilled && (
+              <div className="flex items-center gap-2 p-2.5 bg-status-info-light rounded text-xs text-status-info-dark">
+                <Zap className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>AI pre-filled answers based on your research. Review and override any that need adjustment.</span>
+              </div>
+            )}
+
+            {/* Diagnostics progress + Auto-select all */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="h-4 w-4 text-international-orange" />
+                  <h2 className="text-sm font-semibold text-foreground">Module Specifications</h2>
+                  {diagStats.isAllComplete ? (
+                    <span className="text-xs font-normal text-status-success flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Complete
+                    </span>
+                  ) : (
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {diagStats.completionPct}% diagnosed
+                    </span>
+                  )}
+                </div>
+                {diagStats.hasUnanswered && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5"
+                    onClick={handleAutoSelectAll}
+                    type="button"
+                  >
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    Auto-select all
+                  </Button>
+                )}
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Answer manufacturing questions per module to unlock accurate
+                supplier matching and contracting. Each module needs{" "}
+                {DIAGNOSTIC_QUESTIONS.length} answers.
+              </p>
+
+              {/* Diagnostics progress bar */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {diagStats.totalAnswered}/{diagStats.totalPossible} answers
+                  </span>
+                  <span>
+                    {diagStats.modulesComplete}/{diagStats.totalModules} modules complete
+                  </span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-500",
+                      diagStats.isAllComplete
+                        ? "bg-status-success"
+                        : diagStats.completionPct > 50
+                          ? "bg-international-orange"
+                          : "bg-muted-foreground",
+                    )}
+                    style={{ width: `${diagStats.completionPct}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Completion banner */}
+              {diagStats.isAllComplete && (
+                <div className="flex items-center gap-2 text-sm text-status-success p-3 bg-status-success-light rounded-lg">
+                  <CheckCircle2 className="h-4 w-4" />
+                  All modules diagnosed. Supply chain matching and contracting are now unlocked.
+                </div>
+              )}
             </div>
 
-            {/* Per-module specification cards */}
+            {/* Per-module specification cards with inline diagnostics */}
             <div className="space-y-4">
-              <h2 className="text-sm font-semibold text-foreground">Per-Module Specifications</h2>
               {modules.map((mod) => {
                 const status = moduleStatuses[mod.id]
                 const isExpanded = expandedModuleId === mod.id
                 const modDiag = diagnosticAnswers[mod.id] ?? {}
                 const costEstimate = earlyCostEstimates[mod.id]
+                const answeredCount = DIAGNOSTIC_QUESTIONS.filter((q) => modDiag[q.id]?.trim()).length
+                const isDiagComplete = answeredCount >= DIAGNOSTIC_QUESTIONS.length
 
                 return (
                   <Card key={mod.id} className={cn(status === "specialist-approved" && "border-success/30")}>
@@ -405,6 +534,13 @@ export default function SpecifyPage(): React.ReactNode {
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-medium text-foreground truncate">{mod.name}</h3>
                           {getSpecStatusBadge(status)}
+                          <span className="text-[10px] text-muted-foreground">
+                            {isDiagComplete ? (
+                              <CheckCircle2 className="h-3 w-3 text-status-success inline" />
+                            ) : (
+                              <>{answeredCount}/{DIAGNOSTIC_QUESTIONS.length}</>
+                            )}
+                          </span>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{mod.purpose}</p>
                       </div>
@@ -416,134 +552,220 @@ export default function SpecifyPage(): React.ReactNode {
                     </button>
 
                     {/* Expanded detail */}
-                    {isExpanded && (
-                      <CardContent className="pt-0 space-y-4 border-t">
-                        {/* Description */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</h4>
-                          <p className="text-sm text-foreground">{mod.description}</p>
-                        </div>
+                    {isExpanded && (() => {
+                      const modRecsWithReasons = inferRecommendationsWithReasons(mod, designBrief)
+                      const modRecs: Record<string, string> = {}
+                      for (const [k, v] of Object.entries(modRecsWithReasons)) {
+                        modRecs[k] = v.value
+                      }
 
-                        {/* Key parts */}
-                        <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Parts</h4>
-                          <div className="flex flex-wrap gap-1.5">
-                            {mod.keyParts.map((part) => (
-                              <span key={part} className="text-xs px-2 py-1 rounded-md bg-muted text-foreground">
-                                {part}
-                              </span>
-                            ))}
+                      return (
+                        <CardContent className="pt-0 space-y-4 border-t">
+                          {/* Description */}
+                          <div>
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</h4>
+                            <p className="text-sm text-foreground">{mod.description}</p>
                           </div>
-                        </div>
 
-                        {/* Diagnostic summary */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Manufacturing Diagnostics</h4>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-xs gap-1.5 text-international-orange hover:text-international-orange hover:bg-international-orange/10"
-                              onClick={() => handleEditDiagnostics(mod.id)}
-                            >
-                              <Pencil className="h-3 w-3" />
-                              Edit diagnostics
-                            </Button>
+                          {/* Key parts */}
+                          <div>
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Parts</h4>
+                            <div className="flex flex-wrap gap-1.5">
+                              {mod.keyParts.map((part) => (
+                                <span key={part} className="text-xs px-2 py-1 rounded-md bg-muted text-foreground">
+                                  {part}
+                                </span>
+                              ))}
+                            </div>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            {[
-                              { key: "mfg_process", label: "Process" },
-                              { key: "material", label: "Material" },
-                              { key: "tolerance", label: "Tolerance" },
-                              { key: "finish", label: "Finish" },
-                              { key: "batch_size", label: "Batch Size" },
-                              { key: "environment", label: "Environment" },
-                            ].map(({ key, label }) => (
-                              <div key={key} className="text-xs">
-                                <span className="text-muted-foreground">{label}: </span>
-                                <span className={cn("font-medium", modDiag[key] ? "text-foreground" : "text-destructive")}>
-                                  {modDiag[key] || "Not set"}
+
+                          {/* ── Inline Manufacturing Diagnostics ── */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                                <FlaskConical className="h-3.5 w-3.5" />
+                                Manufacturing Diagnostics
+                                {isDiagComplete ? (
+                                  <CheckCircle2 className="h-3 w-3 text-status-success" />
+                                ) : (
+                                  <span className="text-[10px] font-normal text-muted-foreground">
+                                    {answeredCount}/{DIAGNOSTIC_QUESTIONS.length}
+                                  </span>
+                                )}
+                              </h4>
+                              {!isDiagComplete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-xs text-international-orange hover:text-international-orange hover:bg-international-orange/10 gap-1.5"
+                                  onClick={() => handleUseRecommended(mod.id)}
+                                  type="button"
+                                >
+                                  <Lightbulb className="h-3.5 w-3.5" />
+                                  Use suggested answers
+                                </Button>
+                              )}
+                            </div>
+
+                            <div className="space-y-5 bg-muted/10 rounded-md p-4">
+                              {DIAGNOSTIC_QUESTIONS.map((q) => {
+                                const currentAnswer = modDiag[q.id]
+
+                                // INTENT: Compute compatibility map for cross-question guidance
+                                let compatMap: Record<string, CompatibilityStatus> | null = null
+                                if (q.id === "material" && modDiag.mfg_process) {
+                                  compatMap = getMaterialCompatibilityForProcess(modDiag.mfg_process)
+                                } else if (q.id === "mfg_process" && modDiag.material) {
+                                  compatMap = getProcessCompatibilityForMaterial(modDiag.material)
+                                }
+
+                                return (
+                                  <div key={q.id} className="space-y-2">
+                                    <div>
+                                      <p className="text-sm font-medium text-foreground">
+                                        {q.question}
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        {q.hint}
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {q.options.map((opt) => {
+                                        const isSelected = currentAnswer === opt
+                                        const isSuggested = modRecs[q.id] === opt
+                                        const compat = compatMap?.[opt]
+                                        const isIncompat = compat === "incompatible" && !isSelected
+
+                                        // Build tooltip text with compatibility note + suggestion reason
+                                        let tooltipText = q.optionDescriptions[opt] ?? opt
+                                        if (isIncompat) {
+                                          const crossField = q.id === "material"
+                                            ? modDiag.mfg_process
+                                            : modDiag.material
+                                          tooltipText += ` — Not typically used with ${crossField}`
+                                        }
+                                        if (isSuggested && modRecsWithReasons[q.id]?.reason) {
+                                          tooltipText += ` — Suggested: ${modRecsWithReasons[q.id].reason}`
+                                        }
+
+                                        return (
+                                          <Tooltip key={opt}>
+                                            <TooltipTrigger asChild>
+                                              <Button
+                                                variant={isSelected ? "default" : "outline"}
+                                                size="sm"
+                                                className={cn(
+                                                  "text-xs h-7",
+                                                  !isSelected && isSuggested &&
+                                                    "ring-1 ring-international-orange/40",
+                                                  isIncompat && "opacity-40",
+                                                )}
+                                                onClick={() => handleAnswer(mod.id, q.id, opt)}
+                                                type="button"
+                                              >
+                                                {isIncompat && (
+                                                  <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
+                                                )}
+                                                {!isIncompat && !isSelected && isSuggested && (
+                                                  <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
+                                                )}
+                                                {opt}
+                                              </Button>
+                                            </TooltipTrigger>
+                                            <TooltipContent
+                                              side="bottom"
+                                              className="max-w-[250px] z-[300]"
+                                            >
+                                              <p className="text-xs leading-relaxed">
+                                                {tooltipText}
+                                              </p>
+                                            </TooltipContent>
+                                          </Tooltip>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Interface contracts for this module */}
+                          {interfaceContracts.length > 0 && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Interface Contracts</h4>
+                              <div className="space-y-1">
+                                {interfaceContracts
+                                  .filter((c) => c.sourceModuleId === mod.id || c.targetModuleId === mod.id)
+                                  .map((contract, i) => {
+                                    const isSource = contract.sourceModuleId === mod.id
+                                    const otherModuleName = modules.find(
+                                      (m) => m.id === (isSource ? contract.targetModuleId : contract.sourceModuleId),
+                                    )?.name ?? "Unknown"
+                                    return (
+                                      <div key={i} className="text-xs flex items-center gap-1.5">
+                                        <span className={cn(
+                                          "h-2 w-2 rounded-full",
+                                          contract.compatible === true ? "bg-success" : contract.compatible === false ? "bg-destructive" : "bg-muted-foreground",
+                                        )} />
+                                        <span className="text-muted-foreground">
+                                          {isSource ? `${contract.sourcePort} → ${otherModuleName}` : `${otherModuleName} → ${contract.targetPort}`}
+                                        </span>
+                                        <span className="text-muted-foreground/60">({contract.portType})</span>
+                                      </div>
+                                    )
+                                  })}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Failure modes + unknowns */}
+                          {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
+                            <div className="grid sm:grid-cols-2 gap-3">
+                              {mod.failureModes.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</h4>
+                                  <ul className="space-y-0.5">
+                                    {mod.failureModes.map((fm, i) => (
+                                      <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                        <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0 mt-0.5" />
+                                        {fm}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {mod.unknowns.length > 0 && (
+                                <div>
+                                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Open Questions</h4>
+                                  <ul className="space-y-0.5">
+                                    {mod.unknowns.map((u, i) => (
+                                      <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
+                                        <FileText className="h-3 w-3 text-info flex-shrink-0 mt-0.5" />
+                                        {u}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Early cost estimate */}
+                          {costEstimate && (
+                            <div>
+                              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Early Cost Estimate</h4>
+                              <div className="text-xs text-foreground">
+                                <span className="font-mono">${costEstimate.totalLow.toFixed(0)} – ${costEstimate.totalHigh.toFixed(0)}</span>
+                                <span className="text-muted-foreground ml-1">
+                                  ({costEstimate.confidence} confidence, {costEstimate.material})
                                 </span>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Interface contracts for this module */}
-                        {interfaceContracts.length > 0 && (
-                          <div>
-                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Interface Contracts</h4>
-                            <div className="space-y-1">
-                              {interfaceContracts
-                                .filter((c) => c.sourceModuleId === mod.id || c.targetModuleId === mod.id)
-                                .map((contract, i) => {
-                                  const isSource = contract.sourceModuleId === mod.id
-                                  const otherModuleName = modules.find(
-                                    (m) => m.id === (isSource ? contract.targetModuleId : contract.sourceModuleId),
-                                  )?.name ?? "Unknown"
-                                  return (
-                                    <div key={i} className="text-xs flex items-center gap-1.5">
-                                      <span className={cn(
-                                        "h-2 w-2 rounded-full",
-                                        contract.compatible === true ? "bg-success" : contract.compatible === false ? "bg-destructive" : "bg-muted-foreground",
-                                      )} />
-                                      <span className="text-muted-foreground">
-                                        {isSource ? `${contract.sourcePort} → ${otherModuleName}` : `${otherModuleName} → ${contract.targetPort}`}
-                                      </span>
-                                      <span className="text-muted-foreground/60">({contract.portType})</span>
-                                    </div>
-                                  )
-                                })}
                             </div>
-                          </div>
-                        )}
-
-                        {/* Failure modes + unknowns */}
-                        {(mod.failureModes.length > 0 || mod.unknowns.length > 0) && (
-                          <div className="grid sm:grid-cols-2 gap-3">
-                            {mod.failureModes.length > 0 && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</h4>
-                                <ul className="space-y-0.5">
-                                  {mod.failureModes.map((fm, i) => (
-                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                                      <AlertTriangle className="h-3 w-3 text-warning flex-shrink-0 mt-0.5" />
-                                      {fm}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                            {mod.unknowns.length > 0 && (
-                              <div>
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Open Questions</h4>
-                                <ul className="space-y-0.5">
-                                  {mod.unknowns.map((u, i) => (
-                                    <li key={i} className="text-xs text-foreground flex items-start gap-1.5">
-                                      <FileText className="h-3 w-3 text-info flex-shrink-0 mt-0.5" />
-                                      {u}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Early cost estimate */}
-                        {costEstimate && (
-                          <div>
-                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Early Cost Estimate</h4>
-                            <div className="text-xs text-foreground">
-                              <span className="font-mono">${costEstimate.totalLow.toFixed(0)} – ${costEstimate.totalHigh.toFixed(0)}</span>
-                              <span className="text-muted-foreground ml-1">
-                                ({costEstimate.confidence} confidence, {costEstimate.material})
-                              </span>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    )}
+                          )}
+                        </CardContent>
+                      )
+                    })()}
                   </Card>
                 )
               })}
@@ -600,7 +822,7 @@ export default function SpecifyPage(): React.ReactNode {
               <Card className="border-border">
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">
-                    Complete diagnostics above to continue.
+                    Complete diagnostics for each module to continue.
                   </p>
                 </CardContent>
               </Card>

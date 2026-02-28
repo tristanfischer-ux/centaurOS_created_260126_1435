@@ -28,7 +28,6 @@ import {
   PoundSterling,
   ChevronDown,
   ChevronRight,
-  AlertTriangle,
   Info,
   Pencil,
   RotateCcw,
@@ -44,6 +43,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  LabelList,
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -225,7 +225,6 @@ export function CadLabCostEstimate({
   const totalProcessCost = costs.reduce((sum, c) => sum + c.processCost, 0)
   const totalToolingCost = costs.reduce((sum, c) => sum + c.toolingCostPerUnit, 0)
   const maxBatch = Math.max(...costs.map((c) => c.batchSize), 1)
-  const hasAnyEstimates = costs.some((c) => c.isEstimated)
   const hasDiagnostics = Object.keys(diagnosticAnswers).length > 0
 
   if (!hasDiagnostics) {
@@ -270,13 +269,6 @@ export function CadLabCostEstimate({
 
       {isExpanded && (
         <CardContent className="space-y-4">
-          {hasAnyEstimates && (
-            <div className="flex items-start gap-2 p-3 bg-status-warning-light rounded text-xs text-status-warning-dark">
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-              <span>Some modules use keyword-estimated mass. Generate CAD for more accurate costs.</span>
-            </div>
-          )}
-
           {/* ── Charts ── */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Cost breakdown donut */}
@@ -324,7 +316,7 @@ export function CadLabCostEstimate({
             {costs.length > 0 && (
               <div className="p-4 border rounded-lg">
                 <p className="text-xs font-semibold text-foreground mb-3">Cost by Module</p>
-                <div className="h-[180px]">
+                <div style={{ height: Math.max(180, costs.length * 28 + 20) }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={costs
@@ -334,8 +326,8 @@ export function CadLabCostEstimate({
                           const num = moduleIndexMap.get(c.moduleId) ?? 0
                           const label = `${num}. ${c.moduleName}`
                           return {
-                            name: label.length > 18
-                              ? `${label.slice(0, 16)}…`
+                            name: label.length > 26
+                              ? `${label.slice(0, 24)}…`
                               : label,
                             material: c.materialCost,
                             process: c.processCost,
@@ -343,7 +335,7 @@ export function CadLabCostEstimate({
                           }
                         })}
                       layout="vertical"
-                      margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+                      margin={{ top: 0, right: 60, left: 0, bottom: 0 }}
                     >
                       <XAxis type="number" hide />
                       <YAxis
@@ -352,12 +344,33 @@ export function CadLabCostEstimate({
                         axisLine={false}
                         tickLine={false}
                         tick={{ fontSize: 10 }}
-                        width={80}
+                        width={120}
                       />
                       <Tooltip content={<ModuleBarTooltip />} cursor={{ fill: "hsl(var(--muted))" }} />
                       <Bar dataKey="material" stackId="cost" fill={COLOR_MATERIAL} radius={[0, 0, 0, 0]} barSize={14} name="Material" />
                       <Bar dataKey="process" stackId="cost" fill={COLOR_PROCESS} radius={[0, 0, 0, 0]} barSize={14} name="Processing" />
-                      <Bar dataKey="tooling" stackId="cost" fill={COLOR_TOOLING} radius={[0, 4, 4, 0]} barSize={14} name="Tooling" />
+                      <Bar dataKey="tooling" stackId="cost" fill={COLOR_TOOLING} radius={[0, 4, 4, 0]} barSize={14} name="Tooling">
+                        <LabelList
+                          content={({ x, y, width: w, height: h, ...entry }) => {
+                            const d = entry as unknown as { material: number; process: number; tooling: number }
+                            const total = (d.material ?? 0) + (d.process ?? 0) + (d.tooling ?? 0)
+                            if (total <= 0) return null
+                            return (
+                              <text
+                                x={(x as number) + (w as number) + 4}
+                                y={(y as number) + (h as number) / 2}
+                                textAnchor="start"
+                                dominantBaseline="central"
+                                className="fill-muted-foreground"
+                                fontSize={10}
+                                fontFamily="monospace"
+                              >
+                                {formatCurrency(total)}
+                              </text>
+                            )
+                          }}
+                        />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
