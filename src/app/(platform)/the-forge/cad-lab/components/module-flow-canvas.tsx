@@ -2,8 +2,8 @@
  * @file module-flow-canvas.tsx — Interactive React Flow canvas for CAD module flow.
  *
  * @description Renders draggable module nodes connected by signal-typed arrow edges
- * in a left-to-right topological layout. Replaces the static grid view from
- * ProcessFlowDiagram with a true graph visualisation for the CAD stage.
+ * in a left-to-right topological layout. Each edge connects a specific output port
+ * to a specific input port with animated, color-coded dashes. Includes fullscreen mode.
  *
  * FLOW: cad/page.tsx → ModuleFlowCanvas → ReactFlowProvider → ModuleFlowCanvasInner
  *
@@ -28,10 +28,14 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
+  type EdgeProps,
 } from "@xyflow/react"
-import { LayoutGrid, AlertCircle } from "lucide-react"
+import { LayoutGrid, Maximize2, Minimize2, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
@@ -48,9 +52,90 @@ import "@xyflow/react/dist/style.css"
 /* ─── Layout constants ─────────────────────────────────────────────────── */
 
 const NODE_WIDTH = 220
-const NODE_HEIGHT = 160
-const NODE_GAP_X = 80
-const NODE_GAP_Y = 40
+const NODE_GAP_X = 160
+const NODE_GAP_Y = 60
+const PORT_ROW_H = 22
+
+/**
+ * Estimate node height based on port count.
+ * Header (~48px) + separator (1px) + input section + output section + footer (~24px) + padding
+ */
+function estimateNodeHeight(inputCount: number, outputCount: number): number {
+  const headerH = 52
+  const separatorH = 1
+  const inputSectionH = inputCount > 0 ? 18 + inputCount * PORT_ROW_H + 4 : 0
+  const outputSectionH = outputCount > 0 ? 18 + outputCount * PORT_ROW_H + 6 : 0
+  const footerH = 24
+  return headerH + separatorH + inputSectionH + outputSectionH + footerH
+}
+
+/* ─── Custom labeled flow edge ─────────────────────────────────────────── */
+
+function LabeledFlowEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+  markerEnd,
+  style,
+}: EdgeProps) {
+  const edgeData = data as { label?: string; strokeColor?: string } | undefined
+  const strokeColor = edgeData?.strokeColor ?? "hsl(var(--chart-5))"
+  const label = edgeData?.label
+
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    borderRadius: 12,
+  })
+
+  // Truncate label for display
+  const truncatedLabel = label && label.length > 24
+    ? label.slice(0, 22) + "\u2026"
+    : label
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{
+          ...style,
+          stroke: strokeColor,
+          strokeWidth: 3,
+        }}
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            title={label}
+            className="nodrag nopan pointer-events-auto"
+            style={{
+              position: "absolute",
+              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            }}
+          >
+            <span
+              className="text-[9px] text-foreground bg-background rounded px-1.5 py-0.5 whitespace-nowrap border border-border shadow-sm"
+              style={{ borderLeftColor: strokeColor, borderLeftWidth: 3 }}
+            >
+              {truncatedLabel}
+            </span>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
+}
 
 /* ─── Topological layout engine (LR) ──────────────────────────────────── */
 
@@ -128,20 +213,39 @@ function getLayoutedElements(
     rankGroups.get(r)!.push(n.id)
   }
 
-  // Position: LR layout — rank determines x (column), index determines y (row)
-  const maxNodesInRank = Math.max(...Array.from(rankGroups.values()).map((g) => g.length))
-  const totalHeight = maxNodesInRank * (NODE_HEIGHT + NODE_GAP_Y) - NODE_GAP_Y
+  // Build a height lookup from node data
+  const nodeHeights = new Map<string, number>()
+  for (const n of nodes) {
+    const d = n.data as ModuleNodeData
+    nodeHeights.set(n.id, estimateNodeHeight(d.inputCount, d.outputCount))
+  }
+
+  // Position: LR layout — rank determines x (column), stack nodes vertically with dynamic heights
   const posMap = new Map<string, { x: number; y: number }>()
 
+  // First pass: compute total column heights to center them
+  const colHeights = new Map<number, number>()
   for (const [r, ids] of rankGroups) {
-    const colHeight = ids.length * (NODE_HEIGHT + NODE_GAP_Y) - NODE_GAP_Y
-    const offsetY = (totalHeight - colHeight) / 2
+    let totalH = 0
+    for (const id of ids) {
+      totalH += nodeHeights.get(id) ?? 160
+    }
+    totalH += (ids.length - 1) * NODE_GAP_Y
+    colHeights.set(r, totalH)
+  }
+  const maxColHeight = Math.max(...Array.from(colHeights.values()))
 
-    for (let i = 0; i < ids.length; i++) {
-      posMap.set(ids[i], {
+  for (const [r, ids] of rankGroups) {
+    const colHeight = colHeights.get(r) ?? 0
+    const offsetY = (maxColHeight - colHeight) / 2
+    let y = offsetY
+
+    for (const id of ids) {
+      posMap.set(id, {
         x: r * (NODE_WIDTH + NODE_GAP_X),
-        y: offsetY + i * (NODE_HEIGHT + NODE_GAP_Y),
+        y,
       })
+      y += (nodeHeights.get(id) ?? 160) + NODE_GAP_Y
     }
   }
 
@@ -153,9 +257,10 @@ function getLayoutedElements(
   return { nodes: layoutedNodes, edges }
 }
 
-/* ─── Node type registry ───────────────────────────────────────────────── */
+/* ─── Node & edge type registries ──────────────────────────────────────── */
 
 const nodeTypes = { module: ModuleNode }
+const edgeTypes = { labeledFlow: LabeledFlowEdge }
 
 /* ─── Props ────────────────────────────────────────────────────────────── */
 
@@ -198,15 +303,15 @@ function buildNodesAndEdges(
     connectedIds.add(e.to)
   }
 
-  // Build React Flow nodes
+  // Build React Flow nodes — pass ALL inputs/outputs for port-level handles
   const rfNodes: Node[] = modules.map((m) => {
     const counts = connectionCounts.get(m.id) ?? { receivesFrom: 0, feedsTo: 0 }
     const nodeData: ModuleNodeData = {
       label: m.name,
       purpose: m.purpose,
       status: m.status,
-      inputs: m.inputs.slice(0, 3),
-      outputs: m.outputs.slice(0, 3),
+      inputs: m.inputs,
+      outputs: m.outputs,
       inputCount: m.inputs.length,
       outputCount: m.outputs.length,
       receivesFrom: counts.receivesFrom,
@@ -223,25 +328,32 @@ function buildNodesAndEdges(
     }
   })
 
-  // Build React Flow edges
+  // Build React Flow edges — port-level handles + always animated + color-coded
   const rfEdges: Edge[] = flowEdges.map((e, idx) => {
     const config = SIGNAL_CONFIG[e.signalType]
-    const isAnimated = generatingModuleIds.has(e.from) || generatingModuleIds.has(e.to)
+    const strokeColor = e.incompatible ? "hsl(var(--destructive))" : config.strokeHsl
 
     return {
       id: `edge-${idx}-${e.from}-${e.to}`,
       source: e.from,
       target: e.to,
-      type: "smoothstep",
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle,
+      type: "labeledFlow",
+      data: {
+        label: e.label,
+        strokeColor,
+      },
       style: {
-        stroke: e.incompatible ? "hsl(var(--destructive))" : config.strokeHsl,
-        strokeWidth: 2,
         strokeDasharray: e.incompatible ? "5 5" : undefined,
       },
-      animated: isAnimated,
-      label: e.label,
-      labelStyle: { fontSize: 10 },
-      markerEnd: { type: MarkerType.ArrowClosed },
+      animated: true,
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        width: 20,
+        height: 20,
+        color: strokeColor,
+      },
     }
   })
 
@@ -257,7 +369,8 @@ function ModuleFlowCanvasInner({
   interfaceContracts,
   generatingModuleIds = new Set(),
   tidyKey,
-}: ModuleFlowCanvasProps & { tidyKey: number }) {
+  isFullscreen,
+}: ModuleFlowCanvasProps & { tidyKey: number; isFullscreen: boolean }) {
   const { fitView } = useReactFlow()
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(
@@ -288,7 +401,7 @@ function ModuleFlowCanvasInner({
       // Full re-layout
       setNodes(layoutedNodes)
       setEdges(layoutedEdges)
-      setTimeout(() => fitView({ padding: 0.3 }), 100)
+      setTimeout(() => fitView({ padding: isFullscreen ? 0.15 : 0.2 }), 100)
     } else {
       // Preserve user-dragged positions, update data only
       setNodes((currentNodes) => {
@@ -302,6 +415,12 @@ function ModuleFlowCanvasInner({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutedNodes, layoutedEdges, tidyKey])
+
+  // Re-fit when toggling fullscreen
+  useEffect(() => {
+    setTimeout(() => fitView({ padding: isFullscreen ? 0.15 : 0.2 }), 150)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullscreen])
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -331,11 +450,12 @@ function ModuleFlowCanvasInner({
       onEdgesChange={onEdgesChange}
       onNodeClick={handleNodeClick}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       fitView
-      fitViewOptions={{ padding: 0.3 }}
+      fitViewOptions={{ padding: isFullscreen ? 0.15 : 0.2 }}
       proOptions={{ hideAttribution: true }}
-      minZoom={0.3}
-      maxZoom={1.5}
+      minZoom={0.2}
+      maxZoom={2}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
       <Controls showInteractive={false} />
@@ -344,7 +464,7 @@ function ModuleFlowCanvasInner({
   )
 }
 
-/* ─── Outer component (header, legend, orphan callout, tidy) ───────────── */
+/* ─── Outer component (header, legend, orphan callout, tidy, fullscreen) ── */
 
 export function ModuleFlowCanvas({
   modules,
@@ -354,6 +474,17 @@ export function ModuleFlowCanvas({
   generatingModuleIds = new Set(),
 }: ModuleFlowCanvasProps): React.ReactNode {
   const [tidyKey, setTidyKey] = useState(0)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  // Escape key exits fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setIsFullscreen(false)
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [isFullscreen])
 
   // Compute edges for header stats and legend
   const flowEdges = useMemo(
@@ -379,8 +510,14 @@ export function ModuleFlowCanvas({
     return modules.filter((m) => !connectedIds.has(m.id))
   }, [flowEdges, modules])
 
-  return (
-    <div className={cn("rounded-lg border border-border bg-card overflow-hidden", className)}>
+  const content = (
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card overflow-hidden",
+        isFullscreen && "fixed inset-0 z-50 rounded-none",
+        !isFullscreen && className,
+      )}
+    >
       {/* Header with orange accent bar */}
       <div className="border-b border-border">
         <div className="h-1 bg-international-orange/60" />
@@ -393,20 +530,35 @@ export function ModuleFlowCanvas({
               {" \u00B7 "}Drag nodes to rearrange
             </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-xs"
-            onClick={() => setTidyKey((k) => k + 1)}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Tidy up
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setTidyKey((k) => k + 1)}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Tidy up
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-xs"
+              onClick={() => setIsFullscreen((f) => !f)}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+              {isFullscreen ? "Exit" : "Fullscreen"}
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Canvas */}
-      <div className="h-[500px] min-h-[400px]">
+      <div className={isFullscreen ? "flex-1" : "h-[500px] min-h-[400px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
         <ReactFlowProvider>
           <ModuleFlowCanvasInner
             modules={modules}
@@ -414,6 +566,7 @@ export function ModuleFlowCanvas({
             interfaceContracts={interfaceContracts}
             generatingModuleIds={generatingModuleIds}
             tidyKey={tidyKey}
+            isFullscreen={isFullscreen}
           />
         </ReactFlowProvider>
       </div>
@@ -463,4 +616,6 @@ export function ModuleFlowCanvas({
       </div>
     </div>
   )
+
+  return content
 }

@@ -1,9 +1,9 @@
 /**
  * @file module-node.tsx — Custom React Flow node for CAD module flow canvas.
  *
- * @description Renders a compact, draggable module card inside the React Flow
- * canvas. Shows module name, purpose, I/O pills, connection counts, and status.
- * Follows the xray-module-node.tsx pattern (memo-wrapped, Handle components).
+ * @description Renders a module card with per-port handles — every input gets
+ * a left Handle and every output gets a right Handle, enabling edges to connect
+ * to specific ports. Port labels are color-coded pills by signal type.
  *
  * FLOW: module-flow-canvas.tsx registers this as nodeTypes["module"]
  *
@@ -14,13 +14,15 @@
 
 "use client"
 
-import React, { memo } from "react"
+import React, { memo, useRef, useEffect, useState } from "react"
 import { Handle, Position } from "@xyflow/react"
 import { ArrowDownToLine, ArrowUpFromLine, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { NodeProps } from "@xyflow/react"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { SignalType } from "../lib/flow-edge-utils"
+import { classifySignalType, SIGNAL_CONFIG } from "../lib/flow-edge-utils"
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
 
@@ -31,9 +33,9 @@ export interface ModuleNodeData {
   purpose: string
   /** Module pipeline status */
   status: CadLabModule["status"]
-  /** First 3 input names for pill display */
+  /** ALL input names (not truncated) */
   inputs: string[]
-  /** First 3 output names for pill display */
+  /** ALL output names (not truncated) */
   outputs: string[]
   /** Total input count */
   inputCount: number
@@ -53,6 +55,10 @@ export interface ModuleNodeData {
   [key: string]: unknown
 }
 
+/* ─── Port row height (px) — used for Handle positioning ──────────────── */
+
+const PORT_ROW_H = 22
+
 /* ─── Status dot color ─────────────────────────────────────────────────── */
 
 function statusDotColor(status: CadLabModule["status"]): string {
@@ -71,10 +77,92 @@ function statusDotColor(status: CadLabModule["status"]): string {
   }
 }
 
+/* ─── Signal type pill styling ─────────────────────────────────────────── */
+
+function signalPillClasses(signalType: SignalType): string {
+  const cfg = SIGNAL_CONFIG[signalType]
+  return cn(cfg.activeBg, cfg.activeBorder, cfg.text)
+}
+
+/* ─── Port row component ──────────────────────────────────────────────── */
+
+function PortRow({
+  name,
+  type,
+  index,
+  sectionTopOffset,
+}: {
+  name: string
+  type: "input" | "output"
+  index: number
+  /** px offset from top of node to the first port row in this section */
+  sectionTopOffset: number
+}) {
+  const signalType = classifySignalType(name)
+  const pillClasses = signalPillClasses(signalType)
+  const isInput = type === "input"
+
+  // INTENT: Position each Handle at the vertical center of its row.
+  // React Flow Handle `top` is relative to the node's top-left corner.
+  const handleTop = sectionTopOffset + index * PORT_ROW_H + PORT_ROW_H / 2
+
+  return (
+    <div
+      className={cn(
+        "relative flex items-center gap-1 px-2",
+        isInput ? "justify-start" : "justify-end",
+      )}
+      style={{ height: PORT_ROW_H }}
+    >
+      <Handle
+        type={isInput ? "target" : "source"}
+        position={isInput ? Position.Left : Position.Right}
+        id={name}
+        style={{ top: handleTop }}
+        className="!w-2 !h-2 !border-2 !border-background !bg-international-orange"
+      />
+
+      {isInput && <ArrowDownToLine className="h-2.5 w-2.5 shrink-0 text-chart-2" />}
+
+      <span
+        title={name}
+        className={cn(
+          "truncate max-w-[160px] text-[10px] rounded px-1 py-px leading-tight border",
+          pillClasses,
+        )}
+      >
+        {name}
+      </span>
+
+      {!isInput && <ArrowUpFromLine className="h-2.5 w-2.5 shrink-0 text-chart-3" />}
+    </div>
+  )
+}
+
 /* ─── Component ────────────────────────────────────────────────────────── */
 
 function ModuleNodeComponent({ data, selected }: NodeProps) {
   const d = data as unknown as ModuleNodeData
+
+  // INTENT: Measure actual header height so Handle `top` positions are accurate.
+  // Falls back to a reasonable estimate (48px) on first render.
+  const headerRef = useRef<HTMLDivElement>(null)
+  const [headerH, setHeaderH] = useState(48)
+
+  useEffect(() => {
+    if (headerRef.current) {
+      setHeaderH(headerRef.current.offsetHeight)
+    }
+  }, [d.label, d.purpose])
+
+  // Section offsets (px from node top)
+  // Header → separator (1px) → input section label (18px) → input rows → output section label (18px) → output rows
+  const INPUT_SECTION_LABEL_H = d.inputCount > 0 ? 18 : 0
+  const inputSectionTop = headerH + 1 + INPUT_SECTION_LABEL_H
+  const afterInputs = inputSectionTop + d.inputCount * PORT_ROW_H
+
+  const OUTPUT_SECTION_LABEL_H = d.outputCount > 0 ? 18 : 0
+  const outputSectionTop = afterInputs + (d.inputCount > 0 && d.outputCount > 0 ? 4 : 0) + OUTPUT_SECTION_LABEL_H
 
   return (
     <div
@@ -88,15 +176,8 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       )}
       style={{ borderLeftColor: "hsl(var(--international-orange))", borderLeftWidth: "4px" }}
     >
-      {/* Left handle — target (inputs flow in) */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="!w-2.5 !h-2.5 !bg-international-orange !border-2 !border-background"
-      />
-
-      <div className="p-2.5 space-y-1.5">
-        {/* Header: name + status dot */}
+      {/* Header: name + purpose */}
+      <div ref={headerRef} className="p-2.5 pb-1.5 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(d.status))} />
           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1 flex-1 min-w-0">
@@ -106,77 +187,67 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
             <AlertCircle className="h-3 w-3 text-status-warning shrink-0" />
           )}
         </div>
-
-        {/* Purpose */}
         <p className="text-[11px] text-muted-foreground leading-snug line-clamp-1">
           {d.purpose}
         </p>
+      </div>
 
-        {/* Input pills */}
-        {d.inputCount > 0 && (
-          <div>
-            <div className="flex items-center gap-1 mb-0.5">
-              <ArrowDownToLine className="h-2.5 w-2.5 text-chart-2" />
-              <span className="text-[9px] font-medium text-chart-2 uppercase tracking-wider">In</span>
-            </div>
-            <div className="flex flex-wrap gap-0.5">
-              {d.inputs.map((inp, j) => (
-                <span
-                  key={j}
-                  title={inp}
-                  className="truncate max-w-[90px] text-[10px] text-foreground bg-chart-2/10 border border-chart-2/20 rounded px-1 py-px leading-tight"
-                >
-                  {inp}
-                </span>
-              ))}
-              {d.inputCount > 3 && (
-                <span className="text-[9px] text-muted-foreground">+{d.inputCount - 3}</span>
-              )}
-            </div>
+      {/* Separator */}
+      <div className="border-t border-border" />
+
+      {/* Input ports */}
+      {d.inputCount > 0 && (
+        <div className="pt-1 pb-0.5">
+          <div className="flex items-center gap-1 px-2" style={{ height: INPUT_SECTION_LABEL_H }}>
+            <ArrowDownToLine className="h-2.5 w-2.5 text-chart-2" />
+            <span className="text-[9px] font-medium text-chart-2 uppercase tracking-wider">
+              Inputs ({d.inputCount})
+            </span>
           </div>
-        )}
+          {d.inputs.map((inp, i) => (
+            <PortRow
+              key={inp}
+              name={inp}
+              type="input"
+              index={i}
+              sectionTopOffset={inputSectionTop}
+            />
+          ))}
+        </div>
+      )}
 
-        {/* Output pills */}
-        {d.outputCount > 0 && (
-          <div>
-            <div className="flex items-center gap-1 mb-0.5">
-              <ArrowUpFromLine className="h-2.5 w-2.5 text-chart-3" />
-              <span className="text-[9px] font-medium text-chart-3 uppercase tracking-wider">Out</span>
-            </div>
-            <div className="flex flex-wrap gap-0.5">
-              {d.outputs.map((out, j) => (
-                <span
-                  key={j}
-                  title={out}
-                  className="truncate max-w-[90px] text-[10px] text-foreground bg-chart-3/10 border border-chart-3/20 rounded px-1 py-px leading-tight"
-                >
-                  {out}
-                </span>
-              ))}
-              {d.outputCount > 3 && (
-                <span className="text-[9px] text-muted-foreground">+{d.outputCount - 3}</span>
-              )}
-            </div>
+      {/* Output ports */}
+      {d.outputCount > 0 && (
+        <div className={cn("pb-1.5", d.inputCount > 0 && "pt-1")}>
+          <div className="flex items-center gap-1 px-2" style={{ height: OUTPUT_SECTION_LABEL_H }}>
+            <ArrowUpFromLine className="h-2.5 w-2.5 text-chart-3" />
+            <span className="text-[9px] font-medium text-chart-3 uppercase tracking-wider">
+              Outputs ({d.outputCount})
+            </span>
           </div>
-        )}
+          {d.outputs.map((out, i) => (
+            <PortRow
+              key={out}
+              name={out}
+              type="output"
+              index={i}
+              sectionTopOffset={outputSectionTop}
+            />
+          ))}
+        </div>
+      )}
 
-        {/* Connection count footer */}
-        {(d.receivesFrom > 0 || d.feedsTo > 0) && (
-          <p className="text-[9px] text-muted-foreground pt-1 border-t border-border">
+      {/* Connection count footer */}
+      {(d.receivesFrom > 0 || d.feedsTo > 0) && (
+        <div className="px-2.5 pb-2 pt-1 border-t border-border">
+          <p className="text-[9px] text-muted-foreground">
             {[
               d.receivesFrom > 0 && `Receives from ${d.receivesFrom}`,
               d.feedsTo > 0 && `Feeds ${d.feedsTo}`,
             ].filter(Boolean).join(" \u00B7 ")}
           </p>
-        )}
-      </div>
-
-      {/* Right handle — source (outputs flow out) */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!w-2.5 !h-2.5 !bg-international-orange !border-2 !border-background"
-      />
+        </div>
+      )}
     </div>
   )
 }

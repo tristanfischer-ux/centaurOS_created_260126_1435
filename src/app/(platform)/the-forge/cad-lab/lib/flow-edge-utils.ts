@@ -25,6 +25,10 @@ export interface FlowNode {
 export interface FlowEdge {
   from: string
   to: string
+  /** Output port name on source node (maps to React Flow sourceHandle) */
+  sourceHandle?: string
+  /** Input port name on target node (maps to React Flow targetHandle) */
+  targetHandle?: string
   label?: string
   signalType: SignalType
   incompatible?: boolean
@@ -93,6 +97,8 @@ export function buildEdges(modules: CadLabModule[]): FlowEdge[] {
               edges.push({
                 from: source.id,
                 to: target.id,
+                sourceHandle: output,
+                targetHandle: input,
                 label: output,
                 signalType: classifySignalType(output),
               })
@@ -129,6 +135,8 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[]): FlowEdg
       edges.push({
         from: contract.sourceModuleId,
         to: contract.targetModuleId,
+        sourceHandle: contract.sourcePort,
+        targetHandle: contract.targetPort,
         label: contract.sourcePort,
         signalType: portTypeToSignalType(contract.portType),
         incompatible: contract.compatible === false,
