@@ -108,6 +108,31 @@ Style: Modern industrial engineering diagram on a white background with thin, pr
 }
 
 /**
+ * Builds a prompt optimized for the multimodal reference path, where the
+ * hero image is literally provided as an inline image alongside this text.
+ * Instructs Gemini to produce a detail view that visually matches the hero.
+ *
+ * @param module - The module (subassembly) to generate a detail view for
+ * @param visualStyle - Optional visual style directives
+ * @returns A prompt designed to be paired with the hero as inlineData
+ */
+function buildReferenceAwareModulePrompt(module: ModuleSpec, visualStyle?: VisualStyleSpec): string {
+  const styleDirective = visualStyle
+    ? `\nColor palette: ${visualStyle.colorPalette}.\nMaterial rendering: ${visualStyle.materialRendering}.\nContext: ${visualStyle.unifyingContext}.`
+    : ""
+
+  return `You are provided a reference image showing the complete system.
+Generate a focused detail view of the "${module.name}" sub-assembly.
+
+CRITICAL STYLE RULE: Match the EXACT visual style of the reference image — same rendering technique, same color palette, same line weight, same perspective angle, same background treatment. The viewer should feel like they are looking at a zoomed-in section of the reference illustration.
+
+This sub-assembly is: ${module.detail.whatItIs}
+It contains ${module.keyParts.length} key components shown through visual differentiation.
+
+Frame the composition to show this specific sub-assembly at larger scale with more component detail visible, while maintaining the same overall aesthetic as the reference.${styleDirective}${COHESIVE_STYLE_SUFFIX}`
+}
+
+/**
  * Builds a descriptive prompt for generating a module blueprint image.
  * Uses the structural brief from Opus when available for consistency
  * with the 3D CAD model. When productFormDescription is present, uses
@@ -279,6 +304,87 @@ async function callNanoBananaImage(
   return { mimeType, data: b64Data }
 }
 
+/**
+ * Calls the Nano Banana 2 generateContent API with a reference image as
+ * multimodal input. The reference image is sent as an inlineData part
+ * alongside the text prompt, allowing Gemini to visually match the style.
+ *
+ * @param prompt - The text prompt
+ * @param referenceBase64 - Base64-encoded reference image (PNG)
+ * @param aspectRatio - Aspect ratio (mapped to Nano Banana 2 supported values)
+ * @returns Base64 image data and mime type
+ *
+ * @throws Error if GOOGLE_AI_API_KEY is missing or API call fails
+ */
+async function callNanoBananaImageWithReference(
+  prompt: string,
+  referenceBase64: string,
+  aspectRatio?: string,
+): Promise<{ mimeType: string; data: string }> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY
+  if (!apiKey) {
+    throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
+  }
+
+  const url = `${GOOGLE_AI_API_BASE}/${NANO_BANANA_MODEL}:generateContent`
+
+  // INTENT: Send reference image as inlineData part so Gemini can visually
+  // match the hero's exact style — same model that generated the hero now
+  // sees it while generating each module image.
+  const body = {
+    contents: [{
+      parts: [
+        { inlineData: { mimeType: "image/png", data: referenceBase64 } },
+        { text: prompt },
+      ],
+    }],
+    generationConfig: {
+      responseModalities: ["TEXT", "IMAGE"],
+      imageConfig: {
+        aspectRatio: toNanoBananaAspectRatio(aspectRatio),
+        imageSize: "2K",
+      },
+    },
+  }
+
+  let response: Response
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify(body),
+    })
+  } catch (fetchError) {
+    const msg = fetchError instanceof Error ? fetchError.message : "Network error"
+    console.error("[XRayImageGen] Fetch failed (multimodal):", { model: NANO_BANANA_MODEL, error: msg })
+    throw new Error(`[XRayImageGen] Network error calling Nano Banana 2 (multimodal): ${msg}`)
+  }
+
+  if (!response.ok) {
+    const errText = await response.text()
+    console.error("[XRayImageGen] Nano Banana 2 multimodal API error:", { status: response.status, body: errText.slice(0, 500) })
+    throw new Error(`[XRayImageGen] Nano Banana 2 multimodal API error (${response.status}): ${errText.slice(0, 200)}`)
+  }
+
+  const data = (await response.json()) as NanoBananaResponse
+
+  if (data.error) {
+    console.error("[XRayImageGen] Nano Banana 2 multimodal returned error:", { error: data.error.message })
+    throw new Error(`[XRayImageGen] Nano Banana 2 multimodal error: ${data.error.message}`)
+  }
+
+  const parts = data.candidates?.[0]?.content?.parts
+  const imagePart = parts?.find((p) => p.inlineData?.data)
+  const b64Data = imagePart?.inlineData?.data
+  if (!b64Data) {
+    console.error("[XRayImageGen] No image in Nano Banana 2 multimodal response:", { candidatesCount: data.candidates?.length ?? 0, partsCount: parts?.length ?? 0 })
+    throw new Error("[XRayImageGen] No image data returned from Nano Banana 2 (multimodal)")
+  }
+
+  const mimeType = imagePart?.inlineData?.mimeType ?? "image/png"
+  return { mimeType, data: b64Data }
+}
+
 // ─── OpenAI Fallback ─────────────────────────────────────────────────
 
 /**
@@ -338,18 +444,35 @@ async function callOpenAIImage(
 }
 
 /**
- * Generates an image using Nano Banana 2 with automatic OpenAI fallback.
+ * Generates an image using Nano Banana 2 with automatic fallback.
  *
- * FLOW: callNanoBananaImage() → [any error] → callOpenAIImage() → result
+ * When referenceBase64 is provided:
+ * FLOW: callNanoBananaImageWithReference() → callNanoBananaImage() (text-only) → callOpenAIImage()
+ *
+ * When no reference:
+ * FLOW: callNanoBananaImage() → callOpenAIImage()
  *
  * Falls back to OpenAI on ANY Nano Banana failure as long as OPENAI_API_KEY is set.
  */
 async function callImageWithFallback(
   prompt: string,
-  imageConfig: { aspectRatio?: string } = {},
+  imageConfig: { aspectRatio?: string; referenceBase64?: string } = {},
 ): Promise<{ mimeType: string; data: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
+
+  // DECISION: When a reference image is available, try the multimodal path first.
+  // Same Gemini model that generated the hero sees it as inlineData — best chance
+  // of matching the exact visual style.
+  if (imageConfig.referenceBase64) {
+    try {
+      return await callNanoBananaImageWithReference(safePrompt, imageConfig.referenceBase64, imageConfig.aspectRatio)
+    } catch (multimodalError) {
+      const msg = multimodalError instanceof Error ? multimodalError.message : String(multimodalError)
+      console.warn("[XRayImageGen] Nano Banana 2 multimodal failed, trying text-only:", { error: msg.slice(0, 200) })
+    }
+  }
+
   try {
     return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio)
   } catch (nanoBananaError) {
@@ -513,10 +636,15 @@ async function tryOpenAIEdit(
 /**
  * Generates a blueprint image for a single module.
  *
+ * When referenceBase64 is provided, uses the multimodal Gemini path:
+ * the hero image is sent as inlineData so Gemini can visually match its style.
+ * Falls back through text-only Gemini → OpenAI automatically.
+ *
  * @param scanId - The scan ID for storage namespacing
  * @param module - The module to generate an image for
  * @param brief - Optional structural brief from Opus orchestrator for consistency with 3D model
  * @param visualStyle - Optional shared visual style for cross-module cohesion
+ * @param referenceBase64 - Optional base64 PNG of the hero image (cropped to 3:2) for style matching
  * @returns The public URL of the generated image
  *
  * @throws Error if image generation or upload fails
@@ -526,11 +654,18 @@ export async function generateModuleImage(
   module: ModuleSpec,
   brief?: StructuralBrief,
   visualStyle?: VisualStyleSpec,
+  referenceBase64?: string,
 ): Promise<string> {
-  const prompt = buildModulePrompt(module, brief, visualStyle)
+  // DECISION: When a reference image is available, use the reference-aware prompt
+  // that instructs Gemini to match the hero's visual style. The text-only prompt
+  // (buildModulePrompt) is still used as fallback when multimodal fails.
+  const prompt = referenceBase64
+    ? buildReferenceAwareModulePrompt(module, visualStyle)
+    : buildModulePrompt(module, brief, visualStyle)
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
+    referenceBase64,
   })
 
   // Post-process: add engineering annotation frame with labels

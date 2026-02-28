@@ -48,7 +48,7 @@ import {
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -168,7 +168,7 @@ export interface CadLabContextValue {
 
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
-  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceImageUrl?: string) => Promise<void>
+  handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string) => Promise<void>
 
   // Progressive module reveal
   revealedModuleIds: Set<string>
@@ -740,10 +740,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             // Non-critical — images still generate, just without coordinated style
           }
 
-          // FLOW: Pass 1 — generate system illustration FIRST, then use it
-          // as a reference image for module images (Pass 2) to guarantee
-          // spatial consistency of ghost outlines across all subassembly images.
-          let referenceImageUrl: string | undefined
+          // FLOW: Pass 1 — generate system illustration FIRST, then crop it
+          // to 3:2 base64 ONCE for use as a Gemini multimodal reference in Pass 2.
+          let referenceBase64: string | undefined
           if (activeProjectId) {
             setSystemIllustrationStatus("generating")
             setSystemIllustrationError(null)
@@ -759,9 +758,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
-                referenceImageUrl = illRes.url
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url)
                   .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
+
+                // INTENT: Fetch + crop the hero to 3:2 base64 ONCE so all module
+                // images share the same pre-cropped reference without redundant fetches.
+                try {
+                  const cropRes = await fetchAndCropReferenceAction(illRes.url)
+                  if ("base64" in cropRes) {
+                    referenceBase64 = cropRes.base64
+                  }
+                } catch {
+                  // Non-critical — module images still generate via text-only path
+                }
               } else {
                 console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
                 setSystemIllustrationStatus("failed")
@@ -774,8 +783,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           }
 
-          // Pass 2 — module images, with reference URL if available
-          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceImageUrl)
+          // Pass 2 — module images, with reference base64 if available
+          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceBase64)
             .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
         }
         imagesPipeline()
@@ -823,7 +832,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceImageUrl?: string) => {
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string) => {
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
@@ -872,7 +881,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
-        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle, referenceImageUrl)
+        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle, referenceBase64)
         if ("module" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
