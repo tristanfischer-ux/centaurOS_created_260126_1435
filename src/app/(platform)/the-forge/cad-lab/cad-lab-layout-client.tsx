@@ -60,6 +60,10 @@ const STAGE_LABELS: Record<string, string> = {
   "": "Concept",
   build: "Build",
   review: "Review",
+  specify: "Specify",
+  source: "Source",
+  assemble: "Assemble",
+  cad: "CAD",
   mashup: "Mashup Lab",
   templates: "Template Library",
 }

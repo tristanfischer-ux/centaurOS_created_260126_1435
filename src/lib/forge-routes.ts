@@ -13,6 +13,7 @@ export const FORGE_ROUTES = {
   cadLabSpecify: "/the-forge/cad-lab/specify",
   cadLabSource: "/the-forge/cad-lab/source",
   cadLabAssemble: "/the-forge/cad-lab/assemble",
+  cadLabCad: "/the-forge/cad-lab/cad",
   cadLabTemplates: "/the-forge/cad-lab/templates",
   cadLabMashup: "/the-forge/cad-lab/mashup",
   cadLabPartsBom: "/the-forge/cad-lab/parts-bom",

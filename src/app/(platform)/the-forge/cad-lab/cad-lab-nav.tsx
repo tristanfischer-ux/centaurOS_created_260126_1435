@@ -18,6 +18,7 @@ import {
   ClipboardList,
   ShoppingCart,
   Package,
+  Box,
   CheckCircle2,
   Lock,
   type LucideIcon,
@@ -91,6 +92,16 @@ export const STAGES: StageDefinition[] = [
     unlockHint: "Award at least one supplier contract in Source",
     features: ["Manufacturing order tracking", "Parts receiving & QC", "Assembly job management", "Shipping & delivery"],
   },
+  {
+    id: "cad",
+    label: "CAD",
+    mobileLabel: "C",
+    icon: Box,
+    href: FORGE_ROUTES.cadLabCad,
+    description: "Generate parametric CAD models and build the system assembly.",
+    unlockHint: "Complete manufacturing orders or finish all module specifications",
+    features: ["Per-module CadQuery generation", "Batch pipeline", "DFM analysis", "Hierarchical STEP assembly"],
+  },
 ]
 
 /**
@@ -100,6 +111,7 @@ export const STAGES: StageDefinition[] = [
  * @param moduleCount - Total number of decomposed modules
  * @param specifiedModuleCount - Number of modules with complete diagnostics + specialist review
  * @param manufacturingOrderCount - Number of active manufacturing orders
+ * @param isSpecificationComplete - Whether all modules have completed specification
  * @returns Access map with enabled/completed per stage
  */
 export function getStageAccess(
@@ -107,12 +119,14 @@ export function getStageAccess(
   moduleCount: number,
   specifiedModuleCount: number,
   manufacturingOrderCount: number,
+  isSpecificationComplete = false,
 ): Record<string, { enabled: boolean; completed: boolean }> {
   return {
     design: { enabled: true, completed: hasResearch && moduleCount > 0 },
     specify: { enabled: hasResearch && moduleCount > 0, completed: specifiedModuleCount > 0 && specifiedModuleCount === moduleCount },
     source: { enabled: specifiedModuleCount > 0, completed: manufacturingOrderCount > 0 },
     assemble: { enabled: manufacturingOrderCount > 0, completed: false },
+    cad: { enabled: manufacturingOrderCount > 0 || isSpecificationComplete, completed: false },
   }
 }
 
@@ -126,10 +140,10 @@ export function getStageAccess(
  */
 export function CadLabBottomNav(): React.ReactNode {
   const pathname = usePathname()
-  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount } = useCadLab()
+  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete } = useCadLab()
   const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
-  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount)
+  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete)
   const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
 
   return (
@@ -161,7 +175,10 @@ export function CadLabBottomNav(): React.ReactNode {
                 {completed && !isActive
                   ? <CheckCircle2 className="h-4 w-4" />
                   : <Icon className="h-4 w-4" />}
-                <span>{stage.label}</span>
+                <span className="flex items-center gap-0.5">
+                  {stage.label}
+                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase text-international-orange">β</span>}
+                </span>
               </Link>
             ) : (
               <button
@@ -170,7 +187,10 @@ export function CadLabBottomNav(): React.ReactNode {
                 className="flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-muted-foreground/50 transition-opacity hover:opacity-70"
               >
                 <Icon className="h-4 w-4" />
-                <span>{stage.label}</span>
+                <span className="flex items-center gap-0.5">
+                  {stage.label}
+                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase opacity-50">β</span>}
+                </span>
               </button>
             )
           })}
@@ -230,10 +250,10 @@ export function CadLabBottomNav(): React.ReactNode {
  */
 export function CadLabNav({ className }: { className?: string }): React.ReactNode {
   const pathname = usePathname()
-  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount } = useCadLab()
+  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete } = useCadLab()
   const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
-  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount)
+  const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete)
   const previewStage = previewStageId ? STAGES.find((s) => s.id === previewStageId) : null
 
   return (
@@ -300,6 +320,12 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                         {stage.id === "specify" && specifiedModuleCount > 0 && modules.length > 0 && (
                           <span className="ml-1 text-xs font-mono opacity-75">
                             {specifiedModuleCount}/{modules.length}
+                          </span>
+                        )}
+                        {/* Beta badge for CAD stage */}
+                        {stage.id === "cad" && (
+                          <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                            Beta
                           </span>
                         )}
                       </span>
