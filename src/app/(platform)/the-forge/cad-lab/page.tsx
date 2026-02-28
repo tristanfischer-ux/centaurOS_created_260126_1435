@@ -327,13 +327,40 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <p className="text-sm font-semibold text-foreground">
                   {Math.min(revealedModuleIds.size, modules.length)} of {modules.length} sub-assemblies
                 </p>
-                {isGeneratingImages && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <Loader2 className="h-3 w-3 animate-spin text-international-orange" />
-                    Generating illustrations...
-                  </span>
-                )}
               </div>
+
+              {/* Illustration progress card — prominent feedback during image generation */}
+              {(isGeneratingImages || systemIllustrationStatus === "generating") && (() => {
+                const completed = modules.filter(m => m.imageStatus === "complete").length
+                const failed = modules.filter(m => m.imageStatus === "failed").length
+                const done = completed + failed
+                const total = modules.length
+                const pct = total > 0 ? Math.round((done / total) * 100) : 0
+                const isHeroPhase = systemIllustrationStatus === "generating"
+
+                return (
+                  <Card className="border-international-orange/20 bg-muted/50">
+                    <CardContent className="pt-4 pb-4 space-y-2.5">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-international-orange shrink-0" />
+                        <p className="text-sm font-medium text-foreground">
+                          {isHeroPhase
+                            ? "Creating system overview..."
+                            : `Generating module illustrations — ${done} of ${total}`}
+                        </p>
+                      </div>
+                      {!isHeroPhase && total > 0 && (
+                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-international-orange transition-all duration-500 ease-out"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })()}
 
               {/* Module image grid with progressive reveal */}
               <ModuleImageGrid
