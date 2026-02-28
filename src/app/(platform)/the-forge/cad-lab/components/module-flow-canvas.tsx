@@ -28,8 +28,6 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
-  BaseEdge,
-  EdgeLabelRenderer,
   getSmoothStepPath,
   type Node,
   type Edge,
@@ -83,11 +81,10 @@ function LabeledFlowEdge({
   markerEnd,
   style,
 }: EdgeProps) {
-  const edgeData = data as { label?: string; strokeColor?: string } | undefined
-  const strokeColor = edgeData?.strokeColor ?? "hsl(var(--chart-5))"
-  const label = edgeData?.label
+  const edgeData = data as { strokeColor?: string } | undefined
+  const strokeColor = edgeData?.strokeColor ?? "hsl(258, 90%, 66%)"
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX,
     sourceY,
     targetX,
@@ -97,43 +94,20 @@ function LabeledFlowEdge({
     borderRadius: 12,
   })
 
-  // Truncate label for display
-  const truncatedLabel = label && label.length > 24
-    ? label.slice(0, 22) + "\u2026"
-    : label
-
   return (
-    <>
-      <BaseEdge
-        id={id}
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={{
-          ...style,
-          stroke: strokeColor,
-          strokeWidth: 3,
-        }}
-      />
-      {label && (
-        <EdgeLabelRenderer>
-          <div
-            title={label}
-            className="nodrag nopan pointer-events-auto"
-            style={{
-              position: "absolute",
-              transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
-            }}
-          >
-            <span
-              className="text-[9px] text-foreground bg-background rounded px-1.5 py-0.5 whitespace-nowrap border border-border shadow-sm"
-              style={{ borderLeftColor: strokeColor, borderLeftWidth: 3 }}
-            >
-              {truncatedLabel}
-            </span>
-          </div>
-        </EdgeLabelRenderer>
-      )}
-    </>
+    <path
+      id={id}
+      d={edgePath}
+      fill="none"
+      stroke={strokeColor}
+      strokeWidth={2.5}
+      markerEnd={typeof markerEnd === "string" ? markerEnd : undefined}
+      style={{
+        ...style,
+        strokeDasharray: "6 4",
+        animation: "flowDash 0.6s linear infinite",
+      }}
+    />
   )
 }
 
@@ -347,7 +321,6 @@ function buildNodesAndEdges(
       style: {
         strokeDasharray: e.incompatible ? "5 5" : undefined,
       },
-      animated: true,
       markerEnd: {
         type: MarkerType.ArrowClosed,
         width: 20,
@@ -518,6 +491,9 @@ export function ModuleFlowCanvas({
         !isFullscreen && className,
       )}
     >
+      {/* INTENT: CSS keyframes for animated flowing dashes on edges (marching ants effect) */}
+      <style>{`@keyframes flowDash { to { stroke-dashoffset: -20; } }`}</style>
+
       {/* Header with orange accent bar */}
       <div className="border-b border-border">
         <div className="h-1 bg-international-orange/60" />

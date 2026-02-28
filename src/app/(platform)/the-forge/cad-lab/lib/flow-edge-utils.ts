@@ -59,11 +59,11 @@ export const SIGNAL_CONFIG: Record<SignalType, {
   activeBg: string
   strokeHsl: string
 }> = {
-  power:      { label: "Power",      dot: "bg-chart-1",  text: "text-chart-1",  activeBorder: "border-chart-1/50",  activeBg: "bg-chart-1/10",  strokeHsl: "hsl(var(--chart-1))" },
-  data:       { label: "Data",       dot: "bg-chart-2",  text: "text-chart-2",  activeBorder: "border-chart-2/50",  activeBg: "bg-chart-2/10",  strokeHsl: "hsl(var(--chart-2))" },
-  mechanical: { label: "Mechanical", dot: "bg-chart-3",  text: "text-chart-3",  activeBorder: "border-chart-3/50",  activeBg: "bg-chart-3/10",  strokeHsl: "hsl(var(--chart-3))" },
-  thermal:    { label: "Thermal",    dot: "bg-chart-4",  text: "text-chart-4",  activeBorder: "border-chart-4/50",  activeBg: "bg-chart-4/10",  strokeHsl: "hsl(var(--chart-4))" },
-  other:      { label: "Other",      dot: "bg-chart-5",  text: "text-chart-5",  activeBorder: "border-chart-5/50",  activeBg: "bg-chart-5/10",  strokeHsl: "hsl(var(--chart-5))" },
+  power:      { label: "Power",      dot: "bg-chart-1",  text: "text-chart-1",  activeBorder: "border-chart-1/50",  activeBg: "bg-chart-1/10",  strokeHsl: "hsl(14, 100%, 50%)" },
+  data:       { label: "Data",       dot: "bg-chart-2",  text: "text-chart-2",  activeBorder: "border-chart-2/50",  activeBg: "bg-chart-2/10",  strokeHsl: "hsl(217, 91%, 60%)" },
+  mechanical: { label: "Mechanical", dot: "bg-chart-3",  text: "text-chart-3",  activeBorder: "border-chart-3/50",  activeBg: "bg-chart-3/10",  strokeHsl: "hsl(160, 84%, 39%)" },
+  thermal:    { label: "Thermal",    dot: "bg-chart-4",  text: "text-chart-4",  activeBorder: "border-chart-4/50",  activeBg: "bg-chart-4/10",  strokeHsl: "hsl(38, 92%, 50%)" },
+  other:      { label: "Other",      dot: "bg-chart-5",  text: "text-chart-5",  activeBorder: "border-chart-5/50",  activeBg: "bg-chart-5/10",  strokeHsl: "hsl(258, 90%, 66%)" },
 }
 
 /** Classify a connection label into a signal type by keyword matching. */

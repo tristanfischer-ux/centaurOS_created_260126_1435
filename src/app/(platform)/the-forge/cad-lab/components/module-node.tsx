@@ -16,7 +16,7 @@
 
 import React, { memo, useRef, useEffect, useState } from "react"
 import { Handle, Position } from "@xyflow/react"
-import { ArrowDownToLine, ArrowUpFromLine, AlertCircle } from "lucide-react"
+import { ArrowUpFromLine, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import type { NodeProps } from "@xyflow/react"
@@ -122,8 +122,6 @@ function PortRow({
         className="!w-2 !h-2 !border-2 !border-background !bg-international-orange"
       />
 
-      {isInput && <ArrowDownToLine className="h-2.5 w-2.5 shrink-0 text-chart-2" />}
-
       <span
         title={name}
         className={cn(
@@ -199,7 +197,6 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       {d.inputCount > 0 && (
         <div className="pt-1 pb-0.5">
           <div className="flex items-center gap-1 px-2" style={{ height: INPUT_SECTION_LABEL_H }}>
-            <ArrowDownToLine className="h-2.5 w-2.5 text-chart-2" />
             <span className="text-[9px] font-medium text-chart-2 uppercase tracking-wider">
               Inputs ({d.inputCount})
             </span>
