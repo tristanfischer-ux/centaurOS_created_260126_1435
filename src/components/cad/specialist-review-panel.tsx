@@ -288,7 +288,11 @@ export function SpecialistReviewPanel({
         : "pass"
         : null
 
-    const isModuleGenerated = module.status === "generated" || module.status === "specified" || !!module.result
+    // INTENT: Review buttons are shown whenever this panel renders. The parent page
+    // already gates rendering behind diagnostics-complete + activeProjectId checks.
+    // Previously gated on isModuleGenerated (status=generated|specified or CAD result),
+    // but at the Specify stage modules are "decomposed" with no CAD — reviews assess
+    // the manufacturing spec, not the CAD model, so the gate was too strict.
 
     return (
         <div className="space-y-3">
@@ -306,46 +310,44 @@ export function SpecialistReviewPanel({
             </div>
 
             {/* Review request buttons */}
-            {isModuleGenerated && (
-                <div className="flex flex-wrap gap-1.5">
-                    {REVIEW_SPECIALISTS.map(spec => {
-                        const hasReview = reviewedBy.has(spec.id)
-                        const isLoading = loadingSpecialist === spec.id
-                        const Icon = spec.icon
-                        const existingReview = reviews.find(r => r.specialistId === spec.id)
+            <div className="flex flex-wrap gap-1.5">
+                {REVIEW_SPECIALISTS.map(spec => {
+                    const hasReview = reviewedBy.has(spec.id)
+                    const isLoading = loadingSpecialist === spec.id
+                    const Icon = spec.icon
+                    const existingReview = reviews.find(r => r.specialistId === spec.id)
 
-                        return (
-                            <Button
-                                key={spec.id}
-                                variant={hasReview ? "ghost" : "secondary"}
-                                size="sm"
-                                disabled={isLoading || !!loadingSpecialist}
-                                onClick={() => handleRequestReview(spec.id)}
-                                className={cn(
-                                    "h-7 text-xs gap-1.5",
-                                    hasReview && existingReview?.verdict === "pass" && "text-success",
-                                    hasReview && existingReview?.verdict === "warn" && "text-warning",
-                                    hasReview && existingReview?.verdict === "fail" && "text-destructive",
-                                )}
-                            >
-                                {isLoading ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                ) : hasReview ? (
-                                    existingReview?.verdict === "pass" ? <CheckCircle2 className="h-3 w-3" /> :
-                                    existingReview?.verdict === "warn" ? <AlertTriangle className="h-3 w-3" /> :
-                                    <XCircle className="h-3 w-3" />
-                                ) : (
-                                    <Icon className="h-3 w-3" />
-                                )}
-                                {spec.label}
-                                <span className="text-muted-foreground font-normal">
-                                    {hasReview ? "Re-review" : spec.focus}
-                                </span>
-                            </Button>
-                        )
-                    })}
-                </div>
-            )}
+                    return (
+                        <Button
+                            key={spec.id}
+                            variant={hasReview ? "ghost" : "secondary"}
+                            size="sm"
+                            disabled={isLoading || !!loadingSpecialist}
+                            onClick={() => handleRequestReview(spec.id)}
+                            className={cn(
+                                "h-7 text-xs gap-1.5",
+                                hasReview && existingReview?.verdict === "pass" && "text-success",
+                                hasReview && existingReview?.verdict === "warn" && "text-warning",
+                                hasReview && existingReview?.verdict === "fail" && "text-destructive",
+                            )}
+                        >
+                            {isLoading ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : hasReview ? (
+                                existingReview?.verdict === "pass" ? <CheckCircle2 className="h-3 w-3" /> :
+                                existingReview?.verdict === "warn" ? <AlertTriangle className="h-3 w-3" /> :
+                                <XCircle className="h-3 w-3" />
+                            ) : (
+                                <Icon className="h-3 w-3" />
+                            )}
+                            {spec.label}
+                            <span className="text-muted-foreground font-normal">
+                                {hasReview ? "Re-review" : spec.focus}
+                            </span>
+                        </Button>
+                    )
+                })}
+            </div>
 
             {/* Error */}
             {error && (
@@ -372,7 +374,7 @@ export function SpecialistReviewPanel({
             )}
 
             {/* Empty state */}
-            {reviews.length === 0 && !loadingSpecialist && isModuleGenerated && (
+            {reviews.length === 0 && !loadingSpecialist && (
                 <p className="text-xs text-muted-foreground italic">
                     No reviews yet. Request a specialist review to validate this module.
                 </p>
