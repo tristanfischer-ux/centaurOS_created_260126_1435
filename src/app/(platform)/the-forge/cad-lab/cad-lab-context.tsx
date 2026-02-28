@@ -626,16 +626,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     // ── Phase 2: API call (real wait, with truthful padding timers) ──
+    addProgressLine(`Research report: ${Math.round(editableReport.length / 1000)}K characters`)
     addProgressLine(`Applied ${domainHint ?? "auto-detected"} domain constraints to analysis`)
     addProgressLine("Claude is decomposing into physical sub-assemblies...")
 
     // INTENT: These timers describe what the prompt actually instructs Claude to do.
-    // They are truthful statements, not fake completion steps.
+    // They are truthful statements, not fake completion steps. Spaced across ~65s to
+    // cover the typical blocking API call duration.
     const paddingTimers: ReturnType<typeof setTimeout>[] = []
-    paddingTimers.push(setTimeout(() => addProgressLine("Targeting 4–8 independent modules optimised for parallel manufacturing"), 5000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Each module assessed for: interfaces, key parts, lead times, failure modes"), 10000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, 3D print"), 16000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Mapping input/output dependencies between sub-assemblies"), 22000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Analysing product architecture to identify independent sub-assemblies"), 5000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Each module assessed for: interfaces, key parts, lead times, failure modes"), 9000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, 3D print"), 13000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Mapping input/output dependencies between sub-assemblies"), 18000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Identifying critical path — longest lead-time module drives project timeline"), 23000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Analysing failure modes and open engineering unknowns per module"), 28000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Cross-referencing module interfaces for dimensional compatibility"), 34000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Finalising module boundaries and component assignments"), 42000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Large report — Claude is still processing. Complex products take longer."), 52000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Nearly there — validating JSON structure of module definitions"), 65000))
 
     const apiStart = Date.now()
 

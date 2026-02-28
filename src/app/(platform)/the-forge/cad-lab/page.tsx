@@ -300,9 +300,20 @@ export default function CadLabResearchPage(): React.ReactNode {
                               {isDecomposing ? "Mapping sub-assemblies..." : "Preparing sub-assembly analysis..."}
                             </span>
                             {isDecomposing && progressLines.length > 0 && (
-                              <span className="text-xs text-muted-foreground/70 max-w-[280px] truncate">
-                                {progressLines[progressLines.length - 1]}
-                              </span>
+                              <div className="flex flex-col items-center gap-1 max-w-[360px]">
+                                {progressLines.slice(-3).map((line, i, arr) => (
+                                  <span
+                                    key={progressLines.length - arr.length + i}
+                                    className={`text-xs truncate max-w-full ${
+                                      i === arr.length - 1
+                                        ? "text-muted-foreground/70"
+                                        : "text-muted-foreground/35"
+                                    }`}
+                                  >
+                                    {line}
+                                  </span>
+                                ))}
+                              </div>
                             )}
                             {isDecomposing && decompositionElapsed > 0 && (
                               <span className="text-xs text-muted-foreground/50 mt-1 tabular-nums">
