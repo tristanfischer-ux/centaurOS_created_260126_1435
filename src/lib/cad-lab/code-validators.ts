@@ -362,7 +362,7 @@ export function analyzeCadQueryCode(
       ruleId: "cq-missing-result",
       severity: "critical",
       message: `No "result = " assignment found — Modal execution will fail`,
-      repairHint: `Add a "result = " assignment as the final line of the script. It must be assigned to a cq.Workplane or cq.Compound object.`,
+      repairHint: `Add a "result = " assignment as the final line of the script. It must be assigned to a cq.Workplane, cq.Assembly, or cq.Compound object.`,
     })
   }
 
@@ -391,7 +391,7 @@ export function analyzeCadQueryCode(
       ruleId: "cq-union-chain-long",
       severity: "warning",
       message: `.union() called ${unionCount}x — long union chains are O(n²) and may timeout`,
-      repairHint: `Use cq.Assembly() for models with many components. Add sub-groups to the assembly with .add() and cq.Location. Convert to solid with assy.toCompound().`,
+      repairHint: `Use cq.Assembly() for models with many components. Add sub-groups to the assembly with .add() and cq.Location. Assign result = assy.`,
       autoFixable: true,
     })
   }

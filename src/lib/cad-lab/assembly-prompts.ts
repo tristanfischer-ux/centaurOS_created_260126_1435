@@ -56,7 +56,7 @@ ENVIRONMENT:
 - Source filenames are: ${namesList}. Each file is at SOURCE_DIR + "/" + name + ".step"
 - Load a source with: cq.importers.importStep(SOURCE_DIR + "/<name>.step") which returns a cq.Workplane.
 - You may translate/rotate with .translate((x,y,z)) and .rotate(axisStart, axisEnd, angleDegrees).
-- The final variable MUST be named "result" and be a cq.Workplane.
+- The final variable MUST be named "result" and be a cq.Workplane or cq.Assembly.
 - Do NOT use open(), os, or file paths other than SOURCE_DIR. Do NOT export or print.
 - Output ONLY Python code inside a \`\`\`python code fence. No explanations.
 
@@ -81,7 +81,7 @@ assy = cq.Assembly()
 assy.add(mod_a, name="module_a", loc=cq.Location(cq.Vector(0, 0, 0)))
 assy.add(mod_b, name="module_b", loc=cq.Location(cq.Vector(x, y, z)))
 
-result = cq.Workplane("XY").newObject([assy.toCompound()])
+result = assy
 \`\`\`
 
 POSITIONING STRATEGY (in priority order):
@@ -91,7 +91,7 @@ POSITIONING STRATEGY (in priority order):
 
 ROTATION: Only rotate if interface definitions or connection logic require it. Default orientation is identity (no rotation).
 
-MANDATORY: The final line must be: result = cq.Workplane("XY").newObject([assy.toCompound()])`
+MANDATORY: The final line must be: result = assy`
 }
 
 /**
@@ -211,7 +211,7 @@ export function getAssemblyCodeGenUserPrompt(
     `2. Places template components first at sensible anchor positions`,
     `3. Positions generated modules relative to the anchors`,
     `4. Uses cq.Assembly() — no boolean operations between modules`,
-    `5. Assigns the final compound to "result"`,
+    `5. Assigns the final assembly to "result"`,
   )
 
   return sections.join("\n")
