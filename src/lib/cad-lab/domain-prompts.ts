@@ -103,6 +103,120 @@ export async function detectDomainFromProductDescription(
   return classifyWithClaude(DETECT_FROM_DESCRIPTION_PROMPT, description)
 }
 
+// ─── Lightweight domain detection from keyParts (no AI call) ────────────
+
+/** Keyword → domain weight map for heuristic classification */
+const DOMAIN_KEYWORDS: Record<CadLabDomain, string[]> = {
+  electronics: [
+    "pcb", "mcu", "microcontroller", "esp32", "stm32", "arduino", "raspberry", "pico",
+    "sensor", "adc", "dac", "i2c", "spi", "uart", "gpio", "oled", "display", "led",
+    "capacitor", "resistor", "transistor", "ic", "chip", "buck", "regulator", "power supply",
+    "antenna", "wifi", "bluetooth", "ble", "rf", "voltage", "current", "amplifier",
+    "thermocouple", "thermistor", "relay", "optocoupler", "connector", "terminal",
+  ],
+  electromechanical: [
+    "motor", "stepper", "servo", "nema", "actuator", "gearmotor", "brushless", "bldc",
+    "encoder", "driver", "esc", "bearing", "shaft", "coupling", "gearbox", "drivetrain",
+    "belt", "pulley", "lead screw", "linear rail", "carriage", "battery", "lipo",
+    "robot", "arm", "gripper", "cnc", "3d printer", "extruder", "hotend", "fan",
+    "damper", "vibration", "torque", "rpm",
+  ],
+  fluid: [
+    "pump", "peristaltic", "diaphragm", "valve", "solenoid", "manifold", "pipe", "tubing",
+    "fitting", "push-fit", "coupling", "hose", "flow", "pressure", "hydraulic", "pneumatic",
+    "cylinder", "piston", "reservoir", "tank", "filter", "seal", "o-ring", "gasket",
+    "coolant", "coolant loop", "water", "dosing", "nozzle", "sprinkler", "irrigation",
+  ],
+  mechanical: [
+    "frame", "extrusion", "bracket", "plate", "enclosure", "housing", "chassis", "panel",
+    "hinge", "latch", "spring", "bolt", "nut", "screw", "washer", "standoff", "spacer",
+    "rail", "guide", "wheel", "roller", "gear", "rack", "pinion", "cam",
+    "weld", "rivet", "structural", "beam", "column", "din rail",
+  ],
+}
+
+/**
+ * Detects CAD Lab domain from module keyParts using keyword frequency heuristic.
+ *
+ * @description Lightweight classification that avoids an AI call. Counts domain-associated
+ * keywords across all keyParts, returns highest-scoring domain. Falls back to `mechanical`.
+ * Useful for BOM generation where no research report is available.
+ *
+ * @param keyParts - Flattened array of keyParts strings from all modules
+ * @returns Best-matching CadLabDomain
+ */
+export function detectDomainFromKeyParts(keyParts: string[]): CadLabDomain {
+  const text = keyParts.join(" ").toLowerCase()
+
+  const scores: Record<CadLabDomain, number> = {
+    electronics: 0,
+    electromechanical: 0,
+    fluid: 0,
+    mechanical: 0,
+  }
+
+  for (const domain of DOMAIN_VALUES) {
+    for (const kw of DOMAIN_KEYWORDS[domain]) {
+      // Count occurrences of each keyword
+      const regex = new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi")
+      const matches = text.match(regex)
+      if (matches) scores[domain] += matches.length
+    }
+  }
+
+  // Return highest scoring, fallback to mechanical
+  let best: CadLabDomain = "mechanical"
+  let bestScore = 0
+  for (const domain of DOMAIN_VALUES) {
+    if (scores[domain] > bestScore) {
+      bestScore = scores[domain]
+      best = domain
+    }
+  }
+
+  return best
+}
+
+/**
+ * Detects CAD Lab domain from arbitrary text (e.g. research report) using keyword frequency.
+ *
+ * @description Same heuristic as detectDomainFromKeyParts but operates on free-form text.
+ * Eliminates the need for an AI call during decomposition preparation.
+ *
+ * @param text - Free-form text such as a research report or product description
+ * @returns Best-matching CadLabDomain
+ */
+export function detectDomainFromText(text: string): CadLabDomain {
+  if (!text?.trim()) return "mechanical"
+  const lower = text.toLowerCase()
+
+  const scores: Record<CadLabDomain, number> = {
+    electronics: 0,
+    electromechanical: 0,
+    fluid: 0,
+    mechanical: 0,
+  }
+
+  for (const domain of DOMAIN_VALUES) {
+    for (const kw of DOMAIN_KEYWORDS[domain]) {
+      const regex = new RegExp(`\\b${kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "gi")
+      const matches = lower.match(regex)
+      if (matches) scores[domain] += matches.length
+    }
+  }
+
+  let best: CadLabDomain = "mechanical"
+  let bestScore = 0
+  for (const domain of DOMAIN_VALUES) {
+    if (scores[domain] > bestScore) {
+      bestScore = scores[domain]
+      best = domain
+    }
+  }
+
+  return best
+}
+
 // ─── Research synthesis prompts (Step 1) ───────────────────────────────
 
 const BASE_RESEARCH_SYNTHESIS = `Your report will be used by a CAD pipeline to generate an accurate 3D model, so dimensional precision is critical. Every number must come from the source data — never invent dimensions.

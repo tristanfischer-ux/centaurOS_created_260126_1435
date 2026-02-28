@@ -69,6 +69,17 @@ export default function CadLabResearchPage(): React.ReactNode {
   const [heroImgError, setHeroImgError] = useState(false)
   useEffect(() => { setHeroImgError(false) }, [systemIllustrationUrl])
 
+  // INTENT: Live elapsed-time counter so decomposition wait feels controlled, not broken.
+  const [decompositionElapsed, setDecompositionElapsed] = useState(0)
+  useEffect(() => {
+    if (!isDecomposing) {
+      setDecompositionElapsed(0)
+      return
+    }
+    const id = setInterval(() => setDecompositionElapsed((s) => s + 1), 1_000)
+    return () => clearInterval(id)
+  }, [isDecomposing])
+
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
   // INTENT: Block "Continue to Specify" while checkpoints load OR have unacknowledged concerns.
@@ -293,9 +304,11 @@ export default function CadLabResearchPage(): React.ReactNode {
                                 {progressLines[progressLines.length - 1]}
                               </span>
                             )}
-                            <span className="text-xs text-muted-foreground/50 mt-1">
-                              This typically takes 5–10 minutes — feel free to grab a coffee
-                            </span>
+                            {isDecomposing && decompositionElapsed > 0 && (
+                              <span className="text-xs text-muted-foreground/50 mt-1 tabular-nums">
+                                {decompositionElapsed}s elapsed
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

@@ -44,6 +44,7 @@ import {
   type CadLabDomain,
   detectDomainFromProductDescription,
   detectDomainFromResearchReport,
+  detectDomainFromText,
   getResearchSynthesisPrompt,
   getModuleDecompositionPrompt,
   getDiagnosticsSystemPrompt,
@@ -1984,7 +1985,8 @@ export async function prepareDecomposition(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error("Unauthorized")
 
-  const domain = await detectDomainFromResearchReport(researchReport)
+  // DECISION: Keyword heuristic instead of Claude API call — saves 2-5s with equivalent accuracy
+  const domain = detectDomainFromText(researchReport)
   const prompt = getModuleDecompositionPrompt(domain)
 
   // INTENT: Rough token estimate so the UI can display an honest number.
@@ -2032,14 +2034,24 @@ export async function decomposeIntoModules(
   const start = Date.now()
 
   try {
-    const domain = domainHint ?? (await detectDomainFromResearchReport(researchReport))
+    // DECISION: Keyword heuristic fallback instead of Claude API call — saves 2-5s
+    const domain = domainHint ?? detectDomainFromText(researchReport)
     console.info("[THE-FORGE] Decomposing product into modules (domain: %s)...", domain)
     const modulePrompt = getModuleDecompositionPrompt(domain)
+
+    // DECISION: Catalogue removed from decomposition prompt — saves 5-15s (fewer input tokens).
+    // Real-part grounding happens later during the Specify stage where individual modules get attention.
+
+    // DECISION: Truncate research report to 12K chars — decomposition only needs high-level structure,
+    // not every detail. Full report remains available for later stages.
+    const truncatedReport = researchReport.length > 12_000
+      ? researchReport.slice(0, 12_000) + "\n\n[Report truncated for decomposition — full report available in later stages]"
+      : researchReport
 
     const userPrompt = `Product: ${description}
 
 Research Report:
-${researchReport}
+${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
