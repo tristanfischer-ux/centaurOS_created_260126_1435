@@ -264,7 +264,7 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
         className={cn("flex items-center py-6 px-4 sm:px-6", className)}
         aria-label="The Forge pipeline stages"
       >
-        <div className="flex items-start w-full max-w-3xl mx-auto">
+        <div className="flex items-start gap-1 sm:gap-2 w-full max-w-3xl mx-auto">
           {STAGES.map((stage, index) => {
             const { enabled, completed } = access[stage.id]
             const isActive = stage.href === FORGE_ROUTES.cadLab

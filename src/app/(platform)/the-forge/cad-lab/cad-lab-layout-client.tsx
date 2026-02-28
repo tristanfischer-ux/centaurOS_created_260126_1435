@@ -315,6 +315,9 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             )}
           >
             Template Library
+            <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+              Beta
+            </span>
           </Link>
           <Link
             href={FORGE_ROUTES.cadLabMashup}
@@ -326,6 +329,9 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             )}
           >
             Mashup Lab
+            <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+              Beta
+            </span>
           </Link>
         </div>
       </div>
