@@ -39,6 +39,7 @@ import { useCadLab } from "../cad-lab-context"
 import { FullscreenOverlay } from "../cad-lab-utils"
 import { ModuleResultsView, type ViewTab } from "../components/module-results-view"
 import { IntegrationView } from "../components/integration-view"
+import { ModuleFlowCanvas } from "../components/module-flow-canvas"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 
@@ -72,6 +73,8 @@ export default function CadStagePage(): React.ReactNode {
     // Module expansion
     expandedModuleId,
     setExpandedModuleId,
+    // Interface contracts for flow canvas
+    interfaceContracts,
     // Gate: CAD requires manufacturing orders OR all modules specified
     manufacturingOrderCount,
     isSpecificationComplete,
@@ -308,6 +311,16 @@ export default function CadStagePage(): React.ReactNode {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── Module flow canvas — shows when 2+ modules exist ── */}
+      {modules.length > 1 && (
+        <ModuleFlowCanvas
+          modules={modules}
+          onModuleClick={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
+          interfaceContracts={interfaceContracts}
+          generatingModuleIds={generatingModuleIds}
+        />
       )}
 
       {/* ── Integration view (all modules generated) ── */}
