@@ -553,6 +553,11 @@ export default function SpecifyPage(): React.ReactNode {
             <CadLabCostEstimate
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
+              onCostOverride={(moduleId, overrides) => {
+                setModules(prev => prev.map(m =>
+                  m.id === moduleId ? { ...m, costOverrides: overrides } : m
+                ))
+              }}
             />
 
             {/* Navigation CTA */}

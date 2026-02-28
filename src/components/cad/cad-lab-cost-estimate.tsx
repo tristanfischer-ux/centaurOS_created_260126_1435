@@ -7,7 +7,7 @@
  * - Batch size from diagnostics
  * - Lead time from modules
  *
- * Uses a lookup table of approximate costs per process × material class.
+ * Uses a lookup table of approximate costs per process x material class.
  * Estimates are educational/rough — intended to give founders a ballpark,
  * not a binding quote.
  *
@@ -17,18 +17,21 @@
  * <CadLabCostEstimate
  *   modules={modules}
  *   diagnosticAnswers={diagnosticAnswers}
+ *   onCostOverride={(moduleId, overrides) => { ... }}
  * />
  */
 
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useCallback } from "react"
 import {
   PoundSterling,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
   Info,
+  Pencil,
+  RotateCcw,
 } from "lucide-react"
 import {
   PieChart,
@@ -44,7 +47,10 @@ import {
 } from "recharts"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/format"
 import { chartColors } from "@/lib/chart-colors"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -98,6 +104,17 @@ interface ModuleCost {
   hourlyRate: number
   /** Total tooling cost (before amortization) */
   toolingTotal: number
+  /** Default (lookup table) values for reset */
+  defaults: {
+    materialCostPerKg: number
+    hoursPerKg: number
+    hourlyRate: number
+    massKg: number
+  }
+  /** Whether any cost overrides are active */
+  hasOverrides: boolean
+  /** Current overrides from the module (for merging in cell popovers) */
+  existingOverrides?: CadLabModule["costOverrides"]
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -107,6 +124,8 @@ interface CadLabCostEstimateProps {
   modules: CadLabModule[]
   /** Diagnostic answers per module */
   diagnosticAnswers: DiagnosticAnswers
+  /** Callback when user edits cost assumptions for a module */
+  onCostOverride?: (moduleId: string, overrides: CadLabModule["costOverrides"]) => void
 }
 
 /**
@@ -120,6 +139,7 @@ interface CadLabCostEstimateProps {
 export function CadLabCostEstimate({
   modules,
   diagnosticAnswers,
+  onCostOverride,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -133,19 +153,30 @@ export function CadLabCostEstimate({
 
       // Get mass from CAD result or keyword-estimate from module text
       const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
-      const { massKg, isEstimated } = getModuleMassKg(
+      const { massKg: defaultMassKg, isEstimated } = getModuleMassKg(
         mod.result?.massProperties?.massKg,
         mod.result?.massGrams,
         undefined,
         moduleText,
       )
 
-      const materialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
+      // Lookup-table defaults
+      const defaultMaterialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
+      const defaultHoursPerKg = HOURS_PER_KG[process] ?? 3
+      const defaultHourlyRate = PROCESS_HOURLY_RATE[process] ?? 50
+
+      // Merge user overrides
+      const overrides = mod.costOverrides
+      const massKg = overrides?.massKg ?? defaultMassKg
+      const materialCostPerKg = overrides?.materialCostPerKg ?? defaultMaterialCostPerKg
+      const hoursPerKg = overrides?.hoursPerKg ?? defaultHoursPerKg
+      const hourlyRate = overrides?.hourlyRate ?? defaultHourlyRate
+
+      const hasOverrides = !!(overrides?.materialCostPerKg != null || overrides?.hoursPerKg != null || overrides?.hourlyRate != null || overrides?.massKg != null)
+
       const isCostEstimated = (MATERIAL_COST_CONFIDENCE[material] ?? "estimate") === "estimate"
       const materialCost = massKg * materialCostPerKg
 
-      const hourlyRate = PROCESS_HOURLY_RATE[process] ?? 50
-      const hoursPerKg = HOURS_PER_KG[process] ?? 3
       const processCost = massKg * hoursPerKg * hourlyRate
 
       const toolingTotal = TOOLING_COST[process] ?? 0
@@ -170,9 +201,24 @@ export function CadLabCostEstimate({
         hoursPerKg,
         hourlyRate,
         toolingTotal,
+        defaults: {
+          materialCostPerKg: defaultMaterialCostPerKg,
+          hoursPerKg: defaultHoursPerKg,
+          hourlyRate: defaultHourlyRate,
+          massKg: defaultMassKg,
+        },
+        hasOverrides,
+        existingOverrides: overrides,
       }
     })
   }, [modules, diagnosticAnswers])
+
+  // Build a stable index map: moduleId → original position (for numbering)
+  const moduleIndexMap = useMemo(() => {
+    const map = new Map<string, number>()
+    modules.forEach((m, i) => map.set(m.id, i + 1))
+    return map
+  }, [modules])
 
   const systemTotal = costs.reduce((sum, c) => sum + c.totalPerUnit, 0)
   const totalMaterialCost = costs.reduce((sum, c) => sum + c.materialCost, 0)
@@ -211,7 +257,7 @@ export function CadLabCostEstimate({
             <PoundSterling className="h-4 w-4" />
             Cost Estimation
             <span className="text-xs font-normal font-mono text-foreground bg-muted px-2 py-0.5 rounded">
-              £{systemTotal.toFixed(2)} / unit
+              {formatCurrency(systemTotal)} / unit
             </span>
           </CardTitle>
           {isExpanded ? (
@@ -284,14 +330,18 @@ export function CadLabCostEstimate({
                       data={costs
                         .slice()
                         .sort((a, b) => b.totalPerUnit - a.totalPerUnit)
-                        .map((c) => ({
-                          name: c.moduleName.length > 16
-                            ? `${c.moduleName.slice(0, 14)}…`
-                            : c.moduleName,
-                          material: c.materialCost,
-                          process: c.processCost,
-                          tooling: c.toolingCostPerUnit,
-                        }))}
+                        .map((c) => {
+                          const num = moduleIndexMap.get(c.moduleId) ?? 0
+                          const label = `${num}. ${c.moduleName}`
+                          return {
+                            name: label.length > 18
+                              ? `${label.slice(0, 16)}…`
+                              : label,
+                            material: c.materialCost,
+                            process: c.processCost,
+                            tooling: c.toolingCostPerUnit,
+                          }
+                        })}
                       layout="vertical"
                       margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
                     >
@@ -332,55 +382,45 @@ export function CadLabCostEstimate({
                   <tr key={c.moduleId} className="border-b last:border-b-0">
                     <td className="p-2 font-medium text-foreground">
                       <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-muted text-[10px] font-bold text-muted-foreground flex-shrink-0">
+                          {moduleIndexMap.get(c.moduleId) ?? 0}
+                        </span>
                         {c.moduleName}
                         {c.isEstimated && (
                           <span className="text-[10px] font-mono text-status-warning" title="Mass estimated">~</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                      <div className="text-[10px] text-muted-foreground font-mono mt-0.5 ml-[26px]">
                         {c.process} · {c.material} · {c.massKg.toFixed(1)}kg
                       </div>
                     </td>
                     <td className="p-2 text-right font-mono text-foreground">
-                      <span className="inline-flex items-center gap-1 justify-end">
-                        £{c.materialCost.toFixed(2)}
-                        {c.isCostEstimated && (
-                          <span title="Cost is approximate — material not in engineering database">
-                            <Info className="h-3 w-3 text-muted-foreground" />
-                          </span>
-                        )}
-                      </span>
-                      <div className="text-[9px] text-muted-foreground mt-0.5">
-                        {c.massKg.toFixed(1)}kg × £{c.materialCostPerKg}/kg
-                      </div>
+                      <MaterialCostCell cost={c} onCostOverride={onCostOverride} />
                     </td>
                     <td className="p-2 text-right font-mono text-foreground">
-                      £{c.processCost.toFixed(2)}
-                      <div className="text-[9px] text-muted-foreground mt-0.5">
-                        {c.massKg.toFixed(1)}kg × {c.hoursPerKg}hr/kg × £{c.hourlyRate}/hr
-                      </div>
+                      <ProcessingCostCell cost={c} onCostOverride={onCostOverride} />
                     </td>
                     <td className="p-2 text-right font-mono text-foreground">
-                      {c.toolingCostPerUnit > 0 ? `£${c.toolingCostPerUnit.toFixed(2)}` : "—"}
+                      {c.toolingCostPerUnit > 0 ? formatCurrency(c.toolingCostPerUnit) : "—"}
                       {c.toolingTotal > 0 && (
                         <div className="text-[9px] text-muted-foreground mt-0.5">
-                          £{c.toolingTotal} ÷ {c.batchSize} units
+                          {formatCurrency(c.toolingTotal)} ÷ {c.batchSize} units
                         </div>
                       )}
                     </td>
-                    <td className="p-2 text-right font-mono font-semibold text-foreground">£{c.totalPerUnit.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono font-semibold text-foreground">{formatCurrency(c.totalPerUnit)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t-2">
                   <td className="p-2 font-semibold text-foreground">System Total</td>
-                  <td className="p-2 text-right font-mono font-semibold text-foreground">£{totalMaterialCost.toFixed(2)}</td>
-                  <td className="p-2 text-right font-mono font-semibold text-foreground">£{totalProcessCost.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono font-semibold text-foreground">{formatCurrency(totalMaterialCost)}</td>
+                  <td className="p-2 text-right font-mono font-semibold text-foreground">{formatCurrency(totalProcessCost)}</td>
                   <td className="p-2 text-right font-mono font-semibold text-foreground">
-                    {totalToolingCost > 0 ? `£${totalToolingCost.toFixed(2)}` : "—"}
+                    {totalToolingCost > 0 ? formatCurrency(totalToolingCost) : "—"}
                   </td>
-                  <td className="p-2 text-right font-mono font-bold text-foreground text-sm">£{systemTotal.toFixed(2)}</td>
+                  <td className="p-2 text-right font-mono font-bold text-foreground text-sm">{formatCurrency(systemTotal)}</td>
                 </tr>
               </tfoot>
             </table>
@@ -393,7 +433,7 @@ export function CadLabCostEstimate({
               <span className="text-muted-foreground">
                 At batch of <span className="font-semibold text-foreground">{maxBatch}</span> units:
                 per-unit system cost ≈ <span className={cn("font-semibold font-mono text-foreground")}>
-                  £{systemTotal.toFixed(2)}
+                  {formatCurrency(systemTotal)}
                 </span>
                 {" "}(tooling amortized)
               </span>
@@ -407,6 +447,260 @@ export function CadLabCostEstimate({
         </CardContent>
       )}
     </Card>
+  )
+}
+
+// ─── Editable Assumption Popovers ───────────────────────────────────
+
+/** Popover trigger + content for editing Raw Material cost assumptions. */
+function MaterialCostCell({
+  cost: c,
+  onCostOverride,
+}: {
+  cost: ModuleCost
+  onCostOverride?: CadLabCostEstimateProps["onCostOverride"]
+}): React.ReactNode {
+  const [massKg, setMassKg] = useState(c.massKg)
+  const [costPerKg, setCostPerKg] = useState(c.materialCostPerKg)
+
+  // Sync local state when props change (e.g. after reset)
+  const prevModuleId = useState(c.moduleId)[0]
+  if (prevModuleId === c.moduleId && massKg !== c.massKg && costPerKg !== c.materialCostPerKg) {
+    setMassKg(c.massKg)
+    setCostPerKg(c.materialCostPerKg)
+  }
+
+  const handleApply = useCallback(() => {
+    if (!onCostOverride) return
+    // Build full merged overrides — preserve processing overrides from other popover
+    const merged: NonNullable<CadLabModule["costOverrides"]> = { ...c.existingOverrides }
+    if (costPerKg !== c.defaults.materialCostPerKg) merged.materialCostPerKg = costPerKg
+    else delete merged.materialCostPerKg
+    if (massKg !== c.defaults.massKg) merged.massKg = massKg
+    else delete merged.massKg
+    onCostOverride(c.moduleId, Object.keys(merged).length > 0 ? merged : undefined)
+  }, [onCostOverride, c.moduleId, c.defaults.materialCostPerKg, c.defaults.massKg, c.existingOverrides, costPerKg, massKg])
+
+  const handleReset = useCallback(() => {
+    setMassKg(c.defaults.massKg)
+    setCostPerKg(c.defaults.materialCostPerKg)
+    // Preserve processing overrides when resetting material
+    const preserved: NonNullable<CadLabModule["costOverrides"]> = {}
+    if (c.existingOverrides?.hoursPerKg != null) preserved.hoursPerKg = c.existingOverrides.hoursPerKg
+    if (c.existingOverrides?.hourlyRate != null) preserved.hourlyRate = c.existingOverrides.hourlyRate
+    onCostOverride?.(c.moduleId, Object.keys(preserved).length > 0 ? preserved : undefined)
+  }, [onCostOverride, c.moduleId, c.defaults.massKg, c.defaults.materialCostPerKg, c.existingOverrides])
+
+  const hasMaterialOverride = c.hasOverrides && (c.materialCostPerKg !== c.defaults.materialCostPerKg || c.massKg !== c.defaults.massKg)
+
+  const trigger = (
+    <span className="inline-flex items-center gap-1 justify-end">
+      <span className={cn(hasMaterialOverride && "text-international-orange")}>
+        {formatCurrency(c.materialCost)}
+      </span>
+      {c.isCostEstimated && !hasMaterialOverride && (
+        <span title="Cost is approximate — material not in engineering database">
+          <Info className="h-3 w-3 text-muted-foreground" />
+        </span>
+      )}
+      {hasMaterialOverride && (
+        <Pencil className="h-2.5 w-2.5 text-international-orange" />
+      )}
+    </span>
+  )
+
+  if (!onCostOverride) {
+    return (
+      <>
+        {trigger}
+        <div className="text-[9px] text-muted-foreground mt-0.5">
+          {c.massKg.toFixed(1)}kg × £{c.materialCostPerKg}/kg
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <Popover onOpenChange={(open) => {
+      if (open) {
+        setMassKg(c.massKg)
+        setCostPerKg(c.materialCostPerKg)
+      }
+    }}>
+      <PopoverTrigger asChild>
+        <button type="button" className="text-right cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors">
+          {trigger}
+          <div className="text-[9px] text-muted-foreground mt-0.5">
+            {c.massKg.toFixed(1)}kg × £{c.materialCostPerKg}/kg
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-3">
+        <p className="text-xs font-semibold text-foreground">Raw Material Assumptions</p>
+        <p className="text-[10px] text-muted-foreground">mass × cost/kg = total</p>
+
+        <div className="space-y-2">
+          <label className="block">
+            <span className="text-[10px] text-muted-foreground">Mass (kg)</span>
+            <Input
+              type="number"
+              min={0}
+              step={0.1}
+              value={massKg}
+              onChange={(e) => setMassKg(parseFloat(e.target.value) || 0)}
+              onBlur={handleApply}
+              className="h-8 text-xs mt-0.5"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] text-muted-foreground">Material cost (£/kg)</span>
+            <Input
+              type="number"
+              min={0}
+              step={0.5}
+              value={costPerKg}
+              onChange={(e) => setCostPerKg(parseFloat(e.target.value) || 0)}
+              onBlur={handleApply}
+              className="h-8 text-xs mt-0.5"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t">
+          <p className="text-[10px] text-muted-foreground font-mono">
+            = {formatCurrency(massKg * costPerKg)}
+          </p>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            <RotateCcw className="h-2.5 w-2.5" />
+            Reset to default
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** Popover trigger + content for editing Processing cost assumptions. */
+function ProcessingCostCell({
+  cost: c,
+  onCostOverride,
+}: {
+  cost: ModuleCost
+  onCostOverride?: CadLabCostEstimateProps["onCostOverride"]
+}): React.ReactNode {
+  const [hoursPerKg, setHoursPerKg] = useState(c.hoursPerKg)
+  const [hourlyRate, setHourlyRate] = useState(c.hourlyRate)
+
+  const handleApply = useCallback(() => {
+    if (!onCostOverride) return
+    // Build full merged overrides — preserve material overrides from other popover
+    const merged: NonNullable<CadLabModule["costOverrides"]> = { ...c.existingOverrides }
+    if (hoursPerKg !== c.defaults.hoursPerKg) merged.hoursPerKg = hoursPerKg
+    else delete merged.hoursPerKg
+    if (hourlyRate !== c.defaults.hourlyRate) merged.hourlyRate = hourlyRate
+    else delete merged.hourlyRate
+    onCostOverride(c.moduleId, Object.keys(merged).length > 0 ? merged : undefined)
+  }, [onCostOverride, c.moduleId, c.defaults.hoursPerKg, c.defaults.hourlyRate, c.existingOverrides, hoursPerKg, hourlyRate])
+
+  const handleReset = useCallback(() => {
+    setHoursPerKg(c.defaults.hoursPerKg)
+    setHourlyRate(c.defaults.hourlyRate)
+    // Preserve material overrides when resetting processing
+    const preserved: NonNullable<CadLabModule["costOverrides"]> = {}
+    if (c.existingOverrides?.materialCostPerKg != null) preserved.materialCostPerKg = c.existingOverrides.materialCostPerKg
+    if (c.existingOverrides?.massKg != null) preserved.massKg = c.existingOverrides.massKg
+    onCostOverride?.(c.moduleId, Object.keys(preserved).length > 0 ? preserved : undefined)
+  }, [onCostOverride, c.moduleId, c.defaults.hoursPerKg, c.defaults.hourlyRate, c.existingOverrides])
+
+  const hasProcessOverride = c.hasOverrides && (c.hoursPerKg !== c.defaults.hoursPerKg || c.hourlyRate !== c.defaults.hourlyRate)
+
+  const trigger = (
+    <span className={cn(hasProcessOverride && "text-international-orange")}>
+      {formatCurrency(c.processCost)}
+    </span>
+  )
+
+  if (!onCostOverride) {
+    return (
+      <>
+        {trigger}
+        <div className="text-[9px] text-muted-foreground mt-0.5">
+          {c.massKg.toFixed(1)}kg × {c.hoursPerKg}hr/kg × £{c.hourlyRate}/hr
+        </div>
+      </>
+    )
+  }
+
+  return (
+    <Popover onOpenChange={(open) => {
+      if (open) {
+        setHoursPerKg(c.hoursPerKg)
+        setHourlyRate(c.hourlyRate)
+      }
+    }}>
+      <PopoverTrigger asChild>
+        <button type="button" className="text-right cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 transition-colors">
+          <span className="inline-flex items-center gap-1 justify-end">
+            {trigger}
+            {hasProcessOverride && (
+              <Pencil className="h-2.5 w-2.5 text-international-orange" />
+            )}
+          </span>
+          <div className="text-[9px] text-muted-foreground mt-0.5">
+            {c.massKg.toFixed(1)}kg × {c.hoursPerKg}hr/kg × £{c.hourlyRate}/hr
+          </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-3">
+        <p className="text-xs font-semibold text-foreground">Processing Assumptions</p>
+        <p className="text-[10px] text-muted-foreground">mass × hours/kg × £/hr = total</p>
+
+        <div className="space-y-2">
+          <label className="block">
+            <span className="text-[10px] text-muted-foreground">Hours per kg</span>
+            <Input
+              type="number"
+              min={0}
+              step={0.5}
+              value={hoursPerKg}
+              onChange={(e) => setHoursPerKg(parseFloat(e.target.value) || 0)}
+              onBlur={handleApply}
+              className="h-8 text-xs mt-0.5"
+            />
+          </label>
+          <label className="block">
+            <span className="text-[10px] text-muted-foreground">Hourly rate (£/hr)</span>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              value={hourlyRate}
+              onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)}
+              onBlur={handleApply}
+              className="h-8 text-xs mt-0.5"
+            />
+          </label>
+        </div>
+
+        <div className="flex items-center justify-between pt-1 border-t">
+          <p className="text-[10px] text-muted-foreground font-mono">
+            = {formatCurrency(c.massKg * hoursPerKg * hourlyRate)}
+          </p>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            <RotateCcw className="h-2.5 w-2.5" />
+            Reset to default
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -435,7 +729,7 @@ function CostDonutTooltip({
     <div className="bg-background p-2 border rounded-lg shadow-lg text-xs">
       <p className="font-medium text-foreground">{item.name}</p>
       <p className="text-muted-foreground font-mono">
-        £{item.value.toFixed(2)} ({pct}%)
+        {formatCurrency(item.value)} ({pct}%)
       </p>
     </div>
   )
@@ -466,13 +760,12 @@ function ModuleBarTooltip({
       {payload.map((p) => (
         <p key={p.dataKey} className="text-muted-foreground">
           <span style={{ color: p.color }}>●</span>{" "}
-          {p.name}: £{p.value.toFixed(2)}
+          {p.name}: {formatCurrency(p.value)}
         </p>
       ))}
       <p className="font-semibold text-foreground mt-1 border-t pt-1">
-        Total: £{total.toFixed(2)}
+        Total: {formatCurrency(total)}
       </p>
     </div>
   )
 }
-

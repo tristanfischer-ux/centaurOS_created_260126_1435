@@ -354,6 +354,14 @@ export interface CadLabModule {
     referenceTemplates: Array<{ slug: string; name: string; category: string; subcategory: string | null; description: string | null; stepUrl: string; score: number; tags?: string[] | null }>
   }
 
+  /** User overrides for cost estimation assumptions (persisted in JSONB) */
+  costOverrides?: {
+    materialCostPerKg?: number
+    hoursPerKg?: number
+    hourlyRate?: number
+    massKg?: number
+  }
+
   /** Snapshot of text fields before checkpoint revision, for redline diff display */
   conceptSnapshot?: {
     purpose: string
