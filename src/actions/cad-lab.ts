@@ -161,6 +161,7 @@ async function callClaude(
   userPrompt: string,
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   maxTokens: number = 16384,
+  timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
 ): Promise<{
   text: string
   tokensIn: number
@@ -183,7 +184,7 @@ async function callClaude(
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
       }),
-      signal: AbortSignal.timeout(600_000), // 10 min — building models need extended generation time
+      signal: AbortSignal.timeout(timeoutMs),
     })
 
     if (!response.ok) {
@@ -2055,11 +2056,14 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
+    // DECISION: 2-min timeout for decomposition — 12K char input + 8192 max tokens
+    // should complete in 30-60s. Fail fast so the user can retry instead of hanging.
     const { text, tokensIn, tokensOut } = await callClaude(
       modulePrompt,
       userPrompt,
       modelId,
       8192,
+      120_000, // 2 min timeout
     )
 
     // Parse JSON array from response — AI may wrap in markdown fences or add prose

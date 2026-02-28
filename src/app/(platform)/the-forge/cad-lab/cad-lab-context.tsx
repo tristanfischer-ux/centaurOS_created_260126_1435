@@ -647,8 +647,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const apiStart = Date.now()
 
+    // INTENT: Client-side safety timeout. If the server action silently dies (e.g. Vercel
+    // kills the function), the await never resolves and the UI hangs forever. This races
+    // the API call against a 3-minute deadline so the user can retry instead of waiting.
+    const CLIENT_TIMEOUT_MS = 180_000 // 3 min — generous buffer over the 2-min server timeout
+    const clientTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
+    )
+
     try {
-      const res = await decomposeIntoModules(subject, editableReport, modelId, domainHint)
+      const res = await Promise.race([
+        decomposeIntoModules(subject, editableReport, modelId, domainHint),
+        clientTimeout,
+      ])
       // Clear any pending padding timers now that the real result is in
       paddingTimers.forEach(clearTimeout)
 
