@@ -72,26 +72,40 @@ export default function CadStagePage(): React.ReactNode {
     // Module expansion
     expandedModuleId,
     setExpandedModuleId,
+    // Gate: CAD requires manufacturing orders OR all modules specified
+    manufacturingOrderCount,
+    isSpecificationComplete,
   } = useCadLab()
 
-  // Redirect if gate not met
+  // INTENT: CAD stage gate — mirrors getStageAccess() logic. Redirect to
+  // Assemble (previous stage) if the user navigates here before the gate is met.
   useEffect(() => {
     if (!hasResearch || modules.length === 0) {
       router.replace(FORGE_ROUTES.cadLab)
+      return
     }
-  }, [hasResearch, modules.length, router])
+    if (manufacturingOrderCount === 0 && !isSpecificationComplete) {
+      router.replace(FORGE_ROUTES.cadLabAssemble)
+    }
+  }, [hasResearch, modules.length, manufacturingOrderCount, isSpecificationComplete, router])
 
   // ── Local UI state ──
-  const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
+  // INTENT: Per-module view tab and copy state to avoid cross-module interference
+  const [viewTabByModule, setViewTabByModule] = useState<Record<string, ViewTab>>({})
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
   const [viewingModuleId, setViewingModuleId] = useState<string | null>(null)
   const [showCodeSet, setShowCodeSet] = useState<Set<string>>(new Set())
-  const [codeCopied, setCodeCopied] = useState(false)
+  const [copiedModuleId, setCopiedModuleId] = useState<string | null>(null)
 
-  const handleCopyCode = useCallback((code: string) => {
+  const getViewTab = (moduleId: string): ViewTab => viewTabByModule[moduleId] ?? "3d"
+  const setViewTab = useCallback((moduleId: string, tab: ViewTab) => {
+    setViewTabByModule((prev) => ({ ...prev, [moduleId]: tab }))
+  }, [])
+
+  const handleCopyCode = useCallback((code: string, moduleId: string) => {
     navigator.clipboard.writeText(code)
-    setCodeCopied(true)
-    setTimeout(() => setCodeCopied(false), 2000)
+    setCopiedModuleId(moduleId)
+    setTimeout(() => setCopiedModuleId(null), 2000)
   }, [])
 
   // ── Derived state ──
@@ -151,7 +165,7 @@ export default function CadStagePage(): React.ReactNode {
     }), [subject, generatedModuleCount, modules.length]),
   )
 
-  if (!hasResearch || modules.length === 0) return null
+  if (!hasResearch || modules.length === 0 || (manufacturingOrderCount === 0 && !isSpecificationComplete)) return null
 
   return (
     <div className="space-y-6">
@@ -245,7 +259,7 @@ export default function CadStagePage(): React.ReactNode {
       )}
 
       {/* ── Batch progress grid ── */}
-      {Object.keys(batchProgress).length > 0 && (
+      {modules.some((m) => batchProgress[m.id]) && (
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-foreground">Generation Progress</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -528,6 +542,23 @@ export default function CadStagePage(): React.ReactNode {
                     </div>
                   )}
 
+                  {/* Generated but result data lost — offer regeneration */}
+                  {isGenerated && !result && !isGenerating && (
+                    <div className="flex items-center justify-center gap-2 py-4 text-sm text-muted-foreground">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      <span>Result data unavailable.</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 text-xs"
+                        onClick={() => handleGenerateSingleModule(mod.id)}
+                        disabled={isAnyLoading}
+                      >
+                        <RotateCcw className="h-3 w-3" /> Regenerate
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Module results (when generated) */}
                   {isGenerated && result && (
                     <ModuleResultsView
@@ -541,10 +572,10 @@ export default function CadStagePage(): React.ReactNode {
                         else next.delete(mod.id)
                         return next
                       })}
-                      codeCopied={codeCopied}
-                      onCopyCode={handleCopyCode}
-                      activeViewTab={activeViewTab}
-                      setActiveViewTab={setActiveViewTab}
+                      codeCopied={copiedModuleId === mod.id}
+                      onCopyCode={(code) => handleCopyCode(code, mod.id)}
+                      activeViewTab={getViewTab(mod.id)}
+                      setActiveViewTab={(tab) => setViewTab(mod.id, tab)}
                       onFullscreen={(view, moduleId) => {
                         setViewingModuleId(moduleId)
                         setFullscreenView(view)

@@ -176,8 +176,9 @@ export function CadLabBottomNav(): React.ReactNode {
                   ? <CheckCircle2 className="h-4 w-4" />
                   : <Icon className="h-4 w-4" />}
                 <span className="flex items-center gap-0.5">
-                  {stage.label}
-                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase text-international-orange">β</span>}
+                  <span className="sm:hidden">{stage.mobileLabel}</span>
+                  <span className="hidden sm:inline">{stage.label}</span>
+                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase text-international-orange hidden sm:inline">β</span>}
                 </span>
               </Link>
             ) : (
@@ -188,8 +189,9 @@ export function CadLabBottomNav(): React.ReactNode {
               >
                 <Icon className="h-4 w-4" />
                 <span className="flex items-center gap-0.5">
-                  {stage.label}
-                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase opacity-50">β</span>}
+                  <span className="sm:hidden">{stage.mobileLabel}</span>
+                  <span className="hidden sm:inline">{stage.label}</span>
+                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase opacity-50 hidden sm:inline">β</span>}
                 </span>
               </button>
             )
@@ -342,7 +344,14 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                     </div>
                     <span className="text-xs font-medium text-muted-foreground/50 whitespace-nowrap">
                       <span className="sm:hidden">{stage.mobileLabel}</span>
-                      <span className="hidden sm:inline">{stage.label}</span>
+                      <span className="hidden sm:inline">
+                        {stage.label}
+                        {stage.id === "cad" && (
+                          <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground/50 border border-muted">
+                            Beta
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </button>
                 )}
