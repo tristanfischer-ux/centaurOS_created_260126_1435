@@ -20,7 +20,6 @@ import {
   Trash2,
   Clock,
   Plus,
-  ChevronRight,
   Info,
   Store,
   X,
@@ -52,28 +51,6 @@ export function CadLabProviderWrapper({ children }: { children: React.ReactNode 
       <CadLabLayoutShell>{children}</CadLabLayoutShell>
     </CadLabProvider>
   )
-}
-
-// ─── Stage label mapping for breadcrumbs ────────────────────────────
-
-const STAGE_LABELS: Record<string, string> = {
-  "": "Concept",
-  build: "Build",
-  review: "Review",
-  specify: "Specify",
-  source: "Source",
-  assemble: "Assemble",
-  cad: "CAD",
-  mashup: "Mashup Lab",
-  templates: "Template Library",
-}
-
-/**
- * Derives the current pipeline stage label from the URL pathname.
- */
-function getCurrentStageLabel(pathname: string): string {
-  const segment = pathname.replace(FORGE_ROUTES.cadLab, "").replace(/^\//, "").split("/")[0]
-  return STAGE_LABELS[segment] ?? "Concept"
 }
 
 /** Mashup Lab and Template Library are standalone tools, not pipeline stages. */
@@ -110,7 +87,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   }, [projectParam, handleLoadProject])
 
   const isAnyActive = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
-  const currentStageLabel = getCurrentStageLabel(pathname)
 
   // Auto-dismiss the research milestone banner after 8s (other milestones stay until dismissed)
   useEffect(() => {
@@ -132,60 +108,13 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
 
   return (
     <div className="space-y-6 pb-16">
-      {/* ── Header (consolidated: breadcrumb + title + badges in 2 rows) ── */}
-      <div className="pb-4 border-b border-muted space-y-2">
-        {/* Row 1: Breadcrumb + save status + projects */}
-        <div className="flex items-center justify-between">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm">
-            <Link
-              href={FORGE_ROUTES.home}
-              className="text-muted-foreground hover:text-foreground transition-colors"
-            >
-              The Forge
-            </Link>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-            {isMashupOrTemplates(pathname) ? (
-              <span className="text-foreground font-medium">{currentStageLabel}</span>
-            ) : (
-              <>
-                <span className="text-muted-foreground">Pipeline</span>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-foreground font-medium">{currentStageLabel}</span>
-              </>
-            )}
-          </nav>
-          <div className="flex items-center gap-2">
-            {activeProjectId && (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {isSaving ? (
-                  <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
-                ) : saveError ? (
-                  <><AlertCircle className="h-3 w-3 text-destructive" /> <span className="text-destructive">Save failed</span></>
-                ) : lastSaved ? (
-                  <><Save className="h-3 w-3 text-status-success" /> Saved</>
-                ) : null}
-              </span>
-            )}
-            <Button
-              variant={showProjects ? "default" : "outline"}
-              size="sm"
-              onClick={() => {
-                setShowProjects(!showProjects)
-                if (!showProjects) refreshProjects()
-              }}
-              className="gap-1.5"
-            >
-              <FolderOpen className="h-3.5 w-3.5" />
-              Projects{projects.length > 0 ? ` (${projects.length})` : ""}
-            </Button>
-          </div>
-        </div>
-        {/* Row 2: Title + inline badges */}
+      {/* ── Header: title + badges + save status + projects ── */}
+      <div className="flex items-center justify-between pb-4 border-b border-muted">
         <div className="flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-international-orange" />
           <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
           <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-            Alpha
+            Beta
           </span>
           {sector && (
             <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
@@ -193,6 +122,31 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
               {SECTOR_LABELS[sector]}
             </span>
           )}
+        </div>
+        <div className="flex items-center gap-2">
+          {activeProjectId && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {isSaving ? (
+                <><Loader2 className="h-3 w-3 animate-spin" /> Saving...</>
+              ) : saveError ? (
+                <><AlertCircle className="h-3 w-3 text-destructive" /> <span className="text-destructive">Save failed</span></>
+              ) : lastSaved ? (
+                <><Save className="h-3 w-3 text-status-success" /> Saved</>
+              ) : null}
+            </span>
+          )}
+          <Button
+            variant={showProjects ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setShowProjects(!showProjects)
+              if (!showProjects) refreshProjects()
+            }}
+            className="gap-1.5"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            Projects{projects.length > 0 ? ` (${projects.length})` : ""}
+          </Button>
         </div>
       </div>
 
