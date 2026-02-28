@@ -253,20 +253,20 @@ export function getVisualStyleSystemPrompt(): string {
 
 const BASE_DIAGNOSTICS = `For each module, output exactly these 6 fields:
 - mfg_process: One of: FDM 3D Print, SLA/Resin Print, SLS/Powder Print, CNC Machining, Sheet Metal, Injection Molding, Casting, Manual/Assembly, Other
-- material: One of: PLA/PETG, ABS/Nylon, Aluminium, Steel/Iron, Stainless Steel, Copper/Brass, Titanium, Carbon Fiber Composite, CFRP/GFRP, Wood/Plywood, Silicone/Rubber, Glass/Ceramic, PCB/Electronic, Other
-- tolerance: One of: ±1mm (hobby), ±0.5mm (standard), ±0.1mm (precision), ±0.01mm (ultra-precision)
-- surface_finish: One of: As-printed (rough), Sanded/Deburred, Painted/Coated, Anodised/Plated, Polished (mirror), Textured (mold)
-- batch_size: One of: 1-10 (prototyping), 10-100 (small batch), 100-1000 (pilot), 1000-10000 (production), 10000+ (mass production)
-- environment: One of: Indoor (office/home), Indoor (industrial), Outdoor (sheltered), Outdoor (exposed), High-temp (>80°C), Wet/Submerged, Food-safe, Medical/Cleanroom
+- material: One of: PLA/PETG, ABS/Nylon, Resin (standard), Aluminum 6061, Steel (mild), Stainless Steel, Titanium, Copper/Brass, Carbon Fiber, Wood/Plywood, Other
+- tolerance: One of: Loose (±1mm), Standard (±0.5mm), Precision (±0.1mm), Tight (±0.05mm), Ultra-tight (±0.01mm)
+- surface_finish: One of: As-manufactured, Sanded/Deburred, Painted/Coated, Anodized, Polished, Plated, N/A
+- batch_size: One of: Prototype (1–5), Small batch (10–50), Medium (50–500), Production (500+), Mass production (10k+)
+- environment: One of: Indoor (office), Indoor (industrial), Outdoor (temperate), Outdoor (harsh), High temperature, Wet/Marine, Corrosive, Cleanroom, Space/Vacuum
 
 Return a JSON object mapping module IDs to their answers. Example:
 {
   "motor_assembly": {
     "mfg_process": "CNC Machining",
-    "material": "Aluminium",
-    "tolerance": "±0.1mm (precision)",
-    "surface_finish": "Anodised/Plated",
-    "batch_size": "10-100 (small batch)",
+    "material": "Aluminum 6061",
+    "tolerance": "Precision (±0.1mm)",
+    "surface_finish": "Anodized",
+    "batch_size": "Small batch (10–50)",
     "environment": "Indoor (industrial)"
   }
 }

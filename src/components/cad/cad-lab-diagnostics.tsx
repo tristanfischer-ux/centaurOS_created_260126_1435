@@ -21,7 +21,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   FlaskConical,
   CheckCircle2,
@@ -324,6 +324,49 @@ const INFER_CATEGORIES: InferCategory[] = [
   },
 ]
 
+// ─── Environment Keyword Inference ──────────────────────────────────
+
+const ENVIRONMENT_KEYWORDS: Record<string, string[]> = {
+  "Wet/Marine": ["seawater", "marine", "underwater", "submerged", "ocean", "ship", "vessel", "bilge", "ballast", "water", "fluid", "hydraulic"],
+  "Corrosive": ["acid", "chemical", "solvent", "corrosive", "caustic"],
+  "Outdoor (harsh)": ["outdoor", "weather", "harsh", "extreme", "desert", "arctic"],
+  "Outdoor (temperate)": ["garden", "patio", "sheltered"],
+  "High temperature": ["exhaust", "furnace", "thermal", "high-temp", "oven", "kiln"],
+  "Indoor (industrial)": ["factory", "workshop", "industrial", "warehouse", "vibration"],
+  "Cleanroom": ["cleanroom", "sterile", "iso class", "particulate"],
+  "Space/Vacuum": ["space", "vacuum", "satellite", "orbit"],
+}
+
+/**
+ * Score environment keywords against module text.
+ * Returns the best-matching environment and matched keywords.
+ */
+function inferEnvironment(text: string): { environment: string; matchedKeywords: string[] } {
+  let bestEnv = "Indoor (office)"
+  let bestScore = 0
+  let bestMatched: string[] = []
+
+  for (const [env, keywords] of Object.entries(ENVIRONMENT_KEYWORDS)) {
+    const matched = keywords.filter((kw) => text.includes(kw))
+    if (matched.length > bestScore) {
+      bestScore = matched.length
+      bestEnv = env
+      bestMatched = matched
+    }
+  }
+
+  return { environment: bestEnv, matchedKeywords: bestMatched }
+}
+
+// ─── Inference Result with Reasons ──────────────────────────────────
+
+interface InferenceResult {
+  /** Suggested answer value */
+  value: string
+  /** Human-readable reason for the suggestion */
+  reason: string
+}
+
 /**
  * Infers recommended diagnostics per module using a scoring approach.
  *
@@ -332,11 +375,29 @@ const INFER_CATEGORIES: InferCategory[] = [
  * If the design brief specifies a target process or material that matches
  * a diagnostic option, those are used directly.
  *
+ * Environment is inferred separately via keyword scoring against a dedicated
+ * environment keyword map — no longer defaults blindly to "Indoor (office)".
+ *
  * @param mod - The module to analyze
  * @param designBrief - Optional design brief with user-specified targets
- * @returns Record of questionId → suggested answer
+ * @returns Record of questionId → suggested answer (string form for backward compat)
  */
 function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief): Record<string, string> {
+  const result = inferRecommendationsWithReasons(mod, designBrief)
+  const plain: Record<string, string> = {}
+  for (const [k, v] of Object.entries(result)) {
+    plain[k] = v.value
+  }
+  return plain
+}
+
+/**
+ * Full inference with reasons — used for tooltip display.
+ */
+function inferRecommendationsWithReasons(
+  mod: CadLabModule,
+  designBrief?: CadLabDesignBrief,
+): Record<string, InferenceResult> {
   const text = [mod.name, mod.purpose, mod.description, ...mod.keyParts]
     .join(" ")
     .toLowerCase()
@@ -344,40 +405,66 @@ function inferRecommendations(mod: CadLabModule, designBrief?: CadLabDesignBrief
   // Score each category by counting keyword hits
   let bestScore = 0
   let bestCat: InferCategory | null = null
+  let bestCatKeywords: string[] = []
   for (const cat of INFER_CATEGORIES) {
-    const score = cat.keywords.reduce((s, kw) => s + (matchWord(text, kw) ? 1 : 0), 0)
-    if (score > bestScore) {
-      bestScore = score
+    const matched = cat.keywords.filter((kw) => matchWord(text, kw))
+    if (matched.length > bestScore) {
+      bestScore = matched.length
       bestCat = cat
+      bestCatKeywords = matched
     }
   }
 
   let mfgProcess = bestCat?.mfgProcess ?? "FDM 3D Print"
+  let mfgReason = bestCat
+    ? `Module mentions ${bestCatKeywords.join(", ")}`
+    : "Default for early-stage prototyping"
   let material = bestCat?.material ?? "PLA/PETG"
+  let materialReason = bestCat
+    ? `Matched with ${mfgProcess}`
+    : "Default for prototyping"
   const tolerance = bestCat?.tolerance ?? "Standard (±0.5mm)"
+  const toleranceReason = bestCat
+    ? `Typical for ${mfgProcess}`
+    : "Good balance of cost and precision"
   const finish = bestCat?.finish ?? "As-manufactured"
+  const finishReason = bestCat
+    ? `Standard finish for ${mfgProcess}`
+    : "No post-processing needed for prototypes"
 
-  // Design brief overrides: use directly if they match a diagnostic option
+  // Design brief overrides
   if (designBrief?.targetProcess) {
     const bp = designBrief.targetProcess.toLowerCase()
     const processQ = DIAGNOSTIC_QUESTIONS.find((q) => q.id === "mfg_process")
     const match = processQ?.options.find((o) => o.toLowerCase().includes(bp) || bp.includes(o.toLowerCase()))
-    if (match) mfgProcess = match
+    if (match) {
+      mfgProcess = match
+      mfgReason = "Specified in design brief"
+    }
   }
   if (designBrief?.targetMaterial) {
     const bm = designBrief.targetMaterial.toLowerCase()
     const materialQ = DIAGNOSTIC_QUESTIONS.find((q) => q.id === "material")
     const match = materialQ?.options.find((o) => o.toLowerCase().includes(bm) || bm.includes(o.toLowerCase()))
-    if (match) material = match
+    if (match) {
+      material = match
+      materialReason = "Specified in design brief"
+    }
   }
 
+  // Environment inference via dedicated keyword map
+  const { environment, matchedKeywords: envKeywords } = inferEnvironment(text)
+  const envReason = envKeywords.length > 0
+    ? `Module mentions ${envKeywords.join(", ")}`
+    : "Default — no environment keywords detected"
+
   return {
-    mfg_process: mfgProcess,
-    material,
-    tolerance,
-    finish,
-    batch_size: "Prototype (1–5)",
-    environment: "Indoor (office)",
+    mfg_process: { value: mfgProcess, reason: mfgReason },
+    material: { value: material, reason: materialReason },
+    tolerance: { value: tolerance, reason: toleranceReason },
+    finish: { value: finish, reason: finishReason },
+    batch_size: { value: "Prototype (1–5)", reason: "Default for early-stage projects" },
+    environment: { value: environment, reason: envReason },
   }
 }
 
@@ -397,6 +484,10 @@ interface CadLabDiagnosticsProps {
   aiPrefilled?: boolean
   /** Design brief for smarter inference defaults */
   designBrief?: CadLabDesignBrief
+  /** Externally controlled expanded module ID (e.g. from "Edit diagnostics" button) */
+  controlledExpandedModuleId?: string | null
+  /** Called when external control should be cleared */
+  onControlledExpandClear?: () => void
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -415,8 +506,18 @@ export function CadLabDiagnostics({
   onAnswersChange,
   aiPrefilled = false,
   designBrief,
+  controlledExpandedModuleId,
+  onControlledExpandClear,
 }: CadLabDiagnosticsProps): React.ReactNode {
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
+
+  // INTENT: Allow parent to programmatically expand a module (e.g. from "Edit diagnostics" button)
+  useEffect(() => {
+    if (controlledExpandedModuleId) {
+      setExpandedModuleId(controlledExpandedModuleId)
+      onControlledExpandClear?.()
+    }
+  }, [controlledExpandedModuleId, onControlledExpandClear])
 
   // Compute completion stats
   const stats = useMemo(() => {
@@ -580,7 +681,11 @@ export function CadLabDiagnostics({
 
                 {/* Expanded questionnaire */}
                 {isExpanded && (() => {
-                  const modRecs = inferRecommendations(mod, designBrief)
+                  const modRecsWithReasons = inferRecommendationsWithReasons(mod, designBrief)
+                  const modRecs: Record<string, string> = {}
+                  for (const [k, v] of Object.entries(modRecsWithReasons)) {
+                    modRecs[k] = v.value
+                  }
                   return (
                   <div className="border-t p-4 space-y-5 bg-muted/10">
                     {/* "Use suggested answers" button — only when unanswered questions remain */}
@@ -627,13 +732,16 @@ export function CadLabDiagnostics({
                               const compat = compatMap?.[opt]
                               const isIncompat = compat === "incompatible" && !isSelected
 
-                              // Build tooltip text with compatibility note
+                              // Build tooltip text with compatibility note + suggestion reason
                               let tooltipText = q.optionDescriptions[opt] ?? opt
                               if (isIncompat) {
                                 const crossField = q.id === "material"
                                   ? modAnswers.mfg_process
                                   : modAnswers.material
                                 tooltipText += ` — Not typically used with ${crossField}`
+                              }
+                              if (isSuggested && modRecsWithReasons[q.id]?.reason) {
+                                tooltipText += ` — Suggested: ${modRecsWithReasons[q.id].reason}`
                               }
 
                               return (

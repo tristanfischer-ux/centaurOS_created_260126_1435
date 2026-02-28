@@ -276,24 +276,63 @@ export function parseBatchSize(batchStr: string): number {
   return 5
 }
 
+// ─── Keyword-based Mass Estimation ──────────────────────────────────
+
 /**
- * Get mass in kg from a module's CAD results, with fallback.
+ * Ordered keyword-to-mass map for rough mass estimation from module text.
+ * First match wins — ordered from heaviest to lightest.
+ */
+const MASS_KEYWORDS: [RegExp, number][] = [
+  [/frame|skid|chassis|structure|base/i, 50],
+  [/pump|motor|compressor|engine/i, 25],
+  [/tank|vessel|reservoir|housing/i, 20],
+  [/pipe|manifold|piping|tubing/i, 15],
+  [/valve|actuator/i, 8],
+  [/filter|strainer|cartridge/i, 5],
+  [/instrument|sensor|controller|pcb/i, 2],
+  [/seal|gasket|o-ring|insulation/i, 1],
+]
+
+/**
+ * Estimate mass from module text using keyword matching.
+ * Returns the mass of the first matching keyword category, or null if none match.
+ */
+function estimateMassFromText(moduleText: string): number | null {
+  const text = moduleText.toLowerCase()
+  for (const [pattern, massKg] of MASS_KEYWORDS) {
+    if (pattern.test(text)) return massKg
+  }
+  return null
+}
+
+/**
+ * Get mass in kg from a module's CAD results, with keyword-based estimation fallback.
  *
  * @param massPropertiesKg - from result.massProperties.massKg
  * @param massGrams - from result.massGrams
- * @param fallbackKg - fallback if no data (default 0.2)
+ * @param fallbackKg - fallback if no data and no keyword match (default 0.2)
+ * @param moduleText - optional module text (name + purpose + keyParts) for keyword-based estimation
  * @returns Object with massKg and whether it's an estimate
  */
 export function getModuleMassKg(
   massPropertiesKg: number | undefined | null,
   massGrams: number | undefined | null,
   fallbackKg = 0.2,
+  moduleText?: string,
 ): { massKg: number; isEstimated: boolean } {
   if (massPropertiesKg && massPropertiesKg > 0) {
     return { massKg: massPropertiesKg, isEstimated: false }
   }
   if (massGrams && massGrams > 0) {
     return { massKg: massGrams / 1000, isEstimated: false }
+  }
+  // INTENT: Use keyword-based estimation for realistic masses at the Specify stage
+  // where no CAD data exists yet. A seawater pump shouldn't default to 200g.
+  if (moduleText) {
+    const keywordMass = estimateMassFromText(moduleText)
+    if (keywordMass !== null) {
+      return { massKg: keywordMass, isEstimated: true }
+    }
   }
   return { massKg: fallbackKg, isEstimated: true }
 }

@@ -13,7 +13,7 @@
  * Gate: redirects to /the-forge/cad-lab (Design stage) if no research/modules exist.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Pencil,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -39,7 +40,6 @@ import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ProcessFlowDiagram } from "../components/process-flow-diagram"
 import { ProductOverviewCard } from "../components/product-overview-card"
-import { DesignIntakeForm } from "../components/design-intake-form"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
@@ -78,7 +78,7 @@ function getSpecStatusBadge(status: ReturnType<typeof getModuleSpecStatus>) {
     case "incomplete":
       return <Badge variant="secondary">Incomplete</Badge>
     case "ready-for-review":
-      return <Badge variant="warning">Ready for review</Badge>
+      return <Badge variant="warning">Diagnostics complete</Badge>
     case "specialist-approved":
       return <Badge variant="success">Approved</Badge>
   }
@@ -98,13 +98,6 @@ export default function SpecifyPage(): React.ReactNode {
     setDiagnosticAnswers,
     aiPrefilled,
     designBrief,
-    setDesignBrief,
-    assumptionNotes,
-    setAssumptionNotes,
-    designReadinessPct,
-    modelId,
-    setModelId,
-    isAnyLoading,
     productOverview,
     setProductOverview,
     interfaceContracts,
@@ -133,6 +126,16 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
 
+  // ── State for programmatically expanding a module in the diagnostics accordion ──
+  const [diagnosticsExpandedModuleId, setDiagnosticsExpandedModuleId] = useState<string | null>(null)
+  const diagnosticsRef = useRef<HTMLDivElement>(null)
+
+  const handleEditDiagnostics = useCallback((moduleId: string) => {
+    setDiagnosticsExpandedModuleId(moduleId)
+    // Scroll to the diagnostics section
+    diagnosticsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
+
   // ── Computed: module spec statuses ──
   const moduleStatuses = useMemo(() => {
     const result: Record<string, ReturnType<typeof getModuleSpecStatus>> = {}
@@ -144,6 +147,7 @@ export default function SpecifyPage(): React.ReactNode {
 
   const approvedCount = Object.values(moduleStatuses).filter((s) => s === "specialist-approved").length
   const allApproved = approvedCount === modules.length && modules.length > 0
+  const allDiagnosticsComplete = modules.length > 0 && modules.every((m) => isDiagnosticsFilledForModule(diagnosticAnswers, m.id))
 
   // INTENT: Mark modules as "specified" when they pass the gate, so the context
   // and nav stepper can reflect the pipeline state.
@@ -277,18 +281,6 @@ export default function SpecifyPage(): React.ReactNode {
               />
             )}
 
-            {/* Design brief / intake form */}
-            <DesignIntakeForm
-              modelId={modelId}
-              setModelId={setModelId}
-              designBrief={designBrief}
-              setDesignBrief={setDesignBrief}
-              assumptionNotes={assumptionNotes}
-              setAssumptionNotes={setAssumptionNotes}
-              designReadinessPct={designReadinessPct}
-              isAnyLoading={isAnyLoading}
-            />
-
             {/* Module summary cards */}
             <div>
               <h2 className="text-sm font-semibold text-foreground mb-3">Modules ({modules.length})</h2>
@@ -366,13 +358,17 @@ export default function SpecifyPage(): React.ReactNode {
         {activeTab === "specs" && (
           <motion.div key="specs" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* Diagnostics form for all modules */}
-            <CadLabDiagnostics
-              modules={modules}
-              answers={diagnosticAnswers}
-              onAnswersChange={setDiagnosticAnswers}
-              aiPrefilled={aiPrefilled}
-              designBrief={designBrief}
-            />
+            <div ref={diagnosticsRef}>
+              <CadLabDiagnostics
+                modules={modules}
+                answers={diagnosticAnswers}
+                onAnswersChange={setDiagnosticAnswers}
+                aiPrefilled={aiPrefilled}
+                designBrief={designBrief}
+                controlledExpandedModuleId={diagnosticsExpandedModuleId}
+                onControlledExpandClear={() => setDiagnosticsExpandedModuleId(null)}
+              />
+            </div>
 
             {/* Per-module specification cards */}
             <div className="space-y-4">
@@ -438,7 +434,18 @@ export default function SpecifyPage(): React.ReactNode {
 
                         {/* Diagnostic summary */}
                         <div>
-                          <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Manufacturing Diagnostics</h4>
+                          <div className="flex items-center justify-between mb-1">
+                            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Manufacturing Diagnostics</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs gap-1.5 text-international-orange hover:text-international-orange hover:bg-international-orange/10"
+                              onClick={() => handleEditDiagnostics(mod.id)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                              Edit diagnostics
+                            </Button>
+                          </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {[
                               { key: "mfg_process", label: "Process" },
@@ -543,6 +550,52 @@ export default function SpecifyPage(): React.ReactNode {
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
             />
+
+            {/* Navigation CTA */}
+            {canProceedToSource ? (
+              <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        Ready to source
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {approvedCount} module{approvedCount !== 1 ? "s" : ""} approved. Continue to match suppliers and create RFQs.
+                      </p>
+                    </div>
+                    <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
+                      Continue to Source
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : allDiagnosticsComplete ? (
+              <Card className="border-border">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Next step: get specialist approval on the{" "}
+                    <button
+                      type="button"
+                      className="text-international-orange font-medium hover:underline"
+                      onClick={() => handleTabClick("review")}
+                    >
+                      Review tab
+                    </button>{" "}
+                    to unlock sourcing.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-border">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    Complete diagnostics above to continue.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </motion.div>
         )}
 

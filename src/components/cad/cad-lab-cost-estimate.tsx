@@ -90,6 +90,14 @@ interface ModuleCost {
   isEstimated: boolean
   /** Whether the material cost is an estimate (not backed by engineering DB) */
   isCostEstimated: boolean
+  /** Material cost per kg rate */
+  materialCostPerKg: number
+  /** Processing hours per kg */
+  hoursPerKg: number
+  /** Processing hourly rate */
+  hourlyRate: number
+  /** Total tooling cost (before amortization) */
+  toolingTotal: number
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -123,10 +131,13 @@ export function CadLabCostEstimate({
       const batchSizeStr = answers.batch_size || "1-10 (prototyping)"
       const batchSize = parseBatchSize(batchSizeStr)
 
-      // Get mass from CAD result or estimate from module data
+      // Get mass from CAD result or keyword-estimate from module text
+      const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
       const { massKg, isEstimated } = getModuleMassKg(
         mod.result?.massProperties?.massKg,
         mod.result?.massGrams,
+        undefined,
+        moduleText,
       )
 
       const materialCostPerKg = MATERIAL_COST_PER_KG[material] ?? 20
@@ -155,6 +166,10 @@ export function CadLabCostEstimate({
         batchSize,
         isEstimated,
         isCostEstimated,
+        materialCostPerKg,
+        hoursPerKg,
+        hourlyRate,
+        toolingTotal,
       }
     })
   }, [modules, diagnosticAnswers])
@@ -212,7 +227,7 @@ export function CadLabCostEstimate({
           {hasAnyEstimates && (
             <div className="flex items-start gap-2 p-3 bg-status-warning-light rounded text-xs text-status-warning-dark">
               <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-              <span>Some modules use estimated mass (0.2 kg default). Generate CAD for more accurate costs.</span>
+              <span>Some modules use keyword-estimated mass. Generate CAD for more accurate costs.</span>
             </div>
           )}
 
@@ -306,8 +321,8 @@ export function CadLabCostEstimate({
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Module</th>
-                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Material</th>
-                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Process</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Raw Material</th>
+                  <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Processing</th>
                   <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Tooling</th>
                   <th scope="col" className="text-right p-2 font-semibold text-foreground">Total</th>
                 </tr>
@@ -323,7 +338,7 @@ export function CadLabCostEstimate({
                         )}
                       </div>
                       <div className="text-[10px] text-muted-foreground font-mono mt-0.5">
-                        {c.process} · {c.material} · {(c.massKg * 1000).toFixed(0)}g
+                        {c.process} · {c.material} · {c.massKg.toFixed(1)}kg
                       </div>
                     </td>
                     <td className="p-2 text-right font-mono text-foreground">
@@ -335,10 +350,23 @@ export function CadLabCostEstimate({
                           </span>
                         )}
                       </span>
+                      <div className="text-[9px] text-muted-foreground mt-0.5">
+                        {c.massKg.toFixed(1)}kg × £{c.materialCostPerKg}/kg
+                      </div>
                     </td>
-                    <td className="p-2 text-right font-mono text-foreground">£{c.processCost.toFixed(2)}</td>
+                    <td className="p-2 text-right font-mono text-foreground">
+                      £{c.processCost.toFixed(2)}
+                      <div className="text-[9px] text-muted-foreground mt-0.5">
+                        {c.massKg.toFixed(1)}kg × {c.hoursPerKg}hr/kg × £{c.hourlyRate}/hr
+                      </div>
+                    </td>
                     <td className="p-2 text-right font-mono text-foreground">
                       {c.toolingCostPerUnit > 0 ? `£${c.toolingCostPerUnit.toFixed(2)}` : "—"}
+                      {c.toolingTotal > 0 && (
+                        <div className="text-[9px] text-muted-foreground mt-0.5">
+                          £{c.toolingTotal} ÷ {c.batchSize} units
+                        </div>
+                      )}
                     </td>
                     <td className="p-2 text-right font-mono font-semibold text-foreground">£{c.totalPerUnit.toFixed(2)}</td>
                   </tr>
