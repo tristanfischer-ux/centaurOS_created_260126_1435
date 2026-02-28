@@ -34,7 +34,6 @@ import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { EmptyState } from "@/components/ui/empty-state"
 import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
@@ -45,10 +44,6 @@ import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
-
-// ─── Feature flag ─────────────────────────────────────────────────────
-
-const CAD_GENERATION_ENABLED = process.env.NEXT_PUBLIC_ENABLE_CAD_GENERATION === "true"
 
 // ─── Constants ────────────────────────────────────────────────────────
 
@@ -171,17 +166,11 @@ export default function SpecifyPage(): React.ReactNode {
   const canProceedToSource = approvedCount > 0
 
   // ── Tab navigation ──
-  const TABS = useMemo(() => {
-    const tabs = [
-      { id: "overview", label: "Overview" },
-      { id: "specs", label: "Module Specs" },
-      { id: "review", label: "Specialist Review" },
-    ]
-    if (CAD_GENERATION_ENABLED) {
-      tabs.push({ id: "cad", label: "CAD Generation" })
-    }
-    return tabs
-  }, [])
+  const TABS = [
+    { id: "overview", label: "Overview" },
+    { id: "specs", label: "Module Specs" },
+    { id: "review", label: "Specialist Review" },
+  ]
 
   const [activeTab, setActiveTab] = useState(() => {
     const param = searchParams.get("tab")
@@ -651,28 +640,6 @@ export default function SpecifyPage(): React.ReactNode {
           </motion.div>
         )}
 
-        {/* ═══ CAD Generation tab (behind feature flag) ═══ */}
-        {activeTab === "cad" && CAD_GENERATION_ENABLED && (
-          <motion.div key="cad" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            <Card>
-              <CardContent className="pt-6">
-                <EmptyState
-                  icon={<Layers className="h-8 w-8" />}
-                  title="CAD Generation"
-                  description="Parametric CadQuery model generation is available as an advanced feature. Visit the Build page to generate CAD models."
-                  action={
-                    <Button
-                      variant="secondary"
-                      onClick={() => router.push(FORGE_ROUTES.cadLabBuild)}
-                    >
-                      Go to Build
-                    </Button>
-                  }
-                />
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
       </AnimatePresence>
     </div>
   )
