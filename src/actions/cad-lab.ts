@@ -284,6 +284,63 @@ async function callGeminiWithSearch(
   }
 }
 
+// ─── Gemini API Call (plain text, no search grounding) ───────────────
+
+/**
+ * Calls Gemini for plain text generation (no search grounding).
+ *
+ * @description Used as a fallback when Claude is unavailable (spend limit,
+ * rate limit). Returns the same shape as `callClaude` for drop-in use.
+ *
+ * @param systemPrompt - System-level instructions
+ * @param userPrompt - User message
+ * @param modelId - Gemini model to use
+ * @param maxTokens - Maximum output tokens
+ * @param timeoutMs - Request timeout in milliseconds
+ * @returns Response text and token counts
+ */
+async function callGemini(
+  systemPrompt: string,
+  userPrompt: string,
+  modelId: string = "gemini-2.5-pro-preview-05-06",
+  maxTokens: number = 8192,
+  timeoutMs: number = 120_000,
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY
+  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ parts: [{ text: userPrompt }] }],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.2,
+      },
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+  const usage = data.usageMetadata ?? {}
+
+  return {
+    text,
+    tokensIn: usage.promptTokenCount ?? 0,
+    tokensOut: usage.candidatesTokenCount ?? 0,
+  }
+}
+
 // ─── Thingiverse CAD Model Search ────────────────────────────────────
 
 /** Search result from Thingiverse API */
@@ -2058,13 +2115,25 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
 
     // DECISION: 2-min timeout for decomposition — 12K char input + 8192 max tokens
     // should complete in 30-60s. Fail fast so the user can retry instead of hanging.
-    const { text, tokensIn, tokensOut } = await callClaude(
-      modulePrompt,
-      userPrompt,
-      modelId,
-      8192,
-      120_000, // 2 min timeout
-    )
+    // INTENT: Fall back to Gemini when Claude is unavailable (spend limit, rate limit, overloaded)
+    let text: string, tokensIn: number, tokensOut: number
+    try {
+      ({ text, tokensIn, tokensOut } = await callClaude(
+        modulePrompt,
+        userPrompt,
+        modelId,
+        8192,
+        120_000, // 2 min timeout
+      ))
+    } catch (claudeErr) {
+      const msg = claudeErr instanceof Error ? claudeErr.message : ""
+      if (msg.includes("429") || msg.includes("529") || msg.includes("overloaded") || msg.includes("billing") || msg.includes("spending")) {
+        console.warn("[THE-FORGE] Claude unavailable, falling back to Gemini for decomposition:", msg.slice(0, 200))
+        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+      } else {
+        throw claudeErr
+      }
+    }
 
     // Parse JSON array from response — AI may wrap in markdown fences or add prose
     const jsonText = extractJsonArray(text)
@@ -2075,14 +2144,15 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     } catch {
       console.warn("[THE-FORGE] Initial JSON parse failed, attempting repair. Fragment:", jsonText.slice(0, 500))
 
-      // INTENT: One retry with a repair prompt — Claude can fix its own malformed JSON
+      // INTENT: One retry with a repair prompt — Claude (or Gemini fallback) can fix malformed JSON
       try {
-        const { text: repairedText } = await callClaude(
-          "You are a JSON repair tool. Fix the following broken JSON array so it parses correctly. Output ONLY the corrected JSON array, nothing else.",
-          jsonText,
-          modelId,
-          8192,
-        )
+        const repairSystem = "You are a JSON repair tool. Fix the following broken JSON array so it parses correctly. Output ONLY the corrected JSON array, nothing else."
+        let repairedText: string
+        try {
+          ({ text: repairedText } = await callClaude(repairSystem, jsonText, modelId, 8192))
+        } catch {
+          ({ text: repairedText } = await callGemini(repairSystem, jsonText))
+        }
         const repairedJson = extractJsonArray(repairedText)
         rawModules = JSON.parse(repairedJson)
         console.info("[THE-FORGE] JSON repair succeeded")
