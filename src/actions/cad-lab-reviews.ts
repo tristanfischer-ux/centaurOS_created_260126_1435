@@ -116,8 +116,8 @@ export async function requestSpecialistReview(
         if (!targetModule) {
             return { error: `Module "${req.moduleId}" not found` }
         }
-        if (targetModule.status !== "generated" && !targetModule.result) {
-            return { error: "Module must be generated before review" }
+        if (targetModule.status !== "generated" && targetModule.status !== "specified" && !targetModule.result) {
+            return { error: "Module must be specified or generated before review" }
         }
 
         // ── Build context ──

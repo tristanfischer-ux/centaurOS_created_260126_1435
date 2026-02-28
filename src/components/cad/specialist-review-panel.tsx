@@ -288,7 +288,7 @@ export function SpecialistReviewPanel({
         : "pass"
         : null
 
-    const isModuleGenerated = module.status === "generated" || !!module.result
+    const isModuleGenerated = module.status === "generated" || module.status === "specified" || !!module.result
 
     return (
         <div className="space-y-3">
