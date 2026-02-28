@@ -43,6 +43,7 @@ interface ModuleImageGridProps {
   expandedModuleId: string | null
   onToggleExpand: (id: string) => void
   onModuleSave?: (updated: CadLabModule) => void
+  onRetryModule?: (moduleId: string) => void
 }
 
 // ─── Module Detail Dialog ─────────────────────────────────────────────
@@ -426,6 +427,7 @@ export function ModuleImageGrid({
   expandedModuleId,
   onToggleExpand,
   onModuleSave,
+  onRetryModule,
 }: ModuleImageGridProps): React.ReactNode {
   const visibleModules = modules.filter((m) => revealedModuleIds.has(m.id))
   const selectedModule = expandedModuleId
@@ -453,6 +455,7 @@ export function ModuleImageGrid({
                 module={module}
                 isExpanded={expandedModuleId === module.id}
                 onToggleExpand={() => onToggleExpand(module.id)}
+                onRetry={onRetryModule ? () => onRetryModule(module.id) : undefined}
               />
             </motion.div>
           ))}

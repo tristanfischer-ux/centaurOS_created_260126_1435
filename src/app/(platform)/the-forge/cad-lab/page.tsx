@@ -54,7 +54,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleResearch, handleDecompose,
     modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
-    isGeneratingImages,
+    isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
     interfaceContracts, isExtractingContracts, generatingModuleIds,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
@@ -86,6 +86,12 @@ export default function CadLabResearchPage(): React.ReactNode {
   const handleModuleClick = (moduleId: string): void => {
     setExpandedModuleId(expandedModuleId === moduleId ? null : moduleId)
   }
+
+  // Retry image generation for a single failed module
+  const handleRetryModule = useCallback((moduleId: string) => {
+    const mod = modules.find((m) => m.id === moduleId)
+    if (mod) handleGenerateModuleImages([mod])
+  }, [modules, handleGenerateModuleImages])
 
   useRegisterScreenContext(
     useMemo(() => {
@@ -405,6 +411,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                 expandedModuleId={expandedModuleId}
                 onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
                 onModuleSave={handleUpdateModule}
+                onRetryModule={handleRetryModule}
               />
 
               {/* Process flow — how modules connect via inputs and outputs */}

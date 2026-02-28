@@ -17,8 +17,9 @@
  * - Build detail: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { ImageIcon, Loader2 } from "lucide-react"
+import { ImageIcon, Loader2, RefreshCw } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -29,11 +30,13 @@ interface ModuleImageCardProps {
   isExpanded?: boolean
   /** Kept for API compatibility with ModuleImageGrid but unused in simplified card */
   onToggleExpand?: () => void
+  /** Retry callback for failed image generation */
+  onRetry?: () => void
 }
 
 // ─── Image Section ────────────────────────────────────────────────────
 
-function ImageSection({ module }: { module: CadLabModule }): React.ReactNode {
+function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () => void }): React.ReactNode {
   const status = module.imageStatus
 
   // Pending — static skeleton
@@ -77,20 +80,25 @@ function ImageSection({ module }: { module: CadLabModule }): React.ReactNode {
       <span className="text-xs text-muted-foreground/60 text-center line-clamp-2">
         {module.imageError || "Image unavailable"}
       </span>
+      {onRetry && (
+        <Button variant="ghost" size="sm" className="h-6 text-xs gap-1" onClick={(e) => { e.stopPropagation(); onRetry(); }}>
+          <RefreshCw className="h-3 w-3" /> Retry
+        </Button>
+      )}
     </div>
   )
 }
 
 // ─── Main Component ───────────────────────────────────────────────────
 
-export function ModuleImageCard({ module, onToggleExpand }: ModuleImageCardProps): React.ReactNode {
+export function ModuleImageCard({ module, onToggleExpand, onRetry }: ModuleImageCardProps): React.ReactNode {
   return (
     <Card
       className="overflow-hidden border hover:border-international-orange/30 transition-colors cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] duration-200"
       onClick={onToggleExpand}
     >
       {/* Image */}
-      <ImageSection module={module} />
+      <ImageSection module={module} onRetry={onRetry} />
 
       {/* Content — name + purpose only */}
       <CardContent className="p-4 space-y-1">

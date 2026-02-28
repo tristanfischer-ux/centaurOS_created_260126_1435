@@ -886,7 +886,27 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
-        const res = await generateCadLabSingleImageAction(projectId, mod, visualStyle, referenceBase64)
+        // INTENT: Strip heavy data (SVGs, code, research, templateMatchResult) to stay under
+        // the 4 MB Next.js bodySizeLimit. The image server action only needs identity + text
+        // fields for prompt construction.
+        const slimMod: CadLabModule = {
+          id: mod.id,
+          name: mod.name,
+          purpose: mod.purpose,
+          inputs: mod.inputs,
+          outputs: mod.outputs,
+          keyParts: mod.keyParts,
+          leadWeeks: mod.leadWeeks,
+          description: mod.description,
+          whyItMatters: mod.whyItMatters,
+          failureModes: mod.failureModes,
+          unknowns: mod.unknowns,
+          status: mod.status,
+          moduleImagePrompt: mod.moduleImagePrompt,
+          seedTemplateSlug: mod.seedTemplateSlug,
+          imageStatus: mod.imageStatus,
+        }
+        const res = await generateCadLabSingleImageAction(projectId, slimMod, visualStyle, referenceBase64)
         if ("module" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
@@ -898,9 +918,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           )
         }
         revealModule(mod.id)
-      } catch {
+      } catch (err) {
+        const errorMsg = err instanceof Error ? err.message : "Image generation failed"
+        console.error(`[CAD-LAB] Image generation failed for ${mod.name}:`, err)
         setModules((prev) =>
-          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: "Network error" } : m)),
+          prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: errorMsg } : m)),
         )
         revealModule(mod.id)
       }
