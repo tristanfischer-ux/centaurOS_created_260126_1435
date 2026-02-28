@@ -36,7 +36,7 @@ import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
 import { ModuleImageGrid } from "./components/module-image-grid"
-import { ProcessFlowDiagram } from "./components/process-flow-diagram"
+import { ModuleFlowCanvas } from "./components/module-flow-canvas"
 import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
@@ -56,7 +56,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages,
     revealedModuleIds,
-    interfaceContracts, isExtractingContracts,
+    interfaceContracts, isExtractingContracts, generatingModuleIds,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines,
     checkpoints, isCheckpointing,
@@ -378,7 +378,14 @@ export default function CadLabResearchPage(): React.ReactNode {
                   Extracting interface contracts...
                 </p>
               )}
-              <ProcessFlowDiagram modules={modules} onModuleClick={handleModuleClick} interfaceContracts={interfaceContracts} />
+              {modules.length > 1 && (
+                <ModuleFlowCanvas
+                  modules={modules}
+                  onModuleClick={handleModuleClick}
+                  interfaceContracts={interfaceContracts}
+                  generatingModuleIds={generatingModuleIds}
+                />
+              )}
 
               {/* Specialist checkpoint — early feedback before generation */}
               {(isCheckpointing || (checkpoints && Object.keys(checkpoints).length > 0)) && (
