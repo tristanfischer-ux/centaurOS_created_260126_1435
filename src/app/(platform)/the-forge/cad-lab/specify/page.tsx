@@ -38,7 +38,7 @@ import { Badge } from "@/components/ui/badge"
 import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
-import { ProcessFlowDiagram } from "../components/process-flow-diagram"
+import { ModuleFlowCanvas } from "../components/module-flow-canvas"
 import { ProductOverviewCard } from "../components/product-overview-card"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -104,6 +104,7 @@ export default function SpecifyPage(): React.ReactNode {
     isExtractingContracts,
     earlyCostEstimates,
     activeProjectId,
+    generatingModuleIds,
   } = useCadLab()
 
   // Redirect to Design if no research or modules
@@ -341,14 +342,17 @@ export default function SpecifyPage(): React.ReactNode {
                     Extracting interface contracts...
                   </p>
                 )}
-                <ProcessFlowDiagram
-                  modules={modules}
-                  onModuleClick={(id) => {
-                    setActiveTab("specs")
-                    setExpandedModuleId(id)
-                  }}
-                  interfaceContracts={interfaceContracts}
-                />
+                {modules.length > 1 && (
+                  <ModuleFlowCanvas
+                    modules={modules}
+                    onModuleClick={(id) => {
+                      setActiveTab("specs")
+                      setExpandedModuleId(id)
+                    }}
+                    interfaceContracts={interfaceContracts}
+                    generatingModuleIds={generatingModuleIds}
+                  />
+                )}
               </div>
             )}
           </motion.div>
