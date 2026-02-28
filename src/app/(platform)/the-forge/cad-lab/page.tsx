@@ -280,15 +280,23 @@ export default function CadLabResearchPage(): React.ReactNode {
 
                   {/* Idle placeholder — visible before illustration generation starts */}
                   {systemIllustrationStatus === "idle" && (
-                    <Card className="overflow-hidden border-dashed border-muted-foreground/20">
+                    <Card className={`overflow-hidden border-dashed border-muted-foreground/20${isDecomposing ? " animate-pulse" : ""}`}>
                       <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-2 text-center px-6">
-                          <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
-                          <span className="text-sm text-muted-foreground">
-                            {isDecomposing
-                              ? "Mapping sub-assemblies — concept illustration will generate once complete"
-                              : "Waiting for sub-assemblies before generating the concept illustration"}
-                          </span>
+                        <div className="flex flex-col items-center gap-3 text-center px-6">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+                          <div className="flex flex-col items-center gap-1">
+                            <span className="text-sm font-medium text-muted-foreground">
+                              {isDecomposing ? "Mapping sub-assemblies..." : "Preparing sub-assembly analysis..."}
+                            </span>
+                            {isDecomposing && progressLines.length > 0 && (
+                              <span className="text-xs text-muted-foreground/70 max-w-[280px] truncate">
+                                {progressLines[progressLines.length - 1]}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground/50 mt-1">
+                              Concept illustration will generate once complete
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </Card>
