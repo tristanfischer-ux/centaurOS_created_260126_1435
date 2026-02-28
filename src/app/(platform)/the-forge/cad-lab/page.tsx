@@ -131,17 +131,20 @@ export default function CadLabResearchPage(): React.ReactNode {
   })
 
   const handleTabClick = useCallback((tabId: string) => {
+    if (tabId === "modules") setModulesUnseen(false)
     setActiveTab(tabId)
     const params = new URLSearchParams(searchParams.toString())
     params.set("tab", tabId)
     router.replace(`?${params.toString()}`, { scroll: false })
   }, [router, searchParams])
 
-  // INTENT: Auto-switch to Modules tab when decomposition completes
+  // INTENT: Show a pulsing notification dot on the Modules tab when modules
+  // first appear, instead of auto-switching tabs (which was disorienting).
+  const [modulesUnseen, setModulesUnseen] = useState(false)
   const prevModuleCount = useMemo(() => ({ current: 0 }), [])
   useEffect(() => {
     if (modules.length > 0 && prevModuleCount.current === 0) {
-      setActiveTab("modules")
+      setModulesUnseen(true)
     }
     prevModuleCount.current = modules.length
   }, [modules.length, prevModuleCount])
@@ -181,6 +184,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                 }`}
               >
                 {tab.label}
+                {tab.id === "modules" && modulesUnseen && (
+                  <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-international-orange animate-pulse" />
+                )}
               </button>
             ))}
           </div>

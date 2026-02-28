@@ -334,7 +334,7 @@ async function callNanoBananaImageWithReference(
   const body = {
     contents: [{
       parts: [
-        { inlineData: { mimeType: "image/png", data: referenceBase64 } },
+        { inlineData: { mimeType: "image/jpeg", data: referenceBase64 } },
         { text: prompt },
       ],
     }],
@@ -567,7 +567,7 @@ export async function cropReferenceFor3x2(base64Png: string): Promise<string> {
   const cropped = await sharp(buf)
     .extract({ left, top, width: cropWidth, height: cropHeight })
     .resize(1536, 1024)
-    .png()
+    .jpeg({ quality: 85 })
     .toBuffer()
 
   return cropped.toString("base64")
