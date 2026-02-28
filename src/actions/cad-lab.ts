@@ -117,13 +117,20 @@ async function lookupUserSector(
 
 /** Extract a JSON array from AI text that may contain markdown fences or prose. */
 function extractJsonArray(text: string): string {
-  const trimmed = text.trim()
-  const first = trimmed.indexOf("[")
-  const last = trimmed.lastIndexOf("]")
+  let cleaned = text.trim()
+  // Strip markdown code fences (```json ... ``` or ``` ... ```)
+  cleaned = cleaned.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "")
+  // Remove single-line // comments (but not inside strings — good-enough heuristic)
+  cleaned = cleaned.replace(/^\s*\/\/.*$/gm, "")
+  // Remove trailing commas before ] or }
+  cleaned = cleaned.replace(/,\s*([}\]])/g, "$1")
+
+  const first = cleaned.indexOf("[")
+  const last = cleaned.lastIndexOf("]")
   if (first !== -1 && last > first) {
-    return trimmed.slice(first, last + 1)
+    return cleaned.slice(first, last + 1)
   }
-  return trimmed
+  return cleaned
 }
 
 /** Extract a JSON object from AI text that may contain markdown fences or prose. */
@@ -2050,14 +2057,29 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     try {
       rawModules = JSON.parse(jsonText)
     } catch {
-      console.error("[THE-FORGE] Failed to parse module JSON:", jsonText.slice(0, 200))
-      return {
-        success: false,
-        error: "Failed to parse module decomposition — AI returned invalid JSON",
-        modules: [],
-        decompositionTime: Date.now() - start,
-        tokensIn,
-        tokensOut,
+      console.warn("[THE-FORGE] Initial JSON parse failed, attempting repair. Fragment:", jsonText.slice(0, 500))
+
+      // INTENT: One retry with a repair prompt — Claude can fix its own malformed JSON
+      try {
+        const { text: repairedText } = await callClaude(
+          "You are a JSON repair tool. Fix the following broken JSON array so it parses correctly. Output ONLY the corrected JSON array, nothing else.",
+          jsonText,
+          modelId,
+          8192,
+        )
+        const repairedJson = extractJsonArray(repairedText)
+        rawModules = JSON.parse(repairedJson)
+        console.info("[THE-FORGE] JSON repair succeeded")
+      } catch {
+        console.error("[THE-FORGE] JSON repair also failed. Original fragment:", jsonText.slice(0, 500))
+        return {
+          success: false,
+          error: "Failed to parse module decomposition — AI returned invalid JSON",
+          modules: [],
+          decompositionTime: Date.now() - start,
+          tokensIn,
+          tokensOut,
+        }
       }
     }
 
