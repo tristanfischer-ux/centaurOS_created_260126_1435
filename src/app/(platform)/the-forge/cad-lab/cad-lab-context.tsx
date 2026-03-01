@@ -850,6 +850,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const catchMsg = err instanceof Error ? err.message : "Decomposition failed"
       setDecompositionError(catchMsg)
       setProgressLines([`Decomposition failed: ${catchMsg}`])
+      toast.error(catchMsg)
     } finally {
       setIsDecomposing(false)
     }

@@ -289,38 +289,49 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
 
-                  {/* Idle placeholder — visible before illustration generation starts */}
-                  {systemIllustrationStatus === "idle" && (
+                  {/* Idle placeholder — only show spinner when decomposition is actively running */}
+                  {systemIllustrationStatus === "idle" && !decompositionError && (
                     <Card className={`overflow-hidden border-dashed border-muted-foreground/20${isDecomposing ? " animate-pulse" : ""}`}>
                       <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3 text-center px-6">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-sm font-medium text-muted-foreground">
-                              {isDecomposing ? "Mapping sub-assemblies..." : "Preparing sub-assembly analysis..."}
-                            </span>
-                            {isDecomposing && progressLines.length > 0 && (
-                              <div className="flex flex-col items-center gap-1 max-w-[360px]">
-                                {progressLines.slice(-3).map((line, i, arr) => (
-                                  <span
-                                    key={progressLines.length - arr.length + i}
-                                    className={`text-xs truncate max-w-full ${
-                                      i === arr.length - 1
-                                        ? "text-muted-foreground/70"
-                                        : "text-muted-foreground/35"
-                                    }`}
-                                  >
-                                    {line}
+                          {isDecomposing ? (
+                            <>
+                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-sm font-medium text-muted-foreground">
+                                  Mapping sub-assemblies...
+                                </span>
+                                {progressLines.length > 0 && (
+                                  <div className="flex flex-col items-center gap-1 max-w-[360px]">
+                                    {progressLines.slice(-3).map((line, i, arr) => (
+                                      <span
+                                        key={progressLines.length - arr.length + i}
+                                        className={`text-xs truncate max-w-full ${
+                                          i === arr.length - 1
+                                            ? "text-muted-foreground/70"
+                                            : "text-muted-foreground/35"
+                                        }`}
+                                      >
+                                        {line}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {decompositionElapsed > 0 && (
+                                  <span className="text-xs text-muted-foreground/50 mt-1 tabular-nums">
+                                    {decompositionElapsed}s elapsed
                                   </span>
-                                ))}
+                                )}
                               </div>
-                            )}
-                            {isDecomposing && decompositionElapsed > 0 && (
-                              <span className="text-xs text-muted-foreground/50 mt-1 tabular-nums">
-                                {decompositionElapsed}s elapsed
+                            </>
+                          ) : (
+                            <>
+                              <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                              <span className="text-xs text-muted-foreground">
+                                System illustration will appear here after decomposition
                               </span>
-                            )}
-                          </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </Card>

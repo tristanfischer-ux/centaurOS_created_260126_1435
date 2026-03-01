@@ -2128,14 +2128,26 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         "claude-opus-4-6",
         8192,
         180_000, // 3 min timeout — Opus is slower but worth it for architectural quality
-        1, // INTENT: Fail fast on first Claude error → Gemini fallback (no 28s wasted retrying spend limits)
+        1, // INTENT: Fail fast on first Claude error → Sonnet fallback (no 28s wasted retrying spend limits)
       ))
-    } catch (claudeErr) {
-      // DECISION: Fall back to Gemini on ALL Claude errors, not just specific status codes.
-      // Spend limits, timeouts, 500s, network failures — Gemini can handle any of these.
-      // If Gemini also fails, the outer catch handles it.
-      console.warn("[THE-FORGE] Claude failed, falling back to Gemini:", claudeErr instanceof Error ? claudeErr.message.slice(0, 200) : String(claudeErr))
-      ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+    } catch (opusErr) {
+      // DECISION: Opus → Sonnet → Gemini fallback chain.
+      // Opus and Sonnet have separate rate/spend limits. Specialists already prove Sonnet works,
+      // so try it before falling to Gemini. If all three fail, the outer catch handles it.
+      console.warn("[THE-FORGE] Opus failed, trying Sonnet:", opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr))
+      try {
+        ({ text, tokensIn, tokensOut } = await callClaude(
+          modulePrompt,
+          userPrompt,
+          "claude-sonnet-4-6",
+          8192,
+          120_000,
+          1,
+        ))
+      } catch (sonnetErr) {
+        console.warn("[THE-FORGE] Sonnet also failed, falling back to Gemini:", sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr))
+        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+      }
     }
 
     // Parse JSON array from response — AI may wrap in markdown fences or add prose
