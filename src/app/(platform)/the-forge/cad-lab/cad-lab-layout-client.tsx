@@ -9,7 +9,7 @@
  * (a server component that also exports maxDuration).
  */
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
@@ -20,15 +20,11 @@ import {
   Trash2,
   Clock,
   Plus,
-  Info,
-  Store,
-  X,
   ShieldAlert,
   AlertCircle,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   Dialog,
   DialogContent,
@@ -95,16 +91,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     return () => clearTimeout(timer)
   }, [milestone, setMilestone])
 
-  // Dismissible disclaimer state — persisted in localStorage
-  const DISCLAIMER_KEY = "forge-disclaimer-dismissed"
-  const [disclaimerDismissed, setDisclaimerDismissed] = useState(true) // default hidden to avoid flash
-  useEffect(() => {
-    setDisclaimerDismissed(localStorage.getItem(DISCLAIMER_KEY) === "true")
-  }, [])
-  const handleDismissDisclaimer = useCallback(() => {
-    localStorage.setItem(DISCLAIMER_KEY, "true")
-    setDisclaimerDismissed(true)
-  }, [])
 
   return (
     <div className="space-y-6 pb-16">
@@ -150,41 +136,14 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         </div>
       </div>
 
-      {/* ── Disclaimer: outputs are for exploration, not final; recruit experts via marketplace ── */}
-      {disclaimerDismissed ? (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldAlert className="h-3.5 w-3.5 text-status-info flex-shrink-0" />
-          <span>For exploration only — outputs must be checked by qualified people.</span>
-          <Link href="/marketplace" className="text-electric-blue hover:underline whitespace-nowrap">
-            Find experts
-          </Link>
-        </div>
-      ) : (
-        <Alert variant="default" className="border-status-info bg-status-info-light/30 relative">
-          <Info className="h-4 w-4 text-status-info" />
-          <AlertTitle className="text-sm font-semibold text-foreground pr-8">
-            For exploration only—not final drawings
-          </AlertTitle>
-          <AlertDescription className="text-sm text-foreground/90">
-            The information and drawings from this pipeline are to help you get an idea of the things to think about. They are <strong>not</strong> actual final drawings and <strong>must be checked by qualified people</strong> before use. Recruit relevant experts via the marketplace to validate and finalise your design.
-            <div className="mt-2">
-              <Button variant="outline" size="sm" className="gap-1.5 border-electric-blue text-electric-blue hover:bg-electric-blue-light/20" asChild>
-                <Link href="/marketplace">
-                  <Store className="h-3.5 w-3.5" />
-                  Find experts in the marketplace
-                </Link>
-              </Button>
-            </div>
-          </AlertDescription>
-          <button
-            onClick={handleDismissDisclaimer}
-            className="absolute top-3 right-3 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            aria-label="Dismiss disclaimer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </Alert>
-      )}
+      {/* ── Disclaimer: compact one-liner — outputs are for exploration, not final ── */}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <ShieldAlert className="h-3.5 w-3.5 text-status-info flex-shrink-0" />
+        <span>For exploration only — outputs must be checked by qualified people.</span>
+        <Link href="/marketplace" className="text-electric-blue hover:underline whitespace-nowrap">
+          Find experts
+        </Link>
+      </div>
 
       {/* ── Project Browser Dialog ── */}
       <Dialog open={showProjects} onOpenChange={setShowProjects}>
