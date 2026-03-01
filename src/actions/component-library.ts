@@ -15,6 +15,8 @@
 
 import { createClient } from "@/lib/supabase/server"
 import type { Sector } from "@/types/foundry"
+import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
+import type { CadLabModule } from "@/lib/cad-lab-types"
 
 // ─── Catalogue Browsing Types ────────────────────────────────────────
 
@@ -32,7 +34,7 @@ export interface ComponentListItem {
   id: string
   name: string
   manufacturer: string | null
-  geometry_type_slug: string
+  geometry_type_slug: string | null
   material: string | null
   verified: boolean | null
   thumbnail_url: string | null
@@ -790,4 +792,204 @@ export async function prepareCodeWithLibrary(
     combinedCode,
     libraryComponents: usedSlugs,
   }
+}
+
+// ─── BOM Grounding: Real Component Catalogue for Prompts ─────────────
+
+/** Keys in geometry_params that are CadQuery-only and not useful for BOM prompts */
+const SKIP_PARAMS = new Set([
+  "corner_r", "fillet_r", "chamfer_r", "wall_t", "base_t",
+  "draft_angle", "shell_t", "render_detail",
+])
+
+/**
+ * Formats the top key-value pairs from geometry_params into a human-readable specs line.
+ *
+ * @description Picks up to 6 interesting params, skipping CadQuery-internal keys,
+ * and formats them as a comma-separated string with units inferred from key names.
+ *
+ * @param params - geometry_params JSONB object from component_catalogue
+ * @returns Formatted specs string, e.g. "NEMA17, 1.8°, 40mm body, 5mm shaft, 1.7A"
+ */
+function formatSpecsFromParams(params: Record<string, unknown> | null): string {
+  if (!params) return ""
+
+  const entries = Object.entries(params).filter(([k]) => !SKIP_PARAMS.has(k))
+  const formatted: string[] = []
+
+  for (const [key, val] of entries) {
+    if (formatted.length >= 6) break
+    if (val === null || val === undefined) continue
+
+    const k = key.toLowerCase()
+    const v = String(val)
+
+    // Infer unit suffix from key name
+    if (k.includes("_mm") || k.endsWith("_mm")) {
+      formatted.push(`${v}mm ${k.replace(/_mm$/, "").replace(/_/g, " ")}`)
+    } else if (k.includes("_v") || k === "voltage_v") {
+      formatted.push(`${v}V`)
+    } else if (k.includes("_a") || k === "rated_current_a" || k === "max_current_a") {
+      formatted.push(`${v}A`)
+    } else if (k.includes("_deg") || k === "step_angle_deg") {
+      formatted.push(`${v}°`)
+    } else if (k.includes("_nm") || k === "holding_torque_nm" || k === "max_torque_nm") {
+      formatted.push(`${v}Nm`)
+    } else if (k.includes("_g") || k === "weight_g") {
+      formatted.push(`${v}g`)
+    } else if (k.includes("_bar")) {
+      formatted.push(`${v}bar`)
+    } else if (k.includes("_pct")) {
+      formatted.push(`${v}%`)
+    } else if (k.includes("_khz")) {
+      formatted.push(`${v}kHz`)
+    } else if (k.includes("_lpm")) {
+      formatted.push(`${v}L/min`)
+    } else if (k.includes("_ml_min")) {
+      formatted.push(`${v}mL/min`)
+    } else if (k.includes("nema_size")) {
+      formatted.push(`NEMA${v}`)
+    } else if (typeof val === "boolean") {
+      if (val) formatted.push(k.replace(/_/g, " "))
+    } else {
+      formatted.push(`${k.replace(/_/g, " ")}: ${v}`)
+    }
+  }
+
+  return formatted.join(", ")
+}
+
+interface CatalogueRow {
+  id: string
+  name: string
+  manufacturer: string | null
+  part_number: string | null
+  geometry_params: Record<string, unknown> | null
+  weight_g: number | null
+  sources: Array<{ price?: number; currency?: string }> | null
+}
+
+/**
+ * Fetches relevant catalogue components and formats them as a prompt reference block.
+ *
+ * @description Two-pass query: domain filter via tags GIN index, then optional keyword
+ * full-text boost. Merges, deduplicates, caps at 30 parts, and formats as numbered list.
+ *
+ * @param domain - CadLabDomain to filter by (matches first tag)
+ * @param keywords - Optional keywords for full-text search boosting
+ * @returns Formatted catalogue reference string for prompt injection, or empty string
+ */
+export async function fetchCatalogueForPrompt(
+  domain: CadLabDomain,
+  keywords?: string[],
+): Promise<string> {
+  const supabase = await createClient()
+
+  // INTENT: Pass 1 — domain filter using GIN index on tags
+  const { data: domainRows, error: domainErr } = await supabase
+    .from("component_catalogue")
+    .select("id, name, manufacturer, part_number, geometry_params, weight_g, sources")
+    .contains("tags", [domain])
+    .limit(50)
+
+  if (domainErr) {
+    console.error("[ComponentLibrary] Catalogue domain query failed:", domainErr.message)
+    return ""
+  }
+
+  const resultMap = new Map<string, CatalogueRow>()
+  for (const row of (domainRows ?? []) as CatalogueRow[]) {
+    resultMap.set(row.id, row)
+  }
+
+  // INTENT: Pass 2 — keyword boost via text search on name
+  if (keywords && keywords.length > 0) {
+    const keywordSet = keywords.slice(0, 10) // Cap keyword count
+    for (const kw of keywordSet) {
+      if (kw.length < 2) continue
+      const { data: kwRows } = await supabase
+        .from("component_catalogue")
+        .select("id, name, manufacturer, part_number, geometry_params, weight_g, sources")
+        .ilike("name", `%${kw}%`)
+        .limit(5)
+
+      for (const row of (kwRows ?? []) as CatalogueRow[]) {
+        resultMap.set(row.id, row)
+      }
+    }
+  }
+
+  const parts = [...resultMap.values()].slice(0, 30)
+  if (parts.length === 0) return ""
+
+  // Format each part as a compact block
+  const lines = parts.map((p, i) => {
+    const specs = formatSpecsFromParams(p.geometry_params)
+    const weight = p.weight_g ? `${p.weight_g}g` : "—"
+
+    // Extract cheapest price from sources
+    let priceStr = "—"
+    if (p.sources && Array.isArray(p.sources) && p.sources.length > 0) {
+      const prices = p.sources
+        .filter((s) => typeof s.price === "number")
+        .map((s) => s.price as number)
+      if (prices.length > 0) {
+        const cheapest = Math.min(...prices)
+        priceStr = `~GBP ${cheapest.toFixed(2)}`
+      }
+    }
+
+    return `[${i + 1}] ${p.name} | ${p.manufacturer ?? "Generic"} | MPN: ${p.part_number ?? "N/A"}
+    Specs: ${specs || "see datasheet"}
+    Weight: ${weight} | ${priceStr}`
+  })
+
+  return `\nREAL COMPONENT CATALOGUE — ${parts.length} verified parts:\n\n${lines.join("\n")}\n\nPrefer catalogue parts over generic descriptions. Use exact MPN when referencing.`
+}
+
+/** Stop words filtered out when extracting search keywords from module data */
+const STOP_WORDS = new Set([
+  "the", "a", "an", "and", "or", "of", "for", "to", "in", "on", "with",
+  "is", "are", "be", "as", "at", "by", "from", "that", "this", "it",
+  "module", "assembly", "system", "sub", "unit", "main", "primary",
+  "secondary", "component", "part", "parts", "section", "structure",
+])
+
+/**
+ * Extracts search keywords from module keyParts and descriptions for catalogue queries.
+ *
+ * @description Tokenizes keyParts[] and description fields, filters stop words and
+ * structural terms, and returns top 15 unique terms by frequency.
+ *
+ * @param modules - Array of CadLabModule from decomposition
+ * @returns Top 15 unique keywords sorted by frequency
+ */
+export function extractSearchKeywords(modules: CadLabModule[]): string[] {
+  const freq = new Map<string, number>()
+
+  for (const mod of modules) {
+    // Tokenize keyParts
+    for (const part of mod.keyParts) {
+      const tokens = part.toLowerCase().split(/[\s,;/()[\]]+/).filter(Boolean)
+      for (const t of tokens) {
+        if (t.length < 3 || STOP_WORDS.has(t) || /^\d+$/.test(t)) continue
+        freq.set(t, (freq.get(t) ?? 0) + 1)
+      }
+    }
+
+    // Tokenize description
+    if (mod.description) {
+      const tokens = mod.description.toLowerCase().split(/[\s,;/()[\]]+/).filter(Boolean)
+      for (const t of tokens) {
+        if (t.length < 3 || STOP_WORDS.has(t) || /^\d+$/.test(t)) continue
+        freq.set(t, (freq.get(t) ?? 0) + 1)
+      }
+    }
+  }
+
+  // Sort by frequency, take top 15
+  return [...freq.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([word]) => word)
 }

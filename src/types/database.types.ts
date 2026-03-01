@@ -4306,7 +4306,7 @@ export type Database = {
           datasheet_url: string | null
           embedding: string | null
           geometry_params: Json
-          geometry_type_slug: string
+          geometry_type_slug: string | null
           id: string
           manufacturer: string | null
           material: string | null
@@ -4328,7 +4328,7 @@ export type Database = {
           datasheet_url?: string | null
           embedding?: string | null
           geometry_params?: Json
-          geometry_type_slug: string
+          geometry_type_slug?: string | null
           id?: string
           manufacturer?: string | null
           material?: string | null
@@ -4350,7 +4350,7 @@ export type Database = {
           datasheet_url?: string | null
           embedding?: string | null
           geometry_params?: Json
-          geometry_type_slug?: string
+          geometry_type_slug?: string | null
           id?: string
           manufacturer?: string | null
           material?: string | null

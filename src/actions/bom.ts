@@ -23,6 +23,8 @@ import type {
   ManufacturingProcessType,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
+import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -154,8 +156,23 @@ Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${massInfo}${bbo
 - Compliance: ${truncate(designBrief.complianceNotes, 200) || "none"}`
       : ""
 
-    const systemPrompt = `You are a manufacturing engineer creating a structured Bill of Materials (BOM) from product module decomposition data.
+    // INTENT: Fetch real component catalogue to ground purchased parts in real products
+    const allKeyParts = modules.flatMap((m) => m.keyParts)
+    const domain = detectDomainFromKeyParts(allKeyParts)
+    const keywords = extractSearchKeywords(modules)
+    const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
 
+    const systemPrompt = `You are a manufacturing engineer creating a structured Bill of Materials (BOM) from product module decomposition data.
+${catalogueRef ? `
+REAL COMPONENT CATALOGUE — USE FOR PURCHASED PARTS:
+${catalogueRef}
+
+CATALOGUE RULES:
+- For purchased/COTS parts, check catalogue FIRST
+- If match exists: use exact manufacturer, MPN, and catalogue price for estimatedUnitCostGbp
+- If no match: describe generically with specific specs
+- Never invent part numbers — use real MPNs or descriptive codes
+` : ""}
 Your task:
 1. Expand each module's keyParts into structured parts with manufacturing specifications
 2. Create one assembly-level part per module (acts as parent in the BOM hierarchy)
