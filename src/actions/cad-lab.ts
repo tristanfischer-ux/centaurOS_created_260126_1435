@@ -162,6 +162,7 @@ async function callClaude(
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   maxTokens: number = 16384,
   timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
+  maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback
 ): Promise<{
   text: string
   tokensIn: number
@@ -207,7 +208,7 @@ async function callClaude(
   // Modal execution time and (before the res.success fix) got silently marked as "generated".
   // Better to throw and let client-side retry handle it after rate limits cool down.
   return await withRetry(() => makeRequest(modelId), {
-    maxRetries: 3,
+    maxRetries,
     baseDelay: 4000,
     maxDelay: 30000,
     shouldRetry: (error) => {
@@ -2124,15 +2125,14 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         modelId,
         8192,
         120_000, // 2 min timeout
+        1, // INTENT: Fail fast on first Claude error → Gemini fallback (no 28s wasted retrying spend limits)
       ))
     } catch (claudeErr) {
-      const msg = claudeErr instanceof Error ? claudeErr.message : ""
-      if (msg.includes("429") || msg.includes("529") || msg.includes("overloaded") || msg.includes("billing") || msg.includes("spending")) {
-        console.warn("[THE-FORGE] Claude unavailable, falling back to Gemini for decomposition:", msg.slice(0, 200))
-        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
-      } else {
-        throw claudeErr
-      }
+      // DECISION: Fall back to Gemini on ALL Claude errors, not just specific status codes.
+      // Spend limits, timeouts, 500s, network failures — Gemini can handle any of these.
+      // If Gemini also fails, the outer catch handles it.
+      console.warn("[THE-FORGE] Claude failed, falling back to Gemini:", claudeErr instanceof Error ? claudeErr.message.slice(0, 200) : String(claudeErr))
+      ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
     }
 
     // Parse JSON array from response — AI may wrap in markdown fences or add prose
