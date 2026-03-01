@@ -704,7 +704,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setProgressLines([])
 
     // INTENT: Reframe the wait as impressive speed rather than a long delay.
-    addProgressLine("This work normally takes 1\u20132 weeks of systems engineering \u2014 it\u2019ll be ready in about 10\u201315 minutes")
+    addProgressLine("This work normally takes 1\u20132 weeks of systems engineering \u2014 it\u2019ll be ready in about 5\u201310 minutes")
 
     // ── Phase 1: Preparation (real ~1-2s Claude call for domain detection) ──
     addProgressLine("Analysing research report to detect engineering domain...")

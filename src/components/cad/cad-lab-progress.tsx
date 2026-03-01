@@ -746,7 +746,7 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
             <Coffee className="h-4 w-4 text-international-orange flex-shrink-0 mt-0.5" />
             <div className="space-y-0.5">
               <p className="text-xs font-medium text-foreground">
-                This analysis typically takes 2–4 minutes
+                This analysis typically takes 5–10 minutes
               </p>
               <p className="text-xs text-muted-foreground">
                 Feel free to grab a coffee or explore other projects — your results will be waiting when you return.
