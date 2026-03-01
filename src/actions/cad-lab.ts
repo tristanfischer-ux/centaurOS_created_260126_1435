@@ -302,7 +302,7 @@ async function callGeminiWithSearch(
 async function callGemini(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "gemini-2.5-pro-preview-05-06",
+  modelId: string = "gemini-3.1-pro-preview",
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
