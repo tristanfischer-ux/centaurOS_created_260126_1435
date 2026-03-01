@@ -273,8 +273,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         if (!profile?.foundry_id) return
         const { data: foundry } = await supabase.from("foundries").select("sector").eq("id", profile.foundry_id).single()
         if (foundry?.sector) setSector(foundry.sector as Sector)
-      } catch {
-        // Non-critical
+      } catch (err) {
+        console.error("[CAD-LAB] Foundry sector fetch failed:", err)
       }
     }
     fetchSector()
@@ -649,8 +649,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     try {
       const res = await listCadLabProjects()
       if ("projects" in res) setProjects(res.projects)
-    } catch {
-      // Non-critical
+    } catch (err) {
+      console.error("[CAD-LAB] Failed to refresh projects:", err)
     } finally {
       setIsLoadingProjects(false)
     }
@@ -689,8 +689,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setActiveProjectId(res.projectId)
         return res.projectId
       }
-    } catch {
-      console.error("[CAD-LAB] Failed to create project for auto-save")
+      console.error("[CAD-LAB] ensureProject returned error:", "error" in res ? res.error : "unknown")
+    } catch (err) {
+      console.error("[CAD-LAB] Failed to create project for auto-save:", err)
     }
     return null
   }, [activeProjectId, subject, modelId])

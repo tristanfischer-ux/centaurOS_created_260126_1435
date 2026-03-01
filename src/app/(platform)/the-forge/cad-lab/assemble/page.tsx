@@ -18,11 +18,13 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   Package,
   ArrowLeft,
+  ArrowRight,
   Truck,
   ClipboardCheck,
   Clock,
   CheckCircle2,
   AlertCircle,
+  Wrench,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -62,6 +64,8 @@ export default function AssemblePage(): React.ReactNode {
     subject,
     activeProjectId,
     hasResearch,
+    manufacturingOrderCount,
+    isSpecificationComplete,
   } = useCadLab()
 
   // Gate: redirect to CAD Lab root if prerequisites are missing
@@ -166,21 +170,24 @@ export default function AssemblePage(): React.ReactNode {
         </div>
       </nav>
 
+      {/* ── Error banner (visible across all tabs) ── */}
+      {assemblyError && (
+        <Card className="border-destructive/30">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              Failed to load orders: {assemblyError}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Tab content ── */}
       <AnimatePresence mode="wait">
         {/* ═══ Orders tab ═══ */}
         {activeTab === "orders" && (
           <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-4">
-            {assemblyError ? (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-2 text-sm text-destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    Failed to load orders: {assemblyError}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : isLoading ? (
+            {isLoading ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -408,6 +415,25 @@ export default function AssemblePage(): React.ReactNode {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Forward navigation to CAD stage ── */}
+      {hasOrders && (manufacturingOrderCount > 0 || isSpecificationComplete) && (
+        <Card>
+          <CardContent className="pt-6 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Ready for CAD</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Continue to the CAD stage to generate detailed engineering outputs.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabCad)}>
+              <Wrench className="h-4 w-4 mr-1.5" />
+              Continue to CAD
+              <ArrowRight className="h-4 w-4 ml-1.5" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
