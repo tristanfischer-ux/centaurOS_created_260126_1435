@@ -2119,12 +2119,15 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     // INTENT: Fall back to Gemini when Claude is unavailable (spend limit, rate limit, overloaded)
     let text: string, tokensIn: number, tokensOut: number
     try {
+      // DECISION: Opus for decomposition — this is the architectural stage that determines
+      // the entire module structure. Runs once per project, cost difference is cents.
+      // Bad decomposition wastes all downstream code gen + Modal compute.
       ({ text, tokensIn, tokensOut } = await callClaude(
         modulePrompt,
         userPrompt,
-        modelId,
+        "claude-opus-4-6",
         8192,
-        120_000, // 2 min timeout
+        180_000, // 3 min timeout — Opus is slower but worth it for architectural quality
         1, // INTENT: Fail fast on first Claude error → Gemini fallback (no 28s wasted retrying spend limits)
       ))
     } catch (claudeErr) {
