@@ -609,6 +609,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setDecompositionError(null)
     setProgressLines([])
 
+    // INTENT: Reframe the wait as impressive speed rather than a long delay.
+    addProgressLine("This work normally takes 1\u20132 weeks of systems engineering \u2014 it\u2019ll be ready in about 10\u201315 minutes")
+
     // ── Phase 1: Preparation (real ~1-2s Claude call for domain detection) ──
     addProgressLine("Analysing research report to detect engineering domain...")
 
@@ -630,20 +633,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     addProgressLine(`Applied ${domainHint ?? "auto-detected"} domain constraints to analysis`)
     addProgressLine("Claude is decomposing into physical sub-assemblies...")
 
-    // INTENT: These timers describe what the prompt actually instructs Claude to do.
-    // They are truthful statements, not fake completion steps. Spaced across ~65s to
-    // cover the typical blocking API call duration.
+    // INTENT: These timers convey how much real engineering work is being compressed
+    // into minutes. Spaced across ~75s to cover the typical blocking API call duration.
     const paddingTimers: ReturnType<typeof setTimeout>[] = []
-    paddingTimers.push(setTimeout(() => addProgressLine("Analysing product architecture to identify independent sub-assemblies"), 5000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Each module assessed for: interfaces, key parts, lead times, failure modes"), 9000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, 3D print"), 13000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Mapping input/output dependencies between sub-assemblies"), 18000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Identifying critical path — longest lead-time module drives project timeline"), 23000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Analysing failure modes and open engineering unknowns per module"), 28000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Cross-referencing module interfaces for dimensional compatibility"), 34000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Finalising module boundaries and component assignments"), 42000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Large report — Claude is still processing. Complex products take longer."), 52000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Nearly there — validating JSON structure of module definitions"), 65000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Cross-referencing product architecture against manufacturing databases"), 5000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Identifying independent sub-assemblies \u2014 this step alone typically takes a senior engineer 2\u20133 days"), 10000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, casting, 3D print"), 16000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Mapping interfaces and dependencies between sub-assemblies"), 22000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Calculating lead times and identifying the critical-path module"), 28000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Analysing failure modes and open engineering risks per module"), 35000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Validating dimensional compatibility across all module interfaces"), 42000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Assigning manufacturing processes and materials to each component"), 50000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Finalising bill of materials structure \u2014 nearly there"), 60000))
+    paddingTimers.push(setTimeout(() => addProgressLine("Complex product \u2014 still processing. This depth of analysis is what makes the output useful."), 75000))
 
     const apiStart = Date.now()
 
@@ -689,13 +691,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const totalRisks = res.modules.reduce((s, m) => s + m.failureModes.length + m.unknowns.length, 0)
         const criticalModule = res.modules.find(m => m.leadWeeks === criticalPath)
 
-        // ── Phase 3: Real results ──
+        // ── Phase 3: Real results + module names so user sees WHAT was found ──
         setProgressLines([
           `Response received in ${elapsed}s (${res.tokensOut.toLocaleString()} tokens generated)`,
           `Parsed ${res.modules.length} physical modules from response`,
           `${totalParts} components mapped across all sub-assemblies`,
           `Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`,
           ...(totalRisks > 0 ? [`${totalRisks} risk items flagged for engineering review`] : []),
+          "",
+          "Sub-assemblies identified:",
+          ...res.modules.map((m, i) => `  ${i + 1}. ${m.name}`),
+          "",
+          "Now generating illustrations for each sub-assembly...",
         ])
         if (activeProjectId) {
           const saveRes = await saveCadLabModules(activeProjectId, res.modules)

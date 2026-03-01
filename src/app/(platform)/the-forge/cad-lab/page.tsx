@@ -339,16 +339,16 @@ export default function CadLabResearchPage(): React.ReactNode {
                 </>
               )}
 
-              {/* "View Modules" banner — shown when hero image completes and modules exist */}
-              {systemIllustrationStatus === "complete" && modules.length > 0 && activeTab === "research" && (
+              {/* "View Modules" banner — shown as soon as modules exist (not gated on system illustration) */}
+              {modules.length > 0 && !isDecomposing && activeTab === "research" && (
                 <Card className="border-international-orange/20 bg-international-orange-light/10">
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Layers className="h-4 w-4 text-international-orange shrink-0" />
                         <p className="text-sm text-foreground">
-                          {isGeneratingImages
-                            ? `Sub-assembly illustrations are being generated — ${modules.filter(m => m.imageStatus === "complete").length} of ${modules.length} ready`
+                          {isGeneratingImages || systemIllustrationStatus === "generating"
+                            ? `${modules.length} sub-assemblies mapped \u2014 generating illustrations (${modules.filter(m => m.imageStatus === "complete").length} of ${modules.length} ready)`
                             : `${modules.length} sub-assembly illustrations ready`}
                         </p>
                       </div>
@@ -362,6 +362,34 @@ export default function CadLabResearchPage(): React.ReactNode {
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Module summary — shown during illustration generation so user sees what was found */}
+              {modules.length > 0 && !isDecomposing && (isGeneratingImages || systemIllustrationStatus === "generating") && activeTab === "research" && (
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-international-orange shrink-0" />
+                      <p className="text-sm font-medium text-foreground">
+                        {modules.length} sub-assemblies identified
+                      </p>
+                    </div>
+                    <div className="grid gap-1.5">
+                      {modules.map((m, i) => (
+                        <div key={m.id} className="flex items-start gap-2 text-xs">
+                          <span className="text-muted-foreground shrink-0 w-4 text-right tabular-nums">{i + 1}.</span>
+                          <div>
+                            <span className="font-medium text-foreground">{m.name}</span>
+                            <span className="text-muted-foreground"> — {m.purpose.slice(0, 80)}{m.purpose.length > 80 ? "..." : ""}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Generating engineering illustrations — {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} ready. Each illustration coordinates manufacturing constraints, interfaces, and dimensional specs.
+                    </p>
                   </CardContent>
                 </Card>
               )}
