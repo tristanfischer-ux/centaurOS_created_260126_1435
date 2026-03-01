@@ -64,10 +64,6 @@ import type { CompatibilityStatus } from "@/lib/cad-lab/diagnostic-mappings"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 
-// ─── Constants ────────────────────────────────────────────────────────
-
-const REQUIRED_REVIEW_COUNT = 2
-
 // ─── Helpers ──────────────────────────────────────────────────────────
 
 function isDiagnosticsFilledForModule(answers: DiagnosticAnswers, moduleId: string): boolean {
@@ -85,9 +81,11 @@ function getModuleSpecStatus(
   const diagComplete = isDiagnosticsFilledForModule(diagnosticAnswers, moduleId)
   if (!diagComplete) return "incomplete"
 
+  // INTENT: Reviews are optional enrichment, not a gate. Diagnostics-complete is
+  // sufficient to proceed. Having ≥1 passing review upgrades to "specialist-approved".
   const reviews = moduleReviews[moduleId] ?? []
-  const passingReviews = reviews.filter((r) => r.verdict !== "fail")
-  if (passingReviews.length >= REQUIRED_REVIEW_COUNT) return "specialist-approved"
+  const hasPassingReview = reviews.some((r) => r.verdict !== "fail")
+  if (hasPassingReview) return "specialist-approved"
 
   return "ready-for-review"
 }
@@ -97,9 +95,9 @@ function getSpecStatusBadge(status: ReturnType<typeof getModuleSpecStatus>) {
     case "incomplete":
       return <Badge variant="secondary">Incomplete</Badge>
     case "ready-for-review":
-      return <Badge variant="warning">Diagnostics complete</Badge>
+      return <Badge variant="success">Ready</Badge>
     case "specialist-approved":
-      return <Badge variant="success">Approved</Badge>
+      return <Badge variant="success">Reviewed</Badge>
   }
 }
 
@@ -208,17 +206,17 @@ export default function SpecifyPage(): React.ReactNode {
     return result
   }, [modules, diagnosticAnswers, moduleReviews])
 
-  const approvedCount = Object.values(moduleStatuses).filter((s) => s === "specialist-approved").length
-  const allApproved = approvedCount === modules.length && modules.length > 0
+  const reviewedCount = Object.values(moduleStatuses).filter((s) => s === "specialist-approved").length
   const allDiagnosticsComplete = modules.length > 0 && modules.every((m) => isDiagnosticsFilledForModule(diagnosticAnswers, m.id))
 
-  // INTENT: Mark modules as "specified" when they pass the gate, so the context
-  // and nav stepper can reflect the pipeline state.
+  // INTENT: Mark modules as "specified" when diagnostics are complete, so the context
+  // and nav stepper can reflect the pipeline state. Both ready-for-review and
+  // specialist-approved qualify since reviews are optional enrichment.
   useEffect(() => {
     let changed = false
     const updated = modules.map((m) => {
       const status = moduleStatuses[m.id]
-      if (status === "specialist-approved" && m.status !== "specified" && m.status !== "generated") {
+      if ((status === "ready-for-review" || status === "specialist-approved") && m.status !== "specified" && m.status !== "generated") {
         changed = true
         return { ...m, status: "specified" as const }
       }
@@ -230,7 +228,8 @@ export default function SpecifyPage(): React.ReactNode {
   }, [moduleStatuses, modules, setModules])
 
   // ── Gate: can proceed to Source? ──
-  const canProceedToSource = approvedCount > 0
+  // INTENT: Diagnostics-complete is sufficient. Reviews are optional enrichment.
+  const canProceedToSource = allDiagnosticsComplete
 
   // ── Tab navigation ──
   const TABS = [
@@ -260,12 +259,13 @@ export default function SpecifyPage(): React.ReactNode {
     useMemo(() => {
       const parts: string[] = [`Viewing the Specify stage for "${subject}".`]
       parts.push(`${modules.length} modules to specify.`)
-      parts.push(`${approvedCount} of ${modules.length} approved by specialists.`)
+      parts.push(`${diagStats.modulesComplete} of ${modules.length} diagnostics complete.`)
+      if (reviewedCount > 0) parts.push(`${reviewedCount} reviewed by specialists.`)
       return {
         pageTitle: `The Forge — Specify: ${subject}`,
         summary: parts.join(" "),
       }
-    }, [subject, modules.length, approvedCount]),
+    }, [subject, modules.length, diagStats.modulesComplete, reviewedCount]),
   )
 
   if (!hasResearch || modules.length === 0) return null
@@ -280,7 +280,7 @@ export default function SpecifyPage(): React.ReactNode {
             Specify
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Define detailed specs per module and get specialist approval.
+            Define detailed specs per module. Reviews are optional.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -297,16 +297,19 @@ export default function SpecifyPage(): React.ReactNode {
         </div>
       </div>
 
-      {/* ── Progress bar ── */}
+      {/* ── Progress bar — tracks diagnostics completion ── */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{approvedCount} of {modules.length} modules approved</span>
-          <span>{Math.round((approvedCount / Math.max(modules.length, 1)) * 100)}%</span>
+          <span>{diagStats.modulesComplete} of {diagStats.totalModules} modules diagnosed</span>
+          <span>{diagStats.completionPct}%</span>
         </div>
         <div className="h-2 bg-muted rounded-full overflow-hidden">
           <div
-            className="h-full bg-international-orange rounded-full transition-all duration-500"
-            style={{ width: `${(approvedCount / Math.max(modules.length, 1)) * 100}%` }}
+            className={cn(
+              "h-full rounded-full transition-all duration-500",
+              diagStats.isAllComplete ? "bg-success" : "bg-international-orange",
+            )}
+            style={{ width: `${diagStats.completionPct}%` }}
           />
         </div>
       </div>
@@ -792,7 +795,7 @@ export default function SpecifyPage(): React.ReactNode {
                         Ready to source
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {approvedCount} module{approvedCount !== 1 ? "s" : ""} approved. Continue to match suppliers and create RFQs.
+                        Diagnostics complete for {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""}. Continue to match suppliers and create RFQs.
                       </p>
                     </div>
                     <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
@@ -800,22 +803,6 @@ export default function SpecifyPage(): React.ReactNode {
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ) : allDiagnosticsComplete ? (
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">
-                    Next step: get specialist approval on the{" "}
-                    <button
-                      type="button"
-                      className="text-international-orange font-medium hover:underline"
-                      onClick={() => handleTabClick("review")}
-                    >
-                      Review tab
-                    </button>{" "}
-                    to unlock sourcing.
-                  </p>
                 </CardContent>
               </Card>
             ) : (
@@ -834,18 +821,18 @@ export default function SpecifyPage(): React.ReactNode {
         {activeTab === "review" && (
           <motion.div key="review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
             {/* Gate status */}
-            <Card className={cn(allApproved ? "border-success/30" : "border-border")}>
+            <Card className={cn(allDiagnosticsComplete ? "border-success/30" : "border-border")}>
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-sm font-semibold text-foreground">Specification Gate</h2>
+                    <h2 className="text-sm font-semibold text-foreground">Specialist Reviews</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {allApproved
-                        ? "All modules approved. You can proceed to Source."
-                        : `All modules need diagnostics filled + at least ${REQUIRED_REVIEW_COUNT} specialist reviews with no failures to unlock Source.`}
+                      {allDiagnosticsComplete
+                        ? "Diagnostics complete. Reviews are optional — request one for extra confidence."
+                        : "Complete diagnostics for all modules to unlock Source. Reviews are optional."}
                     </p>
                   </div>
-                  {allApproved && (
+                  {allDiagnosticsComplete && (
                     <CheckCircle2 className="h-6 w-6 text-success flex-shrink-0" />
                   )}
                 </div>
@@ -901,7 +888,7 @@ export default function SpecifyPage(): React.ReactNode {
             })}
 
             {/* Source CTA */}
-            {canProceedToSource && (
+            {allDiagnosticsComplete && (
               <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -910,7 +897,7 @@ export default function SpecifyPage(): React.ReactNode {
                         Ready to source
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {approvedCount} module{approvedCount !== 1 ? "s" : ""} approved. Continue to match suppliers and create RFQs.
+                        Diagnostics complete for {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""}. Continue to match suppliers and create RFQs.
                       </p>
                     </div>
                     <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">

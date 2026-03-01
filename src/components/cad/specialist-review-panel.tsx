@@ -14,7 +14,7 @@
  * - Build page: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import Image from "next/image"
 import {
     CheckCircle2,
@@ -37,6 +37,7 @@ import { requestSpecialistReview } from "@/actions/cad-lab-reviews"
 import type { ReviewRequest } from "@/actions/cad-lab-reviews"
 import type { SpecialistReview, ReviewVerdict, CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { recommendSpecialist } from "@/lib/cad-lab/recommend-specialist"
 
 // ─── Configuration ──────────────────────────────────────────────────
 
@@ -237,6 +238,14 @@ export function SpecialistReviewPanel({
 }: SpecialistReviewPanelProps) {
     const [loadingSpecialist, setLoadingSpecialist] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
+    const [showOtherSpecialists, setShowOtherSpecialists] = useState(false)
+
+    // INTENT: Rank specialists by relevance to this module's text and diagnostics.
+    // The top pick becomes the primary CTA; the rest are in an expandable section.
+    const ranking = useMemo(
+        () => recommendSpecialist(module, diagnosticAnswers ?? {}),
+        [module, diagnosticAnswers],
+    )
 
     const handleRequestReview = useCallback(async (specialistId: string) => {
         setLoadingSpecialist(specialistId)
@@ -294,6 +303,50 @@ export function SpecialistReviewPanel({
     // but at the Specify stage modules are "decomposed" with no CAD — reviews assess
     // the manufacturing spec, not the CAD model, so the gate was too strict.
 
+    // Resolve recommended specialist from ranking
+    const topRanked = ranking[0]
+    const topSpec = REVIEW_SPECIALISTS.find(s => s.id === topRanked?.id)
+    const otherSpecs = REVIEW_SPECIALISTS.filter(s => s.id !== topRanked?.id)
+
+    /** Render a specialist button (shared between primary and secondary) */
+    function SpecButton({ spec, primary }: { spec: ReviewSpecialist; primary?: boolean }) {
+        const hasReview = reviewedBy.has(spec.id)
+        const isLoading = loadingSpecialist === spec.id
+        const Icon = spec.icon
+        const existingReview = reviews.find(r => r.specialistId === spec.id)
+
+        return (
+            <Button
+                variant={primary ? (hasReview ? "secondary" : "default") : (hasReview ? "ghost" : "secondary")}
+                size="sm"
+                disabled={isLoading || !!loadingSpecialist}
+                onClick={() => handleRequestReview(spec.id)}
+                className={cn(
+                    primary ? "text-sm gap-2" : "h-7 text-xs gap-1.5",
+                    hasReview && existingReview?.verdict === "pass" && "text-success",
+                    hasReview && existingReview?.verdict === "warn" && "text-warning",
+                    hasReview && existingReview?.verdict === "fail" && "text-destructive",
+                )}
+            >
+                {isLoading ? (
+                    <Loader2 className={cn("animate-spin", primary ? "h-4 w-4" : "h-3 w-3")} />
+                ) : hasReview ? (
+                    existingReview?.verdict === "pass" ? <CheckCircle2 className={primary ? "h-4 w-4" : "h-3 w-3"} /> :
+                    existingReview?.verdict === "warn" ? <AlertTriangle className={primary ? "h-4 w-4" : "h-3 w-3"} /> :
+                    <XCircle className={primary ? "h-4 w-4" : "h-3 w-3"} />
+                ) : (
+                    <Icon className={primary ? "h-4 w-4" : "h-3 w-3"} />
+                )}
+                {primary
+                    ? `Get ${spec.label}'s ${spec.focus} Review`
+                    : <>{spec.label} <span className="text-muted-foreground font-normal">{hasReview ? "Re-review" : spec.focus}</span></>}
+                {primary && hasReview && (
+                    <span className="text-muted-foreground font-normal text-xs">(Re-review)</span>
+                )}
+            </Button>
+        )
+    }
+
     return (
         <div className="space-y-3">
             {/* Header */}
@@ -303,50 +356,45 @@ export function SpecialistReviewPanel({
                     {worstVerdict && <VerdictBadge verdict={worstVerdict as ReviewVerdict} />}
                     {reviews.length > 0 && (
                         <span className="text-xs text-muted-foreground">
-                            ({reviews.length}/{REVIEW_SPECIALISTS.length})
+                            ({reviews.length} review{reviews.length !== 1 ? "s" : ""})
                         </span>
                     )}
                 </div>
             </div>
 
-            {/* Review request buttons */}
-            <div className="flex flex-wrap gap-1.5">
-                {REVIEW_SPECIALISTS.map(spec => {
-                    const hasReview = reviewedBy.has(spec.id)
-                    const isLoading = loadingSpecialist === spec.id
-                    const Icon = spec.icon
-                    const existingReview = reviews.find(r => r.specialistId === spec.id)
+            {/* Recommended specialist — primary CTA */}
+            {topSpec && (
+                <div className="space-y-1.5">
+                    <SpecButton spec={topSpec} primary />
+                    {topRanked.matchedKeywords.length > 0 && (
+                        <p className="text-[11px] text-muted-foreground pl-1">
+                            Matched: {topRanked.matchedKeywords.slice(0, 4).join(", ")}
+                        </p>
+                    )}
+                </div>
+            )}
 
-                    return (
-                        <Button
-                            key={spec.id}
-                            variant={hasReview ? "ghost" : "secondary"}
-                            size="sm"
-                            disabled={isLoading || !!loadingSpecialist}
-                            onClick={() => handleRequestReview(spec.id)}
-                            className={cn(
-                                "h-7 text-xs gap-1.5",
-                                hasReview && existingReview?.verdict === "pass" && "text-success",
-                                hasReview && existingReview?.verdict === "warn" && "text-warning",
-                                hasReview && existingReview?.verdict === "fail" && "text-destructive",
-                            )}
-                        >
-                            {isLoading ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : hasReview ? (
-                                existingReview?.verdict === "pass" ? <CheckCircle2 className="h-3 w-3" /> :
-                                existingReview?.verdict === "warn" ? <AlertTriangle className="h-3 w-3" /> :
-                                <XCircle className="h-3 w-3" />
-                            ) : (
-                                <Icon className="h-3 w-3" />
-                            )}
-                            {spec.label}
-                            <span className="text-muted-foreground font-normal">
-                                {hasReview ? "Re-review" : spec.focus}
-                            </span>
-                        </Button>
-                    )
-                })}
+            {/* Other specialists — expandable */}
+            <div>
+                <button
+                    type="button"
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                    onClick={() => setShowOtherSpecialists(prev => !prev)}
+                >
+                    {showOtherSpecialists ? (
+                        <ChevronDown className="h-3 w-3" />
+                    ) : (
+                        <ChevronRight className="h-3 w-3" />
+                    )}
+                    Choose a different specialist
+                </button>
+                {showOtherSpecialists && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                        {otherSpecs.map(spec => (
+                            <SpecButton key={spec.id} spec={spec} />
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Error */}
@@ -376,7 +424,7 @@ export function SpecialistReviewPanel({
             {/* Empty state */}
             {reviews.length === 0 && !loadingSpecialist && (
                 <p className="text-xs text-muted-foreground italic">
-                    No reviews yet. Request a specialist review to validate this module.
+                    No reviews yet — optional, but recommended for extra confidence.
                 </p>
             )}
         </div>
