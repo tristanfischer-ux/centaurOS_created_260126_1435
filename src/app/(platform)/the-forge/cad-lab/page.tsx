@@ -69,17 +69,6 @@ export default function CadLabResearchPage(): React.ReactNode {
   const [heroImgError, setHeroImgError] = useState(false)
   useEffect(() => { setHeroImgError(false) }, [systemIllustrationUrl])
 
-  // INTENT: Live elapsed-time counter so decomposition wait feels controlled, not broken.
-  const [decompositionElapsed, setDecompositionElapsed] = useState(0)
-  useEffect(() => {
-    if (!isDecomposing) {
-      setDecompositionElapsed(0)
-      return
-    }
-    const id = setInterval(() => setDecompositionElapsed((s) => s + 1), 1_000)
-    return () => clearInterval(id)
-  }, [isDecomposing])
-
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
   // INTENT: Block "Continue to Specify" while checkpoints load OR have unacknowledged concerns.
@@ -289,49 +278,25 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
 
-                  {/* Idle placeholder — only show spinner when decomposition is actively running */}
-                  {systemIllustrationStatus === "idle" && !decompositionError && (
-                    <Card className={`overflow-hidden border-dashed border-muted-foreground/20${isDecomposing ? " animate-pulse" : ""}`}>
+                  {/* During decomposition — rich progress in hero position */}
+                  {systemIllustrationStatus === "idle" && !decompositionError && isDecomposing && (
+                    <CadLabProgress
+                      lines={progressLines}
+                      isActive={true}
+                      operationType="breakdown"
+                      subject={subject}
+                    />
+                  )}
+
+                  {/* Idle placeholder — only when NOT decomposing */}
+                  {systemIllustrationStatus === "idle" && !decompositionError && !isDecomposing && (
+                    <Card className="overflow-hidden border-dashed border-muted-foreground/20">
                       <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
                         <div className="flex flex-col items-center gap-3 text-center px-6">
-                          {isDecomposing ? (
-                            <>
-                              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="text-sm font-medium text-muted-foreground">
-                                  Mapping sub-assemblies...
-                                </span>
-                                {progressLines.length > 0 && (
-                                  <div className="flex flex-col items-center gap-1 max-w-[360px]">
-                                    {progressLines.slice(-3).map((line, i, arr) => (
-                                      <span
-                                        key={progressLines.length - arr.length + i}
-                                        className={`text-xs truncate max-w-full ${
-                                          i === arr.length - 1
-                                            ? "text-muted-foreground/70"
-                                            : "text-muted-foreground/35"
-                                        }`}
-                                      >
-                                        {line}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                {decompositionElapsed > 0 && (
-                                  <span className="text-xs text-muted-foreground/50 mt-1 tabular-nums">
-                                    {decompositionElapsed}s elapsed
-                                  </span>
-                                )}
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
-                              <span className="text-xs text-muted-foreground">
-                                System illustration will appear here after decomposition
-                              </span>
-                            </>
-                          )}
+                          <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                          <span className="text-xs text-muted-foreground">
+                            System illustration will appear here after decomposition
+                          </span>
                         </div>
                       </div>
                     </Card>
@@ -399,16 +364,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <ProductOverviewCard
                   overview={productOverview}
                   onSave={setProductOverview}
-                />
-              )}
-
-              {/* Decomposing in progress */}
-              {modules.length === 0 && isDecomposing && (
-                <CadLabProgress
-                  lines={progressLines}
-                  isActive={true}
-                  operationType="breakdown"
-                  subject={subject}
                 />
               )}
 

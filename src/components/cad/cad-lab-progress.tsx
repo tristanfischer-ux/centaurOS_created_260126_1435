@@ -16,7 +16,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { CheckCircle2, Loader2, Clock, GraduationCap, Activity } from "lucide-react"
+import { CheckCircle2, Loader2, Clock, GraduationCap, Activity, Coffee } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 
 // ─────────────────────────────────────────────────────────────────────
@@ -30,8 +30,12 @@ const OPERATION_EXPLAINERS: Record<string, string[]> = {
   ],
   breakdown: [
     "Detecting engineering domain from your research report, then building a domain-specific decomposition prompt.",
-    "Claude is analysing the full research report to identify 4–8 independent physical sub-assemblies with realistic lead times.",
-    "Each module is assessed for interfaces, key parts, failure modes, and manufacturing process compatibility.",
+    "Identifying 4–8 independent physical sub-assemblies with realistic lead times from the full research report.",
+    "Assessing interface requirements between modules — electrical, thermal, and mechanical connections.",
+    "Evaluating manufacturing process compatibility for each sub-assembly against available fabrication methods.",
+    "Estimating lead times and identifying critical-path dependencies across the module tree.",
+    "Running failure mode and risk analysis per sub-assembly to flag structural or thermal concerns early.",
+    "Synthesising bill-of-materials with cost estimates and manufacturing process recommendations per module.",
   ],
   generate: [
     "Writing parametric CadQuery code. Unlike static STEP files, parametric models rebuild automatically when any dimension changes.",
@@ -732,6 +736,21 @@ export function CadLabProgress({ lines, isActive, operationType, subject = "" }:
                 className="h-full bg-international-orange rounded-full transition-all duration-700 ease-out"
                 style={{ width: `${steppedProgress}%` }}
               />
+            </div>
+          </div>
+        )}
+
+        {/* Time-estimate banner — breakdown-only, sets expectations */}
+        {isActive && operationType === "breakdown" && (
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-international-orange-light/10 border border-international-orange/10">
+            <Coffee className="h-4 w-4 text-international-orange flex-shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium text-foreground">
+                This analysis typically takes 2–4 minutes
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Feel free to grab a coffee or explore other projects — your results will be waiting when you return.
+              </p>
             </div>
           </div>
         )}
