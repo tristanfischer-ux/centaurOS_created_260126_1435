@@ -216,6 +216,7 @@ export interface CadLabContextValue {
   // P1: Interface contracts
   interfaceContracts: InterfaceContract[]
   isExtractingContracts: boolean
+  unmatchedPorts: { outputs: Array<{ moduleId: string; portName: string }>; inputs: Array<{ moduleId: string; portName: string }> }
 
   // Pipeline stage tracking (4-stage flow)
   specifiedModuleCount: number
@@ -404,6 +405,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // P1: Interface contracts between modules
   const [interfaceContracts, setInterfaceContracts] = useState<InterfaceContract[]>([])
   const [isExtractingContracts, setIsExtractingContracts] = useState(false)
+  const [unmatchedPorts, setUnmatchedPorts] = useState<{ outputs: Array<{ moduleId: string; portName: string }>; inputs: Array<{ moduleId: string; portName: string }> }>({ outputs: [], inputs: [] })
   const [isRevising, setIsRevising] = useState(false)
   const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
@@ -785,6 +787,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           extractInterfaceContracts(res.modules, editableReport, modelId)
             .then((contractRes) => {
               setInterfaceContracts(contractRes.contracts)
+              setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
               setIsExtractingContracts(false)
               if (activeProjectId) {
                 saveCadLabInterfaceContracts(activeProjectId, contractRes)
@@ -1784,8 +1787,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
       setCheckpoints(p.checkpoints ?? null)
       setProductOverview(p.productOverview ?? "")
-      // P1: Load persisted interface contracts
+      // P1: Load persisted interface contracts + unmatched ports
       setInterfaceContracts(p.interfaceContracts?.contracts ?? [])
+      setUnmatchedPorts({
+        outputs: p.interfaceContracts?.unmatchedOutputs ?? [],
+        inputs: p.interfaceContracts?.unmatchedInputs ?? [],
+      })
       // Restore diagnostic answers from database
       if (p.diagnosticAnswers && Object.keys(p.diagnosticAnswers).length > 0) {
         setDiagnosticAnswers(p.diagnosticAnswers)
@@ -1966,6 +1973,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     earlyCostEstimates,
     interfaceContracts,
     isExtractingContracts,
+    unmatchedPorts,
     specifiedModuleCount,
     manufacturingOrderCount,
     isSpecificationComplete,

@@ -33,7 +33,7 @@ import {
   type Edge,
   type EdgeProps,
 } from "@xyflow/react"
-import { LayoutGrid, Maximize2, Minimize2, AlertCircle } from "lucide-react"
+import { LayoutGrid, Maximize2, Minimize2, AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
@@ -244,6 +244,7 @@ interface ModuleFlowCanvasProps {
   onModuleClick?: (moduleId: string) => void
   interfaceContracts?: InterfaceContract[]
   generatingModuleIds?: Set<string>
+  unmatchedPorts?: { outputs: Array<{ moduleId: string; portName: string }>; inputs: Array<{ moduleId: string; portName: string }> }
 }
 
 /* ─── Build nodes and edges ────────────────────────────────────────────── */
@@ -445,6 +446,7 @@ export function ModuleFlowCanvas({
   onModuleClick,
   interfaceContracts,
   generatingModuleIds = new Set(),
+  unmatchedPorts,
 }: ModuleFlowCanvasProps): React.ReactNode {
   const [tidyKey, setTidyKey] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -594,6 +596,16 @@ export function ModuleFlowCanvas({
                 </span>
               ))}
               . Review inputs/outputs to identify integration points.
+            </p>
+          </div>
+        )}
+
+        {/* Unmatched ports callout — shows after extraction when some ports face the environment */}
+        {unmatchedPorts && (unmatchedPorts.outputs.length + unmatchedPorts.inputs.length) > 0 && (
+          <div className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-start gap-2">
+            <Info className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground">
+              {unmatchedPorts.outputs.length + unmatchedPorts.inputs.length} port{(unmatchedPorts.outputs.length + unmatchedPorts.inputs.length) !== 1 ? "s" : ""} not connected to other modules — these may interface with the environment.
             </p>
           </div>
         )}

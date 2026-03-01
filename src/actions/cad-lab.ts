@@ -2241,6 +2241,54 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
 // ─── P1: Interface Contract Extraction ────────────────────────────────
 
 /**
+ * Formats unmatched ports into a focused prompt for the re-extraction pass.
+ *
+ * @description Lists only the ports that have no contract from the first pass,
+ * grouped by module, so the second Claude call can focus on filling gaps.
+ */
+function buildUnmatchedPortsSummary(
+  modules: CadLabModule[],
+  unmatchedOutputs: Array<{ moduleId: string; portName: string }>,
+  unmatchedInputs: Array<{ moduleId: string; portName: string }>,
+): string {
+  const moduleMap = new Map(modules.map((m) => [m.id, m]))
+  const lines: string[] = ["The following ports were NOT connected in the first extraction pass. Identify a connection for each.\n"]
+
+  // Group by module for readability
+  const outputsByModule = new Map<string, string[]>()
+  for (const u of unmatchedOutputs) {
+    if (!outputsByModule.has(u.moduleId)) outputsByModule.set(u.moduleId, [])
+    outputsByModule.get(u.moduleId)!.push(u.portName)
+  }
+  const inputsByModule = new Map<string, string[]>()
+  for (const u of unmatchedInputs) {
+    if (!inputsByModule.has(u.moduleId)) inputsByModule.set(u.moduleId, [])
+    inputsByModule.get(u.moduleId)!.push(u.portName)
+  }
+
+  const allModuleIds = new Set([...outputsByModule.keys(), ...inputsByModule.keys()])
+  for (const modId of allModuleIds) {
+    const mod = moduleMap.get(modId)
+    const name = mod?.name ?? modId
+    lines.push(`## ${name} (id: ${modId})`)
+    if (mod) lines.push(`Purpose: ${mod.purpose}`)
+    const outs = outputsByModule.get(modId)
+    if (outs) lines.push(`Unmatched OUTPUTS:\n${outs.map((o, i) => `  ${i + 1}. "${o}"`).join("\n")}`)
+    const ins = inputsByModule.get(modId)
+    if (ins) lines.push(`Unmatched INPUTS:\n${ins.map((inp, i) => `  ${i + 1}. "${inp}"`).join("\n")}`)
+    lines.push("")
+  }
+
+  // Also list all module IDs so Claude knows what targets are available
+  lines.push("Available modules:")
+  for (const m of modules) {
+    lines.push(`- ${m.name} (id: ${m.id})`)
+  }
+
+  return lines.join("\n")
+}
+
+/**
  * Extracts interface contracts between modules using Claude.
  *
  * @description Analyses module inputs/outputs and asks Claude to identify
@@ -2271,13 +2319,28 @@ export async function extractInterfaceContracts(
     }
   }
 
-  // Build module summary for the prompt
-  const moduleSummary = modules.map((m) => [
-    `## ${m.name} (id: ${m.id})`,
-    `Purpose: ${m.purpose}`,
-    `Inputs: ${m.inputs.length > 0 ? m.inputs.join(", ") : "none"}`,
-    `Outputs: ${m.outputs.length > 0 ? m.outputs.join(", ") : "none"}`,
-  ].join("\n")).join("\n\n")
+  // INTENT: Enumerate every port in numbered lists so Claude can copy names verbatim.
+  // Count totals so the prompt can mandate 100% coverage.
+  let totalOutputs = 0
+  let totalInputs = 0
+  const moduleSummary = modules.map((m) => {
+    const outputList = m.outputs.length > 0
+      ? m.outputs.map((o, i) => `  ${i + 1}. "${o}"`).join("\n")
+      : "  (none)"
+    const inputList = m.inputs.length > 0
+      ? m.inputs.map((inp, i) => `  ${i + 1}. "${inp}"`).join("\n")
+      : "  (none)"
+    totalOutputs += m.outputs.length
+    totalInputs += m.inputs.length
+    return [
+      `## ${m.name} (id: ${m.id})`,
+      `Purpose: ${m.purpose}`,
+      `Outputs (${m.outputs.length}):`,
+      outputList,
+      `Inputs (${m.inputs.length}):`,
+      inputList,
+    ].join("\n")
+  }).join("\n\n")
 
   const systemPrompt = `You are an engineering systems integration specialist. Analyse the module interfaces and identify which output ports connect to which input ports across modules.
 
@@ -2301,15 +2364,16 @@ Return a JSON array of contracts. Each contract:
 
 Rules:
 - Match outputs to inputs across different modules (never within same module)
-- Use the EXACT port names from the module definitions
+- Copy port names EXACTLY as listed — do not rephrase, abbreviate, or expand them
 - Set compatible=null if you cannot determine compatibility
-- Include ALL plausible connections, even if uncertain
+- Your response MUST contain at least one contract for EVERY listed port (${totalOutputs} outputs and ${totalInputs} inputs)
+- For ports that interface with the external environment (user input, environmental output, ground, ambient air, etc.) rather than another module, use "external" as the sourceModuleId or targetModuleId
 - Return ONLY the JSON array, no markdown fences or explanation`
 
-  const userPrompt = `Here are the modules to analyse:\n\n${moduleSummary}\n\nResearch context (abbreviated):\n${researchReport.slice(0, 3000)}`
+  const userPrompt = `Here are the modules to analyse:\n\n${moduleSummary}\n\nResearch context (abbreviated):\n${researchReport.slice(0, 6000)}`
 
   try {
-    const res = await callClaude(systemPrompt, userPrompt, modelId, 4096)
+    const res = await callClaude(systemPrompt, userPrompt, modelId, 8192)
 
     // Parse JSON from response (handle potential markdown fences)
     let jsonText = res.text.trim()
@@ -2318,23 +2382,87 @@ Rules:
 
     const rawContracts = JSON.parse(jsonText) as InterfaceContract[]
 
-    // Validate module IDs exist
+    // Validate module IDs exist ("external" is allowed for environment-facing ports)
     const moduleIds = new Set(modules.map((m) => m.id))
     const validContracts = rawContracts.filter(
-      (c) => moduleIds.has(c.sourceModuleId) && moduleIds.has(c.targetModuleId),
+      (c) =>
+        (moduleIds.has(c.sourceModuleId) || c.sourceModuleId === "external") &&
+        (moduleIds.has(c.targetModuleId) || c.targetModuleId === "external"),
     )
 
     // Run deterministic validation
-    const validation = validateInterfaceContracts(modules, validContracts)
+    let validation = validateInterfaceContracts(modules, validContracts)
+    const allContracts = [...validContracts]
+    let totalTokensIn = res.tokensIn
+    let totalTokensOut = res.tokensOut
+
+    // INTENT: Re-extraction pass — if unmatched ports remain, run a focused second call
+    // asking specifically for those ports. This catches gaps the initial prompt missed.
+    const unmatchedCount = validation.unmatchedOutputs.length + validation.unmatchedInputs.length
+    if (unmatchedCount > 0 && unmatchedCount <= 30) {
+      try {
+        const unmatchedSummary = buildUnmatchedPortsSummary(modules, validation.unmatchedOutputs, validation.unmatchedInputs)
+        const reExtractSystem = `You are an engineering systems integration specialist. You are given ports that were NOT connected in a first pass. For each port, identify its connection — either to another module's port or to the external environment ("external").
+
+Return a JSON array of contracts in the same format:
+{
+  "sourceModuleId": "module-id or external",
+  "sourcePort": "exact port name",
+  "targetModuleId": "module-id or external",
+  "targetPort": "exact port name",
+  "portType": "power|data|mechanical|thermal|fluid|optical|other",
+  "sourceSpec": "optional",
+  "targetSpec": "optional",
+  "compatible": true|false|null,
+  "incompatibilityReason": "optional"
+}
+
+Rules:
+- Copy port names EXACTLY as listed
+- Use "external" for ports that interface with the environment
+- Return ONLY the JSON array`
+
+        const reExtractRes = await callClaude(reExtractSystem, unmatchedSummary, modelId, 4096)
+        totalTokensIn += reExtractRes.tokensIn
+        totalTokensOut += reExtractRes.tokensOut
+
+        let reJsonText = reExtractRes.text.trim()
+        const reFenceMatch = reJsonText.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (reFenceMatch) reJsonText = reFenceMatch[1].trim()
+
+        const reContracts = JSON.parse(reJsonText) as InterfaceContract[]
+        const validReContracts = reContracts.filter(
+          (c) =>
+            (moduleIds.has(c.sourceModuleId) || c.sourceModuleId === "external") &&
+            (moduleIds.has(c.targetModuleId) || c.targetModuleId === "external"),
+        )
+
+        // Merge, deduplicating by source→target key
+        const existingKeys = new Set(allContracts.map((c) => `${c.sourceModuleId}:${c.sourcePort}→${c.targetModuleId}:${c.targetPort}`))
+        for (const c of validReContracts) {
+          const key = `${c.sourceModuleId}:${c.sourcePort}→${c.targetModuleId}:${c.targetPort}`
+          if (!existingKeys.has(key)) {
+            allContracts.push(c)
+            existingKeys.add(key)
+          }
+        }
+
+        // Re-validate merged set
+        validation = validateInterfaceContracts(modules, allContracts)
+        console.info(`[THE-FORGE] Re-extraction added ${validReContracts.length} contracts, ${validation.unmatchedOutputs.length + validation.unmatchedInputs.length} ports still unmatched`)
+      } catch (reErr) {
+        console.warn("[THE-FORGE] Re-extraction pass failed (non-critical):", reErr instanceof Error ? reErr.message : reErr)
+      }
+    }
 
     return {
-      contracts: validContracts,
+      contracts: allContracts,
       unmatchedOutputs: validation.unmatchedOutputs,
       unmatchedInputs: validation.unmatchedInputs,
       warnings: validation.warnings,
       extractionTimeMs: Date.now() - start,
-      tokensIn: res.tokensIn,
-      tokensOut: res.tokensOut,
+      tokensIn: totalTokensIn,
+      tokensOut: totalTokensOut,
     }
   } catch (error) {
     console.error("[THE-FORGE] Interface contract extraction failed:", error instanceof Error ? error.message : error)

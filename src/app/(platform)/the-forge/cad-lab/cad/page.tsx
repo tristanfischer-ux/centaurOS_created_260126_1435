@@ -75,6 +75,7 @@ export default function CadStagePage(): React.ReactNode {
     setExpandedModuleId,
     // Interface contracts for flow canvas
     interfaceContracts,
+    unmatchedPorts,
     // Gate: CAD requires manufacturing orders OR all modules specified
     manufacturingOrderCount,
     isSpecificationComplete,
@@ -320,6 +321,7 @@ export default function CadStagePage(): React.ReactNode {
           onModuleClick={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
           interfaceContracts={interfaceContracts}
           generatingModuleIds={generatingModuleIds}
+          unmatchedPorts={unmatchedPorts}
         />
       )}
 

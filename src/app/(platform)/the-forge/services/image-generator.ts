@@ -97,6 +97,7 @@ The ghost should be rendered at roughly 10-15% opacity — just enough to show t
 
 HIGHLIGHTED SUBASSEMBLY (full color, foreground):
 Within that ghost outline, render the "${module.name}" subassembly in full vivid color at its correct physical position inside the product. This is: ${module.detail.whatItIs}. It contains ${module.keyParts.length} key components shown through visual differentiation (color coding, positioning, distinct shapes).
+The highlighted sub-assembly's geometry must be consistent with its appearance within the ghost outline — same proportions, same structural forms, same component shapes.
 
 The contrast between the faint ghost and the vivid highlighted section should be dramatic — the viewer's eye should immediately go to the highlighted subassembly while understanding exactly where it sits within the overall product.
 
@@ -121,15 +122,22 @@ function buildReferenceAwareModulePrompt(module: ModuleSpec, visualStyle?: Visua
     ? `\nColor palette: ${visualStyle.colorPalette}.\nMaterial rendering: ${visualStyle.materialRendering}.\nContext: ${visualStyle.unifyingContext}.`
     : ""
 
+  const geometryDirective = visualStyle?.productFormDescription
+    ? `\n\nPRODUCT GEOMETRY (the complete system shown in the reference image):\n${visualStyle.productFormDescription}\n\nThe "${module.name}" sub-assembly is one component of this product. Its geometry, proportions, and structural details MUST match exactly how it appears in the reference image above.`
+    : ""
+
   return `You are provided a reference image showing the complete system.
 Generate a focused detail view of the "${module.name}" sub-assembly.
 
-CRITICAL STYLE RULE: Match the EXACT visual style of the reference image — same rendering technique, same color palette, same line weight, same perspective angle, same background treatment. The viewer should feel like they are looking at a zoomed-in section of the reference illustration.
+CRITICAL CONSISTENCY RULE: Match the reference image EXACTLY — both its visual style AND its physical geometry:
+- GEOMETRY: The shapes, proportions, structural forms, and dimensions of components must be identical to the reference. If the reference shows ducted propellers, draw ducted propellers (not open blades). If the chassis is triangular, keep it triangular. Preserve exact proportions.
+- STYLE: Same rendering technique, same color palette, same line weight, same perspective angle, same background treatment.
+The viewer should feel like they are looking at a zoomed-in crop of the reference illustration — not a reinterpretation.
 
 This sub-assembly is: ${module.detail.whatItIs}
-It contains ${module.keyParts.length} key components shown through visual differentiation.
+It contains ${module.keyParts.length} key components shown through visual differentiation.${geometryDirective}
 
-Frame the composition to show this specific sub-assembly at larger scale with more component detail visible, while maintaining the same overall aesthetic as the reference.${styleDirective}${COHESIVE_STYLE_SUFFIX}`
+Frame the composition to show this specific sub-assembly at larger scale with more component detail visible. Do NOT redesign or reinterpret the component — reproduce it faithfully from the reference at higher magnification.${styleDirective}${COHESIVE_STYLE_SUFFIX}`
 }
 
 /**
@@ -466,7 +474,9 @@ async function callImageWithFallback(
   // of matching the exact visual style.
   if (imageConfig.referenceBase64) {
     try {
-      return await callNanoBananaImageWithReference(safePrompt, imageConfig.referenceBase64, imageConfig.aspectRatio)
+      const result = await callNanoBananaImageWithReference(safePrompt, imageConfig.referenceBase64, imageConfig.aspectRatio)
+      console.log("[XRayImageGen] Multimodal generation succeeded (hero reference used)")
+      return result
     } catch (multimodalError) {
       const msg = multimodalError instanceof Error ? multimodalError.message : String(multimodalError)
       console.warn("[XRayImageGen] Nano Banana 2 multimodal failed, trying text-only:", { error: msg.slice(0, 200) })

@@ -120,6 +120,7 @@ export default function SpecifyPage(): React.ReactNode {
     setProductOverview,
     interfaceContracts,
     isExtractingContracts,
+    unmatchedPorts,
     earlyCostEstimates,
     activeProjectId,
     generatingModuleIds,
@@ -442,6 +443,7 @@ export default function SpecifyPage(): React.ReactNode {
                     }}
                     interfaceContracts={interfaceContracts}
                     generatingModuleIds={generatingModuleIds}
+                    unmatchedPorts={unmatchedPorts}
                   />
                 )}
               </div>

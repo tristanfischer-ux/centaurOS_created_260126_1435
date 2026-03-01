@@ -56,7 +56,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
-    interfaceContracts, isExtractingContracts, generatingModuleIds,
+    interfaceContracts, isExtractingContracts, generatingModuleIds, unmatchedPorts,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
     progressLines,
     checkpoints, isCheckpointing,
@@ -453,6 +453,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   onModuleClick={handleModuleClick}
                   interfaceContracts={interfaceContracts}
                   generatingModuleIds={generatingModuleIds}
+                  unmatchedPorts={unmatchedPorts}
                 />
               )}
 

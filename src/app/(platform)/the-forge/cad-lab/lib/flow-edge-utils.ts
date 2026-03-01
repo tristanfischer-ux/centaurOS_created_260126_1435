@@ -131,12 +131,20 @@ export function portTypeToSignalType(portType: string): SignalType {
  * to the real port names via exact match first, then keyword overlap fallback.
  */
 function resolvePortName(contractPort: string, actualPorts: string[]): string | null {
-  // Exact match — fast path
+  // Tier 1: Exact match — fast path
   if (actualPorts.includes(contractPort)) return contractPort
 
-  // Fuzzy match — reuse existing keyword overlap (handles short labels, stop words)
+  // Tier 2: Keyword overlap (2+ shared significant words)
   for (const port of actualPorts) {
     if (hasKeywordOverlap(contractPort, port)) return port
+  }
+
+  // Tier 3: Substring containment — one label contains the other (case-insensitive).
+  // Catches "Motor Power Supply" matching "Motor Power Supply 12V" when keyword overlap fails.
+  const contractLower = contractPort.toLowerCase()
+  for (const port of actualPorts) {
+    const portLower = port.toLowerCase()
+    if (portLower.includes(contractLower) || contractLower.includes(portLower)) return port
   }
 
   return null
@@ -159,6 +167,10 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[], modules:
 
   const edges: FlowEdge[] = []
   for (const contract of contracts) {
+    // INTENT: "external" contracts exist for validation bookkeeping only —
+    // they represent ports that interface with the environment, not another module node.
+    if (contract.sourceModuleId === "external" || contract.targetModuleId === "external") continue
+
     const sourcePorts = portLookup.get(contract.sourceModuleId)
     const targetPorts = portLookup.get(contract.targetModuleId)
 
