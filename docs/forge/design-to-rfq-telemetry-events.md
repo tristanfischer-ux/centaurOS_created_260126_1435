@@ -42,6 +42,12 @@ This document defines activity events emitted from Cad Lab Review and Procuremen
 - `cad_lab_rfq_rebroadcast_failed`
   - `reason`
 
+### Order award
+
+- `cad_lab_order_created_from_award`
+  - `orderId`
+  - `rfqId`
+
 ### Contract document interactions
 
 - `cad_lab_contract_doc_generated`
