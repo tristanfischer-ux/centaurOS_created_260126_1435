@@ -159,7 +159,7 @@ Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${massInfo}${bbo
     // INTENT: Fetch real component catalogue to ground purchased parts in real products
     const allKeyParts = modules.flatMap((m) => m.keyParts)
     const domain = detectDomainFromKeyParts(allKeyParts)
-    const keywords = extractSearchKeywords(modules)
+    const keywords = await extractSearchKeywords(modules)
     const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
 
     const systemPrompt = `You are a manufacturing engineer creating a structured Bill of Materials (BOM) from product module decomposition data.

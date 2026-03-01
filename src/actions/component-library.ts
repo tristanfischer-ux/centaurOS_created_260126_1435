@@ -964,7 +964,7 @@ const STOP_WORDS = new Set([
  * @param modules - Array of CadLabModule from decomposition
  * @returns Top 15 unique keywords sorted by frequency
  */
-export function extractSearchKeywords(modules: CadLabModule[]): string[] {
+export async function extractSearchKeywords(modules: CadLabModule[]): Promise<string[]> {
   const freq = new Map<string, number>()
 
   for (const mod of modules) {

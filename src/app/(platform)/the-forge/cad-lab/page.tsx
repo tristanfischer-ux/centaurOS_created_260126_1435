@@ -50,7 +50,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     subject, setSubject,
     referenceModel,
     isResearching,
-    hasResearch, isAnyLoading, freshResearchRef,
+    hasResearch, isAnyLoading, freshResearchRef, activeProjectId,
     handleResearch, handleDecompose,
     modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
@@ -169,11 +169,11 @@ export default function CadLabResearchPage(): React.ReactNode {
   // INTENT: Auto-trigger decomposition after fresh research completes.
   // freshResearchRef is only set by handleResearch — loading a saved project won't trigger this.
   useEffect(() => {
-    if (freshResearchRef.current && hasResearch && modules.length === 0 && !isDecomposing) {
+    if (freshResearchRef.current && hasResearch && modules.length === 0 && !isDecomposing && activeProjectId) {
       freshResearchRef.current = false
       handleDecompose()
     }
-  }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose])
+  }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose, activeProjectId])
 
   // Fall back to research if modules tab is active but no modules exist
   useEffect(() => {
