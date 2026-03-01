@@ -551,16 +551,24 @@ export function ModuleFlowCanvas({
       <div className="border-t border-border px-5 py-3 space-y-2">
         {/* Signal type legend — only show types present */}
         {presentSignalTypes.size > 0 && (
-          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Signal types:</span>
-            {(Object.keys(SIGNAL_CONFIG) as SignalType[])
-              .filter((type) => presentSignalTypes.has(type))
-              .map((type) => (
-                <span key={type} className="flex items-center gap-1">
-                  <div className={cn("h-2 w-2 rounded-full", SIGNAL_CONFIG[type].dot)} />
-                  {SIGNAL_CONFIG[type].label}
-                </span>
-              ))}
+          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+            <p className="text-xs font-medium text-foreground mb-2">Signal types</p>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {(Object.keys(SIGNAL_CONFIG) as SignalType[])
+                .filter((type) => presentSignalTypes.has(type))
+                .map((type) => {
+                  const config = SIGNAL_CONFIG[type]
+                  return (
+                    <span key={type} className="flex items-center gap-2 text-xs">
+                      <svg width="28" height="12" className="flex-shrink-0">
+                        <line x1="0" y1="6" x2="28" y2="6" stroke={config.strokeHsl} strokeWidth={2.5} strokeDasharray="6 4" />
+                      </svg>
+                      <span className="font-medium text-foreground">{config.label}</span>
+                      <span className="text-muted-foreground">{config.description}</span>
+                    </span>
+                  )
+                })}
+            </div>
           </div>
         )}
 
