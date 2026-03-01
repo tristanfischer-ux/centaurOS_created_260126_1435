@@ -14,7 +14,7 @@
 
 "use client"
 
-import React, { memo, useRef, useEffect, useState } from "react"
+import React, { memo } from "react"
 import { Handle, Position } from "@xyflow/react"
 import { ArrowUpFromLine, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -89,22 +89,18 @@ function signalPillClasses(signalType: SignalType): string {
 function PortRow({
   name,
   type,
-  index,
-  sectionTopOffset,
 }: {
   name: string
   type: "input" | "output"
-  index: number
-  /** px offset from top of node to the first port row in this section */
-  sectionTopOffset: number
 }) {
   const signalType = classifySignalType(name)
   const pillClasses = signalPillClasses(signalType)
   const isInput = type === "input"
 
-  // INTENT: Position each Handle at the vertical center of its row.
-  // React Flow Handle `top` is relative to the node's top-left corner.
-  const handleTop = sectionTopOffset + index * PORT_ROW_H + PORT_ROW_H / 2
+  // INTENT: Center Handle in its row. The PortRow div is `position: relative`,
+  // so `top` here is relative to the row, not the node root. React Flow reads
+  // the absolute DOM position via getBoundingClientRect(), so edges connect correctly.
+  const handleTop = PORT_ROW_H / 2
 
   return (
     <div
@@ -142,26 +138,6 @@ function PortRow({
 function ModuleNodeComponent({ data, selected }: NodeProps) {
   const d = data as unknown as ModuleNodeData
 
-  // INTENT: Measure actual header height so Handle `top` positions are accurate.
-  // Falls back to a reasonable estimate (48px) on first render.
-  const headerRef = useRef<HTMLDivElement>(null)
-  const [headerH, setHeaderH] = useState(48)
-
-  useEffect(() => {
-    if (headerRef.current) {
-      setHeaderH(headerRef.current.offsetHeight)
-    }
-  }, [d.label, d.purpose])
-
-  // Section offsets (px from node top)
-  // Header → separator (1px) → input section label (18px) → input rows → output section label (18px) → output rows
-  const INPUT_SECTION_LABEL_H = d.inputCount > 0 ? 18 : 0
-  const inputSectionTop = headerH + 1 + INPUT_SECTION_LABEL_H
-  const afterInputs = inputSectionTop + d.inputCount * PORT_ROW_H
-
-  const OUTPUT_SECTION_LABEL_H = d.outputCount > 0 ? 18 : 0
-  const outputSectionTop = afterInputs + (d.inputCount > 0 && d.outputCount > 0 ? 4 : 0) + OUTPUT_SECTION_LABEL_H
-
   return (
     <div
       className={cn(
@@ -175,7 +151,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       style={{ borderLeftColor: "hsl(var(--international-orange))", borderLeftWidth: "4px" }}
     >
       {/* Header: name + purpose */}
-      <div ref={headerRef} className="p-2.5 pb-1.5 space-y-0.5">
+      <div className="p-2.5 pb-1.5 space-y-0.5">
         <div className="flex items-center gap-2">
           <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(d.status))} />
           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-1 flex-1 min-w-0">
@@ -196,18 +172,16 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       {/* Input ports */}
       {d.inputCount > 0 && (
         <div className="pt-1 pb-0.5">
-          <div className="flex items-center gap-1 px-2" style={{ height: INPUT_SECTION_LABEL_H }}>
+          <div className="flex items-center gap-1 px-2" style={{ height: 18 }}>
             <span className="text-[9px] font-medium text-chart-2 uppercase tracking-wider">
               Inputs ({d.inputCount})
             </span>
           </div>
-          {d.inputs.map((inp, i) => (
+          {d.inputs.map((inp) => (
             <PortRow
               key={inp}
               name={inp}
               type="input"
-              index={i}
-              sectionTopOffset={inputSectionTop}
             />
           ))}
         </div>
@@ -216,19 +190,17 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       {/* Output ports */}
       {d.outputCount > 0 && (
         <div className={cn("pb-1.5", d.inputCount > 0 && "pt-1")}>
-          <div className="flex items-center gap-1 px-2" style={{ height: OUTPUT_SECTION_LABEL_H }}>
+          <div className="flex items-center gap-1 px-2" style={{ height: 18 }}>
             <ArrowUpFromLine className="h-2.5 w-2.5 text-chart-3" />
             <span className="text-[9px] font-medium text-chart-3 uppercase tracking-wider">
               Outputs ({d.outputCount})
             </span>
           </div>
-          {d.outputs.map((out, i) => (
+          {d.outputs.map((out) => (
             <PortRow
               key={out}
               name={out}
               type="output"
-              index={i}
-              sectionTopOffset={outputSectionTop}
             />
           ))}
         </div>
