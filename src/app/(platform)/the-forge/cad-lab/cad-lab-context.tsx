@@ -751,6 +751,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Generate shared visual style for cohesive illustrations (~1-2s),
         // then trigger image generation with it. Non-blocking overall.
         const imagesPipeline = async () => {
+          // INTENT: Set illustration status immediately so the hero card shows "Generating..."
+          // as soon as decomposition finishes, eliminating the visual gap before visual style resolves.
+          if (activeProjectId) {
+            setSystemIllustrationStatus("generating")
+            setSystemIllustrationError(null)
+          }
           // FLOW: visual style → system illustration (Pass 1) → module images (Pass 2, uses reference)
           let visualStyle: VisualStyleSpec | undefined
           try {
@@ -775,8 +781,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           // to 3:2 base64 ONCE for use as a Gemini multimodal reference in Pass 2.
           let referenceBase64: string | undefined
           if (activeProjectId) {
-            setSystemIllustrationStatus("generating")
-            setSystemIllustrationError(null)
             try {
               const illRes = await generateCadLabSystemIllustrationAction(
                 activeProjectId,
@@ -1556,6 +1560,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       if (res.success) {
         setMilestone("research")
+        freshResearchRef.current = true // INTENT: must be set BEFORE any await so the auto-decompose effect sees it when React flushes the batch
         const projId = await ensureProject()
         if (projId) {
           setIsSaving(true)
@@ -1579,7 +1584,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           // The image pipeline in handleDecompose already handles: visual style → system
           // illustration (with modules) → module images (referencing hero).
 
-          freshResearchRef.current = true
         }
       }
     } catch (err) {
