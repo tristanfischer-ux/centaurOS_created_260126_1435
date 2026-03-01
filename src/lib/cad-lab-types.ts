@@ -285,6 +285,8 @@ export interface VisualStyleSpec {
   unifyingContext: string
   /** Purely geometric description of the complete product's physical shape/silhouette (60-120 words). Used to render a faint ghost outline behind each subassembly so every module image shows spatial context within the whole product. */
   productFormDescription?: string
+  /** Per-module geometry descriptions mapping module name to a 30-50 word description of visible geometry within the product (shape, position, proportions, distinctive features). Used to constrain module image generation. */
+  moduleGeometryMap?: Record<string, string>
 }
 
 // ─── Module Types ────────────────────────────────────────────────────

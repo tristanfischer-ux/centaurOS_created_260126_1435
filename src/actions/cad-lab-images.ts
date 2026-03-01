@@ -18,7 +18,8 @@
 
 import type { CadLabModule, VisualStyleSpec } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
-import { generateModuleImage, generateResearchIllustration, cropReferenceFor3x2 } from "@/app/(platform)/the-forge/services/image-generator"
+import { generateModuleImage, generateResearchIllustration, prepareReferenceImage, cropReferenceFor3x2, analyseHeroBoundingBoxes, cropModuleRegion } from "@/app/(platform)/the-forge/services/image-generator"
+import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
 import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
@@ -54,11 +55,12 @@ export async function generateCadLabSingleImageAction(
   module: CadLabModule,
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
+  moduleCropBase64?: string,
 ): Promise<{ module: CadLabModule } | { error: string }> {
   return withAuth(async () => {
     try {
       const adapted = cadLabModuleToModuleSpec(module)
-      const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64)
+      const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
 
       return {
         module: {
@@ -200,8 +202,8 @@ export async function fetchAndCropReferenceAction(
       }
       const arrayBuf = await response.arrayBuffer()
       const base64 = Buffer.from(arrayBuf).toString("base64")
-      const cropped = await cropReferenceFor3x2(base64)
-      return { base64: cropped }
+      const prepared = await prepareReferenceImage(base64)
+      return { base64: prepared }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.warn("[CAD-LAB-IMAGES] Failed to fetch/crop reference image:", errorMsg)
@@ -247,7 +249,7 @@ export async function generateVisualStyleAction(
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
-          max_tokens: 512,
+          max_tokens: 1024,
           system: getVisualStyleSystemPrompt(),
           messages: [{ role: "user", content: userMessage }],
         }),
@@ -282,6 +284,54 @@ export async function generateVisualStyleAction(
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Failed to generate visual style:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Analyses the hero image to detect bounding box regions for each module.
+ * Called once after hero generation. Returns normalised (0-1) bounding boxes.
+ *
+ * @param heroBase64 - Base64-encoded PNG of the hero/system illustration
+ * @param moduleNames - Names of modules to locate
+ * @returns Map of module name → bounding box, or empty on failure
+ */
+export async function analyseHeroForModulesAction(
+  heroBase64: string,
+  moduleNames: string[],
+): Promise<{ boxes: Record<string, ModuleBoundingBox> } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const boxes = await analyseHeroBoundingBoxes(heroBase64, moduleNames)
+      return { boxes }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.warn("[CAD-LAB-IMAGES] Bounding box analysis failed:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Crops a specific module's region from the hero image using a bounding box.
+ * Returns a 1024×1024 PNG suitable as a second reference image.
+ *
+ * @param heroBase64 - Base64-encoded PNG of the hero image
+ * @param box - Normalised bounding box from analyseHeroForModulesAction
+ * @returns Base64-encoded 1024×1024 PNG crop, or error
+ */
+export async function cropModuleRegionAction(
+  heroBase64: string,
+  box: ModuleBoundingBox,
+): Promise<{ base64: string } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const base64 = await cropModuleRegion(heroBase64, box)
+      return { base64 }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.warn("[CAD-LAB-IMAGES] Module region crop failed:", errorMsg)
       return { error: errorMsg }
     }
   })

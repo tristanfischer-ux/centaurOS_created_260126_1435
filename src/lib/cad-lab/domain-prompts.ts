@@ -336,13 +336,14 @@ const VISUAL_STYLE_SYSTEM_PROMPT = `You are an art director for a professional e
 
 Given a product description and its module list, generate a cohesive visual style specification that will be injected into every module illustration prompt. The goal is that all module images look like they belong to the same document — as if each is a zoomed-in detail view of one master concept drawing.
 
-Output STRICTLY as JSON with exactly these 4 fields:
+Output STRICTLY as JSON with exactly these 5 fields:
 
 {
   "colorPalette": "3-4 dominant colors described by name (e.g. 'steel blue, warm gray, copper accent, matte white'). Pick colors appropriate for the product's domain and materials.",
   "materialRendering": "How surfaces and materials should be rendered across all illustrations (e.g. 'brushed metal with soft specular highlights and subtle anodized color tints'). Keep it specific enough to be visually consistent.",
   "unifyingContext": "A short phrase that frames every module as part of one system (e.g. 'sub-assemblies of a compact quadrotor drone with carbon-fiber arms'). This gets prepended to each module prompt.",
-  "productFormDescription": "A purely geometric description of the complete product's physical shape and silhouette (60-120 words). Describe the overall form factor, proportions, and spatial arrangement of major volumes — e.g. 'A low rectangular chassis roughly twice as wide as it is tall, with four cylindrical wheel housings at each corner. A trapezoidal sensor mast rises from the front-center. The rear third is an open flatbed bay.' Do NOT reference module names, part numbers, or technical labels — describe only visible shapes, positions, and proportions."
+  "productFormDescription": "A purely geometric description of the complete product's physical shape and silhouette (60-120 words). Describe the overall form factor, proportions, and spatial arrangement of major volumes — e.g. 'A low rectangular chassis roughly twice as wide as it is tall, with four cylindrical wheel housings at each corner. A trapezoidal sensor mast rises from the front-center. The rear third is an open flatbed bay.' Do NOT reference module names, part numbers, or technical labels — describe only visible shapes, positions, and proportions.",
+  "moduleGeometryMap": { "Module Name": "30-50 word description of this module's visible geometry within the product (shape, position, proportions, distinctive features). Describe what someone would SEE — silhouettes, relative sizes, spatial relationships." }
 }
 
 RULES:
@@ -351,7 +352,8 @@ RULES:
 - materialRendering should describe a single consistent rendering approach
 - unifyingContext should name the product and its defining physical characteristic
 - Keep colorPalette, materialRendering, and unifyingContext each under 30 words
-- productFormDescription should be 60-120 words of purely geometric/visual description`
+- productFormDescription should be 60-120 words of purely geometric/visual description
+- moduleGeometryMap must have one entry per module, each 30-50 words of purely visual/geometric description`
 
 /**
  * Returns the system prompt for generating a VisualStyleSpec via Claude.

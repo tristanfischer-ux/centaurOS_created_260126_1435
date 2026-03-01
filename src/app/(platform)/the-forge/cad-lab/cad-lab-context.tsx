@@ -49,7 +49,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -878,9 +878,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             // Non-critical — images still generate, just without coordinated style
           }
 
-          // FLOW: Pass 1 — generate system illustration FIRST, then crop it
-          // to 3:2 base64 ONCE for use as a Gemini multimodal reference in Pass 2.
+          // FLOW: Pass 1 — generate system illustration FIRST, then prepare it
+          // as full-resolution reference ONCE for use as Gemini multimodal reference in Pass 2.
           let referenceBase64: string | undefined
+          const moduleCrops = new Map<string, string>()
           if (activeProjectId) {
             try {
               const illRes = await generateCadLabSystemIllustrationAction(
@@ -898,8 +899,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url)
                   .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
 
-                // INTENT: Fetch + crop the hero to 3:2 base64 ONCE so all module
-                // images share the same pre-cropped reference without redundant fetches.
+                // INTENT: Fetch + prepare the hero as full-resolution reference ONCE
+                // so all module images share the same base64 without redundant fetches.
                 try {
                   const cropRes = await fetchAndCropReferenceAction(illRes.url)
                   if ("base64" in cropRes) {
@@ -907,6 +908,33 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   }
                 } catch {
                   // Non-critical — module images still generate via text-only path
+                }
+
+                // Layer 2: Analyse hero for per-module bounding boxes, then crop each
+                if (referenceBase64) {
+                  try {
+                    const bbRes = await analyseHeroForModulesAction(referenceBase64, res.modules.map(m => m.name))
+                    if ("boxes" in bbRes && Object.keys(bbRes.boxes).length > 0) {
+                      // Crop each module's region in parallel
+                      const cropPromises = res.modules.map(async (mod) => {
+                        const box = bbRes.boxes[mod.name]
+                        if (!box) return { id: mod.id, crop: undefined }
+                        try {
+                          const cropResult = await cropModuleRegionAction(referenceBase64!, box)
+                          if ("base64" in cropResult) {
+                            return { id: mod.id, crop: cropResult.base64 }
+                          }
+                        } catch { /* ignore individual crop failures */ }
+                        return { id: mod.id, crop: undefined }
+                      })
+                      const cropResults = await Promise.all(cropPromises)
+                      for (const cr of cropResults) {
+                        if (cr.crop) moduleCrops.set(cr.id, cr.crop)
+                      }
+                    }
+                  } catch {
+                    // Non-critical — modules still generate with full-hero-only reference
+                  }
                 }
               } else {
                 console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
@@ -921,8 +949,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           }
 
-          // Pass 2 — module images, with reference base64 if available
-          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceBase64)
+          // Pass 2 — module images, with reference base64 + per-module crops if available
+          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceBase64, moduleCrops)
             .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
         }
         imagesPipeline()
@@ -972,7 +1000,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string) => {
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>) => {
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
@@ -1041,7 +1069,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           seedTemplateSlug: mod.seedTemplateSlug,
           imageStatus: mod.imageStatus,
         }
-        const res = await generateCadLabSingleImageAction(projectId, slimMod, visualStyle, referenceBase64)
+        const moduleCrop = moduleCrops?.get(mod.id)
+        const res = await generateCadLabSingleImageAction(projectId, slimMod, visualStyle, referenceBase64, moduleCrop)
         if ("module" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),

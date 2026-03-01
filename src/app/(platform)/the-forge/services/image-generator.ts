@@ -117,19 +117,34 @@ Style: Modern industrial engineering diagram on a white background with thin, pr
  * @param visualStyle - Optional visual style directives
  * @returns A prompt designed to be paired with the hero as inlineData
  */
-function buildReferenceAwareModulePrompt(module: ModuleSpec, visualStyle?: VisualStyleSpec): string {
+function buildReferenceAwareModulePrompt(module: ModuleSpec, visualStyle?: VisualStyleSpec, hasModuleCrop?: boolean): string {
   const styleDirective = visualStyle
     ? `\nColor palette: ${visualStyle.colorPalette}.\nMaterial rendering: ${visualStyle.materialRendering}.\nContext: ${visualStyle.unifyingContext}.`
     : ""
+
+  const moduleGeometry = visualStyle?.moduleGeometryMap?.[module.name]
 
   const geometryDirective = visualStyle?.productFormDescription
     ? `\n\nPRODUCT GEOMETRY (the complete system shown in the reference image):\n${visualStyle.productFormDescription}\n\nThe "${module.name}" sub-assembly is one component of this product. Its geometry, proportions, and structural details MUST match exactly how it appears in the reference image above.`
     : ""
 
-  return `You are provided a reference image showing the complete system.
-Generate a focused detail view of the "${module.name}" sub-assembly.
+  const specificModuleGeometry = moduleGeometry
+    ? `\n\nSPECIFIC MODULE GEOMETRY for "${module.name}":\n${moduleGeometry}\nReproduce these exact geometric features — do not substitute, simplify, or reinterpret any shapes.`
+    : ""
 
-CRITICAL CONSISTENCY RULE: Match the reference image EXACTLY — both its visual style AND its physical geometry:
+  // When a module crop is provided as IMAGE 2, reference both images explicitly
+  const imageReferenceText = hasModuleCrop
+    ? `You are provided two reference images.
+IMAGE 1: The complete system (full product view).
+IMAGE 2: A cropped close-up of the specific region containing the "${module.name}" sub-assembly.
+CRITICAL: Reproduce the geometry from IMAGE 2 exactly. IMAGE 1 provides overall context.
+Generate a focused detail view of the "${module.name}" sub-assembly.`
+    : `You are provided a reference image showing the complete system.
+Generate a focused detail view of the "${module.name}" sub-assembly.`
+
+  return `${imageReferenceText}
+
+CRITICAL CONSISTENCY RULE: Match the reference image${hasModuleCrop ? "s" : ""} EXACTLY — both ${hasModuleCrop ? "their" : "its"} visual style AND ${hasModuleCrop ? "their" : "its"} physical geometry:
 - GEOMETRY: The shapes, proportions, structural forms, and dimensions of components must be identical to the reference. If the reference shows ducted propellers, draw ducted propellers (not open blades). If the chassis is triangular, keep it triangular. Preserve exact proportions.
 - STYLE: Same rendering technique, same color palette, same line weight, same perspective angle, same background treatment.
 The viewer should feel like they are looking at a zoomed-in crop of the reference illustration — not a reinterpretation.
@@ -137,7 +152,7 @@ The viewer should feel like they are looking at a zoomed-in crop of the referenc
 This sub-assembly is: ${module.detail.whatItIs}
 It contains ${module.keyParts.length} key components shown through visual differentiation.${geometryDirective}
 
-Frame the composition to show this specific sub-assembly at larger scale with more component detail visible. Do NOT redesign or reinterpret the component — reproduce it faithfully from the reference at higher magnification.${styleDirective}${COHESIVE_STYLE_SUFFIX}`
+Frame the composition to show this specific sub-assembly at larger scale with more component detail visible. Do NOT redesign or reinterpret the component — reproduce it faithfully from the reference at higher magnification.${specificModuleGeometry}${styleDirective}${COHESIVE_STYLE_SUFFIX}`
 }
 
 /**
@@ -312,13 +327,21 @@ async function callNanoBananaImage(
   return { mimeType, data: b64Data }
 }
 
+/** A reference image to send as multimodal input alongside the text prompt */
+interface ReferenceImage {
+  mimeType: string
+  base64: string
+}
+
 /**
- * Calls the Nano Banana 2 generateContent API with a reference image as
- * multimodal input. The reference image is sent as an inlineData part
- * alongside the text prompt, allowing Gemini to visually match the style.
+ * Calls the Nano Banana 2 generateContent API with one or more reference images
+ * as multimodal input. Reference images are sent as inlineData parts alongside
+ * the text prompt, allowing Gemini to visually match the style and geometry.
+ *
+ * Gemini supports up to 14 reference images per request.
  *
  * @param prompt - The text prompt
- * @param referenceBase64 - Base64-encoded reference image (PNG)
+ * @param referenceImages - Array of reference images (PNG/JPEG)
  * @param aspectRatio - Aspect ratio (mapped to Nano Banana 2 supported values)
  * @returns Base64 image data and mime type
  *
@@ -326,7 +349,7 @@ async function callNanoBananaImage(
  */
 async function callNanoBananaImageWithReference(
   prompt: string,
-  referenceBase64: string,
+  referenceImages: ReferenceImage[],
   aspectRatio?: string,
 ): Promise<{ mimeType: string; data: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
@@ -336,13 +359,13 @@ async function callNanoBananaImageWithReference(
 
   const url = `${GOOGLE_AI_API_BASE}/${NANO_BANANA_MODEL}:generateContent`
 
-  // INTENT: Send reference image as inlineData part so Gemini can visually
+  // INTENT: Send reference images as inlineData parts so Gemini can visually
   // match the hero's exact style — same model that generated the hero now
   // sees it while generating each module image.
   const body = {
     contents: [{
       parts: [
-        { inlineData: { mimeType: "image/jpeg", data: referenceBase64 } },
+        ...referenceImages.map(img => ({ inlineData: { mimeType: img.mimeType, data: img.base64 } })),
         { text: prompt },
       ],
     }],
@@ -464,17 +487,22 @@ async function callOpenAIImage(
  */
 async function callImageWithFallback(
   prompt: string,
-  imageConfig: { aspectRatio?: string; referenceBase64?: string } = {},
+  imageConfig: { aspectRatio?: string; referenceBase64?: string; moduleCropBase64?: string } = {},
 ): Promise<{ mimeType: string; data: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
 
-  // DECISION: When a reference image is available, try the multimodal path first.
-  // Same Gemini model that generated the hero sees it as inlineData — best chance
-  // of matching the exact visual style.
+  // DECISION: When reference images are available, try the multimodal path first.
+  // Build array of reference images: full hero + optional per-module crop.
   if (imageConfig.referenceBase64) {
+    const refs: ReferenceImage[] = [
+      { mimeType: "image/png", base64: imageConfig.referenceBase64 },
+    ]
+    if (imageConfig.moduleCropBase64) {
+      refs.push({ mimeType: "image/png", base64: imageConfig.moduleCropBase64 })
+    }
     try {
-      const result = await callNanoBananaImageWithReference(safePrompt, imageConfig.referenceBase64, imageConfig.aspectRatio)
+      const result = await callNanoBananaImageWithReference(safePrompt, refs, imageConfig.aspectRatio)
       console.log("[XRayImageGen] Multimodal generation succeeded (hero reference used)")
       return result
     } catch (multimodalError) {
@@ -540,6 +568,177 @@ async function uploadToStorage(
     .getPublicUrl(path)
 
   return urlData.publicUrl
+}
+
+// ─── Reference Image Preparation ────────────────────────────────────
+
+/**
+ * Prepares the hero image as a full-resolution reference for Gemini multimodal.
+ * Keeps the full 16:9 aspect (no crop — cropping removes edge components),
+ * resizes to 2048px wide (matching Gemini's native 2K output), lossless PNG.
+ *
+ * @param base64Png - Base64-encoded 16:9 PNG from system illustration
+ * @returns Base64-encoded 16:9 PNG at 2048px wide
+ */
+export async function prepareReferenceImage(base64Png: string): Promise<string> {
+  const buf = Buffer.from(base64Png, "base64")
+  const meta = await sharp(buf).metadata()
+  const w = meta.width ?? 1920
+  const h = meta.height ?? 1080
+
+  // Resize to 2048px wide, preserving aspect ratio, lossless PNG
+  const targetWidth = Math.min(w, 2048)
+  const targetHeight = Math.round(targetWidth * (h / w))
+
+  const resized = await sharp(buf)
+    .resize(targetWidth, targetHeight)
+    .png()
+    .toBuffer()
+
+  return resized.toString("base64")
+}
+
+// ─── Bounding Box Analysis & Module Cropping (Layer 2) ──────────────
+
+/** Normalised bounding box (0-1 coordinates) for a module region in the hero image */
+export interface ModuleBoundingBox {
+  x: number // left edge (0-1)
+  y: number // top edge (0-1)
+  w: number // width (0-1)
+  h: number // height (0-1)
+}
+
+/**
+ * Calls Claude Vision (Sonnet) to identify bounding box regions for each
+ * named module in the hero image. Returns normalised (0-1) coordinates.
+ *
+ * @param heroBase64 - Base64-encoded PNG of the hero/system illustration
+ * @param moduleNames - Names of modules to locate in the image
+ * @returns Map of module name → normalised bounding box, or {} on failure
+ */
+export async function analyseHeroBoundingBoxes(
+  heroBase64: string,
+  moduleNames: string[],
+): Promise<Record<string, ModuleBoundingBox>> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    console.warn("[XRayImageGen] No ANTHROPIC_API_KEY — skipping bounding box analysis")
+    return {}
+  }
+
+  if (!heroBase64 || moduleNames.length === 0) return {}
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system: `You are a vision analyst identifying component regions in engineering illustrations.
+
+Given a technical illustration and a list of module/sub-assembly names, identify the approximate bounding box region for each module visible in the image. Return normalised coordinates (0-1 range, where 0,0 is top-left and 1,1 is bottom-right).
+
+Return ONLY valid JSON: { "ModuleName": { "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4 }, ... }
+If a module is not clearly visible, omit it from the result. Do not include text outside JSON.`,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: "image/png",
+                data: heroBase64,
+              },
+            },
+            {
+              type: "text",
+              text: `Identify the bounding box region for each of these modules in the illustration:\n${moduleNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nReturn JSON with normalised 0-1 coordinates.`,
+            },
+          ],
+        }],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+
+    if (!response.ok) {
+      console.warn(`[XRayImageGen] Bounding box API returned ${response.status}`)
+      return {}
+    }
+
+    const data = await response.json()
+    const text = data?.content?.[0]?.text
+    if (!text) return {}
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      console.warn("[XRayImageGen] Could not extract JSON from bounding box response")
+      return {}
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, ModuleBoundingBox>
+
+    // Validate and clamp all bounding boxes
+    const validated: Record<string, ModuleBoundingBox> = {}
+    for (const [name, box] of Object.entries(parsed)) {
+      if (
+        typeof box.x === "number" && typeof box.y === "number" &&
+        typeof box.w === "number" && typeof box.h === "number" &&
+        box.w > 0 && box.h > 0
+      ) {
+        validated[name] = {
+          x: Math.max(0, Math.min(1, box.x)),
+          y: Math.max(0, Math.min(1, box.y)),
+          w: Math.max(0.05, Math.min(1, box.w)),
+          h: Math.max(0.05, Math.min(1, box.h)),
+        }
+      }
+    }
+
+    console.log(`[XRayImageGen] Bounding boxes detected for ${Object.keys(validated).length} modules`)
+    return validated
+  } catch (err) {
+    console.warn("[XRayImageGen] Bounding box analysis failed:", err instanceof Error ? err.message : err)
+    return {}
+  }
+}
+
+/**
+ * Crops a module's region from the hero image using a normalised bounding box.
+ * Adds 10% padding, then resizes to 1024×1024 PNG for use as a second reference.
+ *
+ * @param heroBase64 - Base64-encoded PNG of the full hero image
+ * @param box - Normalised bounding box (0-1 coordinates)
+ * @returns Base64-encoded 1024×1024 PNG of the cropped region
+ */
+export async function cropModuleRegion(
+  heroBase64: string,
+  box: ModuleBoundingBox,
+): Promise<string> {
+  const buf = Buffer.from(heroBase64, "base64")
+  const meta = await sharp(buf).metadata()
+  const imgW = meta.width ?? 1920
+  const imgH = meta.height ?? 1080
+
+  // Convert normalised to pixel coords with 10% padding
+  const pad = 0.1
+  const px = Math.max(0, Math.round((box.x - box.w * pad) * imgW))
+  const py = Math.max(0, Math.round((box.y - box.h * pad) * imgH))
+  const pw = Math.min(imgW - px, Math.round(box.w * (1 + 2 * pad) * imgW))
+  const ph = Math.min(imgH - py, Math.round(box.h * (1 + 2 * pad) * imgH))
+
+  const cropped = await sharp(buf)
+    .extract({ left: px, top: py, width: Math.max(1, pw), height: Math.max(1, ph) })
+    .resize(1024, 1024, { fit: "contain", background: { r: 255, g: 255, b: 255, alpha: 1 } })
+    .png()
+    .toBuffer()
+
+  return cropped.toString("base64")
 }
 
 // ─── Reference Image Editing (Two-Pass) ─────────────────────────────
@@ -641,6 +840,122 @@ async function tryOpenAIEdit(
   }
 }
 
+// ─── Geometric Consistency Verification (Layer 3) ───────────────────
+
+/** Result from geometric consistency scoring */
+interface ConsistencyScoreResult {
+  score: number // 1-10
+  issues: string[]
+  shouldRegenerate: boolean
+}
+
+/**
+ * Sends hero + module image to Claude Vision and scores geometric consistency.
+ * Returns null on any failure (non-blocking — keeps the first generation).
+ *
+ * @param heroBase64 - Base64-encoded PNG of the hero image
+ * @param moduleBase64 - Base64-encoded PNG of the generated module image
+ * @param moduleName - Name of the module being scored
+ * @returns Score result, or null on failure
+ */
+async function scoreImageConsistency(
+  heroBase64: string,
+  moduleBase64: string,
+  moduleName: string,
+): Promise<ConsistencyScoreResult | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey) return null
+
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 512,
+        system: `You are an engineering illustration quality inspector. Compare a hero/overview image (IMAGE 1) with a module detail image (IMAGE 2) and score geometric consistency on a scale of 1-10.
+
+Scoring guide:
+- 9-10: Components in IMAGE 2 are geometrically identical to the corresponding region in IMAGE 1 — same shapes, proportions, and structural forms
+- 7-8: Most geometry matches, minor proportional differences
+- 5-6: Recognisably the same concept but with notable geometric differences (e.g. circular vs rectangular, different proportions)
+- 3-4: Significant geometric mismatch — shapes or component types differ substantially
+- 1-2: No geometric relationship — IMAGE 2 looks like a completely different design
+
+Return ONLY valid JSON: { "score": <number>, "issues": ["<specific geometric difference>", ...] }
+Do not include text outside JSON.`,
+        messages: [{
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/png", data: heroBase64 },
+            },
+            {
+              type: "image",
+              source: { type: "base64", media_type: "image/png", data: moduleBase64 },
+            },
+            {
+              type: "text",
+              text: `Score the geometric consistency of the "${moduleName}" module (IMAGE 2) against the hero image (IMAGE 1). Return JSON only.`,
+            },
+          ],
+        }],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    })
+
+    if (!response.ok) {
+      console.warn(`[XRayImageGen] Consistency scoring API returned ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+    const text = data?.content?.[0]?.text
+    if (!text) return null
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return null
+
+    const parsed = JSON.parse(jsonMatch[0])
+    if (typeof parsed.score !== "number" || !Array.isArray(parsed.issues)) return null
+
+    const score = Math.round(Math.max(1, Math.min(10, parsed.score)))
+    return {
+      score,
+      issues: parsed.issues.map(String),
+      shouldRegenerate: score < 6,
+    }
+  } catch (err) {
+    console.warn("[XRayImageGen] Consistency scoring failed:", err instanceof Error ? err.message : err)
+    return null
+  }
+}
+
+/**
+ * Builds a constrained retry prompt that incorporates specific issues from
+ * the consistency scorer. Appended to the original module prompt on retry.
+ */
+function buildConstrainedRetryPrompt(
+  module: ModuleSpec,
+  issues: string[],
+  visualStyle?: VisualStyleSpec,
+  hasModuleCrop?: boolean,
+): string {
+  const basePrompt = buildReferenceAwareModulePrompt(module, visualStyle, hasModuleCrop)
+  const issueList = issues.map((i, idx) => `- ${idx + 1}. ${i}`).join("\n")
+
+  return `${basePrompt}
+
+RETRY: A previous generation failed geometric consistency review. Fix these specific issues:
+${issueList}
+Do NOT deviate from the reference image geometry. Every shape, proportion, and component type must match exactly.`
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
@@ -665,18 +980,43 @@ export async function generateModuleImage(
   brief?: StructuralBrief,
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
+  moduleCropBase64?: string,
 ): Promise<string> {
   // DECISION: When a reference image is available, use the reference-aware prompt
   // that instructs Gemini to match the hero's visual style. The text-only prompt
   // (buildModulePrompt) is still used as fallback when multimodal fails.
   const prompt = referenceBase64
-    ? buildReferenceAwareModulePrompt(module, visualStyle)
+    ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
     : buildModulePrompt(module, brief, visualStyle)
 
-  const imageData = await callImageWithFallback(prompt, {
+  let imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",
     referenceBase64,
+    moduleCropBase64,
   })
+
+  // Layer 3: Geometric consistency verification + single retry
+  if (referenceBase64 && process.env.ANTHROPIC_API_KEY) {
+    const consistencyResult = await scoreImageConsistency(referenceBase64, imageData.data, module.name)
+    if (consistencyResult) {
+      console.log(`[XRayImageGen] Geometric consistency score ${consistencyResult.score}/10 for ${module.name}`)
+      if (consistencyResult.shouldRegenerate) {
+        console.log(`[XRayImageGen] Score below threshold, retrying with constraints for ${module.name}`)
+        const retryPrompt = buildConstrainedRetryPrompt(module, consistencyResult.issues, visualStyle, !!moduleCropBase64)
+        try {
+          const retryData = await callImageWithFallback(retryPrompt, {
+            aspectRatio: "3:2",
+            referenceBase64,
+            moduleCropBase64,
+          })
+          imageData = retryData
+        } catch (retryErr) {
+          console.warn(`[XRayImageGen] Retry failed for ${module.name}, keeping original:`, retryErr instanceof Error ? retryErr.message : retryErr)
+          // Keep original imageData on retry failure
+        }
+      }
+    }
+  }
 
   // Post-process: add engineering annotation frame with labels
   const labeledData = await overlayModuleLabels(imageData.data, {
