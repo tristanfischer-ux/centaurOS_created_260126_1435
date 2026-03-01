@@ -122,22 +122,66 @@ export function portTypeToSignalType(portType: string): SignalType {
 }
 
 /**
+ * Resolve a contract port name to the actual module port name.
+ *
+ * INTENT: Claude's interface extraction may rephrase port names (e.g.
+ * "Motor Power Supply" vs the module's "Motor Power Supply 12V"). React Flow
+ * silently drops edges when handle IDs don't match. This snaps contract names
+ * to the real port names via exact match first, then keyword overlap fallback.
+ */
+function resolvePortName(contractPort: string, actualPorts: string[]): string | null {
+  // Exact match — fast path
+  if (actualPorts.includes(contractPort)) return contractPort
+
+  // Fuzzy match — reuse existing keyword overlap (handles short labels, stop words)
+  for (const port of actualPorts) {
+    if (hasKeywordOverlap(contractPort, port)) return port
+  }
+
+  return null
+}
+
+/**
  * Builds edges from extracted interface contracts instead of keyword overlap.
  * Each contract becomes an edge with compatibility status preserved.
+ *
+ * DECISION: Accepts modules to fuzzy-match contract port names against actual
+ * module port names. Without this, rephrased port names from Claude's extraction
+ * cause React Flow to silently drop arrows (handle ID mismatch).
  */
-export function buildEdgesFromContracts(contracts: InterfaceContract[]): FlowEdge[] {
+export function buildEdgesFromContracts(contracts: InterfaceContract[], modules: CadLabModule[]): FlowEdge[] {
+  // Build port lookup: moduleId → { inputs, outputs }
+  const portLookup = new Map<string, { inputs: string[]; outputs: string[] }>()
+  for (const m of modules) {
+    portLookup.set(m.id, { inputs: m.inputs, outputs: m.outputs })
+  }
+
   const edges: FlowEdge[] = []
   for (const contract of contracts) {
+    const sourcePorts = portLookup.get(contract.sourceModuleId)
+    const targetPorts = portLookup.get(contract.targetModuleId)
+
+    // Resolve port names to actual module handles
+    const resolvedSource = sourcePorts
+      ? resolvePortName(contract.sourcePort, sourcePorts.outputs)
+      : null
+    const resolvedTarget = targetPorts
+      ? resolvePortName(contract.targetPort, targetPorts.inputs)
+      : null
+
+    // Skip edge if either port can't be resolved — contract is invalid
+    if (!resolvedSource || !resolvedTarget) continue
+
     const isDuplicate = edges.some(
-      (e) => e.from === contract.sourceModuleId && e.to === contract.targetModuleId && e.label === contract.sourcePort,
+      (e) => e.from === contract.sourceModuleId && e.to === contract.targetModuleId && e.label === resolvedSource,
     )
     if (!isDuplicate) {
       edges.push({
         from: contract.sourceModuleId,
         to: contract.targetModuleId,
-        sourceHandle: contract.sourcePort,
-        targetHandle: contract.targetPort,
-        label: contract.sourcePort,
+        sourceHandle: resolvedSource,
+        targetHandle: resolvedTarget,
+        label: resolvedSource,
         signalType: portTypeToSignalType(contract.portType),
         incompatible: contract.compatible === false,
         incompatibilityReason: contract.incompatibilityReason,

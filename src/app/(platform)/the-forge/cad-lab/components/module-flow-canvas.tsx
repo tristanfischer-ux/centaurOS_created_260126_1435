@@ -255,7 +255,7 @@ function buildNodesAndEdges(
 ) {
   // Build flow edges (contracts-first, keyword-fallback)
   const flowEdges = interfaceContracts && interfaceContracts.length > 0
-    ? buildEdgesFromContracts(interfaceContracts)
+    ? buildEdgesFromContracts(interfaceContracts, modules)
     : buildEdges(modules)
 
   // Connection counts per module
@@ -462,7 +462,7 @@ export function ModuleFlowCanvas({
   // Compute edges for header stats and legend
   const flowEdges = useMemo(
     () => interfaceContracts && interfaceContracts.length > 0
-      ? buildEdgesFromContracts(interfaceContracts)
+      ? buildEdgesFromContracts(interfaceContracts, modules)
       : buildEdges(modules),
     [modules, interfaceContracts],
   )

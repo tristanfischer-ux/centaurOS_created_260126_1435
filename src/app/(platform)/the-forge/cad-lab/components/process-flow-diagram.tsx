@@ -57,7 +57,7 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick, int
   // INTENT: Use contract-based edges when available, fall back to keyword matching
   const edges = useMemo(
     () => interfaceContracts && interfaceContracts.length > 0
-      ? buildEdgesFromContracts(interfaceContracts)
+      ? buildEdgesFromContracts(interfaceContracts, modules)
       : buildEdges(modules),
     [modules, interfaceContracts],
   )
