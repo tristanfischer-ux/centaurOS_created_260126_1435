@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   Clock,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -60,19 +61,31 @@ export default function AssemblePage(): React.ReactNode {
   const {
     subject,
     activeProjectId,
+    hasResearch,
   } = useCadLab()
+
+  // Gate: redirect to CAD Lab root if prerequisites are missing
+  useEffect(() => {
+    if (!hasResearch) {
+      router.replace(FORGE_ROUTES.cadLab)
+    }
+  }, [hasResearch, router])
 
   // ── Assembly dashboard data ──
   const [orderLines, setOrderLines] = useState<OrderLineSummary[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [assemblyError, setAssemblyError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!activeProjectId) return
     setIsLoading(true)
+    setAssemblyError(null)
     getAssemblyDashboard(activeProjectId)
       .then((result) => {
         if ("orderLines" in result) {
           setOrderLines(result.orderLines)
+        } else {
+          setAssemblyError(result.error)
         }
       })
       .finally(() => setIsLoading(false))
@@ -158,7 +171,16 @@ export default function AssemblePage(): React.ReactNode {
         {/* ═══ Orders tab ═══ */}
         {activeTab === "orders" && (
           <motion.div key="orders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-4">
-            {isLoading ? (
+            {assemblyError ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    Failed to load orders: {assemblyError}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : isLoading ? (
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -47,6 +47,7 @@ import {
   deleteCadLabProject,
   loadCadLabBatchStatus,
 } from "@/actions/cad-lab-projects"
+import { getProjectOrders } from "@/actions/manufacturing-orders"
 
 import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction } from "@/actions/cad-lab-images"
 import { toast } from "sonner"
@@ -221,6 +222,7 @@ export interface CadLabContextValue {
   // Pipeline stage tracking (4-stage flow)
   specifiedModuleCount: number
   manufacturingOrderCount: number
+  refreshManufacturingOrderCount: () => Promise<void>
   isSpecificationComplete: boolean
   projectReviewVerdicts: Record<string, Record<string, SpecialistReview>>
 
@@ -437,9 +439,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const isAnyLoading = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0 || isGeneratingImages
   const generatedModuleCount = modules.filter((m) => m.status === "generated").length
   const specifiedModuleCount = modules.filter((m) => m.status === "specified" || m.status === "generated").length
-  // INTENT: manufacturingOrderCount will be populated once Source stage is wired up.
-  // For now it's 0, which correctly locks the Assemble stage.
-  const manufacturingOrderCount = 0
+  const [manufacturingOrderCount, setManufacturingOrderCount] = useState(0)
   const isSpecificationComplete = specifiedModuleCount > 0 && specifiedModuleCount === modules.length
   const projectReviewVerdicts: Record<string, Record<string, SpecialistReview>> = {}
   const riskCount = modules.reduce(
@@ -465,6 +465,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   const productOverviewRef = useRef(productOverview)
   useEffect(() => { productOverviewRef.current = productOverview }, [productOverview])
+
+  // INTENT: Tracks whether the component is still mounted, so fire-and-forget
+  // async callbacks (contract extraction, diagnostic prefill, image pipeline)
+  // can skip state updates after unmount and avoid React warnings.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  // INTENT: Ref-mirror of activeProjectId so the unmount cleanup closure
+  // can read the current value (closures capture stale state).
+  const activeProjectIdRef = useRef(activeProjectId)
+  useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
+
+  // INTENT: Prevents auto-restore from firing twice in React StrictMode.
+  const autoRestoreRef = useRef(false)
 
   // INTENT: Tracks whether research JUST completed in this session (vs loaded from a saved project).
   // Only set to true at the end of handleResearch — never during handleLoadProject.
@@ -581,23 +598,50 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     debouncedSaveDiagnostics()
   }, [diagnosticAnswers, debouncedSaveDiagnostics])
 
-  // Cleanup pending saves on unmount
+  // INTENT: Flush (not drop) pending debounced saves on unmount so navigating
+  // away doesn't silently discard unsaved edits. Fire-and-forget is fine here —
+  // the server action will persist even after the component is gone.
   useEffect(() => {
     return () => {
+      const pid = activeProjectIdRef.current
       if (savePendingRef.current) {
         clearTimeout(savePendingRef.current)
         savePendingRef.current = null
+        if (pid) {
+          saveCadLabModules(pid, modulesRef.current).catch(() => { /* best-effort */ })
+        }
       }
       if (overviewPendingRef.current) {
         clearTimeout(overviewPendingRef.current)
         overviewPendingRef.current = null
+        if (pid) {
+          saveCadLabProductOverview(pid, productOverviewRef.current).catch(() => { /* best-effort */ })
+        }
       }
       if (diagPendingRef.current) {
         clearTimeout(diagPendingRef.current)
         diagPendingRef.current = null
+        if (pid) {
+          saveCadLabDiagnosticAnswers(pid, diagnosticAnswersRef.current).catch(() => { /* best-effort */ })
+        }
       }
     }
   }, [])
+
+  // ── Manufacturing order count ──
+  const refreshManufacturingOrderCount = useCallback(async () => {
+    const pid = activeProjectId
+    if (!pid) {
+      setManufacturingOrderCount(0)
+      return
+    }
+    const res = await getProjectOrders(pid)
+    if ("orders" in res) {
+      setManufacturingOrderCount(res.orders.length)
+    } else {
+      console.error("[CAD-LAB] Failed to fetch manufacturing orders:", res.error)
+    }
+  }, [activeProjectId])
 
   // ── Project List ──
   const refreshProjects = useCallback(async () => {
@@ -768,6 +812,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Smart diagnostics pre-fill (background)
         prefillDiagnostics(res.modules, editableReport, modelId)
           .then((prefillRes) => {
+            if (!mountedRef.current) return
             if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
               setDiagnosticAnswers((prev) => {
                 const merged = { ...prefillRes.answers }
@@ -786,6 +831,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsExtractingContracts(true)
           extractInterfaceContracts(res.modules, editableReport, modelId)
             .then((contractRes) => {
+              if (!mountedRef.current) return
               setInterfaceContracts(contractRes.contracts)
               setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
               setIsExtractingContracts(false)
@@ -795,6 +841,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               }
             })
             .catch((e) => {
+              if (!mountedRef.current) return
               console.error("[CAD-LAB] Interface contract extraction failed:", e)
               setIsExtractingContracts(false)
             })
@@ -817,6 +864,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               res.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
               extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
             )
+            if (!mountedRef.current) return
             if ("visualStyle" in styleRes) {
               visualStyle = styleRes.visualStyle
               setVisualStyle(visualStyle)
@@ -842,6 +890,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 visualStyle,
                 extractExecutiveSummary(editableReport)?.slice(0, 600),
               )
+              if (!mountedRef.current) return
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
@@ -864,6 +913,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
               }
             } catch (e) {
+              if (!mountedRef.current) return
               console.error("[CAD-LAB] System illustration failed:", e)
               setSystemIllustrationStatus("failed")
               setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
@@ -887,12 +937,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             researchReport: editableReport,
           })
             .then((checkpointRes) => {
+              if (!mountedRef.current) return
               if ("checkpoints" in checkpointRes) {
                 setCheckpoints(checkpointRes.checkpoints)
               }
             })
             .catch((e) => console.error("[CAD-LAB] Checkpoint failed:", e))
-            .finally(() => setIsCheckpointing(false))
+            .finally(() => { if (mountedRef.current) setIsCheckpointing(false) })
         }
       } else {
         // Decomposition returned but failed — show the user why
@@ -1797,10 +1848,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (p.diagnosticAnswers && Object.keys(p.diagnosticAnswers).length > 0) {
         setDiagnosticAnswers(p.diagnosticAnswers)
       }
+
+      // Fetch manufacturing order count for this project
+      const ordersRes = await getProjectOrders(projectId)
+      if ("orders" in ordersRes) {
+        setManufacturingOrderCount(ordersRes.orders.length)
+      }
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }
   }, [])
+
+  // INTENT: Restore the last active project when the provider remounts after
+  // navigation. Without this, navigating away and back leaves a blank canvas
+  // because activeProjectId initializes to null and nothing triggers a load.
+  // Guarded by autoRestoreRef to prevent double-fire in React StrictMode.
+  useEffect(() => {
+    if (autoRestoreRef.current) return
+    autoRestoreRef.current = true
+    if (typeof window === "undefined") return
+    const storedProjectId = localStorage.getItem(CAD_LAB_ACTIVE_PROJECT_KEY)
+    if (storedProjectId) {
+      handleLoadProject(storedProjectId)
+    }
+  }, [handleLoadProject])
 
   // ── Delete a project ──
   const handleDeleteProject = useCallback(async (projectId: string) => {
@@ -1976,6 +2047,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     unmatchedPorts,
     specifiedModuleCount,
     manufacturingOrderCount,
+    refreshManufacturingOrderCount,
     isSpecificationComplete,
     projectReviewVerdicts,
     handleDownload,

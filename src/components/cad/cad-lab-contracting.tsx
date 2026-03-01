@@ -42,6 +42,7 @@ import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { computeRfqReadiness } from "./cad-lab-procurement-utils"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
 import { getRFQDetail, getMatchedSuppliers, triggerRFQBroadcast } from "@/actions/rfq"
+import { createOrderFromAward } from "@/actions/manufacturing-orders"
 import type { SupplierMatch } from "@/types/rfq"
 import { trackFeatureUse } from "@/hooks/useActivityTracker"
 
@@ -64,6 +65,8 @@ interface CadLabContractingProps {
   designBrief?: CadLabDesignBrief
   /** Optional assumptions entered by user */
   assumptionNotes?: string
+  /** Called after a manufacturing order is created from an award */
+  onOrderCreated?: () => void
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -366,6 +369,7 @@ export function CadLabContracting({
   onRfqLinked,
   designBrief,
   assumptionNotes,
+  onOrderCreated,
 }: CadLabContractingProps): React.ReactNode {
   const [buyerName, setBuyerName] = useState("")
   const [deadline, setDeadline] = useState("")
@@ -382,6 +386,7 @@ export function CadLabContracting({
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false)
   const [isRebroadcasting, setIsRebroadcasting] = useState(false)
   const [lastBroadcastCount, setLastBroadcastCount] = useState<number | null>(null)
+  const [isAwarding, setIsAwarding] = useState(false)
 
   const rfqReadiness = useMemo(
     () => computeRfqReadiness(modules, diagnosticAnswers),
@@ -596,6 +601,35 @@ export function CadLabContracting({
     window.open(`/rfq/${createdRfqId}`, "_blank", "noopener,noreferrer")
   }
 
+  const handleAwardOrder = async (): Promise<void> => {
+    if (!createdRfqId || !projectId) return
+    setIsAwarding(true)
+    try {
+      const res = await createOrderFromAward(
+        createdRfqId,
+        createdRfqId, // responseId — uses RFQ ID as reference since responses are tracked via RFQ
+        projectId,
+        `${projectName} — Manufacturing Order`,
+      )
+      if ("error" in res) {
+        console.error("[CONTRACTING] Award failed:", res.error)
+        toast.error(res.error)
+        return
+      }
+      trackFeatureUse("cad_lab_order_created_from_award", {
+        orderId: res.orderId,
+        rfqId: createdRfqId,
+      })
+      toast.success("Manufacturing order created")
+      onOrderCreated?.()
+    } catch (err) {
+      console.error("[CONTRACTING] Award failed:", err)
+      toast.error(err instanceof Error ? err.message : "Failed to create manufacturing order")
+    } finally {
+      setIsAwarding(false)
+    }
+  }
+
   const procurementStage = !createdRfqId
     ? "draft"
     : rfqStatus === "Awarded"
@@ -806,6 +840,27 @@ export function CadLabContracting({
           <p className="text-[11px] text-muted-foreground -mt-1">
             Last rebroadcast reached {lastBroadcastCount} supplier(s).
           </p>
+        )}
+
+        {/* Award & Create Order — visible when responses exist */}
+        {createdRfqId && rfqResponseCount > 0 && projectId && (
+          <div className="rounded-lg border border-status-success/30 bg-status-success-light/20 p-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold text-foreground">Award supplier & create order</p>
+              <p className="text-[11px] text-muted-foreground">
+                Create a manufacturing order from this RFQ to unlock the Assemble stage.
+              </p>
+            </div>
+            <Button
+              variant="default"
+              size="sm"
+              className="text-xs h-8"
+              onClick={handleAwardOrder}
+              disabled={isAwarding}
+            >
+              {isAwarding ? "Creating order..." : "Award & Create Order"}
+            </Button>
+          </div>
         )}
 
         {createdRfqId && (

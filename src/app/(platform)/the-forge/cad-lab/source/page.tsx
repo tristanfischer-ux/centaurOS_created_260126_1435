@@ -18,11 +18,15 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ShoppingCart,
   ArrowLeft,
+  ArrowRight,
+  Package,
+  AlertCircle,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
@@ -59,6 +63,9 @@ export default function SourcePage(): React.ReactNode {
     linkedRfqId,
     linkRfqToProject,
     specifiedModuleCount,
+    manufacturingOrderCount,
+    refreshManufacturingOrderCount,
+    setModules,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -68,8 +75,28 @@ export default function SourcePage(): React.ReactNode {
     }
   }, [hasResearch, specifiedModuleCount, router])
 
-  // ── Supplier matching state ──
-  const [supplierMatches, setSupplierMatches] = useState<Map<string, SupplierMatch[]>>(new Map())
+  // ── Supplier matching state (persisted to localStorage per project) ──
+  const storageKey = activeProjectId ? `forge-supplier-matches-${activeProjectId}` : null
+
+  const [supplierMatches, setSupplierMatchesRaw] = useState<Map<string, SupplierMatch[]>>(() => {
+    if (!storageKey) return new Map()
+    try {
+      const stored = localStorage.getItem(storageKey)
+      if (stored) return new Map(JSON.parse(stored) as [string, SupplierMatch[]][])
+    } catch { /* ignore corrupt data */ }
+    return new Map()
+  })
+
+  const setSupplierMatches = useCallback((updater: (prev: Map<string, SupplierMatch[]>) => Map<string, SupplierMatch[]>) => {
+    setSupplierMatchesRaw((prev) => {
+      const next = updater(prev)
+      if (storageKey) {
+        try { localStorage.setItem(storageKey, JSON.stringify([...next.entries()])) } catch { /* quota */ }
+      }
+      return next
+    })
+  }, [storageKey])
+
   const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set())
   const [matchAllLoading, setMatchAllLoading] = useState(false)
 
@@ -92,7 +119,8 @@ export default function SourcePage(): React.ReactNode {
         material: diag.material ?? null,
       })
       setSupplierMatches((prev) => new Map(prev).set(mod.id, matches))
-    } catch {
+    } catch (err) {
+      console.error("[SOURCE] Supplier match failed:", err)
       toast.error(`Failed to match suppliers for ${mod.name}`)
     } finally {
       setLoadingModules((prev) => {
@@ -101,7 +129,7 @@ export default function SourcePage(): React.ReactNode {
         return next
       })
     }
-  }, [diagnosticAnswers])
+  }, [diagnosticAnswers, setSupplierMatches])
 
   const handleMatchAll = useCallback(async () => {
     setMatchAllLoading(true)
@@ -194,15 +222,49 @@ export default function SourcePage(): React.ReactNode {
         {/* ═══ Suppliers tab ═══ */}
         {activeTab === "suppliers" && (
           <motion.div key="suppliers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            <CadLabSupplyChain
-              modules={eligibleModules}
-              diagnosticAnswers={diagnosticAnswers}
-              supplierMatches={supplierMatches}
-              loadingModules={loadingModules}
-              matchAllLoading={matchAllLoading}
-              onMatchModule={handleMatchModule}
-              onMatchAll={handleMatchAll}
-            />
+            {eligibleModules.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center">
+                  <AlertCircle className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium text-foreground">No eligible modules</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Modules need to be specified or generated before they can be matched with suppliers.
+                  </p>
+                  <Button variant="secondary" size="sm" className="mt-3" onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)}>
+                    Go to Specify
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <CadLabSupplyChain
+                modules={eligibleModules}
+                diagnosticAnswers={diagnosticAnswers}
+                supplierMatches={supplierMatches}
+                loadingModules={loadingModules}
+                matchAllLoading={matchAllLoading}
+                onMatchModule={handleMatchModule}
+                onMatchAll={handleMatchAll}
+              />
+            )}
+
+            {/* Forward navigation — visible when manufacturing orders exist */}
+            {manufacturingOrderCount > 0 && (
+              <Card>
+                <CardContent className="pt-6 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Sourcing complete</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {manufacturingOrderCount} manufacturing order{manufacturingOrderCount !== 1 ? "s" : ""} created. Continue to assembly.
+                    </p>
+                  </div>
+                  <Button size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabAssemble)}>
+                    <Package className="h-4 w-4 mr-1.5" />
+                    Continue to Assemble
+                    <ArrowRight className="h-4 w-4 ml-1.5" />
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </motion.div>
         )}
 
@@ -218,6 +280,7 @@ export default function SourcePage(): React.ReactNode {
               onRfqLinked={linkRfqToProject}
               designBrief={designBrief}
               assumptionNotes={assumptionNotes}
+              onOrderCreated={refreshManufacturingOrderCount}
             />
           </motion.div>
         )}
@@ -228,6 +291,11 @@ export default function SourcePage(): React.ReactNode {
             <CadLabCostEstimate
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
+              onCostOverride={(moduleId, overrides) => {
+                setModules(prev => prev.map(m =>
+                  m.id === moduleId ? { ...m, costOverrides: overrides } : m
+                ))
+              }}
             />
           </motion.div>
         )}

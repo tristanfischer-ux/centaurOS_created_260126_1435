@@ -82,6 +82,7 @@ export async function getProjectOrders(
       .order("created_at", { ascending: false })
 
     if (error) {
+      console.error("[MFG-ORDERS] Failed to fetch:", error.message)
       return { orders: [] }
     }
 

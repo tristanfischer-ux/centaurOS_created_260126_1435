@@ -57,6 +57,7 @@ export async function getAssemblyDashboard(
       .order("created_at", { ascending: false })
 
     if (orderError) {
+      console.error("[ASSEMBLY] Failed to fetch orders:", orderError.message)
       return { orderLines: [] }
     }
 
