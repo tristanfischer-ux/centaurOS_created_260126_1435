@@ -94,6 +94,9 @@ export interface CadLabProjectData {
   /** P1: Extracted interface contracts between modules */
   interfaceContracts: InterfaceContractResult | null
 
+  /** Per-module diagnostic answers from Specify stage */
+  diagnosticAnswers: Record<string, Record<string, string>> | null
+
   createdAt: string
   updatedAt: string
 }
@@ -200,6 +203,7 @@ export async function loadCadLabProject(
         checkpoints: (project.checkpoints as Record<string, DecompositionCheckpoint> | null) ?? null,
         productOverview: project.product_overview ?? null,
         interfaceContracts: (project.interface_contracts as InterfaceContractResult | null) ?? null,
+        diagnosticAnswers: (project.diagnostic_answers as Record<string, Record<string, string>> | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -439,6 +443,36 @@ export async function saveCadLabProductOverview(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save product overview:", error.message)
       return { error: `Failed to save product overview: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Diagnostic Answers ──────────────────────────────────────────
+
+/**
+ * Persists per-module diagnostic answers from the Specify stage.
+ *
+ * @param projectId - Project to update
+ * @param answers - Diagnostic answers keyed by module ID
+ * @returns Success or error
+ */
+export async function saveCadLabDiagnosticAnswers(
+  projectId: string,
+  answers: Record<string, Record<string, string>>,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ diagnostic_answers: answers as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save diagnostic answers:", error.message)
+      return { error: `Failed to save diagnostic answers: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }

@@ -2127,7 +2127,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         userPrompt,
         "claude-opus-4-6",
         8192,
-        180_000, // 3 min timeout — Opus is slower but worth it for architectural quality
+        120_000, // 2 min timeout — if Opus hasn't responded in 2 min, fall through to Sonnet/Gemini
         1, // INTENT: Fail fast on first Claude error → Sonnet fallback (no 28s wasted retrying spend limits)
       ))
     } catch (opusErr) {

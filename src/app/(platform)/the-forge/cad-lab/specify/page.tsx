@@ -33,6 +33,7 @@ import {
   FlaskConical,
   Lightbulb,
   Zap,
+  RefreshCw,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -122,6 +123,8 @@ export default function SpecifyPage(): React.ReactNode {
     earlyCostEstimates,
     activeProjectId,
     generatingModuleIds,
+    isGeneratingImages,
+    handleRefreshModuleImages,
   } = useCadLab()
 
   // Redirect to Design if no research or modules
@@ -230,6 +233,29 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Gate: can proceed to Source? ──
   // INTENT: Diagnostics-complete is sufficient. Reviews are optional enrichment.
   const canProceedToSource = allDiagnosticsComplete
+
+  // ── Finalize summary: manufacturing process & material breakdown ──
+  const finalizeSummary = useMemo(() => {
+    if (!canProceedToSource) return null
+    const processCounts: Record<string, number> = {}
+    const materials = new Set<string>()
+    for (const mod of modules) {
+      const answers = diagnosticAnswers[mod.id] || {}
+      const proc = answers.mfg_process?.trim()
+      const mat = answers.material?.trim()
+      if (proc) {
+        processCounts[proc] = (processCounts[proc] || 0) + 1
+      }
+      if (mat) materials.add(mat)
+    }
+    const processEntries = Object.entries(processCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => `${name} (${count})`)
+    return {
+      processBreakdown: processEntries.join(", ") || "Not specified",
+      materials: Array.from(materials).join(", ") || "Not specified",
+    }
+  }, [canProceedToSource, modules, diagnosticAnswers])
 
   // ── Tab navigation ──
   const TABS = [
@@ -785,17 +811,48 @@ export default function SpecifyPage(): React.ReactNode {
               }}
             />
 
-            {/* Navigation CTA */}
-            {canProceedToSource ? (
-              <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
+            {/* Finalize / Navigation CTA */}
+            {canProceedToSource && finalizeSummary ? (
+              <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-full bg-success/10 p-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                    </div>
+                    <div className="flex-1 space-y-1">
                       <p className="text-sm font-semibold text-foreground">
-                        Ready to source
+                        Design finalized
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Diagnostics complete for {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""}. Continue to match suppliers and create RFQs.
+                      <p className="text-xs text-muted-foreground">
+                        All {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""} fully specified.
+                      </p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Manufacturing:</span>{" "}
+                          {finalizeSummary.processBreakdown}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">Materials:</span>{" "}
+                          {finalizeSummary.materials}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleRefreshModuleImages}
+                        disabled={isGeneratingImages}
+                        className="gap-1.5"
+                      >
+                        <RefreshCw className={cn("h-3.5 w-3.5", isGeneratingImages && "animate-spin")} />
+                        {isGeneratingImages ? "Refreshing..." : "Refresh Illustrations"}
+                      </Button>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Regenerate module images using your specifications.
                       </p>
                     </div>
                     <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
@@ -888,16 +945,14 @@ export default function SpecifyPage(): React.ReactNode {
             })}
 
             {/* Source CTA */}
-            {allDiagnosticsComplete && (
-              <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
+            {allDiagnosticsComplete && finalizeSummary && (
+              <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-success" />
                       <p className="text-sm font-semibold text-foreground">
-                        Ready to source
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Diagnostics complete for {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""}. Continue to match suppliers and create RFQs.
+                        Design finalized
                       </p>
                     </div>
                     <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">

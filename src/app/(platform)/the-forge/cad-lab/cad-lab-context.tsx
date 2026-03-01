@@ -34,7 +34,7 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -170,6 +170,7 @@ export interface CadLabContextValue {
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
   handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string) => Promise<void>
+  handleRefreshModuleImages: () => Promise<void>
 
   // Progressive module reveal
   revealedModuleIds: Set<string>
@@ -339,6 +340,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
   }, [])
   const [diagnosticAnswers, setDiagnosticAnswers] = useState<DiagnosticAnswers>({})
+  const diagnosticAnswersRef = useRef<DiagnosticAnswers>({})
+  useEffect(() => { diagnosticAnswersRef.current = diagnosticAnswers }, [diagnosticAnswers])
   const [aiPrefilled, setAiPrefilled] = useState(false)
 
   // ── Batch pipeline state ──
@@ -536,6 +539,46 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     debouncedSaveModules()
   }, [debouncedSaveModules])
 
+  // ── Debounced save: diagnostic answers ──
+  const diagPendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const debouncedSaveDiagnostics = useCallback(() => {
+    if (!activeProjectId) return
+    if (diagPendingRef.current) clearTimeout(diagPendingRef.current)
+    diagPendingRef.current = setTimeout(async () => {
+      diagPendingRef.current = null
+      const res = await saveCadLabDiagnosticAnswers(activeProjectId, diagnosticAnswersRef.current)
+      if ("error" in res) {
+        console.error("[CAD-LAB] Debounced diagnostic save failed:", res.error)
+        setSaveError(true)
+        // Retry once after 2s
+        setTimeout(async () => {
+          const retryRes = await saveCadLabDiagnosticAnswers(activeProjectId, diagnosticAnswersRef.current)
+          if ("error" in retryRes) {
+            setSaveError(true)
+            toast.error("Diagnostic answers couldn't be saved — check your connection")
+          } else {
+            setSaveError(false)
+            setLastSaved(new Date().toISOString())
+          }
+        }, 2000)
+      } else {
+        setSaveError(false)
+        setLastSaved(new Date().toISOString())
+      }
+    }, 500)
+  }, [activeProjectId])
+
+  // Auto-save diagnostic answers when they change
+  const diagAnswerCountRef = useRef(0)
+  useEffect(() => {
+    // INTENT: Skip the initial empty render and only save after user edits
+    const keyCount = Object.keys(diagnosticAnswers).length
+    if (keyCount === 0 && diagAnswerCountRef.current === 0) return
+    diagAnswerCountRef.current = keyCount
+    debouncedSaveDiagnostics()
+  }, [diagnosticAnswers, debouncedSaveDiagnostics])
+
   // Cleanup pending saves on unmount
   useEffect(() => {
     return () => {
@@ -546,6 +589,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (overviewPendingRef.current) {
         clearTimeout(overviewPendingRef.current)
         overviewPendingRef.current = null
+      }
+      if (diagPendingRef.current) {
+        clearTimeout(diagPendingRef.current)
+        diagPendingRef.current = null
       }
     }
   }, [])
@@ -651,8 +698,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     // INTENT: Client-side safety timeout. If the server action silently dies (e.g. Vercel
     // kills the function), the await never resolves and the UI hangs forever. This races
-    // the API call against a 3-minute deadline so the user can retry instead of waiting.
-    const CLIENT_TIMEOUT_MS = 180_000 // 3 min — generous buffer over the 2-min server timeout
+    // the API call against a 6-minute deadline so the full fallback chain can complete.
+    // DECISION: 360s because server-side chain is Opus(120s) + Sonnet(120s) + Gemini(120s) = 360s worst case.
+    // The real timeouts are server-side — this is just a safety net for silent server death.
+    const CLIENT_TIMEOUT_MS = 360_000 // 6 min — covers full Opus→Sonnet→Gemini fallback chain
     const clientTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
     )
@@ -986,6 +1035,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
     setIsGeneratingImages(false)
   }, [activeProjectId])
+
+  // ── Refresh module images using current diagnostic specs ──
+  // INTENT: Called from the Specify finalize card. Regenerates blueprint illustrations
+  // using the existing visualStyle and systemIllustrationUrl so the images reflect
+  // the user's refined manufacturing/material choices.
+  const handleRefreshModuleImages = useCallback(async () => {
+    if (modules.length === 0) return
+    await handleGenerateModuleImages(
+      modules,
+      activeProjectId ?? undefined,
+      visualStyle ?? undefined,
+    )
+  }, [modules, activeProjectId, visualStyle, handleGenerateModuleImages])
 
   // ── Generate CAD for a specific module ──
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
@@ -1724,6 +1786,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setProductOverview(p.productOverview ?? "")
       // P1: Load persisted interface contracts
       setInterfaceContracts(p.interfaceContracts?.contracts ?? [])
+      // Restore diagnostic answers from database
+      if (p.diagnosticAnswers && Object.keys(p.diagnosticAnswers).length > 0) {
+        setDiagnosticAnswers(p.diagnosticAnswers)
+      }
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }
@@ -1886,7 +1952,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
-    isGeneratingImages, handleGenerateModuleImages,
+    isGeneratingImages, handleGenerateModuleImages, handleRefreshModuleImages,
     revealedModuleIds,
     visualStyle,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,

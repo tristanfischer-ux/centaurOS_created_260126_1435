@@ -3854,6 +3854,7 @@ export type Database = {
           checkpoints: Json | null
           created_at: string
           created_by: string
+          diagnostic_answers: Json | null
           foundry_id: string
           generated_code: string | null
           id: string
@@ -3885,6 +3886,7 @@ export type Database = {
           checkpoints?: Json | null
           created_at?: string
           created_by: string
+          diagnostic_answers?: Json | null
           foundry_id: string
           generated_code?: string | null
           id?: string
@@ -3916,6 +3918,7 @@ export type Database = {
           checkpoints?: Json | null
           created_at?: string
           created_by?: string
+          diagnostic_answers?: Json | null
           foundry_id?: string
           generated_code?: string | null
           id?: string
