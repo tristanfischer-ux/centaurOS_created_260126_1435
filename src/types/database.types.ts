@@ -8438,12 +8438,16 @@ export type Database = {
       }
       marketplace_listings: {
         Row: {
+          address: string | null
           approval_notes: string | null
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
           attributes: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
+          certifications: Json | null
+          city: string | null
+          company_size: string | null
           contact_email: string | null
           contact_enriched_at: string | null
           contact_linkedin: string | null
@@ -8451,34 +8455,57 @@ export type Database = {
           contact_phone: string | null
           contact_source: string | null
           contact_title: string | null
+          country: string | null
           created_at: string | null
           created_by_provider_id: string | null
           currency: string | null
           data_quality_score: number
           description: string | null
           embedding: string | null
+          employee_count_exact: number | null
+          enrichment_quality: number | null
+          export_controls: string | null
+          financial_health: string | null
+          founded_year: number | null
           id: string
           image_url: string | null
+          industries: Json | null
           is_demo: boolean
           is_self_created: boolean | null
           is_verified: boolean | null
+          key_equipment: Json | null
+          key_people: Json | null
           last_contacted_at: string | null
+          lead_time: string | null
+          materials: Json | null
+          minimum_order: string | null
           outreach_contact_id: string | null
           outreach_notes: string | null
           outreach_status: string | null
           price: number | null
+          production_capacity: string | null
+          products: Json | null
+          quality_systems: string | null
+          relevance_score: number | null
           search_vector: unknown
+          security_clearances: Json | null
+          specialties: Json | null
           subcategory: string
           title: string
           verification_tier: Database["public"]["Enums"]["verification_tier"]
+          website_url: string | null
         }
         Insert: {
+          address?: string | null
           approval_notes?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
           attributes?: Json | null
           category: Database["public"]["Enums"]["marketplace_category"]
+          certifications?: Json | null
+          city?: string | null
+          company_size?: string | null
           contact_email?: string | null
           contact_enriched_at?: string | null
           contact_linkedin?: string | null
@@ -8486,34 +8513,57 @@ export type Database = {
           contact_phone?: string | null
           contact_source?: string | null
           contact_title?: string | null
+          country?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
           data_quality_score?: number
           description?: string | null
           embedding?: string | null
+          employee_count_exact?: number | null
+          enrichment_quality?: number | null
+          export_controls?: string | null
+          financial_health?: string | null
+          founded_year?: number | null
           id?: string
           image_url?: string | null
+          industries?: Json | null
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          key_equipment?: Json | null
+          key_people?: Json | null
           last_contacted_at?: string | null
+          lead_time?: string | null
+          materials?: Json | null
+          minimum_order?: string | null
           outreach_contact_id?: string | null
           outreach_notes?: string | null
           outreach_status?: string | null
           price?: number | null
+          production_capacity?: string | null
+          products?: Json | null
+          quality_systems?: string | null
+          relevance_score?: number | null
           search_vector?: unknown
+          security_clearances?: Json | null
+          specialties?: Json | null
           subcategory: string
           title: string
           verification_tier?: Database["public"]["Enums"]["verification_tier"]
+          website_url?: string | null
         }
         Update: {
+          address?: string | null
           approval_notes?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
           attributes?: Json | null
           category?: Database["public"]["Enums"]["marketplace_category"]
+          certifications?: Json | null
+          city?: string | null
+          company_size?: string | null
           contact_email?: string | null
           contact_enriched_at?: string | null
           contact_linkedin?: string | null
@@ -8521,26 +8571,45 @@ export type Database = {
           contact_phone?: string | null
           contact_source?: string | null
           contact_title?: string | null
+          country?: string | null
           created_at?: string | null
           created_by_provider_id?: string | null
           currency?: string | null
           data_quality_score?: number
           description?: string | null
           embedding?: string | null
+          employee_count_exact?: number | null
+          enrichment_quality?: number | null
+          export_controls?: string | null
+          financial_health?: string | null
+          founded_year?: number | null
           id?: string
           image_url?: string | null
+          industries?: Json | null
           is_demo?: boolean
           is_self_created?: boolean | null
           is_verified?: boolean | null
+          key_equipment?: Json | null
+          key_people?: Json | null
           last_contacted_at?: string | null
+          lead_time?: string | null
+          materials?: Json | null
+          minimum_order?: string | null
           outreach_contact_id?: string | null
           outreach_notes?: string | null
           outreach_status?: string | null
           price?: number | null
+          production_capacity?: string | null
+          products?: Json | null
+          quality_systems?: string | null
+          relevance_score?: number | null
           search_vector?: unknown
+          security_clearances?: Json | null
+          specialties?: Json | null
           subcategory?: string
           title?: string
           verification_tier?: Database["public"]["Enums"]["verification_tier"]
+          website_url?: string | null
         }
         Relationships: [
           {
