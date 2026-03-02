@@ -284,16 +284,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
 
-                  {/* During decomposition — rich progress in hero position */}
-                  {systemIllustrationStatus === "idle" && !decompositionError && isDecomposing && (
-                    <CadLabProgress
-                      lines={progressLines}
-                      isActive={true}
-                      operationType="breakdown"
-                      subject={subject}
-                    />
-                  )}
-
                   {/* Idle placeholder — only when NOT decomposing */}
                   {systemIllustrationStatus === "idle" && !decompositionError && !isDecomposing && (
                     <Card className="overflow-hidden border-dashed border-muted-foreground/20">
@@ -315,6 +305,16 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <ProductOverviewCard
                   overview={productOverview}
                   onSave={setProductOverview}
+                />
+              )}
+
+              {/* During decomposition — rich progress below overview */}
+              {systemIllustrationStatus === "idle" && !decompositionError && isDecomposing && (
+                <CadLabProgress
+                  lines={progressLines}
+                  isActive={true}
+                  operationType="breakdown"
+                  subject={subject}
                 />
               )}
 
