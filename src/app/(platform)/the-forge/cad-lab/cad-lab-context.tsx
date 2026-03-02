@@ -753,7 +753,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // the API call against a 6-minute deadline so the full fallback chain can complete.
     // DECISION: 360s because server-side chain is Opus(120s) + Sonnet(120s) + Gemini(120s) = 360s worst case.
     // The real timeouts are server-side — this is just a safety net for silent server death.
-    const CLIENT_TIMEOUT_MS = 360_000 // 6 min — covers full Opus→Sonnet→Gemini fallback chain
+    const CLIENT_TIMEOUT_MS = 310_000 // 5m10s — slightly above Vercel's 300s cap so client sees the server's classified error, not generic timeout
     const clientTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
     )

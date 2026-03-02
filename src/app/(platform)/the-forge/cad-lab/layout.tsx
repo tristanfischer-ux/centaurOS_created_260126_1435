@@ -5,11 +5,11 @@
  * the persistent header, project picker, pipeline stepper navigation,
  * progress overlay, and milestone celebrations.
  *
- * maxDuration is set to 600s for long-running server actions (building
- * architectural models with 50+ components can take 5-8 min).
+ * maxDuration is set to 300s — Vercel Pro caps at 300s without Fluid Compute.
+ * The decomposition fallback chain (Opus→Sonnet→Gemini) fits within ~230s worst case.
  */
 
-export const maxDuration = 600
+export const maxDuration = 300
 
 import { CadLabProviderWrapper } from "./cad-lab-layout-client"
 

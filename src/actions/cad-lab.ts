@@ -2074,7 +2074,10 @@ export async function prepareDecomposition(
  * because that function is a security boundary used by 30+ actions. Adding AI-specific
  * patterns there could leak context in unrelated error surfaces.
  */
-function classifyDecompositionError(error: unknown): string {
+function classifyDecompositionError(
+  error: unknown,
+  triedModels: Array<{ model: string; error: string }> = [],
+): string {
   const msg =
     error instanceof Error
       ? error.message
@@ -2083,20 +2086,25 @@ function classifyDecompositionError(error: unknown): string {
         : ""
   const lower = msg.toLowerCase()
 
+  // INTENT: Append fallback chain info so the user knows which models were attempted
+  const chainSuffix = triedModels.length > 0
+    ? ` (tried ${triedModels.map((m) => m.model).join(" → ")})`
+    : ""
+
   if (lower.includes("429") || lower.includes("rate limit"))
-    return "AI rate limit reached. Please wait a moment and try again."
+    return `AI rate limit reached. Please wait a moment and try again.${chainSuffix}`
   if (lower.includes("529") || lower.includes("overloaded"))
-    return "AI service is temporarily overloaded. Please try again shortly."
+    return `AI service is temporarily overloaded. Please try again shortly.${chainSuffix}`
   if (/spend|billing|credit|quota/.test(lower))
-    return "AI usage limit reached. Please check your API billing."
+    return `AI usage limit reached. Please check your API billing.${chainSuffix}`
   if (/401|403|unauthorized|forbidden/.test(lower))
-    return "AI service authentication failed. Please contact support."
+    return `AI service authentication failed. Please contact support.${chainSuffix}`
   if (/500|502|503/.test(lower))
-    return "AI service error. Please try again in a few minutes."
+    return `AI service error. Please try again in a few minutes.${chainSuffix}`
   if (/timeout|abort|timed out/.test(lower))
-    return "Request timed out. The AI service may be under heavy load."
+    return `Request timed out. The AI service may be under heavy load.${chainSuffix}`
   if (/fetch failed|econnrefused|network/.test(lower))
-    return "Could not reach AI service. Check your connection."
+    return `Could not reach AI service. Check your connection.${chainSuffix}`
   if (lower.includes("api_key not configured"))
     return "AI service not configured. Please contact support."
 
@@ -2133,6 +2141,7 @@ export async function decomposeIntoModules(
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabDecompositionResult
 
   const start = Date.now()
+  const triedModels: Array<{ model: string; error: string }> = []
 
   try {
     // DECISION: Keyword heuristic fallback instead of Claude API call — saves 2-5s
@@ -2156,9 +2165,10 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: 2-min timeout for decomposition — 12K char input + 8192 max tokens
-    // should complete in 30-60s. Fail fast so the user can retry instead of hanging.
-    // INTENT: Fall back to Gemini when Claude is unavailable (spend limit, rate limit, overloaded)
+    // DECISION: 60s timeout per model — 12K char input + 8192 max tokens should complete in 30-60s.
+    // If a model hasn't responded in 60s, falling to the next model is better than waiting.
+    // INTENT: Fall back through Opus → Sonnet → Gemini, fitting within Vercel Pro's 300s cap.
+    // Worst case: Opus(60s×2) + Sonnet(60s×1) + Gemini(45s×1) = ~230s, well within 300s.
     let text: string, tokensIn: number, tokensOut: number
     try {
       // DECISION: Opus for decomposition — this is the architectural stage that determines
@@ -2169,26 +2179,38 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         userPrompt,
         "claude-opus-4-6",
         8192,
-        120_000, // 2 min timeout — if Opus hasn't responded in 2 min, fall through to Sonnet/Gemini
-        2, // INTENT: One retry on transient 500s, then fall to Sonnet. Was 1 (zero retries) — caused hard failures when API returned 500s.
+        60_000, // 60s timeout — if Opus hasn't responded, fall through to Sonnet/Gemini
+        2, // INTENT: One retry on transient 500s, then fall to Sonnet.
       ))
     } catch (opusErr) {
+      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
+      triedModels.push({ model: "Opus", error: opusMsg })
       // DECISION: Opus → Sonnet → Gemini fallback chain.
       // Opus and Sonnet have separate rate/spend limits. Specialists already prove Sonnet works,
       // so try it before falling to Gemini. If all three fail, the outer catch handles it.
-      console.warn("[THE-FORGE] Opus failed, trying Sonnet:", opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr))
+      console.warn("[THE-FORGE] Opus failed, trying Sonnet:", opusMsg)
       try {
+        // DECISION: No retry for Sonnet — if Opus failed twice and Sonnet fails once,
+        // model diversity (Gemini) is more valuable than retrying the same Anthropic endpoint.
         ({ text, tokensIn, tokensOut } = await callClaude(
           modulePrompt,
           userPrompt,
           "claude-sonnet-4-6",
           8192,
-          120_000,
-          2,
+          60_000,
+          1, // No retry — fall to Gemini for model diversity
         ))
       } catch (sonnetErr) {
-        console.warn("[THE-FORGE] Sonnet also failed, falling back to Gemini:", sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr))
-        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+        const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
+        triedModels.push({ model: "Sonnet", error: sonnetMsg })
+        console.warn("[THE-FORGE] Sonnet also failed, falling back to Gemini:", sonnetMsg)
+        try {
+          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 45_000))
+        } catch (geminiErr) {
+          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+          triedModels.push({ model: "Gemini", error: geminiMsg })
+          throw geminiErr
+        }
       }
     }
 
@@ -2269,9 +2291,12 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     }
   } catch (error) {
     console.error("[THE-FORGE] Module decomposition failed:", error instanceof Error ? error.message : error)
+    if (triedModels.length > 0) {
+      console.error("[THE-FORGE] Fallback chain:", JSON.stringify(triedModels))
+    }
     return {
       success: false,
-      error: classifyDecompositionError(error),
+      error: classifyDecompositionError(error, triedModels),
       modules: [],
       decompositionTime: Date.now() - start,
       tokensIn: 0,
