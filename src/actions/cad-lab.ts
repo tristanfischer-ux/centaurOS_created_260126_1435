@@ -2164,29 +2164,37 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Use caller's modelId (defaults to Sonnet) with default params (600s timeout, 3 retries).
-    // This is the original working pattern — same as Product Overview.
-    // TRIED: Hardcoded Opus — hangs/times out, likely rate-limited or unavailable on API plan.
-    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) chain — too many variables changed at once.
-    // TRIED: Sonnet(120s,3)→Gemini(60s) — worked sometimes but custom timeouts caused issues.
+    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Gemini fallback chain.
+    // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s — fits Vercel's 300s cap.
+    // TRIED: Default params (600s, 3 retries) — exceeds Vercel 300s cap, function gets killed silently.
+    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) — too aggressive, models need ≥120s for decomposition.
     let text: string, tokensIn: number, tokensOut: number
     try {
+      // Opus first — 120s timeout, 1 retry (fail fast to Sonnet)
       ({ text, tokensIn, tokensOut } = await callClaude(
-        modulePrompt,
-        userPrompt,
-        modelId,
-        8192,
+        modulePrompt, userPrompt, "claude-opus-4-6", 8192, 120_000, 1,
       ))
-    } catch (claudeErr) {
-      const claudeMsg = claudeErr instanceof Error ? claudeErr.message.slice(0, 200) : String(claudeErr)
-      triedModels.push({ model: modelId, error: claudeMsg })
-      console.warn("[THE-FORGE] %s failed, falling back to Gemini:", modelId, claudeMsg)
+    } catch (opusErr) {
+      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
+      triedModels.push({ model: "Opus", error: opusMsg })
+      console.warn("[THE-FORGE] Opus failed, falling back to Sonnet:", opusMsg)
       try {
-        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 120_000))
-      } catch (geminiErr) {
-        const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-        triedModels.push({ model: "Gemini", error: geminiMsg })
-        throw geminiErr
+        // Sonnet fallback — same params
+        ({ text, tokensIn, tokensOut } = await callClaude(
+          modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 120_000, 1,
+        ))
+      } catch (sonnetErr) {
+        const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
+        triedModels.push({ model: "Sonnet", error: sonnetMsg })
+        console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
+        try {
+          // Gemini final fallback
+          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+        } catch (geminiErr) {
+          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+          triedModels.push({ model: "Gemini", error: geminiMsg })
+          throw geminiErr
+        }
       }
     }
 
