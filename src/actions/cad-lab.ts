@@ -2061,6 +2061,44 @@ export async function prepareDecomposition(
   }
 }
 
+// ─── Decomposition Error Classification ──────────────────────────────
+
+/**
+ * Maps known AI API error patterns to user-friendly messages.
+ *
+ * @description Local to decomposition — not added to the global sanitizeErrorMessage
+ * because that function is a security boundary used by 30+ actions. Adding AI-specific
+ * patterns there could leak context in unrelated error surfaces.
+ */
+function classifyDecompositionError(error: unknown): string {
+  const msg =
+    error instanceof Error
+      ? error.message
+      : typeof error === "string"
+        ? error
+        : ""
+  const lower = msg.toLowerCase()
+
+  if (lower.includes("429") || lower.includes("rate limit"))
+    return "AI rate limit reached. Please wait a moment and try again."
+  if (lower.includes("529") || lower.includes("overloaded"))
+    return "AI service is temporarily overloaded. Please try again shortly."
+  if (/spend|billing|credit|quota/.test(lower))
+    return "AI usage limit reached. Please check your API billing."
+  if (/401|403|unauthorized|forbidden/.test(lower))
+    return "AI service authentication failed. Please contact support."
+  if (/500|502|503/.test(lower))
+    return "AI service error. Please try again in a few minutes."
+  if (/timeout|abort|timed out/.test(lower))
+    return "Request timed out. The AI service may be under heavy load."
+  if (/fetch failed|econnrefused|network/.test(lower))
+    return "Could not reach AI service. Check your connection."
+  if (lower.includes("api_key not configured"))
+    return "AI service not configured. Please contact support."
+
+  return sanitizeErrorMessage(error)
+}
+
 // ─── Module Decomposition (exported) ─────────────────────────────────
 
 /**
@@ -2229,7 +2267,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     console.error("[THE-FORGE] Module decomposition failed:", error instanceof Error ? error.message : error)
     return {
       success: false,
-      error: sanitizeErrorMessage(error),
+      error: classifyDecompositionError(error),
       modules: [],
       decompositionTime: Date.now() - start,
       tokensIn: 0,
