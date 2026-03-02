@@ -186,7 +186,7 @@ describe('Attachment Actions', () => {
 
             const result = await uploadTaskAttachment(VALID_TASK_ID, mockFormData)
 
-            expect(result).toEqual({ error: 'An error occurred. Please try again.' })
+            expect(result).toEqual({ error: 'File storage error. Please try again.' })
         })
 
         it('should handle task not found error', async () => {
