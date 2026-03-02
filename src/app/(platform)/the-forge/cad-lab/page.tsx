@@ -130,11 +130,17 @@ export default function CadLabResearchPage(): React.ReactNode {
   }, [modules.length])
 
   const searchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTab] = useState("research")
+
+  // INTENT: Read tab from URL after hydration — avoids React #418.
+  // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
+  useEffect(() => {
     const param = searchParams.get("tab")
-    if (param && (param === "research" || (param === "modules" && modules.length > 0))) return param
-    return "research"
-  })
+    if (param && (param === "research" || (param === "modules" && modules.length > 0))) {
+      setActiveTab(param)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleTabClick = useCallback((tabId: string) => {
     if (tabId === "modules") setModulesUnseen(false)

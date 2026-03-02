@@ -265,11 +265,17 @@ export default function SpecifyPage(): React.ReactNode {
     { id: "review", label: "Specialist Review" },
   ]
 
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // INTENT: Read tab from URL after hydration — avoids React #418.
+  // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
+  useEffect(() => {
     const param = searchParams.get("tab")
-    if (param && TABS.some((t) => t.id === param)) return param
-    return "overview"
-  })
+    if (param && TABS.some((t) => t.id === param)) {
+      setActiveTab(param)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleTabClick = useCallback(
     (tabId: string) => {

@@ -230,10 +230,17 @@ export default function CadLabBuildPage(): React.ReactNode {
 
   const searchParams = useSearchParams()
   const validTabIds = useMemo(() => BUILD_TABS.map((t) => t.id), [BUILD_TABS])
-  const [activeTab, setActiveTab] = useState(() => {
+  const [activeTab, setActiveTab] = useState("overview")
+
+  // INTENT: Read tab from URL after hydration — avoids React #418.
+  // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
+  useEffect(() => {
     const param = searchParams.get("tab")
-    return param && validTabIds.includes(param) ? param : "overview"
-  })
+    if (param && validTabIds.includes(param)) {
+      setActiveTab(param)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const tabContentRef = useRef<HTMLDivElement>(null)
 
   // Fallback to "overview" if active tab becomes hidden (e.g. modules removed)
