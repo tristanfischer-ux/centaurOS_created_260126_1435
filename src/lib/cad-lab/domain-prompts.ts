@@ -311,6 +311,7 @@ RULES:
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
 - Every module must have at least 1 input and 1 output
 - CRITICAL: When module A's output feeds module B, use the EXACT SAME label for A's output and B's input (e.g., if Battery Pack outputs "Electrical power", then Lift Motors must have an input called "Electrical power" — not "Power supply" or "Electricity"). Consistent naming is essential for the system to detect connections between modules.
+- IMPORTANT: Only list inter-module interfaces — inputs that come from another module's output, and outputs that feed another module's input. Do NOT include external/environmental interfaces (e.g., "ground reaction forces", "external charger input", "user control input", "telemetry to ground station", "ambient air intake"). If a module interfaces with the outside world, describe that in its purpose or description — not in inputs/outputs.
 - Modules should cover the ENTIRE product — no gaps
 - Use dimensions from the research report — do not invent new ones
 - If the research report mentions sub-components, those are good module candidates
