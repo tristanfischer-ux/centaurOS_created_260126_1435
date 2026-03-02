@@ -393,8 +393,8 @@ export function CadLabSupplyChain({
                             )}
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[10px] text-muted-foreground font-mono">
-                              {match.matchScore.toFixed(0)}pts
+                            <span className="text-[10px] text-muted-foreground font-mono" title={match.scoreBreakdown ? `Semantic: ${match.scoreBreakdown.semantic} | Process: ${match.scoreBreakdown.process} | Material: ${match.scoreBreakdown.material} | Quality: ${match.scoreBreakdown.quality} | Keyword: ${match.scoreBreakdown.keyword}` : undefined}>
+                              {Math.round(match.matchScore)}%
                             </span>
                             <Button
                               variant="ghost"

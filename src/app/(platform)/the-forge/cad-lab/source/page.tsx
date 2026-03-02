@@ -35,6 +35,7 @@ import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
 import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
 
 // ─── Supplier match type (mirrors action return) ────────────────────
 
@@ -42,6 +43,7 @@ interface SupplierMatch {
   id: string
   name: string
   matchScore: number
+  scoreBreakdown: ScoreBreakdown
   matchReasons: string[]
   isVerified: boolean
   supplierType: string
