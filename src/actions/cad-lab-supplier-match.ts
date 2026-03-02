@@ -129,7 +129,7 @@ const BASE_WEIGHTS = {
   keyword: 10,
 } as const
 
-const MIN_SCORE_THRESHOLD = 15
+const MIN_SCORE_THRESHOLD = 25
 const MAX_RESULTS = 8
 
 /**
@@ -172,24 +172,19 @@ function scoreStructuredMatch(
   const candidateProcessKeys = normalizeToCategories(candidateAllText, PROCESS_CATEGORIES)
   const candidateMaterialKeys = normalizeToCategories(candidateAllText, MATERIAL_CATEGORIES)
 
-  // Process scoring: exact key overlap = 1.0, any related category = 0.5
+  // Process scoring: exact key overlap = 1.0, no partial credit for unrelated processes
   if (inputProcessKeys.size > 0) {
     const overlap = [...inputProcessKeys].filter((k) => candidateProcessKeys.has(k))
     if (overlap.length > 0) {
       processScore = 1.0
-    } else if (candidateProcessKeys.size > 0) {
-      // Partial credit if supplier does any manufacturing process
-      processScore = 0.3
     }
   }
 
-  // Material scoring: exact key overlap = 1.0, related material family = 0.5
+  // Material scoring: exact key overlap = 1.0, no partial credit for unrelated materials
   if (inputMaterialKeys.size > 0) {
     const overlap = [...inputMaterialKeys].filter((k) => candidateMaterialKeys.has(k))
     if (overlap.length > 0) {
       materialScore = 1.0
-    } else if (candidateMaterialKeys.size > 0) {
-      materialScore = 0.3
     }
   }
 
@@ -297,12 +292,12 @@ export async function matchCadLabModuleSuppliers(
       const [suppSemantic, mlSemantic] = await Promise.all([
         supabase.rpc("match_suppliers_semantic", {
           query_embedding: embedding as unknown as string,
-          match_threshold: 0.3,
+          match_threshold: 0.4,
           match_count: 30,
         }),
         supabase.rpc("match_marketplace_listings", {
           query_embedding: JSON.stringify(embedding),
-          match_threshold: 0.3,
+          match_threshold: 0.4,
           match_count: 20,
         }),
       ])
@@ -358,13 +353,22 @@ export async function matchCadLabModuleSuppliers(
       )
 
       // Factor 4: Quality
-      const qualityRaw = scoreQuality(
+      let qualityRaw = scoreQuality(
         supplier.verification_status,
         supplier.community_rating ? Number(supplier.community_rating) : null,
       )
 
       // Factor 5: Keyword
-      const { score: keywordRaw } = scoreKeywords(searchTerms, supplierText)
+      let { score: keywordRaw } = scoreKeywords(searchTerms, supplierText)
+
+      // Relevance gate: at least one "hard" factor must show genuine relevance
+      // before quality/keyword can contribute — prevents verified-but-irrelevant
+      // companies (e.g. Google, Lockheed) from passing on trust score alone
+      const hasRelevance = semanticRaw >= 0.5 || processScore >= 1.0 || materialScore >= 1.0
+      if (!hasRelevance) {
+        qualityRaw = 0
+        keywordRaw = 0
+      }
 
       // Apply weights
       const breakdown: ScoreBreakdown = {
@@ -424,13 +428,20 @@ export async function matchCadLabModuleSuppliers(
       )
 
       // Factor 4: Quality (listings use is_verified, no community_rating)
-      const qualityRaw = scoreQuality(
+      let qualityRaw = scoreQuality(
         listing.is_verified ? "verified" : "unverified",
         null,
       )
 
       // Factor 5: Keyword
-      const { score: keywordRaw } = scoreKeywords(searchTerms, listingText)
+      let { score: keywordRaw } = scoreKeywords(searchTerms, listingText)
+
+      // Relevance gate (same logic as suppliers above)
+      const hasRelevance = semanticRaw >= 0.5 || processScore >= 1.0 || materialScore >= 1.0
+      if (!hasRelevance) {
+        qualityRaw = 0
+        keywordRaw = 0
+      }
 
       const breakdown: ScoreBreakdown = {
         semantic: Math.round(semanticRaw * weights.semantic * 10) / 10,

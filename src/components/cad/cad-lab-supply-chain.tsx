@@ -383,7 +383,7 @@ export function CadLabSupplyChain({
                         <div key={match.id} className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 text-xs">
                           <div className="flex items-center gap-2 min-w-0">
                             <button
-                              onClick={() => router.push(`/the-forge/marketplace?q=${encodeURIComponent(match.name)}`)}
+                              onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
                               className="font-medium text-foreground hover:text-international-orange transition-colors truncate"
                             >
                               {match.name}
@@ -400,7 +400,7 @@ export function CadLabSupplyChain({
                               variant="ghost"
                               size="sm"
                               className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
-                              onClick={() => router.push(`/the-forge/marketplace?q=${encodeURIComponent(match.name)}`)}
+                              onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
                             >
                               <ExternalLink className="h-2.5 w-2.5 mr-1" />
                               View

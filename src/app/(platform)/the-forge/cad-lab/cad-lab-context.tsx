@@ -730,7 +730,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // ── Phase 2: API call (real wait, with truthful padding timers) ──
     addProgressLine(`Research report: ${Math.round(editableReport.length / 1000)}K characters`)
     addProgressLine(`Applied ${domainHint ?? "auto-detected"} domain constraints to analysis`)
-    addProgressLine("Claude is decomposing into physical sub-assemblies...")
+    addProgressLine("Decomposing into physical sub-assemblies...")
 
     // INTENT: These timers convey how much real engineering work is being compressed
     // into minutes. Spaced across ~75s to cover the typical blocking API call duration.
