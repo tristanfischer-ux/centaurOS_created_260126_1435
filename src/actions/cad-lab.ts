@@ -177,7 +177,7 @@ async function callClaude(
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "anthropic-version": "2024-10-22",
       },
       body: JSON.stringify({
         model,
@@ -213,7 +213,11 @@ async function callClaude(
     maxDelay: 30000,
     shouldRetry: (error) => {
       const msg = error.message
+      // INTENT: Retry on transient API errors. 429/529 = rate limit/overloaded (original).
+      // 500/502/503 = transient server errors that usually resolve on retry (added after
+      // decomposition consistently failed when the API returned 500s with no retry).
       return msg.includes("429") || msg.includes("529") || msg.includes("overloaded")
+        || msg.includes("500") || msg.includes("502") || msg.includes("503")
     },
   })
 }
@@ -2166,7 +2170,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         "claude-opus-4-6",
         8192,
         120_000, // 2 min timeout — if Opus hasn't responded in 2 min, fall through to Sonnet/Gemini
-        1, // INTENT: Fail fast on first Claude error → Sonnet fallback (no 28s wasted retrying spend limits)
+        2, // INTENT: One retry on transient 500s, then fall to Sonnet. Was 1 (zero retries) — caused hard failures when API returned 500s.
       ))
     } catch (opusErr) {
       // DECISION: Opus → Sonnet → Gemini fallback chain.
@@ -2180,7 +2184,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
           "claude-sonnet-4-6",
           8192,
           120_000,
-          1,
+          2,
         ))
       } catch (sonnetErr) {
         console.warn("[THE-FORGE] Sonnet also failed, falling back to Gemini:", sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr))
