@@ -6,7 +6,7 @@
  * progress overlay, and milestone celebrations.
  *
  * maxDuration is set to 300s — Vercel Pro caps at 300s without Fluid Compute.
- * The decomposition fallback chain (Opus→Sonnet→Gemini) fits within ~230s worst case.
+ * The decomposition chain races Sonnet+Gemini in parallel (240s) then OpenAI fallback (55s) = 295s worst case.
  */
 
 export const maxDuration = 300

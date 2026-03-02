@@ -1,16 +1,16 @@
 /**
  * @file cad-lab-supplier-match.ts — Multi-factor supplier matching for CadLab modules.
  *
- * @description Server action that matches CadLab modules to suppliers and
- * marketplace listings using a 5-factor scoring system (100pts total):
+ * @description Server action that matches CadLab modules to marketplace listings
+ * using a 5-factor scoring system (100pts total):
  *
  * | Factor            | Max | Source                                      |
  * |-------------------|-----|---------------------------------------------|
- * | Semantic relevance| 40  | match_suppliers_semantic RPC (cosine sim)    |
- * | Process match     | 20  | capabilities JSONB + domain_categories       |
- * | Material match    | 15  | capabilities JSONB                           |
- * | Quality & trust   | 15  | verification_status + community_rating       |
- * | Keyword relevance | 10  | text matching on name/description/categories  |
+ * | Semantic relevance| 40  | match_marketplace_listings RPC (cosine sim)  |
+ * | Process match     | 20  | attributes JSONB + subcategory               |
+ * | Material match    | 15  | attributes JSONB                             |
+ * | Quality & trust   | 15  | is_verified flag                             |
+ * | Keyword relevance | 10  | text matching on title/description/categories |
  *
  * When process or material is unspecified, their points redistribute to
  * semantic + keyword so the total always sums to 100.
@@ -19,8 +19,7 @@
  *
  * @related
  * - Semantic infra: src/lib/search/semantic-search.ts (embedText)
- * - RPC: supabase/migrations/20260223130000_supplier_people_embeddings.sql
- * - X-Ray supplier matching: src/app/(platform)/the-forge/services/suppliers.ts
+ * - RPC: supabase/migrations/20260218110000_semantic_search_embeddings.sql
  * - CadLab supply chain UI: src/components/cad/cad-lab-supply-chain.tsx
  */
 
@@ -225,35 +224,58 @@ function scoreQuality(
 }
 
 /**
- * Scores keyword relevance (0-1 normalized).
- * Counts unique search term hits in candidate text, capped to prevent
- * common-word inflation.
+ * Scores keyword relevance (0-1 normalized) with length-weighted terms.
+ *
+ * Longer terms are more specific and score higher:
+ * - Terms 3-5 chars: 1pt each (generic: "cnc", "abs")
+ * - Terms 6-11 chars: 2pts each (moderate: "nylon", "milling")
+ * - Terms 12+ chars: 3pts each (specific: "injection moulding")
+ *
+ * keyParts (module-specific component names) get a 2x multiplier since
+ * they represent the most relevant search context.
+ *
+ * Normalized so 12 weighted points → 1.0 (prevents all suppliers from
+ * hitting the same generic terms and scoring identically).
  */
 function scoreKeywords(
   searchTerms: string[],
   candidateText: string,
+  keyParts: string[] = [],
 ): { score: number; matchedTerms: string[] } {
   const matched: string[] = []
+  const keyPartsLower = new Set(keyParts.map((k) => k.toLowerCase()))
+  let weightedScore = 0
+
   for (const term of searchTerms) {
-    // Skip very short terms that match everything
     if (term.length < 3) continue
     if (candidateText.includes(term)) {
       matched.push(term)
+
+      // Length-based weight: longer = more specific = higher value
+      let weight = 1
+      if (term.length >= 12) weight = 3
+      else if (term.length >= 6) weight = 2
+
+      // keyParts get 2x multiplier — they're the most relevant terms
+      if (keyPartsLower.has(term)) weight *= 2
+
+      weightedScore += weight
     }
   }
-  // Normalize: cap at 5 unique hits → 1.0
-  const score = Math.min(matched.length / 5, 1.0)
+
+  // Normalize: 12 weighted points → 1.0
+  const score = Math.min(weightedScore / 12, 1.0)
   return { score, matchedTerms: matched }
 }
 
 // ─── Main Action ────────────────────────────────────────────────────
 
 /**
- * Matches a single CadLab module to suppliers and marketplace listings
+ * Matches a single CadLab module to marketplace listings
  * using a 5-factor scoring system.
  *
  * @param input - Module data including diagnostics-derived process/material
- * @returns Top 8 supplier matches ranked by score (min 15pts)
+ * @returns Top 8 marketplace matches ranked by score (min 25pts)
  */
 export async function matchCadLabModuleSuppliers(
   input: CadLabModuleInput,
@@ -289,26 +311,14 @@ export async function matchCadLabModuleSuppliers(
 
     if (embedding) {
       // GOTCHA: Supabase types map vector(1536) → string, but the client correctly sends number[] at runtime
-      const [suppSemantic, mlSemantic] = await Promise.all([
-        supabase.rpc("match_suppliers_semantic", {
-          query_embedding: embedding as unknown as string,
-          match_threshold: 0.4,
-          match_count: 30,
-        }),
-        supabase.rpc("match_marketplace_listings", {
-          query_embedding: JSON.stringify(embedding),
-          match_threshold: 0.4,
-          match_count: 20,
-        }),
-      ])
+      const { data: mlSemantic } = await supabase.rpc("match_marketplace_listings", {
+        query_embedding: JSON.stringify(embedding),
+        match_threshold: 0.4,
+        match_count: 30,
+      })
 
-      if (suppSemantic.data) {
-        for (const sm of suppSemantic.data) {
-          semanticScores.set(sm.id, sm.similarity as number)
-        }
-      }
-      if (mlSemantic.data) {
-        for (const ml of mlSemantic.data) {
+      if (mlSemantic) {
+        for (const ml of mlSemantic) {
           semanticScores.set(ml.id, ml.similarity as number)
         }
       }
@@ -317,98 +327,17 @@ export async function matchCadLabModuleSuppliers(
     console.warn("[CadLabMatch] Semantic matching failed, falling back to keyword-only:", err instanceof Error ? err.message : "Unknown")
   }
 
-  // ── Step 2: Fetch candidate pools ──
+  // ── Step 2: Fetch marketplace listings ──
 
-  const [{ data: suppliers }, { data: listings }] = await Promise.all([
-    supabase
-      .from("suppliers")
-      .select("id, name, description, supplier_type, domain_categories, capabilities, verification_status, community_rating")
-      .limit(50),
-    supabase
-      .from("marketplace_listings")
-      .select("id, title, description, attributes, is_verified, subcategory, category")
-      .in("category", ["Products", "Services"])
-      .limit(50),
-  ])
+  const { data: listings } = await supabase
+    .from("marketplace_listings")
+    .select("id, title, description, attributes, is_verified, subcategory, category")
+    .in("category", ["Products", "Services"])
+    .limit(50)
 
   const matches: CadLabSupplierMatch[] = []
 
-  // ── Step 3: Score suppliers ──
-
-  if (suppliers) {
-    for (const supplier of suppliers) {
-      const supplierText = `${supplier.name} ${supplier.description || ""} ${(supplier.domain_categories || []).join(" ")}`.toLowerCase()
-      const caps = supplier.capabilities as Record<string, unknown> | null
-
-      // Factor 1: Semantic (0-1)
-      const semanticRaw = semanticScores.get(supplier.id) ?? 0
-
-      // Factor 2 & 3: Process + Material
-      const { processScore, materialScore } = scoreStructuredMatch(
-        supplierText,
-        supplier.domain_categories || [],
-        caps,
-        inputProcessKeys,
-        inputMaterialKeys,
-      )
-
-      // Factor 4: Quality
-      let qualityRaw = scoreQuality(
-        supplier.verification_status,
-        supplier.community_rating ? Number(supplier.community_rating) : null,
-      )
-
-      // Factor 5: Keyword
-      let { score: keywordRaw } = scoreKeywords(searchTerms, supplierText)
-
-      // Relevance gate: at least one "hard" factor must show genuine relevance
-      // before quality/keyword can contribute — prevents verified-but-irrelevant
-      // companies (e.g. Google, Lockheed) from passing on trust score alone
-      const hasRelevance = semanticRaw >= 0.5 || processScore >= 1.0 || materialScore >= 1.0
-      if (!hasRelevance) {
-        qualityRaw = 0
-        keywordRaw = 0
-      }
-
-      // Apply weights
-      const breakdown: ScoreBreakdown = {
-        semantic: Math.round(semanticRaw * weights.semantic * 10) / 10,
-        process: Math.round(processScore * weights.process * 10) / 10,
-        material: Math.round(materialScore * weights.material * 10) / 10,
-        quality: Math.round(qualityRaw * weights.quality * 10) / 10,
-        keyword: Math.round(keywordRaw * weights.keyword * 10) / 10,
-        total: 0,
-      }
-      breakdown.total = Math.round(
-        (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality + breakdown.keyword) * 10,
-      ) / 10
-
-      if (breakdown.total >= MIN_SCORE_THRESHOLD) {
-        // Build human-readable match reasons
-        const reasons: string[] = []
-        if (breakdown.semantic >= weights.semantic * 0.5) reasons.push("Semantic match")
-        if (processScore >= 1.0 && input.process) reasons.push(`Process: ${input.process}`)
-        if (materialScore >= 1.0 && input.material) reasons.push(`Material: ${input.material}`)
-        if (supplier.domain_categories?.length) {
-          reasons.push(...supplier.domain_categories.slice(0, 2))
-        }
-
-        const isVerified = supplier.verification_status === "verified" || supplier.verification_status === "community_verified"
-
-        matches.push({
-          id: supplier.id,
-          name: supplier.name,
-          matchScore: breakdown.total,
-          scoreBreakdown: breakdown,
-          matchReasons: [...new Set(reasons)].slice(0, 3),
-          isVerified,
-          supplierType: supplier.supplier_type,
-        })
-      }
-    }
-  }
-
-  // ── Step 4: Score marketplace listings ──
+  // ── Step 3: Score marketplace listings ──
 
   if (listings) {
     for (const listing of listings) {
@@ -433,8 +362,8 @@ export async function matchCadLabModuleSuppliers(
         null,
       )
 
-      // Factor 5: Keyword
-      let { score: keywordRaw } = scoreKeywords(searchTerms, listingText)
+      // Factor 5: Keyword (with keyParts for higher-value term matching)
+      let { score: keywordRaw } = scoreKeywords(searchTerms, listingText, input.keyParts)
 
       // Relevance gate (same logic as suppliers above)
       const hasRelevance = semanticRaw >= 0.5 || processScore >= 1.0 || materialScore >= 1.0

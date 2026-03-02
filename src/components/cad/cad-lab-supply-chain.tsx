@@ -401,7 +401,7 @@ export function CadLabSupplyChain({
                           >
                             <div className="flex items-center gap-2 min-w-0">
                               <button
-                                onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
+                                onClick={() => router.push(`/marketplace/${match.id}`)}
                                 className="font-medium text-foreground hover:text-international-orange transition-colors truncate"
                               >
                                 {match.name}
@@ -443,7 +443,7 @@ export function CadLabSupplyChain({
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
-                                onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
+                                onClick={() => router.push(`/marketplace/${match.id}`)}
                               >
                                 <ExternalLink className="h-2.5 w-2.5 mr-1" />
                                 View

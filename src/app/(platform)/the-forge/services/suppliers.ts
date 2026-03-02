@@ -1,9 +1,8 @@
 /**
  * @file suppliers.ts — Supplier matching service for X-Ray modules
  *
- * @description Matches X-Ray module requirements to real suppliers:
- * 1. Suppliers table (domain_categories, capabilities, supplier_type)
- * 2. Marketplace Products/Services listings
+ * @description Matches X-Ray module requirements to marketplace listings
+ * (Products/Services categories) using keyword + semantic scoring.
  *
  * Enforces gating: no supplier matches until the gating module's
  * diagnostic is complete (clarity-first quoting principle).
@@ -100,16 +99,6 @@ export async function matchSuppliersForModule(
     ...module.keyParts,
   ].map((t) => t.toLowerCase())
 
-  // Query suppliers table
-  const { data: suppliers, error: suppliersError } = await supabase
-    .from("suppliers")
-    .select("id, name, description, supplier_type, domain_categories, capabilities, verification_status, community_rating")
-    .limit(50)
-
-  if (suppliersError) {
-    console.error("[SupplierMatch] Failed to query suppliers:", suppliersError.message)
-  }
-
   // Query marketplace listings for Products and Services
   const { data: listings, error: listingsError } = await supabase
     .from("marketplace_listings")
@@ -128,8 +117,8 @@ export async function matchSuppliersForModule(
     const embedding = await embedText(embeddingText)
     if (embedding) {
       // GOTCHA: Supabase types map vector(1536) → string, but the client correctly sends number[] at runtime
-      const { data: semanticMatches, error: rpcError } = await supabase.rpc("match_suppliers_semantic", {
-        query_embedding: embedding as unknown as string,
+      const { data: semanticMatches, error: rpcError } = await supabase.rpc("match_marketplace_listings", {
+        query_embedding: JSON.stringify(embedding),
         match_threshold: 0.4,
         match_count: 20,
       })
@@ -149,70 +138,6 @@ export async function matchSuppliersForModule(
   }
 
   const matches: SupplierMatch[] = []
-
-  // Score suppliers
-  if (suppliers) {
-    for (const supplier of suppliers) {
-      const supplierText = `${supplier.name} ${supplier.description || ""} ${(supplier.domain_categories || []).join(" ")}`.toLowerCase()
-      const caps = supplier.capabilities as Record<string, unknown> | null
-
-      let score = 0
-      const matchReasons: string[] = []
-
-      // Match domain categories
-      if (supplier.domain_categories) {
-        for (const cat of supplier.domain_categories) {
-          for (const term of searchTerms) {
-            if (cat.toLowerCase().includes(term) || term.includes(cat.toLowerCase())) {
-              score += 3
-              matchReasons.push(`Domain: ${cat}`)
-            }
-          }
-        }
-      }
-
-      // Match name/description text
-      for (const term of searchTerms) {
-        if (supplierText.includes(term)) {
-          score += 2
-          matchReasons.push(`Matched: ${term}`)
-        }
-      }
-
-      // Match capabilities JSONB
-      if (caps) {
-        const capsStr = JSON.stringify(caps).toLowerCase()
-        for (const term of searchTerms) {
-          if (capsStr.includes(term)) {
-            score += 2
-          }
-        }
-      }
-
-      // Combine keyword score with semantic score (×1.5 so semantic max ~15 is comparable to keyword range)
-      const semScore = (semanticScores.get(supplier.id) ?? 0) * 1.5
-      const combinedScore = score + semScore
-
-      if (combinedScore > 0) {
-        const isVerified = supplier.verification_status === "verified" || supplier.verification_status === "community_verified"
-        const leadTime = (caps as Record<string, unknown>)?.lead_time
-        const warranty = 12 // Default warranty
-
-        matches.push({
-          id: supplier.id,
-          name: supplier.name,
-          capabilities: supplier.domain_categories || [],
-          typicalLeadWeeks: typeof leadTime === "number" ? leadTime : 8,
-          warrantyMonths: warranty,
-          matchReason: [...new Set(matchReasons)].slice(0, 3).join(", "),
-          matchScore: combinedScore + (isVerified ? 3 : 0) + (supplier.community_rating ? Number(supplier.community_rating) : 0),
-          supplierType: supplier.supplier_type,
-          isVerified,
-          moduleId: module.id,
-        })
-      }
-    }
-  }
 
   // Score marketplace listings
   if (listings) {

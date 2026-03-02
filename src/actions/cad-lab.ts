@@ -2304,83 +2304,62 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Qwen 3.5 Together(120s) → Gemini(120s) → OpenAI(120s) fallback chain.
-    // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s (only 2-3 models attempt before succeeding) — fits Vercel's 300s cap.
-    // Qwen 3.5 (397B-A17B) via Together AI slots between Anthropic and Google — different infra, strong reasoning.
-    // Gemini 3.1 Pro is stronger than GPT-4o for structured JSON + reasoning — prioritise it.
-    // OpenAI (Azure-based) is last resort — different infra from both Anthropic and Google.
-    // TRIED: Default params (600s, 3 retries) — exceeds Vercel 300s cap, function gets killed silently.
-    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) — too aggressive, models need ≥120s for decomposition.
+    // DECISION: Race Sonnet + Gemini in parallel via Promise.any, then OpenAI sequential fallback.
+    // Parallel racing means total time = max(240s, 240s) + 55s = 295s worst case — fits Vercel 300s cap.
+    // TRIED: Sequential Opus(120s)→Sonnet(120s)→Qwen(120s)→Gemini(120s)→OpenAI(120s) — 600s worst case,
+    //   far exceeds Vercel 300s cap. All models genuinely timeout at 120s for complex prompts (~13.5K chars).
+    // TRIED: AbortSignal.timeout — silently fails in Next.js server actions (commit 0795994c fixed mechanism,
+    //   but sequential chain still too slow).
     dlog(`System prompt length: ${modulePrompt.length} chars`)
     dlog(`User prompt length: ${userPrompt.length} chars`)
     let text: string, tokensIn: number, tokensOut: number
+
+    // Race Sonnet + Gemini in parallel — first success wins
+    dlog(">>> RACING: Sonnet(240s) + Gemini(240s) in parallel")
+    const raceStart = Date.now()
+
+    type RaceResult = { text: string; tokensIn: number; tokensOut: number; model: string }
+
+    const sonnetPromise: Promise<RaceResult> = callClaude(
+      modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 240_000, 1,
+    ).then(r => {
+      dlog(`<<< SONNET SUCCEEDED in ${Date.now() - raceStart}ms`)
+      return { ...r, model: "Sonnet" }
+    }).catch(err => {
+      const msg = err instanceof Error ? err.message.slice(0, 200) : String(err)
+      dlog(`<<< SONNET FAILED in ${Date.now() - raceStart}ms: ${msg}`)
+      triedModels.push({ model: "Sonnet", error: msg })
+      throw err
+    })
+
+    const geminiPromise: Promise<RaceResult> = callGemini(
+      modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 240_000,
+    ).then(r => {
+      dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - raceStart}ms`)
+      return { ...r, model: "Gemini" }
+    }).catch(err => {
+      const msg = err instanceof Error ? err.message.slice(0, 200) : String(err)
+      dlog(`<<< GEMINI FAILED in ${Date.now() - raceStart}ms: ${msg}`)
+      triedModels.push({ model: "Gemini", error: msg })
+      throw err
+    })
+
     try {
-      // Opus first — 120s timeout, 1 retry (fail fast to Sonnet)
-      dlog(">>> ATTEMPTING OPUS (timeout=120s, retries=1)")
-      const opusStart = Date.now()
-      ;({ text, tokensIn, tokensOut } = await callClaude(
-        modulePrompt, userPrompt, "claude-opus-4-6", 8192, 120_000, 1,
-      ))
-      dlog(`<<< OPUS SUCCEEDED in ${Date.now() - opusStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-    } catch (opusErr) {
-      const opusElapsed = Date.now() - start
-      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
-      dlog(`<<< OPUS FAILED after ${opusElapsed}ms: ${opusMsg}`)
-      triedModels.push({ model: "Opus", error: opusMsg })
-      console.warn("[THE-FORGE] Opus failed, falling back to Sonnet:", opusMsg)
+      const winner = await Promise.any([sonnetPromise, geminiPromise])
+      text = winner.text; tokensIn = winner.tokensIn; tokensOut = winner.tokensOut
+      dlog(`<<< RACE WON by ${winner.model} in ${Date.now() - raceStart}ms`)
+    } catch {
+      // Both failed — try OpenAI as final resort
+      dlog(">>> ATTEMPTING OPENAI (timeout=55s) — final fallback")
+      const openaiStart = Date.now()
       try {
-        // Sonnet fallback — same params
-        dlog(">>> ATTEMPTING SONNET (timeout=120s, retries=1)")
-        const sonnetStart = Date.now()
-        ;({ text, tokensIn, tokensOut } = await callClaude(
-          modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 120_000, 1,
-        ))
-        dlog(`<<< SONNET SUCCEEDED in ${Date.now() - sonnetStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-      } catch (sonnetErr) {
-        const sonnetElapsed = Date.now() - start
-        const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
-        dlog(`<<< SONNET FAILED after ${sonnetElapsed}ms (total): ${sonnetMsg}`)
-        triedModels.push({ model: "Sonnet", error: sonnetMsg })
-        console.warn("[THE-FORGE] Sonnet failed, falling back to Qwen 3.5 (Together):", sonnetMsg)
-        try {
-          // Qwen 3.5 fallback — 397B-A17B via Together AI, different infra from Anthropic
-          dlog(">>> ATTEMPTING QWEN 3.5 TOGETHER (timeout=120s)")
-          const togetherStart = Date.now()
-          ;({ text, tokensIn, tokensOut } = await callTogether(modulePrompt, userPrompt))
-          dlog(`<<< QWEN 3.5 TOGETHER SUCCEEDED in ${Date.now() - togetherStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-        } catch (togetherErr) {
-          const togetherElapsed = Date.now() - start
-          const togetherMsg = togetherErr instanceof Error ? togetherErr.message.slice(0, 200) : String(togetherErr)
-          dlog(`<<< QWEN 3.5 TOGETHER FAILED after ${togetherElapsed}ms (total): ${togetherMsg}`)
-          triedModels.push({ model: "Qwen 3.5 (Together)", error: togetherMsg })
-          console.warn("[THE-FORGE] Qwen 3.5 failed, falling back to Gemini:", togetherMsg)
-          try {
-            // Gemini fallback — stronger than GPT-4o for structured JSON + reasoning
-            dlog(">>> ATTEMPTING GEMINI (timeout=120s)")
-            const geminiStart = Date.now()
-            ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
-            dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-          } catch (geminiErr) {
-            const geminiElapsed = Date.now() - start
-            const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-            dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
-            triedModels.push({ model: "Gemini", error: geminiMsg })
-            console.warn("[THE-FORGE] Gemini failed, falling back to OpenAI:", geminiMsg)
-            try {
-              // OpenAI final fallback — Azure-based, different infra from Anthropic and Google
-              dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
-              const openaiStart = Date.now()
-              ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
-              dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-            } catch (openaiErr) {
-              const openaiElapsed = Date.now() - start
-              const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
-              dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
-              triedModels.push({ model: "OpenAI", error: openaiMsg })
-              throw openaiErr
-            }
-          }
-        }
+        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 55_000))
+        dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
+      } catch (openaiErr) {
+        const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
+        dlog(`<<< OPENAI FAILED in ${Date.now() - openaiStart}ms: ${msg}`)
+        triedModels.push({ model: "OpenAI", error: msg })
+        throw openaiErr
       }
     }
 
