@@ -46,7 +46,9 @@ export function computeRfqReadiness(
       generated,
       missingDiagnostics,
       missingArtifacts,
-      quoteReady: generated && missingArtifacts.length === 0,
+      // DECISION: diagnostics-complete = quote-ready. CAD artifacts (STEP/STL/manifest)
+      // are optional — CAD generation is beta and not yet in active use.
+      quoteReady: missingDiagnostics.length === 0,
     }
   })
   const generatedCount = moduleDetails.filter((mod) => mod.generated).length
@@ -60,11 +62,11 @@ export function computeRfqReadiness(
 
   const generationScore = generatedCount / moduleCount
   const diagnosticsScore = diagnosticsComplete / moduleCount
-  const artifactsScore = artifactComplete / moduleCount
+  // DECISION: Dropped artifacts from the score — CAD is beta, diagnostics + generation
+  // are the primary readiness signals. 60/40 weighting matches server-side logic.
   const totalScore = Math.round(
-    generationScore * 45 +
-    diagnosticsScore * 35 +
-    artifactsScore * 20,
+    diagnosticsScore * 60 +
+    generationScore * 40,
   )
 
   const gaps: string[] = []
@@ -74,9 +76,7 @@ export function computeRfqReadiness(
   if (diagnosticsComplete < modules.length) {
     gaps.push(`${modules.length - diagnosticsComplete} module(s) missing procurement diagnostics`)
   }
-  if (artifactComplete < modules.length) {
-    gaps.push(`${modules.length - artifactComplete} module(s) missing full STEP/STL/manifest package`)
-  }
+  // INTENT: Artifact gap message removed — CAD artifacts are informational only, not a blocker.
 
   return {
     totalScore,

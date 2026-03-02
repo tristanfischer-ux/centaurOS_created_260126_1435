@@ -7,7 +7,7 @@
  * Users match suppliers to specified modules, create and broadcast RFQs, compare
  * incoming quotes, and award contracts to unlock the Assemble stage.
  *
- * 3 tabs: Suppliers, Proposals, Costs.
+ * 3 tabs: Suppliers, Shortlist, Costs.
  *
  * Gate: redirects to Specify if no specified modules exist.
  */
@@ -29,13 +29,13 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
-import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
+import { CadLabShortlist } from "@/components/cad/cad-lab-shortlist"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
 import { toast } from "sonner"
 import type { CadLabModule } from "@/lib/cad-lab-types"
-import type { ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
+import type { CadLabSupplierMatch, ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
 
 // ─── Supplier match type (mirrors action return) ────────────────────
 
@@ -47,6 +47,19 @@ interface SupplierMatch {
   matchReasons: string[]
   isVerified: boolean
   supplierType: string
+}
+
+// ─── Shortlisted supplier type ──────────────────────────────────────
+
+export interface ShortlistedSupplier {
+  id: string
+  name: string
+  isVerified: boolean
+  supplierType: string
+  moduleIds: string[]
+  bestMatchScore: number
+  bestScoreBreakdown: ScoreBreakdown
+  allMatchReasons: string[]
 }
 
 // ─── Page Component ──────────────────────────────────────────────────
@@ -62,8 +75,6 @@ export default function SourcePage(): React.ReactNode {
     designBrief,
     assumptionNotes,
     activeProjectId,
-    linkedRfqId,
-    linkRfqToProject,
     specifiedModuleCount,
     manufacturingOrderCount,
     refreshManufacturingOrderCount,
@@ -101,6 +112,92 @@ export default function SourcePage(): React.ReactNode {
 
   const [loadingModules, setLoadingModules] = useState<Set<string>>(new Set())
   const [matchAllLoading, setMatchAllLoading] = useState(false)
+
+  // ── Shortlisted suppliers (persisted to localStorage per project) ──
+  const shortlistKey = activeProjectId ? `forge-supplier-shortlist-${activeProjectId}` : null
+  const rfqIdsKey = activeProjectId ? `forge-supplier-rfqs-${activeProjectId}` : null
+
+  const [shortlistedSuppliers, setShortlistedSuppliersRaw] = useState<Map<string, ShortlistedSupplier>>(() => {
+    if (!shortlistKey) return new Map()
+    try {
+      const stored = localStorage.getItem(shortlistKey)
+      if (stored) return new Map(JSON.parse(stored) as [string, ShortlistedSupplier][])
+    } catch { /* ignore corrupt data */ }
+    return new Map()
+  })
+
+  const setShortlistedSuppliers = useCallback((updater: (prev: Map<string, ShortlistedSupplier>) => Map<string, ShortlistedSupplier>) => {
+    setShortlistedSuppliersRaw((prev) => {
+      const next = updater(prev)
+      if (shortlistKey) {
+        try { localStorage.setItem(shortlistKey, JSON.stringify([...next.entries()])) } catch { /* quota */ }
+      }
+      return next
+    })
+  }, [shortlistKey])
+
+  const [perSupplierRfqIds, setPerSupplierRfqIdsRaw] = useState<Map<string, string>>(() => {
+    if (!rfqIdsKey) return new Map()
+    try {
+      const stored = localStorage.getItem(rfqIdsKey)
+      if (stored) return new Map(JSON.parse(stored) as [string, string][])
+    } catch { /* ignore corrupt data */ }
+    return new Map()
+  })
+
+  const setPerSupplierRfqIds = useCallback((updater: (prev: Map<string, string>) => Map<string, string>) => {
+    setPerSupplierRfqIdsRaw((prev) => {
+      const next = updater(prev)
+      if (rfqIdsKey) {
+        try { localStorage.setItem(rfqIdsKey, JSON.stringify([...next.entries()])) } catch { /* quota */ }
+      }
+      return next
+    })
+  }, [rfqIdsKey])
+
+  const shortlistedSupplierIds = useMemo(
+    () => new Set(shortlistedSuppliers.keys()),
+    [shortlistedSuppliers],
+  )
+
+  const handleShortlistSupplier = useCallback((supplier: CadLabSupplierMatch, moduleId: string) => {
+    setShortlistedSuppliers((prev) => {
+      const next = new Map(prev)
+      const existing = next.get(supplier.id)
+
+      if (existing) {
+        // If already shortlisted from this module, remove the module association
+        const remainingModules = existing.moduleIds.filter((id) => id !== moduleId)
+        if (remainingModules.length === 0) {
+          // Fully remove from shortlist
+          next.delete(supplier.id)
+        } else {
+          next.set(supplier.id, { ...existing, moduleIds: remainingModules })
+        }
+      } else {
+        // Add to shortlist
+        next.set(supplier.id, {
+          id: supplier.id,
+          name: supplier.name,
+          isVerified: supplier.isVerified,
+          supplierType: supplier.supplierType,
+          moduleIds: [moduleId],
+          bestMatchScore: supplier.matchScore,
+          bestScoreBreakdown: supplier.scoreBreakdown,
+          allMatchReasons: [...supplier.matchReasons],
+        })
+      }
+      return next
+    })
+  }, [setShortlistedSuppliers])
+
+  const handleRemoveFromShortlist = useCallback((supplierId: string) => {
+    setShortlistedSuppliers((prev) => {
+      const next = new Map(prev)
+      next.delete(supplierId)
+      return next
+    })
+  }, [setShortlistedSuppliers])
 
   const eligibleModules = useMemo(
     () => modules.filter((m) => m.status === "specified" || m.status === "generated"),
@@ -146,7 +243,7 @@ export default function SourcePage(): React.ReactNode {
   const TABS = useMemo(
     () => [
       { id: "suppliers", label: "Suppliers" },
-      { id: "proposals", label: "Proposals" },
+      { id: "shortlist", label: "Shortlist" },
       { id: "costs", label: "Costs" },
     ],
     [],
@@ -157,7 +254,9 @@ export default function SourcePage(): React.ReactNode {
   // INTENT: Read tab from URL after hydration — avoids React #418.
   // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
   useEffect(() => {
-    const param = searchParams.get("tab")
+    let param = searchParams.get("tab")
+    // INTENT: Legacy redirect — "proposals" was renamed to "shortlist"
+    if (param === "proposals") param = "shortlist"
     if (param && TABS.some((t) => t.id === param)) {
       setActiveTab(param)
     }
@@ -252,6 +351,8 @@ export default function SourcePage(): React.ReactNode {
                 matchAllLoading={matchAllLoading}
                 onMatchModule={handleMatchModule}
                 onMatchAll={handleMatchAll}
+                shortlistedSupplierIds={shortlistedSupplierIds}
+                onShortlistSupplier={handleShortlistSupplier}
               />
             )}
 
@@ -276,18 +377,22 @@ export default function SourcePage(): React.ReactNode {
           </motion.div>
         )}
 
-        {/* ═══ Proposals tab ═══ */}
-        {activeTab === "proposals" && (
-          <motion.div key="proposals" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            <CadLabContracting
+        {/* ═══ Shortlist tab ═══ */}
+        {activeTab === "shortlist" && (
+          <motion.div key="shortlist" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <CadLabShortlist
               modules={eligibleModules}
               projectName={subject}
               diagnosticAnswers={diagnosticAnswers}
               projectId={activeProjectId}
-              linkedRfqId={linkedRfqId}
-              onRfqLinked={linkRfqToProject}
               designBrief={designBrief}
               assumptionNotes={assumptionNotes}
+              shortlistedSuppliers={shortlistedSuppliers}
+              perSupplierRfqIds={perSupplierRfqIds}
+              onSupplierRfqCreated={(supplierId, rfqId) => {
+                setPerSupplierRfqIds((prev) => new Map(prev).set(supplierId, rfqId))
+              }}
+              onRemoveFromShortlist={handleRemoveFromShortlist}
               onOrderCreated={refreshManufacturingOrderCount}
             />
           </motion.div>
@@ -299,6 +404,7 @@ export default function SourcePage(): React.ReactNode {
             <CadLabCostEstimate
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
+              shortlistedSupplierCount={shortlistedSuppliers.size}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

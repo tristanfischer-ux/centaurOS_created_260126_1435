@@ -29,6 +29,8 @@ import {
   Loader2,
   BadgeCheck,
   ExternalLink,
+  Plus,
+  Check,
 } from "lucide-react"
 
 import { toast } from "sonner"
@@ -56,6 +58,10 @@ interface CadLabSupplyChainProps {
   onMatchModule: (mod: CadLabModule) => void
   /** Callback to match all modules */
   onMatchAll: () => void
+  /** Set of supplier IDs that have been shortlisted */
+  shortlistedSupplierIds?: Set<string>
+  /** Callback when user shortlists/unshortlists a supplier from a module */
+  onShortlistSupplier?: (supplier: CadLabSupplierMatch, moduleId: string) => void
 }
 
 /** Manufacturing specification for a single module */
@@ -183,6 +189,8 @@ export function CadLabSupplyChain({
   matchAllLoading,
   onMatchModule,
   onMatchAll,
+  shortlistedSupplierIds,
+  onShortlistSupplier,
 }: CadLabSupplyChainProps): React.ReactNode {
   const router = useRouter()
   const specs = useMemo(
@@ -375,39 +383,83 @@ export function CadLabSupplyChain({
                   </div>
                 ) : (
                   <div className="border-t pt-2 space-y-1.5">
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Matched Suppliers</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Matched Suppliers</p>
+                      {shortlistedSupplierIds && supplierMatches.get(spec.module.id)!.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground">
+                          {supplierMatches.get(spec.module.id)!.filter((m) => shortlistedSupplierIds.has(m.id)).length} of{" "}
+                          {supplierMatches.get(spec.module.id)!.length} shortlisted
+                        </p>
+                      )}
+                    </div>
                     {supplierMatches.get(spec.module.id)!.length === 0 ? (
                       <p className="text-xs text-muted-foreground">No matching suppliers found. Try completing diagnostics for better matches.</p>
                     ) : (
-                      supplierMatches.get(spec.module.id)!.map((match) => (
-                        <div key={match.id} className="flex items-center justify-between gap-2 p-2 rounded bg-muted/30 text-xs">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <button
-                              onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
-                              className="font-medium text-foreground hover:text-international-orange transition-colors truncate"
-                            >
-                              {match.name}
-                            </button>
-                            {match.isVerified && (
-                              <BadgeCheck className="h-3 w-3 text-status-success flex-shrink-0" />
+                      supplierMatches.get(spec.module.id)!.map((match) => {
+                        const isShortlisted = shortlistedSupplierIds?.has(match.id) ?? false
+                        return (
+                          <div
+                            key={match.id}
+                            className={cn(
+                              "flex items-center justify-between gap-2 p-2 rounded text-xs transition-colors",
+                              isShortlisted
+                                ? "bg-status-success-light/30 border-l-2 border-status-success"
+                                : "bg-muted/30",
                             )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <button
+                                onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
+                                className="font-medium text-foreground hover:text-international-orange transition-colors truncate"
+                              >
+                                {match.name}
+                              </button>
+                              {match.isVerified && (
+                                <BadgeCheck className="h-3 w-3 text-status-success flex-shrink-0" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-[10px] text-muted-foreground font-mono" title={match.scoreBreakdown ? `Semantic: ${match.scoreBreakdown.semantic} | Process: ${match.scoreBreakdown.process} | Material: ${match.scoreBreakdown.material} | Quality: ${match.scoreBreakdown.quality} | Keyword: ${match.scoreBreakdown.keyword}` : undefined}>
+                                {Math.round(match.matchScore)}%
+                              </span>
+                              {onShortlistSupplier && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className={cn(
+                                    "h-6 px-2 text-[10px]",
+                                    isShortlisted
+                                      ? "text-status-success hover:text-status-success"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                  onClick={() => onShortlistSupplier(match, spec.module.id)}
+                                >
+                                  {isShortlisted ? (
+                                    <>
+                                      <Check className="h-2.5 w-2.5 mr-1" />
+                                      Shortlisted
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Plus className="h-2.5 w-2.5 mr-1" />
+                                      Shortlist
+                                    </>
+                                  )}
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
+                                onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
+                              >
+                                <ExternalLink className="h-2.5 w-2.5 mr-1" />
+                                View
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[10px] text-muted-foreground font-mono" title={match.scoreBreakdown ? `Semantic: ${match.scoreBreakdown.semantic} | Process: ${match.scoreBreakdown.process} | Material: ${match.scoreBreakdown.material} | Quality: ${match.scoreBreakdown.quality} | Keyword: ${match.scoreBreakdown.keyword}` : undefined}>
-                              {Math.round(match.matchScore)}%
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 px-2 text-[10px] text-international-orange hover:text-international-orange"
-                              onClick={() => router.push(`/the-forge/marketplace/${match.id}`)}
-                            >
-                              <ExternalLink className="h-2.5 w-2.5 mr-1" />
-                              View
-                            </Button>
-                          </div>
-                        </div>
-                      ))
+                        )
+                      })
                     )}
                     {supplierMatches.get(spec.module.id)!.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">

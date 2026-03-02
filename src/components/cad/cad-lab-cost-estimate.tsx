@@ -126,6 +126,8 @@ interface CadLabCostEstimateProps {
   diagnosticAnswers: DiagnosticAnswers
   /** Callback when user edits cost assumptions for a module */
   onCostOverride?: (moduleId: string, overrides: CadLabModule["costOverrides"]) => void
+  /** Number of suppliers on the shortlist (for callout banner) */
+  shortlistedSupplierCount?: number
 }
 
 /**
@@ -140,6 +142,7 @@ export function CadLabCostEstimate({
   modules,
   diagnosticAnswers,
   onCostOverride,
+  shortlistedSupplierCount = 0,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -452,6 +455,22 @@ export function CadLabCostEstimate({
               </span>
             </div>
           )}
+
+          {/* Shortlist callout */}
+          <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 space-y-1">
+            <p className="text-xs font-medium text-foreground">
+              These are internal budget estimates based on industry rates.
+            </p>
+            {shortlistedSupplierCount > 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                {shortlistedSupplierCount} supplier{shortlistedSupplierCount !== 1 ? "s" : ""} shortlisted — send RFQs from the Shortlist tab to get real pricing.
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Compare against real supplier quotes on the Shortlist tab.
+              </p>
+            )}
+          </div>
 
           <p className="text-[10px] text-muted-foreground">
             Costs are rough estimates based on material mass × process rates. Actual quotes from suppliers will differ.
