@@ -17,6 +17,7 @@
  */
 
 import { createHash } from "crypto"
+import { appendFileSync, writeFileSync } from "fs"
 import type {
   ClaudeModelId,
   CadLabResult,
@@ -342,6 +343,49 @@ async function callGemini(
     text,
     tokensIn: usage.promptTokenCount ?? 0,
     tokensOut: usage.candidatesTokenCount ?? 0,
+  }
+}
+
+async function callOpenAI(
+  systemPrompt: string,
+  userPrompt: string,
+  modelId: string = "gpt-4o",
+  maxTokens: number = 8192,
+  timeoutMs: number = 120_000,
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
+  const apiKey = process.env.OPENAI_API_KEY
+  if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: modelId,
+      max_tokens: maxTokens,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text: string = data.choices?.[0]?.message?.content ?? ""
+
+  return {
+    text,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
   }
 }
 
@@ -2110,6 +2154,13 @@ function classifyDecompositionError(
   return sanitizeErrorMessage(error)
 }
 
+// ─── Temporary debug logging (remove after diagnosing decomposition hang) ───
+const DECOMP_LOG = "/tmp/forge-decomposition.log"
+function dlog(msg: string) {
+  const ts = new Date().toISOString()
+  appendFileSync(DECOMP_LOG, `[${ts}] ${msg}\n`)
+}
+
 // ─── Module Decomposition (exported) ─────────────────────────────────
 
 /**
@@ -2142,10 +2193,17 @@ export async function decomposeIntoModules(
   const start = Date.now()
   const triedModels: Array<{ model: string; error: string }> = []
 
+  // Clear log file for this run
+  writeFileSync(DECOMP_LOG, `=== DECOMPOSITION START === ${new Date().toISOString()}\n`)
+  dlog(`Product: ${description.slice(0, 100)}`)
+  dlog(`Research report length: ${researchReport.length} chars`)
+  dlog(`Model hint: ${modelId}, Domain hint: ${domainHint ?? "none"}`)
+
   try {
     // DECISION: Keyword heuristic fallback instead of Claude API call — saves 2-5s
     const domain = domainHint ?? detectDomainFromText(researchReport)
     console.info("[THE-FORGE] Decomposing product into modules (domain: %s)...", domain)
+    dlog(`Detected domain: ${domain}`)
     const modulePrompt = getModuleDecompositionPrompt(domain)
 
     // DECISION: Catalogue removed from decomposition prompt — saves 5-15s (fewer input tokens).
@@ -2164,36 +2222,66 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Gemini fallback chain.
+    // DECISION: Opus(120s,1) → Sonnet(120s,1) → OpenAI(120s) → Gemini fallback chain.
     // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s — fits Vercel's 300s cap.
     // TRIED: Default params (600s, 3 retries) — exceeds Vercel 300s cap, function gets killed silently.
     // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) — too aggressive, models need ≥120s for decomposition.
+    dlog(`System prompt length: ${modulePrompt.length} chars`)
+    dlog(`User prompt length: ${userPrompt.length} chars`)
     let text: string, tokensIn: number, tokensOut: number
     try {
       // Opus first — 120s timeout, 1 retry (fail fast to Sonnet)
-      ({ text, tokensIn, tokensOut } = await callClaude(
+      dlog(">>> ATTEMPTING OPUS (timeout=120s, retries=1)")
+      const opusStart = Date.now()
+      ;({ text, tokensIn, tokensOut } = await callClaude(
         modulePrompt, userPrompt, "claude-opus-4-6", 8192, 120_000, 1,
       ))
+      dlog(`<<< OPUS SUCCEEDED in ${Date.now() - opusStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
     } catch (opusErr) {
+      const opusElapsed = Date.now() - start
       const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
+      dlog(`<<< OPUS FAILED after ${opusElapsed}ms: ${opusMsg}`)
       triedModels.push({ model: "Opus", error: opusMsg })
       console.warn("[THE-FORGE] Opus failed, falling back to Sonnet:", opusMsg)
       try {
         // Sonnet fallback — same params
-        ({ text, tokensIn, tokensOut } = await callClaude(
+        dlog(">>> ATTEMPTING SONNET (timeout=120s, retries=1)")
+        const sonnetStart = Date.now()
+        ;({ text, tokensIn, tokensOut } = await callClaude(
           modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 120_000, 1,
         ))
+        dlog(`<<< SONNET SUCCEEDED in ${Date.now() - sonnetStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
       } catch (sonnetErr) {
+        const sonnetElapsed = Date.now() - start
         const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
+        dlog(`<<< SONNET FAILED after ${sonnetElapsed}ms (total): ${sonnetMsg}`)
         triedModels.push({ model: "Sonnet", error: sonnetMsg })
-        console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
+        console.warn("[THE-FORGE] Sonnet failed, falling back to OpenAI:", sonnetMsg)
         try {
-          // Gemini final fallback
-          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
-        } catch (geminiErr) {
-          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-          triedModels.push({ model: "Gemini", error: geminiMsg })
-          throw geminiErr
+          // OpenAI fallback — Azure-based, unaffected by AWS outages
+          dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
+          const openaiStart = Date.now()
+          ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
+          dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+        } catch (openaiErr) {
+          const openaiElapsed = Date.now() - start
+          const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
+          dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
+          triedModels.push({ model: "OpenAI", error: openaiMsg })
+          console.warn("[THE-FORGE] OpenAI failed, falling back to Gemini:", openaiMsg)
+          try {
+            // Gemini final fallback
+            dlog(">>> ATTEMPTING GEMINI")
+            const geminiStart = Date.now()
+            ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+            dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+          } catch (geminiErr) {
+            const geminiElapsed = Date.now() - start
+            const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+            dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
+            triedModels.push({ model: "Gemini", error: geminiMsg })
+            throw geminiErr
+          }
         }
       }
     }
@@ -2262,18 +2350,28 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     })
 
+    const totalMs = Date.now() - start
+    dlog(`SUCCESS: ${modules.length} modules in ${totalMs}ms`)
+    dlog(`=== DECOMPOSITION END ===`)
     console.info(
-      `[THE-FORGE] Decomposed into ${modules.length} modules in ${Date.now() - start}ms`,
+      `[THE-FORGE] Decomposed into ${modules.length} modules in ${totalMs}ms`,
     )
 
     return {
       success: true,
       modules,
-      decompositionTime: Date.now() - start,
+      decompositionTime: totalMs,
       tokensIn,
       tokensOut,
     }
   } catch (error) {
+    const totalMs = Date.now() - start
+    const errMsg = error instanceof Error ? error.message : String(error)
+    dlog(`FATAL ERROR after ${totalMs}ms: ${errMsg}`)
+    if (triedModels.length > 0) {
+      dlog(`Fallback chain: ${JSON.stringify(triedModels)}`)
+    }
+    dlog(`=== DECOMPOSITION END (FAILED) ===`)
     console.error("[THE-FORGE] Module decomposition failed:", error instanceof Error ? error.message : error)
     if (triedModels.length > 0) {
       console.error("[THE-FORGE] Fallback chain:", JSON.stringify(triedModels))
