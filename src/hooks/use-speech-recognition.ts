@@ -157,8 +157,17 @@ export function useSpeechRecognition(
     const onErrorRef = useRef(onError)
     onErrorRef.current = onError
 
-    const useNative = hasNativeSpeechRecognition()
-    const isSupported = useNative || hasMediaRecorder()
+    // INTENT: Defer browser capability detection to after hydration. During SSR
+    // both checks return false (no `window`), so isSupported must start as false
+    // on both server and client to avoid hydration mismatch in SpeechButton.
+    const useNativeRef = useRef(false)
+    const [isSupported, setIsSupported] = useState(false)
+
+    useEffect(() => {
+        const native = hasNativeSpeechRecognition()
+        useNativeRef.current = native
+        setIsSupported(native || hasMediaRecorder())
+    }, [])
 
     // ─── Native Web Speech API refs ─────────────────────────────────────
     const recognitionRef = useRef<SpeechRecognitionInstance | null>(null)
@@ -478,20 +487,20 @@ export function useSpeechRecognition(
 
     const start = useCallback(() => {
         if (!isSupported) return
-        if (useNative) {
+        if (useNativeRef.current) {
             startNative()
         } else {
             startWhisper()
         }
-    }, [isSupported, useNative, startNative, startWhisper])
+    }, [isSupported, startNative, startWhisper])
 
     const stop = useCallback(() => {
-        if (useNative) {
+        if (useNativeRef.current) {
             stopNative()
         } else {
             stopWhisper()
         }
-    }, [useNative, stopNative, stopWhisper])
+    }, [stopNative, stopWhisper])
 
     const reset = useCallback(() => {
         setTranscript("")
