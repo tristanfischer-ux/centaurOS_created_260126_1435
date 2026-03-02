@@ -148,6 +148,30 @@ function extractJsonObject(text: string): string {
 
 // ─── Claude API Call ─────────────────────────────────────────────────
 
+// INTENT: AbortSignal.timeout() silently fails to abort in-flight fetches in Next.js
+// server actions (Node.js runtime). Promise.race guarantees we reject after timeoutMs,
+// while AbortController.abort() attempts to kill the TCP connection for cleanup.
+// TRIED: AbortSignal.timeout alone — hangs indefinitely on Opus decomposition calls.
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await Promise.race([
+      fetch(url, { ...init, signal: controller.signal }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Request timeout")), timeoutMs),
+      ),
+    ])
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 /**
  * Calls a Claude model and returns the response text.
  *
@@ -173,21 +197,24 @@ async function callClaude(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   const makeRequest = async (model: ClaudeModelId) => {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: maxTokens,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
       },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    })
+      timeoutMs,
+    )
 
     if (!response.ok) {
       const errText = await response.text()
@@ -248,19 +275,22 @@ async function callGeminiWithSearch(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.2,
-      },
-    }),
-    signal: AbortSignal.timeout(60_000),
-  })
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        tools: [{ google_search: {} }],
+        generationConfig: {
+          maxOutputTokens: 8192,
+          temperature: 0.2,
+        },
+      }),
+    },
+    60_000,
+  )
 
   if (!response.ok) {
     const errText = await response.text()
@@ -316,19 +346,22 @@ async function callGemini(
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemPrompt }] },
-      contents: [{ parts: [{ text: userPrompt }] }],
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.2,
-      },
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
+  const response = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.2,
+        },
+      }),
+    },
+    timeoutMs,
+  )
 
   if (!response.ok) {
     const errText = await response.text()
@@ -356,27 +389,76 @@ async function callOpenAI(
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
+  const response = await fetchWithTimeout(
+    "https://api.openai.com/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model: modelId,
-      max_tokens: maxTokens,
-      temperature: 0.2,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }),
-    signal: AbortSignal.timeout(timeoutMs),
-  })
+    timeoutMs,
+  )
 
   if (!response.ok) {
     const errText = await response.text()
     throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const text: string = data.choices?.[0]?.message?.content ?? ""
+
+  return {
+    text,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
+  }
+}
+
+async function callTogether(
+  systemPrompt: string,
+  userPrompt: string,
+  modelId: string = "Qwen/Qwen3.5-397B-A17B",
+  maxTokens: number = 8192,
+  timeoutMs: number = 120_000,
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
+  const apiKey = process.env.TOGETHER_API_KEY
+  if (!apiKey) throw new Error("TOGETHER_API_KEY not configured")
+
+  const response = await fetchWithTimeout(
+    "https://api.together.xyz/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    },
+    timeoutMs,
+  )
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`Together API error (${response.status}): ${errText.slice(0, 300)}`)
   }
 
   const data = await response.json()
@@ -2222,8 +2304,9 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Gemini(120s) → OpenAI(120s) fallback chain.
-    // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s — fits Vercel's 300s cap.
+    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Qwen 3.5 Together(120s) → Gemini(120s) → OpenAI(120s) fallback chain.
+    // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s (only 2-3 models attempt before succeeding) — fits Vercel's 300s cap.
+    // Qwen 3.5 (397B-A17B) via Together AI slots between Anthropic and Google — different infra, strong reasoning.
     // Gemini 3.1 Pro is stronger than GPT-4o for structured JSON + reasoning — prioritise it.
     // OpenAI (Azure-based) is last resort — different infra from both Anthropic and Google.
     // TRIED: Default params (600s, 3 retries) — exceeds Vercel 300s cap, function gets killed silently.
@@ -2258,31 +2341,44 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
         dlog(`<<< SONNET FAILED after ${sonnetElapsed}ms (total): ${sonnetMsg}`)
         triedModels.push({ model: "Sonnet", error: sonnetMsg })
-        console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
+        console.warn("[THE-FORGE] Sonnet failed, falling back to Qwen 3.5 (Together):", sonnetMsg)
         try {
-          // Gemini fallback — stronger than GPT-4o for structured JSON + reasoning
-          dlog(">>> ATTEMPTING GEMINI (timeout=120s)")
-          const geminiStart = Date.now()
-          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
-          dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-        } catch (geminiErr) {
-          const geminiElapsed = Date.now() - start
-          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-          dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
-          triedModels.push({ model: "Gemini", error: geminiMsg })
-          console.warn("[THE-FORGE] Gemini failed, falling back to OpenAI:", geminiMsg)
+          // Qwen 3.5 fallback — 397B-A17B via Together AI, different infra from Anthropic
+          dlog(">>> ATTEMPTING QWEN 3.5 TOGETHER (timeout=120s)")
+          const togetherStart = Date.now()
+          ;({ text, tokensIn, tokensOut } = await callTogether(modulePrompt, userPrompt))
+          dlog(`<<< QWEN 3.5 TOGETHER SUCCEEDED in ${Date.now() - togetherStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+        } catch (togetherErr) {
+          const togetherElapsed = Date.now() - start
+          const togetherMsg = togetherErr instanceof Error ? togetherErr.message.slice(0, 200) : String(togetherErr)
+          dlog(`<<< QWEN 3.5 TOGETHER FAILED after ${togetherElapsed}ms (total): ${togetherMsg}`)
+          triedModels.push({ model: "Qwen 3.5 (Together)", error: togetherMsg })
+          console.warn("[THE-FORGE] Qwen 3.5 failed, falling back to Gemini:", togetherMsg)
           try {
-            // OpenAI final fallback — Azure-based, different infra from Anthropic and Google
-            dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
-            const openaiStart = Date.now()
-            ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
-            dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-          } catch (openaiErr) {
-            const openaiElapsed = Date.now() - start
-            const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
-            dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
-            triedModels.push({ model: "OpenAI", error: openaiMsg })
-            throw openaiErr
+            // Gemini fallback — stronger than GPT-4o for structured JSON + reasoning
+            dlog(">>> ATTEMPTING GEMINI (timeout=120s)")
+            const geminiStart = Date.now()
+            ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+            dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+          } catch (geminiErr) {
+            const geminiElapsed = Date.now() - start
+            const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+            dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
+            triedModels.push({ model: "Gemini", error: geminiMsg })
+            console.warn("[THE-FORGE] Gemini failed, falling back to OpenAI:", geminiMsg)
+            try {
+              // OpenAI final fallback — Azure-based, different infra from Anthropic and Google
+              dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
+              const openaiStart = Date.now()
+              ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
+              dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+            } catch (openaiErr) {
+              const openaiElapsed = Date.now() - start
+              const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
+              dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
+              triedModels.push({ model: "OpenAI", error: openaiMsg })
+              throw openaiErr
+            }
           }
         }
       }
