@@ -143,7 +143,7 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
  */
 export function sanitizeErrorMessage(error: unknown): string {
   // Handle null/undefined
-  if (!error) return 'An error occurred. Please try again.'
+  if (!error) return 'An unexpected error occurred. Please try again or contact support if the problem persists.'
   
   // Get error message string
   let message: string
@@ -154,7 +154,7 @@ export function sanitizeErrorMessage(error: unknown): string {
   } else if (typeof error === 'object' && error !== null && 'message' in error) {
     message = String((error as { message: unknown }).message)
   } else {
-    return 'An error occurred. Please try again.'
+    return 'An unexpected error occurred. Please try again or contact support if the problem persists.'
   }
   
   // Check if it's a known safe message
@@ -164,24 +164,74 @@ export function sanitizeErrorMessage(error: unknown): string {
     }
   }
   
-  // Check for common database errors and provide generic messages
-  if (message.includes('PGRST') || message.includes('duplicate key') || message.includes('violates')) {
+  // Check for common database errors and provide specific messages
+  const lower = message.toLowerCase()
+
+  if (lower.includes('duplicate key') || lower.includes('unique constraint') || lower.includes('already exists')) {
+    return 'This record already exists. Please check for duplicates.'
+  }
+
+  if (lower.includes('violates foreign key')) {
+    return 'This operation references data that no longer exists. Please refresh and try again.'
+  }
+
+  if (lower.includes('violates check constraint')) {
+    return 'The provided value is out of the allowed range.'
+  }
+
+  if (lower.includes('row-level security') || lower.includes('new row violates') || lower.includes('policy')) {
+    return "You don't have permission to modify this record."
+  }
+
+  if (lower.includes('pgrst301') || lower.includes('jwt expired')) {
+    return 'Your session has expired. Please sign in again.'
+  }
+
+  if (lower.includes('pgrst116')) {
+    return 'The requested record was not found. It may have been deleted.'
+  }
+
+  if (lower.includes('pgrst')) {
     return 'A database error occurred. Please try again.'
   }
-  
-  if (message.includes('network') || message.includes('timeout') || message.includes('ECONNREFUSED')) {
-    return 'A network error occurred. Please check your connection and try again.'
+
+  if (lower.includes('rate limit') || lower.includes('429') || lower.includes('too many requests')) {
+    return 'Too many requests. Please wait a moment and try again.'
   }
-  
-  if (message.includes('permission') || message.includes('forbidden') || message.includes('403')) {
+
+  if (lower.includes('payload too large') || lower.includes('413')) {
+    return 'The file or data is too large. Please reduce the size and try again.'
+  }
+
+  if (lower.includes('500') || lower.includes('502') || lower.includes('503') || lower.includes('internal server error')) {
+    return 'A temporary service error occurred. Please try again in a few minutes.'
+  }
+
+  if (lower.includes('529') || lower.includes('overloaded')) {
+    return 'The service is temporarily overloaded. Please try again shortly.'
+  }
+
+  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('etimedout') || lower.includes('aborted')) {
+    return 'The request timed out. Please try again.'
+  }
+
+  if (lower.includes('fetch failed') || lower.includes('econnrefused') || lower.includes('enotfound') || lower.includes('network')) {
+    return 'Could not reach the server. Please check your connection.'
+  }
+
+  if (lower.includes('storage') || lower.includes('bucket') || lower.includes('upload failed')) {
+    return 'File storage error. Please try again.'
+  }
+
+  if (lower.includes('permission') || lower.includes('forbidden') || lower.includes('403')) {
     return 'You do not have permission to perform this action.'
   }
-  
+
   // For validation errors, we can show them as they don't expose internal details
   if (message.startsWith('Invalid') || message.includes('required') || message.includes('must be')) {
     return message
   }
-  
+
   // Default: return generic error to avoid exposing internal details
-  return 'An error occurred. Please try again.'
+  return 'An unexpected error occurred. Please try again or contact support if the problem persists.'
 }
