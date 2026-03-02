@@ -11,6 +11,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 
 /** Assembly job summary for UI display */
 export interface AssemblyJobSummary {
@@ -132,7 +133,7 @@ export async function updateAssemblyStatus(
       .eq("id", jobId)
 
     if (error) {
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { success: true }
@@ -159,7 +160,7 @@ export async function updateOrderLineStatus(
       .eq("id", orderId)
 
     if (error) {
-      return { error: error.message }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { success: true }

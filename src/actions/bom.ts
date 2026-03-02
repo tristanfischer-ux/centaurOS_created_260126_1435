@@ -13,6 +13,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type {
   StructuredPart,
   BomLine,
@@ -700,7 +701,7 @@ export async function savePart(
         .select("id")
         .single()
 
-      if (error) return { error: error.message }
+      if (error) return { error: sanitizeErrorMessage(error) }
       return { part: { ...part, id: data.id } }
     } else {
       // Insert new part
@@ -710,7 +711,7 @@ export async function savePart(
         .select("id")
         .single()
 
-      if (error) return { error: error.message }
+      if (error) return { error: sanitizeErrorMessage(error) }
       return { part: { ...part, id: data.id } }
     }
   })
@@ -751,7 +752,7 @@ export async function saveBomLine(
         .select("id")
         .single()
 
-      if (error) return { error: error.message }
+      if (error) return { error: sanitizeErrorMessage(error) }
       return { bomLine: { ...line, id: data.id } }
     } else {
       const { data, error } = await supabase
@@ -760,7 +761,7 @@ export async function saveBomLine(
         .select("id")
         .single()
 
-      if (error) return { error: error.message }
+      if (error) return { error: sanitizeErrorMessage(error) }
       return { bomLine: { ...line, id: data.id } }
     }
   })
@@ -780,7 +781,7 @@ export async function deletePart(
       .delete()
       .eq("id", partId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
     return { success: true }
   })
 }
@@ -799,7 +800,7 @@ export async function deleteBomLine(
       .delete()
       .eq("id", bomLineId)
 
-    if (error) return { error: error.message }
+    if (error) return { error: sanitizeErrorMessage(error) }
     return { success: true }
   })
 }

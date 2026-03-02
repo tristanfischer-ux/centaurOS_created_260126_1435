@@ -70,12 +70,12 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                 
                 // Move to Stripe step
                 setStep('stripe')
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'An error occurred')
+            } catch {
+                setError('Failed to create provider profile. Please try again.')
             }
         })
     }
-    
+
     const handleStripeConnect = async () => {
         setError(null)
         
@@ -90,8 +90,8 @@ export function ProviderSignupForm({ listingId, listing, migrationRecord }: Prov
                 
                 // Redirect to Stripe
                 window.location.href = result.onboardingUrl
-            } catch (err) {
-                setError(err instanceof Error ? err.message : 'An error occurred')
+            } catch {
+                setError('Failed to connect to Stripe. Please try again.')
             }
         })
     }

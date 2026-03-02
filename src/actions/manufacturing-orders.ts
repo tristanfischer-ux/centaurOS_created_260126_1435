@@ -10,6 +10,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 
 /** Summary of a manufacturing order for UI display */
 export interface ManufacturingOrderSummary {
@@ -58,7 +59,7 @@ export async function createOrderFromAward(
       .single()
 
     if (error || !data) {
-      return { error: error?.message ?? "Failed to create manufacturing order." }
+      return { error: sanitizeErrorMessage(error) }
     }
 
     return { orderId: data.id }
