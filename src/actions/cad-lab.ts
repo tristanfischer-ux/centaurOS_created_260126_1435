@@ -2164,23 +2164,23 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Opus with default params (600s timeout, 3 retries) — same config that works
-    // for Product Overview. No custom timeout/retries needed.
-    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) chain — failed, too many variables changed.
-    // TRIED: Sonnet(120s,3)→Gemini(60s) — dropped Opus entirely, still flaky.
-    // REVERTED: Back to original working pattern: Opus primary with defaults, simple Gemini fallback.
+    // DECISION: Use caller's modelId (defaults to Sonnet) with default params (600s timeout, 3 retries).
+    // This is the original working pattern — same as Product Overview.
+    // TRIED: Hardcoded Opus — hangs/times out, likely rate-limited or unavailable on API plan.
+    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) chain — too many variables changed at once.
+    // TRIED: Sonnet(120s,3)→Gemini(60s) — worked sometimes but custom timeouts caused issues.
     let text: string, tokensIn: number, tokensOut: number
     try {
       ({ text, tokensIn, tokensOut } = await callClaude(
         modulePrompt,
         userPrompt,
-        "claude-opus-4-6",
+        modelId,
         8192,
       ))
-    } catch (opusErr) {
-      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
-      triedModels.push({ model: "Opus", error: opusMsg })
-      console.warn("[THE-FORGE] Opus failed, falling back to Gemini:", opusMsg)
+    } catch (claudeErr) {
+      const claudeMsg = claudeErr instanceof Error ? claudeErr.message.slice(0, 200) : String(claudeErr)
+      triedModels.push({ model: modelId, error: claudeMsg })
+      console.warn("[THE-FORGE] %s failed, falling back to Gemini:", modelId, claudeMsg)
       try {
         ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 120_000))
       } catch (geminiErr) {
