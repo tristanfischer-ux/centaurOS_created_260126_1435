@@ -89,7 +89,7 @@ interface ModuleSupplySpec {
   printTimeMin: number | null
   /** Number of DFM issues */
   dfmIssueCount: number
-  /** Readiness level (0-3: none, partial, mostly, full) */
+  /** Readiness level (0-2: none, partial, full) */
   readiness: number
 }
 
@@ -110,10 +110,9 @@ function buildSupplySpecs(
     const diag = diagnosticAnswers?.[mod.id] || {}
     const r = mod.result
 
-    // Readiness score: 1 point for diagnostics, 1 for CAD, 1 for DFM
+    // Readiness score: 1 point for diagnostics, 1 for DFM
     let readiness = 0
     if (Object.keys(diag).length >= 6) readiness++ // Full diagnostics
-    if (mod.status === "generated") readiness++ // CAD generated
     if (r?.dfm) readiness++ // DFM available
 
     return {
@@ -145,17 +144,11 @@ function getReadinessInfo(level: number): {
   bgColor: string
 } {
   switch (level) {
-    case 3:
+    case 2:
       return {
         label: "Ready to quote",
         textColor: "text-status-success",
         bgColor: "bg-status-success-light",
-      }
-    case 2:
-      return {
-        label: "Mostly ready",
-        textColor: "text-status-info",
-        bgColor: "bg-status-info-light",
       }
     case 1:
       return {
@@ -198,9 +191,9 @@ export function CadLabSupplyChain({
     [modules, diagnosticAnswers]
   )
 
-  const readyCount = specs.filter((s) => s.readiness >= 3).length
+  const readyCount = specs.filter((s) => s.readiness >= 2).length
   const partialCount = specs.filter(
-    (s) => s.readiness > 0 && s.readiness < 3
+    (s) => s.readiness > 0 && s.readiness < 2
   ).length
 
   return (
@@ -217,9 +210,8 @@ export function CadLabSupplyChain({
       <CardContent className="space-y-5">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Manufacturing specifications per module, derived from diagnostics and
-            CAD analysis. Complete diagnostics and generate CAD for best supplier
-            matching.
+            Manufacturing specifications per module, derived from diagnostics.
+            Complete diagnostics for best supplier matching.
           </p>
           <Button
             variant="default"
@@ -482,15 +474,11 @@ export function CadLabSupplyChain({
           <span className="font-medium">Readiness:</span>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-status-success" />
-            Diagnostics + CAD + DFM complete
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-status-info" />
-            2 of 3 data sources available
+            Diagnostics + DFM complete
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block w-2 h-2 rounded-full bg-status-warning" />
-            1 of 3 data sources available
+            Diagnostics only
           </div>
         </div>
       </CardContent>

@@ -474,7 +474,6 @@ export function CadLabCostEstimate({
 
           <p className="text-[10px] text-muted-foreground">
             Costs are rough estimates based on material mass × process rates. Actual quotes from suppliers will differ.
-            Generate CAD models for mass-based accuracy.
           </p>
         </CardContent>
       )}
