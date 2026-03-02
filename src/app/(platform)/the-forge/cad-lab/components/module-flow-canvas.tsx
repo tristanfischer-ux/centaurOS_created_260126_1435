@@ -41,7 +41,7 @@ import {
   type SignalType,
   SIGNAL_CONFIG,
   buildEdges,
-  buildEdgesFromContracts,
+  buildEdgesHybrid,
 } from "../lib/flow-edge-utils"
 import { ModuleNode, type ModuleNodeData } from "./module-node"
 
@@ -254,9 +254,9 @@ function buildNodesAndEdges(
   interfaceContracts: InterfaceContract[] | undefined,
   generatingModuleIds: Set<string>,
 ) {
-  // Build flow edges (contracts-first, keyword-fallback)
+  // Build flow edges (hybrid: contracts first, keyword gap-fill for unconnected ports)
   const flowEdges = interfaceContracts && interfaceContracts.length > 0
-    ? buildEdgesFromContracts(interfaceContracts, modules)
+    ? buildEdgesHybrid(interfaceContracts, modules)
     : buildEdges(modules)
 
   // Connection counts per module
@@ -464,7 +464,7 @@ export function ModuleFlowCanvas({
   // Compute edges for header stats and legend
   const flowEdges = useMemo(
     () => interfaceContracts && interfaceContracts.length > 0
-      ? buildEdgesFromContracts(interfaceContracts, modules)
+      ? buildEdgesHybrid(interfaceContracts, modules)
       : buildEdges(modules),
     [modules, interfaceContracts],
   )

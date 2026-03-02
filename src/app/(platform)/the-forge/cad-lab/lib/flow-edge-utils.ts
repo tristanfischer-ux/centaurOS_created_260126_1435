@@ -183,7 +183,14 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[], modules:
       : null
 
     // Skip edge if either port can't be resolved — contract is invalid
-    if (!resolvedSource || !resolvedTarget) continue
+    if (!resolvedSource || !resolvedTarget) {
+      console.warn("[FLOW] Dropped contract edge: could not resolve port", {
+        contract: `${contract.sourceModuleId}.${contract.sourcePort} → ${contract.targetModuleId}.${contract.targetPort}`,
+        resolvedSource,
+        resolvedTarget,
+      })
+      continue
+    }
 
     const isDuplicate = edges.some(
       (e) => e.from === contract.sourceModuleId && e.to === contract.targetModuleId && e.label === resolvedSource,
@@ -202,4 +209,65 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[], modules:
     }
   }
   return edges
+}
+
+/* ─── Hybrid edge building (contracts + keyword gap-fill) ─────────────── */
+
+/**
+ * Builds edges using contracts first, then fills gaps with keyword matching.
+ *
+ * INTENT: Contract extraction is non-deterministic — Claude may miss ports or
+ * rephrase names so `resolvePortName` fails. The either/or strategy left those
+ * ports completely disconnected. This hybrid approach gives contracts priority
+ * but falls back to keyword overlap for any ports that remain unconnected.
+ */
+export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLabModule[]): FlowEdge[] {
+  // Step 1: Start with contract-based edges
+  const contractEdges = buildEdgesFromContracts(contracts, modules)
+
+  // Step 2: Track which ports are already connected
+  const connectedOutputs = new Set<string>() // "moduleId::portName"
+  const connectedInputs = new Set<string>()
+  for (const e of contractEdges) {
+    if (e.sourceHandle) connectedOutputs.add(`${e.from}::${e.sourceHandle}`)
+    if (e.targetHandle) connectedInputs.add(`${e.to}::${e.targetHandle}`)
+  }
+
+  // Step 3: Keyword-match unconnected outputs → unconnected inputs
+  const keywordEdges: FlowEdge[] = []
+  for (const source of modules) {
+    for (const output of source.outputs) {
+      if (connectedOutputs.has(`${source.id}::${output}`)) continue
+
+      for (const target of modules) {
+        if (target.id === source.id) continue
+        for (const input of target.inputs) {
+          if (connectedInputs.has(`${target.id}::${input}`)) continue
+
+          if (hasKeywordOverlap(output, input)) {
+            // Deduplicate against both contract edges and earlier keyword edges
+            const isDuplicate =
+              contractEdges.some((e) => e.from === source.id && e.to === target.id && e.sourceHandle === output && e.targetHandle === input) ||
+              keywordEdges.some((e) => e.from === source.id && e.to === target.id && e.sourceHandle === output && e.targetHandle === input)
+
+            if (!isDuplicate) {
+              keywordEdges.push({
+                from: source.id,
+                to: target.id,
+                sourceHandle: output,
+                targetHandle: input,
+                label: output,
+                signalType: classifySignalType(output),
+              })
+              // Mark these ports as connected so they don't match again
+              connectedOutputs.add(`${source.id}::${output}`)
+              connectedInputs.add(`${target.id}::${input}`)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return [...contractEdges, ...keywordEdges]
 }
