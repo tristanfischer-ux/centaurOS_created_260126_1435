@@ -39,9 +39,9 @@ export interface FlowEdge {
 
 /** Keywords that classify a connection's signal type. */
 export const SIGNAL_KEYWORDS: Record<Exclude<SignalType, "other">, string[]> = {
-  power: ["voltage", "battery", "current", "watt", "amp", "dc", "charger", "power", "supply", "energy"],
-  data: ["signal", "data", "control", "sensor", "telemetry", "pwm", "serial", "usb", "uart", "command", "feedback", "communication", "protocol", "digital", "analog"],
-  mechanical: ["force", "torque", "mount", "structural", "load", "bracket", "axle", "frame", "chassis", "gear", "shaft", "bearing", "mechanical", "assembly"],
+  power: ["voltage", "battery", "current", "watt", "amp", "dc", "charger", "power", "supply", "energy", "fuel", "charge", "discharge"],
+  data: ["signal", "data", "control", "sensor", "telemetry", "pwm", "serial", "usb", "uart", "command", "feedback", "communication", "protocol", "digital", "analog", "throttle", "motor", "input", "output", "pilot"],
+  mechanical: ["force", "torque", "mount", "structural", "load", "bracket", "axle", "frame", "chassis", "gear", "shaft", "bearing", "mechanical", "assembly", "deploy", "deployment", "propulsion", "thrust", "lift", "arm", "capability"],
   thermal: ["heat", "thermal", "cooling", "temperature", "dissipation", "fan", "heatsink", "ventilation"],
 }
 
@@ -214,12 +214,18 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[], modules:
 /* ─── Hybrid edge building (contracts + keyword gap-fill) ─────────────── */
 
 /**
- * Builds edges using contracts first, then fills gaps with keyword matching.
+ * Builds edges using contracts first, then fills gaps with 2-tier fallback.
  *
  * INTENT: Contract extraction is non-deterministic — Claude may miss ports or
  * rephrase names so `resolvePortName` fails. The either/or strategy left those
- * ports completely disconnected. This hybrid approach gives contracts priority
- * but falls back to keyword overlap for any ports that remain unconnected.
+ * ports completely disconnected. This hybrid approach gives contracts priority,
+ * then uses relaxed keyword overlap (Tier 1), then signal-type matching (Tier 2)
+ * for any ports that remain unconnected.
+ *
+ * DECISION: Gap-fill uses minShared=1 (not 2) because it only runs for already-
+ * orphaned ports — the contract pass had first crack. Signal-type fallback is a
+ * last resort: it only fires for ports still orphaned after keyword matching, and
+ * connects 1:1 (each output to at most one input).
  */
 export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLabModule[]): FlowEdge[] {
   // Step 1: Start with contract-based edges
@@ -233,8 +239,9 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
     if (e.targetHandle) connectedInputs.add(`${e.to}::${e.targetHandle}`)
   }
 
-  // Step 3: Keyword-match unconnected outputs → unconnected inputs
-  const keywordEdges: FlowEdge[] = []
+  // Step 3 (Tier 1): Keyword-match unconnected outputs → unconnected inputs
+  // DECISION: minShared=1 (relaxed) since these are already orphaned ports
+  const gapEdges: FlowEdge[] = []
   for (const source of modules) {
     for (const output of source.outputs) {
       if (connectedOutputs.has(`${source.id}::${output}`)) continue
@@ -244,14 +251,13 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
         for (const input of target.inputs) {
           if (connectedInputs.has(`${target.id}::${input}`)) continue
 
-          if (hasKeywordOverlap(output, input)) {
-            // Deduplicate against both contract edges and earlier keyword edges
+          if (hasKeywordOverlap(output, input, 1)) {
             const isDuplicate =
               contractEdges.some((e) => e.from === source.id && e.to === target.id && e.sourceHandle === output && e.targetHandle === input) ||
-              keywordEdges.some((e) => e.from === source.id && e.to === target.id && e.sourceHandle === output && e.targetHandle === input)
+              gapEdges.some((e) => e.from === source.id && e.to === target.id && e.sourceHandle === output && e.targetHandle === input)
 
             if (!isDuplicate) {
-              keywordEdges.push({
+              gapEdges.push({
                 from: source.id,
                 to: target.id,
                 sourceHandle: output,
@@ -259,7 +265,6 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
                 label: output,
                 signalType: classifySignalType(output),
               })
-              // Mark these ports as connected so they don't match again
               connectedOutputs.add(`${source.id}::${output}`)
               connectedInputs.add(`${target.id}::${input}`)
             }
@@ -269,5 +274,46 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
     }
   }
 
-  return [...contractEdges, ...keywordEdges]
+  // Step 4 (Tier 2): Signal-type fallback for still-orphaned ports.
+  // INTENT: Last resort — connects orphaned outputs to orphaned inputs that share
+  // the same signal type classification. 1:1 matching only.
+  const orphanedOutputs: { moduleId: string; port: string; signalType: SignalType }[] = []
+  const orphanedInputs: { moduleId: string; port: string; signalType: SignalType }[] = []
+
+  for (const m of modules) {
+    for (const output of m.outputs) {
+      if (!connectedOutputs.has(`${m.id}::${output}`)) {
+        const st = classifySignalType(output)
+        if (st !== "other") orphanedOutputs.push({ moduleId: m.id, port: output, signalType: st })
+      }
+    }
+    for (const input of m.inputs) {
+      if (!connectedInputs.has(`${m.id}::${input}`)) {
+        const st = classifySignalType(input)
+        if (st !== "other") orphanedInputs.push({ moduleId: m.id, port: input, signalType: st })
+      }
+    }
+  }
+
+  const claimedInputs = new Set<string>()
+  for (const out of orphanedOutputs) {
+    for (const inp of orphanedInputs) {
+      if (inp.moduleId === out.moduleId) continue
+      if (claimedInputs.has(`${inp.moduleId}::${inp.port}`)) continue
+      if (out.signalType !== inp.signalType) continue
+
+      gapEdges.push({
+        from: out.moduleId,
+        to: inp.moduleId,
+        sourceHandle: out.port,
+        targetHandle: inp.port,
+        label: out.port,
+        signalType: out.signalType,
+      })
+      claimedInputs.add(`${inp.moduleId}::${inp.port}`)
+      break // 1:1 — this output is now connected, move to next
+    }
+  }
+
+  return [...contractEdges, ...gapEdges]
 }

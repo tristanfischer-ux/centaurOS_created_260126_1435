@@ -21,15 +21,20 @@ export const KEYWORD_STOP_WORDS = new Set([
 /**
  * Extracts significant keywords from an IO label.
  *
+ * DECISION: Naive plural normalization (strip trailing 's' for words >4 chars)
+ * so "signals"→"signal", "controls"→"control". The `!w.endsWith("ss")` guard
+ * preserves words like "stress", "process", "access".
+ *
  * @param text - Raw IO label string
- * @returns Set of lowercase keywords (>2 chars, non-stop-words)
+ * @returns Set of lowercase keywords (>2 chars, non-stop-words, plural-normalized)
  */
 export function extractKeywords(text: string): Set<string> {
   return new Set(
     text.toLowerCase()
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
-      .filter((w) => w.length > 2 && !KEYWORD_STOP_WORDS.has(w)),
+      .filter((w) => w.length > 2 && !KEYWORD_STOP_WORDS.has(w))
+      .map((w) => (w.length > 4 && w.endsWith("s") && !w.endsWith("ss")) ? w.slice(0, -1) : w),
   )
 }
 
