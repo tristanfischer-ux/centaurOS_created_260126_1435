@@ -310,6 +310,14 @@ export default function CadLabResearchPage(): React.ReactNode {
                 </>
               )}
 
+              {/* Product overview — always visible after research, editable. Above progress so user reads context first. */}
+              {productOverview && (
+                <ProductOverviewCard
+                  overview={productOverview}
+                  onSave={setProductOverview}
+                />
+              )}
+
               {/* "View Modules" banner — shown as soon as modules exist (not gated on system illustration) */}
               {modules.length > 0 && !isDecomposing && activeTab === "research" && (
                 <Card className="border-international-orange/20 bg-international-orange-light/10">
@@ -363,14 +371,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </p>
                   </CardContent>
                 </Card>
-              )}
-
-              {/* Product overview — always visible after research, editable */}
-              {productOverview && (
-                <ProductOverviewCard
-                  overview={productOverview}
-                  onSave={setProductOverview}
-                />
               )}
 
               {/* Decomposition failed — persistent error card with retry */}

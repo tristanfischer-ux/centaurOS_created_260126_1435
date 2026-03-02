@@ -2165,52 +2165,31 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: 60s timeout per model — 12K char input + 8192 max tokens should complete in 30-60s.
-    // If a model hasn't responded in 60s, falling to the next model is better than waiting.
-    // INTENT: Fall back through Opus → Sonnet → Gemini, fitting within Vercel Pro's 300s cap.
-    // Worst case: Opus(60s×2) + Sonnet(60s×1) + Gemini(45s×1) = ~230s, well within 300s.
+    // DECISION: Sonnet as primary — same model + default params that work for Product Overview.
+    // TRIED: Opus primary (60s, 2 retries) → Sonnet (60s, 1 retry) → Gemini (45s) — all three
+    // failed consistently. Opus likely hitting rate/spend limits. Swapping to Sonnet as diagnostic
+    // step; will revisit Opus once we confirm the pipeline works end-to-end.
+    // INTENT: Sonnet (120s, 3 retries) → Gemini fallback. Fits within Vercel Pro's 300s cap.
     let text: string, tokensIn: number, tokensOut: number
     try {
-      // DECISION: Opus for decomposition — this is the architectural stage that determines
-      // the entire module structure. Runs once per project, cost difference is cents.
-      // Bad decomposition wastes all downstream code gen + Modal compute.
       ({ text, tokensIn, tokensOut } = await callClaude(
         modulePrompt,
         userPrompt,
-        "claude-opus-4-6",
+        "claude-sonnet-4-6",
         8192,
-        60_000, // 60s timeout — if Opus hasn't responded, fall through to Sonnet/Gemini
-        2, // INTENT: One retry on transient 500s, then fall to Sonnet.
+        120_000, // 120s — generous timeout matching proven Product Overview config
+        3, // Default retries — same as Product Overview which works reliably
       ))
-    } catch (opusErr) {
-      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
-      triedModels.push({ model: "Opus", error: opusMsg })
-      // DECISION: Opus → Sonnet → Gemini fallback chain.
-      // Opus and Sonnet have separate rate/spend limits. Specialists already prove Sonnet works,
-      // so try it before falling to Gemini. If all three fail, the outer catch handles it.
-      console.warn("[THE-FORGE] Opus failed, trying Sonnet:", opusMsg)
+    } catch (sonnetErr) {
+      const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
+      triedModels.push({ model: "Sonnet", error: sonnetMsg })
+      console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
       try {
-        // DECISION: No retry for Sonnet — if Opus failed twice and Sonnet fails once,
-        // model diversity (Gemini) is more valuable than retrying the same Anthropic endpoint.
-        ({ text, tokensIn, tokensOut } = await callClaude(
-          modulePrompt,
-          userPrompt,
-          "claude-sonnet-4-6",
-          8192,
-          60_000,
-          1, // No retry — fall to Gemini for model diversity
-        ))
-      } catch (sonnetErr) {
-        const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
-        triedModels.push({ model: "Sonnet", error: sonnetMsg })
-        console.warn("[THE-FORGE] Sonnet also failed, falling back to Gemini:", sonnetMsg)
-        try {
-          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 45_000))
-        } catch (geminiErr) {
-          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-          triedModels.push({ model: "Gemini", error: geminiMsg })
-          throw geminiErr
-        }
+        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 60_000))
+      } catch (geminiErr) {
+        const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+        triedModels.push({ model: "Gemini", error: geminiMsg })
+        throw geminiErr
       }
     }
 
