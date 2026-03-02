@@ -2222,8 +2222,10 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Opus(120s,1) → Sonnet(120s,1) → OpenAI(120s) → Gemini fallback chain.
+    // DECISION: Opus(120s,1) → Sonnet(120s,1) → Gemini(120s) → OpenAI(120s) fallback chain.
     // Each model fails fast (1 retry, 120s timeout) so worst case ≈ 280s — fits Vercel's 300s cap.
+    // Gemini 3.1 Pro is stronger than GPT-4o for structured JSON + reasoning — prioritise it.
+    // OpenAI (Azure-based) is last resort — different infra from both Anthropic and Google.
     // TRIED: Default params (600s, 3 retries) — exceeds Vercel 300s cap, function gets killed silently.
     // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) — too aggressive, models need ≥120s for decomposition.
     dlog(`System prompt length: ${modulePrompt.length} chars`)
@@ -2256,31 +2258,31 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
         dlog(`<<< SONNET FAILED after ${sonnetElapsed}ms (total): ${sonnetMsg}`)
         triedModels.push({ model: "Sonnet", error: sonnetMsg })
-        console.warn("[THE-FORGE] Sonnet failed, falling back to OpenAI:", sonnetMsg)
+        console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
         try {
-          // OpenAI fallback — Azure-based, unaffected by AWS outages
-          dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
-          const openaiStart = Date.now()
-          ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
-          dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-        } catch (openaiErr) {
-          const openaiElapsed = Date.now() - start
-          const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
-          dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
-          triedModels.push({ model: "OpenAI", error: openaiMsg })
-          console.warn("[THE-FORGE] OpenAI failed, falling back to Gemini:", openaiMsg)
+          // Gemini fallback — stronger than GPT-4o for structured JSON + reasoning
+          dlog(">>> ATTEMPTING GEMINI (timeout=120s)")
+          const geminiStart = Date.now()
+          ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
+          dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+        } catch (geminiErr) {
+          const geminiElapsed = Date.now() - start
+          const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
+          dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
+          triedModels.push({ model: "Gemini", error: geminiMsg })
+          console.warn("[THE-FORGE] Gemini failed, falling back to OpenAI:", geminiMsg)
           try {
-            // Gemini final fallback
-            dlog(">>> ATTEMPTING GEMINI")
-            const geminiStart = Date.now()
-            ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt))
-            dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
-          } catch (geminiErr) {
-            const geminiElapsed = Date.now() - start
-            const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
-            dlog(`<<< GEMINI FAILED after ${geminiElapsed}ms (total): ${geminiMsg}`)
-            triedModels.push({ model: "Gemini", error: geminiMsg })
-            throw geminiErr
+            // OpenAI final fallback — Azure-based, different infra from Anthropic and Google
+            dlog(">>> ATTEMPTING OPENAI (timeout=120s)")
+            const openaiStart = Date.now()
+            ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt))
+            dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms (tokensIn=${tokensIn}, tokensOut=${tokensOut})`)
+          } catch (openaiErr) {
+            const openaiElapsed = Date.now() - start
+            const openaiMsg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
+            dlog(`<<< OPENAI FAILED after ${openaiElapsed}ms (total): ${openaiMsg}`)
+            triedModels.push({ model: "OpenAI", error: openaiMsg })
+            throw openaiErr
           }
         }
       }
