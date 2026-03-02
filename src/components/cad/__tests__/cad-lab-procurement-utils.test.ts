@@ -112,7 +112,9 @@ describe("Cad Lab procurement utility functions", () => {
   it("computes weighted RFQ readiness and blockers", () => {
     const readiness = computeRfqReadiness(modules, diagnosticAnswers)
 
-    expect(readiness.totalScore).toBe(48)
+    // DECISION: 60/40 weighting (diagnostics/generation), artifacts excluded from score.
+    // 3 modules: diagnosticsScore=1/3, generationScore=2/3 → round(20 + 26.67) = 47
+    expect(readiness.totalScore).toBe(47)
     expect(readiness.generatedCount).toBe(2)
     expect(readiness.diagnosticsComplete).toBe(1)
     expect(readiness.artifactComplete).toBe(1)
@@ -120,7 +122,6 @@ describe("Cad Lab procurement utility functions", () => {
     expect(readiness.gaps).toEqual([
       "1 module(s) still need generated geometry",
       "2 module(s) missing procurement diagnostics",
-      "2 module(s) missing full STEP/STL/manifest package",
     ])
     expect(readiness.moduleDetails).toEqual([
       {
