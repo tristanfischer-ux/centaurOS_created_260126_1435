@@ -213,11 +213,10 @@ async function callClaude(
     maxDelay: 30000,
     shouldRetry: (error) => {
       const msg = error.message
-      // INTENT: Retry on transient API errors. 429/529 = rate limit/overloaded (original).
-      // 500/502/503 = transient server errors that usually resolve on retry (added after
-      // decomposition consistently failed when the API returned 500s with no retry).
+      // INTENT: Only retry on rate limits / overloaded — these are transient and worth waiting for.
+      // TRIED: Retrying on 500/502/503 (commit d2b72fa8) — burns timeout budget retrying
+      // persistent API errors instead of failing fast to fallback. Reverted.
       return msg.includes("429") || msg.includes("529") || msg.includes("overloaded")
-        || msg.includes("500") || msg.includes("502") || msg.includes("503")
     },
   })
 }
@@ -2165,27 +2164,25 @@ ${truncatedReport}
 
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
-    // DECISION: Sonnet as primary — same model + default params that work for Product Overview.
-    // TRIED: Opus primary (60s, 2 retries) → Sonnet (60s, 1 retry) → Gemini (45s) — all three
-    // failed consistently. Opus likely hitting rate/spend limits. Swapping to Sonnet as diagnostic
-    // step; will revisit Opus once we confirm the pipeline works end-to-end.
-    // INTENT: Sonnet (120s, 3 retries) → Gemini fallback. Fits within Vercel Pro's 300s cap.
+    // DECISION: Opus with default params (600s timeout, 3 retries) — same config that works
+    // for Product Overview. No custom timeout/retries needed.
+    // TRIED: Opus(60s,2)→Sonnet(60s,1)→Gemini(45s) chain — failed, too many variables changed.
+    // TRIED: Sonnet(120s,3)→Gemini(60s) — dropped Opus entirely, still flaky.
+    // REVERTED: Back to original working pattern: Opus primary with defaults, simple Gemini fallback.
     let text: string, tokensIn: number, tokensOut: number
     try {
       ({ text, tokensIn, tokensOut } = await callClaude(
         modulePrompt,
         userPrompt,
-        "claude-sonnet-4-6",
+        "claude-opus-4-6",
         8192,
-        120_000, // 120s — generous timeout matching proven Product Overview config
-        3, // Default retries — same as Product Overview which works reliably
       ))
-    } catch (sonnetErr) {
-      const sonnetMsg = sonnetErr instanceof Error ? sonnetErr.message.slice(0, 200) : String(sonnetErr)
-      triedModels.push({ model: "Sonnet", error: sonnetMsg })
-      console.warn("[THE-FORGE] Sonnet failed, falling back to Gemini:", sonnetMsg)
+    } catch (opusErr) {
+      const opusMsg = opusErr instanceof Error ? opusErr.message.slice(0, 200) : String(opusErr)
+      triedModels.push({ model: "Opus", error: opusMsg })
+      console.warn("[THE-FORGE] Opus failed, falling back to Gemini:", opusMsg)
       try {
-        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 60_000))
+        ;({ text, tokensIn, tokensOut } = await callGemini(modulePrompt, userPrompt, undefined, undefined, 120_000))
       } catch (geminiErr) {
         const geminiMsg = geminiErr instanceof Error ? geminiErr.message.slice(0, 200) : String(geminiErr)
         triedModels.push({ model: "Gemini", error: geminiMsg })
