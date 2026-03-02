@@ -3,7 +3,7 @@
 /**
  * @file cad-lab-layout-client.tsx — Client-side layout wrapper for The Forge.
  *
- * @description Renders the CadLabProvider, persistent header with project
+ * @description Initializes CadLabProvider (mounted at platform level) and renders persistent header with project
  * picker Dialog, pipeline stepper navigation, progress overlay, and milestone
  * celebration banners. This client component is referenced by layout.tsx
  * (a server component that also exports maxDuration).
@@ -37,16 +37,18 @@ import { SECTOR_LABELS } from "@/types/foundry"
 
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { CadLabProvider, useCadLab } from "./cad-lab-context"
+import { useCadLab } from "./cad-lab-context"
 import { CadLabNav, CadLabBottomNav } from "./cad-lab-nav"
 import { formatRelativeTime } from "./cad-lab-utils"
 
 export function CadLabProviderWrapper({ children }: { children: React.ReactNode }): React.ReactNode {
-  return (
-    <CadLabProvider>
-      <CadLabLayoutShell>{children}</CadLabLayoutShell>
-    </CadLabProvider>
-  )
+  const { initialized, initializeCadLab } = useCadLab()
+
+  useEffect(() => {
+    if (!initialized) initializeCadLab()
+  }, [initialized, initializeCadLab])
+
+  return <CadLabLayoutShell>{children}</CadLabLayoutShell>
 }
 
 /** Mashup Lab and Template Library are standalone tools, not pipeline stages. */

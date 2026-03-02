@@ -18,7 +18,8 @@ import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { AdvisorPanelProvider } from "@/contexts/advisor-panel-context";
-import { BackgroundOpsProvider } from "@/contexts/background-ops-context";
+import { BackgroundOpsProvider } from "@/contexts/background-ops-context"
+import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-context";
 
 import { BrowseContextProvider } from "@/contexts/browse-context";
 import { AdvisorPanel } from "@/components/specialists/advisor-panel";
@@ -97,6 +98,7 @@ export default async function PlatformLayout({
             <PresenceProvider>
                 <ZoomProvider>
                   <BackgroundOpsProvider>
+                  <CadLabProvider>
                   <AdvisorPanelProvider>
                   <BrowseContextProvider>
                   <ScreenContextProvider>
@@ -144,6 +146,7 @@ export default async function PlatformLayout({
                   </ScreenContextProvider>
                   </BrowseContextProvider>
                   </AdvisorPanelProvider>
+                  </CadLabProvider>
                   </BackgroundOpsProvider>
                 </ZoomProvider>
             </PresenceProvider>

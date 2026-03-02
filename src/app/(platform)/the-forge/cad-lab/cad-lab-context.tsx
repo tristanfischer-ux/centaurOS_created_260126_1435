@@ -7,7 +7,8 @@
  * into a React Context so that Concept, Build, and Review sub-route pages
  * can share a single source of truth.
  *
- * The provider is mounted in layout.tsx and wraps all child routes.
+ * The provider is mounted in the platform layout (survives navigation) and
+ * lazily initialized on first CAD Lab visit via initializeCadLab().
  */
 
 import {
@@ -226,6 +227,10 @@ export interface CadLabContextValue {
   isSpecificationComplete: boolean
   projectReviewVerdicts: Record<string, Record<string, SpecialistReview>>
 
+  // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
+  initialized: boolean
+  initializeCadLab: () => void
+
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }
@@ -260,10 +265,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [saveError, setSaveError] = useState(false)
 
+  // ── Lazy initialization (no-op until first CAD Lab visit) ──
+  const [initialized, setInitialized] = useState(false)
+  const initializeCadLab = useCallback(() => {
+    if (initialized) return
+    setInitialized(true)
+  }, [initialized])
+
   // ── Foundry sector ──
   const [sector, setSector] = useState<Sector | null>(null)
 
   useEffect(() => {
+    if (!initialized) return
     async function fetchSector(): Promise<void> {
       try {
         const supabase = createClient()
@@ -278,7 +291,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     }
     fetchSector()
-  }, [])
+  }, [initialized])
 
   // ── Input state ──
   const [subject, setSubject] = useState("")
@@ -297,12 +310,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     return () => clearTimeout(t)
   }, [subject])
 
-  // Restore draft subject on mount (project load will override if one exists)
+  // Restore draft subject on init (project load will override if one exists)
   useEffect(() => {
+    if (!initialized) return
     if (typeof window === "undefined") return
     const stored = localStorage.getItem(CAD_LAB_DRAFT_SUBJECT_KEY)
     if (stored) setSubject(stored)
-  }, [])
+  }, [initialized])
 
   // ── Reference model (matched from subject for instant 3D preview) ──
   const [referenceModel, setReferenceModel] = useState<ReferenceModel | null>(null)
@@ -465,15 +479,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   const productOverviewRef = useRef(productOverview)
   useEffect(() => { productOverviewRef.current = productOverview }, [productOverview])
-
-  // INTENT: Tracks whether the component is still mounted, so fire-and-forget
-  // async callbacks (contract extraction, diagnostic prefill, image pipeline)
-  // can skip state updates after unmount and avoid React warnings.
-  const mountedRef = useRef(true)
-  useEffect(() => {
-    mountedRef.current = true
-    return () => { mountedRef.current = false }
-  }, [])
 
   // INTENT: Ref-mirror of activeProjectId so the unmount cleanup closure
   // can read the current value (closures capture stale state).
@@ -656,7 +661,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [])
 
-  useEffect(() => { refreshProjects() }, [refreshProjects])
+  useEffect(() => { if (initialized) refreshProjects() }, [initialized, refreshProjects])
 
   // Match reference model when subject changes (debounced)
   useEffect(() => {
@@ -813,7 +818,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Smart diagnostics pre-fill (background)
         prefillDiagnostics(res.modules, editableReport, modelId)
           .then((prefillRes) => {
-            if (!mountedRef.current) return
+            if (!activeProjectIdRef.current) return
             if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
               setDiagnosticAnswers((prev) => {
                 const merged = { ...prefillRes.answers }
@@ -832,7 +837,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsExtractingContracts(true)
           extractInterfaceContracts(res.modules, editableReport, modelId)
             .then((contractRes) => {
-              if (!mountedRef.current) return
+              if (!activeProjectIdRef.current) return
               setInterfaceContracts(contractRes.contracts)
               setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
               setIsExtractingContracts(false)
@@ -842,7 +847,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               }
             })
             .catch((e) => {
-              if (!mountedRef.current) return
+              if (!activeProjectIdRef.current) return
               console.error("[CAD-LAB] Interface contract extraction failed:", e)
               setIsExtractingContracts(false)
             })
@@ -865,7 +870,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               res.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
               extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
             )
-            if (!mountedRef.current) return
+            if (!activeProjectIdRef.current) return
             if ("visualStyle" in styleRes) {
               visualStyle = styleRes.visualStyle
               setVisualStyle(visualStyle)
@@ -892,7 +897,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 visualStyle,
                 extractExecutiveSummary(editableReport)?.slice(0, 600),
               )
-              if (!mountedRef.current) return
+              if (!activeProjectIdRef.current) return
               if ("url" in illRes) {
                 setSystemIllustrationUrl(illRes.url)
                 setSystemIllustrationStatus("complete")
@@ -942,7 +947,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
               }
             } catch (e) {
-              if (!mountedRef.current) return
+              if (!activeProjectIdRef.current) return
               console.error("[CAD-LAB] System illustration failed:", e)
               setSystemIllustrationStatus("failed")
               setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
@@ -966,13 +971,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             researchReport: editableReport,
           })
             .then((checkpointRes) => {
-              if (!mountedRef.current) return
+              if (!activeProjectIdRef.current) return
               if ("checkpoints" in checkpointRes) {
                 setCheckpoints(checkpointRes.checkpoints)
               }
             })
             .catch((e) => console.error("[CAD-LAB] Checkpoint failed:", e))
-            .finally(() => { if (mountedRef.current) setIsCheckpointing(false) })
+            .finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
         }
       } else {
         // Decomposition returned but failed — show the user why
@@ -1894,6 +1899,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // because activeProjectId initializes to null and nothing triggers a load.
   // Guarded by autoRestoreRef to prevent double-fire in React StrictMode.
   useEffect(() => {
+    if (!initialized) return
     if (autoRestoreRef.current) return
     autoRestoreRef.current = true
     if (typeof window === "undefined") return
@@ -1901,7 +1907,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (storedProjectId) {
       handleLoadProject(storedProjectId)
     }
-  }, [handleLoadProject])
+  }, [initialized, handleLoadProject])
 
   // ── Delete a project ──
   const handleDeleteProject = useCallback(async (projectId: string) => {
@@ -2080,6 +2086,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     refreshManufacturingOrderCount,
     isSpecificationComplete,
     projectReviewVerdicts,
+    initialized,
+    initializeCadLab,
     handleDownload,
   }
 
