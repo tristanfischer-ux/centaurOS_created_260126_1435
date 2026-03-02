@@ -12,6 +12,7 @@
   - Tier 2 (Smoke): Playwright page render check
   - For static-only: `npm run verify -- --static`
 - Commit after each page's fixes are verified — not in a single batch
+- **Log every fix to memory** — after each commit (pass or fail), add an entry to `~/.claude/projects/-Users-tristanfischer/memory/forgeos-fix-log.md` with: what was changed, did it work, why, and any gotchas. This is part of the definition of done.
 
 ### Bug Fixing Strategy
 1. First attempt: analyze and try a direct fix
