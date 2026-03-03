@@ -99,7 +99,7 @@ describe("getModuleDecompositionPrompt", () => {
   it("all prompts include the JSON output format instruction", () => {
     for (const domain of KNOWN_DOMAINS) {
       const prompt = getModuleDecompositionPrompt(domain)
-      expect(prompt).toContain("JSON array")
+      expect(prompt).toContain("JSON object")
     }
   })
 })
