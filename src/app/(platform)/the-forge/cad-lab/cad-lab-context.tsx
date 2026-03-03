@@ -396,11 +396,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // Shared concurrency gate — blocks until a generation slot is available
   const waitForSlot = useCallback((): Promise<void> => {
     if (activeModuleCountRef.current < MAX_CONCURRENCY) return Promise.resolve()
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
+      const TIMEOUT_MS = 120_000 // 2 minutes max wait
+      const start = Date.now()
       const check = setInterval(() => {
         if (activeModuleCountRef.current < MAX_CONCURRENCY) {
           clearInterval(check)
           resolve()
+        } else if (Date.now() - start > TIMEOUT_MS) {
+          clearInterval(check)
+          reject(new Error("Generation slot timeout — previous generation may be stuck. Try refreshing."))
         }
       }, 200)
     })
@@ -1400,7 +1405,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
    */
   const handleGenerateSingleModule = useCallback(async (moduleId: string) => {
     const mod = modules.find((m) => m.id === moduleId)
-    if (!mod || !activeProjectId) return
+    if (!mod) { toast.error("Module not found"); return }
+    if (!activeProjectId) { toast.error("Project not initialized — try reloading the page"); return }
     if (generatingGuardRef.current.has(moduleId)) return
     generatingGuardRef.current.add(moduleId)
 
@@ -1436,6 +1442,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           addProgressLine(`Dimensions planned for ${mod.name}. Generating CAD...`)
         } else {
           addProgressLine(`Failed to plan dimensions for ${mod.name}.`)
+          toast.error(`Failed to plan dimensions for ${mod.name}`)
           return
         }
       }
@@ -1592,7 +1599,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
    * polling required. This replaces the monolithic batch endpoint.
    */
   const handleGenerateAllModules = useCallback(async () => {
-    if (modules.length === 0 || isBatchRunning || !activeProjectId) return
+    if (modules.length === 0 || isBatchRunning) return
+    if (!activeProjectId) { toast.error("Project not initialized — try reloading the page"); return }
 
     const pending = modules.filter((m) => m.status !== "generated")
     if (pending.length === 0) return
