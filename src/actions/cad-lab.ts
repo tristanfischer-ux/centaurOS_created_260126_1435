@@ -2305,7 +2305,7 @@ ${truncatedReport}
 Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
 
     // DECISION: Race Sonnet + Gemini in parallel via Promise.any, then OpenAI sequential fallback.
-    // Parallel racing means total time = max(240s, 240s) + 55s = 295s worst case — fits Vercel 300s cap.
+    // Parallel racing means total time = max(150s, 150s) + 120s = 270s worst case — fits Vercel 300s cap.
     // TRIED: Sequential Opus(120s)→Sonnet(120s)→Qwen(120s)→Gemini(120s)→OpenAI(120s) — 600s worst case,
     //   far exceeds Vercel 300s cap. All models genuinely timeout at 120s for complex prompts (~13.5K chars).
     // TRIED: AbortSignal.timeout — silently fails in Next.js server actions (commit 0795994c fixed mechanism,
@@ -2315,13 +2315,13 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     let text: string, tokensIn: number, tokensOut: number
 
     // Race Sonnet + Gemini in parallel — first success wins
-    dlog(">>> RACING: Sonnet(240s) + Gemini(240s) in parallel")
+    dlog(">>> RACING: Sonnet(150s) + Gemini(150s) in parallel")
     const raceStart = Date.now()
 
     type RaceResult = { text: string; tokensIn: number; tokensOut: number; model: string }
 
     const sonnetPromise: Promise<RaceResult> = callClaude(
-      modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 240_000, 1,
+      modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 150_000, 1,
     ).then(r => {
       dlog(`<<< SONNET SUCCEEDED in ${Date.now() - raceStart}ms`)
       return { ...r, model: "Sonnet" }
@@ -2333,7 +2333,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     })
 
     const geminiPromise: Promise<RaceResult> = callGemini(
-      modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 240_000,
+      modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 150_000,
     ).then(r => {
       dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - raceStart}ms`)
       return { ...r, model: "Gemini" }
@@ -2350,10 +2350,10 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       dlog(`<<< RACE WON by ${winner.model} in ${Date.now() - raceStart}ms`)
     } catch {
       // Both failed — try OpenAI as final resort
-      dlog(">>> ATTEMPTING OPENAI (timeout=55s) — final fallback")
+      dlog(">>> ATTEMPTING OPENAI (timeout=120s) — final fallback")
       const openaiStart = Date.now()
       try {
-        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 55_000))
+        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 120_000))
         dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
       } catch (openaiErr) {
         const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)

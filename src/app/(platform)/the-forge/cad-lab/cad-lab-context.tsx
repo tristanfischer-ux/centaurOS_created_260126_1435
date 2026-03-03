@@ -751,9 +751,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // INTENT: Client-side safety timeout. If the server action silently dies (e.g. Vercel
     // kills the function), the await never resolves and the UI hangs forever. This races
     // the API call against a deadline just above the server-side budget.
-    // DECISION: 310s = just above Vercel 300s cap. Server chain is Sonnet+Gemini parallel(240s) + OpenAI(55s) = 295s.
+    // DECISION: 280s = just above server chain. Server chain is Sonnet+Gemini parallel(150s) + OpenAI(120s) = 270s.
     // The real timeouts are server-side — this is just a safety net for silent server death.
-    const CLIENT_TIMEOUT_MS = 310_000 // 310s — safety net, just above Vercel 300s maxDuration
+    const CLIENT_TIMEOUT_MS = 280_000 // 280s — safety net, just above server 270s chain
     const clientTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
     )
