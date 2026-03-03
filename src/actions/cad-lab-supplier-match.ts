@@ -128,7 +128,7 @@ const BASE_WEIGHTS = {
   keyword: 10,
 } as const
 
-const MIN_SCORE_THRESHOLD = 25
+const MIN_SCORE_THRESHOLD = 15
 const MAX_RESULTS = 8
 
 /**
@@ -282,8 +282,8 @@ export async function matchCadLabModuleSuppliers(
 ): Promise<CadLabSupplierMatch[]> {
   const supabase = await createClient()
 
-  const hasProcess = !!input.process
-  const hasMaterial = !!input.material
+  const hasProcess = !!input.process && input.process.toLowerCase() !== "other"
+  const hasMaterial = !!input.material && input.material.toLowerCase() !== "other"
   const weights = computeWeights(hasProcess, hasMaterial)
 
   // Normalize input process/material to canonical keys
@@ -313,8 +313,8 @@ export async function matchCadLabModuleSuppliers(
       // GOTCHA: Supabase types map vector(1536) → string, but the client correctly sends number[] at runtime
       const { data: mlSemantic } = await supabase.rpc("match_marketplace_listings", {
         query_embedding: JSON.stringify(embedding),
-        match_threshold: 0.4,
-        match_count: 30,
+        match_threshold: 0.25,
+        match_count: 50,
       })
 
       if (mlSemantic) {
@@ -327,13 +327,47 @@ export async function matchCadLabModuleSuppliers(
     console.warn("[CadLabMatch] Semantic matching failed, falling back to keyword-only:", err instanceof Error ? err.message : "Unknown")
   }
 
-  // ── Step 2: Fetch marketplace listings ──
+  // ── Step 2: Build candidate set from semantic hits + process fallback ──
 
+  const candidateIds = new Set(semanticScores.keys())
+
+  // Fallback: also fetch listings matching process keywords via subcategory
+  // (catches cases where semantic is weak but process is exact)
+  if (inputProcessKeys.size > 0) {
+    const processTerms = [...inputProcessKeys].flatMap(
+      (key) => PROCESS_CATEGORIES[key] ?? []
+    )
+    // Use ilike on subcategory for each process term
+    for (const term of processTerms.slice(0, 3)) {
+      const { data: processHits } = await supabase
+        .from("marketplace_listings")
+        .select("id")
+        .in("category", ["Products", "Services"])
+        .ilike("subcategory", `%${term}%`)
+        .limit(20)
+      if (processHits) {
+        for (const h of processHits) candidateIds.add(h.id)
+      }
+    }
+  }
+
+  // If we still have few candidates, add a general fallback
+  if (candidateIds.size < 20) {
+    const { data: fallback } = await supabase
+      .from("marketplace_listings")
+      .select("id")
+      .in("category", ["Products", "Services"])
+      .limit(30)
+    if (fallback) {
+      for (const h of fallback) candidateIds.add(h.id)
+    }
+  }
+
+  // Fetch full data for all candidates
   const { data: listings } = await supabase
     .from("marketplace_listings")
     .select("id, title, description, attributes, is_verified, subcategory, category")
-    .in("category", ["Products", "Services"])
-    .limit(50)
+    .in("id", [...candidateIds])
 
   const matches: CadLabSupplierMatch[] = []
 
@@ -366,7 +400,7 @@ export async function matchCadLabModuleSuppliers(
       let { score: keywordRaw } = scoreKeywords(searchTerms, listingText, input.keyParts)
 
       // Relevance gate (same logic as suppliers above)
-      const hasRelevance = semanticRaw >= 0.5 || processScore >= 1.0 || materialScore >= 1.0
+      const hasRelevance = semanticRaw >= 0.3 || processScore >= 1.0 || materialScore >= 1.0
       if (!hasRelevance) {
         qualityRaw = 0
         keywordRaw = 0
