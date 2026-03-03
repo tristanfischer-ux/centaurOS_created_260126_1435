@@ -36,12 +36,11 @@ import {
 import { LayoutGrid, Maximize2, Minimize2, AlertCircle, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
+import type { CadLabModule, InterfaceContract, ModuleConnection } from "@/lib/cad-lab-types"
 import {
   type SignalType,
   SIGNAL_CONFIG,
-  buildEdges,
-  buildEdgesHybrid,
+  buildEdgesUnified,
 } from "../lib/flow-edge-utils"
 import { ModuleNode, type ModuleNodeData } from "./module-node"
 
@@ -243,6 +242,7 @@ interface ModuleFlowCanvasProps {
   className?: string
   onModuleClick?: (moduleId: string) => void
   interfaceContracts?: InterfaceContract[]
+  decompositionConnections?: ModuleConnection[]
   generatingModuleIds?: Set<string>
   unmatchedPorts?: { outputs: Array<{ moduleId: string; portName: string }>; inputs: Array<{ moduleId: string; portName: string }> }
 }
@@ -252,12 +252,11 @@ interface ModuleFlowCanvasProps {
 function buildNodesAndEdges(
   modules: CadLabModule[],
   interfaceContracts: InterfaceContract[] | undefined,
+  decompositionConnections: ModuleConnection[] | undefined,
   generatingModuleIds: Set<string>,
 ) {
-  // Build flow edges (hybrid: contracts first, keyword gap-fill for unconnected ports)
-  const flowEdges = interfaceContracts && interfaceContracts.length > 0
-    ? buildEdgesHybrid(interfaceContracts, modules)
-    : buildEdges(modules)
+  // Build flow edges — unified: connections (best) → contracts → keywords (oldest)
+  const flowEdges = buildEdgesUnified(modules, { connections: decompositionConnections, contracts: interfaceContracts })
 
   // Port-level link coverage: count how many input/output ports are connected
   // DECISION: Per-port counts instead of per-edge counts. A single output feeding
@@ -347,6 +346,7 @@ function ModuleFlowCanvasInner({
   modules,
   onModuleClick,
   interfaceContracts,
+  decompositionConnections,
   generatingModuleIds = new Set(),
   tidyKey,
   isFullscreen,
@@ -354,10 +354,10 @@ function ModuleFlowCanvasInner({
   const { fitView } = useReactFlow()
 
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(
-    () => buildNodesAndEdges(modules, interfaceContracts, generatingModuleIds),
+    () => buildNodesAndEdges(modules, interfaceContracts, decompositionConnections, generatingModuleIds),
     // INTENT: Serialise Set for stable deps — Set identity changes every render
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [modules, interfaceContracts, [...generatingModuleIds].join(",")],
+    [modules, interfaceContracts, decompositionConnections, [...generatingModuleIds].join(",")],
   )
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
@@ -451,6 +451,7 @@ export function ModuleFlowCanvas({
   className,
   onModuleClick,
   interfaceContracts,
+  decompositionConnections,
   generatingModuleIds = new Set(),
   unmatchedPorts,
 }: ModuleFlowCanvasProps): React.ReactNode {
@@ -469,10 +470,8 @@ export function ModuleFlowCanvas({
 
   // Compute edges for header stats and legend
   const flowEdges = useMemo(
-    () => interfaceContracts && interfaceContracts.length > 0
-      ? buildEdgesHybrid(interfaceContracts, modules)
-      : buildEdges(modules),
-    [modules, interfaceContracts],
+    () => buildEdgesUnified(modules, { connections: decompositionConnections, contracts: interfaceContracts }),
+    [modules, decompositionConnections, interfaceContracts],
   )
 
   const presentSignalTypes = useMemo(() => {
@@ -548,6 +547,7 @@ export function ModuleFlowCanvas({
             modules={modules}
             onModuleClick={onModuleClick}
             interfaceContracts={interfaceContracts}
+            decompositionConnections={decompositionConnections}
             generatingModuleIds={generatingModuleIds}
             tidyKey={tidyKey}
             isFullscreen={isFullscreen}

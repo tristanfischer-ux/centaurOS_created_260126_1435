@@ -287,35 +287,40 @@ const BASE_MODULE_DECOMPOSITION = `Given a product description and research repo
 - Tested separately
 - Modelled as its own 3D CAD model
 
-Output STRICTLY as a JSON array with this exact structure for each module:
+Output STRICTLY as a JSON object with two keys — "modules" and "connections":
 
-[
-  {
-    "id": "lowercase_no_spaces",
-    "name": "Human Readable Name",
-    "purpose": "One sentence: what this module does",
-    "inputs": ["Input stream or signal 1", "Input 2"],
-    "outputs": ["Output stream or signal 1"],
-    "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
-    "leadWeeks": 6,
-    "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
-    "whyItMatters": "Why this module is critical to the overall system.",
-    "failureModes": ["Failure mode 1", "Failure mode 2"],
-    "unknowns": ["Open question 1", "Open question 2"]
-  }
-]
+{
+  "modules": [
+    {
+      "id": "lowercase_no_spaces",
+      "name": "Human Readable Name",
+      "purpose": "One sentence: what this module does",
+      "inputs": ["Input stream or signal 1", "Input 2"],
+      "outputs": ["Output stream or signal 1"],
+      "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
+      "leadWeeks": 6,
+      "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
+      "whyItMatters": "Why this module is critical to the overall system.",
+      "failureModes": ["Failure mode 1", "Failure mode 2"],
+      "unknowns": ["Open question 1", "Open question 2"]
+    }
+  ],
+  "connections": [
+    { "from": "source_module_id", "output": "Exact output label", "to": "target_module_id", "input": "Exact input label" }
+  ]
+}
 
 RULES:
 - Generate 4-8 modules (more for complex products, fewer for simple ones)
 - Each module MUST have at least 3 keyParts
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
 - Every module must have at least 1 input and 1 output
-- CRITICAL: When module A's output feeds module B, use the EXACT SAME label for A's output and B's input (e.g., if Battery Pack outputs "Electrical power", then Lift Motors must have an input called "Electrical power" — not "Power supply" or "Electricity"). Consistent naming is essential for the system to detect connections between modules.
+- CRITICAL — connections array: Every inter-module output/input MUST appear in exactly one connection entry. The "from" and "to" fields must be valid module IDs. The "output" must match an entry in the source module's "outputs" array EXACTLY. The "input" must match an entry in the target module's "inputs" array EXACTLY.
 - IMPORTANT: Only list inter-module interfaces — inputs that come from another module's output, and outputs that feed another module's input. Do NOT include external/environmental interfaces (e.g., "ground reaction forces", "external charger input", "user control input", "telemetry to ground station", "ambient air intake"). If a module interfaces with the outside world, describe that in its purpose or description — not in inputs/outputs.
 - Modules should cover the ENTIRE product — no gaps
 - Use dimensions from the research report — do not invent new ones
 - If the research report mentions sub-components, those are good module candidates
-- Output ONLY the JSON array — no markdown, no explanation`
+- Output ONLY the JSON object — no markdown, no explanation`
 
 const MODULE_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:

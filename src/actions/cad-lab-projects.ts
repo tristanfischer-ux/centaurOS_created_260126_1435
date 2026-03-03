@@ -25,6 +25,7 @@ import type {
   VisualStyleSpec,
   DecompositionCheckpoint,
   InterfaceContractResult,
+  ModuleConnection,
 } from "@/lib/cad-lab-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -96,6 +97,9 @@ export interface CadLabProjectData {
 
   /** Per-module diagnostic answers from Specify stage */
   diagnosticAnswers: Record<string, Record<string, string>> | null
+
+  /** AI-declared inter-module connections from decomposition */
+  decompositionConnections: ModuleConnection[] | null
 
   createdAt: string
   updatedAt: string
@@ -204,6 +208,7 @@ export async function loadCadLabProject(
         productOverview: project.product_overview ?? null,
         interfaceContracts: (project.interface_contracts as InterfaceContractResult | null) ?? null,
         diagnosticAnswers: (project.diagnostic_answers as Record<string, Record<string, string>> | null) ?? null,
+        decompositionConnections: (project.decomposition_connections as ModuleConnection[] | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -606,6 +611,36 @@ export async function saveCadLabInterfaceContracts(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save interface contracts:", error.message)
+      return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Decomposition Connections ─────────────────────────────────
+
+/**
+ * Persists AI-declared inter-module connections from decomposition.
+ *
+ * @param projectId - Project to update
+ * @param connections - Validated ModuleConnection[] from decomposition
+ * @returns Success or error
+ */
+export async function saveCadLabDecompositionConnections(
+  projectId: string,
+  connections: ModuleConnection[],
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ decomposition_connections: connections as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save decomposition connections:", error.message)
       return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
     }
 

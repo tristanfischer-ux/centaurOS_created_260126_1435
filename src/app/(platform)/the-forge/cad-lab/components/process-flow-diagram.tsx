@@ -13,7 +13,7 @@
 
 import { useMemo, useState, type KeyboardEvent } from "react"
 import { ArrowDownToLine, ArrowUpFromLine, Box, ChevronDown, ChevronUp, AlertCircle } from "lucide-react"
-import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
+import type { CadLabModule, InterfaceContract, ModuleConnection } from "@/lib/cad-lab-types"
 import { cn } from "@/lib/utils"
 import { ForgeSectionHeader } from "../../components/forge-hover-explanations"
 import {
@@ -21,8 +21,7 @@ import {
   type FlowNode,
   type FlowEdge,
   SIGNAL_CONFIG,
-  buildEdges,
-  buildEdgesFromContracts,
+  buildEdgesUnified,
 } from "../lib/flow-edge-utils"
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -32,6 +31,7 @@ interface ProcessFlowDiagramProps {
   className?: string
   onModuleClick?: (moduleId: string) => void
   interfaceContracts?: InterfaceContract[]
+  decompositionConnections?: ModuleConnection[]
 }
 
 /** Number of connections shown in collapsed preview before "Show all" toggle. */
@@ -39,7 +39,7 @@ const PREVIEW_COUNT = 6
 
 /* ─── Component ────────────────────────────────────────────────────────── */
 
-export function ProcessFlowDiagram({ modules, className = "", onModuleClick, interfaceContracts }: ProcessFlowDiagramProps): React.ReactNode {
+export function ProcessFlowDiagram({ modules, className = "", onModuleClick, interfaceContracts, decompositionConnections }: ProcessFlowDiagramProps): React.ReactNode {
   const [hoveredModuleId, setHoveredModuleId] = useState<string | null>(null)
   const [connectionsExpanded, setConnectionsExpanded] = useState(false)
 
@@ -54,12 +54,10 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick, int
     [modules],
   )
 
-  // INTENT: Use contract-based edges when available, fall back to keyword matching
+  // INTENT: Unified edge builder — connections (best) → contracts → keywords (oldest)
   const edges = useMemo(
-    () => interfaceContracts && interfaceContracts.length > 0
-      ? buildEdgesFromContracts(interfaceContracts, modules)
-      : buildEdges(modules),
-    [modules, interfaceContracts],
+    () => buildEdgesUnified(modules, { connections: decompositionConnections, contracts: interfaceContracts }),
+    [modules, decompositionConnections, interfaceContracts],
   )
 
   /** Set of module IDs connected to the currently hovered module. */

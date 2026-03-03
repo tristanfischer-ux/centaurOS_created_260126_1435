@@ -8,7 +8,7 @@
  * FLOW: process-flow-diagram.tsx + module-flow-canvas.tsx → import from here
  */
 
-import type { CadLabModule, InterfaceContract } from "@/lib/cad-lab-types"
+import type { CadLabModule, InterfaceContract, ModuleConnection } from "@/lib/cad-lab-types"
 import { hasKeywordOverlap } from "@/lib/cad-lab/keyword-matching"
 
 /* ─── Types ────────────────────────────────────────────────────────────── */
@@ -216,18 +216,19 @@ export function buildEdgesFromContracts(contracts: InterfaceContract[], modules:
 /* ─── Hybrid edge building (contracts + keyword gap-fill) ─────────────── */
 
 /**
- * Builds edges using contracts first, then fills gaps with 2-tier fallback.
+ * Builds edges using contracts first, then fills gaps with keyword overlap.
  *
  * INTENT: Contract extraction is non-deterministic — Claude may miss ports or
  * rephrase names so `resolvePortName` fails. The either/or strategy left those
  * ports completely disconnected. This hybrid approach gives contracts priority,
- * then uses relaxed keyword overlap (Tier 1), then signal-type matching (Tier 2)
- * for any ports that remain unconnected.
+ * then uses relaxed keyword overlap for any ports that remain unconnected.
  *
  * DECISION: Gap-fill uses minShared=1 (not 2) because it only runs for already-
- * orphaned ports — the contract pass had first crack. Signal-type fallback is a
- * last resort: it only fires for ports still orphaned after keyword matching, and
- * connects 1:1 (each output to at most one input).
+ * orphaned ports — the contract pass had first crack.
+ *
+ * DECISION: Signal-type fallback (Tier 2) removed — it connected any "power" output
+ * to any "power" input regardless of specs, causing false positives. Projects with
+ * connections data should use buildEdgesFromConnections() instead.
  */
 export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLabModule[]): FlowEdge[] {
   // Step 1: Start with contract-based edges
@@ -241,7 +242,7 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
     if (e.targetHandle) connectedInputs.add(`${e.to}::${e.targetHandle}`)
   }
 
-  // Step 3 (Tier 1): Keyword-match unconnected outputs → unconnected inputs
+  // Step 3: Keyword-match unconnected outputs → unconnected inputs
   // DECISION: minShared=1 (relaxed) since these are already orphaned ports
   const gapEdges: FlowEdge[] = []
   for (const source of modules) {
@@ -276,46 +277,61 @@ export function buildEdgesHybrid(contracts: InterfaceContract[], modules: CadLab
     }
   }
 
-  // Step 4 (Tier 2): Signal-type fallback for still-orphaned ports.
-  // INTENT: Last resort — connects orphaned outputs to orphaned inputs that share
-  // the same signal type classification. 1:1 matching only.
-  const orphanedOutputs: { moduleId: string; port: string; signalType: SignalType }[] = []
-  const orphanedInputs: { moduleId: string; port: string; signalType: SignalType }[] = []
-
-  for (const m of modules) {
-    for (const output of m.outputs) {
-      if (!connectedOutputs.has(`${m.id}::${output}`)) {
-        const st = classifySignalType(output)
-        if (st !== "other") orphanedOutputs.push({ moduleId: m.id, port: output, signalType: st })
-      }
-    }
-    for (const input of m.inputs) {
-      if (!connectedInputs.has(`${m.id}::${input}`)) {
-        const st = classifySignalType(input)
-        if (st !== "other") orphanedInputs.push({ moduleId: m.id, port: input, signalType: st })
-      }
-    }
-  }
-
-  const claimedInputs = new Set<string>()
-  for (const out of orphanedOutputs) {
-    for (const inp of orphanedInputs) {
-      if (inp.moduleId === out.moduleId) continue
-      if (claimedInputs.has(`${inp.moduleId}::${inp.port}`)) continue
-      if (out.signalType !== inp.signalType) continue
-
-      gapEdges.push({
-        from: out.moduleId,
-        to: inp.moduleId,
-        sourceHandle: out.port,
-        targetHandle: inp.port,
-        label: out.port,
-        signalType: out.signalType,
-      })
-      claimedInputs.add(`${inp.moduleId}::${inp.port}`)
-      break // 1:1 — this output is now connected, move to next
-    }
-  }
-
   return [...contractEdges, ...gapEdges]
+}
+
+/* ─── Edge building (from decomposition connections) ───────────────── */
+
+/**
+ * Builds edges from explicit connections declared during decomposition.
+ *
+ * INTENT: Highest-fidelity edge source — the AI declared these connections at
+ * decomposition time when it had full topology knowledge. No fuzzy matching needed;
+ * connections reference exact module IDs and port names (already validated server-side).
+ */
+export function buildEdgesFromConnections(connections: ModuleConnection[], modules: CadLabModule[]): FlowEdge[] {
+  const moduleIds = new Set(modules.map(m => m.id))
+  const edges: FlowEdge[] = []
+
+  for (const conn of connections) {
+    // Skip if module IDs don't exist (shouldn't happen — validated server-side)
+    if (!moduleIds.has(conn.from) || !moduleIds.has(conn.to)) continue
+
+    const isDuplicate = edges.some(
+      (e) => e.from === conn.from && e.to === conn.to && e.sourceHandle === conn.output && e.targetHandle === conn.input,
+    )
+    if (!isDuplicate) {
+      edges.push({
+        from: conn.from,
+        to: conn.to,
+        sourceHandle: conn.output,
+        targetHandle: conn.input,
+        label: conn.output,
+        signalType: classifySignalType(conn.output),
+      })
+    }
+  }
+
+  return edges
+}
+
+/* ─── Unified edge builder ──────────────────────────────────────────── */
+
+/**
+ * Single entry point for edge building — picks the best strategy based on
+ * available data, gracefully degrading for older projects.
+ *
+ * Priority: connections (highest fidelity) → contracts (legacy) → keywords (oldest)
+ */
+export function buildEdgesUnified(
+  modules: CadLabModule[],
+  opts: { connections?: ModuleConnection[]; contracts?: InterfaceContract[] },
+): FlowEdge[] {
+  if (opts.connections && opts.connections.length > 0) {
+    return buildEdgesFromConnections(opts.connections, modules)
+  }
+  if (opts.contracts && opts.contracts.length > 0) {
+    return buildEdgesHybrid(opts.contracts, modules)
+  }
+  return buildEdges(modules)
 }

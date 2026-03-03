@@ -118,6 +118,7 @@ export default function SpecifyPage(): React.ReactNode {
     designBrief,
     productOverview,
     setProductOverview,
+    decompositionConnections,
     interfaceContracts,
     isExtractingContracts,
     unmatchedPorts,
@@ -448,6 +449,7 @@ export default function SpecifyPage(): React.ReactNode {
                       setExpandedModuleId(id)
                     }}
                     interfaceContracts={interfaceContracts}
+                    decompositionConnections={decompositionConnections}
                     generatingModuleIds={generatingModuleIds}
                     unmatchedPorts={unmatchedPorts}
                   />

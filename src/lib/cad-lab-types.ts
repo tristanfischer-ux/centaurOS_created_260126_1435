@@ -375,12 +375,28 @@ export interface CadLabModule {
   }
 }
 
+// ─── Decomposition Connection Types ──────────────────────────────────
+
+/** An explicit inter-module connection declared by the AI during decomposition. */
+export interface ModuleConnection {
+  /** Source module ID */
+  from: string
+  /** Output port name on the source module (must match an entry in module.outputs) */
+  output: string
+  /** Target module ID */
+  to: string
+  /** Input port name on the target module (must match an entry in module.inputs) */
+  input: string
+}
+
 /** Result from module decomposition */
 export interface CadLabDecompositionResult {
   success: boolean
   error?: string
   /** Array of decomposed modules */
   modules: CadLabModule[]
+  /** Explicit inter-module connections declared during decomposition */
+  connections?: ModuleConnection[]
   /** Time taken in ms */
   decompositionTime: number
   /** Tokens used */

@@ -70,7 +70,7 @@ import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/actions/step-template-matching"
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
-import type { PreExecValidationResult } from "@/lib/cad-lab-types"
+import type { ModuleConnection, PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
 import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
@@ -2302,7 +2302,7 @@ export async function decomposeIntoModules(
 Research Report:
 ${truncatedReport}
 
-Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON array.`
+Decompose this product into physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections" arrays.`
 
     // DECISION: Race Sonnet + Gemini in parallel via Promise.any, then OpenAI sequential fallback.
     // Parallel racing means total time = max(150s, 150s) + 120s = 270s worst case — fits Vercel 300s cap.
@@ -2364,29 +2364,47 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     }
 
-    // Parse JSON array from response — AI may wrap in markdown fences or add prose
-    const jsonText = extractJsonArray(text)
-
+    // Parse JSON from response — AI may return { modules, connections } object or bare array
+    // DECISION: Try object parse first (new format), fall back to array (legacy/fallback models)
     let rawModules: unknown[]
-    try {
-      rawModules = JSON.parse(jsonText)
-    } catch {
-      console.warn("[THE-FORGE] Initial JSON parse failed, attempting repair. Fragment:", jsonText.slice(0, 500))
+    let rawConnections: unknown[] | undefined
 
-      // INTENT: One retry with a repair prompt — Claude (or Gemini fallback) can fix malformed JSON
+    // Try parsing as object first, then array
+    let parsed: unknown
+    try {
+      const jsonObjText = extractJsonObject(text)
+      parsed = JSON.parse(jsonObjText)
+    } catch {
       try {
-        const repairSystem = "You are a JSON repair tool. Fix the following broken JSON array so it parses correctly. Output ONLY the corrected JSON array, nothing else."
+        const jsonArrText = extractJsonArray(text)
+        parsed = JSON.parse(jsonArrText)
+      } catch {
+        // Both failed — try repair
+        parsed = null
+      }
+    }
+
+    if (parsed === null) {
+      console.warn("[THE-FORGE] Initial JSON parse failed, attempting repair. Fragment:", text.slice(0, 500))
+      try {
+        const repairSystem = "You are a JSON repair tool. Fix the following broken JSON so it parses correctly. The expected format is a JSON object with \"modules\" (array) and \"connections\" (array) keys, OR a bare JSON array of modules. Output ONLY the corrected JSON, nothing else."
         let repairedText: string
         try {
-          ({ text: repairedText } = await callClaude(repairSystem, jsonText, modelId, 8192))
+          ({ text: repairedText } = await callClaude(repairSystem, text, modelId, 8192))
         } catch {
-          ({ text: repairedText } = await callGemini(repairSystem, jsonText))
+          ({ text: repairedText } = await callGemini(repairSystem, text))
         }
-        const repairedJson = extractJsonArray(repairedText)
-        rawModules = JSON.parse(repairedJson)
+        // Try object first, then array
+        try {
+          const repairedObj = extractJsonObject(repairedText)
+          parsed = JSON.parse(repairedObj)
+        } catch {
+          const repairedArr = extractJsonArray(repairedText)
+          parsed = JSON.parse(repairedArr)
+        }
         console.info("[THE-FORGE] JSON repair succeeded")
       } catch {
-        console.error("[THE-FORGE] JSON repair also failed. Original fragment:", jsonText.slice(0, 500))
+        console.error("[THE-FORGE] JSON repair also failed. Original fragment:", text.slice(0, 500))
         return {
           success: false,
           error: "Failed to parse module decomposition — AI returned invalid JSON",
@@ -2398,7 +2416,19 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     }
 
-    if (!Array.isArray(rawModules) || rawModules.length === 0) {
+    // INTENT: Backward compat — if AI returns bare array, treat as modules-only
+    if (Array.isArray(parsed)) {
+      rawModules = parsed
+      rawConnections = undefined
+    } else if (parsed && typeof parsed === "object" && "modules" in (parsed as Record<string, unknown>)) {
+      const obj = parsed as Record<string, unknown>
+      rawModules = Array.isArray(obj.modules) ? obj.modules : []
+      rawConnections = Array.isArray(obj.connections) ? obj.connections : undefined
+    } else {
+      rawModules = []
+    }
+
+    if (rawModules.length === 0) {
       return {
         success: false,
         error: "AI returned empty or invalid module array",
@@ -2428,16 +2458,52 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     })
 
+    // Validate connections against parsed modules
+    const moduleIds = new Set(modules.map(m => m.id))
+    const modulePortLookup = new Map(modules.map(m => [m.id, { inputs: m.inputs, outputs: m.outputs }]))
+    let connections: ModuleConnection[] | undefined
+
+    if (rawConnections && rawConnections.length > 0) {
+      connections = []
+      for (const raw of rawConnections) {
+        const c = raw as Record<string, unknown>
+        const from = String(c.from || "")
+        const output = String(c.output || "")
+        const to = String(c.to || "")
+        const input = String(c.input || "")
+
+        // Validate: from/to must be valid module IDs, output/input must exist in port arrays
+        if (!moduleIds.has(from) || !moduleIds.has(to)) {
+          console.warn("[THE-FORGE] Dropped connection: invalid module ID", { from, to })
+          continue
+        }
+        const sourcePorts = modulePortLookup.get(from)
+        const targetPorts = modulePortLookup.get(to)
+        if (!sourcePorts?.outputs.includes(output)) {
+          console.warn("[THE-FORGE] Dropped connection: output not in module ports", { from, output, available: sourcePorts?.outputs })
+          continue
+        }
+        if (!targetPorts?.inputs.includes(input)) {
+          console.warn("[THE-FORGE] Dropped connection: input not in module ports", { to, input, available: targetPorts?.inputs })
+          continue
+        }
+        connections.push({ from, output, to, input })
+      }
+      if (connections.length === 0) connections = undefined
+      dlog(`Validated ${connections?.length ?? 0}/${rawConnections.length} connections`)
+    }
+
     const totalMs = Date.now() - start
-    dlog(`SUCCESS: ${modules.length} modules in ${totalMs}ms`)
+    dlog(`SUCCESS: ${modules.length} modules, ${connections?.length ?? 0} connections in ${totalMs}ms`)
     dlog(`=== DECOMPOSITION END ===`)
     console.info(
-      `[THE-FORGE] Decomposed into ${modules.length} modules in ${totalMs}ms`,
+      `[THE-FORGE] Decomposed into ${modules.length} modules with ${connections?.length ?? 0} connections in ${totalMs}ms`,
     )
 
     return {
       success: true,
       modules,
+      connections,
       decompositionTime: totalMs,
       tokensIn,
       tokensOut,
