@@ -24,6 +24,7 @@ import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/imag
 import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { createAdminClient } from "@/lib/supabase/admin"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
 interface ImageGenResult {
@@ -35,6 +36,104 @@ interface ImageGenResult {
 /** Concurrency limit — matches xray.ts batch size */
 const BATCH_SIZE = 3
 
+const STORAGE_BUCKET = "xray-images"
+
+/**
+ * Uploads shared image generation assets (reference PNG, visual style JSON) to
+ * Supabase Storage so they can be fetched server-side by each module image call.
+ * Eliminates ~500-800KB of redundant base64 per React Flight request.
+ *
+ * @param projectId - Storage namespace
+ * @param referenceBase64 - Base64-encoded reference PNG
+ * @param visualStyle - Shared visual style spec
+ * @returns Public URLs for both assets
+ */
+export async function uploadSharedImageAssetsAction(
+  projectId: string,
+  referenceBase64?: string,
+  visualStyle?: VisualStyleSpec,
+): Promise<{ referenceUrl?: string; visualStyleUrl?: string } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const admin = createAdminClient()
+      const timestamp = Date.now()
+      let referenceUrl: string | undefined
+      let visualStyleUrl: string | undefined
+
+      if (referenceBase64) {
+        const refPath = `${projectId}/temp-ref-${timestamp}.png`
+        const { error: refErr } = await admin.storage
+          .from(STORAGE_BUCKET)
+          .upload(refPath, Buffer.from(referenceBase64, "base64"), {
+            contentType: "image/png",
+            upsert: true,
+          })
+        if (refErr) {
+          console.error("[CAD-LAB-IMAGES] Failed to upload reference:", refErr.message)
+        } else {
+          const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(refPath)
+          referenceUrl = data.publicUrl
+        }
+      }
+
+      if (visualStyle) {
+        const stylePath = `${projectId}/temp-style-${timestamp}.json`
+        const { error: styleErr } = await admin.storage
+          .from(STORAGE_BUCKET)
+          .upload(stylePath, Buffer.from(JSON.stringify(visualStyle), "utf-8"), {
+            contentType: "application/json",
+            upsert: true,
+          })
+        if (styleErr) {
+          console.error("[CAD-LAB-IMAGES] Failed to upload visual style:", styleErr.message)
+        } else {
+          const { data } = admin.storage.from(STORAGE_BUCKET).getPublicUrl(stylePath)
+          visualStyleUrl = data.publicUrl
+        }
+      }
+
+      return { referenceUrl, visualStyleUrl }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Failed to upload shared assets:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Cleans up temporary shared assets (temp-ref-*, temp-style-*) from Storage.
+ * Called after image generation completes (success or failure).
+ *
+ * @param projectId - Storage namespace to clean
+ */
+export async function cleanupSharedImageAssetsAction(
+  projectId: string,
+): Promise<{ success: boolean } | { error: string }> {
+  return withAuth(async () => {
+    try {
+      const admin = createAdminClient()
+      const { data: files } = await admin.storage
+        .from(STORAGE_BUCKET)
+        .list(projectId, { search: "temp-" })
+
+      if (files && files.length > 0) {
+        const tempFiles = files
+          .filter(f => f.name.startsWith("temp-ref-") || f.name.startsWith("temp-style-"))
+          .map(f => `${projectId}/${f.name}`)
+
+        if (tempFiles.length > 0) {
+          await admin.storage.from(STORAGE_BUCKET).remove(tempFiles)
+        }
+      }
+      return { success: true }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.warn("[CAD-LAB-IMAGES] Cleanup failed (non-critical):", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
 
 interface GenerateImagesResult {
   /** Updated modules with imageUrl/imageStatus filled in */
@@ -48,25 +147,51 @@ interface GenerateImagesResult {
 /**
  * Generates Gemini blueprint images for a single CAD Lab module.
  *
- * When referenceBase64 is provided, passes it to generateModuleImage() which
- * uses the Gemini multimodal path (hero as inlineData) for style-matched
- * module images. Falls back through text-only Gemini → OpenAI automatically.
+ * Accepts either raw base64 data OR Supabase Storage URLs for shared assets.
+ * When URLs are provided, fetches them server-side (same-region, ~10ms) to
+ * avoid sending ~800KB of redundant base64 through React Flight per call.
  *
  * @param projectId - The CAD Lab project ID (used as storage namespace)
  * @param module - The module to generate an image for
- * @param visualStyle - Optional shared visual style for cross-module cohesion
- * @param referenceBase64 - Optional base64 PNG of the hero image (cropped to 3:2)
+ * @param visualStyleOrUrl - VisualStyleSpec object OR Supabase Storage URL to fetch it from
+ * @param referenceBase64OrUrl - Base64 PNG string OR Supabase Storage URL to fetch it from
+ * @param moduleCropBase64 - Optional base64 PNG of this module's cropped region (unique per module)
  * @returns Updated module with imageUrl/imageStatus set
  */
 export async function generateCadLabSingleImageAction(
   projectId: string,
   module: ImageGenModuleInput,
-  visualStyle?: VisualStyleSpec,
-  referenceBase64?: string,
+  visualStyleOrUrl?: VisualStyleSpec | string,
+  referenceBase64OrUrl?: string,
   moduleCropBase64?: string,
 ): Promise<ImageGenResult | { error: string }> {
   return withAuth(async () => {
     try {
+      // INTENT: Resolve shared assets from URLs if strings were passed (Supabase Storage).
+      // Same-region fetch is ~10ms vs ~800KB saved per React Flight request.
+      let visualStyle: VisualStyleSpec | undefined
+      let referenceBase64: string | undefined
+
+      if (typeof visualStyleOrUrl === "string") {
+        const res = await fetch(visualStyleOrUrl, { signal: AbortSignal.timeout(5_000) })
+        if (res.ok) visualStyle = await res.json() as VisualStyleSpec
+      } else {
+        visualStyle = visualStyleOrUrl
+      }
+
+      if (referenceBase64OrUrl) {
+        // DECISION: If it starts with http, it's a URL to fetch. Otherwise it's raw base64.
+        if (referenceBase64OrUrl.startsWith("http")) {
+          const res = await fetch(referenceBase64OrUrl, { signal: AbortSignal.timeout(10_000) })
+          if (res.ok) {
+            const buf = await res.arrayBuffer()
+            referenceBase64 = Buffer.from(buf).toString("base64")
+          }
+        } else {
+          referenceBase64 = referenceBase64OrUrl
+        }
+      }
+
       const adapted = cadLabModuleToModuleSpec(module)
       const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
 

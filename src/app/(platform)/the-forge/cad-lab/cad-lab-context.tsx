@@ -50,7 +50,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -1021,6 +1021,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
     toast.info(`Generating ${modulesToProcess.length} blueprint illustrations...`)
 
+    // INTENT: Upload shared assets (reference PNG ~500-800KB, visual style ~1-3KB) to
+    // Supabase Storage ONCE so each module call fetches them server-side (~10ms) instead
+    // of sending redundant base64 through React Flight per call.
+    let referenceUrl: string | undefined
+    let visualStyleUrl: string | undefined
+    if (referenceBase64 || visualStyle) {
+      try {
+        const uploadRes = await uploadSharedImageAssetsAction(projectId, referenceBase64, visualStyle)
+        if ("referenceUrl" in uploadRes) {
+          referenceUrl = uploadRes.referenceUrl
+          visualStyleUrl = uploadRes.visualStyleUrl
+        }
+      } catch {
+        // Non-critical — fall back to inline base64/object
+      }
+    }
+
     // Per-module safety timeout (30s) — reveal module even if image hasn't resolved
     const moduleTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
     for (const mod of modulesToProcess) {
@@ -1053,6 +1070,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
     }
 
+    // DECISION: Pass URLs when available (drops per-call payload from ~800KB to ~200-300KB).
+    // Falls back to raw base64/object if upload failed.
+    const effectiveVisualStyle = visualStyleUrl ?? visualStyle
+    const effectiveReference = referenceUrl ?? referenceBase64
+
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
         // INTENT: Strip heavy data (SVGs, code, research, templateMatchResult) to stay under
@@ -1074,7 +1096,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           imageStatus: mod.imageStatus,
         }
         const moduleCrop = moduleCrops?.get(mod.id)
-        const res = await generateCadLabSingleImageAction(projectId, slimMod, visualStyle, referenceBase64, moduleCrop)
+        const res = await generateCadLabSingleImageAction(projectId, slimMod, effectiveVisualStyle, effectiveReference, moduleCrop)
         if ("imageStatus" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError } : m)),
@@ -1099,11 +1121,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // INTENT: Process one at a time — concurrent large base64 payloads trigger
     // React Flight's "Maximum array nesting exceeded" serialization limit.
     // Retry (single module, no base64) always worked; this aligns bulk gen to match.
-    for (let i = 0; i < modulesToProcess.length; i++) {
-      await generateOne(modulesToProcess[i])
-      // Small delay between calls to let React Flight serialization settle
-      if (i < modulesToProcess.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500))
+    try {
+      for (let i = 0; i < modulesToProcess.length; i++) {
+        await generateOne(modulesToProcess[i])
+        // Small delay between calls to let React Flight serialization settle
+        if (i < modulesToProcess.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+      }
+    } finally {
+      // Clean up shared assets from Storage regardless of success/failure
+      if (referenceUrl || visualStyleUrl) {
+        cleanupSharedImageAssetsAction(projectId).catch(() => { /* Non-critical */ })
       }
     }
 
