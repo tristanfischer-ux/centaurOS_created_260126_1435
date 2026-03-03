@@ -11,7 +11,41 @@
 import { useCallback, useState, useRef, useEffect } from "react"
 import { SlidersHorizontal, RotateCcw } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { ExtractedParameter } from "@/lib/cad-lab/parameter-extractor"
+
+// ─── Unit extraction regex ───────────────────────────────────────────
+
+const UNIT_RE = /\b(mm|cm|m|in|deg|rad|%)\b/i
+
+/** Extract unit suffix from parameter label/comment if present */
+function extractUnit(param: ExtractedParameter): string | null {
+  const source = param.label || param.name
+  const match = UNIT_RE.exec(source)
+  return match ? match[1] : null
+}
+
+/** Compute smarter slider range based on value magnitude (#7) */
+function computeRange(originalValue: number): { min: number; max: number; step: number } {
+  const abs = Math.abs(originalValue)
+
+  // Near-zero: symmetric range around 0
+  if (abs < 0.001) return { min: -10, max: 10, step: 0.1 }
+
+  // Negative values: symmetric range
+  if (originalValue < 0) {
+    return { min: originalValue * 3, max: -originalValue * 0.5, step: abs < 1 ? 0.01 : abs < 10 ? 0.1 : 1 }
+  }
+
+  // 0-1 range (ratios, percentages)
+  if (abs <= 1) return { min: 0, max: 1, step: 0.01 }
+
+  // 1-100 range
+  if (abs <= 100) return { min: 0, max: Math.ceil(originalValue * 3), step: 0.5 }
+
+  // 100+ range
+  return { min: 0, max: Math.ceil(originalValue * 2), step: 1 }
+}
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -109,11 +143,12 @@ export function ParameterPanel({
       {!collapsed && (
         <div className="px-2.5 pb-2.5 space-y-2">
           {localParams.map((param) => {
-            // Handle zero, near-zero, and negative original values safely
-            const absVal = Math.abs(param.originalValue)
-            const min = absVal > 0.001 ? param.originalValue * 0.1 : -10
-            const max = absVal > 0.001 ? param.originalValue * 10 : 10
-            const step = absVal < 1 ? 0.01 : absVal < 10 ? 0.1 : 1
+            const { min, max, step } = computeRange(param.originalValue)
+            const unit = extractUnit(param)
+            // Visual warning when value is at extreme range (#19)
+            const range = max - min
+            const pct = range > 0 ? (param.value - min) / range : 0.5
+            const isExtreme = pct < 0.05 || pct > 0.95
 
             return (
               <div key={param.name} className="space-y-0.5">
@@ -121,17 +156,27 @@ export function ParameterPanel({
                   <label className="text-[10px] font-mono text-muted-foreground">
                     {param.label || param.name.replace(/_/g, " ")}
                   </label>
-                  <input
-                    type="number"
-                    value={param.value}
-                    onChange={(e) => {
-                      const v = parseFloat(e.target.value)
-                      if (!isNaN(v)) handleParamChange(param.name, v)
-                    }}
-                    disabled={disabled}
-                    className="w-20 h-6 text-[10px] font-mono text-right border rounded px-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange disabled:opacity-50"
-                    step={step}
-                  />
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number"
+                      value={param.value}
+                      onChange={(e) => {
+                        const v = parseFloat(e.target.value)
+                        if (!isNaN(v)) handleParamChange(param.name, v)
+                      }}
+                      disabled={disabled}
+                      min={min}
+                      max={max}
+                      step={step}
+                      className={cn(
+                        "w-20 h-6 text-[10px] font-mono text-right border rounded px-1.5 bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-international-orange disabled:opacity-50",
+                        isExtreme && "border-status-warning",
+                      )}
+                    />
+                    {unit && (
+                      <span className="text-[10px] text-muted-foreground font-mono w-6">{unit}</span>
+                    )}
+                  </div>
                 </div>
                 <input
                   type="range"

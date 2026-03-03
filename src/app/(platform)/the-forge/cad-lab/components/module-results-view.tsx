@@ -12,6 +12,7 @@ import {
   Download,
   Printer,
   Info,
+  XCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -230,6 +231,27 @@ export function ModuleResultsView({
         })
     }
   }, [onExecuteCode, moduleId])
+
+  // Restore a specific version from history (#9)
+  const handleRestoreVersion = useCallback((index: number) => {
+    if (!codeHistory[index]) return
+    const newHistory = codeHistory.slice(0, index + 1)
+    setCodeHistory(newHistory)
+    setEditedCode(newHistory[newHistory.length - 1].code)
+  }, [codeHistory])
+
+  // Previous code for diff view (#15)
+  const previousCode = codeHistory.length >= 2 ? codeHistory[codeHistory.length - 2].code : null
+
+  // Cancel in-flight execution (#16)
+  const handleCancel = useCallback(() => {
+    // Client-side cancellation: immediately clear UI state
+    // Note: server-side Modal computation continues — true abort requires Modal API changes
+    setIsExecuting(false)
+    setIsRefining(false)
+    busyRef.current = false
+    setExecutionError("Execution cancelled")
+  }, [])
 
   // P3: Prefer persisted SVG URLs from Supabase, fall back to data URI from result
   const resolveSvg = (viewName: string): string | undefined =>
@@ -525,6 +547,17 @@ export function ModuleResultsView({
                   {executionError}
                 </p>
               )}
+              {/* Cancel button (#16) */}
+              {(isExecuting || isRefining) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCancel}
+                  className="gap-1 text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
+                >
+                  <XCircle className="h-3 w-3" /> Cancel
+                </Button>
+              )}
               {/* Monaco editor with Run/Refine */}
               <CodeEditor
                 code={editedCode}
@@ -537,6 +570,8 @@ export function ModuleResultsView({
                 history={codeHistory}
                 onUndo={handleUndo}
                 canUndo={codeHistory.length > 1}
+                onRestoreVersion={handleRestoreVersion}
+                previousCode={previousCode}
               />
             </div>
           )}
