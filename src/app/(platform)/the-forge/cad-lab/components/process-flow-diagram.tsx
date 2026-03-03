@@ -73,17 +73,20 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick, int
     return related
   }, [hoveredModuleId, edges])
 
-  /** Connection counts per module: how many it receives from / feeds to. */
+  /** Port-level link coverage per module: how many input/output ports are connected. */
   const connectionCounts = useMemo(() => {
-    const counts = new Map<string, { receivesFrom: number; feedsTo: number }>()
-    for (const node of nodes) {
-      counts.set(node.id, { receivesFrom: 0, feedsTo: 0 })
-    }
+    const connectedOutputPorts = new Set<string>()
+    const connectedInputPorts = new Set<string>()
     for (const edge of edges) {
-      const fromCounts = counts.get(edge.from)
-      const toCounts = counts.get(edge.to)
-      if (fromCounts) fromCounts.feedsTo++
-      if (toCounts) toCounts.receivesFrom++
+      if (edge.sourceHandle) connectedOutputPorts.add(`${edge.from}::${edge.sourceHandle}`)
+      if (edge.targetHandle) connectedInputPorts.add(`${edge.to}::${edge.targetHandle}`)
+    }
+    const counts = new Map<string, { linkedInputs: number; linkedOutputs: number }>()
+    for (const node of nodes) {
+      counts.set(node.id, {
+        linkedInputs: node.inputs.filter(inp => connectedInputPorts.has(`${node.id}::${inp}`)).length,
+        linkedOutputs: node.outputs.filter(out => connectedOutputPorts.has(`${node.id}::${out}`)).length,
+      })
     }
     return counts
   }, [nodes, edges])
@@ -228,12 +231,12 @@ export function ProcessFlowDiagram({ modules, className = "", onModuleClick, int
                   </div>
                 )}
 
-                {/* Relationship summary footer — only show non-zero counts */}
-                {counts && (counts.receivesFrom > 0 || counts.feedsTo > 0) && (
+                {/* Port link coverage footer */}
+                {counts && (node.inputs.length > 0 || node.outputs.length > 0) && (
                   <p className="text-[10px] text-muted-foreground pt-1 border-t border-border">
                     {[
-                      counts.receivesFrom > 0 && `Receives from ${counts.receivesFrom}`,
-                      counts.feedsTo > 0 && `Feeds ${counts.feedsTo}`,
+                      node.inputs.length > 0 && `${counts.linkedInputs}/${node.inputs.length} in`,
+                      node.outputs.length > 0 && `${counts.linkedOutputs}/${node.outputs.length} out`,
                     ].filter(Boolean).join(" \u00B7 ")}
                   </p>
                 )}

@@ -41,10 +41,10 @@ export interface ModuleNodeData {
   inputCount: number
   /** Total output count */
   outputCount: number
-  /** Inbound connection count */
-  receivesFrom: number
-  /** Outbound connection count */
-  feedsTo: number
+  /** Number of input ports with at least one incoming edge */
+  linkedInputs: number
+  /** Number of output ports with at least one outgoing edge */
+  linkedOutputs: number
   /** Whether this module is currently generating */
   isGenerating: boolean
   /** Whether this module has zero connections */
@@ -206,13 +206,13 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
         </div>
       )}
 
-      {/* Connection count footer */}
-      {(d.receivesFrom > 0 || d.feedsTo > 0) && (
+      {/* Connection count footer — shows port-level link coverage */}
+      {(d.inputCount > 0 || d.outputCount > 0) && (
         <div className="px-2.5 pb-2 pt-1 border-t border-border">
           <p className="text-[9px] text-muted-foreground">
             {[
-              d.receivesFrom > 0 && `Receives from ${d.receivesFrom}`,
-              d.feedsTo > 0 && `Feeds ${d.feedsTo}`,
+              d.inputCount > 0 && `${d.linkedInputs}/${d.inputCount} in`,
+              d.outputCount > 0 && `${d.linkedOutputs}/${d.outputCount} out`,
             ].filter(Boolean).join(" \u00B7 ")}
           </p>
         </div>

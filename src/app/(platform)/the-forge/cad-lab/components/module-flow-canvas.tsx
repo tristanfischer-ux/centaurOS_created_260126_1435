@@ -259,16 +259,22 @@ function buildNodesAndEdges(
     ? buildEdgesHybrid(interfaceContracts, modules)
     : buildEdges(modules)
 
-  // Connection counts per module
-  const connectionCounts = new Map<string, { receivesFrom: number; feedsTo: number }>()
-  for (const m of modules) {
-    connectionCounts.set(m.id, { receivesFrom: 0, feedsTo: 0 })
-  }
+  // Port-level link coverage: count how many input/output ports are connected
+  // DECISION: Per-port counts instead of per-edge counts. A single output feeding
+  // 4 modules counted as "Feeds 4" was confusing — users couldn't verify it against
+  // visible edges. Per-port "1/1 out" is always verifiable by looking at the ports.
+  const connectedOutputPorts = new Set<string>() // "moduleId::portName"
+  const connectedInputPorts = new Set<string>()
   for (const e of flowEdges) {
-    const from = connectionCounts.get(e.from)
-    const to = connectionCounts.get(e.to)
-    if (from) from.feedsTo++
-    if (to) to.receivesFrom++
+    if (e.sourceHandle) connectedOutputPorts.add(`${e.from}::${e.sourceHandle}`)
+    if (e.targetHandle) connectedInputPorts.add(`${e.to}::${e.targetHandle}`)
+  }
+  const connectionCounts = new Map<string, { linkedInputs: number; linkedOutputs: number }>()
+  for (const m of modules) {
+    connectionCounts.set(m.id, {
+      linkedInputs: m.inputs.filter(inp => connectedInputPorts.has(`${m.id}::${inp}`)).length,
+      linkedOutputs: m.outputs.filter(out => connectedOutputPorts.has(`${m.id}::${out}`)).length,
+    })
   }
 
   // Connected IDs for orphan detection
@@ -280,7 +286,7 @@ function buildNodesAndEdges(
 
   // Build React Flow nodes — pass ALL inputs/outputs for port-level handles
   const rfNodes: Node[] = modules.map((m) => {
-    const counts = connectionCounts.get(m.id) ?? { receivesFrom: 0, feedsTo: 0 }
+    const counts = connectionCounts.get(m.id) ?? { linkedInputs: 0, linkedOutputs: 0 }
     const nodeData: ModuleNodeData = {
       label: m.name,
       purpose: m.purpose,
@@ -289,8 +295,8 @@ function buildNodesAndEdges(
       outputs: m.outputs,
       inputCount: m.inputs.length,
       outputCount: m.outputs.length,
-      receivesFrom: counts.receivesFrom,
-      feedsTo: counts.feedsTo,
+      linkedInputs: counts.linkedInputs,
+      linkedOutputs: counts.linkedOutputs,
       isGenerating: generatingModuleIds.has(m.id),
       isOrphan: flowEdges.length > 0 && !connectedIds.has(m.id),
       moduleId: m.id,

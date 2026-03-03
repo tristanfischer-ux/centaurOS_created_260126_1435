@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { useSearchParams, usePathname } from 'next/navigation'
 import type { MarketplaceListing, MarketplaceSortOption, AdvancedFilters } from '@/actions/marketplace'
 import { searchMarketplaceListings } from '@/actions/marketplace'
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
@@ -78,7 +78,6 @@ export function useMarketplaceState({
     initialSavedIds = [],
     allowedCategories,
 }: UseMarketplaceStateProps) {
-    const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
 
@@ -225,8 +224,8 @@ export function useMarketplaceState({
         if (f.companyTypes && f.companyTypes.length > 0) p.set('ct', f.companyTypes.join(','))
         if (f.companySizes && f.companySizes.length > 0) p.set('cs', f.companySizes.join(','))
         const newURL = p.toString() ? `${pathname}?${p.toString()}` : pathname
-        router.push(newURL, { scroll: false })
-    }, [pathname, router, advancedFilters])
+        window.history.replaceState(null, '', newURL)
+    }, [pathname, advancedFilters])
 
     useEffect(() => {
         updateURL(debouncedQuery, activeCategory, advancedFilters)
@@ -375,9 +374,9 @@ export function useMarketplaceState({
             const params = new URLSearchParams(searchParams?.toString() || '')
             params.delete('technique')
             const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
-            router.push(newURL, { scroll: false })
+            window.history.replaceState(null, '', newURL)
         }
-    }, [techniqueSlug, searchParams, pathname, router])
+    }, [techniqueSlug, searchParams, pathname])
 
     const advancedFilterCount = useMemo(() => Object.keys(advancedFilters).length, [advancedFilters])
 
@@ -469,8 +468,8 @@ export function useMarketplaceState({
         const params = new URLSearchParams(searchParams?.toString() || '')
         params.delete('technique')
         const newURL = params.toString() ? `${pathname}?${params.toString()}` : pathname
-        router.push(newURL, { scroll: false })
-    }, [searchParams, pathname, router])
+        window.history.replaceState(null, '', newURL)
+    }, [searchParams, pathname])
 
     const setSortByAndRefetch = useCallback((sort: SortOption) => {
         setSortBy(sort)
