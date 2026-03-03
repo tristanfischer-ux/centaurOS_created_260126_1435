@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState, useCallback, useRef } from "react"
 import {
   Box,
   Code2,
@@ -20,6 +20,9 @@ import { Badge } from "@/components/ui/badge"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { Metric, SvgView, RenderedView } from "../cad-lab-utils"
 import { useRenderedViews } from "@/hooks/use-rendered-views"
+import { CodeEditor, type CodeVersion } from "./code-editor"
+import { ParameterPanel } from "./parameter-panel"
+import { extractParameters, rebuildCodeWithParameters, type ExtractedParameter } from "@/lib/cad-lab/parameter-extractor"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -73,6 +76,8 @@ export function ModuleResultsView({
   onDownload,
   svgUrls,
   mfgProcess,
+  onExecuteCode,
+  onRefineCode,
 }: {
   result: CadLabResult
   moduleName: string
@@ -90,9 +95,115 @@ export function ModuleResultsView({
   svgUrls?: Record<string, string>
   /** Diagnostic manufacturing process — when non-3D-printing, FDM metrics are hidden */
   mfgProcess?: string
+  /** Execute edited code on Modal — returns updated result */
+  onExecuteCode?: (moduleId: string, code: string) => Promise<void>
+  /** Refine code with natural language instruction — returns new code */
+  onRefineCode?: (moduleId: string, currentCode: string, instruction: string) => Promise<string | null>
 }): React.ReactNode {
   // Render high-quality orthographic views from STL using Three.js
   const { views: renderedViews, loading: renderedLoading } = useRenderedViews(result.stlData)
+
+  // ── Interactive code editor state ──
+  const [editedCode, setEditedCode] = useState(code ?? "")
+  const [isExecuting, setIsExecuting] = useState(false)
+  const [isRefining, setIsRefining] = useState(false)
+  // Mutex: prevent concurrent execute/refine operations
+  const busyRef = useRef(false)
+  const [codeHistory, setCodeHistory] = useState<CodeVersion[]>(() =>
+    code ? [{ code, timestamp: Date.now() }] : [],
+  )
+  const originalCodeRef = useRef(code)
+  // INTENT: Track code changes we initiated (via Run/Refine) vs external regeneration.
+  // Only wipe history on external changes (full module regeneration), not our own executions.
+  const selfUpdateRef = useRef(false)
+
+  // Sync if parent code changes externally (e.g., after full regeneration)
+  useEffect(() => {
+    if (code && code !== originalCodeRef.current) {
+      if (selfUpdateRef.current) {
+        // Our own execution updated the parent — don't wipe history
+        selfUpdateRef.current = false
+        originalCodeRef.current = code
+      } else {
+        // External change (full regeneration) — reset everything
+        originalCodeRef.current = code
+        setEditedCode(code)
+        setCodeHistory([{ code, timestamp: Date.now() }])
+      }
+    }
+  }, [code])
+
+  // Extract parameters from current code
+  const parameters = extractParameters(editedCode)
+
+  const handleRun = useCallback(async () => {
+    if (!onExecuteCode || busyRef.current) return
+    busyRef.current = true
+    setIsExecuting(true)
+    selfUpdateRef.current = true
+    try {
+      await onExecuteCode(moduleId, editedCode)
+    } finally {
+      setIsExecuting(false)
+      busyRef.current = false
+    }
+  }, [onExecuteCode, moduleId, editedCode])
+
+  const handleReset = useCallback(() => {
+    if (originalCodeRef.current) {
+      setEditedCode(originalCodeRef.current)
+    }
+  }, [])
+
+  const handleRefine = useCallback(async (instruction: string) => {
+    if (!onRefineCode || busyRef.current) return
+    busyRef.current = true
+    setIsRefining(true)
+    try {
+      const newCode = await onRefineCode(moduleId, editedCode, instruction)
+      if (newCode) {
+        setCodeHistory((prev) => [...prev, { code: newCode, instruction, timestamp: Date.now() }])
+        setEditedCode(newCode)
+        // Auto-execute after refinement
+        if (onExecuteCode) {
+          setIsExecuting(true)
+          selfUpdateRef.current = true
+          try {
+            await onExecuteCode(moduleId, newCode)
+          } finally {
+            setIsExecuting(false)
+          }
+        }
+      }
+    } finally {
+      setIsRefining(false)
+      busyRef.current = false
+    }
+  }, [onRefineCode, onExecuteCode, moduleId, editedCode])
+
+  const handleUndo = useCallback(() => {
+    if (codeHistory.length < 2) return
+    const newHistory = codeHistory.slice(0, -1)
+    setCodeHistory(newHistory)
+    setEditedCode(newHistory[newHistory.length - 1].code)
+  }, [codeHistory])
+
+  // Use ref for editedCode to avoid stale closure in parameter change callback
+  const editedCodeRef = useRef(editedCode)
+  useEffect(() => { editedCodeRef.current = editedCode }, [editedCode])
+
+  const handleParameterChange = useCallback((params: ExtractedParameter[]) => {
+    const newCode = rebuildCodeWithParameters(editedCodeRef.current, params)
+    setEditedCode(newCode)
+    editedCodeRef.current = newCode
+    setCodeHistory((prev) => [...prev, { code: newCode, instruction: "Parameter adjustment", timestamp: Date.now() }])
+    // Auto-execute after parameter change
+    if (onExecuteCode) {
+      setIsExecuting(true)
+      selfUpdateRef.current = true
+      onExecuteCode(moduleId, newCode).finally(() => setIsExecuting(false))
+    }
+  }, [onExecuteCode, moduleId])
 
   // P3: Prefer persisted SVG URLs from Supabase, fall back to data URI from result
   const resolveSvg = (viewName: string): string | undefined =>
@@ -355,16 +466,16 @@ export function ModuleResultsView({
         </div>
       )}
 
-      {/* Code */}
+      {/* Code Editor */}
       {code && (
         <div className="border rounded-md">
           <div className="flex items-center justify-between p-3 border-b">
             <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <Code2 className="h-3.5 w-3.5" /> Generated Code
-              <span className="font-normal text-muted-foreground">({result.codeLines} lines)</span>
+              <Code2 className="h-3.5 w-3.5" /> CadQuery Code
+              <span className="font-normal text-muted-foreground">({editedCode.split("\n").length} lines)</span>
             </p>
             <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" onClick={() => onCopyCode(code)} className="gap-1 text-xs h-7">
+              <Button variant="outline" size="sm" onClick={() => onCopyCode(editedCode)} className="gap-1 text-xs h-7">
                 {codeCopied ? <><Check className="h-3 w-3" /> Copied!</> : <><Copy className="h-3 w-3" /> Copy</>}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setShowCode(!showCode)} className="text-xs h-7">
@@ -373,8 +484,28 @@ export function ModuleResultsView({
             </div>
           </div>
           {showCode && (
-            <div className="p-3">
-              <pre className="text-xs font-mono bg-muted p-3 rounded-lg overflow-auto max-h-[400px] whitespace-pre-wrap">{code}</pre>
+            <div className="p-3 space-y-3">
+              {/* Parameter sliders (when parameters detected) */}
+              {parameters.length > 0 && onExecuteCode && (
+                <ParameterPanel
+                  parameters={parameters}
+                  onChange={handleParameterChange}
+                  disabled={isExecuting || isRefining}
+                />
+              )}
+              {/* Monaco editor with Run/Refine */}
+              <CodeEditor
+                code={editedCode}
+                onChange={setEditedCode}
+                onRun={handleRun}
+                isRunning={isExecuting}
+                onReset={handleReset}
+                onRefine={onRefineCode ? handleRefine : undefined}
+                isRefining={isRefining}
+                history={codeHistory}
+                onUndo={handleUndo}
+                canUndo={codeHistory.length > 1}
+              />
             </div>
           )}
         </div>

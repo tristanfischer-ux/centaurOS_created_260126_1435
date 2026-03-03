@@ -328,6 +328,7 @@ export async function POST(request: Request): Promise<Response> {
         // QW3: Pass cached template match to avoid redundant DB + semantic scoring
         // H4: Pass design brief for manufacturing constraints in code gen prompt
         // J1: Pass cached domain to eliminate redundant Claude detection call
+        // FLOW: Pass module blueprint image for multimodal geometric reference
         const res = await generateCadLabModelSmart(
           enrichedDescription,
           cadResearch,
@@ -337,6 +338,7 @@ export async function POST(request: Request): Promise<Response> {
           localMod.templateMatchResult || undefined,
           designBrief,
           detectedDomain as import("@/lib/cad-lab/domain-prompts").CadLabDomain | undefined,
+          localMod.imageUrl,
         )
         cadResult = res
 

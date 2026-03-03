@@ -77,6 +77,9 @@ export default function CadStagePage(): React.ReactNode {
     decompositionConnections,
     interfaceContracts,
     unmatchedPorts,
+    // Interactive code workbench
+    handleExecuteModuleCode,
+    handleRefineModuleCode,
     // Gate: CAD requires manufacturing orders OR all modules specified
     manufacturingOrderCount,
     isSpecificationComplete,
@@ -598,6 +601,8 @@ export default function CadStagePage(): React.ReactNode {
                       onDownload={handleDownload}
                       svgUrls={mod.svgUrls}
                       mfgProcess={diagnosticAnswers?.[mod.id]?.mfg_process}
+                      onExecuteCode={handleExecuteModuleCode}
+                      onRefineCode={handleRefineModuleCode}
                     />
                   )}
 

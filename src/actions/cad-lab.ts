@@ -169,6 +169,8 @@ async function callClaude(
   maxTokens: number = 16384,
   timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
   maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback
+  /** Optional base64-encoded image to include as multimodal content before the text prompt */
+  imageBase64?: string,
 ): Promise<{
   text: string
   tokensIn: number
@@ -178,6 +180,21 @@ async function callClaude(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   const makeRequest = async (model: ClaudeModelId) => {
+    // INTENT: Build multimodal content array when an image is provided,
+    // otherwise use plain string for backward compatibility
+    const userContent: string | Array<{ type: string; source?: { type: string; media_type: string; data: string }; text?: string }> = imageBase64
+      ? [
+          {
+            type: "image" as const,
+            source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
+          },
+          {
+            type: "text" as const,
+            text: "The above blueprint illustration shows the intended visual appearance and proportions of this module. Use it as geometric reference for your CadQuery model.\n\n" + userPrompt,
+          },
+        ]
+      : userPrompt
+
     const response = await fetchWithTimeout(
       "https://api.anthropic.com/v1/messages",
       {
@@ -191,7 +208,7 @@ async function callClaude(
           model,
           max_tokens: maxTokens,
           system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
+          messages: [{ role: "user", content: userContent }],
         }),
       },
       timeoutMs,
@@ -1083,6 +1100,7 @@ export async function generateCadLabModel(
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
+  blueprintImageUrl?: string,
 ): Promise<CadLabResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -1266,6 +1284,34 @@ If the research report or interface definition contains any unresolved questions
       }
     }
 
+    // ── Fetch blueprint image for multimodal prompt (best-effort) ──
+    // SECURITY: Only fetch from our own Supabase storage to prevent SSRF
+    let blueprintImageBase64: string | undefined
+    if (blueprintImageUrl) {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+      const isAllowedOrigin = supabaseUrl && blueprintImageUrl.startsWith(supabaseUrl)
+      if (!isAllowedOrigin) {
+        console.warn("[THE-FORGE] Step 3: Blueprint image URL rejected — not from Supabase storage:", blueprintImageUrl.slice(0, 80))
+      } else {
+        try {
+          const imgRes = await fetch(blueprintImageUrl, { signal: AbortSignal.timeout(10_000) })
+          if (imgRes.ok) {
+            const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
+            // SECURITY: Cap image size at 10MB to prevent memory abuse
+            if (imgBuffer.length > 10 * 1024 * 1024) {
+              console.warn("[THE-FORGE] Step 3: Blueprint image too large, skipping:", Math.round(imgBuffer.length / 1024), "KB")
+            } else {
+              blueprintImageBase64 = imgBuffer.toString("base64")
+              console.info(`[THE-FORGE] Step 3: Blueprint image fetched (${Math.round(imgBuffer.length / 1024)}KB)`)
+            }
+          }
+        } catch (imgErr) {
+          // Silent — blueprint image is best-effort enrichment
+          console.warn("[THE-FORGE] Step 3: Blueprint image fetch failed:", imgErr instanceof Error ? imgErr.message : imgErr)
+        }
+      }
+    }
+
     // ── #7: Iterative repair loop ──
     // QW2: Opus gets 4 attempts (better at using repair feedback), others get 3
     const MAX_REPAIR_ATTEMPTS = modelId.includes("opus") ? 4 : 3
@@ -1320,7 +1366,8 @@ ${finalCode}
         console.info(`[THE-FORGE] Step 3: Repair attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}`)
       }
 
-      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000)
+      // INTENT: Include blueprint image on first attempt for geometric reference
+      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000, undefined, undefined, attempt === 0 ? blueprintImageBase64 : undefined)
       totalTokensIn += codeResult.tokensIn
       totalTokensOut += codeResult.tokensOut
 
@@ -2876,6 +2923,201 @@ Recommend diagnostic answers for each module. Output JSON only.`
   }
 }
 
+// ─── Execute Edited CadQuery Code ────────────────────────────────────
+
+/** Result shape from executeCadQueryAction — serializable for client consumption */
+export interface ExecuteCadQueryResult {
+  stlData?: string
+  stepData?: string
+  svgIso?: string
+  svgTop?: string
+  svgFront?: string
+  svgBack?: string
+  svgRight?: string
+  svgLeft?: string
+  svgExploded?: string
+  bbox?: { xLen: number; yLen: number; zLen: number }
+  massGrams?: number
+  volumeMm3?: number
+  surfaceAreaMm2?: number
+  fillRatio?: number
+  dfm?: {
+    printable: boolean
+    issues: Array<{ severity: string; category: string; message: string }>
+    estimatedPrintTimeMin: number
+    estimatedMaterialG: number
+    supportVolumePct: number
+    compatiblePrinters: string[]
+  }
+}
+
+/**
+ * Executes user-edited CadQuery code on Modal and returns the result.
+ *
+ * @description Used by the interactive code editor to re-run modified code
+ * without going through the full generation pipeline. Validates the code,
+ * executes it on Modal, and returns structured results.
+ *
+ * @param code - Complete CadQuery Python code to execute
+ * @returns Structured result with STL/STEP/SVG data and metrics, or error
+ *
+ * @security Requires authenticated user. Rate limited.
+ */
+export async function executeCadQueryAction(
+  code: string,
+): Promise<{ success: true; result: ExecuteCadQueryResult } | { success: false; error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  // Rate limit
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { success: false, error: rateLimitError }
+
+  // VALIDATION: Length bounds to prevent abuse
+  if (!code || code.length < 50) {
+    return { success: false, error: "Code too short to be a valid CadQuery script" }
+  }
+  if (code.length > 500_000) {
+    return { success: false, error: "Code exceeds 500KB limit" }
+  }
+  if (!code.includes("import cadquery") && !code.includes("import cq")) {
+    return { success: false, error: "Missing CadQuery import" }
+  }
+  if (!code.includes("result")) {
+    return { success: false, error: "No 'result' variable — Modal has nothing to export" }
+  }
+
+  // Strip unsafe code
+  const safeCode = stripUnsafeCode(code)
+
+  try {
+    const modalResult = await executeOnModal(safeCode)
+
+    if (modalResult.error) {
+      return { success: false, error: modalResult.error }
+    }
+
+    // Map Modal response to client-friendly shape
+    const mp = modalResult.analysis?.mass_properties
+    const dfmRaw = modalResult.analysis?.dfm
+    const bbox = mp?.bounding_box
+    const massGrams = mp?.mass_kg != null ? Math.round(mp.mass_kg * 1000) : undefined
+    const volumeMm3 = mp?.volume_mm3
+    const surfaceAreaMm2 = mp?.surface_area_mm2
+
+    let fillRatio: number | undefined
+    if (bbox && volumeMm3) {
+      const envelopeVol = bbox.xLen * bbox.yLen * bbox.zLen
+      if (envelopeVol > 0) fillRatio = Math.round((volumeMm3 / envelopeVol) * 100)
+    }
+
+    const result: ExecuteCadQueryResult = {
+      stlData: modalResult.stl ?? undefined,
+      stepData: modalResult.step ?? undefined,
+      svgIso: modalResult.svg_iso ?? undefined,
+      svgTop: modalResult.svg_top ?? undefined,
+      svgFront: modalResult.svg_front ?? undefined,
+      svgBack: modalResult.svg_back ?? undefined,
+      svgRight: modalResult.svg_right ?? undefined,
+      svgLeft: modalResult.svg_left ?? undefined,
+      svgExploded: modalResult.svg_exploded ?? undefined,
+      bbox,
+      massGrams,
+      volumeMm3,
+      surfaceAreaMm2,
+      fillRatio,
+      dfm: dfmRaw ? {
+        printable: dfmRaw.printable ?? false,
+        issues: dfmRaw.issues ?? [],
+        estimatedPrintTimeMin: dfmRaw.estimated_print_time_min ?? 0,
+        estimatedMaterialG: dfmRaw.estimated_material_g ?? 0,
+        supportVolumePct: dfmRaw.support_volume_pct ?? 0,
+        compatiblePrinters: dfmRaw.compatible_printers ?? [],
+      } : undefined,
+    }
+
+    return { success: true, result }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Modal execution failed" }
+  }
+}
+
+// ─── Refine CadQuery Code with Natural Language ─────────────────────
+
+/**
+ * Refines existing CadQuery code based on a natural language instruction.
+ *
+ * @description Uses Claude Sonnet to make targeted modifications to existing
+ * CadQuery code. Returns ONLY the modified code, not explanations.
+ *
+ * @param currentCode - The current CadQuery Python code
+ * @param instruction - Natural language instruction (e.g., "make walls 3mm thick")
+ * @param moduleContext - Module name/purpose/description for context
+ * @returns Modified code or error
+ *
+ * @security Requires authenticated user. Rate limited.
+ */
+export async function refineCadQueryCodeAction(
+  currentCode: string,
+  instruction: string,
+  moduleContext: { name: string; purpose: string; description: string },
+): Promise<{ success: true; code: string } | { success: false; error: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized" }
+
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { success: false, error: rateLimitError }
+
+  if (!currentCode.trim() || !instruction.trim()) {
+    return { success: false, error: "Code and instruction are required" }
+  }
+  // SECURITY: Prevent cost amplification and prompt injection via oversized inputs
+  if (instruction.length > 2000) {
+    return { success: false, error: "Instruction too long (max 2000 characters)" }
+  }
+  if (currentCode.length > 500_000) {
+    return { success: false, error: "Code exceeds 500KB limit" }
+  }
+
+  try {
+    const systemPrompt = `You are modifying existing CadQuery Python code. Return ONLY the complete modified Python code inside a single \`\`\`python code fence. No explanations before or after.
+
+Rules:
+- Keep all existing imports and the "result" variable
+- Maintain the parametric structure (variables at top, derived values calculated)
+- Do NOT break the code — it must remain executable
+- If the instruction is unclear, make your best engineering judgment
+- Preserve the result_exploded variable if it exists`
+
+    const userPrompt = `Module: ${moduleContext.name}
+Purpose: ${moduleContext.purpose}
+Description: ${moduleContext.description}
+
+Current code:
+\`\`\`python
+${currentCode}
+\`\`\`
+
+Instruction: ${instruction}
+
+Return the complete modified code.`
+
+    // DECISION: Use Sonnet for refinement — fast and cheap for targeted edits
+    const result = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6" as ClaudeModelId, 8192, 120_000, 1)
+    const code = extractCode(result.text)
+
+    if (!code.trim()) {
+      return { success: false, error: "Refinement returned empty code" }
+    }
+
+    return { success: true, code }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Refinement failed" }
+  }
+}
+
 // ─── Smart Generation (Grammar-First with Fallback) ─────────────────
 
 /**
@@ -2906,6 +3148,7 @@ export async function generateCadLabModelSmart(
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
+  blueprintImageUrl?: string,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -2945,7 +3188,7 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief, domainHint)
+  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief, domainHint, blueprintImageUrl)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

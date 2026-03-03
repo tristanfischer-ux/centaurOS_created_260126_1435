@@ -32,6 +32,8 @@ import {
   prefillDiagnostics,
   generateSystemAssembly,
   extractInterfaceContracts,
+  executeCadQueryAction,
+  refineCadQueryCodeAction,
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
@@ -57,6 +59,7 @@ import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
   CadLabResearchResult,
+  CadLabResult,
   CadLabModule,
   ClaudeModelId,
   CadLabDesignBrief,
@@ -241,6 +244,10 @@ export interface CadLabContextValue {
   refreshManufacturingOrderCount: () => Promise<void>
   isSpecificationComplete: boolean
   projectReviewVerdicts: Record<string, Record<string, SpecialistReview>>
+
+  // Interactive code workbench
+  handleExecuteModuleCode: (moduleId: string, code: string) => Promise<void>
+  handleRefineModuleCode: (moduleId: string, currentCode: string, instruction: string) => Promise<string | null>
 
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
@@ -1136,7 +1143,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const res = await generateCadLabSingleImageAction(projectId, slimMod, effectiveVisualStyle, effectiveReference, moduleCrop)
         if ("imageStatus" in res) {
           setModules((prev) =>
-            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError } : m)),
+            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError, imageModelUsed: res.imageModelUsed } : m)),
           )
           if (res.imageStatus === "complete") {
             completedCount++
@@ -2151,6 +2158,75 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
   }, [checkpointAcknowledged, isRevising, checkpoints, editableReport, subject, debouncedSaveModules])
 
+  // ── Interactive code workbench: execute edited code ──
+  const handleExecuteModuleCode = useCallback(async (moduleId: string, code: string) => {
+    if (!activeProjectIdRef.current) return
+
+    const res = await executeCadQueryAction(code)
+    if (!res.success) {
+      toast.error(res.error)
+      return
+    }
+
+    const { result: modalRes } = res
+
+    // Patch the module's result in state with new execution data
+    // INTENT: Merge new Modal results into existing result, preserving fields
+    // the Modal response doesn't include (e.g., drawingPackage, visionScore)
+    setModules((prev) =>
+      prev.map((m) => {
+        if (m.id !== moduleId) return m
+        const existing = m.result ?? {} as Partial<CadLabResult>
+        const patched = {
+          ...existing,
+          success: true as const,
+          code,
+          codeLines: code.split("\n").length,
+          stlData: modalRes.stlData ?? (existing as CadLabResult).stlData,
+          stepData: modalRes.stepData ?? (existing as CadLabResult).stepData,
+          svgIso: modalRes.svgIso ?? (existing as CadLabResult).svgIso,
+          svgTop: modalRes.svgTop ?? (existing as CadLabResult).svgTop,
+          svgFront: modalRes.svgFront ?? (existing as CadLabResult).svgFront,
+          svgBack: modalRes.svgBack ?? (existing as CadLabResult).svgBack,
+          svgRight: modalRes.svgRight ?? (existing as CadLabResult).svgRight,
+          svgLeft: modalRes.svgLeft ?? (existing as CadLabResult).svgLeft,
+          svgExploded: modalRes.svgExploded ?? (existing as CadLabResult).svgExploded,
+          bbox: modalRes.bbox ?? (existing as CadLabResult).bbox,
+          massGrams: modalRes.massGrams ?? (existing as CadLabResult).massGrams,
+          volumeMm3: modalRes.volumeMm3 ?? (existing as CadLabResult).volumeMm3,
+          fillRatio: modalRes.fillRatio ?? (existing as CadLabResult).fillRatio,
+          dfm: modalRes.dfm ?? (existing as CadLabResult).dfm,
+        } as unknown as Omit<CadLabResult, "stlData" | "stepData">
+        return { ...m, code, result: patched }
+      }),
+    )
+    debouncedSaveModules()
+    toast.success("Code executed successfully")
+  }, [debouncedSaveModules])
+
+  // ── Interactive code workbench: refine code with natural language ──
+  const handleRefineModuleCode = useCallback(async (
+    moduleId: string,
+    currentCode: string,
+    instruction: string,
+  ): Promise<string | null> => {
+    const mod = modules.find((m) => m.id === moduleId)
+    if (!mod) return null
+
+    const res = await refineCadQueryCodeAction(currentCode, instruction, {
+      name: mod.name,
+      purpose: mod.purpose,
+      description: mod.description,
+    })
+
+    if (!res.success) {
+      toast.error(res.error)
+      return null
+    }
+
+    return res.code
+  }, [modules])
+
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
     try {
@@ -2210,6 +2286,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     refreshManufacturingOrderCount,
     isSpecificationComplete,
     projectReviewVerdicts,
+    handleExecuteModuleCode,
+    handleRefineModuleCode,
     initialized,
     initializeCadLab,
     handleDownload,
