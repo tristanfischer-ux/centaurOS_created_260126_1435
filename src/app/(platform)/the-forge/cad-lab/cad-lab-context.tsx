@@ -35,7 +35,8 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDecompositionConnections } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections } from "@/actions/cad-lab-projects"
+import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -157,6 +158,7 @@ export interface CadLabContextValue {
   generatingModuleIds: Set<string>
   diagnosticAnswers: DiagnosticAnswers
   setDiagnosticAnswers: Dispatch<SetStateAction<DiagnosticAnswers>>
+  diagnosticEnrichment: DiagnosticEnrichment
   aiPrefilled: boolean
   handleDecompose: () => Promise<void>
   handleModuleGenerate: (moduleId: string, step: "interface" | "generate") => Promise<void>
@@ -372,6 +374,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [diagnosticAnswers, setDiagnosticAnswers] = useState<DiagnosticAnswers>({})
   const diagnosticAnswersRef = useRef<DiagnosticAnswers>({})
   useEffect(() => { diagnosticAnswersRef.current = diagnosticAnswers }, [diagnosticAnswers])
+  const [diagnosticEnrichment, setDiagnosticEnrichment] = useState<DiagnosticEnrichment>({})
   const [aiPrefilled, setAiPrefilled] = useState(false)
 
   // ── Batch pipeline state ──
@@ -854,6 +857,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 return merged
               })
               setAiPrefilled(true)
+              // Persist enrichment (reasoning + alternatives) if present
+              if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
+                setDiagnosticEnrichment(prefillRes.enrichment)
+                if (activeProjectIdRef.current) {
+                  saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment)
+                    .catch((e) => console.error("[CAD-LAB] Failed to persist diagnostic enrichment:", e))
+                }
+              }
             }
           })
           .catch(() => { /* Non-critical */ })
@@ -1757,6 +1768,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setProgressLines([])
     setModules([])
     setDiagnosticAnswers({})
+    setDiagnosticEnrichment({})
     setAiPrefilled(false)
     setBatchProgress({})
     setSystemIllustrationStatus("idle")
@@ -1872,6 +1884,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setExpandedModuleId(null)
     setGeneratingModuleIds(new Set())
     setDiagnosticAnswers({})
+    setDiagnosticEnrichment({})
     setProgressLines([])
     setBatchProgress({})
     setAiPrefilled(false)
@@ -1977,9 +1990,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         outputs: p.interfaceContracts?.unmatchedOutputs ?? [],
         inputs: p.interfaceContracts?.unmatchedInputs ?? [],
       })
-      // Restore diagnostic answers from database
+      // Restore diagnostic answers + enrichment from database
       if (p.diagnosticAnswers && Object.keys(p.diagnosticAnswers).length > 0) {
         setDiagnosticAnswers(p.diagnosticAnswers)
+      }
+      if (p.diagnosticEnrichment && Object.keys(p.diagnosticEnrichment).length > 0) {
+        setDiagnosticEnrichment(p.diagnosticEnrichment)
       }
 
       // Fetch manufacturing order count for this project
@@ -2161,7 +2177,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     handleResearch, handleReset,
     isDecomposing, decompositionError, modules, setModules,
     expandedModuleId, setExpandedModuleId, generatingModuleIds,
-    diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
+    diagnosticAnswers, setDiagnosticAnswers, diagnosticEnrichment, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
     isGeneratingImages, imageGenProgress, handleGenerateModuleImages, handleRefreshModuleImages,

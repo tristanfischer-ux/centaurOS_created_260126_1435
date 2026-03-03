@@ -382,17 +382,44 @@ const BASE_DIAGNOSTICS = `For each module, output exactly these 6 fields:
 - batch_size: One of: Prototype (1–5), Small batch (10–50), Medium (50–500), Production (500+), Mass production (10k+)
 - environment: One of: Indoor (office), Indoor (industrial), Outdoor (temperate), Outdoor (harsh), High temperature, Wet/Marine, Corrosive, Cleanroom, Space/Vacuum
 
-Return a JSON object mapping module IDs to their answers. Example:
+Return a JSON object with two keys: "answers" and "enrichment".
+
+"answers" maps module IDs to their diagnostic answers:
 {
-  "motor_assembly": {
-    "mfg_process": "CNC Machining",
-    "material": "Aluminum 6061",
-    "tolerance": "Precision (±0.1mm)",
-    "surface_finish": "Anodized",
-    "batch_size": "Small batch (10–50)",
-    "environment": "Indoor (industrial)"
+  "answers": {
+    "motor_assembly": {
+      "mfg_process": "CNC Machining",
+      "material": "Aluminum 6061",
+      "tolerance": "Precision (±0.1mm)",
+      "surface_finish": "Anodized",
+      "batch_size": "Small batch (10–50)",
+      "environment": "Indoor (industrial)"
+    }
+  },
+  "enrichment": {
+    "motor_assembly": {
+      "mfg_process": {
+        "reason": "Tight tolerances on bearing seats require subtractive machining",
+        "alternatives": [
+          { "value": "Sheet Metal", "reason": "Housing could be bent but loses precision" },
+          { "value": "Casting", "reason": "Viable at higher volumes but longer lead" }
+        ]
+      },
+      "material": {
+        "reason": "6061 balances machinability with thermal conductivity for motor heat",
+        "alternatives": [
+          { "value": "Stainless Steel", "reason": "Better corrosion resistance but heavier" }
+        ]
+      }
+    }
   }
 }
+
+ENRICHMENT RULES:
+- Keep reasons under 20 words. Focus on engineering rationale.
+- Provide 1-3 ranked alternatives per field (best alternative first).
+- Alternatives must be different from the chosen answer.
+- Every module and every field must have an enrichment entry.
 
 Only output valid JSON. No explanation.`
 

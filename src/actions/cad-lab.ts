@@ -53,6 +53,7 @@ import {
   getDomainDescription,
   getCodeGenDomainHints,
 } from "@/lib/cad-lab/domain-prompts"
+import type { DiagnosticEnrichment, FieldEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
 import {
   getMashupPlanningSystemPrompt,
@@ -2795,15 +2796,15 @@ export async function prefillDiagnostics(
   modelId: ClaudeModelId = "claude-sonnet-4-6",
   domainHint?: CadLabDomain,
   options?: { useConsensusForMaterial?: boolean },
-): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; error?: string }> {
+): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; enrichment: DiagnosticEnrichment; error?: string }> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, answers: {}, error: "Unauthorized" }
+  if (!user) return { success: false, answers: {}, enrichment: {}, error: "Unauthorized" }
 
   // SECURITY: Rate limit
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
-  if (rateLimitError) return { success: false, answers: {}, error: rateLimitError }
+  if (rateLimitError) return { success: false, answers: {}, enrichment: {}, error: rateLimitError }
 
   try {
     const domain = domainHint ?? (await detectDomainFromResearchReport(researchReport))
@@ -2822,24 +2823,49 @@ ${moduleSummaries}
 
 Recommend diagnostic answers for each module. Output JSON only.`
 
-    const { text } = await callClaude(systemPrompt, userPrompt, modelId, 4096)
+    const { text } = await callClaude(systemPrompt, userPrompt, modelId, 6144)
 
     // Parse JSON object from response — AI may wrap in markdown fences or add prose
     const jsonText = extractJsonObject(text)
-    const parsed = JSON.parse(jsonText) as Record<string, Record<string, string>>
+    const parsed = JSON.parse(jsonText) as Record<string, unknown>
+
+    // INTENT: Support both new { answers, enrichment } format and legacy flat format
+    const rawAnswers = (parsed.answers ?? parsed) as Record<string, Record<string, string>>
+    const rawEnrichment = (parsed.enrichment ?? {}) as Record<string, Record<string, unknown>>
 
     // VALIDATION: Only keep valid module IDs and valid question IDs
     const validModuleIds = new Set(modules.map((m) => m.id))
     const validQuestionIds = new Set(["mfg_process", "material", "tolerance", "surface_finish", "batch_size", "environment"])
     const cleanAnswers: Record<string, Record<string, string>> = {}
+    const cleanEnrichment: DiagnosticEnrichment = {}
 
-    for (const [moduleId, answers] of Object.entries(parsed)) {
+    for (const [moduleId, answers] of Object.entries(rawAnswers)) {
       if (!validModuleIds.has(moduleId)) continue
       cleanAnswers[moduleId] = {}
       for (const [qId, answer] of Object.entries(answers)) {
         if (validQuestionIds.has(qId) && typeof answer === "string") {
           cleanAnswers[moduleId][qId] = answer
         }
+      }
+    }
+
+    // Validate enrichment structure
+    for (const [moduleId, fields] of Object.entries(rawEnrichment)) {
+      if (!validModuleIds.has(moduleId)) continue
+      cleanEnrichment[moduleId] = {}
+      for (const [qId, field] of Object.entries(fields)) {
+        if (!validQuestionIds.has(qId)) continue
+        const f = field as { reason?: unknown; alternatives?: unknown }
+        if (typeof f?.reason !== "string") continue
+        const alts = Array.isArray(f.alternatives)
+          ? f.alternatives
+              .filter((a: unknown): a is { value: string; reason: string } =>
+                typeof (a as Record<string, unknown>)?.value === "string" &&
+                typeof (a as Record<string, unknown>)?.reason === "string"
+              )
+              .slice(0, 3)
+          : []
+        cleanEnrichment[moduleId][qId] = { reason: f.reason, alternatives: alts } satisfies FieldEnrichment
       }
     }
 
@@ -2861,12 +2887,12 @@ Recommend diagnostic answers for each module. Output JSON only.`
       }
     }
 
-    console.info(`[THE-FORGE] Pre-filled diagnostics for ${Object.keys(cleanAnswers).length} modules`)
+    console.info(`[THE-FORGE] Pre-filled diagnostics for ${Object.keys(cleanAnswers).length} modules (enrichment: ${Object.keys(cleanEnrichment).length} modules)`)
 
-    return { success: true, answers: cleanAnswers }
+    return { success: true, answers: cleanAnswers, enrichment: cleanEnrichment }
   } catch (error) {
     console.error("[THE-FORGE] Diagnostic pre-fill failed:", error instanceof Error ? error.message : error)
-    return { success: false, answers: {}, error: "Failed to pre-fill diagnostics" }
+    return { success: false, answers: {}, enrichment: {}, error: "Failed to pre-fill diagnostics" }
   }
 }
 

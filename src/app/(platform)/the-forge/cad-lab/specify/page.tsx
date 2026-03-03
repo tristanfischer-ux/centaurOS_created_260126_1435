@@ -47,6 +47,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+import {
   DIAGNOSTIC_QUESTIONS,
   inferRecommendations,
   inferRecommendationsWithReasons,
@@ -114,6 +119,7 @@ export default function SpecifyPage(): React.ReactNode {
     setModules,
     diagnosticAnswers,
     setDiagnosticAnswers,
+    diagnosticEnrichment,
     aiPrefilled,
     designBrief,
     productOverview,
@@ -649,6 +655,7 @@ export default function SpecifyPage(): React.ReactNode {
                             <div className="space-y-5 bg-muted/10 rounded-md p-4">
                               {DIAGNOSTIC_QUESTIONS.map((q) => {
                                 const currentAnswer = modDiag[q.id]
+                                const fieldEnrichment = diagnosticEnrichment?.[mod.id]?.[q.id]
 
                                 // INTENT: Compute compatibility map for cross-question guidance
                                 let compatMap: Record<string, CompatibilityStatus> | null = null
@@ -675,17 +682,79 @@ export default function SpecifyPage(): React.ReactNode {
                                         const compat = compatMap?.[opt]
                                         const isIncompat = compat === "incompatible" && !isSelected
 
-                                        // Build tooltip text with compatibility note + suggestion reason
-                                        let tooltipText = q.optionDescriptions[opt] ?? opt
-                                        if (isIncompat) {
-                                          const crossField = q.id === "material"
-                                            ? modDiag.mfg_process
-                                            : modDiag.material
-                                          tooltipText += ` — Not typically used with ${crossField}`
+                                        // Suggested pills get HoverCard with enrichment; others keep Tooltip
+                                        if (isSuggested && !isSelected) {
+                                          const reason = fieldEnrichment?.reason ?? modRecsWithReasons[q.id]?.reason
+                                          const alternatives = fieldEnrichment?.alternatives ?? []
+                                          const compatNote = isIncompat
+                                            ? ` — Not typically used with ${q.id === "material" ? modDiag.mfg_process : modDiag.material}`
+                                            : ""
+
+                                          return (
+                                            <HoverCard key={opt} openDelay={200} closeDelay={100}>
+                                              <HoverCardTrigger asChild>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className={cn(
+                                                    "text-xs h-7 ring-1 ring-international-orange/40",
+                                                    isIncompat && "opacity-40",
+                                                  )}
+                                                  onClick={() => handleAnswer(mod.id, q.id, opt)}
+                                                  type="button"
+                                                >
+                                                  {isIncompat ? (
+                                                    <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
+                                                  ) : (
+                                                    <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
+                                                  )}
+                                                  {opt}
+                                                </Button>
+                                              </HoverCardTrigger>
+                                              <HoverCardContent
+                                                side="bottom"
+                                                align="start"
+                                                className="w-80 z-[300] space-y-2.5"
+                                              >
+                                                {/* Option description */}
+                                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                                  {q.optionDescriptions[opt] ?? opt}{compatNote}
+                                                </p>
+
+                                                {/* AI reasoning in international-orange */}
+                                                {reason && (
+                                                  <p className="text-xs text-international-orange leading-relaxed font-medium">
+                                                    {reason}
+                                                  </p>
+                                                )}
+
+                                                {/* Ranked alternatives */}
+                                                {alternatives.length > 0 && (
+                                                  <div className="space-y-1 border-t pt-2">
+                                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                                      Alternatives considered
+                                                    </p>
+                                                    {alternatives.map((alt, i) => (
+                                                      <div key={alt.value} className="flex items-start gap-1.5 text-xs">
+                                                        <span className="text-muted-foreground font-mono text-[10px] mt-0.5 flex-shrink-0">
+                                                          {i + 2}.
+                                                        </span>
+                                                        <div>
+                                                          <span className="font-medium text-foreground">{alt.value}</span>
+                                                          <span className="text-muted-foreground"> — {alt.reason}</span>
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </HoverCardContent>
+                                            </HoverCard>
+                                          )
                                         }
-                                        if (isSuggested && modRecsWithReasons[q.id]?.reason) {
-                                          tooltipText += ` — Suggested: ${modRecsWithReasons[q.id].reason}`
-                                        }
+
+                                        // Non-suggested pills: keep existing Tooltip
+                                        const tooltipText = (q.optionDescriptions[opt] ?? opt)
+                                          + (isIncompat ? ` — Not typically used with ${q.id === "material" ? modDiag.mfg_process : modDiag.material}` : "")
 
                                         return (
                                           <Tooltip key={opt}>
@@ -695,8 +764,6 @@ export default function SpecifyPage(): React.ReactNode {
                                                 size="sm"
                                                 className={cn(
                                                   "text-xs h-7",
-                                                  !isSelected && isSuggested &&
-                                                    "ring-1 ring-international-orange/40",
                                                   isIncompat && "opacity-40",
                                                 )}
                                                 onClick={() => handleAnswer(mod.id, q.id, opt)}
@@ -704,9 +771,6 @@ export default function SpecifyPage(): React.ReactNode {
                                               >
                                                 {isIncompat && (
                                                   <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
-                                                )}
-                                                {!isIncompat && !isSelected && isSuggested && (
-                                                  <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
                                                 )}
                                                 {opt}
                                               </Button>

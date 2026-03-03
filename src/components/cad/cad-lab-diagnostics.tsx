@@ -40,8 +40,14 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"
+import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import {
   getMaterialCompatibilityForProcess,
   getProcessCompatibilityForMaterial,
@@ -484,6 +490,8 @@ interface CadLabDiagnosticsProps {
   aiPrefilled?: boolean
   /** Design brief for smarter inference defaults */
   designBrief?: CadLabDesignBrief
+  /** AI-generated reasoning for diagnostic answers */
+  diagnosticEnrichment?: DiagnosticEnrichment
   /** Externally controlled expanded module ID (e.g. from "Edit diagnostics" button) */
   controlledExpandedModuleId?: string | null
   /** Called when external control should be cleared */
@@ -506,6 +514,7 @@ export function CadLabDiagnostics({
   onAnswersChange,
   aiPrefilled = false,
   designBrief,
+  diagnosticEnrichment,
   controlledExpandedModuleId,
   onControlledExpandClear,
 }: CadLabDiagnosticsProps): React.ReactNode {
@@ -706,6 +715,7 @@ export function CadLabDiagnostics({
 
                     {DIAGNOSTIC_QUESTIONS.map((q) => {
                       const currentAnswer = modAnswers[q.id]
+                      const fieldEnrichment = diagnosticEnrichment?.[mod.id]?.[q.id]
 
                       // INTENT: Compute compatibility map for cross-question guidance
                       let compatMap: Record<string, CompatibilityStatus> | null = null
@@ -732,17 +742,79 @@ export function CadLabDiagnostics({
                               const compat = compatMap?.[opt]
                               const isIncompat = compat === "incompatible" && !isSelected
 
-                              // Build tooltip text with compatibility note + suggestion reason
-                              let tooltipText = q.optionDescriptions[opt] ?? opt
-                              if (isIncompat) {
-                                const crossField = q.id === "material"
-                                  ? modAnswers.mfg_process
-                                  : modAnswers.material
-                                tooltipText += ` — Not typically used with ${crossField}`
+                              // Suggested pills get HoverCard with enrichment; others keep Tooltip
+                              if (isSuggested && !isSelected) {
+                                const reason = fieldEnrichment?.reason ?? modRecsWithReasons[q.id]?.reason
+                                const alternatives = fieldEnrichment?.alternatives ?? []
+                                const compatNote = isIncompat
+                                  ? ` — Not typically used with ${q.id === "material" ? modAnswers.mfg_process : modAnswers.material}`
+                                  : ""
+
+                                return (
+                                  <HoverCard key={opt} openDelay={200} closeDelay={100}>
+                                    <HoverCardTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className={cn(
+                                          "text-xs h-7 ring-1 ring-international-orange/40",
+                                          isIncompat && "opacity-40",
+                                        )}
+                                        onClick={() => handleAnswer(mod.id, q.id, opt)}
+                                        type="button"
+                                      >
+                                        {isIncompat ? (
+                                          <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
+                                        ) : (
+                                          <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
+                                        )}
+                                        {opt}
+                                      </Button>
+                                    </HoverCardTrigger>
+                                    <HoverCardContent
+                                      side="bottom"
+                                      align="start"
+                                      className="w-80 z-[300] space-y-2.5"
+                                    >
+                                      {/* Option description */}
+                                      <p className="text-xs text-muted-foreground leading-relaxed">
+                                        {q.optionDescriptions[opt] ?? opt}{compatNote}
+                                      </p>
+
+                                      {/* AI reasoning in international-orange */}
+                                      {reason && (
+                                        <p className="text-xs text-international-orange leading-relaxed font-medium">
+                                          {reason}
+                                        </p>
+                                      )}
+
+                                      {/* Ranked alternatives */}
+                                      {alternatives.length > 0 && (
+                                        <div className="space-y-1 border-t pt-2">
+                                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                                            Alternatives considered
+                                          </p>
+                                          {alternatives.map((alt, i) => (
+                                            <div key={alt.value} className="flex items-start gap-1.5 text-xs">
+                                              <span className="text-muted-foreground font-mono text-[10px] mt-0.5 flex-shrink-0">
+                                                {i + 2}.
+                                              </span>
+                                              <div>
+                                                <span className="font-medium text-foreground">{alt.value}</span>
+                                                <span className="text-muted-foreground"> — {alt.reason}</span>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </HoverCardContent>
+                                  </HoverCard>
+                                )
                               }
-                              if (isSuggested && modRecsWithReasons[q.id]?.reason) {
-                                tooltipText += ` — Suggested: ${modRecsWithReasons[q.id].reason}`
-                              }
+
+                              // Non-suggested pills: keep existing Tooltip
+                              const tooltipText = (q.optionDescriptions[opt] ?? opt)
+                                + (isIncompat ? ` — Not typically used with ${q.id === "material" ? modAnswers.mfg_process : modAnswers.material}` : "")
 
                               return (
                                 <Tooltip key={opt}>
@@ -752,8 +824,6 @@ export function CadLabDiagnostics({
                                       size="sm"
                                       className={cn(
                                         "text-xs h-7",
-                                        !isSelected && isSuggested &&
-                                          "ring-1 ring-international-orange/40",
                                         isIncompat && "opacity-40",
                                       )}
                                       onClick={() =>
@@ -763,9 +833,6 @@ export function CadLabDiagnostics({
                                     >
                                       {isIncompat && (
                                         <AlertTriangle className="h-3 w-3 mr-1 text-muted-foreground" />
-                                      )}
-                                      {!isIncompat && !isSelected && isSuggested && (
-                                        <Lightbulb className="h-3 w-3 mr-1 text-international-orange/70" />
                                       )}
                                       {opt}
                                     </Button>
