@@ -53,7 +53,8 @@ export default function CadStagePage(): React.ReactNode {
     modules,
     diagnosticAnswers,
     referenceModel,
-    isAnyLoading,
+    isResearching,
+    isDecomposing,
     // Generation handlers
     handleGenerateSingleModule,
     handleGenerateAllModules,
@@ -111,6 +112,9 @@ export default function CadStagePage(): React.ReactNode {
   }, [])
 
   // ── Derived state ──
+  // INTENT: CAD-specific busy flag — excludes isGeneratingImages so CAD generation
+  // isn't blocked by background blueprint image pipeline. (#cadBusy)
+  const cadBusy = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
   const allGenerated = generatedModuleCount === modules.length && modules.length > 0
   const someGenerated = generatedModuleCount > 0
   const someNotGenerated = modules.some((m) => m.status !== "generated")
@@ -244,7 +248,7 @@ export default function CadStagePage(): React.ReactNode {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Button onClick={handleGenerateAllModules} disabled={isAnyLoading} size="sm" className="gap-1.5">
+              <Button onClick={handleGenerateAllModules} disabled={cadBusy} size="sm" className="gap-1.5">
                 {isBatchRunning ? (
                   <><Loader2 className="h-3.5 w-3.5 animate-spin" />Generating...</>
                 ) : (
@@ -297,7 +301,7 @@ export default function CadStagePage(): React.ReactNode {
                       size="sm"
                       className="flex-shrink-0 h-7 text-xs"
                       onClick={() => handleGenerateSingleModule(mod.id)}
-                      disabled={isAnyLoading}
+                      disabled={cadBusy}
                     >
                       <RotateCcw className="h-3 w-3" />
                     </Button>
@@ -385,7 +389,7 @@ export default function CadStagePage(): React.ReactNode {
                   size="sm"
                   className="gap-1.5 text-xs border-warning/40 text-warning hover:bg-warning/20"
                   onClick={handleGenerateAllModules}
-                  disabled={isAnyLoading}
+                  disabled={cadBusy}
                 >
                   <RotateCcw className="h-3 w-3" /> Retry Failed Modules
                 </Button>
@@ -450,7 +454,7 @@ export default function CadStagePage(): React.ReactNode {
                         e.stopPropagation()
                         handleGenerateSingleModule(mod.id)
                       }}
-                      disabled={isAnyLoading}
+                      disabled={cadBusy}
                     >
                       <Play className="h-3 w-3" /> Generate
                     </Button>
@@ -536,7 +540,7 @@ export default function CadStagePage(): React.ReactNode {
                     <div className="flex justify-center py-4">
                       <Button
                         onClick={() => handleGenerateSingleModule(mod.id)}
-                        disabled={isAnyLoading}
+                        disabled={cadBusy}
                         className="gap-1.5"
                       >
                         <Play className="h-4 w-4" />
@@ -563,7 +567,7 @@ export default function CadStagePage(): React.ReactNode {
                         size="sm"
                         className="gap-1 text-xs"
                         onClick={() => handleGenerateSingleModule(mod.id)}
-                        disabled={isAnyLoading}
+                        disabled={cadBusy}
                       >
                         <RotateCcw className="h-3 w-3" /> Regenerate
                       </Button>
