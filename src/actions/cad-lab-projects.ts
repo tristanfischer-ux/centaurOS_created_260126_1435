@@ -299,6 +299,8 @@ export async function saveCadLabResearch(
       .update({
         research: researchData as unknown as Json,
         status: "researched",
+        system_illustration_url: null,
+        modules: null,
       })
       .eq("id", projectId)
 
@@ -398,15 +400,19 @@ export async function saveCadLabResult(
  */
 export async function saveCadLabModules(
   projectId: string,
-  modules: CadLabModule[],
+  modulesJson: string,
 ): Promise<{ success: true } | { error: string }> {
+  // INTENT: Accept pre-serialized JSON string to avoid React Flight depth
+  // limit ("Maximum array nesting exceeded") when passing deeply nested
+  // CadLabModule[] through server action argument serialization.
   return withAuth(async ({ supabase }) => {
     if (!projectId) return { error: "Project ID required" }
 
+    const modules = JSON.parse(modulesJson)
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({
-        modules: modules as unknown as Json,
+        modules: modules as Json,
       })
       .eq("id", projectId)
 

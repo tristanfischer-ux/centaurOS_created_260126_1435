@@ -1151,7 +1151,7 @@ Style: Modern technical illustration on a clean white background. Show the compl
     imageData.mimeType,
   )
 
-  return url
+  return `${url}?v=${Date.now()}`
 }
 
 /**
