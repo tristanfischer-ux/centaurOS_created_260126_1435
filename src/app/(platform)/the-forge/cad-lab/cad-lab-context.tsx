@@ -500,13 +500,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     if (savePendingRef.current) clearTimeout(savePendingRef.current)
     savePendingRef.current = setTimeout(async () => {
       savePendingRef.current = null
-      const res = await saveCadLabModules(activeProjectId, modulesRef.current)
+      const res = await saveCadLabModules(activeProjectId, JSON.stringify(modulesRef.current))
       if ("error" in res) {
         console.error("[CAD-LAB] Debounced save failed:", res.error)
         setSaveError(true)
         // Retry once after 2s
         setTimeout(async () => {
-          const retryRes = await saveCadLabModules(activeProjectId, modulesRef.current)
+          const retryRes = await saveCadLabModules(activeProjectId, JSON.stringify(modulesRef.current))
           if ("error" in retryRes) {
             setSaveError(true)
             toast.error("Changes couldn't be saved — check your connection")
@@ -614,7 +614,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         clearTimeout(savePendingRef.current)
         savePendingRef.current = null
         if (pid) {
-          saveCadLabModules(pid, modulesRef.current).catch(() => { /* best-effort */ })
+          saveCadLabModules(pid, JSON.stringify(modulesRef.current)).catch(() => { /* best-effort */ })
         }
       }
       if (overviewPendingRef.current) {
@@ -807,7 +807,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           "Now generating illustrations for each sub-assembly...",
         ])
         if (activeProjectId) {
-          const saveRes = await saveCadLabModules(activeProjectId, res.modules)
+          const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(res.modules))
           if ("error" in saveRes) {
             console.error("[CAD-LAB] Failed to save modules:", saveRes.error)
             toast.error("Modules mapped but failed to save — your changes may be lost on reload")
@@ -1035,8 +1035,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       moduleTimeouts.set(mod.id, timeout)
     }
 
-    // Process concurrently (batch of 3) with progressive reveal
-    const CONCURRENCY = 3
+    // Process sequentially to avoid React Flight "Maximum array nesting exceeded"
+    // when multiple large base64 payloads are serialized concurrently
     let completedCount = 0
 
     const revealModule = (moduleId: string): void => {
@@ -1096,10 +1096,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     }
 
-    // Run in batches of CONCURRENCY
-    for (let i = 0; i < modulesToProcess.length; i += CONCURRENCY) {
-      const batch = modulesToProcess.slice(i, i + CONCURRENCY)
-      await Promise.allSettled(batch.map(generateOne))
+    // INTENT: Process one at a time — concurrent large base64 payloads trigger
+    // React Flight's "Maximum array nesting exceeded" serialization limit.
+    // Retry (single module, no base64) always worked; this aligns bulk gen to match.
+    for (let i = 0; i < modulesToProcess.length; i++) {
+      await generateOne(modulesToProcess[i])
+      // Small delay between calls to let React Flight serialization settle
+      if (i < modulesToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
     }
 
     // Clear any remaining safety timeouts
@@ -1109,12 +1114,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     moduleTimeouts.clear()
 
     // Final persist
-    setModules((current) => {
-      saveCadLabModules(projectId, current)
-        .then(() => setLastSaved(new Date().toISOString()))
-        .catch(() => { /* Non-critical */ })
-      return current
-    })
+    // INTENT: Read latest modules via pure updater, then save OUTSIDE setState
+    // to avoid triggering Router update during render (server actions dispatch
+    // router actions in Next.js, which is illegal inside a setState updater).
+    let snapshot: CadLabModule[] = []
+    setModules((current) => { snapshot = current; return current })
+    saveCadLabModules(projectId, JSON.stringify(snapshot))
+      .then(() => setLastSaved(new Date().toISOString()))
+      .catch(() => { /* Non-critical */ })
 
     if (completedCount > 0) {
       toast.success(`Generated ${completedCount}/${modulesToProcess.length} blueprint illustrations`)

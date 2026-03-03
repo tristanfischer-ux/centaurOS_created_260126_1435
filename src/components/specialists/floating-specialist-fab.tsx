@@ -236,7 +236,7 @@ export function FloatingSpecialistFAB(): React.ReactElement | null {
               <button
                 type="button"
                 onClick={handleGuideMeClick}
-                aria-label={`Guide me through ${screenContext.pageTitle}`}
+                aria-label={mounted ? `Guide me through ${screenContext.pageTitle}` : "Guide me through this page"}
                 className={cn(
                   "absolute -bottom-1 -left-1 flex h-6 w-6 items-center justify-center rounded-full",
                   "bg-international-orange text-white shadow-md",

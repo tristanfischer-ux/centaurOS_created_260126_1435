@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, ReactNode, CSSProperties } from "react"
+// NOTE: MobileZoomControl intentionally has no mounted guard — zoom defaults
+// to 100 on both server and client, so SSR output matches first client render.
 import { ZoomControl } from "./ZoomControl"
 
 const ZOOM_LEVELS = [80, 90, 100, 110, 120, 130, 140, 150]
@@ -58,13 +60,6 @@ export function ZoomProvider({ children }: ZoomProviderProps) {
 // Separate component for the mobile zoom control that floats above content
 export function MobileZoomControl() {
     const { zoom, setZoom } = useZoomContext()
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
-
-    if (!mounted) return null
 
     // Inverse scale so control stays readable at any zoom level
     const inverseScale = 100 / zoom
