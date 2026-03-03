@@ -47,7 +47,7 @@ import { CheckpointRevisionDiffs } from "./components/checkpoint-revision-diffs"
 export default function CadLabResearchPage(): React.ReactNode {
   const router = useRouter()
   const {
-    subject, setSubject,
+    subject, setSubject, modelId,
     referenceModel,
     isResearching,
     hasResearch, isAnyLoading, freshResearchRef, activeProjectId,
@@ -169,6 +169,16 @@ export default function CadLabResearchPage(): React.ReactNode {
       handleDecompose()
     }
   }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose, activeProjectId])
+
+  // INTENT: Compute model audit data from modules for attribution display.
+  const modelAudit = useMemo(() => {
+    if (modules.length === 0) return undefined
+    const generatedCount = modules.filter(m => m.result?.modelUsed).length
+    const imageCount = modules.filter(m => m.imageModelUsed).length
+    const imageModels = [...new Set(modules.map(m => m.imageModelUsed).filter(Boolean) as string[])]
+    if (generatedCount === 0 && imageCount === 0) return undefined
+    return { codeModel: modelId, moduleCount: modules.length, generatedCount, imageCount, imageModels }
+  }, [modules, modelId])
 
   // Fall back to research if modules tab is active but no modules exist
   useEffect(() => {
@@ -304,6 +314,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <ProductOverviewCard
                   overview={productOverview}
                   onSave={setProductOverview}
+                  modelAudit={modelAudit}
                 />
               )}
 

@@ -113,7 +113,7 @@ export default function SpecifyPage(): React.ReactNode {
   const router = useRouter()
   const searchParams = useSearchParams()
   const {
-    subject,
+    subject, modelId,
     hasResearch,
     modules,
     setModules,
@@ -134,6 +134,16 @@ export default function SpecifyPage(): React.ReactNode {
     isGeneratingImages,
     handleRefreshModuleImages,
   } = useCadLab()
+
+  // INTENT: Compute model audit data from modules for attribution display.
+  const modelAudit = useMemo(() => {
+    if (modules.length === 0) return undefined
+    const generatedCount = modules.filter(m => m.result?.modelUsed).length
+    const imageCount = modules.filter(m => m.imageModelUsed).length
+    const imageModels = [...new Set(modules.map(m => m.imageModelUsed).filter(Boolean) as string[])]
+    if (generatedCount === 0 && imageCount === 0) return undefined
+    return { codeModel: modelId, moduleCount: modules.length, generatedCount, imageCount, imageModels }
+  }, [modules, modelId])
 
   // Redirect to Design if no research or modules
   useEffect(() => {
@@ -384,6 +394,7 @@ export default function SpecifyPage(): React.ReactNode {
               <ProductOverviewCard
                 overview={productOverview}
                 onSave={setProductOverview}
+                modelAudit={modelAudit}
               />
             )}
 

@@ -522,7 +522,7 @@ export async function generateModuleImagesAction(scanId: string): Promise<
             return module // Already has an image
           }
           try {
-            const url = await generateModuleImage(scanId, module)
+            const { url } = await generateModuleImage(scanId, module)
             return { ...module, imageUrl: url, imageStatus: "complete" as const }
           } catch (error) {
             console.error(`[XRay] Failed to generate image for module ${module.id}:`, {

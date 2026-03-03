@@ -345,6 +345,8 @@ export interface CadLabModule {
   imageStatus?: "pending" | "generating" | "complete" | "failed"
   /** Error message if image generation failed */
   imageError?: string
+  /** Which model generated this module's blueprint image (e.g. "gemini-3.1-flash-image-preview", "gpt-image-1") */
+  imageModelUsed?: string
   /** AI-crafted image prompt (set during decomposition or generated on-the-fly) */
   moduleImagePrompt?: string
   /** Slug of the step_template matched as seed geometry for this module */

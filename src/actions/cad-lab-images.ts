@@ -24,6 +24,7 @@ import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/imag
 import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 /** Lean return type for single-image generation — avoids React Flight serialization limits */
@@ -31,6 +32,7 @@ interface ImageGenResult {
   imageUrl?: string
   imageStatus: "complete" | "failed"
   imageError?: string
+  imageModelUsed?: string
 }
 
 /** Concurrency limit — matches xray.ts batch size */
@@ -173,7 +175,7 @@ export async function generateCadLabSingleImageAction(
       let referenceBase64: string | undefined
 
       if (typeof visualStyleOrUrl === "string") {
-        const res = await fetch(visualStyleOrUrl, { signal: AbortSignal.timeout(5_000) })
+        const res = await fetchWithTimeout(visualStyleOrUrl, {}, 5_000)
         if (res.ok) visualStyle = await res.json() as VisualStyleSpec
       } else {
         visualStyle = visualStyleOrUrl
@@ -182,7 +184,7 @@ export async function generateCadLabSingleImageAction(
       if (referenceBase64OrUrl) {
         // DECISION: If it starts with http, it's a URL to fetch. Otherwise it's raw base64.
         if (referenceBase64OrUrl.startsWith("http")) {
-          const res = await fetch(referenceBase64OrUrl, { signal: AbortSignal.timeout(10_000) })
+          const res = await fetchWithTimeout(referenceBase64OrUrl, {}, 10_000)
           if (res.ok) {
             const buf = await res.arrayBuffer()
             referenceBase64 = Buffer.from(buf).toString("base64")
@@ -193,18 +195,21 @@ export async function generateCadLabSingleImageAction(
       }
 
       const adapted = cadLabModuleToModuleSpec(module)
-      const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
+      const { url, modelUsed } = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
 
       return {
         imageUrl: url,
         imageStatus: "complete" as const,
+        imageModelUsed: modelUsed,
       }
     } catch (err) {
-      const errorMsg = sanitizeErrorMessage(err)
-      console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, errorMsg)
+      const rawMsg = err instanceof Error ? err.message : String(err)
+      // INTENT: Pass raw error to client for debugging — image gen errors are
+      // API responses (Gemini/OpenAI status codes), not sensitive internal state.
+      console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, rawMsg)
       return {
         imageStatus: "failed" as const,
-        imageError: errorMsg,
+        imageError: rawMsg,
       }
     }
   })
@@ -242,11 +247,12 @@ export async function generateCadLabModuleImagesAction(
           const adapted = cadLabModuleToModuleSpec(module)
 
           try {
-            const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64)
+            const { url, modelUsed } = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64)
             updatedModules[globalIdx] = {
               ...module,
               imageUrl: url,
               imageStatus: "complete" as const,
+              imageModelUsed: modelUsed,
             }
             successCount++
           } catch (err) {
@@ -323,7 +329,7 @@ export async function fetchAndCropReferenceAction(
 ): Promise<{ base64: string } | { error: string }> {
   return withAuth(async () => {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
+      const response = await fetchWithTimeout(url, {}, 10_000)
       if (!response.ok) {
         return { error: `Failed to fetch reference image (${response.status})` }
       }
@@ -367,21 +373,24 @@ export async function generateVisualStyleAction(
     const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}`
 
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+      const response = await fetchWithTimeout(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: 1024,
+            system: getVisualStyleSystemPrompt(),
+            messages: [{ role: "user", content: userMessage }],
+          }),
         },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1024,
-          system: getVisualStyleSystemPrompt(),
-          messages: [{ role: "user", content: userMessage }],
-        }),
-        signal: AbortSignal.timeout(15_000),
-      })
+        15_000,
+      )
 
       if (!response.ok) {
         const errText = await response.text()

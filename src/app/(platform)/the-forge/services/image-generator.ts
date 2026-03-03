@@ -18,6 +18,7 @@
 
 import sharp from "sharp"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
 import { overlayModuleLabels, overlaySystemLegend } from "./image-overlay"
 import type { ModuleSpec, XRaySpec } from "./xray-schema"
@@ -267,7 +268,7 @@ function toNanoBananaAspectRatio(aspectRatio?: string): string {
 async function callNanoBananaImage(
   prompt: string,
   aspectRatio?: string,
-): Promise<{ mimeType: string; data: string }> {
+): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
@@ -324,7 +325,7 @@ async function callNanoBananaImage(
   }
 
   const mimeType = imagePart?.inlineData?.mimeType ?? "image/png"
-  return { mimeType, data: b64Data }
+  return { mimeType, data: b64Data, modelUsed: NANO_BANANA_MODEL }
 }
 
 /** A reference image to send as multimodal input alongside the text prompt */
@@ -351,7 +352,7 @@ async function callNanoBananaImageWithReference(
   prompt: string,
   referenceImages: ReferenceImage[],
   aspectRatio?: string,
-): Promise<{ mimeType: string; data: string }> {
+): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
@@ -413,7 +414,7 @@ async function callNanoBananaImageWithReference(
   }
 
   const mimeType = imagePart?.inlineData?.mimeType ?? "image/png"
-  return { mimeType, data: b64Data }
+  return { mimeType, data: b64Data, modelUsed: NANO_BANANA_MODEL }
 }
 
 // ─── OpenAI Fallback ─────────────────────────────────────────────────
@@ -447,7 +448,7 @@ function geminiAspectToOpenAISize(
 async function callOpenAIImage(
   prompt: string,
   size: "1024x1024" | "1024x1536" | "1536x1024",
-): Promise<{ mimeType: string; data: string }> {
+): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     throw new Error("[XRayImageGen] OPENAI_API_KEY is not configured — cannot use OpenAI fallback")
@@ -471,7 +472,7 @@ async function callOpenAIImage(
     throw new Error("[XRayImageGen] No image data returned from OpenAI")
   }
 
-  return { mimeType: "image/png", data: b64Data }
+  return { mimeType: "image/png", data: b64Data, modelUsed: OPENAI_IMAGE_MODEL }
 }
 
 /**
@@ -488,7 +489,7 @@ async function callOpenAIImage(
 async function callImageWithFallback(
   prompt: string,
   imageConfig: { aspectRatio?: string; referenceBase64?: string; moduleCropBase64?: string } = {},
-): Promise<{ mimeType: string; data: string }> {
+): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
 
@@ -629,42 +630,45 @@ export async function analyseHeroBoundingBoxes(
   if (!heroBase64 || moduleNames.length === 0) return {}
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 1024,
-        system: `You are a vision analyst identifying component regions in engineering illustrations.
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 1024,
+          system: `You are a vision analyst identifying component regions in engineering illustrations.
 
 Given a technical illustration and a list of module/sub-assembly names, identify the approximate bounding box region for each module visible in the image. Return normalised coordinates (0-1 range, where 0,0 is top-left and 1,1 is bottom-right).
 
 Return ONLY valid JSON: { "ModuleName": { "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4 }, ... }
 If a module is not clearly visible, omit it from the result. Do not include text outside JSON.`,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/png",
-                data: heroBase64,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: "image/png",
+                  data: heroBase64,
+                },
               },
-            },
-            {
-              type: "text",
-              text: `Identify the bounding box region for each of these modules in the illustration:\n${moduleNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nReturn JSON with normalised 0-1 coordinates.`,
-            },
-          ],
-        }],
-      }),
-      signal: AbortSignal.timeout(20_000),
-    })
+              {
+                type: "text",
+                text: `Identify the bounding box region for each of these modules in the illustration:\n${moduleNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nReturn JSON with normalised 0-1 coordinates.`,
+              },
+            ],
+          }],
+        }),
+      },
+      20_000,
+    )
 
     if (!response.ok) {
       console.warn(`[XRayImageGen] Bounding box API returned ${response.status}`)
@@ -867,17 +871,19 @@ async function scoreImageConsistency(
   if (!apiKey) return null
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 512,
-        system: `You are an engineering illustration quality inspector. Compare a hero/overview image (IMAGE 1) with a module detail image (IMAGE 2) and score geometric consistency on a scale of 1-10.
+    const response = await fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 512,
+          system: `You are an engineering illustration quality inspector. Compare a hero/overview image (IMAGE 1) with a module detail image (IMAGE 2) and score geometric consistency on a scale of 1-10.
 
 Scoring guide:
 - 9-10: Components in IMAGE 2 are geometrically identical to the corresponding region in IMAGE 1 — same shapes, proportions, and structural forms
@@ -888,26 +894,27 @@ Scoring guide:
 
 Return ONLY valid JSON: { "score": <number>, "issues": ["<specific geometric difference>", ...] }
 Do not include text outside JSON.`,
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: { type: "base64", media_type: "image/png", data: heroBase64 },
-            },
-            {
-              type: "image",
-              source: { type: "base64", media_type: "image/png", data: moduleBase64 },
-            },
-            {
-              type: "text",
-              text: `Score the geometric consistency of the "${moduleName}" module (IMAGE 2) against the hero image (IMAGE 1). Return JSON only.`,
-            },
-          ],
-        }],
-      }),
-      signal: AbortSignal.timeout(20_000),
-    })
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: { type: "base64", media_type: "image/png", data: heroBase64 },
+              },
+              {
+                type: "image",
+                source: { type: "base64", media_type: "image/png", data: moduleBase64 },
+              },
+              {
+                type: "text",
+                text: `Score the geometric consistency of the "${moduleName}" module (IMAGE 2) against the hero image (IMAGE 1). Return JSON only.`,
+              },
+            ],
+          }],
+        }),
+      },
+      20_000,
+    )
 
     if (!response.ok) {
       console.warn(`[XRayImageGen] Consistency scoring API returned ${response.status}`)
@@ -981,7 +988,7 @@ export async function generateModuleImage(
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
   moduleCropBase64?: string,
-): Promise<string> {
+): Promise<{ url: string; modelUsed: string }> {
   // DECISION: When a reference image is available, use the reference-aware prompt
   // that instructs Gemini to match the hero's visual style. The text-only prompt
   // (buildModulePrompt) is still used as fallback when multimodal fails.
@@ -1033,7 +1040,7 @@ export async function generateModuleImage(
     imageData.mimeType,
   )
 
-  return url
+  return { url, modelUsed: imageData.modelUsed }
 }
 
 /**
@@ -1057,13 +1064,13 @@ export async function generateModuleImageWithReference(
   module: ModuleSpec,
   referenceBase64: string,
   visualStyle: VisualStyleSpec,
-): Promise<string> {
+): Promise<{ url: string; modelUsed: string }> {
   // FLOW: tryOpenAIEdit → [fail] → text-only ghost prompt (existing path)
   const editResult = await tryOpenAIEdit(module, referenceBase64, visualStyle)
 
-  let imageData: { mimeType: string; data: string }
+  let imageData: { mimeType: string; data: string; modelUsed: string }
   if (editResult) {
-    imageData = editResult
+    imageData = { ...editResult, modelUsed: OPENAI_IMAGE_MODEL }
   } else {
     // Fallback to text-only ghost prompt
     const prompt = buildModulePrompt(module, undefined, visualStyle)
@@ -1085,7 +1092,7 @@ export async function generateModuleImageWithReference(
     imageData.mimeType,
   )
 
-  return url
+  return { url, modelUsed: imageData.modelUsed }
 }
 
 /**

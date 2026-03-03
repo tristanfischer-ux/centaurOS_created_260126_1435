@@ -6,6 +6,9 @@
  * @description Displays the executive summary extracted from the research
  * report with an inline edit toggle. User edits are stored separately from
  * the original report so the research artifact stays intact.
+ *
+ * Optional "Model Attribution" section shows which LLMs generated the
+ * code and images, with per-module counts — enables quality traceability.
  */
 
 import { useState, useRef, useEffect } from "react"
@@ -14,11 +17,42 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
+// ─── Display Name Lookup ──────────────────────────────────────────────
+
+/** Maps raw model IDs to human-friendly display names */
+function getModelDisplayName(modelId: string): string {
+  const DISPLAY_NAMES: Record<string, string> = {
+    "claude-opus-4-6": "Claude Opus 4.6",
+    "claude-sonnet-4-6": "Claude Sonnet 4.6",
+    "claude-sonnet-4-5-20250929": "Claude Sonnet 4.5",
+    "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+    "gemini-3.1-flash-image-preview": "Nano Banana 2 (Gemini)",
+    "gpt-image-1": "GPT Image 1 (OpenAI)",
+  }
+  return DISPLAY_NAMES[modelId] ?? modelId
+}
+
+// ─── Types ────────────────────────────────────────────────────────────
+
+export interface ModelAudit {
+  /** Model ID used for code generation (e.g. "claude-opus-4-6") */
+  codeModel: string
+  /** Total module count */
+  moduleCount: number
+  /** Number of modules that have been generated (have code) */
+  generatedCount: number
+  /** Number of modules that have images */
+  imageCount: number
+  /** Distinct image model IDs used across modules */
+  imageModels: string[]
+}
+
 // ─── Props ───────────────────────────────────────────────────────────
 
 interface ProductOverviewCardProps {
   overview: string
   onSave: (text: string) => void
+  modelAudit?: ModelAudit
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -26,6 +60,7 @@ interface ProductOverviewCardProps {
 export function ProductOverviewCard({
   overview,
   onSave,
+  modelAudit,
 }: ProductOverviewCardProps): React.ReactNode {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(overview)
@@ -99,6 +134,39 @@ export function ProductOverviewCard({
           <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
             {overview}
           </p>
+        )}
+
+        {/* ── Model Attribution ── */}
+        {modelAudit && (modelAudit.generatedCount > 0 || modelAudit.imageCount > 0) && (
+          <div className="border-t border-border mt-4 pt-3">
+            <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Model Attribution
+            </h4>
+            <div className="space-y-1">
+              {modelAudit.generatedCount > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Code: <span className="text-foreground font-medium">{getModelDisplayName(modelAudit.codeModel)}</span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {modelAudit.generatedCount}/{modelAudit.moduleCount} modules
+                  </span>
+                </div>
+              )}
+              {modelAudit.imageCount > 0 && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Images: <span className="text-foreground font-medium">
+                      {modelAudit.imageModels.map(getModelDisplayName).join(", ")}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {modelAudit.imageCount}/{modelAudit.moduleCount} modules
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </CardContent>
     </Card>
