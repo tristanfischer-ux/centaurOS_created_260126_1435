@@ -78,6 +78,16 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   // Load project only when explicitly requested via ?project=<id>.
   // Bare /the-forge/cad-lab always starts with a blank form (safe default).
   const projectParam = searchParams.get("project")
+  const isNewParam = searchParams.has("new")
+
+  // When ?new is present (and no ?project=), reset to a blank form.
+  // This clears localStorage so auto-restore finds nothing to load.
+  useEffect(() => {
+    if (isNewParam && !projectParam) {
+      handleReset()
+    }
+  }, [isNewParam, projectParam, handleReset])
+
   useEffect(() => {
     if (projectParam) {
       handleLoadProject(projectParam)
