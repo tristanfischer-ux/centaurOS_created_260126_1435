@@ -2314,21 +2314,22 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     dlog(`User prompt length: ${userPrompt.length} chars`)
     let text: string, tokensIn: number, tokensOut: number
 
-    // Race Sonnet + Gemini in parallel — first success wins
-    dlog(">>> RACING: Sonnet(150s) + Gemini(150s) in parallel")
+    // Race user's chosen Claude model + Gemini in parallel — first success wins
+    const claudeLabel = modelId.includes("opus") ? "Opus" : modelId.includes("haiku") ? "Haiku" : "Sonnet"
+    dlog(`>>> RACING: ${claudeLabel}(150s) + Gemini(150s) in parallel`)
     const raceStart = Date.now()
 
     type RaceResult = { text: string; tokensIn: number; tokensOut: number; model: string }
 
-    const sonnetPromise: Promise<RaceResult> = callClaude(
-      modulePrompt, userPrompt, "claude-sonnet-4-6", 8192, 150_000, 1,
+    const claudePromise: Promise<RaceResult> = callClaude(
+      modulePrompt, userPrompt, modelId, 8192, 150_000, 1,
     ).then(r => {
-      dlog(`<<< SONNET SUCCEEDED in ${Date.now() - raceStart}ms`)
-      return { ...r, model: "Sonnet" }
+      dlog(`<<< ${claudeLabel.toUpperCase()} SUCCEEDED in ${Date.now() - raceStart}ms`)
+      return { ...r, model: claudeLabel }
     }).catch(err => {
       const msg = err instanceof Error ? err.message.slice(0, 200) : String(err)
-      dlog(`<<< SONNET FAILED in ${Date.now() - raceStart}ms: ${msg}`)
-      triedModels.push({ model: "Sonnet", error: msg })
+      dlog(`<<< ${claudeLabel.toUpperCase()} FAILED in ${Date.now() - raceStart}ms: ${msg}`)
+      triedModels.push({ model: claudeLabel, error: msg })
       throw err
     })
 
@@ -2345,7 +2346,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     })
 
     try {
-      const winner = await Promise.any([sonnetPromise, geminiPromise])
+      const winner = await Promise.any([claudePromise, geminiPromise])
       text = winner.text; tokensIn = winner.tokensIn; tokensOut = winner.tokensOut
       dlog(`<<< RACE WON by ${winner.model} in ${Date.now() - raceStart}ms`)
     } catch {
