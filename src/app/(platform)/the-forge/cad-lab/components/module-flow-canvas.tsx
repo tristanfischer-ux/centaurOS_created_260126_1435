@@ -48,7 +48,7 @@ import "@xyflow/react/dist/style.css"
 
 /* ─── Layout constants ─────────────────────────────────────────────────── */
 
-const NODE_WIDTH = 220
+const NODE_WIDTH = 260
 const NODE_GAP_X = 160
 const NODE_GAP_Y = 60
 const PORT_ROW_H = 22
@@ -434,7 +434,7 @@ function ModuleFlowCanvasInner({
       fitView
       fitViewOptions={{ padding: isFullscreen ? 0.15 : 0.2 }}
       proOptions={{ hideAttribution: true }}
-      minZoom={0.2}
+      minZoom={0.35}
       maxZoom={2}
     >
       <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
@@ -541,7 +541,7 @@ export function ModuleFlowCanvas({
       </div>
 
       {/* Canvas */}
-      <div className={isFullscreen ? "flex-1" : "h-[500px] min-h-[400px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
+      <div className={isFullscreen ? "flex-1" : "h-[650px] min-h-[500px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
         <ReactFlowProvider>
           <ModuleFlowCanvasInner
             modules={modules}

@@ -251,13 +251,12 @@ export default function CadLabResearchPage(): React.ReactNode {
 
                   {/* System illustration generating */}
                   {systemIllustrationStatus === "generating" && (
-                    <Card className="overflow-hidden">
-                      <div className="aspect-[16/9] w-full bg-muted animate-pulse flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-2">
-                          <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
-                          <span className="text-xs text-muted-foreground">Generating concept illustration...</span>
-                        </div>
-                      </div>
+                    <Card className="overflow-hidden border-international-orange/20">
+                      <div className="aspect-[16/9] w-full bg-muted animate-pulse" />
+                      <CardContent className="py-3 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                        <span className="text-sm font-medium text-foreground">Generating concept illustration...</span>
+                      </CardContent>
                     </Card>
                   )}
 

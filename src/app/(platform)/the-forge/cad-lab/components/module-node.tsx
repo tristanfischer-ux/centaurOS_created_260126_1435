@@ -121,7 +121,7 @@ function PortRow({
       <span
         title={name}
         className={cn(
-          "truncate max-w-[160px] text-[10px] rounded px-1 py-px leading-tight border",
+          "truncate max-w-[190px] text-[11px] rounded px-1 py-px leading-tight border",
           pillClasses,
         )}
       >
@@ -141,7 +141,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
   return (
     <div
       className={cn(
-        "bg-background rounded-xl border-2 shadow-sm w-[220px]",
+        "bg-background rounded-xl border-2 shadow-sm w-[260px]",
         "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
         selected
           ? "ring-2 ring-international-orange/20 shadow-lg border-muted"
@@ -173,7 +173,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
       {d.inputCount > 0 && (
         <div className="pt-1 pb-0.5">
           <div className="flex items-center gap-1 px-2" style={{ height: 18 }}>
-            <span className="text-[9px] font-medium text-chart-2 uppercase tracking-wider">
+            <span className="text-[10px] font-medium text-chart-2 uppercase tracking-wider">
               Inputs ({d.inputCount})
             </span>
           </div>
@@ -192,7 +192,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
         <div className={cn("pb-1.5", d.inputCount > 0 && "pt-1")}>
           <div className="flex items-center gap-1 px-2" style={{ height: 18 }}>
             <ArrowUpFromLine className="h-2.5 w-2.5 text-chart-3" />
-            <span className="text-[9px] font-medium text-chart-3 uppercase tracking-wider">
+            <span className="text-[10px] font-medium text-chart-3 uppercase tracking-wider">
               Outputs ({d.outputCount})
             </span>
           </div>
