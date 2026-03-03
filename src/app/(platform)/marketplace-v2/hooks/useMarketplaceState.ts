@@ -187,23 +187,24 @@ export function useMarketplaceState({
     const isInitialMount = useRef(true)
 
     useEffect(() => {
-        setListings(initialListings)
-        setTotalCount(initialTotalCount ?? 0)
-        setHasMore(initialHasMore ?? false)
-        if (initialCategoryCounts) setServerCategoryCounts(initialCategoryCounts)
-        setCurrentPage(1)
-    }, [initialListings, initialTotalCount, initialHasMore, initialCategoryCounts])
-
-    useEffect(() => {
         const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300)
         return () => clearTimeout(timer)
     }, [searchQuery])
 
-    // Refetch first page when search/filter/sort change (skip initial mount to avoid double-fetch)
+    // Refetch first page when search/filter/sort change.
+    // On initial mount, skip only when no URL params are present — the server
+    // already returned the correct default results. When URL params exist
+    // (e.g. bookmarked ?q=Pack+Chlb), the server returned cached defaults
+    // so the client must fetch param-specific results.
     useEffect(() => {
         if (isInitialMount.current) {
             isInitialMount.current = false
-            return
+            const hasUrlFilters =
+                debouncedQuery.trim() !== '' ||
+                activeCategory !== defaultCategory ||
+                Object.keys(advancedFilters).length > 0 ||
+                selectedSubcategories.size > 0
+            if (!hasUrlFilters) return
         }
         fetchPage(1, false)
     }, [debouncedQuery, activeCategory, sortBy, selectedSubcategories, advancedFilters]) // eslint-disable-line react-hooks/exhaustive-deps
