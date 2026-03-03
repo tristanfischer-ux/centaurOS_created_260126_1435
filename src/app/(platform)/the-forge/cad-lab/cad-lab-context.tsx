@@ -1175,6 +1175,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
     moduleTimeouts.clear()
 
+    // INTENT: Auto-retry failed modules once with backoff. Skip if ALL failed
+    // (systemic issue like missing API key — retrying won't help).
+    let retrySnapshot: CadLabModule[] = []
+    setModules((current) => { retrySnapshot = current; return current })
+    const failedModules = modulesToProcess.filter(mod =>
+      retrySnapshot.find(m => m.id === mod.id)?.imageStatus === "failed"
+    )
+    if (failedModules.length > 0 && failedModules.length < modulesToProcess.length) {
+      setImageGenProgress({ completed: 0, total: failedModules.length, failed: 0, phase: "retrying" })
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      for (const mod of failedModules) {
+        await generateOne(mod)
+      }
+    }
+
     // Final persist
     // INTENT: Read latest modules via pure updater, then save OUTSIDE setState
     // to avoid triggering Router update during render (server actions dispatch
@@ -1185,8 +1200,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       .then(() => setLastSaved(new Date().toISOString()))
       .catch(() => { /* Non-critical */ })
 
-    if (completedCount > 0) {
-      toast.success(`Generated ${completedCount}/${modulesToProcess.length} blueprint illustrations`)
+    // Recount after retries
+    const finalCompleted = snapshot.filter(m =>
+      modulesToProcess.some(t => t.id === m.id) && m.imageStatus === "complete"
+    ).length
+    if (finalCompleted > 0) {
+      toast.success(`Generated ${finalCompleted}/${modulesToProcess.length} blueprint illustrations`)
     } else if (modulesToProcess.length > 0) {
       toast.error("All blueprint illustrations failed to generate. Check your API key or try again.")
     }
