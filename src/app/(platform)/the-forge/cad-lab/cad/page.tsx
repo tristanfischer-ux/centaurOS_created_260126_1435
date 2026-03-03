@@ -80,22 +80,16 @@ export default function CadStagePage(): React.ReactNode {
     // Interactive code workbench
     handleExecuteModuleCode,
     handleRefineModuleCode,
-    // Gate: CAD requires manufacturing orders OR all modules specified
-    manufacturingOrderCount,
-    isSpecificationComplete,
   } = useCadLab()
 
-  // INTENT: CAD stage gate — mirrors getStageAccess() logic. Redirect to
-  // Assemble (previous stage) if the user navigates here before the gate is met.
+  // INTENT: CAD stage gate — mirrors getStageAccess() logic.
+  // Requires research + modules (from Design stage). No further pipeline gates —
+  // CAD is accessible as soon as decomposition completes.
   useEffect(() => {
     if (!hasResearch || modules.length === 0) {
       router.replace(FORGE_ROUTES.cadLab)
-      return
     }
-    if (manufacturingOrderCount === 0 && !isSpecificationComplete) {
-      router.replace(FORGE_ROUTES.cadLabAssemble)
-    }
-  }, [hasResearch, modules.length, manufacturingOrderCount, isSpecificationComplete, router])
+  }, [hasResearch, modules.length, router])
 
   // ── Local UI state ──
   // INTENT: Per-module view tab and copy state to avoid cross-module interference
@@ -173,7 +167,7 @@ export default function CadStagePage(): React.ReactNode {
     }), [subject, generatedModuleCount, modules.length]),
   )
 
-  if (!hasResearch || modules.length === 0 || (manufacturingOrderCount === 0 && !isSpecificationComplete)) return null
+  if (!hasResearch || modules.length === 0) return null
 
   return (
     <div className="space-y-6">
