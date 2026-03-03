@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useEffect, useState, useCallback, useRef, useMemo } from "react"
 import {
   Box,
   Code2,
@@ -23,6 +23,7 @@ import { useRenderedViews } from "@/hooks/use-rendered-views"
 import { CodeEditor, type CodeVersion } from "./code-editor"
 import { ParameterPanel } from "./parameter-panel"
 import { extractParameters, rebuildCodeWithParameters, type ExtractedParameter } from "@/lib/cad-lab/parameter-extractor"
+import { checkPythonSyntax } from "@/lib/cad-lab/code-validators"
 
 // ─── View Tab Type ───────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ export function ModuleResultsView({
   const [editedCode, setEditedCode] = useState(code ?? "")
   const [isExecuting, setIsExecuting] = useState(false)
   const [isRefining, setIsRefining] = useState(false)
+  const [executionError, setExecutionError] = useState<string | null>(null)
   // Mutex: prevent concurrent execute/refine operations
   const busyRef = useRef(false)
   const [codeHistory, setCodeHistory] = useState<CodeVersion[]>(() =>
@@ -114,15 +116,14 @@ export function ModuleResultsView({
   )
   const originalCodeRef = useRef(code)
   // INTENT: Track code changes we initiated (via Run/Refine) vs external regeneration.
-  // Only wipe history on external changes (full module regeneration), not our own executions.
-  const selfUpdateRef = useRef(false)
+  // Counter instead of boolean — handles rapid overlapping updates safely.
+  const selfUpdateRef = useRef(0)
 
   // Sync if parent code changes externally (e.g., after full regeneration)
   useEffect(() => {
     if (code && code !== originalCodeRef.current) {
-      if (selfUpdateRef.current) {
+      if (selfUpdateRef.current > 0) {
         // Our own execution updated the parent — don't wipe history
-        selfUpdateRef.current = false
         originalCodeRef.current = code
       } else {
         // External change (full regeneration) — reset everything
@@ -133,17 +134,21 @@ export function ModuleResultsView({
     }
   }, [code])
 
-  // Extract parameters from current code
-  const parameters = extractParameters(editedCode)
+  // Extract parameters from current code (#21: memoize to avoid recalc on every render)
+  const parameters = useMemo(() => extractParameters(editedCode), [editedCode])
 
   const handleRun = useCallback(async () => {
     if (!onExecuteCode || busyRef.current) return
     busyRef.current = true
     setIsExecuting(true)
-    selfUpdateRef.current = true
+    setExecutionError(null)
+    selfUpdateRef.current++
     try {
       await onExecuteCode(moduleId, editedCode)
+    } catch (err) {
+      setExecutionError(err instanceof Error ? err.message : "Execution failed")
     } finally {
+      selfUpdateRef.current--
       setIsExecuting(false)
       busyRef.current = false
     }
@@ -159,18 +164,28 @@ export function ModuleResultsView({
     if (!onRefineCode || busyRef.current) return
     busyRef.current = true
     setIsRefining(true)
+    setExecutionError(null)
     try {
       const newCode = await onRefineCode(moduleId, editedCode, instruction)
       if (newCode) {
         setCodeHistory((prev) => [...prev, { code: newCode, instruction, timestamp: Date.now() }])
         setEditedCode(newCode)
-        // Auto-execute after refinement
-        if (onExecuteCode) {
+        // Pre-validate refined code before auto-execution (#18)
+        const syntaxIssues = checkPythonSyntax(newCode)
+        const critical = syntaxIssues.find((i) => i.severity === "critical")
+        if (critical) {
+          setExecutionError(`Syntax issue: ${critical.message}`)
+          // Skip auto-execute — let user review and fix
+        } else if (onExecuteCode) {
+          // Auto-execute after refinement
           setIsExecuting(true)
-          selfUpdateRef.current = true
+          selfUpdateRef.current++
           try {
             await onExecuteCode(moduleId, newCode)
+          } catch (err) {
+            setExecutionError(err instanceof Error ? err.message : "Execution failed")
           } finally {
+            selfUpdateRef.current--
             setIsExecuting(false)
           }
         }
@@ -193,15 +208,26 @@ export function ModuleResultsView({
   useEffect(() => { editedCodeRef.current = editedCode }, [editedCode])
 
   const handleParameterChange = useCallback((params: ExtractedParameter[]) => {
+    if (busyRef.current) return
     const newCode = rebuildCodeWithParameters(editedCodeRef.current, params)
     setEditedCode(newCode)
     editedCodeRef.current = newCode
     setCodeHistory((prev) => [...prev, { code: newCode, instruction: "Parameter adjustment", timestamp: Date.now() }])
+    setExecutionError(null)
     // Auto-execute after parameter change
     if (onExecuteCode) {
+      busyRef.current = true
       setIsExecuting(true)
-      selfUpdateRef.current = true
-      onExecuteCode(moduleId, newCode).finally(() => setIsExecuting(false))
+      selfUpdateRef.current++
+      onExecuteCode(moduleId, newCode)
+        .catch((err) => {
+          setExecutionError(err instanceof Error ? err.message : "Execution failed")
+        })
+        .finally(() => {
+          selfUpdateRef.current--
+          setIsExecuting(false)
+          busyRef.current = false
+        })
     }
   }, [onExecuteCode, moduleId])
 
@@ -492,6 +518,12 @@ export function ModuleResultsView({
                   onChange={handleParameterChange}
                   disabled={isExecuting || isRefining}
                 />
+              )}
+              {/* Inline execution error (#3) */}
+              {executionError && (
+                <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded px-2.5 py-1.5">
+                  {executionError}
+                </p>
               )}
               {/* Monaco editor with Run/Refine */}
               <CodeEditor

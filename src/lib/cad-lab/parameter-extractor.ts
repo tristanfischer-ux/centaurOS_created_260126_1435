@@ -93,20 +93,32 @@ export function rebuildCodeWithParameters(
   const lines = code.split("\n")
 
   for (const param of params) {
-    if (param.line >= 0 && param.line < lines.length) {
-      const originalLine = lines[param.line]
-      // Replace the numeric value in the parameter assignment
-      const match = PARAM_RE.exec(originalLine.trim())
-      if (match && match[1] === param.name) {
-        const comment = match[3] ? `  # ${match[3]}` : ""
-        // Format value: use original precision style
-        const formatted = Number.isInteger(param.value)
-          ? param.value.toString()
-          : param.value.toFixed(countDecimals(match[2]))
-        // Preserve leading whitespace
-        const indent = originalLine.match(/^(\s*)/)?.[1] ?? ""
-        lines[param.line] = `${indent}${param.name} = ${formatted}${comment}`
-      }
+    // Find actual line — scan from stored index first, fall back to full search (#5)
+    let targetLine = param.line
+    if (
+      targetLine < 0 ||
+      targetLine >= lines.length ||
+      !PARAM_RE.exec(lines[targetLine].trim())?.at(1)?.match(new RegExp(`^${param.name}$`))
+    ) {
+      // User may have added/removed lines — search for the parameter by name
+      targetLine = lines.findIndex((l) => {
+        const m = PARAM_RE.exec(l.trim())
+        return m && m[1] === param.name
+      })
+      if (targetLine === -1) continue // Parameter was deleted — skip
+    }
+
+    const originalLine = lines[targetLine]
+    const match = PARAM_RE.exec(originalLine.trim())
+    if (match && match[1] === param.name) {
+      const comment = match[3] ? `  # ${match[3]}` : ""
+      // Format value: use original precision style
+      const formatted = Number.isInteger(param.value)
+        ? param.value.toString()
+        : param.value.toFixed(countDecimals(match[2]))
+      // Preserve leading whitespace
+      const indent = originalLine.match(/^(\s*)/)?.[1] ?? ""
+      lines[targetLine] = `${indent}${param.name} = ${formatted}${comment}`
     }
   }
 

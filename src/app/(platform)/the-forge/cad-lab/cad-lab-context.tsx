@@ -2205,12 +2205,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [debouncedSaveModules])
 
   // ── Interactive code workbench: refine code with natural language ──
+  // INTENT: Use modulesRef instead of modules to avoid stale closure (#4)
   const handleRefineModuleCode = useCallback(async (
     moduleId: string,
     currentCode: string,
     instruction: string,
   ): Promise<string | null> => {
-    const mod = modules.find((m) => m.id === moduleId)
+    const mod = modulesRef.current.find((m) => m.id === moduleId)
     if (!mod) return null
 
     const res = await refineCadQueryCodeAction(currentCode, instruction, {
@@ -2225,7 +2226,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     return res.code
-  }, [modules])
+  }, [])
 
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
