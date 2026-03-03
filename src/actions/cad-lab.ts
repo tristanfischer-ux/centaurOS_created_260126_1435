@@ -264,7 +264,7 @@ async function callClaude(
  */
 async function callGeminiWithSearch(
   prompt: string,
-  modelId: string = "gemini-3-flash-preview",
+  modelId: string = "gemini-3.1-flash-lite-preview",
 ): Promise<{
   text: string
   sources: Array<{ uri: string; title: string }>

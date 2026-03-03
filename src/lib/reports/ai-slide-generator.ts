@@ -27,7 +27,7 @@ import type {
 // DECISION: Reuse the same module-level SDK instantiation pattern as ai-narrative.ts
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
 
-const MODEL_ID = 'gemini-3-flash-preview'
+const MODEL_ID = 'gemini-3.1-flash-lite-preview'
 // DECISION: 60s timeout (not 30s) because structured JSON generation with
 // 12-18 slides takes significantly longer than a short narrative summary.
 const API_TIMEOUT_MS = 60_000
@@ -296,7 +296,7 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
         body: 'The strategic briefing system uses Google Gemini to synthesize source material into a structured presentation.',
         supportingPoints: [
           'Set GOOGLE_AI_API_KEY in your environment variables',
-          'The system uses the gemini-3-flash-preview model for fast generation',
+          'The system uses the gemini-3.1-flash-lite-preview model for fast generation',
           'Fallback content is shown when the API is unavailable',
         ],
       },
