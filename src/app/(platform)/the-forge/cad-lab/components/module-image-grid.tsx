@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { EditableList } from "../../components/editable-list"
 import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { ImageGenProgress } from "../cad-lab-context"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -44,6 +45,7 @@ interface ModuleImageGridProps {
   onToggleExpand: (id: string) => void
   onModuleSave?: (updated: CadLabModule) => void
   onRetryModule?: (moduleId: string) => void
+  imageGenProgress?: ImageGenProgress | null
 }
 
 // ─── Module Detail Dialog ─────────────────────────────────────────────
@@ -428,6 +430,7 @@ export function ModuleImageGrid({
   onToggleExpand,
   onModuleSave,
   onRetryModule,
+  imageGenProgress,
 }: ModuleImageGridProps): React.ReactNode {
   const visibleModules = modules.filter((m) => revealedModuleIds.has(m.id))
   const selectedModule = expandedModuleId
@@ -436,6 +439,27 @@ export function ModuleImageGrid({
 
   return (
     <>
+      {/* Progress banner — visible during image generation */}
+      {imageGenProgress && (
+        <div className="rounded-lg border border-international-orange/20 bg-muted/50 overflow-hidden">
+          <div className="h-1 bg-international-orange/10">
+            <div
+              className="h-full bg-international-orange transition-all duration-500 ease-out"
+              style={{ width: `${imageGenProgress.total > 0 ? Math.round((imageGenProgress.completed / imageGenProgress.total) * 100) : 0}%` }}
+            />
+          </div>
+          <div className="px-4 py-3 flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-international-orange animate-pulse" />
+            <p className="text-sm text-foreground">
+              {imageGenProgress.phase === "retrying"
+                ? `Retrying failed illustrations: ${imageGenProgress.completed}/${imageGenProgress.total}`
+                : `Generating illustrations: ${imageGenProgress.completed}/${imageGenProgress.total} complete`}
+              {imageGenProgress.failed > 0 && `, ${imageGenProgress.failed} failed`}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         <AnimatePresence mode="popLayout">
           {visibleModules.map((module) => (

@@ -35,7 +35,7 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDecompositionConnections } from "@/actions/cad-lab-projects"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
   listCadLabProjects,
@@ -63,6 +63,7 @@ import type {
   DecompositionCheckpoint,
   EarlyCostEstimate,
   InterfaceContract,
+  ModuleConnection,
   SpecialistReview,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
@@ -93,6 +94,13 @@ function extractExecutiveSummary(report: string): string | null {
 // ─── Context Shape ───────────────────────────────────────────────────
 
 type MilestoneType = "research" | "breakdown" | "generate" | "batch" | null
+
+export interface ImageGenProgress {
+  completed: number
+  total: number
+  failed: number
+  phase?: "generating" | "retrying"
+}
 
 export interface CadLabContextValue {
   // Project persistence
@@ -172,6 +180,7 @@ export interface CadLabContextValue {
 
   // Image generation (Gemini blueprint illustrations)
   isGeneratingImages: boolean
+  imageGenProgress: ImageGenProgress | null
   handleGenerateModuleImages: (modules: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string) => Promise<void>
   handleRefreshModuleImages: () => Promise<void>
 
@@ -215,6 +224,9 @@ export interface CadLabContextValue {
 
   // P9: Early cost estimates (keyed by moduleId)
   earlyCostEstimates: Record<string, EarlyCostEstimate>
+
+  // Decomposition connections (highest-fidelity edge source)
+  decompositionConnections: ModuleConnection[]
 
   // P1: Interface contracts
   interfaceContracts: InterfaceContract[]
@@ -389,6 +401,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Image generation state (Gemini blueprint illustrations) ──
   const [isGeneratingImages, setIsGeneratingImages] = useState(false)
+  const [imageGenProgress, setImageGenProgress] = useState<ImageGenProgress | null>(null)
 
   // ── Progressive module reveal ──
   const [revealedModuleIds, setRevealedModuleIds] = useState<Set<string>>(new Set())
@@ -418,6 +431,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // P9: Early cost estimates keyed by moduleId
   const [earlyCostEstimates, setEarlyCostEstimates] = useState<Record<string, EarlyCostEstimate>>({})
+
+  // Decomposition connections (AI-declared inter-module topology)
+  const [decompositionConnections, setDecompositionConnections] = useState<ModuleConnection[]>([])
 
   // P1: Interface contracts between modules
   const [interfaceContracts, setInterfaceContracts] = useState<InterfaceContract[]>([])
@@ -774,6 +790,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setRevealedModuleIds(new Set(res.modules.map(m => m.id))) // Reveal immediately so text is visible while images generate
         setMilestone("breakdown")
 
+        // Persist decomposition connections (highest-fidelity edge source)
+        if (res.connections && res.connections.length > 0) {
+          setDecompositionConnections(res.connections)
+          if (activeProjectId) {
+            saveCadLabDecompositionConnections(activeProjectId, res.connections)
+              .catch((e) => console.error("[CAD-LAB] Failed to persist decomposition connections:", e))
+          }
+        }
+
         // Seed product overview from executive summary (fires exactly once — on decomposition)
         if (!productOverviewRef.current) {
           const summary = extractExecutiveSummary(editableReport)
@@ -1010,6 +1035,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) return
     setIsGeneratingImages(true)
+    setImageGenProgress({ completed: 0, total: modulesToProcess.length, failed: 0, phase: "generating" })
 
     // Immediately set all modules to "generating" image status in local state
     setModules((prev) =>
@@ -1101,11 +1127,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError } : m)),
           )
-          if (res.imageStatus === "complete") completedCount++
+          if (res.imageStatus === "complete") {
+            completedCount++
+            setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
+          } else if (res.imageStatus === "failed") {
+            setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
+          }
         } else if ("error" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: res.error } : m)),
           )
+          setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
         }
         revealModule(mod.id)
       } catch (err) {
@@ -1114,6 +1146,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setModules((prev) =>
           prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: errorMsg } : m)),
         )
+        setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
         revealModule(mod.id)
       }
     }
@@ -1158,6 +1191,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       toast.error("All blueprint illustrations failed to generate. Check your API key or try again.")
     }
     setIsGeneratingImages(false)
+    setImageGenProgress(null)
   }, [activeProjectId])
 
   // ── Refresh module images using current diagnostic specs ──
@@ -1916,6 +1950,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       setIntegratedAssemblyStepUrl(p.integratedAssemblyStepUrl ?? null)
       setCheckpoints(p.checkpoints ?? null)
       setProductOverview(p.productOverview ?? "")
+      // Load decomposition connections
+      setDecompositionConnections(p.decompositionConnections ?? [])
       // P1: Load persisted interface contracts + unmatched ports
       setInterfaceContracts(p.interfaceContracts?.contracts ?? [])
       setUnmatchedPorts({
@@ -2109,7 +2145,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     diagnosticAnswers, setDiagnosticAnswers, aiPrefilled,
     handleDecompose, handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
     isBatchRunning, batchProgress,
-    isGeneratingImages, handleGenerateModuleImages, handleRefreshModuleImages,
+    isGeneratingImages, imageGenProgress, handleGenerateModuleImages, handleRefreshModuleImages,
     revealedModuleIds,
     visualStyle,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
@@ -2121,6 +2157,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
     earlyCostEstimates,
+    decompositionConnections,
     interfaceContracts,
     isExtractingContracts,
     unmatchedPorts,
