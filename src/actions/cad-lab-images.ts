@@ -18,6 +18,7 @@
 
 import type { CadLabModule, VisualStyleSpec } from "@/lib/cad-lab-types"
 import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-adapter"
+import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration, prepareReferenceImage, cropReferenceFor3x2, analyseHeroBoundingBoxes, cropModuleRegion } from "@/app/(platform)/the-forge/services/image-generator"
 import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
 import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
@@ -59,7 +60,7 @@ interface GenerateImagesResult {
  */
 export async function generateCadLabSingleImageAction(
   projectId: string,
-  module: CadLabModule,
+  module: ImageGenModuleInput,
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
   moduleCropBase64?: string,

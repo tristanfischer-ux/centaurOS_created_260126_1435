@@ -51,6 +51,7 @@ import {
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
 import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction } from "@/actions/cad-lab-images"
+import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 import type {
@@ -1057,7 +1058,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // INTENT: Strip heavy data (SVGs, code, research, templateMatchResult) to stay under
         // the 4 MB Next.js bodySizeLimit. The image server action only needs identity + text
         // fields for prompt construction.
-        const slimMod: CadLabModule = {
+        const slimMod: ImageGenModuleInput = {
           id: mod.id,
           name: mod.name,
           purpose: mod.purpose,
@@ -1069,9 +1070,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           whyItMatters: mod.whyItMatters,
           failureModes: mod.failureModes,
           unknowns: mod.unknowns,
-          status: mod.status,
           moduleImagePrompt: mod.moduleImagePrompt,
-          seedTemplateSlug: mod.seedTemplateSlug,
           imageStatus: mod.imageStatus,
         }
         const moduleCrop = moduleCrops?.get(mod.id)
@@ -1846,7 +1845,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       if (p.modules && p.modules.length > 0) {
-        setModules(p.modules)
+        // INTENT: Failed image statuses are transient (API timeouts, stale errors, etc.)
+        // and shouldn't persist across sessions — clear them so users see pending skeletons
+        // instead of stale error messages. Only imageUrl (successful results) persists.
+        const cleanedModules = p.modules.map(m =>
+          m.imageStatus === "failed"
+            ? { ...m, imageStatus: undefined, imageError: undefined }
+            : m
+        )
+        setModules(cleanedModules)
         // All loaded modules are immediately revealed (no progressive reveal for saved projects)
         setRevealedModuleIds(new Set(p.modules.map((m) => m.id)))
         // Recompute revisedModuleIds and acknowledgment from persisted conceptSnapshot

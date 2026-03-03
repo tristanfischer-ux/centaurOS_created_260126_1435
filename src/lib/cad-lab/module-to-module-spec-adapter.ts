@@ -17,16 +17,34 @@
  * - ModuleSpec type: src/app/(platform)/the-forge/services/xray-schema.ts
  */
 
-import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { ModuleSpec } from "@/app/(platform)/the-forge/services/xray-schema"
 
+/** Lean input type for image generation — only the fields cadLabModuleToModuleSpec reads */
+export interface ImageGenModuleInput {
+  id: string
+  name: string
+  purpose: string
+  inputs: string[]
+  outputs: string[]
+  keyParts: string[]
+  leadWeeks: number
+  description: string
+  whyItMatters: string
+  failureModes: string[]
+  unknowns: string[]
+  moduleImagePrompt?: string
+  imageUrl?: string
+  imageStatus?: string
+}
+
 /**
- * Adapts a CadLabModule to the ModuleSpec shape expected by image-generator.ts.
+ * Adapts an ImageGenModuleInput (or CadLabModule) to the ModuleSpec shape
+ * expected by image-generator.ts.
  *
  * Fields not used by the image generator are filled with safe defaults to satisfy
  * the TypeScript type without introducing false data.
  */
-export function cadLabModuleToModuleSpec(module: CadLabModule): ModuleSpec {
+export function cadLabModuleToModuleSpec(module: ImageGenModuleInput): ModuleSpec {
   return {
     id: module.id,
     name: module.name,
