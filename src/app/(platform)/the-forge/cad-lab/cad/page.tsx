@@ -1,13 +1,13 @@
 "use client"
 
 /**
- * @file cad/page.tsx — The Forge: CAD stage (Stage 5 — Beta).
+ * @file cad/page.tsx — The Forge: CAD stage (Stage 5).
  *
  * @description Dedicated CAD generation page. Consumes existing context handlers
  * to generate per-module CadQuery models and build the system assembly.
  * No tabs — single-purpose page with generation controls and results display.
  *
- * Pipeline: Design → Specify → Source → Assemble → **CAD (Beta)**
+ * Pipeline: Design → Specify → Source → Assemble → **CAD**
  *
  * Gate: requires manufacturing orders OR all modules specified.
  */
@@ -180,9 +180,6 @@ export default function CadStagePage(): React.ReactNode {
           <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Box className="h-5 w-5 text-international-orange" />
             CAD Generation
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-              Beta
-            </span>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Generate parametric CadQuery models for each module and build the system assembly.

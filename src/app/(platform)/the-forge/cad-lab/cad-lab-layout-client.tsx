@@ -111,9 +111,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         <div className="flex items-center gap-3">
           <div className="h-8 w-1 rounded-full bg-international-orange" />
           <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-            Beta
-          </span>
           {sector && (
             <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
               <Factory className="h-3 w-3" />
@@ -240,9 +237,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             )}
           >
             Template Library
-            <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-              Beta
-            </span>
           </Link>
           <Link
             href={FORGE_ROUTES.cadLabMashup}
@@ -254,9 +248,6 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             )}
           >
             Mashup Lab
-            <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-              Beta
-            </span>
           </Link>
         </div>
       </div>

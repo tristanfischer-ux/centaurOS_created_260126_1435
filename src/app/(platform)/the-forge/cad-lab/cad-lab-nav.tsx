@@ -99,7 +99,7 @@ export const STAGES: StageDefinition[] = [
     icon: Box,
     href: FORGE_ROUTES.cadLabCad,
     description: "Generate parametric CAD models and build the system assembly.",
-    unlockHint: "Complete manufacturing orders or finish all module specifications",
+    unlockHint: "Complete module decomposition in the Design stage",
     features: ["Per-module CadQuery generation", "Batch pipeline", "DFM analysis", "Hierarchical STEP assembly"],
   },
 ]
@@ -126,7 +126,7 @@ export function getStageAccess(
     specify: { enabled: hasResearch && moduleCount > 0, completed: specifiedModuleCount > 0 && specifiedModuleCount === moduleCount },
     source: { enabled: specifiedModuleCount > 0, completed: manufacturingOrderCount > 0 },
     assemble: { enabled: manufacturingOrderCount > 0, completed: false },
-    cad: { enabled: manufacturingOrderCount > 0 || isSpecificationComplete, completed: false },
+    cad: { enabled: hasResearch && moduleCount > 0, completed: false },
   }
 }
 
@@ -178,8 +178,7 @@ export function CadLabBottomNav(): React.ReactNode {
                 <span className="flex items-center gap-0.5">
                   <span className="sm:hidden">{stage.mobileLabel}</span>
                   <span className="hidden sm:inline">{stage.label}</span>
-                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase text-international-orange hidden sm:inline">β</span>}
-                </span>
+                                  </span>
               </Link>
             ) : (
               <button
@@ -191,7 +190,6 @@ export function CadLabBottomNav(): React.ReactNode {
                 <span className="flex items-center gap-0.5">
                   <span className="sm:hidden">{stage.mobileLabel}</span>
                   <span className="hidden sm:inline">{stage.label}</span>
-                  {stage.id === "cad" && <span className="text-[7px] font-semibold uppercase opacity-50 hidden sm:inline">β</span>}
                 </span>
               </button>
             )
@@ -324,12 +322,6 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                             {specifiedModuleCount}/{modules.length}
                           </span>
                         )}
-                        {/* Beta badge for CAD stage */}
-                        {stage.id === "cad" && (
-                          <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-                            Beta
-                          </span>
-                        )}
                       </span>
                     </span>
                   </Link>
@@ -346,11 +338,6 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                       <span className="sm:hidden">{stage.mobileLabel}</span>
                       <span className="hidden sm:inline">
                         {stage.label}
-                        {stage.id === "cad" && (
-                          <span className="ml-1 inline-flex items-center px-1 py-0.5 rounded text-[8px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground/50 border border-muted">
-                            Beta
-                          </span>
-                        )}
                       </span>
                     </span>
                   </button>
