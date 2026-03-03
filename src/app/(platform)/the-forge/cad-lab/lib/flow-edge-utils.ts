@@ -40,7 +40,9 @@ export interface FlowEdge {
 /** Keywords that classify a connection's signal type. */
 export const SIGNAL_KEYWORDS: Record<Exclude<SignalType, "other">, string[]> = {
   power: ["voltage", "battery", "current", "watt", "amp", "dc", "charger", "power", "supply", "energy", "fuel", "charge", "discharge"],
-  data: ["signal", "data", "control", "sensor", "telemetry", "pwm", "serial", "usb", "uart", "command", "feedback", "communication", "protocol", "digital", "analog", "throttle", "motor", "input", "output", "pilot"],
+  // DECISION: Removed "motor" (belongs in mechanical — "motor torque" misclassified as data),
+  // "input"/"output" (too generic — nearly every port label contains these words).
+  data: ["signal", "data", "control", "sensor", "telemetry", "pwm", "serial", "usb", "uart", "command", "feedback", "communication", "protocol", "digital", "analog", "throttle", "pilot"],
   mechanical: ["force", "torque", "mount", "structural", "load", "bracket", "axle", "frame", "chassis", "gear", "shaft", "bearing", "mechanical", "assembly", "deploy", "deployment", "propulsion", "thrust", "lift", "arm", "capability"],
   thermal: ["heat", "thermal", "cooling", "temperature", "dissipation", "fan", "heatsink", "ventilation"],
 }

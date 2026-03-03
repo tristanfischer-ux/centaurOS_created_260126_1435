@@ -115,7 +115,8 @@ export async function updateAssemblyStatus(
   jobId: string,
   status: string,
 ): Promise<{ success: boolean } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  // SECURITY: foundry_id filter prevents cross-tenant status updates
+  return withAuth(async ({ supabase, foundryId }) => {
     const updateData: Record<string, string | null> = { status }
     if (status === "in_progress" || status === "assembling") {
       updateData.started_at = new Date().toISOString()
@@ -131,6 +132,7 @@ export async function updateAssemblyStatus(
       .from("assembly_jobs")
       .update(updateData)
       .eq("id", jobId)
+      .eq("foundry_id", foundryId)
 
     if (error) {
       return { error: sanitizeErrorMessage(error) }
@@ -148,7 +150,8 @@ export async function updateOrderLineStatus(
   status: string,
   trackingReference?: string,
 ): Promise<{ success: boolean } | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  // SECURITY: foundry_id filter prevents cross-tenant status updates
+  return withAuth(async ({ supabase, foundryId }) => {
     const updateData: Record<string, string> = { status }
     if (trackingReference) {
       updateData.notes = `Tracking: ${trackingReference}`
@@ -158,6 +161,7 @@ export async function updateOrderLineStatus(
       .from("manufacturing_orders")
       .update(updateData)
       .eq("id", orderId)
+      .eq("foundry_id", foundryId)
 
     if (error) {
       return { error: sanitizeErrorMessage(error) }
