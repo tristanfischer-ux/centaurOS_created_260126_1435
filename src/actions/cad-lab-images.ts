@@ -24,6 +24,13 @@ import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
+/** Lean return type for single-image generation — avoids React Flight serialization limits */
+interface ImageGenResult {
+  imageUrl?: string
+  imageStatus: "complete" | "failed"
+  imageError?: string
+}
+
 /** Concurrency limit — matches xray.ts batch size */
 const BATCH_SIZE = 3
 
@@ -56,28 +63,22 @@ export async function generateCadLabSingleImageAction(
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
   moduleCropBase64?: string,
-): Promise<{ module: CadLabModule } | { error: string }> {
+): Promise<ImageGenResult | { error: string }> {
   return withAuth(async () => {
     try {
       const adapted = cadLabModuleToModuleSpec(module)
       const url = await generateModuleImage(projectId, adapted, undefined, visualStyle, referenceBase64, moduleCropBase64)
 
       return {
-        module: {
-          ...module,
-          imageUrl: url,
-          imageStatus: "complete" as const,
-        },
+        imageUrl: url,
+        imageStatus: "complete" as const,
       }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error(`[CAD-LAB-IMAGES] Failed to generate image for ${module.name}:`, errorMsg)
       return {
-        module: {
-          ...module,
-          imageStatus: "failed" as const,
-          imageError: errorMsg,
-        },
+        imageStatus: "failed" as const,
+        imageError: errorMsg,
       }
     }
   })

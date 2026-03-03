@@ -1076,11 +1076,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         }
         const moduleCrop = moduleCrops?.get(mod.id)
         const res = await generateCadLabSingleImageAction(projectId, slimMod, visualStyle, referenceBase64, moduleCrop)
-        if ("module" in res) {
+        if ("imageStatus" in res) {
           setModules((prev) =>
-            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.module.imageUrl, imageStatus: res.module.imageStatus, imageError: res.module.imageError } : m)),
+            prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: res.imageUrl, imageStatus: res.imageStatus, imageError: res.imageError } : m)),
           )
-          if (res.module.imageStatus === "complete") completedCount++
+          if (res.imageStatus === "complete") completedCount++
         } else if ("error" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: res.error } : m)),
