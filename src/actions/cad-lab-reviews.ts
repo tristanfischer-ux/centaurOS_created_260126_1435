@@ -48,7 +48,7 @@ import type { ConversationMessage } from "@/lib/agent-memory"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const REVIEW_MODEL = "claude-sonnet-4-6"
+const REVIEW_MODEL = "claude-opus-4-6"
 const MAX_TOOL_LOOPS = 5
 const MAX_TOKENS = 8192
 

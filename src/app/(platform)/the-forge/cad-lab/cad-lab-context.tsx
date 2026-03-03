@@ -310,7 +310,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Input state ──
   const [subject, setSubject] = useState("")
-  const [modelId, setModelId] = useState<ClaudeModelId>("claude-sonnet-4-6")
+  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-6")
 
   // Persist draft subject so it survives navigation before Research is triggered
   useEffect(() => {
@@ -916,8 +916,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   .catch((e) => console.error("[CAD-LAB] Failed to persist visual style:", e))
               }
             }
-          } catch {
-            // Non-critical — images still generate, just without coordinated style
+          } catch (e) {
+            console.warn("[CAD-LAB] Visual style generation failed (images will generate without coordinated style):", e)
           }
 
           // FLOW: Pass 1 — generate system illustration FIRST, then prepare it
@@ -948,8 +948,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   if ("base64" in cropRes) {
                     referenceBase64 = cropRes.base64
                   }
-                } catch {
-                  // Non-critical — module images still generate via text-only path
+                } catch (e) {
+                  console.warn("[CAD-LAB] Failed to fetch/crop reference image (modules will generate via text-only path):", e)
                 }
 
                 // Layer 2: Analyse hero for per-module bounding boxes, then crop each
@@ -966,7 +966,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                           if ("base64" in cropResult) {
                             return { id: mod.id, crop: cropResult.base64 }
                           }
-                        } catch { /* ignore individual crop failures */ }
+                        } catch (e) { console.warn(`[CAD-LAB] Module crop failed for ${mod.name}:`, e) }
                         return { id: mod.id, crop: undefined }
                       })
                       const cropResults = await Promise.all(cropPromises)
@@ -974,8 +974,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                         if (cr.crop) moduleCrops.set(cr.id, cr.crop)
                       }
                     }
-                  } catch {
-                    // Non-critical — modules still generate with full-hero-only reference
+                  } catch (e) {
+                    console.warn("[CAD-LAB] Bounding box analysis failed (modules will generate with full-hero reference):", e)
                   }
                 }
               } else {
@@ -1070,8 +1070,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           referenceUrl = uploadRes.referenceUrl
           visualStyleUrl = uploadRes.visualStyleUrl
         }
-      } catch {
-        // Non-critical — fall back to inline base64/object
+      } catch (e) {
+        console.warn("[CAD-LAB] Failed to upload shared image assets (falling back to inline):", e)
       }
     }
 
@@ -1143,12 +1143,20 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
           } else if (res.imageStatus === "failed") {
             setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
+            // INTENT: Show actual error on first failure so user can diagnose
+            if (res.imageError && completedCount === 0) {
+              toast.error(`Image gen error: ${res.imageError.slice(0, 120)}`)
+            }
           }
         } else if ("error" in res) {
           setModules((prev) =>
             prev.map((m) => (m.id === mod.id ? { ...m, imageStatus: "failed" as const, imageError: res.error } : m)),
           )
           setImageGenProgress(p => p ? { ...p, completed: p.completed + 1, failed: p.failed + 1 } : p)
+          // INTENT: Show actual error on first failure so user can diagnose
+          if (res.error && completedCount === 0) {
+            toast.error(`Image gen error: ${res.error.slice(0, 120)}`)
+          }
         }
         revealModule(mod.id)
       } catch (err) {
@@ -1165,18 +1173,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // INTENT: Process one at a time — concurrent large base64 payloads trigger
     // React Flight's "Maximum array nesting exceeded" serialization limit.
     // Retry (single module, no base64) always worked; this aligns bulk gen to match.
-    try {
-      for (let i = 0; i < modulesToProcess.length; i++) {
-        await generateOne(modulesToProcess[i])
-        // Small delay between calls to let React Flight serialization settle
-        if (i < modulesToProcess.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500))
-        }
-      }
-    } finally {
-      // Clean up shared assets from Storage regardless of success/failure
-      if (referenceUrl || visualStyleUrl) {
-        cleanupSharedImageAssetsAction(projectId).catch(() => { /* Non-critical */ })
+    for (let i = 0; i < modulesToProcess.length; i++) {
+      await generateOne(modulesToProcess[i])
+      // Small delay between calls to let React Flight serialization settle
+      if (i < modulesToProcess.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
 
@@ -1199,6 +1200,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       for (const mod of failedModules) {
         await generateOne(mod)
       }
+    }
+
+    // INTENT: Clean up shared assets AFTER retry loop — retried modules still need
+    // the shared reference/style URLs to be alive.
+    if (referenceUrl || visualStyleUrl) {
+      cleanupSharedImageAssetsAction(projectId).catch((e) => {
+        console.warn("[CAD-LAB] Cleanup of shared image assets failed:", e)
+      })
     }
 
     // Final persist

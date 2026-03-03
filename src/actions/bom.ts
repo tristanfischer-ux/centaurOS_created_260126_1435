@@ -29,7 +29,7 @@ import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const BOM_MODEL = "claude-sonnet-4-6"
+const BOM_MODEL = "claude-opus-4-6"
 const BOM_MAX_TOKENS = 8192
 /** Max depth for BOM tree recursion to prevent infinite loops from cyclic data */
 const MAX_BOM_DEPTH = 20

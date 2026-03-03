@@ -37,6 +37,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createClient } from "@/lib/supabase/server"
 import { CAD_INSTRUCTIONS } from "@/lib/cad-instructions"
 import { fetchLibrarySummary, formatLibraryForPrompt, prepareCodeWithLibrary } from "@/actions/component-library"
@@ -149,29 +150,8 @@ function extractJsonObject(text: string): string {
 
 // ─── Claude API Call ─────────────────────────────────────────────────
 
-// INTENT: AbortSignal.timeout() silently fails to abort in-flight fetches in Next.js
-// server actions (Node.js runtime). Promise.race guarantees we reject after timeoutMs,
-// while AbortController.abort() attempts to kill the TCP connection for cleanup.
-// TRIED: AbortSignal.timeout alone — hangs indefinitely on Opus decomposition calls.
-async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await Promise.race([
-      fetch(url, { ...init, signal: controller.signal }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), timeoutMs),
-      ),
-    ])
-    return response
-  } finally {
-    clearTimeout(timer)
-  }
-}
+// FLOW: fetchWithTimeout imported from @/lib/fetch-with-timeout (shared util).
+// See that file for explanation of why AbortSignal.timeout() is unreliable in Next.js.
 
 /**
  * Calls a Claude model and returns the response text.
@@ -185,7 +165,7 @@ async function fetchWithTimeout(
 async function callClaude(
   systemPrompt: string,
   userPrompt: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   maxTokens: number = 16384,
   timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
   maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback
@@ -896,7 +876,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
 export async function generateCadLabInterface(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
 ): Promise<CadLabInterfaceResult & { templateMatchResult?: TemplateMatchResult }> {
@@ -1097,7 +1077,7 @@ export async function generateCadLabModel(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   checkpointContext?: string,
   interfaceWarnings?: PreExecValidationResult[],
   cachedTemplateMatch?: TemplateMatchResult,
@@ -1778,7 +1758,7 @@ async function generateCadLabModelWithSeed(
   researchReport: string,
   interfaceDefinition: string,
   seedTemplate: { slug: string; name: string; category: string; stepUrl: string; score: number },
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   checkpointContext?: string,
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
@@ -2261,7 +2241,7 @@ function dlog(msg: string) {
 export async function decomposeIntoModules(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   domainHint?: CadLabDomain,
 ): Promise<CadLabDecompositionResult> {
   // AUTH: Verify user is authenticated
@@ -2591,13 +2571,13 @@ function buildUnmatchedPortsSummary(
  *
  * @param modules - Decomposed modules with inputs/outputs
  * @param researchReport - Research report for additional context
- * @param modelId - Claude model to use (defaults to Sonnet for cost/speed)
+ * @param modelId - Claude model to use
  * @returns Contract extraction result with contracts, unmatched ports, and warnings
  */
 export async function extractInterfaceContracts(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
 ): Promise<InterfaceContractResult> {
   const start = Date.now()
 
@@ -2793,7 +2773,7 @@ Rules:
 export async function prefillDiagnostics(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   domainHint?: CadLabDomain,
   options?: { useConsensusForMaterial?: boolean },
 ): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; enrichment: DiagnosticEnrichment; error?: string }> {
@@ -2921,7 +2901,7 @@ export async function generateCadLabModelSmart(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-sonnet-4-6",
+  modelId: ClaudeModelId = "claude-opus-4-6",
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
@@ -3012,7 +2992,7 @@ export async function generateMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-sonnet-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-6"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0
@@ -3234,7 +3214,7 @@ export async function planMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-sonnet-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-6"
   const startTime = Date.now()
 
   try {
@@ -3326,7 +3306,7 @@ export async function executeMashupPlan(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Unauthorized" }
 
-  const modelId = options?.modelId ?? "claude-sonnet-4-6"
+  const modelId = options?.modelId ?? "claude-opus-4-6"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0
