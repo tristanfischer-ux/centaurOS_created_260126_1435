@@ -249,6 +249,9 @@ export interface CadLabContextValue {
   // Specialist reviews (lifted from pages for persistence across navigation)
   moduleReviews: Record<string, SpecialistReview[]>
   handleReviewComplete: (moduleId: string, review: SpecialistReview) => void
+  pendingReviewKeys: Set<string>
+  markReviewPending: (moduleId: string, specialistId: string) => void
+  clearReviewPending: (moduleId: string, specialistId: string) => void
   isApplyingReviewRevisions: boolean
   handleApplyReviewRevisions: (acceptedIssues: Array<{
     moduleId: string
@@ -504,11 +507,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
+  const [pendingReviewKeys, setPendingReviewKeys] = useState<Set<string>>(new Set())
+
+  const markReviewPending = useCallback((moduleId: string, specialistId: string) => {
+    setPendingReviewKeys(prev => new Set(prev).add(`${moduleId}:${specialistId}`))
+  }, [])
+
+  const clearReviewPending = useCallback((moduleId: string, specialistId: string) => {
+    setPendingReviewKeys(prev => {
+      const next = new Set(prev)
+      next.delete(`${moduleId}:${specialistId}`)
+      return next
+    })
+  }, [])
+
   const handleReviewComplete = useCallback((moduleId: string, review: SpecialistReview) => {
     setModuleReviews(prev => {
       const existing = prev[moduleId] ?? []
       const filtered = existing.filter(r => r.specialistId !== review.specialistId)
       return { ...prev, [moduleId]: [...filtered, review] }
+    })
+    setPendingReviewKeys(prev => {
+      const next = new Set(prev)
+      next.delete(`${moduleId}:${review.specialistId}`)
+      return next
     })
   }, [])
 
@@ -2958,6 +2980,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     unmatchedPorts,
     moduleReviews,
     handleReviewComplete,
+    pendingReviewKeys,
+    markReviewPending,
+    clearReviewPending,
     isApplyingReviewRevisions,
     handleApplyReviewRevisions,
     specifiedModuleCount,

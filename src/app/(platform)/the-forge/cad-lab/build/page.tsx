@@ -148,7 +148,7 @@ export default function CadLabBuildPage(): React.ReactNode {
   }, [activeProjectId])
 
   // Specialist reviews — lifted to context for persistence across navigation
-  const { moduleReviews, handleReviewComplete } = useCadLab()
+  const { moduleReviews, handleReviewComplete, pendingReviewKeys, markReviewPending, clearReviewPending } = useCadLab()
 
   // Register screen context so specialists can see what the user is working on
   useRegisterScreenContext(
@@ -1254,6 +1254,9 @@ export default function CadLabBuildPage(): React.ReactNode {
                           designBrief={designBrief}
                           diagnosticAnswers={diagnosticAnswers}
                           onReviewComplete={(review) => handleReviewComplete(mod.id, review)}
+                          pendingReviewKeys={pendingReviewKeys}
+                          onMarkPending={markReviewPending}
+                          onClearPending={clearReviewPending}
                         />
                       )}
 

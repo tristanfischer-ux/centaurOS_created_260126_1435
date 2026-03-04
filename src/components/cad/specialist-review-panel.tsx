@@ -74,6 +74,12 @@ interface SpecialistReviewPanelProps {
     diagnosticAnswers?: DiagnosticAnswers
     /** Callback when a new review is added */
     onReviewComplete?: (review: SpecialistReview) => void
+    /** Keys of in-flight reviews (survives navigation via context) */
+    pendingReviewKeys?: Set<string>
+    /** Mark a review as in-flight (persisted in context) */
+    onMarkPending?: (moduleId: string, specialistId: string) => void
+    /** Clear a pending review (on error) */
+    onClearPending?: (moduleId: string, specialistId: string) => void
 }
 
 // ─── Verdict Badge ──────────────────────────────────────────────────
@@ -235,6 +241,9 @@ export function SpecialistReviewPanel({
     designBrief,
     diagnosticAnswers,
     onReviewComplete,
+    pendingReviewKeys,
+    onMarkPending,
+    onClearPending,
 }: SpecialistReviewPanelProps) {
     const [loadingSpecialist, setLoadingSpecialist] = useState<string | null>(null)
     const [detailLoading, setDetailLoading] = useState<string | null>(null)
@@ -275,6 +284,7 @@ export function SpecialistReviewPanel({
     const handleRequestReview = useCallback(async (specialistId: string) => {
         setLoadingSpecialist(specialistId)
         setError(null)
+        onMarkPending?.(module.id, specialistId)
 
         const req = buildSlimRequest(specialistId)
 
@@ -294,6 +304,7 @@ export function SpecialistReviewPanel({
 
             if ("error" in fullResult) {
                 setError(fullResult.error)
+                onClearPending?.(module.id, specialistId)
             } else {
                 // Clear quick verdict — full review replaces it
                 setQuickVerdicts(prev => {
@@ -301,14 +312,16 @@ export function SpecialistReviewPanel({
                     delete next[specialistId]
                     return next
                 })
+                // INTENT: handleReviewComplete in context clears pending automatically
                 onReviewComplete?.(fullResult.review)
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Review failed")
             setLoadingSpecialist(null)
             setDetailLoading(null)
+            onClearPending?.(module.id, specialistId)
         }
-    }, [buildSlimRequest, onReviewComplete])
+    }, [buildSlimRequest, onReviewComplete, onMarkPending, onClearPending, module.id])
 
     // Which specialists have already reviewed
     const reviewedBy = new Set(reviews.map(r => r.specialistId))
@@ -331,10 +344,16 @@ export function SpecialistReviewPanel({
     const topSpec = REVIEW_SPECIALISTS.find(s => s.id === topRanked?.id)
     const otherSpecs = REVIEW_SPECIALISTS.filter(s => s.id !== topRanked?.id)
 
+    // INTENT: Check context-level pending state so spinners survive navigation
+    const isPendingInContext = useCallback((specialistId: string) => {
+        return pendingReviewKeys?.has(`${module.id}:${specialistId}`) ?? false
+    }, [pendingReviewKeys, module.id])
+    const anyPendingInContext = pendingReviewKeys ? Array.from(pendingReviewKeys).some(k => k.startsWith(`${module.id}:`)) : false
+
     /** Render a specialist button (shared between primary and secondary) */
     function SpecButton({ spec, primary }: { spec: ReviewSpecialist; primary?: boolean }) {
         const hasReview = reviewedBy.has(spec.id)
-        const isLoading = loadingSpecialist === spec.id
+        const isLoading = loadingSpecialist === spec.id || isPendingInContext(spec.id)
         const Icon = spec.icon
         const existingReview = reviews.find(r => r.specialistId === spec.id)
 
@@ -342,7 +361,7 @@ export function SpecialistReviewPanel({
             <Button
                 variant={primary ? (hasReview ? "secondary" : "default") : (hasReview ? "ghost" : "secondary")}
                 size="sm"
-                disabled={isLoading || !!loadingSpecialist}
+                disabled={isLoading || !!loadingSpecialist || anyPendingInContext}
                 onClick={() => handleRequestReview(spec.id)}
                 className={cn(
                     primary ? "text-sm gap-2" : "h-7 text-xs gap-1.5",
@@ -425,15 +444,18 @@ export function SpecialistReviewPanel({
                 <p className="text-xs text-destructive">{error}</p>
             )}
 
-            {/* Loading indicator */}
-            {loadingSpecialist && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                    <span>
-                        {getSpecialistById(loadingSpecialist)?.name ?? "Specialist"} is reviewing {module.name}...
-                    </span>
-                </div>
-            )}
+            {/* Loading indicator — local state OR context-level pending (survives navigation) */}
+            {(loadingSpecialist || (!loadingSpecialist && anyPendingInContext && Object.keys(quickVerdicts).length === 0)) && (() => {
+                const activeSpecId = loadingSpecialist ?? Array.from(pendingReviewKeys ?? []).find(k => k.startsWith(`${module.id}:`))?.split(":")[1]
+                return activeSpecId ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                        <span>
+                            {getSpecialistById(activeSpecId)?.name ?? "Specialist"} is reviewing {module.name}...
+                        </span>
+                    </div>
+                ) : null
+            })()}
 
             {/* Quick verdicts (shown while full review loads in background) */}
             {Object.entries(quickVerdicts).map(([specId, qv]) => {
@@ -483,7 +505,7 @@ export function SpecialistReviewPanel({
             )}
 
             {/* Empty state */}
-            {reviews.length === 0 && !loadingSpecialist && (
+            {reviews.length === 0 && !loadingSpecialist && !anyPendingInContext && (
                 <p className="text-xs text-muted-foreground italic">
                     No reviews yet — optional, but recommended for extra confidence.
                 </p>

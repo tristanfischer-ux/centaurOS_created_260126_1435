@@ -1049,6 +1049,9 @@ export default function SpecifyPage(): React.ReactNode {
                         designBrief={designBrief}
                         diagnosticAnswers={diagnosticAnswers}
                         onReviewComplete={(review) => handleReviewComplete(mod.id, review)}
+                        pendingReviewKeys={pendingReviewKeys}
+                        onMarkPending={markReviewPending}
+                        onClearPending={clearReviewPending}
                       />
                     ) : !activeProjectId ? (
                       <p className="text-xs text-muted-foreground italic">
