@@ -910,12 +910,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           } catch { /* Non-critical */ }
 
           let referenceBase64: string | undefined
+          let fallbackHeroUrl: string | undefined
           const moduleCrops = new Map<string, string>()
           if (activeProjectId) {
             try {
               const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600))
               if (!activeProjectIdRef.current) return
               if ("url" in illRes) {
+                fallbackHeroUrl = illRes.url
                 setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
                 saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch(() => {})
                 try { const cropRes = await fetchAndCropReferenceAction(illRes.url); if ("base64" in cropRes) referenceBase64 = cropRes.base64 } catch { /* Non-critical */ }
@@ -942,7 +944,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           if (currentProjectId) {
             // DECISION: Strip heroImagePrompt — only needed for system illustration, not per-module images
             const perModuleStyle = visualStyle ? { ...visualStyle, heroImagePrompt: undefined } : undefined
-            handleGenerateModuleImages(fallbackModules, currentProjectId, perModuleStyle, referenceBase64, moduleCrops)
+            handleGenerateModuleImages(fallbackModules, currentProjectId, perModuleStyle, referenceBase64, moduleCrops, fallbackHeroUrl)
               .catch((e) => console.error("[CAD-LAB] Fallback image pipeline failed:", e))
           } else {
             console.warn("[CAD-LAB] Skipping image generation — no active project ID")
@@ -1207,7 +1209,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (activeProjectIdRef.current) {
         addProgressLine("Generating module blueprint illustrations...")
         const perModuleStyle = style ? { ...style, heroImagePrompt: undefined } : undefined
-        await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, perModuleStyle, referenceBase64, moduleCrops)
+        await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, perModuleStyle, referenceBase64, moduleCrops, illustrationUrl)
       }
 
       // All expansions done — final save and summary
@@ -1283,7 +1285,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
-  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>) => {
+  const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>, heroUrl?: string) => {
     const projectId = explicitProjectId ?? activeProjectId
     if (modulesToProcess.length === 0 || !projectId) {
       if (!projectId) console.warn("[CAD-LAB] handleGenerateModuleImages skipped — no project ID")
@@ -1358,14 +1360,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     // DECISION: Pass URLs when available (drops per-call payload from ~800KB to ~200-300KB).
-    // If upload failed, skip inline referenceBase64 (~800KB) — it triggers React Flight
-    // "Maximum array nesting exceeded". Images generate fine without reference, just less consistent.
-    // Visual style is small (~1-3KB without heroImagePrompt) so safe to pass inline.
+    // If upload failed, fall back to heroUrl (the system illustration URL already in Supabase
+    // Storage) — the server action fetches it directly (~10ms same-region). This preserves
+    // geometric consistency without sending ~800KB base64 through React Flight.
+    // Never fall back to inline referenceBase64 — it triggers "Maximum array nesting exceeded".
     if (!referenceUrl && referenceBase64) {
-      console.warn("[CAD-LAB] Shared asset upload failed — generating images without reference to avoid React Flight limits")
+      console.warn(`[CAD-LAB] Shared asset upload failed — falling back to hero URL${heroUrl ? ` (${heroUrl.slice(0, 60)}...)` : " (none available)"}`)
     }
     const effectiveVisualStyle = visualStyleUrl ?? visualStyle
-    const effectiveReference = referenceUrl ?? undefined
+    const effectiveReference = referenceUrl ?? heroUrl ?? undefined
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {
@@ -1498,8 +1501,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       modules,
       activeProjectId ?? undefined,
       visualStyle ?? undefined,
+      undefined,                           // no referenceBase64 — upload will handle it
+      undefined,                           // no moduleCrops — refresh doesn't re-analyze hero
+      systemIllustrationUrl ?? undefined,   // hero URL for upload-failure fallback
     )
-  }, [modules, activeProjectId, visualStyle, handleGenerateModuleImages])
+  }, [modules, activeProjectId, visualStyle, systemIllustrationUrl, handleGenerateModuleImages])
 
   // ── Generate CAD for a specific module ──
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
