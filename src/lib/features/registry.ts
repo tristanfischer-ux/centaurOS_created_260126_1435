@@ -461,7 +461,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/guild',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'stable',
+        status: 'beta',
         isVisibleInNav: true,
         changelog: 'The Guild connects executives with apprentices. Browse the apprentice pool, assign apprentices to projects, and attend networking events.'
     },

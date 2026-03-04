@@ -299,6 +299,7 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
       "outputs": ["Output stream or signal 1"],
       "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
       "leadWeeks": 6,
+      "estimatedMassKg": 0.5,
       "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
       "whyItMatters": "Why this module is critical to the overall system.",
       "failureModes": ["Failure mode 1", "Failure mode 2"],
@@ -314,6 +315,7 @@ RULES:
 - Generate 4-8 modules (more for complex products, fewer for simple ones)
 - Each module MUST have at least 3 keyParts
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
+- estimatedMassKg: your best estimate of this module's mass in kg, calibrated to the product's size class. A vacuum cleaner motor ≈ 0.3 kg, an industrial pump motor ≈ 25 kg. Be specific to this product.
 - Every module must have at least 1 input and 1 output
 - CRITICAL — connections array: Every inter-module output/input MUST appear in exactly one connection entry. The "from" and "to" fields must be valid module IDs. The "output" must match an entry in the source module's "outputs" array EXACTLY. The "input" must match an entry in the target module's "inputs" array EXACTLY.
 - IMPORTANT: Only list inter-module interfaces — inputs that come from another module's output, and outputs that feed another module's input. Do NOT include external/environmental interfaces (e.g., "ground reaction forces", "external charger input", "user control input", "telemetry to ground station", "ambient air intake"). If a module interfaces with the outside world, describe that in its purpose or description — not in inputs/outputs.
@@ -464,7 +466,7 @@ const DESIGN_SYNTHESIS_SYSTEM_PROMPT = `You are a senior industrial designer rev
 
 Your job is to see the product AS A WHOLE and create visual specifications that unify every module image into one coherent product.
 
-Output STRICTLY as JSON with exactly these 6 fields:
+Output STRICTLY as JSON with exactly these 8 fields:
 
 {
   "colorPalette": "3-4 dominant colors described by name (e.g. 'steel blue, warm gray, copper accent, matte white'). Pick colors appropriate for the product's domain, materials, and industrial context.",
@@ -472,7 +474,9 @@ Output STRICTLY as JSON with exactly these 6 fields:
   "unifyingContext": "A short phrase that frames every module as part of one system (e.g. 'sub-assemblies of a compact quadrotor drone with carbon-fiber arms').",
   "productFormDescription": "150-300 words. A purely geometric description of the complete product's physical shape, silhouette, and spatial arrangement. Describe the overall form factor, proportions, volumes, and how major sections relate spatially. Example: 'A low rectangular chassis roughly twice as wide as it is tall, tapering slightly toward the front. Four cylindrical motor housings extend from booms at each corner, each containing a brushless motor with 10-inch propeller guards forming protective arcs. The top surface is dominated by a flat battery bay occupying the central third, with a raised sensor mast protruding 40mm above the chassis center-line. The rear houses a rectangular avionics bay with ventilation slots on both sides. Landing gear consists of four splayed carbon-fiber legs with rubber feet, creating a stable footprint roughly 1.5x the chassis width.' Do NOT reference module names, part numbers, or technical labels — describe only visible shapes, positions, and proportions.",
   "moduleGeometryMap": { "Module Name": "50-100 words describing this module's visible geometry within the product: its shape, position relative to other modules, proportions, distinctive visual features, material appearance. Describe what a viewer would SEE — silhouettes, relative sizes, surface textures, spatial relationships to adjacent modules." },
-  "heroImagePrompt": "300-500 words. A complete image generation prompt for a hero illustration showing the entire product. Describe the product's silhouette and overall form, then describe each major section's geometry and position WITHOUT using module names (image models garble text). Use spatial language: 'the front-left quadrant contains...', 'centered on the top surface...', 'extending downward from the rear...'. Specify color coding for each section using the colorPalette. Include material rendering instructions. Specify camera angle (30-degree isometric, slightly above and to the right). Describe the exploded or semi-transparent view showing internal arrangement. End with rendering rules: white background, thin precise lines, engineering grid, no text/labels/annotations of any kind."
+  "heroImagePrompt": "300-500 words. A complete image generation prompt for a hero illustration showing the entire product. Describe the product's silhouette and overall form, then describe each major section's geometry and position WITHOUT using module names (image models garble text). Use spatial language: 'the front-left quadrant contains...', 'centered on the top surface...', 'extending downward from the rear...'. Specify color coding for each section using the colorPalette. Include material rendering instructions. Specify camera angle (30-degree isometric, slightly above and to the right). Describe the exploded or semi-transparent view showing internal arrangement. End with rendering rules: white background, thin precise lines, engineering grid, no text/labels/annotations of any kind.",
+  "overallDimensionsMm": "Overall product dimensions in 'W × D × H mm' format, extracted from the research report or module data (e.g. '350 × 320 × 95 mm'). null if no dimensions found in source data.",
+  "moduleDimensionNotes": { "Module Name": "Absolute dimensions AND proportional relationship to the whole product (e.g. 'Ø40mm × 60mm tall, roughly 12% of chassis width'). null per module if no dimensional data available." }
 }
 
 RULES:
@@ -483,7 +487,8 @@ RULES:
 - moduleGeometryMap: one entry per module, each 50-100 words of geometric description
 - heroImagePrompt: 300-500 words, the COMPLETE prompt for generating a hero image — must be self-contained (no references to other fields)
 - CRITICAL: heroImagePrompt must contain ZERO module names, part numbers, or technical labels. Describe components by their geometry, position, and function only. Image models render text/names as garbled characters.
-- Use the connections list to understand spatial relationships between modules — connected modules are physically adjacent or interfacing`
+- Use the connections list to understand spatial relationships between modules — connected modules are physically adjacent or interfacing
+- DIMENSIONAL DATA: Use ONLY dimensions present in the source data (research report, module descriptions, keyParts). NEVER invent dimensions. Include proportional relationships between modules (e.g. "this module occupies roughly 15% of the overall chassis width"). If no dimensions are found, set overallDimensionsMm to null and individual moduleDimensionNotes entries to null.`
 
 /**
  * Returns the system prompt for Opus design synthesis.

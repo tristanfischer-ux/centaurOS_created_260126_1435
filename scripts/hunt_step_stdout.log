@@ -1,0 +1,223 @@
+[09:17:32] ======================================================================
+[09:17:32] ForgeOS — Hunt Additional STEP/STL Files
+[09:17:32] Repos: 20 sources
+[09:17:32] Staging: /Users/tristanfischer/Developer/CentaurOS created 260126 1435/data/extra-step-staging
+[09:17:32] ======================================================================
+[09:17:32] 
+--- voron-2 (mechanical/3d-printer-parts) ---
+[09:17:32]   Found: 3 STEP, 47 STL files
+[09:17:33]     ⚠ DB insert failed voron-2-mic6_bed_v2_250-2442c6534ed9: HTTP 409
+[09:17:34]     ⚠ DB insert failed voron-2-mic6_bed_v2_300-030103886474: HTTP 409
+[09:17:35]     ⚠ DB insert failed voron-2-mic6_bed_v2_350-351cf15bc588: HTTP 409
+[09:17:37]     ⚠ DB insert failed voron-2-bigdipper_bracket_set-4a31eb78ab4b: HTTP 409
+[09:17:40]     ⚠ DB insert failed voron-2-btt_mot_exp_bracket-c1ba7c378103: HTTP 409
+[09:17:42]     ⚠ DB insert failed voron-2-duet2_duet3mini5_bracket_set-d05450b4ec2a: HTTP 409
+[09:17:45]     ⚠ DB insert failed voron-2-gtr_bracket_set-75de2cf390c7: HTTP 409
+[09:17:48]     ⚠ DB insert failed voron-2-octopus_bracket_set-4a8766e121eb: HTTP 409
+[09:17:50]     ⚠ DB insert failed voron-2-s6_bracket_set-759dd9e08c03: HTTP 409
+[09:17:52]     ⚠ DB insert failed voron-2-skr_pro_bracket_set-1a6288cd9b73: HTTP 409
+[09:17:55]     ⚠ DB insert failed voron-2-skr_bracket_inline_set-6ccd1821b526: HTTP 409
+[09:17:57]     ⚠ DB insert failed voron-2-spider_bracket_set-7b6225054717: HTTP 409
+[09:17:59]     ⚠ DB insert failed voron-2-uhp_200_mount_x2-637a126bd9c4: HTTP 409
+[09:18:00]     ⚠ DB insert failed voron-2-uhp_350_mount_x2-c21c2f652328: HTTP 409
+[09:18:02]     ⚠ DB insert failed voron-2-psu_stabilizer_50mm-54880ccc29b0: HTTP 409
+[09:18:04]     ⚠ DB insert failed voron-2-lrs_200_psu_bracket_x2-27cbefe37245: HTTP 409
+[09:18:05]     ⚠ DB insert failed voron-2-pcb_din_clip_x3-8c7428a872a8: HTTP 409
+[09:18:08]     ⚠ DB insert failed voron-2-raspberrypi_bracket-73f16a325a87: HTTP 409
+[09:18:10]     ⚠ DB insert failed voron-2-rs25_psu_bracket-a44d0c06fcc3: HTTP 409
+[09:18:11]     ⚠ DB insert failed voron-2-wago_221-415_mount_3by5-ac1fbc59f14a: HTTP 409
+[09:18:13]     ⚠ DB insert failed voron-2-a_exhaust_fan_grill-013762a6b015: HTTP 409
+[09:18:15]     ⚠ DB insert failed voron-2-a_exhaust_filter_mount_x2-5abe4cbf90da: HTTP 409
+[09:18:16]     ⚠ DB insert failed voron-2-a_filter_access_cover-c1646a5818bf: HTTP 409
+[09:18:18]     ⚠ DB insert failed voron-2-exhaust_filter_grill-872d3845ba5b: HTTP 409
+[09:18:25]     ⚠ DB insert failed voron-2-exhaust_filter_housing-abaa931f463c: HTTP 409
+[09:18:27]     ⚠ DB insert failed voron-2-a_cable_cover-76f2ed07313c: HTTP 409
+[09:18:29]     ⚠ DB insert failed voron-2-a_z_chain_retainer_bracket_x2-7bdaa66f55f8: HTTP 409
+[09:18:33]     ⚠ DB insert failed voron-2-a_drive_frame_lower-d8c02828ea16: HTTP 409
+[09:18:36]     ⚠ DB insert failed voron-2-a_drive_frame_upper-d252e54205a6: HTTP 409
+[09:18:40]     ⚠ DB insert failed voron-2-b_drive_frame_lower-b5429c307379: HTTP 409
+[09:18:42]     ⚠ DB insert failed voron-2-b_drive_frame_upper-075a4f08943e: HTTP 409
+[09:18:44]     ⚠ DB insert failed voron-2-a_tensioner_left-78187e3850d7: HTTP 409
+[09:18:45]     ⚠ DB insert failed voron-2-a_tensioner_right-b51e5abbcb35: HTTP 409
+[09:18:46]     ⚠ DB insert failed voron-2-front_idler_left_lower-e8b7590d62a9: HTTP 409
+[09:18:48]     ⚠ DB insert failed voron-2-front_idler_left_upper-7200903ee061: HTTP 409
+[09:18:50]     ⚠ DB insert failed voron-2-front_idler_right_lower-f1ff33a1168f: HTTP 409
+[09:18:51]     ⚠ DB insert failed voron-2-front_idler_right_upper-241a2a753615: HTTP 409
+[09:18:53]     ⚠ DB insert failed voron-2-a_endstop_pod_d2f_switch-b0e61a93648d: HTTP 409
+[09:18:55]     ⚠ DB insert failed voron-2-a_endstop_pod_hall_effect-c35b964a6d51: HTTP 409
+[09:18:56]     ⚠ DB insert failed voron-2-a_xy_joint_cable_bridge_2hole-8f9cfb4a616c: HTTP 409
+[09:18:57]     ⚠ DB insert failed voron-2-a_xy_joint_cable_bridge_3hole-00d694524716: HTTP 409
+[09:18:59]     ⚠ DB insert failed voron-2-xy_joint_left_lower_mgn12-51fb8b85e598: HTTP 409
+[09:19:01]     ⚠ DB insert failed voron-2-xy_joint_left_upper_mgn12-87c0e926fa85: HTTP 409
+[09:19:03]     ⚠ DB insert failed voron-2-xy_joint_right_lower_mgn12-64f7cc2542cf: HTTP 409
+[09:19:04]     ⚠ DB insert failed voron-2-xy_joint_right_upper_mgn12-4caba810d7f1: HTTP 409
+[09:19:07]     ⚠ DB insert failed voron-2-pinda_adapter-2d1f8ddadea4: HTTP 409
+[09:19:08]     ⚠ DB insert failed voron-2-probe_retainer_bracket-d099b012c681: HTTP 409
+[09:19:09]     ⚠ DB insert failed voron-2-probe_retainer_bracket_9mm-0000e507876d: HTTP 409
+[09:19:11]     ⚠ DB insert failed voron-2-x_frame_v2tr_mgn12_left-d715190b1743: HTTP 409
+[09:19:12]     ⚠ DB insert failed voron-2-x_frame_v2tr_mgn12_right-0b3bd595778c: HTTP 409
+[09:19:12]   Uploaded: 0
+[09:19:12] 
+--- voron-trident (mechanical/3d-printer-parts) ---
+[09:19:12]   Found: 3 STEP, 47 STL files
+[09:19:14]     ⚠ DB insert failed voron-trident-mic6_bed_250-9b63d230783c: HTTP 409
+[09:19:15]     ⚠ DB insert failed voron-trident-mic6_bed_300-21c47d633c04: HTTP 409
+[09:19:16]     ⚠ DB insert failed voron-trident-mic6_bed_350-c9fa85c9982a: HTTP 409
+[09:19:18]     ⚠ DB insert failed voron-trident-bigdipper_bracket_set-4a31eb78ab4b: HTTP 409
+[09:19:20]     ⚠ DB insert failed voron-trident-btt_mot_exp_bracket-c1ba7c378103: HTTP 409
+[09:19:23]     ⚠ DB insert failed voron-trident-duet2_duet3mini5_bracket_set-d05450b4ec2a: HTTP 409
+[09:19:25]     ⚠ DB insert failed voron-trident-gtr_bracket_set-75de2cf390c7: HTTP 409
+[09:19:27]     ⚠ DB insert failed voron-trident-octopus_bracket_set-4a8766e121eb: HTTP 409
+[09:19:29]     ⚠ DB insert failed voron-trident-s6_bracket_set-759dd9e08c03: HTTP 409
+[09:19:31]     ⚠ DB insert failed voron-trident-skr_pro_bracket_set-1a6288cd9b73: HTTP 409
+[09:19:33]     ⚠ DB insert failed voron-trident-skr_bracket_inline_set-6ccd1821b526: HTTP 409
+[09:19:36]     ⚠ DB insert failed voron-trident-spider_bracket_set-7b6225054717: HTTP 409
+[09:19:37]     ⚠ DB insert failed voron-trident-din_center_support_x2-4611d8d57b35: HTTP 409
+[09:19:38]     ⚠ DB insert failed voron-trident-din_frame_mount_x4-b0514d2d9893: HTTP 409
+[09:19:39]     ⚠ DB insert failed voron-trident-uhp_200_mount_x2-637a126bd9c4: HTTP 409
+[09:19:40]     ⚠ DB insert failed voron-trident-uhp_350_mount_x2-c21c2f652328: HTTP 409
+[09:19:41]     ⚠ DB insert failed voron-trident-psu_stabilizer_50mm-09f5c40b8f3e: HTTP 409
+[09:19:42]     ⚠ DB insert failed voron-trident-cable_frame_anchor_x6-ec31fd801c0f: HTTP 409
+[09:19:43]     ⚠ DB insert failed voron-trident-deck_support_3mm_optional_x6-cfd75d95a952: HTTP 409
+[09:19:44]     ⚠ DB insert failed voron-trident-deck_support_4mm_optional_x6-96711064d31e: HTTP 409
+[09:19:45]     ⚠ DB insert failed voron-trident-lrs_psu_bracket_x2-27cbefe37245: HTTP 409
+[09:19:46]     ⚠ DB insert failed voron-trident-pcb_din_clip_x3-8c7428a872a8: HTTP 409
+[09:19:47]     ⚠ DB insert failed voron-trident-raspberrypi_bracket-73f16a325a87: HTTP 409
+[09:19:48]     ⚠ DB insert failed voron-trident-rs25_psu_bracket-a44d0c06fcc3: HTTP 409
+[09:19:49]     ⚠ DB insert failed voron-trident-wago_221-415_corner_mount-13b6acc66ac2: HTTP 409
+[09:19:50]     ⚠ DB insert failed voron-trident-a_exhaust_fan_grill-c28ee5e4eb69: HTTP 409
+[09:19:51]     ⚠ DB insert failed voron-trident-a_exhaust_filter_mount_x2-5abe4cbf90da: HTTP 409
+[09:19:52]     ⚠ DB insert failed voron-trident-a_filter_access_cover-c1646a5818bf: HTTP 409
+[09:19:54]     ⚠ DB insert failed voron-trident-exhaust_filter_grill-872d3845ba5b: HTTP 409
+[09:19:56]     ⚠ DB insert failed voron-trident-exhaust_filter_housing-abaa931f463c: HTTP 409
+[09:19:57]     ⚠ DB insert failed voron-trident-a_wire_cover-43ef5b489746: HTTP 409
+[09:19:59]     ⚠ DB insert failed voron-trident-a_y_endstop_bumper-c2e2a9dad42f: HTTP 409
+[09:20:00]     ⚠ DB insert failed voron-trident-a_y_endstop_housing-2ec0574327e3: HTTP 409
+[09:20:02]     ⚠ DB insert failed voron-trident-a_drive_frame_lower-38fbd8e7e95c: HTTP 409
+[09:20:04]     ⚠ DB insert failed voron-trident-a_drive_frame_upper-20b730aa1c7a: HTTP 409
+[09:20:06]     ⚠ DB insert failed voron-trident-b_drive_frame_lower-c08d80d26a06: HTTP 409
+[09:20:08]     ⚠ DB insert failed voron-trident-b_drive_frame_upper-166c921e2802: HTTP 409
+[09:20:09]     ⚠ DB insert failed voron-trident-a_tensioner_left-37d9bd2e682c: HTTP 409
+[09:20:10]     ⚠ DB insert failed voron-trident-a_tensioner_right-2246c3d1ef47: HTTP 409
+[09:20:11]     ⚠ DB insert failed voron-trident-front_idler_a_x2-098a5e2a1e63: HTTP 409
+[09:20:12]     ⚠ DB insert failed voron-trident-front_idler_b_x2-278bfb81783f: HTTP 409
+[09:20:13]     ⚠ DB insert failed voron-trident-a_endstop_pod_d2f_switch-a32e6df1e233: HTTP 409
+[09:20:15]     ⚠ DB insert failed voron-trident-a_endstop_pod_hall_effect-c35b964a6d51: HTTP 409
+[09:20:16]     ⚠ DB insert failed voron-trident-a_xy_joint_cable_bridge_2hole-a9a9911f2fe7: HTTP 409
+[09:20:17]     ⚠ DB insert failed voron-trident-a_xy_joint_cable_bridge_3hole-465fa31085ce: HTTP 409
+[09:20:18]     ⚠ DB insert failed voron-trident-xy_joint_left_lower_mgn12-51fb8b85e598: HTTP 409
+[09:20:20]     ⚠ DB insert failed voron-trident-xy_joint_left_upper_mgn12-87c0e926fa85: HTTP 409
+[09:20:22]     ⚠ DB insert failed voron-trident-xy_joint_right_lower_mgn12-64f7cc2542cf: HTTP 409
+[09:20:23]     ⚠ DB insert failed voron-trident-xy_joint_right_upper_mgn12-4caba810d7f1: HTTP 409
+[09:20:25]     ⚠ DB insert failed voron-trident-pinda_adapter-2d1f8ddadea4: HTTP 409
+[09:20:25]   Uploaded: 0
+[09:20:25] 
+--- voron-0 (mechanical/3d-printer-parts) ---
+[09:20:25]   Found: 29 STEP, 21 STL files
+[09:20:34]     ⚠ DB insert failed voron-0-minisb_adxl_mount_adafruit_19mm_c_c-67c75055c95d: HTTP 409
+[09:20:35]     ⚠ DB insert failed voron-0-minisb_adxl_mount_adafruit_lis3dh-2abf5472cc16: HTTP 409
+[09:20:37]     ⚠ DB insert failed voron-0-minisb_adxl_mount_generic_155mm_c_c-f13730684185: HTTP 409
+[09:20:39]     ⚠ DB insert failed voron-0-minisb_adxl_mount_ldo_15mm_c_c-0c88cac32268: HTTP 409
+[09:20:53]     ⚠ DB insert failed voron-0-minisb_bowden-43125cc6fe2d: HTTP 409
+[09:20:57]     ⚠ DB insert failed voron-0-fly_gemini_v2_din_mount_2pc-cb556289990e: HTTP 409
+[09:20:58]     ⚠ DB insert failed voron-0-manta_m4p_din_mount_2pc-9d9b5d9dc0a6: HTTP 409
+[09:21:05]     ⚠ DB insert failed voron-0-rpi_or_btt-pico_din_mount-513c70b5555c: HTTP 409
+[09:21:08]     ⚠ DB insert failed voron-0-skr_3_din_mount-67bc2bd8c70c: HTTP 409
+[09:21:10]     ⚠ DB insert failed voron-0-skr_3_ez_din_mount-926f76d46e6a: HTTP 409
+[09:21:12]     ⚠ DB insert failed voron-0-skr_e3_v3_din_mount-d65340dd3bc3: HTTP 409
+[09:21:13]     ⚠ DB insert failed voron-0-vhb-din-mount-95427554556b: HTTP 409
+[09:21:14]     ⚠ DB insert failed voron-0-fs_creality_spider_hotend_mount-92e1095015d3: HTTP 409
+[09:21:19]     ⚠ DB insert failed voron-0-fs_hotend_mount_bambu_x1c-e9e71657becb: HTTP 409
+[09:21:20]     ⚠ DB insert failed voron-0-fs_hotend_mount_dragon-d78bce1d3840: HTTP 409
+[09:21:22]     ⚠ DB insert failed voron-0-fs_hotend_mount_dragonfly_bmo-1daf13933da2: HTTP 409
+[09:21:23]     ⚠ DB insert failed voron-0-fs_hotend_mount_dragonfly_bms_7_fins-1cee9a74e997: HTTP 409
+[09:21:24]     ⚠ DB insert failed voron-0-fs_hotend_mount_drop_effect_xg-db98a35d5208: HTTP 409
+[09:21:26]     ⚠ DB insert failed voron-0-fs_hotend_mount_formbot-c710eceb8c32: HTTP 409
+[09:21:28]     ⚠ DB insert failed voron-0-fs_hotend_mount_revo_voron-4d44d0eb13b5: HTTP 409
+[09:21:31]     ⚠ DB insert failed voron-0-hotend_mount_bambu_x1c-555380383c71: HTTP 409
+[09:21:33]     ⚠ DB insert failed voron-0-hotend_mount_creality_spider_pro-dc9e1689f451: HTTP 409
+[09:21:35]     ⚠ DB insert failed voron-0-hotend_mount_dragon-8b5315424313: HTTP 409
+[09:21:36]     ⚠ DB insert failed voron-0-hotend_mount_dragonfly_bmo-b5c7dbabcdf4: HTTP 409
+[09:21:38]     ⚠ DB insert failed voron-0-hotend_mount_dragonfly_bms_7_fins-7d3f39bbabf3: HTTP 409
+[09:21:40]     ⚠ DB insert failed voron-0-hotend_mount_drop_effect_xg-ddfc26204034: HTTP 409
+[09:21:42]     ⚠ DB insert failed voron-0-hotend_mount_formbot-7a7f226c1872: HTTP 409
+[09:21:43]     ⚠ DB insert failed voron-0-hotend_mount_microswiss_all_metal-08d789abf84d: HTTP 409
+[09:21:45]     ⚠ DB insert failed voron-0-hotend_mount_revo_voron-aafd94c13ee7: HTTP 409
+[09:21:47]     ⚠ DB insert failed voron-0-a_drive_frame_lower_x1-b78bcffca298: HTTP 409
+[09:21:51]     ⚠ DB insert failed voron-0-a_drive_frame_upper_x1-3205940055e3: HTTP 409
+[09:21:52]     ⚠ DB insert failed voron-0-a_idler_lower_x1-00a24ff88834: HTTP 409
+[09:21:54]     ⚠ DB insert failed voron-0-a_idler_upper_x1-df95b158debd: HTTP 409
+[09:21:56]     ⚠ DB insert failed voron-0-b_drive_frame_lower_x1-efe7696fd17b: HTTP 409
+[09:22:01]     ⚠ DB insert failed voron-0-b_drive_frame_upper_x1-ce217bf0fbac: HTTP 409
+[09:22:02]     ⚠ DB insert failed voron-0-b_idler_lower_x1-758384314d6e: HTTP 409
+[09:22:04]     ⚠ DB insert failed voron-0-b_idler_upper_x1-6207e5409164: HTTP 409
+[09:22:08]     ⚠ DB insert failed voron-0-display_knob_x1-535fa181e692: HTTP 409
+[09:22:10]     ⚠ DB insert failed voron-0-display_mount_left_x1-bf4ef3598131: HTTP 409
+[09:22:11]     ⚠ DB insert failed voron-0-display_mount_right_x1-b45afce72d05: HTTP 409
+[09:22:12]     ⚠ DB insert failed voron-0-a_display_faceplate_x1-3d6a312a5256: HTTP 409
+[09:22:13]     ⚠ DB insert failed voron-0-c_display_diffuser_x1-844732cb9b08: HTTP 409
+[09:22:14]     ⚠ DB insert failed voron-0-drag_chain_spacer_x1-e2e41c797635: HTTP 409
+[09:22:15]     ⚠ DB insert failed voron-0-fan_mount_bottom_x1-34deb13e4397: HTTP 409
+[09:22:16]     ⚠ DB insert failed voron-0-fan_mount_top_x1-9209b8aba34b: HTTP 409
+[09:22:18]     ⚠ DB insert failed voron-0-fly_gemini_v2_din_mount_2pc-241e9fa6d719: HTTP 409
+[09:22:20]     ⚠ DB insert failed voron-0-manta_m4p_din_mount_2pc-ce05775c2870: HTTP 409
+[09:22:20]     ⚠ DB insert failed voron-0-pcb_din_clip_x2-921865e0f92b: HTTP 409
+[09:22:21]     ⚠ DB insert failed voron-0-psu_cover_x1-00f52354a325: HTTP 409
+[09:22:23]     ⚠ DB insert failed voron-0-rpi_or_btt-pico_mount-a18277ed3e6e: HTTP 409
+[09:22:23]   Uploaded: 0
+[09:22:23] 
+--- klipper-parts (mechanical/3d-printer-parts) ---
+[09:22:23]   Found: 0 STEP, 4 STL files
+[09:22:26]   Uploaded: 4
+[09:22:26] 
+--- grbl-hardware (mechanical/cnc-parts) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- px4-autopilot (aerospace/drones) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- ardupilot (aerospace/drones) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- betaflight (aerospace/drones) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- openuc2 (scientific/optical-mounts) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- openflexure (scientific/microscopy) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- einsy-retro (electronics/enclosures) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- olinuxino (electronics/enclosures) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- om-linear-actuator (mechanical/actuators) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- niryo-one (mechanical/robot-arms) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- open-biped (mechanical/humanoids) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- raspberry-pi-docs (electronics/sbc-hardware) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- cva6-hardware (electronics/processors) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- e-nable-devices (medical/prosthetics) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- farmbot-genesis (mechanical/agricultural) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+--- open-energy-tools (mechanical/energy) ---
+[09:22:26]   Skipped (not cloned)
+[09:22:26] 
+======================================================================
+[09:22:26] COMPLETE — 154 total files from 20 repos
+[09:22:26] ======================================================================

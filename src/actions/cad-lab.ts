@@ -2743,6 +2743,8 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         outputs: Array.isArray(m.outputs) ? m.outputs.map(String) : ["Output"],
         keyParts: Array.isArray(m.keyParts) ? m.keyParts.map(String) : [],
         leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : 4,
+        estimatedMassKg: typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0
+          ? m.estimatedMassKg : undefined,
         description: String(m.description || ""),
         whyItMatters: String(m.whyItMatters || ""),
         failureModes: Array.isArray(m.failureModes) ? m.failureModes.map(String) : [],

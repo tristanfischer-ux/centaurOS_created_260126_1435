@@ -296,6 +296,8 @@ function buildNodesAndEdges(
       outputCount: m.outputs.length,
       linkedInputs: counts.linkedInputs,
       linkedOutputs: counts.linkedOutputs,
+      connectedInputPorts: m.inputs.filter(inp => connectedInputPorts.has(`${m.id}::${inp}`)),
+      connectedOutputPorts: m.outputs.filter(out => connectedOutputPorts.has(`${m.id}::${out}`)),
       isGenerating: generatingModuleIds.has(m.id),
       isOrphan: flowEdges.length > 0 && !connectedIds.has(m.id),
       moduleId: m.id,
@@ -576,6 +578,15 @@ export function ModuleFlowCanvas({
                     </span>
                   )
                 })}
+              {/* External boundary stub legend entry */}
+              <span className="flex items-center gap-2 text-xs">
+                <svg width="28" height="12" className="flex-shrink-0">
+                  <line x1="0" y1="6" x2="20" y2="6" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 3" />
+                  <polygon points="20,2 28,6 20,10" fill="hsl(var(--muted-foreground))" />
+                </svg>
+                <span className="font-medium text-foreground">External boundary</span>
+                <span className="text-muted-foreground">Unconnected port (system I/O)</span>
+              </span>
             </div>
           </div>
         )}
@@ -611,7 +622,7 @@ export function ModuleFlowCanvas({
           <div className="rounded-md border border-border bg-muted/30 px-3 py-2 flex items-start gap-2">
             <Info className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground">
-              {unmatchedPorts.outputs.length + unmatchedPorts.inputs.length} port{(unmatchedPorts.outputs.length + unmatchedPorts.inputs.length) !== 1 ? "s" : ""} not connected to other modules — these may interface with the environment.
+              {unmatchedPorts.outputs.length + unmatchedPorts.inputs.length} port{(unmatchedPorts.outputs.length + unmatchedPorts.inputs.length) !== 1 ? "s" : ""} not connected to other modules — these interface with the environment (shown as stub arrows).
             </p>
           </div>
         )}

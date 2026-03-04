@@ -283,14 +283,14 @@ export function parseBatchSize(batchStr: string): number {
  * First match wins — ordered from heaviest to lightest.
  */
 const MASS_KEYWORDS: [RegExp, number][] = [
-  [/frame|skid|chassis|structure|base/i, 50],
-  [/pump|motor|compressor|engine/i, 25],
-  [/tank|vessel|reservoir|housing/i, 20],
-  [/pipe|manifold|piping|tubing/i, 15],
-  [/valve|actuator/i, 8],
-  [/filter|strainer|cartridge/i, 5],
-  [/instrument|sensor|controller|pcb/i, 2],
-  [/seal|gasket|o-ring|insulation/i, 1],
+  [/frame|skid|chassis|structure|base/i, 5],
+  [/pump|motor|compressor|engine/i, 3],
+  [/tank|vessel|reservoir|housing/i, 2],
+  [/pipe|manifold|piping|tubing/i, 1.5],
+  [/valve|actuator/i, 0.8],
+  [/filter|strainer|cartridge/i, 0.5],
+  [/instrument|sensor|controller|pcb/i, 0.2],
+  [/seal|gasket|o-ring|insulation/i, 0.1],
 ]
 
 /**
@@ -306,12 +306,21 @@ function estimateMassFromText(moduleText: string): number | null {
 }
 
 /**
- * Get mass in kg from a module's CAD results, with keyword-based estimation fallback.
+ * Get mass in kg from a module's CAD results, with multi-tier estimation fallback.
+ *
+ * Priority chain:
+ * 1. CAD exact mass (from generation)
+ * 2. Early cost estimate mass (dimension-based, from interface definition)
+ * 3. AI-estimated mass from decomposition (product-scale-aware)
+ * 4. Keyword fallback (reduced values as safety net)
+ * 5. Hardcoded fallback
  *
  * @param massPropertiesKg - from result.massProperties.massKg
  * @param massGrams - from result.massGrams
  * @param fallbackKg - fallback if no data and no keyword match (default 0.2)
  * @param moduleText - optional module text (name + purpose + keyParts) for keyword-based estimation
+ * @param estimatedMassKg - AI-estimated mass from decomposition (product-scale-aware)
+ * @param earlyEstimateMassKg - dimension-based mass from early cost estimator
  * @returns Object with massKg and whether it's an estimate
  */
 export function getModuleMassKg(
@@ -319,20 +328,31 @@ export function getModuleMassKg(
   massGrams: number | undefined | null,
   fallbackKg = 0.2,
   moduleText?: string,
+  estimatedMassKg?: number,
+  earlyEstimateMassKg?: number,
 ): { massKg: number; isEstimated: boolean } {
+  // 1. CAD exact mass
   if (massPropertiesKg && massPropertiesKg > 0) {
     return { massKg: massPropertiesKg, isEstimated: false }
   }
   if (massGrams && massGrams > 0) {
     return { massKg: massGrams / 1000, isEstimated: false }
   }
-  // INTENT: Use keyword-based estimation for realistic masses at the Specify stage
-  // where no CAD data exists yet. A seawater pump shouldn't default to 200g.
+  // 2. Early cost estimate (dimension-based, from interface definition)
+  if (earlyEstimateMassKg && earlyEstimateMassKg > 0) {
+    return { massKg: earlyEstimateMassKg, isEstimated: true }
+  }
+  // 3. AI decomposition estimate (product-scale-aware)
+  if (estimatedMassKg && estimatedMassKg > 0) {
+    return { massKg: estimatedMassKg, isEstimated: true }
+  }
+  // 4. Keyword fallback (reduced values as safety net)
   if (moduleText) {
     const keywordMass = estimateMassFromText(moduleText)
     if (keywordMass !== null) {
       return { massKg: keywordMass, isEstimated: true }
     }
   }
+  // 5. Hardcoded fallback
   return { massKg: fallbackKg, isEstimated: true }
 }

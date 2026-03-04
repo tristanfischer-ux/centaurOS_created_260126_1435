@@ -277,8 +277,8 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                             </p>
                         </div>
 
-                        {/* Company Details (CH data) */}
-                        <CompanyDetailsSection attrs={attrs} />
+                        {/* Company Details (CH data) — only for non-People listings */}
+                        {!isPeople && <CompanyDetailsSection attrs={attrs} />}
 
                         {/* Skills / Tags */}
                         {tags.length > 0 && (

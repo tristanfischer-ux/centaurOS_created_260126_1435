@@ -83,6 +83,21 @@ Rendering rules (mandatory for visual consistency across all illustrations in th
 // ─── Prompt Templates ────────────────────────────────────────────────
 
 /**
+ * Builds an optional DIMENSIONAL CONSTRAINTS block from VisualStyleSpec.
+ * Returns empty string when no dimensional data is available.
+ */
+function buildDimensionalConstraints(moduleName: string, visualStyle?: VisualStyleSpec): string {
+  const overall = visualStyle?.overallDimensionsMm
+  const moduleNote = visualStyle?.moduleDimensionNotes?.[moduleName]
+  if (!overall && !moduleNote) return ""
+
+  const lines: string[] = ["\n\nDIMENSIONAL CONSTRAINTS (ensure proportions respect these measurements):"]
+  if (overall) lines.push(`- Overall product: ${overall}`)
+  if (moduleNote) lines.push(`- This module ("${moduleName}"): ${moduleNote}`)
+  return lines.join("\n")
+}
+
+/**
  * Builds a ghost-outline prompt that renders the complete product as a faint
  * wireframe/ghost with only the target subassembly highlighted in full color.
  *
@@ -105,7 +120,7 @@ The contrast between the faint ghost and the vivid highlighted section should be
 
 Color palette: use ${visualStyle.colorPalette} for the highlighted subassembly.
 Material rendering: ${visualStyle.materialRendering}.
-Context: ${visualStyle.unifyingContext}.
+Context: ${visualStyle.unifyingContext}.${buildDimensionalConstraints(module.name, visualStyle)}
 
 Style: Modern industrial product render on a white background with thin, precise lines. Isometric view. No decorative elements. Subtle light gray grid lines in the background. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
 }
@@ -154,7 +169,7 @@ The viewer should feel like they are looking at a zoomed-in crop of the referenc
 This sub-assembly is: ${module.detail.whatItIs}
 It contains ${module.keyParts.length} key components shown through visual differentiation.${geometryDirective}
 
-Frame the composition to show this specific sub-assembly at larger scale with more component detail visible. Do NOT redesign or reinterpret the component — reproduce it faithfully from the reference at higher magnification.${specificModuleGeometry}${styleDirective}${COHESIVE_STYLE_SUFFIX}`
+Frame the composition to show this specific sub-assembly at larger scale with more component detail visible. Do NOT redesign or reinterpret the component — reproduce it faithfully from the reference at higher magnification.${specificModuleGeometry}${buildDimensionalConstraints(module.name, visualStyle)}${styleDirective}${COHESIVE_STYLE_SUFFIX}`
 }
 
 /**
@@ -201,7 +216,7 @@ Material rendering: ${visualStyle.materialRendering}.
 
 The diagram should clearly show ${module.keyParts.length} distinct key components through visual differentiation (color coding, positioning, distinct shapes).
 
-Show input flow entering from the left side and output flow exiting to the right.
+Show input flow entering from the left side and output flow exiting to the right.${buildDimensionalConstraints(module.name, visualStyle)}
 
 Style: Modern industrial product render on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
 }

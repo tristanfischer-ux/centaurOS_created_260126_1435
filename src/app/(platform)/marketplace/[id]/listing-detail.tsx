@@ -208,8 +208,8 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                     {category === 'Products' && <ProductsSection attrs={attrs} />}
                     {category === 'Services' && <ServicesSection attrs={attrs} />}
 
-                    {/* Companies House info (directors, PSC, SIC codes) */}
-                    <CompanyInfoSection attrs={attrs} />
+                    {/* Companies House info (directors, PSC, SIC codes) — only for non-People listings */}
+                    {category !== 'People' && <CompanyInfoSection attrs={attrs} />}
 
                     {/* Fractional Executives */}
                     {executives.length > 0 && (
@@ -267,21 +267,23 @@ function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<s
         if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
     }
 
-    // CH data fallbacks — show key company info when marketplace-specific fields are missing
-    if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
-    if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
-    if (attrs.ch_incorporation_date) {
-        const date = new Date(attrs.ch_incorporation_date)
-        if (!isNaN(date.getTime())) {
-            metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
+    // CH data fallbacks — only for non-People listings (company data, not recruit profiles)
+    if (category !== 'People') {
+        if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
+        if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
+        if (attrs.ch_incorporation_date) {
+            const date = new Date(attrs.ch_incorporation_date)
+            if (!isNaN(date.getTime())) {
+                metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
+            }
         }
+        if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
+        if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
+        if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
+            metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
+        }
+        if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
     }
-    if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
-    if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
-    if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
-        metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
-    }
-    if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
 
     if (metrics.length === 0) return null
 
@@ -589,6 +591,7 @@ function AttributesSection({ attrs, category }: { attrs: Record<string, any>; ca
 
     const remainingAttrs = Object.entries(attrs)
         .filter(([key]) => !shownKeys.has(key) && !HIDDEN_ATTRIBUTES.has(key))
+        .filter(([key]) => category !== 'People' || !key.startsWith('ch_'))
 
     if (remainingAttrs.length === 0) return null
 

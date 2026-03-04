@@ -395,7 +395,8 @@ export function buildFullReviewReport(
     const process = diag?.mfg_process || "Other"
     const material = diag?.material || "Other"
     const batchSize = parseBatchSize(diag?.batch_size || "1-10")
-    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams)
+    const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
+    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams, undefined, moduleText, mod.estimatedMassKg)
     const matCost = massKg * (MATERIAL_COST_PER_KG[material] ?? 20)
     const procCost = massKg * (HOURS_PER_KG[process] ?? 3) * (PROCESS_HOURLY_RATE[process] ?? 50)
     const toolCost = batchSize > 0 ? (TOOLING_COST[process] ?? 0) / batchSize : 0
@@ -419,7 +420,8 @@ export function buildFullReviewReport(
     const material = diag?.material || "Other"
     const process = diag?.mfg_process || "Other"
     const batchSize = parseBatchSize(diag?.batch_size || "1-10")
-    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams)
+    const moduleText2 = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
+    const { massKg } = getModuleMassKg(mod.result?.massProperties?.massKg, mod.result?.massGrams, undefined, moduleText2, mod.estimatedMassKg)
     const existing = materialMap.get(material) || { totalKg: 0, modules: [] }
     existing.totalKg += massKg
     existing.modules.push(mod.name)

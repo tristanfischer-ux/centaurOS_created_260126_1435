@@ -149,6 +149,16 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       { type: 'week-ahead', enabled: false, order: 11 },
     ],
   },
+  {
+    id: 'skill-document',
+    name: 'Document Writer',
+    description: 'Generate full business documents — competitive analyses, SOPs, investor updates, and more.',
+    icon: 'FileEdit',
+    defaultDateRange: 'this-month',
+    defaultSections: [
+      { type: 'cover', enabled: true, order: 0 },
+    ],
+  },
 ]
 
 /**

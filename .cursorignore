@@ -1,0 +1,121 @@
+# =============================================================================
+# .cursorignore — Exclude files from Cursor's AI indexing and context window
+# This directly reduces token consumption and cost on every AI request.
+# =============================================================================
+
+# ---- Large binary/data directories (20GB+ of CAD files, zero coding value) --
+data/
+
+# ---- Build artifacts and generated output ----------------------------------
+.next/
+dist/
+build/
+out/
+__pycache__/
+.pytest_cache/
+.swc/
+
+# ---- Dependencies (auto-excluded but explicit is faster) --------------------
+node_modules/
+.venv/
+
+# ---- Binary file types (never useful in LLM context) -----------------------
+*.stl
+*.step
+*.f3d
+*.dxf
+*.DXF
+*.pdf
+*.pack
+*.idx
+*.promisor
+*.rev
+*.zip
+
+# ---- Screenshots and images in root (test artifacts) -----------------------
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+
+# ---- Log / output files ----------------------------------------------------
+*.log
+autoscroll-test.log
+console-output.log
+
+# ---- Temp scripts (one-off automation scripts) -----------------------------
+capture-audience-final.ts
+check-knowledge-page.ts
+check-login-button.ts
+
+# ---- Auth / secret artifacts -----------------------------------------------
+auth.json
+
+# ---- Agent test reports and deployment summaries (stale artifacts) ---------
+# These are past-tense records, not coding context.
+*_REPORT.md
+*_SUMMARY.md
+*_VERIFICATION_REPORT.md
+FORGE_*.md
+DEPLOYMENT_*.md
+AI_DELIGHT*.md
+AI_ERROR*.md
+CAD_LAB*.md
+HUDDLE_*.md
+100_PERCENT_COMPLETE.md
+AGENT_HANDOVER.md
+APPRENTICESHIP_HANDOVER.md
+COMPLETION_REPORT.md
+COMPANY_PURPOSE_IMPLEMENTATION.md
+CONTEXT_AWARE_MESSAGING_IMPLEMENTATION.md
+CONTEXT_SELECTOR_IMPROVEMENTS.md
+CONTEXTUAL_HELP_IMPLEMENTATION_SUMMARY*.md
+DATABASE_MANUAL_FIX_REQUIRED.md
+DATA_ISOLATION_FIX_SUMMARY.md
+DEMO_CREDENTIALS.md
+DESIGN_CONSISTENCY_AUDIT.md
+DESIGN_CONSISTENCY_NEXT_STEPS.md
+DESIGN_SYSTEM_IMPLEMENTATION_COMPLETE.md
+DNS_CONFIGURATION_GUIDE.md
+DOMAINS_LIVE_STATUS.md
+DOMAIN_PURCHASE_INSTRUCTIONS.md
+DRAG_DROP_TEST_REPORT.md
+EMAIL_SETUP_GUIDE.md
+EXECUTE_THIS_SQL_NOW.md
+EXECUTIVE_SUMMARY.md
+EXPANSION_PROGRESS.md
+FILE_ATTACHMENTS_IMPLEMENTED.md
+FINAL_*.md
+FIX_*.md
+ALL_SIGNUPS_TEST_GUIDE.md
+BUSINESS_ANALYSIS_PROMPT.md
+CLAUDE_CAD_INSTRUCTIONS_*.md
+
+# ---- Playwright / test artifacts -------------------------------------------
+playwright-report/
+test-results/
+e2e/.auth/
+.playwright/
+
+# ---- Misc project artifacts ------------------------------------------------
+drone_output/
+experiments/
+scripts/generated_*/
+scripts/*_log.txt
+scripts/*_stderr.log
+
+# ---- Archive (moved clutter, not coding context) ---------------------------
+_archive/
+
+# ---- Remaining artifact directories ----------------------------------------
+drone_output/
+experiments/
+duplicate_routes_backup/
+cad-lab-*/
+landing-screenshots/
+platform-verification/
+playwright-report/
+test-results/
+screenshots/
+tasks/

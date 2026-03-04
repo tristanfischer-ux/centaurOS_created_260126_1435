@@ -17,7 +17,7 @@
  * - Build detail: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react"
+import { Clock, ImageIcon, Loader2, RefreshCw } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -39,12 +39,17 @@ interface ModuleImageCardProps {
 function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () => void }): React.ReactNode {
   const status = module.imageStatus
 
-  // Pending — awaiting illustration
+  // Pending — modules need full expansion + hero image before per-module illustrations start
   if (!status || status === "pending") {
     return (
-      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-2">
-        <Sparkles className="h-6 w-6 text-muted-foreground/40" />
-        <span className="text-xs text-muted-foreground/60">Illustration pending</span>
+      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-2 px-6">
+        <Clock className="h-5 w-5 text-muted-foreground/40" />
+        <div className="text-center space-y-0.5">
+          <span className="text-xs font-medium text-muted-foreground/60">Illustration queued</span>
+          <p className="text-[11px] text-muted-foreground/40 leading-tight">
+            Blueprints begin after all modules are expanded and the hero image is created
+          </p>
+        </div>
       </div>
     )
   }

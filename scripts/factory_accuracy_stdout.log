@@ -1,0 +1,134 @@
+[09:17:32] ======================================================================
+[09:17:32] ForgeOS Factory Accuracy Fix
+[09:17:32] Model: qwen3:14b @ http://localhost:11434
+[09:17:32] ======================================================================
+[09:17:32] Loaded 318 profiles from batch_20260220_173208.json
+[09:17:32] Loaded 81 profiles from batch_remaining_20260221_102124.json
+[09:17:32] 
+Total profiles loaded: 399
+[09:17:32] PASS 1: Deduplication
+[09:17:32]   🗑️  Fuzzy duplicate: 'Materialise' ≈ 'i.materialise'
+[09:17:32]   🗑️  Duplicate URL: 'Xometry' same as 'Xometry' (https://www.xometry.com)
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct UK' ≈ '3D Printers Direct'
+[09:17:32]   🗑️  Duplicate URL: '3D Printers Direct US' same as '3D Printers Direct' (https://www.3dprintersdirect.com)
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct Japan' ≈ '3D Printers Direct'
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct China' ≈ '3D Printers Direct'
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct France' ≈ '3D Printers Direct Germany'
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct Italy' ≈ '3D Printers Direct'
+[09:17:32]   🗑️  Fuzzy duplicate: '3D Printers Direct Spain' ≈ '3D Printers Direct'
+[09:17:32]   🗑️  Duplicate URL: 'POSCO' same as 'Posco' (https://www.posco.com)
+[09:17:32]   🗑️  Duplicate URL: 'Tempo Automation' same as 'Tempo Automation' (https://www.tempoautomation.com)
+[09:17:32]   🗑️  Duplicate URL: 'Jabil' same as 'Jabil' (https://www.jabil.com)
+[09:17:32]   🗑️  Duplicate URL: 'Foxconn' same as 'Foxconn Technology Group' (https://www.foxconn.com)
+[09:17:32]   🗑️  Duplicate URL: 'Murata' same as 'Murata Manufacturing' (https://www.murata.com)
+[09:17:32]   🗑️  Duplicate URL: 'Flextronics' same as 'Flex' (https://www.flex.com)
+[09:17:32]   🗑️  Fuzzy duplicate: 'Jiangsu Huayu Casting' ≈ 'Jiangsu Shuanghui Casting'
+[09:17:32]   🗑️  Duplicate URL: 'Doosan Foundry' same as 'Doosan Machine Tools' (https://www.doosan.com)
+[09:17:32]   🗑️  Duplicate URL: 'Nippon Steel & Sumitomo Metal' same as 'Nippon Steel' (https://www.nipponsteel.com)
+[09:17:32]   🗑️  Duplicate URL: 'Hyundai Steel' same as 'Hyundai Steel' (https://www.hyundai-steel.com)
+[09:17:32]   🗑️  Fuzzy duplicate: 'Taichung Casting Co., Ltd.' ≈ 'Thai Casting Co., Ltd.'
+[09:17:32]   🗑️  Duplicate URL: 'POSCO' same as 'Posco' (https://www.posco.com)
+[09:17:32]   🗑️  Fuzzy duplicate: 'Taiwan Surface Treatment Co., Ltd.' ≈ 'Thai Surface Treatment Co., Ltd.'
+[09:17:32]   🗑️  Fuzzy duplicate: 'Surface Engineering Asia' ≈ 'Surface Engineering India'
+[09:17:32]   🗑️  Duplicate URL: 'Hanwha Polymer' same as 'Hanwha' (https://www.hanwha.com)
+[09:17:32]   🗑️  Duplicate URL: 'Walsin Technology Corporation' same as 'Walsin' (https://www.walsin.com.tw)
+[09:17:32]   🗑️  Duplicate URL: 'TE Connectivity' same as 'TE Connectivity' (https://www.te.com)
+[09:17:32]   🗑️  Duplicate URL: 'Walsin Technology' same as 'Walsin' (https://www.walsin.com.tw)
+[09:17:32]   🗑️  Duplicate URL: 'Sumitomo Electric Industries' same as 'Sumitomo Heavy Industries' (https://www.sumitomo.com)
+[09:17:32]   🗑️  Duplicate URL: 'Amphenol Corporation' same as 'Amphenol' (https://www.amphenol.com)
+[09:17:32]   🗑️  Duplicate URL: 'Altair ProductDesign' same as 'Altair Engineering' (https://www.altair.com)
+[09:17:32]   🗑️  Duplicate URL: 'Engineering Simulation Services' same as 'Engineering Simulation and Software' (https://www.ess-sim.com)
+[09:17:32]   🗑️  Fuzzy duplicate: 'Master Electronics' ≈ 'Mouser Electronics'
+[09:17:32]   🗑️  Fuzzy duplicate: 'Sager Electronics' ≈ 'Mouser Electronics'
+[09:17:33]   🗑️  Duplicate URL: 'NTS (National Technical Systems)' same as 'National Technical Systems' (https://www.nts.com)
+[09:17:33]   ✅ Removed 34 duplicates, 365 remaining
+[09:17:33] 
+PASS 2: Misclassification removal
+[09:17:33]   🗑️  Misclassified: 'Honeywell' in 'Electronics Assembly'
+[09:17:33]   🗑️  Misclassified: 'Schneider Electric' in 'Electronics Assembly'
+[09:17:33]   🗑️  Misclassified: 'Siemens' in 'Electronics Assembly'
+[09:17:33]   🗑️  Misclassified: 'PT. Aneka Tambang' in 'Casting & Foundry'
+[09:17:33]   🗑️  Misclassified: 'Kemet Surface Solutions' in 'Surface Treatment & Finishing'
+[09:17:33]   🗑️  Misclassified: 'Balrampur Chintamanji' in 'Packaging Design & Manufacturing'
+[09:17:33]   ✅ Removed 6 misclassified, 359 remaining
+[09:17:33] 
+PASS 3: Fact verification via web scraping + LLM
+[09:17:33]   [1] Verifying JLCPCB...
+[09:17:46]     📝 JLCPCB: founded_year '2009' → '2006'
+[09:17:46]     📝 JLCPCB: employee_count_range '500-1000' → '8000+'
+[09:21:43]   [21] Verifying PCB India...
+[09:26:27]   [41] Verifying Star Rapid...
+[09:29:15]     📝 Fractory: headquarters 'United Kingdom' → 'Manchester, United Kingdom'
+[09:29:15]     📝 Fractory: founded_year 'None' → '2017'
+[09:29:15]     📝 Fractory: employee_count_range '1000-5000' → '50+'
+[09:29:31]     📝 eMachineShop: headquarters 'City, Country' → 'Mahwah, New Jersey, USA'
+[09:29:31]     📝 eMachineShop: founded_year 'None' → '1999'
+[09:31:00]     📝 JawsTec: headquarters 'Unknown, Unknown' → 'American Falls, Idaho, USA'
+[09:33:13]   [61] Verifying Materialise (excluding)...
+[09:37:05]   [81] Verifying ProtoMold...
+[09:38:19]     📝 Fagor Arrasate: employee_count_range '10,000+' → '5,000-10,000'
+[09:41:23]   [101] Verifying Moldex...
+[09:43:00]     📝 Fab-Tech: founded_year '1998' → '1973'
+[09:43:21]     📝 L'Usine: headquarters 'Paris, France' → 'Riyadh, Saudi Arabia'
+[09:47:25]   [121] Verifying Tata Steel...
+[09:48:21]     📝 Nippon Steel: employee_count_range '100000+' → '136,000'
+[09:49:38]     📝 Thyssenkrupp: founded_year '1811' → '1999'
+[09:52:52]   [141] Verifying Molex...
+[09:53:29]     📝 Amphenol: headquarters 'Wallingford, United States' → 'Wallingford, Connecticut, USA'
+[09:53:29]     📝 Amphenol: employee_count_range '10000+' → '95,000+'
+[09:57:52]     📝 Shenzhen Huada: headquarters 'Shenzhen, China' → 'Jiangsu, China'
+[09:57:52]     📝 Shenzhen Huada: employee_count_range '500-1000' → '600-1000'
+[09:58:27]   [161] Verifying Pentair...
+[10:02:28]   [181] Verifying Jiangsu Shuanghui Casting...
+[10:03:09]     📝 Shree Metal Industries: founded_year '2017' → '1982'
+[10:06:12]   [201] Verifying AEROSPACE SURFACE TECHNOLOGIES...
+[10:06:58]     📝 Metal Surface Technologies: founded_year 'None' → '2003'
+[10:08:49]     📝 Taiyo Kogyo Corporation: founded_year 'None' → '1954'
+[10:10:42]   [221] Verifying Nippon Gompa Co., Ltd....
+[10:15:49]     📝 Whipsaw: founded_year '1998' → '1999'
+[10:17:08]   [241] Verifying SimScale...
+[10:20:48]     📝 Thermal Management Systems: founded_year 'None' → '1974'
+[10:20:48]     📝 Thermal Management Systems: employee_count_range 'Not specified' → '90+'
+[10:21:08]     📝 Mechanical Engineering Consultancy Ltd.: headquarters 'Staplehurst, UK' → 'Staplehurst, Kent, UK'
+[10:21:50]   [261] Verifying UL Solutions...
+[10:25:39]   [281] Verifying Indorama...
+[10:25:58]     📝 Indorama: founded_year 'None' → '1975'
+[10:26:17]     📝 Eurocircuits: founded_year 'None' → '1993'
+[10:26:17]     📝 Eurocircuits: employee_count_range 'Unknown' → '550+'
+[10:27:24]     📝 Precision Micro: headquarters 'Not specified' → 'UK'
+[10:27:40]     📝 Worthy Hardware: headquarters 'Shanghai, China' → 'Dongguan, China'
+[10:27:40]     📝 Worthy Hardware: founded_year '2003' → '1998'
+[10:30:43]     📝 Metal Cutting Corporation: founded_year '1973' → '1967'
+[10:31:41]     📝 JM Performance Products: founded_year 'None' → '1966'
+[10:31:41]   [301] Verifying Quickparts CNC...
+[10:32:31]     📝 TME: headquarters 'London, United Kingdom' → 'Łódź, Poland'
+[10:32:31]     📝 TME: founded_year 'None' → '1990'
+[10:36:04]     📝 Core Electronics: founded_year 'None' → '2007'
+[10:37:41]   [321] Verifying Designit...
+[10:38:17]     📝 Product Creation Studio: headquarters 'New York, USA' → 'Seattle, USA'
+[10:38:17]     📝 Product Creation Studio: founded_year 'None' → '1999'
+[10:39:03]     📝 Herbst Produkt: founded_year 'None' → '1962'
+[10:41:45]     📝 Y Studios: founded_year 'None' → '2001'
+[10:44:18]     📝 Smart Design: founded_year 'None' → '1980'
+[10:44:18]   [341] Verifying National Technical Systems...
+[10:49:10]   ✅ Checked 359 companies, made 40 corrections
+[10:49:10] 
+💾 Saved 359 cleaned profiles to generated_factories/cleaned_20260222_104910.json
+[10:49:10] 
+📤 Replacing factory listings in Supabase...
+[10:49:12]   Cleared old listings: HTTP 204
+[10:50:23]     📤 Pushed 50...
+[10:51:20]     📤 Pushed 100...
+[10:52:27]     📤 Pushed 150...
+[10:53:33]     📤 Pushed 200...
+[10:54:40]     📤 Pushed 250...
+[10:56:21]     📤 Pushed 300...
+[10:57:54]     📤 Pushed 350...
+[10:58:08] ✅ Pushed 359/359 cleaned listings
+[10:58:08] 
+======================================================================
+[10:58:08] ✅ ACCURACY FIX COMPLETE
+[10:58:08]    Original: 399 profiles
+[10:58:08]    After dedup: 359 profiles
+[10:58:08]    Pushed to Supabase: 359
+[10:58:08] ======================================================================

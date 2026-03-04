@@ -113,9 +113,13 @@ export function CadLabRawMaterials({
       const batchSizeStr = answers.batch_size || "1-10 (prototyping)"
       const batchSize = parseBatchSize(batchSizeStr)
 
+      const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
       const { massKg, isEstimated } = getModuleMassKg(
         mod.result?.massProperties?.massKg,
         mod.result?.massGrams,
+        undefined,
+        moduleText,
+        mod.estimatedMassKg,
       )
       if (isEstimated) hasAnyEstimates = true
 

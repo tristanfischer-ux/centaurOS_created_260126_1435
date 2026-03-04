@@ -49,6 +49,10 @@ export interface ModuleNodeData {
   isGenerating: boolean
   /** Whether this module has zero connections */
   isOrphan: boolean
+  /** Input port names that have an incoming edge */
+  connectedInputPorts: string[]
+  /** Output port names that have an outgoing edge */
+  connectedOutputPorts: string[]
   /** Module ID for click callback */
   moduleId: string
   /** React Flow requires index signature */
@@ -84,14 +88,48 @@ function signalPillClasses(signalType: SignalType): string {
   return cn(cfg.activeBg, cfg.activeBorder, cfg.text)
 }
 
+/* ─── External boundary stub SVGs ──────────────────────────────────── */
+
+/** Stub arrow extending right from an unconnected output — "→ leaves the system" */
+function OutputStub() {
+  return (
+    <svg
+      width="36"
+      height="12"
+      className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ left: "100%" }}
+    >
+      <line x1="0" y1="6" x2="28" y2="6" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 3" />
+      <polygon points="28,2 36,6 28,10" fill="hsl(var(--muted-foreground))" />
+    </svg>
+  )
+}
+
+/** Stub arrow entering from left into an unconnected input — "enters the system →" */
+function InputStub() {
+  return (
+    <svg
+      width="36"
+      height="12"
+      className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
+      style={{ right: "100%" }}
+    >
+      <polygon points="0,2 8,6 0,10" fill="hsl(var(--muted-foreground))" />
+      <line x1="8" y1="6" x2="36" y2="6" stroke="hsl(var(--muted-foreground))" strokeWidth={1.5} strokeDasharray="4 3" />
+    </svg>
+  )
+}
+
 /* ─── Port row component ──────────────────────────────────────────────── */
 
 function PortRow({
   name,
   type,
+  isConnected,
 }: {
   name: string
   type: "input" | "output"
+  isConnected: boolean
 }) {
   const signalType = classifySignalType(name)
   const pillClasses = signalPillClasses(signalType)
@@ -117,6 +155,9 @@ function PortRow({
         style={{ top: handleTop }}
         className="!w-2 !h-2 !border-2 !border-background !bg-international-orange"
       />
+
+      {/* External boundary stub for unconnected ports */}
+      {!isConnected && (isInput ? <InputStub /> : <OutputStub />)}
 
       <span
         title={name}
@@ -182,6 +223,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
               key={inp}
               name={inp}
               type="input"
+              isConnected={d.connectedInputPorts.includes(inp)}
             />
           ))}
         </div>
@@ -201,6 +243,7 @@ function ModuleNodeComponent({ data, selected }: NodeProps) {
               key={out}
               name={out}
               type="output"
+              isConnected={d.connectedOutputPorts.includes(out)}
             />
           ))}
         </div>

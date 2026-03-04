@@ -90,9 +90,13 @@ export function CadLabExecutiveSummary({
       const material = answers.material || "Other"
       const batchSize = parseBatchSize(answers.batch_size || "1-10 (prototyping)")
 
+      const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
       const { massKg, isEstimated } = getModuleMassKg(
         mod.result?.massProperties?.massKg,
         mod.result?.massGrams,
+        undefined,
+        moduleText,
+        mod.estimatedMassKg,
       )
       if (isEstimated) hasEstimatedMass = true
       totalMassKg += massKg

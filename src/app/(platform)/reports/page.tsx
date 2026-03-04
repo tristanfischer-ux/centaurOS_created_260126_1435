@@ -29,6 +29,7 @@ import {
   Sliders,
   FileDown,
   FileText,
+  FileEdit,
   Loader2,
   Check,
   AlignLeft,
@@ -82,6 +83,7 @@ import { ReportDocument } from '@/components/reports/ReportDocument'
 import { ReportInfographic } from '@/components/reports/ReportInfographic'
 import { SlideDeckRenderer } from '@/components/reports/SlideDeckRenderer'
 import { ReportHistory } from '@/components/reports/ReportHistory'
+import { SkillDocumentSection } from '@/components/reports/SkillDocumentSection'
 
 import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
 
@@ -110,6 +112,7 @@ const TEMPLATE_ICONS: Record<ReportTemplateId, React.ComponentType<{ className?:
   'weekly-update': CalendarDays,
   'board-pack': Briefcase,
   'custom': Sliders,
+  'skill-document': FileEdit,
 }
 
 const TONE_OPTIONS: { value: ReportTone; label: string; description: string }[] = [
@@ -203,6 +206,7 @@ export default function ReportsPage(): React.JSX.Element {
   const [briefingResult, setBriefingResult] = useState<StrategicBriefing | null>(null)
 
   const isStrategicBriefing = selectedTemplate === 'strategic-briefing'
+  const isSkillDocument = selectedTemplate === 'skill-document'
 
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -239,6 +243,8 @@ export default function ReportsPage(): React.JSX.Element {
       setDetailLevel('standard')
     } else if (templateId === 'strategic-briefing') {
       setTone('investor')
+    } else if (templateId === 'skill-document') {
+      setTone('internal')
     }
     setReportDocument(null)
     setBriefingResult(null)
@@ -647,8 +653,11 @@ export default function ReportsPage(): React.JSX.Element {
         </>
       )}
 
+      {/* ──── Document Writer: Skill-based generation ──── */}
+      {isSkillDocument && <SkillDocumentSection />}
+
       {/* ──── Operational Reports: Tone, Date Range, Sections ──── */}
-      {!isStrategicBriefing && (
+      {!isStrategicBriefing && !isSkillDocument && (
         <>
           {/* Tone & Detail Controls */}
           <section className="space-y-4">

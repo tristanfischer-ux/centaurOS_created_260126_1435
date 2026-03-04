@@ -54,7 +54,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleResearch, handleDecompose,
     modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
-    isGeneratingImages, imageGenProgress, handleGenerateModuleImages,
+    isGeneratingImages, handleGenerateModuleImages,
     revealedModuleIds,
     decompositionConnections, interfaceContracts, isExtractingContracts, generatingModuleIds, unmatchedPorts,
     systemIllustrationUrl, systemIllustrationStatus, systemIllustrationError, handleRetryIllustration,
@@ -458,7 +458,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                 onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
                 onModuleSave={handleUpdateModule}
                 onRetryModule={handleRetryModule}
-                imageGenProgress={imageGenProgress}
               />
 
               {/* Process flow — how modules connect via inputs and outputs */}
