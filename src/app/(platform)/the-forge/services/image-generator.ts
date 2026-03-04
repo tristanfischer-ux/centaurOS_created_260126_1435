@@ -77,7 +77,8 @@ Rendering rules (mandatory for visual consistency across all illustrations in th
 - Shadows: single soft drop shadow, bottom-right, 15% opacity
 - Lighting: single directional light from upper-left, soft ambient fill
 - Scale: component fills 70-80% of frame with generous margins
-- No decorative elements, borders, title blocks, or watermarks`
+- No decorative elements, borders, title blocks, or watermarks
+- ZERO TEXT: Do not render any text, letters, words, labels, annotations, callouts, captions, or numbers anywhere in the image. The image must contain only visual elements — no written language of any kind.`
 
 // ─── Prompt Templates ────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ Color palette: use ${visualStyle.colorPalette} for the highlighted subassembly.
 Material rendering: ${visualStyle.materialRendering}.
 Context: ${visualStyle.unifyingContext}.
 
-Style: Modern industrial engineering diagram on a white background with thin, precise lines. Isometric view. No decorative elements — this should look like a page from a professional engineering specification document. Subtle light gray grid lines in the background. Do NOT include any text, labels, words, or annotations anywhere in the image.${COHESIVE_STYLE_SUFFIX}`
+Style: Modern industrial product render on a white background with thin, precise lines. Isometric view. No decorative elements. Subtle light gray grid lines in the background. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
 }
 
 /**
@@ -202,7 +203,7 @@ The diagram should clearly show ${module.keyParts.length} distinct key component
 
 Show input flow entering from the left side and output flow exiting to the right.
 
-Style: Modern industrial engineering diagram on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements -- this should look like a page from a professional engineering specification document. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. Do NOT include any text, labels, words, or annotations anywhere in the image.${COHESIVE_STYLE_SUFFIX}`
+Style: Modern industrial product render on a white background with thin, precise lines. Use an isometric or cutaway view to show internal arrangement of components. No decorative elements. Use color coding to distinguish components. Subtle light gray grid lines in the background for a technical feel. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
 }
 
 /**
@@ -242,7 +243,7 @@ function buildSystemPrompt(spec: XRaySpec, brief?: SystemStructuralBrief): strin
 
 This system is composed of ${spec.modules.length} connected subsystems arranged in a processing chain.
 
-Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace — NOT a traditional P&ID with dense annotations. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. Do NOT include any text, labels, words, annotations, title block, document ID, revision number, date, project name, or engineer name anywhere on the diagram. No borders or frames around the diagram.`
+Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. No borders or frames around the diagram. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, title blocks, document IDs, revision numbers, dates, or writing of any kind anywhere in the image.`
 }
 
 // ─── Nano Banana 2 API Caller ────────────────────────────────────────
@@ -1143,9 +1144,14 @@ export async function generateResearchIllustration(
     ? `\n\nColor palette: use ${visualStyle.colorPalette} as the dominant colors. Material rendering: ${visualStyle.materialRendering}. Context: ${visualStyle.unifyingContext}.`
     : ""
 
-  const prompt = `Create a clean, professional technical illustration of a ${subject}.${moduleContext}${formDescription}${structuralContext}${styleDirective}
+  // DECISION: "engineering specification document" cues the image model to add labeled
+  // annotations with leader lines — Gemini/DALL-E can't spell, producing garbled text.
+  // Use "product render" framing instead, and triple-reinforce the no-text instruction.
+  const prompt = `IMPORTANT: This image must contain ZERO text — no labels, no annotations, no words, no letters, no numbers, no callouts, no captions anywhere.
 
-Style: Modern technical illustration on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. The composition should feel like a hero image from a professional engineering specification document. No decorative elements, borders, title blocks, or watermarks. Do NOT include any text, labels, words, or annotations anywhere in the image. Generous whitespace around the illustration.${COHESIVE_STYLE_SUFFIX}`
+Create a clean, professional technical illustration of a ${subject}.${moduleContext}${formDescription}${structuralContext}${styleDirective}
+
+Style: Modern technical product render on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration. Remember: absolutely no text, labels, annotations, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",
