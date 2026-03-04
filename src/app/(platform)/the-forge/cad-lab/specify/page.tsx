@@ -393,14 +393,12 @@ export default function SpecifyPage(): React.ReactNode {
         {/* ═══ Overview tab ═══ */}
         {activeTab === "overview" && (
           <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            {/* Product overview card */}
-            {productOverview && (
-              <ProductOverviewCard
-                overview={productOverview}
-                onSave={setProductOverview}
-                modelAudit={modelAudit}
-              />
-            )}
+            {/* Product overview card — always visible so user can add/edit */}
+            <ProductOverviewCard
+              overview={productOverview}
+              onSave={setProductOverview}
+              modelAudit={modelAudit}
+            />
 
             {/* Module summary cards */}
             <div>

@@ -313,8 +313,8 @@ export default function CadLabResearchPage(): React.ReactNode {
                 </>
               )}
 
-              {/* Product overview — always visible after research, editable. Above progress so user reads context first. */}
-              {productOverview && (
+              {/* Product overview — visible after research OR when modules exist (loaded project). Editable. */}
+              {(productOverview || modules.length > 0) && (
                 <ProductOverviewCard
                   overview={productOverview}
                   onSave={setProductOverview}
@@ -323,7 +323,7 @@ export default function CadLabResearchPage(): React.ReactNode {
               )}
 
               {/* During decomposition — rich progress below overview */}
-              {systemIllustrationStatus === "idle" && !decompositionError && isDecomposing && (
+              {!decompositionError && isDecomposing && (
                 <CadLabProgress
                   lines={progressLines}
                   isActive={true}

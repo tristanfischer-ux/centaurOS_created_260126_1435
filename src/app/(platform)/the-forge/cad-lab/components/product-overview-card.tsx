@@ -99,8 +99,6 @@ export function ProductOverviewCard({
     setIsEditing(false)
   }
 
-  if (!overview && !isEditing) return null
-
   return (
     <Card>
       <CardContent className="pt-5 pb-5">
@@ -114,7 +112,7 @@ export function ProductOverviewCard({
               onClick={() => setIsEditing(true)}
             >
               <Pencil className="h-3 w-3" />
-              Edit
+              {overview ? "Edit" : "Add"}
             </Button>
           )}
         </div>
@@ -140,9 +138,13 @@ export function ProductOverviewCard({
               </Button>
             </div>
           </div>
-        ) : (
+        ) : overview ? (
           <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
             {overview}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground/60 italic">
+            No product overview yet. Click Add to describe your product.
           </p>
         )}
 
