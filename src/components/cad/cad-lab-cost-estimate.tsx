@@ -52,7 +52,7 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import { formatCurrency } from "@/lib/format"
 import { chartColors } from "@/lib/chart-colors"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabModule, EarlyCostEstimate } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import {
   MATERIAL_COST_PER_KG,
@@ -128,6 +128,8 @@ interface CadLabCostEstimateProps {
   onCostOverride?: (moduleId: string, overrides: CadLabModule["costOverrides"]) => void
   /** Number of suppliers on the shortlist (for callout banner) */
   shortlistedSupplierCount?: number
+  /** Early cost estimates with dimension-based mass (keyed by moduleId) */
+  earlyCostEstimates?: Record<string, EarlyCostEstimate>
 }
 
 /**
@@ -143,6 +145,7 @@ export function CadLabCostEstimate({
   diagnosticAnswers,
   onCostOverride,
   shortlistedSupplierCount = 0,
+  earlyCostEstimates,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -154,13 +157,16 @@ export function CadLabCostEstimate({
       const batchSizeStr = answers.batch_size || "1-10 (prototyping)"
       const batchSize = parseBatchSize(batchSizeStr)
 
-      // Get mass from CAD result or keyword-estimate from module text
+      // Get mass from CAD result or multi-tier estimation fallback
       const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
+      const earlyMassKg = earlyCostEstimates?.[mod.id]?.estimatedMassKg
       const { massKg: defaultMassKg, isEstimated } = getModuleMassKg(
         mod.result?.massProperties?.massKg,
         mod.result?.massGrams,
         undefined,
         moduleText,
+        mod.estimatedMassKg,
+        earlyMassKg,
       )
 
       // Lookup-table defaults
@@ -214,7 +220,7 @@ export function CadLabCostEstimate({
         existingOverrides: overrides,
       }
     })
-  }, [modules, diagnosticAnswers])
+  }, [modules, diagnosticAnswers, earlyCostEstimates])
 
   // Build a stable index map: moduleId → original position (for numbering)
   const moduleIndexMap = useMemo(() => {

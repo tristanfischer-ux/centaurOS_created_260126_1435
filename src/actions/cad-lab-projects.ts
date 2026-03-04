@@ -26,6 +26,7 @@ import type {
   DecompositionCheckpoint,
   InterfaceContractResult,
   ModuleConnection,
+  SpecialistReview,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 
@@ -110,6 +111,9 @@ export interface CadLabProjectData {
 
   /** Unified CadQuery code */
   unifiedCode: string | null
+
+  /** Specialist reviews per module (keyed by moduleId → array of reviews) */
+  reviews: Record<string, SpecialistReview[]> | null
 
   createdAt: string
   updatedAt: string
@@ -221,6 +225,7 @@ export async function loadCadLabProject(
         decompositionConnections: (project.decomposition_connections as ModuleConnection[] | null) ?? null,
         unifiedResult: (project.unified_result as CadLabProjectData["unifiedResult"]) ?? null,
         unifiedCode: project.unified_code ?? null,
+        reviews: (project.reviews as Record<string, SpecialistReview[]> | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -934,6 +939,55 @@ export async function deleteCadLabProject(
     console.info("[THE-FORGE-PROJECTS] Project deleted:", { projectId, userId: user.id })
 
     return { success: true as const }
+  })
+}
+
+// ─── Poll Unified Result ──────────────────────────────────────────────
+
+/**
+ * Lightweight poll for unified CAD generation result.
+ *
+ * @description Used by the client-side polling loop when SSE stream breaks
+ * (e.g. user navigates away). Only fetches unified_result + unified_code
+ * to minimise payload. The server-side route continues generating and persists
+ * to DB independently, so polling will eventually pick up the result.
+ *
+ * @param projectId - Project to check
+ * @returns { result, code } if generation is complete, { pending: true } otherwise
+ *
+ * @security RLS ensures foundry-level isolation
+ */
+export async function pollUnifiedResultAction(
+  projectId: string,
+): Promise<
+  | { pending: true }
+  | { result: Omit<CadLabResult, "stlData" | "stepData">; code: string | null }
+  | { error: string }
+> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+      return { error: "Invalid project ID" }
+    }
+
+    const { data, error } = await supabase
+      .from("cad_lab_projects")
+      .select("unified_result, unified_code")
+      .eq("id", projectId)
+      .single()
+
+    if (error || !data) {
+      return { error: "Project not found" }
+    }
+
+    const unifiedResult = data.unified_result as Omit<CadLabResult, "stlData" | "stepData"> | null
+    if (!unifiedResult) {
+      return { pending: true as const }
+    }
+
+    return {
+      result: unifiedResult,
+      code: (data.unified_code as string | null) ?? null,
+    }
   })
 }
 

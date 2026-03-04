@@ -290,6 +290,10 @@ export interface VisualStyleSpec {
   moduleGeometryMap?: Record<string, string>
   /** Opus-crafted hero image prompt (300-500 words). When present, used directly as the Gemini prompt for the system illustration instead of the programmatic prompt. */
   heroImagePrompt?: string
+  /** Overall product dimensions as freeform text extracted by Opus from research/module data (e.g. "350W × 320D × 95H mm"). */
+  overallDimensionsMm?: string
+  /** Per-module approximate dimensions and proportional notes, keyed by module name (e.g. "Ø40mm × 60mm, roughly 12% of chassis width"). */
+  moduleDimensionNotes?: Record<string, string>
 }
 
 // ─── Module Types ────────────────────────────────────────────────────
@@ -316,6 +320,8 @@ export interface CadLabModule {
   keyParts: string[]
   /** Estimated procurement lead time in weeks */
   leadWeeks: number
+  /** AI-estimated mass in kg from decomposition (product-scale-aware) */
+  estimatedMassKg?: number
   /** Technical description (1-2 paragraphs) */
   description: string
   /** Why this module is critical to the system */
@@ -369,7 +375,7 @@ export interface CadLabModule {
     massKg?: number
   }
 
-  /** Snapshot of text fields before checkpoint revision, for redline diff display */
+  /** Snapshot of text fields before revision, for redline diff display */
   conceptSnapshot?: {
     purpose: string
     description: string
@@ -378,6 +384,11 @@ export interface CadLabModule {
     failureModes: string[]
     unknowns: string[]
   }
+
+  /** Revision number — 1 = original decomposition, 2+ = revised */
+  revisionNumber?: number
+  /** What triggered the most recent revision */
+  lastRevisionSource?: "checkpoint" | "review"
 }
 
 // ─── Decomposition Connection Types ──────────────────────────────────

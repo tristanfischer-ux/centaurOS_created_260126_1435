@@ -40,7 +40,8 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { useBackgroundOps } from "@/contexts/background-ops-context"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
@@ -73,7 +74,7 @@ import type {
   ModuleConnection,
   SpecialistReview,
 } from "@/lib/cad-lab-types"
-import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints } from "@/actions/cad-lab-reviews"
+import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints, reviseModulesFromReviews } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
 import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
@@ -244,6 +245,17 @@ export interface CadLabContextValue {
   interfaceContracts: InterfaceContract[]
   isExtractingContracts: boolean
   unmatchedPorts: { outputs: Array<{ moduleId: string; portName: string }>; inputs: Array<{ moduleId: string; portName: string }> }
+
+  // Specialist reviews (lifted from pages for persistence across navigation)
+  moduleReviews: Record<string, SpecialistReview[]>
+  handleReviewComplete: (moduleId: string, review: SpecialistReview) => void
+  isApplyingReviewRevisions: boolean
+  handleApplyReviewRevisions: (acceptedIssues: Array<{
+    moduleId: string
+    moduleName: string
+    specialistName: string
+    issue: { severity: string; category: string; message: string; suggestion?: string }
+  }>) => Promise<void>
 
   // Pipeline stage tracking (4-stage flow)
   specifiedModuleCount: number
@@ -459,6 +471,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // INTENT: Synchronous double-click guard — prevents duplicate handler invocations
   // between click and React re-render (before disabled prop takes effect)
   const unifiedGuardRef = useRef(false)
+  // INTENT: Polling refs for background-resilient generation — when SSE breaks
+  // (e.g. navigation), we poll the DB until the server-side route persists the result.
+  const unifiedPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const unifiedBgOpIdRef = useRef<string | null>(null)
+  const { startOp, updateOp, completeOp, failOp } = useBackgroundOps()
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -484,6 +501,93 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isRevising, setIsRevising] = useState(false)
   const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
+
+  // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
+  const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
+  const handleReviewComplete = useCallback((moduleId: string, review: SpecialistReview) => {
+    setModuleReviews(prev => {
+      const existing = prev[moduleId] ?? []
+      const filtered = existing.filter(r => r.specialistId !== review.specialistId)
+      return { ...prev, [moduleId]: [...filtered, review] }
+    })
+  }, [])
+
+  // ── Apply review revisions (AI-driven rewriting from accepted issues) ──
+  const [isApplyingReviewRevisions, setIsApplyingReviewRevisions] = useState(false)
+  const handleApplyReviewRevisions = useCallback(async (acceptedIssues: Array<{
+    moduleId: string
+    moduleName: string
+    specialistName: string
+    issue: { severity: string; category: string; message: string; suggestion?: string }
+  }>) => {
+    if (acceptedIssues.length === 0) return
+    setIsApplyingReviewRevisions(true)
+
+    try {
+      const revised = await reviseModulesFromReviews({
+        modules: modulesRef.current,
+        acceptedIssues,
+        diagnosticAnswers: diagnosticAnswersRef.current,
+        projectSubject: subject,
+      })
+
+      if (Object.keys(revised).length === 0) {
+        toast.error("Revision failed — no modules were updated")
+        return
+      }
+
+      // Update modules with revised fields + snapshot for redline diff
+      setModules(prev => prev.map(m => {
+        const rev = revised[m.id]
+        if (!rev) return m
+        return {
+          ...m,
+          conceptSnapshot: {
+            purpose: m.purpose,
+            description: m.description,
+            keyParts: [...m.keyParts],
+            whyItMatters: m.whyItMatters,
+            failureModes: [...m.failureModes],
+            unknowns: [...m.unknowns],
+          },
+          purpose: rev.purpose,
+          description: rev.description,
+          keyParts: rev.keyParts,
+          whyItMatters: rev.whyItMatters,
+          failureModes: rev.failureModes,
+          unknowns: rev.unknowns,
+          revisionNumber: (m.revisionNumber ?? 1) + 1,
+          lastRevisionSource: "review" as const,
+        }
+      }))
+
+      // Track which modules were revised
+      setRevisedModuleIds(new Set(Object.keys(revised)))
+
+      // Save updated modules to DB
+      if (activeProjectIdRef.current) {
+        // INTENT: Read the updated modules from the ref after setModules has flushed
+        setTimeout(async () => {
+          if (activeProjectIdRef.current) {
+            const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(modulesRef.current))
+            if ("error" in saveRes) {
+              console.error("[CAD-LAB] Failed to save revised modules:", saveRes.error)
+            } else {
+              setLastSaved(new Date().toISOString())
+            }
+          }
+        }, 100)
+      }
+
+      const revisedCount = Object.keys(revised).length
+      toast.success(`${revisedCount} module${revisedCount !== 1 ? "s" : ""} revised from specialist feedback`)
+    } catch (err) {
+      console.error("[CAD-LAB] Review revision failed:", err)
+      toast.error("Revision failed — please try again")
+    } finally {
+      setIsApplyingReviewRevisions(false)
+    }
+  }, [subject])
 
   // ── Product overview (editable executive summary) ──
   const [productOverview, setProductOverview] = useState("")
@@ -2173,6 +2277,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setSystemIllustrationUrl(null)
     setSystemIllustrationStatus("idle")
     setCheckpoints(null)
+    setModuleReviews({})
     setProductOverview("")
     setUnifiedResult(null)
     setUnifiedCode(null)
@@ -2275,6 +2380,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
       if (p.diagnosticEnrichment && Object.keys(p.diagnosticEnrichment).length > 0) {
         setDiagnosticEnrichment(p.diagnosticEnrichment)
+      }
+
+      // Restore specialist reviews from database
+      if (p.reviews && Object.keys(p.reviews).length > 0) {
+        setModuleReviews(p.reviews)
+      } else {
+        setModuleReviews({})
       }
 
       // Restore unified CAD result from database
@@ -2505,10 +2617,67 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     return res.code
   }, [])
 
+  // ── Unified model polling (background-resilient recovery) ──
+  // INTENT: When the SSE stream breaks (navigation, network), the server-side route
+  // continues and persists to DB. This polls the DB until the result appears.
+  const startUnifiedResultPolling = useCallback((projectId: string) => {
+    // Clear any existing poll
+    if (unifiedPollIntervalRef.current) {
+      clearInterval(unifiedPollIntervalRef.current)
+    }
+
+    let pollCount = 0
+    const MAX_POLLS = 38 // ~5 min at 8s intervals
+    const POLL_INTERVAL_MS = 8_000
+
+    addProgressLine("SSE stream interrupted — polling server for result...")
+
+    unifiedPollIntervalRef.current = setInterval(async () => {
+      pollCount++
+      if (pollCount > MAX_POLLS) {
+        // Timeout — give up
+        if (unifiedPollIntervalRef.current) clearInterval(unifiedPollIntervalRef.current)
+        unifiedPollIntervalRef.current = null
+        if (unifiedBgOpIdRef.current) failOp(unifiedBgOpIdRef.current, "Generation timed out")
+        unifiedBgOpIdRef.current = null
+        setIsGeneratingUnified(false)
+        unifiedGuardRef.current = false
+        addProgressLine("Generation timed out — please try again")
+        toast.error("Generation timed out")
+        return
+      }
+
+      try {
+        const res = await pollUnifiedResultAction(projectId)
+        if ("error" in res) {
+          console.warn("[CAD-LAB] Poll error:", res.error)
+          return // keep polling
+        }
+        if ("pending" in res) return // keep polling
+
+        // Result found — hydrate state
+        if (unifiedPollIntervalRef.current) clearInterval(unifiedPollIntervalRef.current)
+        unifiedPollIntervalRef.current = null
+        setUnifiedResult(res.result as CadLabResult)
+        setUnifiedCode(res.code ?? null)
+        if (unifiedBgOpIdRef.current) completeOp(unifiedBgOpIdRef.current, "CAD model ready")
+        unifiedBgOpIdRef.current = null
+        setIsGeneratingUnified(false)
+        unifiedGuardRef.current = false
+        addProgressLine("Unified model generated successfully!")
+        sendNotification("CAD Model Ready", `Unified model for "${subject}" is ready`)
+        toast.success("Unified CAD model generated")
+      } catch (err) {
+        console.warn("[CAD-LAB] Poll exception:", err)
+        // keep polling — transient errors shouldn't abort
+      }
+    }, POLL_INTERVAL_MS)
+  }, [subject, addProgressLine, sendNotification, completeOp, failOp])
+
   // ── Unified model generation ──
-  // INTENT: Generates a single CadQuery model for the entire product by concatenating
-  // all module descriptions into one prompt. Calls the same server actions as per-module
-  // generation but with the combined description.
+  // INTENT: Generates a single CadQuery model for the entire product. Integrates
+  // with BackgroundOps so the progress pill persists across navigation. If the SSE
+  // stream breaks, falls back to DB polling.
   const handleGenerateUnifiedModel = useCallback(async () => {
     if (unifiedGuardRef.current) return
     if (!activeProjectIdRef.current) {
@@ -2526,6 +2695,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setUnifiedResult(null)
     setUnifiedCode(null)
     addProgressLine("Starting unified model generation...")
+
+    // Register background op so the indicator pill appears app-wide
+    const bgOpId = startOp("Generating CAD Model", "/the-forge/cad-lab/cad")
+    unifiedBgOpIdRef.current = bgOpId
+    let sseCompleted = false
 
     try {
       const response = await fetch("/api/cad-lab/generate-unified", {
@@ -2565,18 +2739,28 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               try {
                 const event = JSON.parse(line.slice(6)) as { type: string; step?: string; message?: string; result?: CadLabResult; code?: string }
                 if (event.type === "status") {
-                  if (event.step === "interface") addProgressLine("Synthesizing interface definitions...")
-                  else if (event.step === "codegen") addProgressLine("Generating CadQuery code...")
-                  else if (event.step === "modal") addProgressLine("Executing CAD model on Modal...")
-                  else if (event.step === "upload") addProgressLine("Uploading assets...")
+                  const stepLabels: Record<string, string> = {
+                    interface: "Synthesizing interface definitions...",
+                    codegen: "Generating CadQuery code...",
+                    modal: "Executing CAD model on Modal...",
+                    upload: "Uploading assets...",
+                  }
+                  const label = event.step ? stepLabels[event.step] : undefined
+                  if (label) {
+                    addProgressLine(label)
+                    if (unifiedBgOpIdRef.current) updateOp(unifiedBgOpIdRef.current, { stepLabel: label })
+                  }
                 } else if (event.type === "progress" && event.message) {
                   addProgressLine(event.message)
                 } else if (event.type === "unified_complete" && event.result) {
+                  sseCompleted = true
                   setUnifiedResult(event.result as CadLabResult)
                   setUnifiedCode(event.code ?? null)
                   addProgressLine("Unified model generated successfully!")
                   sendNotification("CAD Model Ready", `Unified model for "${subject}" is ready`)
                   toast.success("Unified CAD model generated")
+                  if (unifiedBgOpIdRef.current) completeOp(unifiedBgOpIdRef.current, "CAD model ready")
+                  unifiedBgOpIdRef.current = null
                 } else if (event.type === "error") {
                   throw new Error(event.message || "Generation failed")
                 }
@@ -2594,23 +2778,52 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Backward compat: non-SSE JSON response
         const data = await response.json() as { result?: CadLabResult; code?: string }
         if (data.result) {
+          sseCompleted = true
           setUnifiedResult(data.result)
           setUnifiedCode(data.code ?? null)
           addProgressLine("Unified model generated successfully!")
           sendNotification("CAD Model Ready", `Unified model for "${subject}" is ready`)
           toast.success("Unified CAD model generated")
+          if (unifiedBgOpIdRef.current) completeOp(unifiedBgOpIdRef.current, "CAD model ready")
+          unifiedBgOpIdRef.current = null
         }
       }
     } catch (err) {
-      console.error("[CAD-LAB] Unified generation failed:", err)
+      console.error("[CAD-LAB] Unified generation SSE failed:", err)
       const msg = err instanceof Error ? err.message : "Unknown error"
+
+      // DECISION: If the SSE stream broke but the server may still be running,
+      // fall back to DB polling instead of immediately declaring failure.
+      // Only truly fatal errors (HTTP 4xx, rate limit) skip polling.
+      const isFatalError = msg.includes("HTTP 4") || msg.includes("Rate limit") || msg.includes("Invalid")
+      if (!isFatalError && activeProjectIdRef.current) {
+        addProgressLine(`Stream interrupted: ${msg}`)
+        startUnifiedResultPolling(activeProjectIdRef.current)
+        return // Don't reset isGeneratingUnified — polling will do it
+      }
+
       addProgressLine(`Unified generation failed: ${msg}`)
       toast.error(`Generation failed: ${msg}`)
+      if (unifiedBgOpIdRef.current) failOp(unifiedBgOpIdRef.current, msg)
+      unifiedBgOpIdRef.current = null
     } finally {
-      unifiedGuardRef.current = false
-      setIsGeneratingUnified(false)
+      // GOTCHA: Only reset if NOT polling — polling will reset when it completes
+      if (sseCompleted || !unifiedPollIntervalRef.current) {
+        unifiedGuardRef.current = false
+        setIsGeneratingUnified(false)
+      }
     }
-  }, [subject, detectedDomain, addProgressLine, sendNotification])
+  }, [subject, detectedDomain, addProgressLine, sendNotification, startOp, updateOp, completeOp, failOp, startUnifiedResultPolling])
+
+  // Cleanup: stop unified polling on unmount
+  useEffect(() => {
+    return () => {
+      if (unifiedPollIntervalRef.current) {
+        clearInterval(unifiedPollIntervalRef.current)
+        unifiedPollIntervalRef.current = null
+      }
+    }
+  }, [])
 
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
   // updates unifiedResult/unifiedCode instead of per-module state.
@@ -2743,6 +2956,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     interfaceContracts,
     isExtractingContracts,
     unmatchedPorts,
+    moduleReviews,
+    handleReviewComplete,
+    isApplyingReviewRevisions,
+    handleApplyReviewRevisions,
     specifiedModuleCount,
     manufacturingOrderCount,
     refreshManufacturingOrderCount,

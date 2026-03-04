@@ -147,15 +147,8 @@ export default function CadLabBuildPage(): React.ReactNode {
     await rateModuleQuality(activeProjectId, moduleId, rating)
   }, [activeProjectId])
 
-  // Specialist reviews (keyed by moduleId → array of reviews)
-  const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
-  const handleReviewComplete = useCallback((moduleId: string, review: SpecialistReview) => {
-    setModuleReviews(prev => {
-      const existing = prev[moduleId] ?? []
-      const filtered = existing.filter(r => r.specialistId !== review.specialistId)
-      return { ...prev, [moduleId]: [...filtered, review] }
-    })
-  }, [])
+  // Specialist reviews — lifted to context for persistence across navigation
+  const { moduleReviews, handleReviewComplete } = useCadLab()
 
   // Register screen context so specialists can see what the user is working on
   useRegisterScreenContext(

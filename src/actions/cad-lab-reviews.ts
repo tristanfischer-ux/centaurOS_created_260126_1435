@@ -956,6 +956,142 @@ Revise the module fields to address the specialist concerns. Return a JSON objec
     })
 }
 
+// ─── Module Revision from Review Feedback (Post-Specialist Review) ───
+
+export interface ReviewRevisionRequest {
+    modules: CadLabModule[]
+    /** Accepted issues from the ReviewIssueSummary component, grouped by module */
+    acceptedIssues: Array<{
+        moduleId: string
+        moduleName: string
+        specialistName: string
+        issue: { severity: string; category: string; message: string; suggestion?: string }
+    }>
+    /** Diagnostic answers for context (process, material, etc.) */
+    diagnosticAnswers?: DiagnosticAnswers
+    projectSubject: string
+}
+
+/**
+ * Revises modules' text fields to address accepted specialist review issues.
+ *
+ * @description Similar pattern to reviseModulesFromCheckpoints() — calls Claude
+ * in parallel per affected module with the specific accepted issues. Returns
+ * revised fields for each module.
+ *
+ * @returns Record of moduleId → revised fields, only for successfully revised modules
+ */
+export async function reviseModulesFromReviews(
+    req: ReviewRevisionRequest,
+): Promise<Record<string, RevisedModuleFields>> {
+    return withAuth(async () => {
+        const apiKey = process.env.ANTHROPIC_API_KEY
+        if (!apiKey) {
+            console.error("[CAD-REVIEWS] No API key for review-based revision")
+            return {}
+        }
+
+        // Group accepted issues by module
+        const issuesByModule = new Map<string, typeof req.acceptedIssues>()
+        for (const item of req.acceptedIssues) {
+            const existing = issuesByModule.get(item.moduleId) ?? []
+            existing.push(item)
+            issuesByModule.set(item.moduleId, existing)
+        }
+
+        if (issuesByModule.size === 0) return {}
+
+        const affectedModules = req.modules.filter(m => issuesByModule.has(m.id))
+        if (affectedModules.length === 0) return {}
+
+        const Anthropic = (await import("@anthropic-ai/sdk")).default
+        const client = new Anthropic({ apiKey })
+
+        const results = await Promise.allSettled(
+            affectedModules.map(async (mod) => {
+                const issues = issuesByModule.get(mod.id) ?? []
+                const diagnostics = req.diagnosticAnswers?.[mod.id]
+
+                const issueText = issues.map((item, i) =>
+                    `${i + 1}. [${item.issue.severity.toUpperCase()}] ${item.issue.category}: ${item.issue.message}${item.issue.suggestion ? `\n   Suggested fix: ${item.issue.suggestion}` : ""}` +
+                    `\n   (Raised by: ${item.specialistName})`
+                ).join("\n")
+
+                const diagnosticContext = diagnostics
+                    ? `\nDiagnostic specs: Process=${diagnostics.mfg_process || "unspecified"}, Material=${diagnostics.material || "unspecified"}, Tolerance=${diagnostics.tolerance || "unspecified"}, Finish=${diagnostics.finish || "unspecified"}, Batch=${diagnostics.batch_size || "unspecified"}`
+                    : ""
+
+                const response = await client.messages.create({
+                    model: REVIEW_MODEL,
+                    max_tokens: 2048,
+                    system: `You revise product module descriptions to address specific specialist review issues. Rules:
+- Address EVERY accepted issue — don't skip any
+- Preserve the original intent and level of detail
+- Only change what's needed to address the specific issues
+- Keep the same writing style and tone
+- Where an issue has a suggested fix, incorporate it
+- Return ALL fields (even unchanged ones) as valid JSON
+- Do NOT add disclaimers or meta-commentary — just return the revised content`,
+                    messages: [{
+                        role: "user",
+                        content: `Product: "${req.projectSubject}"
+
+Module: "${mod.name}" (id: ${mod.id})
+${diagnosticContext}
+
+Current fields:
+- Purpose: ${mod.purpose}
+- Description: ${mod.description}
+- Key Parts: ${JSON.stringify(mod.keyParts)}
+- Why It Matters: ${mod.whyItMatters}
+- Failure Modes: ${JSON.stringify(mod.failureModes)}
+- Unknowns: ${JSON.stringify(mod.unknowns)}
+
+Specialist review issues to address:
+${issueText}
+
+Revise the module fields to address all the issues above. Return a JSON object with keys: purpose, description, keyParts, whyItMatters, failureModes, unknowns.`,
+                    }],
+                })
+
+                const text = response.content
+                    .filter((b) => b.type === "text")
+                    .map((b) => b.type === "text" ? b.text : "")
+                    .join("")
+
+                const parsed = extractAndParseJson(text)
+                if (!parsed) {
+                    throw new Error(`No valid JSON found in revision response for module ${mod.id}`)
+                }
+
+                if (
+                    typeof parsed.purpose !== "string" ||
+                    typeof parsed.description !== "string" ||
+                    !Array.isArray(parsed.keyParts) || !parsed.keyParts.every((s: unknown) => typeof s === "string") ||
+                    typeof parsed.whyItMatters !== "string" ||
+                    !Array.isArray(parsed.failureModes) || !parsed.failureModes.every((s: unknown) => typeof s === "string") ||
+                    !Array.isArray(parsed.unknowns) || !parsed.unknowns.every((s: unknown) => typeof s === "string")
+                ) {
+                    throw new Error(`Invalid revision shape for module ${mod.id}`)
+                }
+
+                return { moduleId: mod.id, fields: parsed as unknown as RevisedModuleFields }
+            }),
+        )
+
+        const revised: Record<string, RevisedModuleFields> = {}
+        for (const result of results) {
+            if (result.status === "fulfilled") {
+                revised[result.value.moduleId] = result.value.fields
+            } else {
+                console.warn("[CAD-REVIEWS] Review revision failed for module:", result.reason)
+            }
+        }
+
+        return revised
+    })
+}
+
 /**
  * Extract and parse the first balanced JSON object from LLM output.
  *

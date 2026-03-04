@@ -69,6 +69,10 @@ import {
 import type { CompatibilityStatus } from "@/lib/cad-lab/diagnostic-mappings"
 import type { SpecialistReview } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { ReviewIssueSummary } from "@/components/cad/review-issue-summary"
+import type { AggregatedIssue } from "@/components/cad/review-issue-summary"
+import { RedlineDiff } from "../components/redline-diff"
+import { buildRevisionItems } from "../components/checkpoint-revision-diffs"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -134,6 +138,9 @@ export default function SpecifyPage(): React.ReactNode {
     isGeneratingImages,
     handleRefreshModuleImages,
     researchModelUsed, decompositionModelUsed,
+    revisedModuleIds,
+    isApplyingReviewRevisions,
+    handleApplyReviewRevisions,
   } = useCadLab()
 
   // INTENT: Compute model audit data from modules for attribution display.
@@ -156,15 +163,8 @@ export default function SpecifyPage(): React.ReactNode {
     }
   }, [hasResearch, modules.length, router])
 
-  // ── Local state: specialist reviews per module ──
-  const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
-  const handleReviewComplete = useCallback((moduleId: string, review: SpecialistReview) => {
-    setModuleReviews((prev) => {
-      const existing = prev[moduleId] ?? []
-      const filtered = existing.filter((r) => r.specialistId !== review.specialistId)
-      return { ...prev, [moduleId]: [...filtered, review] }
-    })
-  }, [])
+  // ── Specialist reviews — lifted to context for persistence across navigation ──
+  const { moduleReviews, handleReviewComplete } = useCadLab()
 
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
@@ -418,7 +418,12 @@ export default function SpecifyPage(): React.ReactNode {
                       <CardContent className="pt-4 pb-4 space-y-2">
                         <div className="flex items-center justify-between">
                           <h3 className="text-sm font-medium text-foreground truncate">{mod.name}</h3>
-                          {getSpecStatusBadge(status)}
+                          <div className="flex items-center gap-1.5">
+                            {(mod.revisionNumber ?? 1) > 1 && (
+                              <Badge variant="secondary" className="text-[10px]">Rev {mod.revisionNumber}</Badge>
+                            )}
+                            {getSpecStatusBadge(status)}
+                          </div>
                         </div>
                         <p className="text-xs text-muted-foreground line-clamp-2">{mod.purpose}</p>
                         {mod.imageUrl && (
@@ -591,6 +596,9 @@ export default function SpecifyPage(): React.ReactNode {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-medium text-foreground truncate">{mod.name}</h3>
+                          {(mod.revisionNumber ?? 1) > 1 && (
+                            <Badge variant="secondary" className="text-[10px]">Rev {mod.revisionNumber}</Badge>
+                          )}
                           {getSpecStatusBadge(status)}
                           <span className="text-[10px] text-muted-foreground">
                             {isDiagComplete ? (
@@ -624,6 +632,15 @@ export default function SpecifyPage(): React.ReactNode {
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Description</h4>
                             <p className="text-sm text-foreground">{mod.description}</p>
                           </div>
+
+                          {/* View Changes — shown when module has been revised */}
+                          {mod.conceptSnapshot && buildRevisionItems(mod).length > 0 && (
+                            <RedlineDiff
+                              fromStage={`Rev ${(mod.revisionNumber ?? 2) - 1}`}
+                              toStage={`Rev ${mod.revisionNumber ?? 2}`}
+                              items={buildRevisionItems(mod)}
+                            />
+                          )}
 
                           {/* Key parts */}
                           <div>
@@ -891,6 +908,7 @@ export default function SpecifyPage(): React.ReactNode {
             <CadLabCostEstimate
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
+              earlyCostEstimates={earlyCostEstimates}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m
@@ -996,6 +1014,11 @@ export default function SpecifyPage(): React.ReactNode {
                       <CardTitle className="text-sm flex items-center gap-2">
                         {mod.name}
                         {getSpecStatusBadge(status)}
+                        {(mod.revisionNumber ?? 1) > 1 && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            Rev {mod.revisionNumber}
+                          </Badge>
+                        )}
                       </CardTitle>
                       {!diagComplete && (
                         <p className="text-xs text-warning flex items-center gap-1">
@@ -1030,6 +1053,16 @@ export default function SpecifyPage(): React.ReactNode {
                 </Card>
               )
             })}
+
+            {/* Cross-module review issue summary with Apply Revisions */}
+            {Object.keys(moduleReviews).length > 0 && (
+              <ReviewIssueSummary
+                modules={modules}
+                moduleReviews={moduleReviews}
+                isApplying={isApplyingReviewRevisions}
+                onApplyRevisions={(issues: AggregatedIssue[]) => handleApplyReviewRevisions(issues)}
+              />
+            )}
 
             {/* Source CTA */}
             {allDiagnosticsComplete && finalizeSummary && (
