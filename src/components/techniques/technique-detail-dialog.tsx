@@ -364,13 +364,13 @@ export function TechniqueDetailDialog({
         <Separator />
         <div className="px-6 py-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <Button asChild variant="default" className="flex-1 sm:flex-none">
-            <Link href={`/marketplace?technique=${technique.slug}`}>
+            <Link href={`/marketplace?technique=${technique.slug}&q=${encodeURIComponent(technique.name)}`}>
               <Search className="h-4 w-4 mr-2" />
               Find Suppliers
             </Link>
           </Button>
           <Button asChild variant="outline" className="flex-1 sm:flex-none">
-            <Link href={`/marketplace?cat=People&q=${encodeURIComponent(technique.name)}`}>
+            <Link href={`/recruits?q=${encodeURIComponent(technique.name)}`}>
               <Briefcase className="h-4 w-4 mr-2" />
               Find an Expert
             </Link>

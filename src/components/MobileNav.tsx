@@ -39,7 +39,6 @@ import {
     Brain,
     Handshake,
     MessageCircle,
-    Send,
     PoundSterling,
     FileText,
     Map,
@@ -95,7 +94,6 @@ const meMoreNavigation = [
 const planMoreNavigation = [
     { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
-    { name: "Outreach", href: "/outreach", icon: Send },
 ]
 
 // "More" dropdown — Finance section (hidden for now, may be restored later)
