@@ -935,9 +935,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               } else { setSystemIllustrationStatus("failed"); setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed") }
             } catch (e) { if (!activeProjectIdRef.current) return; setSystemIllustrationStatus("failed"); setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed") }
           }
-          handleGenerateModuleImages(fallbackModules, activeProjectId ?? undefined, visualStyle, referenceBase64, moduleCrops).catch(() => {})
+          // INTENT: Guard with ref (not state) to prevent stale closure from silently skipping
+          // image generation. Previously used `activeProjectId ?? undefined` which captured
+          // stale null from the state value, causing handleGenerateModuleImages to silently return.
+          const currentProjectId = activeProjectIdRef.current
+          if (currentProjectId) {
+            handleGenerateModuleImages(fallbackModules, currentProjectId, visualStyle, referenceBase64, moduleCrops)
+              .catch((e) => console.error("[CAD-LAB] Fallback image pipeline failed:", e))
+          } else {
+            console.warn("[CAD-LAB] Skipping image generation — no active project ID")
+          }
         }
-        fallbackImagesPipeline().catch(() => {})
+        fallbackImagesPipeline().catch((e) => console.error("[CAD-LAB] Fallback images pipeline error:", e))
 
         if (activeProjectId) {
           setIsCheckpointing(true)
@@ -1243,7 +1252,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
   const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>) => {
     const projectId = explicitProjectId ?? activeProjectId
-    if (modulesToProcess.length === 0 || !projectId) return
+    if (modulesToProcess.length === 0 || !projectId) {
+      if (!projectId) console.warn("[CAD-LAB] handleGenerateModuleImages skipped — no project ID")
+      return
+    }
     setIsGeneratingImages(true)
     setImageGenProgress({ completed: 0, total: modulesToProcess.length, failed: 0, phase: "generating" })
 
@@ -2229,20 +2241,30 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [])
 
-  // INTENT: Restore the last active project when the provider remounts after
-  // navigation. Without this, navigating away and back leaves a blank canvas
-  // because activeProjectId initializes to null and nothing triggers a load.
-  // Guarded by autoRestoreRef to prevent double-fire in React StrictMode.
+  // INTENT: Restore the last active project when the provider initializes or
+  // when activeProjectId becomes null (state lost due to page reload, etc.).
+  // Without this, navigating away and back leaves a blank canvas because
+  // activeProjectId initializes to null and nothing triggers a load.
+  //
+  // DECISION: Uses activeProjectId in deps so it re-fires when state is lost.
+  // The `autoRestoreRef` prevents double-fire in React StrictMode (cleared after
+  // 100ms so subsequent legitimate restores still work).
   useEffect(() => {
     if (!initialized) return
+    if (typeof window === "undefined") return
+    // Only restore when activeProjectId is null (state lost or fresh init)
+    if (activeProjectId) return
+    // StrictMode guard — prevent double-fire within the same tick
     if (autoRestoreRef.current) return
     autoRestoreRef.current = true
-    if (typeof window === "undefined") return
+    // Reset guard after StrictMode's double-invoke window
+    const resetTimer = setTimeout(() => { autoRestoreRef.current = false }, 100)
     const storedProjectId = localStorage.getItem(CAD_LAB_ACTIVE_PROJECT_KEY)
     if (storedProjectId) {
       handleLoadProject(storedProjectId)
     }
-  }, [initialized, handleLoadProject])
+    return () => clearTimeout(resetTimer)
+  }, [initialized, activeProjectId, handleLoadProject])
 
   // ── Delete a project ──
   const handleDeleteProject = useCallback(async (projectId: string) => {
