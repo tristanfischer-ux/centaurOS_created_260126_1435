@@ -3879,6 +3879,8 @@ export type Database = {
           subject: string
           system_illustration_url: string | null
           thumbnail_svg: string | null
+          unified_code: string | null
+          unified_result: Json | null
           updated_at: string
           visual_style: Json | null
         }
@@ -3913,6 +3915,8 @@ export type Database = {
           subject: string
           system_illustration_url?: string | null
           thumbnail_svg?: string | null
+          unified_code?: string | null
+          unified_result?: Json | null
           updated_at?: string
           visual_style?: Json | null
         }
@@ -3947,6 +3951,8 @@ export type Database = {
           subject?: string
           system_illustration_url?: string | null
           thumbnail_svg?: string | null
+          unified_code?: string | null
+          unified_result?: Json | null
           updated_at?: string
           visual_style?: Json | null
         }

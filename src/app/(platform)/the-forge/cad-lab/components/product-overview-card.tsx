@@ -28,6 +28,12 @@ function getModelDisplayName(modelId: string): string {
     "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
     "gemini-3.1-flash-image-preview": "Nano Banana 2 (Gemini)",
     "gpt-image-1": "GPT Image 1 (OpenAI)",
+    // Short labels from the decomposition race
+    "Opus": "Claude Opus 4.6",
+    "Sonnet": "Claude Sonnet 4.6",
+    "Haiku": "Claude Haiku 4.5",
+    "Gemini": "Gemini Pro",
+    "GPT-4o": "GPT-4o",
   }
   return DISPLAY_NAMES[modelId] ?? modelId
 }
@@ -45,6 +51,10 @@ export interface ModelAudit {
   imageCount: number
   /** Distinct image model IDs used across modules */
   imageModels: string[]
+  /** Which model synthesized the research/overview report */
+  researchModel?: string
+  /** Which model won the decomposition race */
+  decompositionModel?: string
 }
 
 // ─── Props ───────────────────────────────────────────────────────────
@@ -137,12 +147,29 @@ export function ProductOverviewCard({
         )}
 
         {/* ── Model Attribution ── */}
-        {modelAudit && (modelAudit.generatedCount > 0 || modelAudit.imageCount > 0) && (
+        {modelAudit && (modelAudit.researchModel || modelAudit.decompositionModel || modelAudit.generatedCount > 0 || modelAudit.imageCount > 0) && (
           <div className="border-t border-border mt-4 pt-3">
             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
               Model Attribution
             </h4>
             <div className="space-y-1">
+              {modelAudit.researchModel && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Overview: <span className="text-foreground font-medium">{getModelDisplayName(modelAudit.researchModel)}</span>
+                  </span>
+                </div>
+              )}
+              {modelAudit.decompositionModel && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">
+                    Breakdown: <span className="text-foreground font-medium">{getModelDisplayName(modelAudit.decompositionModel)}</span>
+                  </span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {modelAudit.moduleCount} modules
+                  </span>
+                </div>
+              )}
               {modelAudit.generatedCount > 0 && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">

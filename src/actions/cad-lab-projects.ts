@@ -105,6 +105,12 @@ export interface CadLabProjectData {
   /** AI-declared inter-module connections from decomposition */
   decompositionConnections: ModuleConnection[] | null
 
+  /** Unified CAD model result (without binary data) */
+  unifiedResult: Omit<CadLabResult, "stlData" | "stepData"> | null
+
+  /** Unified CadQuery code */
+  unifiedCode: string | null
+
   createdAt: string
   updatedAt: string
 }
@@ -127,7 +133,6 @@ export async function listCadLabProjects(): Promise<
       .from("cad_lab_projects")
       .select("id, name, subject, status, stage, thumbnail_svg, system_illustration_url, created_at, updated_at")
       .order("updated_at", { ascending: false })
-      .limit(50)
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to list projects:", error.message)
@@ -214,6 +219,8 @@ export async function loadCadLabProject(
         diagnosticAnswers: (project.diagnostic_answers as Record<string, Record<string, string>> | null) ?? null,
         diagnosticEnrichment: (project.diagnostic_enrichment as DiagnosticEnrichment | null) ?? null,
         decompositionConnections: (project.decomposition_connections as ModuleConnection[] | null) ?? null,
+        unifiedResult: (project.unified_result as CadLabProjectData["unifiedResult"]) ?? null,
+        unifiedCode: project.unified_code ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -616,6 +623,41 @@ export async function saveCadLabIntegratedAssembly(
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save integrated assembly:", error.message)
+      return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Unified CAD Result ─────────────────────────────────────────
+
+/**
+ * Persists the unified CAD generation result + code for a project.
+ *
+ * @param projectId - Project to update
+ * @param result - CadLabResult without binary blobs (stlData/stepData stripped by caller)
+ * @param code - CadQuery Python source
+ * @returns Success or error
+ */
+export async function saveCadLabUnifiedResult(
+  projectId: string,
+  result: Omit<CadLabResult, "stlData" | "stepData">,
+  code: string,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        unified_result: result as unknown as Json,
+        unified_code: code,
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save unified result:", error.message)
       return { error: `Failed to save: ${sanitizeErrorMessage(error)}` }
     }
 

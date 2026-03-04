@@ -226,30 +226,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
       {/* ── Pipeline stepper nav ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <CadLabNav />
-        <div className="flex items-center gap-1 self-center sm:self-auto">
-          <Link
-            href={FORGE_ROUTES.cadLabTemplates}
-            className={cn(
-              "text-sm font-medium transition-colors rounded-md px-3 py-2",
-              pathname === FORGE_ROUTES.cadLabTemplates
-                ? "text-international-orange font-semibold bg-orange-50"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted",
-            )}
-          >
-            Template Library
-          </Link>
-          <Link
-            href={FORGE_ROUTES.cadLabMashup}
-            className={cn(
-              "text-sm font-medium transition-colors rounded-md px-3 py-2",
-              pathname === FORGE_ROUTES.cadLabMashup
-                ? "text-international-orange font-semibold bg-orange-50"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted",
-            )}
-          >
-            Mashup Lab
-          </Link>
-        </div>
+        {/* Template Library and Mashup Lab hidden for now */}
       </div>
 
       {/* ── Milestone celebration ── */}
