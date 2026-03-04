@@ -15,11 +15,13 @@ describe('ProductOverviewCard', () => {
     expect(screen.getByText('Edit')).toBeInTheDocument()
   })
 
-  it('returns null when overview is empty and not editing', () => {
-    const { container } = render(
+  it('shows Add prompt when overview is empty', () => {
+    render(
       <ProductOverviewCard overview="" onSave={jest.fn()} />
     )
-    expect(container.innerHTML).toBe('')
+    expect(screen.getByText('Product Overview')).toBeInTheDocument()
+    expect(screen.getByText('Add')).toBeInTheDocument()
+    expect(screen.getByText(/No product overview yet/)).toBeInTheDocument()
   })
 
   it('switches to edit mode on Edit click', () => {
