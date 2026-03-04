@@ -83,7 +83,327 @@ function clampPositive(n: unknown): number | null {
   return Math.max(0, n)
 }
 
-// ─── AI BOM Generation ──────────────────────────────────────────────
+// ─── Types (internal to progressive BOM flow) ──────────────────────
+
+export interface SkeletonPart {
+  partNumber: string
+  name: string
+  sourceModuleId: string
+  process: string
+  isPurchased: boolean
+  parentPartNumber: string | null
+}
+
+export interface BomSkeletonResult {
+  success: boolean
+  error?: string
+  parts: SkeletonPart[]
+  bomLines: Array<{ parentPartNumber: string | null; childPartNumber: string; quantity: number }>
+}
+
+export interface BomExpansionResult {
+  success: boolean
+  error?: string
+  expansions: Record<string, {
+    description: string
+    material: string
+    materialSpec: string
+    finish: string
+    tolerance: string
+    massKg: number
+    envelopeXMm: number
+    envelopeYMm: number
+    envelopeZMm: number
+    estimatedUnitCostGbp: number
+    aiConfidence: number
+  }>
+}
+
+// ─── Progressive BOM: Phase 1 — Skeleton ────────────────────────────
+
+/**
+ * Phase 1 of progressive BOM generation: returns lightweight skeleton
+ * with part names, hierarchy, process type, and isPurchased flag.
+ *
+ * @description Uses a focused prompt with max_tokens: 2048 for fast response (~10s).
+ * Caller should display skeleton parts immediately (specs show "—"),
+ * then call expandBomParts() for full specifications.
+ */
+export async function skeletonBom(
+  projectId: string,
+  modules: CadLabModule[],
+  designBrief?: CadLabDesignBrief,
+  diagnosticAnswers?: DiagnosticAnswers,
+): Promise<BomSkeletonResult> {
+  return withAuth(async ({ supabase }) => {
+    if (!modules.length) {
+      return { success: false, error: "No modules to generate BOM from", parts: [], bomLines: [] }
+    }
+
+    const { data: project, error: projErr } = await supabase
+      .from("cad_lab_projects")
+      .select("id, subject")
+      .eq("id", projectId)
+      .single()
+
+    if (projErr || !project) {
+      return { success: false, error: "Project not found", parts: [], bomLines: [] }
+    }
+
+    const moduleDescriptions = modules.map((m) => {
+      const diagInfo = diagnosticAnswers?.[m.id]
+        ? `\nDiagnostic answers: ${JSON.stringify(diagnosticAnswers[m.id])}`
+        : ""
+      return `## Module: ${truncate(m.name, 100)} (id: ${truncate(m.id, 50)})
+Purpose: ${truncate(m.purpose, MAX_PROMPT_FIELD_LENGTH)}
+Key Parts: ${m.keyParts.map((p) => truncate(p, 100)).join(", ")}
+Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${diagInfo}`
+    }).join("\n\n")
+
+    const briefContext = designBrief
+      ? `\n\nDesign Brief:
+- Use case: ${truncate(designBrief.useCase, 200) || "not specified"}
+- Target process: ${truncate(designBrief.targetProcess, 100) || "not specified"}
+- Target material: ${truncate(designBrief.targetMaterial, 100) || "not specified"}`
+      : ""
+
+    const systemPrompt = `You are a manufacturing engineer creating a Bill of Materials skeleton from product module decomposition data.
+
+Your task (SKELETON ONLY — no detailed specs):
+1. Expand each module's keyParts into named parts with a manufacturing process type
+2. Create one assembly-level part per module (parent in hierarchy)
+3. Deduplicate shared parts across modules (common fasteners, bearings, connectors)
+4. Mark purchased/COTS parts
+5. Assign part numbers: {MODULE_PREFIX}-{SEQ}, assemblies use -ASY, purchased use -PUR
+
+Process types: cnc, injection_molding, sheet_metal, 3d_print_fdm, 3d_print_sla, 3d_print_sls, casting, forging, machining, purchased_cots, other
+
+Respond with ONLY valid JSON:
+{
+  "parts": [
+    {
+      "partNumber": "string",
+      "name": "string",
+      "sourceModuleId": "string (module id)",
+      "process": "enum value",
+      "isPurchased": boolean,
+      "parentPartNumber": "string | null (assembly this belongs to)"
+    }
+  ],
+  "bomLines": [
+    { "parentPartNumber": "string | null", "childPartNumber": "string", "quantity": number }
+  ]
+}`
+
+    const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return { success: false, error: "Anthropic API key not configured", parts: [], bomLines: [] }
+    }
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic({ apiKey })
+
+    const response = await client.messages.create({
+      model: BOM_MODEL,
+      max_tokens: 2048,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+
+    const textBlock = response.content.find((b) => b.type === "text")
+    if (!textBlock || textBlock.type !== "text") {
+      return { success: false, error: "No text response from Claude", parts: [], bomLines: [] }
+    }
+
+    const jsonStr = extractJson(textBlock.text)
+    let parsed: { parts: Array<Record<string, unknown>>; bomLines: Array<Record<string, unknown>> }
+
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      console.error("[skeletonBom] Failed to parse AI response:", jsonStr.slice(0, 200))
+      return { success: false, error: "Failed to parse skeleton response", parts: [], bomLines: [] }
+    }
+
+    if (!Array.isArray(parsed.parts) || !parsed.parts.length) {
+      return { success: false, error: "No parts in skeleton", parts: [], bomLines: [] }
+    }
+
+    // Validate skeleton parts
+    const skeletonParts: SkeletonPart[] = parsed.parts.map((p) => ({
+      partNumber: truncate(String(p.partNumber ?? ""), 50),
+      name: truncate(String(p.name ?? ""), 200),
+      sourceModuleId: truncate(String(p.sourceModuleId ?? ""), 50),
+      process: validateProcess(p.process) ?? "other",
+      isPurchased: Boolean(p.isPurchased),
+      parentPartNumber: p.parentPartNumber ? truncate(String(p.parentPartNumber), 50) : null,
+    }))
+
+    // Check for duplicate part numbers
+    const partNumbers = new Set<string>()
+    for (const p of skeletonParts) {
+      if (!p.partNumber) {
+        return { success: false, error: "Skeleton part missing part number", parts: [], bomLines: [] }
+      }
+      if (partNumbers.has(p.partNumber)) {
+        return { success: false, error: `Duplicate skeleton part: ${p.partNumber}`, parts: [], bomLines: [] }
+      }
+      partNumbers.add(p.partNumber)
+    }
+
+    const bomLines = (parsed.bomLines ?? []).map((bl) => ({
+      parentPartNumber: bl.parentPartNumber ? truncate(String(bl.parentPartNumber), 50) : null,
+      childPartNumber: truncate(String(bl.childPartNumber ?? ""), 50),
+      quantity: typeof bl.quantity === "number" && bl.quantity > 0 ? Math.round(bl.quantity) : 1,
+    }))
+
+    return { success: true, parts: skeletonParts, bomLines }
+  })
+}
+
+// ─── Progressive BOM: Phase 2 — Expand Specs ───────────────────────
+
+/**
+ * Phase 2 of progressive BOM generation: expands skeleton parts with
+ * full specifications (material, finish, tolerance, mass, dimensions, cost).
+ *
+ * @description Takes the full skeleton for context and returns expanded spec
+ * fields keyed by partNumber. One call for all parts since BOM parts are
+ * interdependent (shared fasteners, deduplication).
+ */
+export async function expandBomParts(
+  skeletonParts: SkeletonPart[],
+  modules: CadLabModule[],
+  designBrief?: CadLabDesignBrief,
+  diagnosticAnswers?: DiagnosticAnswers,
+): Promise<BomExpansionResult> {
+  return withAuth(async () => {
+    if (!skeletonParts.length) {
+      return { success: false, error: "No skeleton parts to expand", expansions: {} }
+    }
+
+    const briefContext = designBrief
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
+      : ""
+
+    // Include module context for material/process reasoning
+    const moduleContext = modules.map((m) => {
+      const diagInfo = diagnosticAnswers?.[m.id]
+        ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
+        : ""
+      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+    }).join("\n")
+
+    // INTENT: Fetch real catalogue for purchased part cost grounding
+    const allKeyParts = modules.flatMap((m) => m.keyParts)
+    const domain = detectDomainFromKeyParts(allKeyParts)
+    const keywords = await extractSearchKeywords(modules)
+    const catalogueRef = await fetchCatalogueForPrompt(domain, keywords)
+
+    const skeletonSummary = skeletonParts.map((p) =>
+      `- ${p.partNumber}: "${p.name}" (${p.process}, ${p.isPurchased ? "purchased" : "manufactured"}, module: ${p.sourceModuleId})`
+    ).join("\n")
+
+    const systemPrompt = `You are a manufacturing engineer adding detailed specifications to a BOM skeleton.
+${catalogueRef ? `
+REAL COMPONENT CATALOGUE — USE FOR PURCHASED PARTS:
+${catalogueRef}
+
+For purchased/COTS parts: use exact manufacturer, MPN, and catalogue price if match exists.
+` : ""}
+For each part number in the skeleton, provide:
+- description: 1-2 sentence functional description
+- material: material name (e.g. "6061 Aluminium", "PLA", "304 Stainless Steel")
+- materialSpec: material specification (e.g. "6061-T6", "ABS CF", "AISI 304")
+- finish: surface finish (e.g. "Anodized", "As-printed", "Zinc plated")
+- tolerance: dimensional tolerance (e.g. "±0.1mm", "±0.5mm")
+- massKg: estimated mass in kg (>= 0)
+- envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
+- estimatedUnitCostGbp: unit cost in GBP (>= 0)
+- aiConfidence: 0-1 confidence in estimates
+
+Respond with ONLY valid JSON:
+{
+  "expansions": {
+    "PART-NUMBER": {
+      "description": "...", "material": "...", "materialSpec": "...",
+      "finish": "...", "tolerance": "...", "massKg": 0.0,
+      "envelopeXMm": 0, "envelopeYMm": 0, "envelopeZMm": 0,
+      "estimatedUnitCostGbp": 0.0, "aiConfidence": 0.0
+    }
+  }
+}`
+
+    const userPrompt = `Expand these skeleton parts with full manufacturing specifications:
+
+${skeletonSummary}
+
+Module context:
+${moduleContext}${briefContext}
+
+Add material, specs, dimensions, mass, cost, and confidence for every part.`
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      return { success: false, error: "Anthropic API key not configured", expansions: {} }
+    }
+
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic({ apiKey })
+
+    const response = await client.messages.create({
+      model: BOM_MODEL,
+      max_tokens: BOM_MAX_TOKENS,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    })
+
+    const textBlock = response.content.find((b) => b.type === "text")
+    if (!textBlock || textBlock.type !== "text") {
+      return { success: false, error: "No text response from Claude", expansions: {} }
+    }
+
+    const jsonStr = extractJson(textBlock.text)
+    let parsed: { expansions: Record<string, Record<string, unknown>> }
+
+    try {
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      console.error("[expandBomParts] Failed to parse AI response:", jsonStr.slice(0, 200))
+      return { success: false, error: "Failed to parse expansion response", expansions: {} }
+    }
+
+    if (!parsed.expansions || typeof parsed.expansions !== "object") {
+      return { success: false, error: "No expansions in response", expansions: {} }
+    }
+
+    // Validate and sanitize each expansion
+    const expansions: BomExpansionResult["expansions"] = {}
+    for (const [partNumber, raw] of Object.entries(parsed.expansions)) {
+      expansions[partNumber] = {
+        description: truncate(String(raw.description ?? ""), 500),
+        material: truncate(String(raw.material ?? ""), 200),
+        materialSpec: truncate(String(raw.materialSpec ?? ""), 200),
+        finish: truncate(String(raw.finish ?? ""), 200),
+        tolerance: truncate(String(raw.tolerance ?? ""), 100),
+        massKg: clampPositive(raw.massKg) ?? 0,
+        envelopeXMm: clampPositive(raw.envelopeXMm) ?? 0,
+        envelopeYMm: clampPositive(raw.envelopeYMm) ?? 0,
+        envelopeZMm: clampPositive(raw.envelopeZMm) ?? 0,
+        estimatedUnitCostGbp: clampPositive(raw.estimatedUnitCostGbp) ?? 0,
+        aiConfidence: typeof raw.aiConfidence === "number"
+          ? Math.max(0, Math.min(1, raw.aiConfidence))
+          : 0.5,
+      }
+    }
+
+    return { success: true, expansions }
+  })
+}
+
+// ─── AI BOM Generation (original monolithic — used as fallback) ─────
 
 /**
  * Generate a structured BOM from CAD Lab modules using Claude.

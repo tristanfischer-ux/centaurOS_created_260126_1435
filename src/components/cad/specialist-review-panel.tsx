@@ -33,8 +33,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
-import { requestSpecialistReview } from "@/actions/cad-lab-reviews"
-import type { ReviewRequest } from "@/actions/cad-lab-reviews"
+import { requestSpecialistReview, quickSpecialistVerdict } from "@/actions/cad-lab-reviews"
+import type { ReviewRequest, QuickVerdictResult } from "@/actions/cad-lab-reviews"
 import type { SpecialistReview, ReviewVerdict, CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { recommendSpecialist } from "@/lib/cad-lab/recommend-specialist"
@@ -237,6 +237,8 @@ export function SpecialistReviewPanel({
     onReviewComplete,
 }: SpecialistReviewPanelProps) {
     const [loadingSpecialist, setLoadingSpecialist] = useState<string | null>(null)
+    const [detailLoading, setDetailLoading] = useState<string | null>(null)
+    const [quickVerdicts, setQuickVerdicts] = useState<Record<string, QuickVerdictResult>>({})
     const [error, setError] = useState<string | null>(null)
     const [showOtherSpecialists, setShowOtherSpecialists] = useState(false)
 
@@ -247,45 +249,66 @@ export function SpecialistReviewPanel({
         [module, diagnosticAnswers],
     )
 
+    // INTENT: Strip SVG/binary display data before sending to server action.
+    // Module results include base64 SVG views (svgIso, svgTop, etc.) used
+    // for rendering, which can be several MB total and exceed Next.js's
+    // 1MB server action body limit.
+    const buildSlimRequest = useCallback((specialistId: string): ReviewRequest => {
+        const slimModules = allModules.map(m => {
+            if (!m.result) return m
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { svgIso, svgTop, svgFront, svgBack, svgRight, svgLeft, svgExploded, ...rest } = m.result
+            return { ...m, result: rest }
+        })
+
+        return {
+            projectId,
+            moduleId: module.id,
+            specialistId,
+            allModules: slimModules,
+            designBrief,
+            diagnosticAnswers,
+            projectSubject,
+        }
+    }, [projectId, module, allModules, designBrief, diagnosticAnswers, projectSubject])
+
     const handleRequestReview = useCallback(async (specialistId: string) => {
         setLoadingSpecialist(specialistId)
         setError(null)
 
+        const req = buildSlimRequest(specialistId)
+
         try {
-            // Strip SVG/binary display data before sending to server action.
-            // Module results include base64 SVG views (svgIso, svgTop, etc.) used
-            // for rendering, which can be several MB total and exceed Next.js's
-            // 1MB server action body limit. The review context only needs structural
-            // text data (geometry dimensions, DFM results, etc.) — not the images.
-            const slimModules = allModules.map(m => {
-                if (!m.result) return m
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { svgIso, svgTop, svgFront, svgBack, svgRight, svgLeft, svgExploded, ...rest } = m.result
-                return { ...m, result: rest }
-            })
-
-            const req: ReviewRequest = {
-                projectId,
-                moduleId: module.id,
-                specialistId,
-                allModules: slimModules,
-                designBrief,
-                diagnosticAnswers,
-                projectSubject,
+            // ── Phase 1: Quick verdict (~3-5s) ──
+            const quickResult = await quickSpecialistVerdict(req)
+            if ("quickVerdict" in quickResult) {
+                setQuickVerdicts(prev => ({ ...prev, [specialistId]: quickResult.quickVerdict }))
             }
+            // Clear loading spinner — quick verdict is shown
+            setLoadingSpecialist(null)
 
-            const result = await requestSpecialistReview(req)
-            if ("error" in result) {
-                setError(result.error)
+            // ── Phase 2: Full review (background, ~15-60s) ──
+            setDetailLoading(specialistId)
+            const fullResult = await requestSpecialistReview(req)
+            setDetailLoading(null)
+
+            if ("error" in fullResult) {
+                setError(fullResult.error)
             } else {
-                onReviewComplete?.(result.review)
+                // Clear quick verdict — full review replaces it
+                setQuickVerdicts(prev => {
+                    const next = { ...prev }
+                    delete next[specialistId]
+                    return next
+                })
+                onReviewComplete?.(fullResult.review)
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Review failed")
-        } finally {
             setLoadingSpecialist(null)
+            setDetailLoading(null)
         }
-    }, [projectId, module, allModules, designBrief, diagnosticAnswers, projectSubject, onReviewComplete])
+    }, [buildSlimRequest, onReviewComplete])
 
     // Which specialists have already reviewed
     const reviewedBy = new Set(reviews.map(r => r.specialistId))
@@ -411,6 +434,44 @@ export function SpecialistReviewPanel({
                     </span>
                 </div>
             )}
+
+            {/* Quick verdicts (shown while full review loads in background) */}
+            {Object.entries(quickVerdicts).map(([specId, qv]) => {
+                const spec = getSpecialistById(specId)
+                const isExpandingDetail = detailLoading === specId
+                return (
+                    <div key={`qv-${specId}`} className="border rounded-md p-3 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                            {spec?.avatarImage ? (
+                                <Image
+                                    src={spec.avatarImage}
+                                    alt={spec.name}
+                                    width={28}
+                                    height={28}
+                                    className="rounded-full flex-shrink-0"
+                                />
+                            ) : (
+                                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                    <span className="text-xs font-medium text-muted-foreground">
+                                        {spec?.name?.[0] ?? "?"}
+                                    </span>
+                                </div>
+                            )}
+                            <span className="text-sm font-medium text-foreground">
+                                {spec?.name ?? specId}
+                            </span>
+                            <VerdictBadge verdict={qv.verdict} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">{qv.summary}</p>
+                        {isExpandingDetail && (
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                <span className="animate-pulse">Expanding analysis…</span>
+                            </div>
+                        )}
+                    </div>
+                )
+            })}
 
             {/* Existing reviews */}
             {reviews.length > 0 && (

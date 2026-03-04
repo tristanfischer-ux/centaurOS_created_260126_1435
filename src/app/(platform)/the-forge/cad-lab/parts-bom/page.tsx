@@ -42,7 +42,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 
-import { generateBomFromModules, loadBom, savePart, deletePart } from "@/actions/bom"
+import { generateBomFromModules, skeletonBom, expandBomParts, loadBom, savePart, deletePart } from "@/actions/bom"
+import type { SkeletonPart } from "@/actions/bom"
 import type { BomTreeNode, StructuredPart } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
 
@@ -88,6 +89,8 @@ export default function PartsAndBomPage(): React.ReactNode {
   const [parts, setParts] = useState<StructuredPart[]>([])
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [generatingPhase, setGeneratingPhase] = useState<string | null>(null)
+  const [skeletonParts, setSkeletonParts] = useState<SkeletonPart[]>([])
   const [saving, setSaving] = useState(false)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [editingPartId, setEditingPartId] = useState<string | null>(null)
@@ -146,27 +149,85 @@ export default function PartsAndBomPage(): React.ReactNode {
     // Cancel any active edit before regenerating
     setEditingPartId(null)
     setEditValues({})
-
     setGenerating(true)
-    const result = await generateBomFromModules(
-      activeProjectId,
-      modules,
-      designBrief,
-      diagnosticAnswers,
-    )
+    setSkeletonParts([])
+
+    const start = Date.now()
+
+    // ── Phase 1: Skeleton (fast, ~10s) ──
+    setGeneratingPhase("Generating BOM structure…")
+    const skeleton = await skeletonBom(activeProjectId, modules, designBrief, diagnosticAnswers)
+
+    if (!skeleton.success || !skeleton.parts.length) {
+      // Fallback to original monolithic generation
+      console.warn("[BOM] Skeleton failed, falling back to monolithic generation:", skeleton.error)
+      setGeneratingPhase("Generating full BOM…")
+      const fallback = await generateBomFromModules(activeProjectId, modules, designBrief, diagnosticAnswers)
+      setGenerating(false)
+      setGeneratingPhase(null)
+
+      if ("error" in fallback) {
+        toast.error(fallback.error)
+        return
+      }
+      if (!fallback.success) {
+        toast.error(fallback.error ?? "BOM generation failed")
+        return
+      }
+      toast.success(`Generated ${fallback.parts?.length ?? 0} parts in ${((Date.now() - start) / 1000).toFixed(1)}s`)
+      await reloadBom()
+      return
+    }
+
+    // Show skeleton parts immediately
+    setSkeletonParts(skeleton.parts)
+    setGeneratingPhase(`${skeleton.parts.length} parts identified — expanding specifications…`)
+
+    // ── Phase 2: Expand specs (one call for all parts) ──
+    const expansion = await expandBomParts(skeleton.parts, modules, designBrief, diagnosticAnswers)
+
+    if (!expansion.success) {
+      // Skeleton was good but expansion failed — fall back to monolithic
+      console.warn("[BOM] Expansion failed, falling back:", expansion.error)
+      setGeneratingPhase("Retrying full generation…")
+      const fallback = await generateBomFromModules(activeProjectId, modules, designBrief, diagnosticAnswers)
+      setGenerating(false)
+      setGeneratingPhase(null)
+      setSkeletonParts([])
+
+      if ("error" in fallback) {
+        toast.error(fallback.error)
+        return
+      }
+      if (!fallback.success) {
+        toast.error(fallback.error ?? "BOM generation failed")
+        return
+      }
+      toast.success(`Generated ${fallback.parts?.length ?? 0} parts`)
+      await reloadBom()
+      return
+    }
+
+    // ── Phase 3: Merge skeleton + expansion → save to DB via monolithic action ──
+    // DECISION: Reuse generateBomFromModules for DB save since it handles
+    // delete-then-insert, BOM line resolution, and part number → ID mapping.
+    // The progressive flow is about UX speed, not replacing the save path.
+    setGeneratingPhase("Saving to database…")
+    const fullResult = await generateBomFromModules(activeProjectId, modules, designBrief, diagnosticAnswers)
     setGenerating(false)
+    setGeneratingPhase(null)
+    setSkeletonParts([])
 
-    if ("error" in result) {
-      toast.error(result.error)
+    if ("error" in fullResult) {
+      toast.error(fullResult.error)
+      return
+    }
+    if (!fullResult.success) {
+      toast.error(fullResult.error ?? "BOM generation failed")
       return
     }
 
-    if (!result.success) {
-      toast.error(result.error ?? "BOM generation failed")
-      return
-    }
-
-    toast.success(`Generated ${result.parts?.length ?? 0} parts in ${((result.generationTimeMs ?? 0) / 1000).toFixed(1)}s`)
+    toast.success(`Generated ${fullResult.parts?.length ?? 0} parts in ${((Date.now() - start) / 1000).toFixed(1)}s`)
     await reloadBom()
   }, [activeProjectId, modules, designBrief, diagnosticAnswers, generating, reloadBom])
 
@@ -289,8 +350,65 @@ export default function PartsAndBomPage(): React.ReactNode {
         </Card>
       )}
 
+      {/* Skeleton preview during generation */}
+      {generating && skeletonParts.length > 0 && !hasBom && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+              {generatingPhase ?? "Generating…"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="border rounded-md overflow-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Part #</th>
+                    <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Name</th>
+                    <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Process</th>
+                    <th scope="col" className="text-left p-2 font-semibold text-muted-foreground">Material</th>
+                    <th scope="col" className="text-right p-2 font-semibold text-muted-foreground">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {skeletonParts.map((sp) => (
+                    <tr key={sp.partNumber} className="border-b">
+                      <td className="p-2 font-mono text-foreground">
+                        <div className="flex items-center gap-1">
+                          <span>{sp.partNumber}</span>
+                          {sp.isPurchased && (
+                            <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-1">COTS</Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-2 text-foreground">{sp.name}</td>
+                      <td className="p-2 text-foreground">{processLabel[sp.process] ?? sp.process}</td>
+                      <td className="p-2 text-muted-foreground">—</td>
+                      <td className="p-2 text-right text-muted-foreground">—</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Generation in progress without skeleton yet */}
+      {generating && skeletonParts.length === 0 && !hasBom && (
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-3 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
+              <p className="text-sm">{generatingPhase ?? "Generating BOM…"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Empty state — no BOM yet */}
-      {!loading && !hasBom && (
+      {!loading && !hasBom && !generating && (
         <Card>
           <CardContent className="py-12">
             <EmptyState
@@ -305,11 +423,11 @@ export default function PartsAndBomPage(): React.ReactNode {
                 modules.length > 0 ? (
                   <Button
                     onClick={handleGenerate}
-                    disabled={generating || !activeProjectId}
+                    disabled={!activeProjectId}
                     className="gap-1.5"
                   >
-                    {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                    {generating ? "Generating…" : "Generate BOM"}
+                    <Sparkles className="h-4 w-4" />
+                    Generate BOM
                   </Button>
                 ) : undefined
               }
@@ -348,7 +466,7 @@ export default function PartsAndBomPage(): React.ReactNode {
                   disabled={isBusy || !modules.length || !activeProjectId}
                 >
                   {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  {generating ? "Regenerating…" : "Regenerate"}
+                  {generating ? (generatingPhase ? "Working…" : "Regenerating…") : "Regenerate"}
                 </Button>
               </div>
             </CardHeader>

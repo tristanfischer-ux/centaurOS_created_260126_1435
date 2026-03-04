@@ -2,69 +2,129 @@
 
 import { withAuth } from '@/lib/server-action-utils'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { z } from 'zod'
 import {
   businessPlanAnalysisSchema,
+  analyzedObjectiveSchema,
+  hiringRequirementSchema,
+  capacityRequirementSchema,
+  fundingRequirementSchema,
   MAX_FILE_SIZE_BYTES,
   ALLOWED_FILE_TYPES,
 } from '@/lib/business-plan-types'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
-// DECISION: Using Claude Opus 4.6 instead of GPT-4o for business plan analysis.
-// Claude excels at strategic reasoning, structured output, and understanding
-// nuanced business context — exactly what's needed for deriving objectives,
-// hiring timelines, and funding requirements from a business plan.
-const MODEL_ID = 'claude-opus-4-6'
+// DECISION: Using Sonnet for parallel section extraction. Each section is
+// straightforward extraction (not creative reasoning), so Sonnet is faster
+// and cheaper. Opus was needed for the monolithic call because it had to
+// maintain coherence across all 5 sections simultaneously.
+const SECTION_MODEL = 'claude-sonnet-4-6'
+const SECTION_MAX_TOKENS = 2048
 
-// INTENT: Single comprehensive prompt that extracts all five output streams
-// in one AI call. This avoids multiple round-trips and keeps the analysis
-// internally consistent (hiring dates derive from objective dates, funding
-// amounts reference the same capacity needs, etc.).
-const SYSTEM_PROMPT = `You are an expert business consultant, strategic planner, and operations advisor.
+// ─── Section-Specific Prompts ─────────────────────────────────────────
 
-Analyze the provided business plan and extract ALL of the following in a single JSON response:
+const OBJECTIVES_PROMPT = `You are an expert business consultant. Extract strategic objectives from the business plan.
 
-1. **Strategic Objectives** — The key pillars or goals of the plan. For each objective:
-   - Break it into 3-5 concrete, actionable tasks
-   - Assign a role to each task: Executive (decisions/hiring/strategy), Apprentice (research/setup/calls), AI_Agent (data/coding/analysis)
-   - Estimate a suggestedStartDate and suggestedEndDate (ISO format, e.g. "2026-04-01") if timing is mentioned or can be inferred
-   - Include the business phase this belongs to (e.g. "Launch", "Scale", "Consolidate")
+For each objective:
+- title: the goal name
+- description: what it entails
+- phase: business phase (e.g. "Launch", "Scale", "Consolidate")
+- suggestedStartDate, suggestedEndDate: ISO dates if timing is mentioned or inferable
+- tasks: 3-5 concrete, actionable tasks. Each task has:
+  - title, description
+  - role: "Executive" (decisions/hiring/strategy), "Apprentice" (research/setup/calls), or "AI_Agent" (data/coding/analysis)
+  - estimatedDays (optional)
 
-2. **Hiring Requirements** — Who the business needs to hire to execute the plan:
-   - roleTitle: the specific role (e.g. "Head of Manufacturing Operations", "Fractional CFO", "Sales Apprentice")
-   - roleType: "full_time", "fractional", or "apprentice"
-   - reason: why this role is needed (link to plan goals)
-   - linkedObjectiveTitle: which objective requires this hire
-   - suggestedDate: when they should start (ISO date, derive from the linked objective's start date minus 6 weeks)
-   - phase: the business phase
+Return ONLY a raw JSON array (no markdown, no code fences):
+[{ "title": "...", "description": "...", "phase": "...", "suggestedStartDate": "...", "suggestedEndDate": "...", "tasks": [...] }]`
 
-3. **Capacity Requirements** — Manufacturing, production, or operational capacity needs:
-   - description: what capacity is needed
-   - linkedObjectiveTitle: which objective drives this need
-   - requiredByDate: when it's needed (ISO date if inferable)
-   - notes: any specific equipment, space, certifications, or process requirements
+const HIRING_PROMPT = `You are an expert HR and operations advisor. Extract hiring requirements from the business plan.
 
-4. **Funding Requirements** — Specific funding events the business needs:
-   - title: short label (e.g. "Seed Round", "Equipment Purchase", "Working Capital Facility")
-   - amountUsd: estimated amount in USD (integer, omit if unknown)
-   - reason: what the money is for
-   - neededByDate: when (ISO date if inferable)
-   - fundingType: one of: bootstrapping, angel, vc, grant, revenue_based, debt, other
-   - linkedObjectiveTitles: array of objective titles that depend on this funding
+For each role:
+- roleTitle: specific role (e.g. "Head of Manufacturing Operations", "Fractional CFO")
+- roleType: "full_time", "fractional", or "apprentice"
+- reason: why this role is needed
+- linkedObjectiveTitle: which objective requires this hire
+- suggestedDate: when they should start (ISO date, derive from linked objective start minus 6 weeks)
+- phase: business phase
 
-5. **executiveSummary**: A 2-3 sentence plain-language summary of the business plan.
+Return ONLY a raw JSON array (no markdown, no code fences):
+[{ "roleTitle": "...", "roleType": "...", "reason": "...", "linkedObjectiveTitle": "...", "suggestedDate": "...", "phase": "..." }]`
 
-Return ONLY a raw JSON object with this exact structure (no markdown, no code fences):
-{
-  "objectives": [...],
-  "hiringRequirements": [...],
-  "capacityRequirements": [...],
-  "fundingRequirements": [...],
-  "executiveSummary": "..."
-}`
+const CAPACITY_PROMPT = `You are an expert manufacturing and operations advisor. Extract capacity requirements from the business plan.
+
+For each capacity need:
+- description: what capacity is needed
+- linkedObjectiveTitle: which objective drives this need
+- requiredByDate: when it's needed (ISO date if inferable)
+- notes: specific equipment, space, certifications, or process requirements
+
+Return ONLY a raw JSON array (no markdown, no code fences):
+[{ "description": "...", "linkedObjectiveTitle": "...", "requiredByDate": "...", "notes": "..." }]`
+
+const FUNDING_PROMPT = `You are an expert financial advisor. Extract funding requirements from the business plan.
+
+For each funding event:
+- title: short label (e.g. "Seed Round", "Equipment Purchase")
+- amountUsd: estimated amount in USD (integer, omit if unknown)
+- reason: what the money is for
+- neededByDate: when (ISO date if inferable)
+- fundingType: one of: bootstrapping, angel, vc, grant, revenue_based, debt, other
+- linkedObjectiveTitles: array of objective titles that depend on this funding
+
+Return ONLY a raw JSON array (no markdown, no code fences):
+[{ "title": "...", "amountUsd": 0, "reason": "...", "neededByDate": "...", "fundingType": "...", "linkedObjectiveTitles": [...] }]`
+
+const SUMMARY_PROMPT = `You are an expert business consultant. Write a 2-3 sentence plain-language executive summary of the business plan.
+
+Return ONLY the summary text — no JSON, no markdown, no code fences. Just the plain text summary.`
+
+// ─── Helpers ──────────────────────────────────────────────────────────
+
+/** Strip markdown code fences and extract JSON from AI response */
+function stripFences(text: string): string {
+  const trimmed = text.trim()
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
+  if (fenceMatch) return fenceMatch[1].trim()
+  return trimmed
+}
 
 /**
- * @description Analyzes a business plan document using Claude Opus 4.6 and extracts
- * strategic objectives, hiring requirements, capacity needs, and funding milestones.
+ * Call Claude for a single section extraction.
+ *
+ * @description Each section gets its own focused prompt and runs as an
+ * independent Sonnet call. The business plan text is passed identically
+ * to all 5 calls.
+ */
+async function extractSection(
+  client: InstanceType<typeof import('@anthropic-ai/sdk').default>,
+  businessPlanText: string,
+  sectionPrompt: string,
+): Promise<string> {
+  const response = await client.messages.create({
+    model: SECTION_MODEL,
+    max_tokens: SECTION_MAX_TOKENS,
+    system: sectionPrompt,
+    messages: [
+      { role: 'user', content: `Analyze the following business plan:\n\n${businessPlanText}` },
+    ],
+  })
+
+  const textBlock = response.content.find(block => block.type === 'text')
+  if (!textBlock || textBlock.type !== 'text') {
+    throw new Error('AI returned no text content')
+  }
+
+  return stripFences(textBlock.text)
+}
+
+// ─── Main Action ──────────────────────────────────────────────────────
+
+/**
+ * @description Analyzes a business plan document using 5 parallel Claude Sonnet
+ * calls, each extracting one section independently. Total time ≈ max(all 5)
+ * instead of one large sequential call.
+ *
  * @param formData - FormData containing either a 'file' (PDF/DOCX/TXT) or 'text' field
  * @returns The full analysis or an error message
  * @security Rate-limited per user to prevent AI cost abuse
@@ -128,43 +188,65 @@ export async function analyzeBusinessPlan(
       const Anthropic = (await import('@anthropic-ai/sdk')).default
       const client = new Anthropic({ apiKey })
 
-      const message = await client.messages.create({
-        model: MODEL_ID,
-        max_tokens: 8192,
-        system: SYSTEM_PROMPT,
-        messages: [
-          { role: 'user', content: `Analyze the following business plan:\n\n${truncatedText}` },
-        ],
-      })
+      // DECISION: Run all 5 section extractions in parallel using Sonnet.
+      // Each section is independent — no cross-section coherence needed.
+      // Total wall time = max(all 5) ≈ 10-20s instead of 30-60s for one Opus call.
+      const [
+        objectivesRaw,
+        hiringRaw,
+        capacityRaw,
+        fundingRaw,
+        summaryRaw,
+      ] = await Promise.all([
+        extractSection(client, truncatedText, OBJECTIVES_PROMPT),
+        extractSection(client, truncatedText, HIRING_PROMPT),
+        extractSection(client, truncatedText, CAPACITY_PROMPT),
+        extractSection(client, truncatedText, FUNDING_PROMPT),
+        extractSection(client, truncatedText, SUMMARY_PROMPT),
+      ])
 
-      const textBlock = message.content.find(block => block.type === 'text')
-      if (!textBlock || textBlock.type !== 'text') {
-        return { error: 'AI returned no text content' }
-      }
-
-      // GOTCHA: Claude often wraps JSON in markdown code fences despite
-      // being told not to. Strip them before parsing.
-      let jsonText = textBlock.text.trim()
-      const fenceMatch = jsonText.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
-      if (fenceMatch) {
-        jsonText = fenceMatch[1].trim()
-      }
-
+      // ── Parse and validate each section independently ──
       try {
-        const raw = JSON.parse(jsonText)
-        const parsed = businessPlanAnalysisSchema.safeParse(raw)
-        if (!parsed.success) {
-          console.error('[analyze] AI response failed Zod validation:', {
-            issues: parsed.error.issues.slice(0, 5),
-            rawKeys: Object.keys(raw),
+        const objectivesParsed = z.array(analyzedObjectiveSchema).default([]).parse(
+          JSON.parse(objectivesRaw),
+        )
+
+        const hiringParsed = z.array(hiringRequirementSchema).default([]).parse(
+          JSON.parse(hiringRaw),
+        )
+
+        const capacityParsed = z.array(capacityRequirementSchema).default([]).parse(
+          JSON.parse(capacityRaw),
+        )
+
+        const fundingParsed = z.array(fundingRequirementSchema).default([]).parse(
+          JSON.parse(fundingRaw),
+        )
+
+        // Summary is plain text, not JSON
+        const executiveSummary = summaryRaw.trim()
+
+        // Assemble full analysis and do final validation
+        const assembled = {
+          objectives: objectivesParsed,
+          hiringRequirements: hiringParsed,
+          capacityRequirements: capacityParsed,
+          fundingRequirements: fundingParsed,
+          executiveSummary,
+        }
+
+        const validated = businessPlanAnalysisSchema.safeParse(assembled)
+        if (!validated.success) {
+          console.error('[analyze] Assembled analysis failed final validation:', {
+            issues: validated.error.issues.slice(0, 5),
           })
           return { error: 'AI response was malformed. Please try again.' }
         }
-        return { analysis: parsed.data }
+
+        return { analysis: validated.data }
       } catch (parseError) {
-        console.error('[analyze] Failed to parse AI JSON response:', {
+        console.error('[analyze] Failed to parse parallel section responses:', {
           error: parseError instanceof Error ? parseError.message : 'Unknown',
-          responsePreview: jsonText.slice(0, 300),
         })
         return { error: 'Failed to parse AI response. Please try again.' }
       }

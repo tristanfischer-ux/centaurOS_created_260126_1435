@@ -344,6 +344,115 @@ ${reviewContext}`
     })
 }
 
+// ─── Quick Verdict (Phase 1 of two-phase review) ────────────────────
+
+const QUICK_VERDICT_MODEL = "claude-sonnet-4-6"
+const QUICK_VERDICT_MAX_TOKENS = 256
+
+export interface QuickVerdictResult {
+    verdict: ReviewVerdict
+    summary: string
+}
+
+/**
+ * Fast specialist verdict — returns just PASS/WARN/FAIL + one-sentence summary.
+ *
+ * @description Phase 1 of the two-phase review flow. Uses Sonnet (fast, no tools)
+ * with max_tokens: 256 for a ~3-5s response. The caller shows this immediately
+ * while the full requestSpecialistReview() runs in the background.
+ */
+export async function quickSpecialistVerdict(
+    req: ReviewRequest,
+): Promise<{ quickVerdict: QuickVerdictResult } | { error: string }> {
+    return withAuth(async () => {
+        // ── Validate inputs ──
+        if (!req.projectId || !/^[0-9a-f-]{36}$/.test(req.projectId)) {
+            return { error: "Invalid project ID" }
+        }
+        if (!REVIEW_SPECIALISTS.has(req.specialistId)) {
+            return { error: `Specialist "${req.specialistId}" cannot review CAD modules` }
+        }
+
+        const specialist = getSpecialistById(req.specialistId)
+        if (!specialist) {
+            return { error: `Unknown specialist: ${req.specialistId}` }
+        }
+
+        const targetModule = req.allModules.find(m => m.id === req.moduleId)
+        if (!targetModule) {
+            return { error: `Module "${req.moduleId}" not found` }
+        }
+
+        // ── Build context (same as full review but no memory bridge) ──
+        const reviewContext = buildCadLabReviewContext(
+            {
+                module: targetModule,
+                allModules: req.allModules,
+                designBrief: req.designBrief,
+                diagnosticAnswers: req.diagnosticAnswers?.[req.moduleId],
+                projectSubject: req.projectSubject,
+            },
+            req.specialistId,
+        )
+
+        const domainContext = loadDomainKnowledge(req.specialistId, specialist.description)
+        const personalityPrompt = compilePersonalityPrompt(
+            `${specialist.name}, the ${specialist.title} specialist`,
+            specialist.personality,
+            domainContext,
+            req.specialistId,
+        )
+
+        const systemPrompt = `${personalityPrompt}
+
+## Current Task: Quick Design Verdict
+Give a fast gut-level assessment of this CAD Lab module. No detailed analysis — just your verdict and one sentence explaining why.
+
+${reviewContext}
+
+## Response Format (STRICT)
+VERDICT: PASS | WARN | FAIL
+SUMMARY: <one sentence explaining the verdict>`
+
+        const apiKey = process.env.ANTHROPIC_API_KEY
+        if (!apiKey) {
+            return { error: "Anthropic API key not configured" }
+        }
+
+        const Anthropic = (await import("@anthropic-ai/sdk")).default
+        const client = new Anthropic({ apiKey })
+
+        const response = await client.messages.create({
+            model: QUICK_VERDICT_MODEL,
+            max_tokens: QUICK_VERDICT_MAX_TOKENS,
+            system: systemPrompt,
+            messages: [{
+                role: "user",
+                content: `Quick verdict on module "${targetModule.name}" — PASS, WARN, or FAIL?`,
+            }],
+        })
+
+        const text = response.content
+            .filter(b => b.type === "text")
+            .map(b => b.type === "text" ? b.text : "")
+            .join("")
+
+        // Parse verdict
+        const verdictMatch = text.match(/VERDICT:\s*(PASS|WARN|FAIL)/i)
+        const verdict: ReviewVerdict = verdictMatch
+            ? verdictMatch[1].toLowerCase() as ReviewVerdict
+            : "warn"
+
+        // Parse summary
+        const summaryMatch = text.match(/SUMMARY:\s*(.+?)(?:\n|$)/i)
+        const summary = summaryMatch?.[1]?.trim() || `Quick assessment by ${specialist.name}`
+
+        return {
+            quickVerdict: { verdict, summary },
+        }
+    })
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────
 
 /**

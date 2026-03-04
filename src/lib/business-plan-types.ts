@@ -13,14 +13,14 @@ import { z } from 'zod'
 // Each stream seeds a different part of the platform. Zod schemas validate
 // the AI response at runtime to catch malformed output before it hits the DB.
 
-const analyzedTaskSchema = z.object({
+export const analyzedTaskSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   role: z.enum(['Executive', 'Apprentice', 'AI_Agent']).default('Apprentice'),
   estimatedDays: z.number().optional(),
 })
 
-const analyzedObjectiveSchema = z.object({
+export const analyzedObjectiveSchema = z.object({
   title: z.string().min(1),
   description: z.string().default(''),
   phase: z.string().optional(),
@@ -29,7 +29,7 @@ const analyzedObjectiveSchema = z.object({
   tasks: z.array(analyzedTaskSchema).default([]),
 })
 
-const hiringRequirementSchema = z.object({
+export const hiringRequirementSchema = z.object({
   roleTitle: z.string().min(1),
   roleType: z.enum(['full_time', 'fractional', 'apprentice']),
   reason: z.string().default(''),
@@ -38,14 +38,14 @@ const hiringRequirementSchema = z.object({
   phase: z.string().optional(),
 })
 
-const capacityRequirementSchema = z.object({
+export const capacityRequirementSchema = z.object({
   description: z.string().min(1),
   linkedObjectiveTitle: z.string().default(''),
   requiredByDate: z.string().optional(),
   notes: z.string().optional(),
 })
 
-const fundingRequirementSchema = z.object({
+export const fundingRequirementSchema = z.object({
   title: z.string().min(1),
   amountUsd: z.number().optional(),
   reason: z.string().default(''),
