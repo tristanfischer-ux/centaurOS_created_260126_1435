@@ -87,7 +87,10 @@ export function ReviewIssueSummary({
   isApplying,
   onApplyRevisions,
 }: ReviewIssueSummaryProps) {
-  // Aggregate all issues from all reviews across all modules
+  // Aggregate all issues from all reviews across all modules.
+  // INTENT: Also promote recommendations to issues when the structured issue
+  // parser didn't match (LLMs vary format heavily). Recommendations are the
+  // most reliably populated field and contain the most actionable feedback.
   const allIssues = useMemo(() => {
     const issues: AggregatedIssue[] = []
     const moduleMap = new Map(modules.map(m => [m.id, m]))
@@ -97,15 +100,39 @@ export function ReviewIssueSummary({
       if (!mod) continue
 
       for (const review of reviews) {
+        // Add structured issues first
         for (let i = 0; i < review.issues.length; i++) {
           issues.push({
-            key: `${moduleId}-${review.specialistId}-${i}`,
+            key: `${moduleId}-${review.specialistId}-issue-${i}`,
             moduleId,
             moduleName: mod.name,
             specialistId: review.specialistId,
             specialistName: review.specialistName,
             issue: review.issues[i],
           })
+        }
+
+        // If no structured issues were parsed, promote recommendations.
+        // This is the common path — LLMs rarely match the exact issue format
+        // but almost always produce actionable recommendations.
+        if (review.issues.length === 0 && review.recommendations.length > 0) {
+          const severity = review.verdict === "fail" ? "critical" as const
+            : review.verdict === "warn" ? "warning" as const
+            : "info" as const
+          for (let i = 0; i < review.recommendations.length; i++) {
+            issues.push({
+              key: `${moduleId}-${review.specialistId}-rec-${i}`,
+              moduleId,
+              moduleName: mod.name,
+              specialistId: review.specialistId,
+              specialistName: review.specialistName,
+              issue: {
+                severity,
+                category: "Recommendation",
+                message: review.recommendations[i],
+              },
+            })
+          }
         }
       }
     }

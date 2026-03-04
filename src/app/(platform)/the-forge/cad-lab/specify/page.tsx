@@ -164,7 +164,7 @@ export default function SpecifyPage(): React.ReactNode {
   }, [hasResearch, modules.length, router])
 
   // ── Specialist reviews — lifted to context for persistence across navigation ──
-  const { moduleReviews, handleReviewComplete } = useCadLab()
+  const { moduleReviews, handleReviewComplete, pendingReviewKeys, markReviewPending, clearReviewPending } = useCadLab()
 
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
@@ -1001,6 +1001,16 @@ export default function SpecifyPage(): React.ReactNode {
               </CardContent>
             </Card>
 
+            {/* Cross-module review issue summary with Apply Revisions — shown prominently before per-module panels */}
+            {Object.keys(moduleReviews).length > 0 && (
+              <ReviewIssueSummary
+                modules={modules}
+                moduleReviews={moduleReviews}
+                isApplying={isApplyingReviewRevisions}
+                onApplyRevisions={(issues: AggregatedIssue[]) => handleApplyReviewRevisions(issues)}
+              />
+            )}
+
             {/* Per-module specialist review panels */}
             {modules.map((mod) => {
               const status = moduleStatuses[mod.id]
@@ -1053,16 +1063,6 @@ export default function SpecifyPage(): React.ReactNode {
                 </Card>
               )
             })}
-
-            {/* Cross-module review issue summary with Apply Revisions */}
-            {Object.keys(moduleReviews).length > 0 && (
-              <ReviewIssueSummary
-                modules={modules}
-                moduleReviews={moduleReviews}
-                isApplying={isApplyingReviewRevisions}
-                onApplyRevisions={(issues: AggregatedIssue[]) => handleApplyReviewRevisions(issues)}
-              />
-            )}
 
             {/* Source CTA */}
             {allDiagnosticsComplete && finalizeSummary && (
