@@ -157,6 +157,7 @@ export type GenerationEvent =
   | { type: "cost_estimate"; estimate: EarlyCostEstimate }
   | { type: "progress"; message: string }
   | { type: "complete"; module: CadLabModule }
+  | { type: "unified_complete"; result: Omit<CadLabResult, "stlData" | "stepData">; code: string }
   | { type: "error"; message: string }
 
 // ─── Result Types ────────────────────────────────────────────────────
@@ -404,6 +405,61 @@ export interface CadLabDecompositionResult {
   /** Tokens used */
   tokensIn: number
   tokensOut: number
+  /** Which model won the decomposition race (e.g. "Opus", "Gemini", "GPT-4o") */
+  modelUsed?: string
+}
+
+// ─── Progressive Decomposition Types ─────────────────────────────────
+
+/** Lightweight module skeleton returned by the fast first pass (~10-15s). */
+export interface SkeletonModule {
+  /** Unique identifier (lowercase, no spaces) */
+  id: string
+  /** Human-readable module name */
+  name: string
+  /** One-sentence purpose */
+  purpose: string
+  /** Input streams/signals */
+  inputs: string[]
+  /** Output streams/signals */
+  outputs: string[]
+}
+
+/** Result from the fast skeleton decomposition (Phase 1). */
+export interface SkeletonDecompositionResult {
+  success: boolean
+  error?: string
+  /** Lightweight module skeletons (id, name, purpose, inputs, outputs only) */
+  modules: SkeletonModule[]
+  /** Explicit inter-module connections */
+  connections?: ModuleConnection[]
+  /** Time taken in ms */
+  decompositionTime: number
+  /** Tokens used */
+  tokensIn: number
+  tokensOut: number
+  /** Which model produced the skeleton */
+  modelUsed?: string
+}
+
+/** Result from expanding a single skeleton module with full details (Phase 2). */
+export interface ModuleExpansionResult {
+  success: boolean
+  error?: string
+  /** Which module was expanded */
+  moduleId: string
+  /** Expanded detail fields (merged into the skeleton to form a full CadLabModule) */
+  expansion?: {
+    keyParts: string[]
+    leadWeeks: number
+    description: string
+    whyItMatters: string
+    failureModes: string[]
+    unknowns: string[]
+  }
+  /** Tokens used */
+  tokensIn: number
+  tokensOut: number
 }
 
 /** Result from the standalone research step (Step 1) */
@@ -422,6 +478,8 @@ export interface CadLabResearchResult {
   designBrief?: CadLabDesignBrief
   /** Explicit assumptions provided by the user */
   assumptionNotes?: string
+  /** Which model synthesized the research report */
+  modelUsed?: string
 }
 
 // ─── Mashup Types ─────────────────────────────────────────────────────

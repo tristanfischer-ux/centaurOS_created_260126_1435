@@ -27,8 +27,11 @@ import { createClient } from "@/lib/supabase/client"
 import {
   runCadLabResearch,
   generateCadLabInterface,
+  generateCadLabModelSmart,
   prepareDecomposition,
   decomposeIntoModules,
+  skeletonDecompose,
+  expandModuleDetail,
   prefillDiagnostics,
   generateSystemAssembly,
   extractInterfaceContracts,
@@ -37,7 +40,7 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult } from "@/actions/cad-lab-projects"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { ReferenceModel } from "@/actions/reference-models"
 import {
@@ -151,6 +154,10 @@ export interface CadLabContextValue {
   handleResearch: () => Promise<void>
   handleReset: () => void
 
+  // Model attribution (which LLM produced research + decomposition)
+  researchModelUsed: string | null
+  decompositionModelUsed: string | null
+
   // Module decomposition
   isDecomposing: boolean
   decompositionError: string | null
@@ -248,6 +255,14 @@ export interface CadLabContextValue {
   // Interactive code workbench
   handleExecuteModuleCode: (moduleId: string, code: string) => Promise<void>
   handleRefineModuleCode: (moduleId: string, currentCode: string, instruction: string) => Promise<string | null>
+
+  // Unified model generation (single model for entire product)
+  unifiedResult: CadLabResult | null
+  unifiedCode: string | null
+  isGeneratingUnified: boolean
+  handleGenerateUnifiedModel: () => Promise<void>
+  handleExecuteUnifiedCode: (code: string) => Promise<void>
+  handleRefineUnifiedCode: (currentCode: string, instruction: string) => Promise<string | null>
 
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
@@ -358,6 +373,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [editableReport, setEditableReport] = useState("")
   const [showSources, setShowSources] = useState(false)
 
+  // ── Model attribution (which LLM produced research + decomposition) ──
+  const [researchModelUsed, setResearchModelUsed] = useState<string | null>(null)
+  const [decompositionModelUsed, setDecompositionModelUsed] = useState<string | null>(null)
+
   // ── Module state ──
   const [isDecomposing, setIsDecomposing] = useState(false)
   const [decompositionError, setDecompositionError] = useState<string | null>(null)
@@ -432,6 +451,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Progress storytelling ──
   const [progressLines, setProgressLines] = useState<string[]>([])
   const [milestone, setMilestone] = useState<MilestoneType>(null)
+
+  // ── Unified model generation ──
+  const [unifiedResult, setUnifiedResult] = useState<CadLabResult | null>(null)
+  const [unifiedCode, setUnifiedCode] = useState<string | null>(null)
+  const [isGeneratingUnified, setIsGeneratingUnified] = useState(false)
+  // INTENT: Synchronous double-click guard — prevents duplicate handler invocations
+  // between click and React re-render (before disabled prop takes effect)
+  const unifiedGuardRef = useRef(false)
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -733,316 +760,476 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     return null
   }, [activeProjectId, subject, modelId])
 
-  // ── Decompose into modules ──
+  // ── Decompose into modules (progressive: skeleton → expand → images) ──
   const handleDecompose = useCallback(async () => {
     if (!editableReport.trim()) return
     setIsDecomposing(true)
     setDecompositionError(null)
     setProgressLines([])
 
-    // INTENT: Reframe the wait as impressive speed rather than a long delay.
     addProgressLine("This work normally takes 1\u20132 weeks of systems engineering \u2014 it\u2019ll be ready in about 5\u201310 minutes")
 
-    // ── Phase 1: Preparation (real ~1-2s Claude call for domain detection) ──
+    // ── Phase 1: Preparation (domain detection, ~instant) ──
     addProgressLine("Analysing research report to detect engineering domain...")
 
-    let domainHint: Parameters<typeof decomposeIntoModules>[3]
+    let domainHint: CadLabDomain | undefined
     try {
       const prep = await prepareDecomposition(subject, editableReport)
       domainHint = prep.domain
-      // J6: Cache domain for reuse in per-module generation requests
       setDetectedDomain(prep.domain)
       addProgressLine(`Engineering domain: ${prep.domainLabel}`)
-      addProgressLine(`Decomposition prompt prepared — ~${prep.estimatedInputTokens.toLocaleString()} input tokens`)
     } catch {
-      // Non-fatal — proceed without domain hint, decomposeIntoModules will detect itself
       addProgressLine("Domain detection skipped — proceeding with auto-detect")
     }
 
-    // ── Phase 2: API call (real wait, with truthful padding timers) ──
     addProgressLine(`Research report: ${Math.round(editableReport.length / 1000)}K characters`)
-    addProgressLine(`Applied ${domainHint ?? "auto-detected"} domain constraints to analysis`)
-    addProgressLine("Decomposing into physical sub-assemblies...")
-
-    // INTENT: These timers convey how much real engineering work is being compressed
-    // into minutes. Spaced across ~75s to cover the typical blocking API call duration.
-    const paddingTimers: ReturnType<typeof setTimeout>[] = []
-    paddingTimers.push(setTimeout(() => addProgressLine("Cross-referencing product architecture against manufacturing databases"), 5000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Identifying independent sub-assemblies \u2014 this step alone typically takes a senior engineer 2\u20133 days"), 10000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes: CNC, injection moulding, sheet metal, casting, 3D print"), 16000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Mapping interfaces and dependencies between sub-assemblies"), 22000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Calculating lead times and identifying the critical-path module"), 28000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Analysing failure modes and open engineering risks per module"), 35000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Validating dimensional compatibility across all module interfaces"), 42000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Assigning manufacturing processes and materials to each component"), 50000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Finalising bill of materials structure \u2014 nearly there"), 60000))
-    paddingTimers.push(setTimeout(() => addProgressLine("Complex product \u2014 still processing. This depth of analysis is what makes the output useful."), 75000))
+    addProgressLine("Identifying physical sub-assemblies (skeleton pass)...")
 
     const apiStart = Date.now()
 
-    // INTENT: Client-side safety timeout. If the server action silently dies (e.g. Vercel
-    // kills the function), the await never resolves and the UI hangs forever. This races
-    // the API call against a deadline just above the server-side budget.
-    // DECISION: 280s = just above server chain. Server chain is Sonnet+Gemini parallel(150s) + OpenAI(120s) = 270s.
-    // The real timeouts are server-side — this is just a safety net for silent server death.
-    const CLIENT_TIMEOUT_MS = 280_000 // 280s — safety net, just above server 270s chain
-    const clientTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
-    )
-
     try {
-      const res = await Promise.race([
-        decomposeIntoModules(subject, editableReport, modelId, domainHint),
-        clientTimeout,
-      ])
-      // Clear any pending padding timers now that the real result is in
-      paddingTimers.forEach(clearTimeout)
+      // ── Phase 1: Skeleton decomposition (~10-15s) ──
+      const skeletonRes = await skeletonDecompose(subject, editableReport, modelId, domainHint)
+      const skeletonElapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
 
-      const elapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
+      // FALLBACK: If skeleton fails, fall back to the existing full decomposition
+      if (!skeletonRes.success || skeletonRes.modules.length === 0) {
+        addProgressLine(`Skeleton pass failed (${skeletonRes.error ?? "no modules"}) — falling back to full decomposition...`)
 
-      if (res.success && res.modules.length > 0) {
-        setModules(res.modules)
-        setRevealedModuleIds(new Set(res.modules.map(m => m.id))) // Reveal immediately so text is visible while images generate
-        setMilestone("breakdown")
+        // INTENT: Padding timers for the longer full-decomposition fallback
+        const paddingTimers: ReturnType<typeof setTimeout>[] = []
+        paddingTimers.push(setTimeout(() => addProgressLine("Cross-referencing product architecture against manufacturing databases"), 5000))
+        paddingTimers.push(setTimeout(() => addProgressLine("Evaluating manufacturing processes and materials"), 16000))
+        paddingTimers.push(setTimeout(() => addProgressLine("Mapping interfaces between sub-assemblies"), 28000))
+        paddingTimers.push(setTimeout(() => addProgressLine("Finalising bill of materials structure"), 50000))
+        paddingTimers.push(setTimeout(() => addProgressLine("Complex product — still processing"), 75000))
 
-        // Persist decomposition connections (highest-fidelity edge source)
-        if (res.connections && res.connections.length > 0) {
-          setDecompositionConnections(res.connections)
-          if (activeProjectId) {
-            saveCadLabDecompositionConnections(activeProjectId, res.connections)
-              .catch((e) => console.error("[CAD-LAB] Failed to persist decomposition connections:", e))
-          }
+        const CLIENT_TIMEOUT_MS = 280_000
+        const clientTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Decomposition timed out — please try again")), CLIENT_TIMEOUT_MS),
+        )
+
+        const fallbackRes = await Promise.race([
+          decomposeIntoModules(subject, editableReport, modelId, domainHint),
+          clientTimeout,
+        ])
+        paddingTimers.forEach(clearTimeout)
+
+        const fallbackElapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
+
+        if (!fallbackRes.success || fallbackRes.modules.length === 0) {
+          const errorMsg = fallbackRes.error ?? "Decomposition returned no modules"
+          setProgressLines([`Response received in ${fallbackElapsed}s`, `Decomposition failed: ${errorMsg}`])
+          setDecompositionError(errorMsg)
+          toast.error(errorMsg)
+          return
         }
 
-        // Seed product overview from executive summary (fires exactly once — on decomposition)
+        // Fallback succeeded — use full modules directly (same as old path)
+        setModules(fallbackRes.modules)
+        if (fallbackRes.modelUsed) setDecompositionModelUsed(fallbackRes.modelUsed)
+        setRevealedModuleIds(new Set(fallbackRes.modules.map(m => m.id)))
+        setMilestone("breakdown")
+
+        if (fallbackRes.connections && fallbackRes.connections.length > 0) {
+          setDecompositionConnections(fallbackRes.connections)
+          if (activeProjectId) saveCadLabDecompositionConnections(activeProjectId, fallbackRes.connections).catch(() => {})
+        }
+
         if (!productOverviewRef.current) {
           const summary = extractExecutiveSummary(editableReport)
           if (summary) {
             setProductOverview(summary)
-            if (activeProjectId) {
-              saveCadLabProductOverview(activeProjectId, summary).catch(() => {
-                console.error("[CAD-LAB] Failed to persist seeded overview")
-              })
-            }
+            if (activeProjectId) saveCadLabProductOverview(activeProjectId, summary).catch(() => {})
           }
         }
 
-        // Build a rich summary from the actual result data
-        const totalParts = res.modules.reduce((s, m) => s + m.keyParts.length, 0)
-        const criticalPath = Math.max(...res.modules.map((m) => m.leadWeeks))
-        const totalRisks = res.modules.reduce((s, m) => s + m.failureModes.length + m.unknowns.length, 0)
-        const criticalModule = res.modules.find(m => m.leadWeeks === criticalPath)
+        const totalParts = fallbackRes.modules.reduce((s, m) => s + m.keyParts.length, 0)
+        const criticalPath = Math.max(...fallbackRes.modules.map((m) => m.leadWeeks))
+        const criticalModule = fallbackRes.modules.find(m => m.leadWeeks === criticalPath)
 
-        // ── Phase 3: Real results + module names so user sees WHAT was found ──
         setProgressLines([
-          `Response received in ${elapsed}s (${res.tokensOut.toLocaleString()} tokens generated)`,
-          `Parsed ${res.modules.length} physical modules from response`,
+          `Identified ${fallbackRes.modules.length} sub-assemblies in ${fallbackElapsed}s (fallback path)`,
           `${totalParts} components mapped across all sub-assemblies`,
           `Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`,
-          ...(totalRisks > 0 ? [`${totalRisks} risk items flagged for engineering review`] : []),
-          "",
-          "Sub-assemblies identified:",
-          ...res.modules.map((m, i) => `  ${i + 1}. ${m.name}`),
-          "",
-          "Now generating illustrations for each sub-assembly...",
+          "", "Sub-assemblies identified:",
+          ...fallbackRes.modules.map((m, i) => `  ${i + 1}. ${m.name}`),
+          "", "Now generating illustrations for each sub-assembly...",
         ])
+
         if (activeProjectId) {
-          const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(res.modules))
+          const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(fallbackRes.modules))
           if ("error" in saveRes) {
-            console.error("[CAD-LAB] Failed to save modules:", saveRes.error)
-            toast.error("Modules mapped but failed to save — your changes may be lost on reload")
+            toast.error("Modules mapped but failed to save")
           } else {
             setLastSaved(new Date().toISOString())
           }
           refreshProjects()
         }
-        // Smart diagnostics pre-fill (background)
-        prefillDiagnostics(res.modules, editableReport, modelId)
+
+        // Fire background tasks with full fallback modules
+        const fallbackModules = fallbackRes.modules
+        prefillDiagnostics(fallbackModules, editableReport, modelId)
           .then((prefillRes) => {
             if (!activeProjectIdRef.current) return
             if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
               setDiagnosticAnswers((prev) => {
                 const merged = { ...prefillRes.answers }
-                for (const [moduleId, existing] of Object.entries(prev)) {
-                  merged[moduleId] = { ...(merged[moduleId] || {}), ...existing }
-                }
+                for (const [mid, existing] of Object.entries(prev)) merged[mid] = { ...(merged[mid] || {}), ...existing }
                 return merged
               })
               setAiPrefilled(true)
-              // Persist enrichment (reasoning + alternatives) if present
               if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
                 setDiagnosticEnrichment(prefillRes.enrichment)
-                if (activeProjectIdRef.current) {
-                  saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment)
-                    .catch((e) => console.error("[CAD-LAB] Failed to persist diagnostic enrichment:", e))
-                }
+                if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
               }
             }
-          })
-          .catch(() => { /* Non-critical */ })
+          }).catch(() => {})
 
-        // P1: Extract interface contracts (non-blocking background task)
-        if (res.modules.length >= 2) {
+        if (fallbackModules.length >= 2) {
           setIsExtractingContracts(true)
-          extractInterfaceContracts(res.modules, editableReport, modelId)
+          extractInterfaceContracts(fallbackModules, editableReport, modelId)
             .then((contractRes) => {
               if (!activeProjectIdRef.current) return
               setInterfaceContracts(contractRes.contracts)
               setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
               setIsExtractingContracts(false)
-              if (activeProjectId) {
-                saveCadLabInterfaceContracts(activeProjectId, contractRes)
-                  .catch((e) => console.error("[CAD-LAB] Failed to persist interface contracts:", e))
-              }
+              if (activeProjectId) saveCadLabInterfaceContracts(activeProjectId, contractRes).catch(() => {})
             })
-            .catch((e) => {
-              if (!activeProjectIdRef.current) return
-              console.error("[CAD-LAB] Interface contract extraction failed:", e)
-              setIsExtractingContracts(false)
-            })
+            .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
         }
 
-        // Generate shared visual style for cohesive illustrations (~1-2s),
-        // then trigger image generation with it. Non-blocking overall.
-        const imagesPipeline = async () => {
-          // INTENT: Set illustration status immediately so the hero card shows "Generating..."
-          // as soon as decomposition finishes, eliminating the visual gap before visual style resolves.
-          if (activeProjectId) {
-            setSystemIllustrationStatus("generating")
-            setSystemIllustrationError(null)
-          }
-          // FLOW: visual style → system illustration (Pass 1) → module images (Pass 2, uses reference)
+        // Images pipeline (same as before)
+        const fallbackImagesPipeline = async () => {
+          if (activeProjectId) { setSystemIllustrationStatus("generating"); setSystemIllustrationError(null) }
           let visualStyle: VisualStyleSpec | undefined
           try {
-            const styleRes = await generateVisualStyleAction(
-              subject,
-              res.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
-              extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
-            )
+            const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800))
             if (!activeProjectIdRef.current) return
-            if ("visualStyle" in styleRes) {
-              visualStyle = styleRes.visualStyle
-              setVisualStyle(visualStyle)
-              if (activeProjectId) {
-                saveCadLabVisualStyle(activeProjectId, visualStyle)
-                  .catch((e) => console.error("[CAD-LAB] Failed to persist visual style:", e))
-              }
-            }
-          } catch (e) {
-            console.warn("[CAD-LAB] Visual style generation failed (images will generate without coordinated style):", e)
-          }
+            if ("visualStyle" in styleRes) { visualStyle = styleRes.visualStyle; setVisualStyle(visualStyle); if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {}) }
+          } catch { /* Non-critical */ }
 
-          // FLOW: Pass 1 — generate system illustration FIRST, then prepare it
-          // as full-resolution reference ONCE for use as Gemini multimodal reference in Pass 2.
           let referenceBase64: string | undefined
           const moduleCrops = new Map<string, string>()
           if (activeProjectId) {
             try {
-              const illRes = await generateCadLabSystemIllustrationAction(
-                activeProjectId,
-                subject,
-                res.modules.map((m) => m.name),
-                res.modules.map((m) => m.purpose),
-                visualStyle,
-                extractExecutiveSummary(editableReport)?.slice(0, 600),
-              )
+              const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600))
               if (!activeProjectIdRef.current) return
               if ("url" in illRes) {
-                setSystemIllustrationUrl(illRes.url)
-                setSystemIllustrationStatus("complete")
-                saveCadLabSystemIllustration(activeProjectId!, illRes.url)
-                  .catch((e) => console.error("[CAD-LAB] Failed to persist system illustration URL:", e))
-
-                // INTENT: Fetch + prepare the hero as full-resolution reference ONCE
-                // so all module images share the same base64 without redundant fetches.
-                try {
-                  const cropRes = await fetchAndCropReferenceAction(illRes.url)
-                  if ("base64" in cropRes) {
-                    referenceBase64 = cropRes.base64
-                  }
-                } catch (e) {
-                  console.warn("[CAD-LAB] Failed to fetch/crop reference image (modules will generate via text-only path):", e)
-                }
-
-                // Layer 2: Analyse hero for per-module bounding boxes, then crop each
+                setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
+                saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch(() => {})
+                try { const cropRes = await fetchAndCropReferenceAction(illRes.url); if ("base64" in cropRes) referenceBase64 = cropRes.base64 } catch { /* Non-critical */ }
                 if (referenceBase64) {
                   try {
-                    const bbRes = await analyseHeroForModulesAction(referenceBase64, res.modules.map(m => m.name))
+                    const bbRes = await analyseHeroForModulesAction(referenceBase64, fallbackModules.map(m => m.name))
                     if ("boxes" in bbRes && Object.keys(bbRes.boxes).length > 0) {
-                      // Crop each module's region in parallel
-                      const cropPromises = res.modules.map(async (mod) => {
-                        const box = bbRes.boxes[mod.name]
-                        if (!box) return { id: mod.id, crop: undefined }
-                        try {
-                          const cropResult = await cropModuleRegionAction(referenceBase64!, box)
-                          if ("base64" in cropResult) {
-                            return { id: mod.id, crop: cropResult.base64 }
-                          }
-                        } catch (e) { console.warn(`[CAD-LAB] Module crop failed for ${mod.name}:`, e) }
+                      const cropResults = await Promise.all(fallbackModules.map(async (mod) => {
+                        const box = bbRes.boxes[mod.name]; if (!box) return { id: mod.id, crop: undefined }
+                        try { const cr = await cropModuleRegionAction(referenceBase64!, box); if ("base64" in cr) return { id: mod.id, crop: cr.base64 } } catch { /* skip */ }
                         return { id: mod.id, crop: undefined }
-                      })
-                      const cropResults = await Promise.all(cropPromises)
-                      for (const cr of cropResults) {
-                        if (cr.crop) moduleCrops.set(cr.id, cr.crop)
-                      }
+                      }))
+                      for (const cr of cropResults) { if (cr.crop) moduleCrops.set(cr.id, cr.crop) }
                     }
-                  } catch (e) {
-                    console.warn("[CAD-LAB] Bounding box analysis failed (modules will generate with full-hero reference):", e)
-                  }
+                  } catch { /* Non-critical */ }
                 }
-              } else {
-                console.error("[CAD-LAB] System illustration failed:", "error" in illRes ? illRes.error : "unknown")
-                setSystemIllustrationStatus("failed")
-                setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
-              }
-            } catch (e) {
-              if (!activeProjectIdRef.current) return
-              console.error("[CAD-LAB] System illustration failed:", e)
-              setSystemIllustrationStatus("failed")
-              setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
-            }
+              } else { setSystemIllustrationStatus("failed"); setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed") }
+            } catch (e) { if (!activeProjectIdRef.current) return; setSystemIllustrationStatus("failed"); setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed") }
           }
-
-          // Pass 2 — module images, with reference base64 + per-module crops if available
-          handleGenerateModuleImages(res.modules, activeProjectId ?? undefined, visualStyle, referenceBase64, moduleCrops)
-            .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+          handleGenerateModuleImages(fallbackModules, activeProjectId ?? undefined, visualStyle, referenceBase64, moduleCrops).catch(() => {})
         }
-        imagesPipeline()
-          .catch(() => { /* Non-critical — images are enhancement, not blocker */ })
+        fallbackImagesPipeline().catch(() => {})
 
-        // Decomposition checkpoints — non-blocking (same pattern as imagesPipeline)
+        if (activeProjectId) {
+          setIsCheckpointing(true)
+          requestDecompositionCheckpoints({ projectId: activeProjectId, projectSubject: subject, modules: fallbackModules, researchReport: editableReport })
+            .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
+            .catch(() => {}).finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
+        }
+
+        return // Fallback path complete
+      }
+
+      // ── Skeleton succeeded — progressive flow ──
+      setDecompositionModelUsed("Opus")
+
+      // Show skeleton module names immediately
+      setProgressLines([
+        `Identified ${skeletonRes.modules.length} sub-assemblies in ${skeletonElapsed}s`,
+        "",
+        "Sub-assemblies identified:",
+        ...skeletonRes.modules.map((m, i) => `  ${i + 1}. ${m.name}`),
+        "",
+        `Expanding ${skeletonRes.modules[0].name} (1/${skeletonRes.modules.length})...`,
+      ])
+
+      // Convert skeleton modules to CadLabModule shells (skeleton data only, empty details)
+      const skeletonAsCadModules: CadLabModule[] = skeletonRes.modules.map((sm) => ({
+        id: sm.id,
+        name: sm.name,
+        purpose: sm.purpose,
+        inputs: sm.inputs,
+        outputs: sm.outputs,
+        keyParts: [],
+        leadWeeks: 0,
+        description: "",
+        whyItMatters: "",
+        failureModes: [],
+        unknowns: [],
+        status: "pending" as const,
+      }))
+
+      setModules(skeletonAsCadModules)
+      setRevealedModuleIds(new Set(skeletonAsCadModules.map(m => m.id)))
+      setMilestone("breakdown")
+
+      // Persist connections from skeleton
+      if (skeletonRes.connections && skeletonRes.connections.length > 0) {
+        setDecompositionConnections(skeletonRes.connections)
+        if (activeProjectId) saveCadLabDecompositionConnections(activeProjectId, skeletonRes.connections).catch(() => {})
+      }
+
+      // Seed product overview
+      if (!productOverviewRef.current) {
+        const summary = extractExecutiveSummary(editableReport)
+        if (summary) {
+          setProductOverview(summary)
+          if (activeProjectId) saveCadLabProductOverview(activeProjectId, summary).catch(() => {})
+        }
+      }
+
+      // Save skeleton modules immediately
+      if (activeProjectId) {
+        const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(skeletonAsCadModules))
+        if ("error" in saveRes) {
+          toast.error("Modules mapped but failed to save")
+        } else {
+          setLastSaved(new Date().toISOString())
+        }
+        refreshProjects()
+      }
+
+      // ── Phase 2: Three concurrent tracks ──
+
+      // Track B: Visual style + system illustration (fire-and-forget)
+      // INTENT: visualStyleReady resolves when the visual style is generated (~2s),
+      // which Track A waits on before generating per-module images.
+      let resolveVisualStyle: (style: VisualStyleSpec | undefined) => void
+      const visualStyleReady = new Promise<VisualStyleSpec | undefined>((resolve) => { resolveVisualStyle = resolve })
+
+      const trackB = async () => {
+        if (activeProjectId) { setSystemIllustrationStatus("generating"); setSystemIllustrationError(null) }
+
+        // Visual style (~2s)
+        let visualStyle: VisualStyleSpec | undefined
+        try {
+          const styleRes = await generateVisualStyleAction(
+            subject,
+            skeletonRes.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
+            extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
+          )
+          if (!activeProjectIdRef.current) { resolveVisualStyle!(undefined); return }
+          if ("visualStyle" in styleRes) {
+            visualStyle = styleRes.visualStyle
+            setVisualStyle(visualStyle)
+            if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {})
+          }
+        } catch {
+          /* Non-critical */
+        }
+        resolveVisualStyle!(visualStyle)
+
+        // System illustration (~15-30s)
+        if (activeProjectId) {
+          try {
+            const illRes = await generateCadLabSystemIllustrationAction(
+              activeProjectId, subject,
+              skeletonRes.modules.map(m => m.name),
+              skeletonRes.modules.map(m => m.purpose),
+              visualStyle,
+              extractExecutiveSummary(editableReport)?.slice(0, 600),
+            )
+            if (!activeProjectIdRef.current) return
+            if ("url" in illRes) {
+              setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
+              saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch(() => {})
+            } else {
+              setSystemIllustrationStatus("failed")
+              setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
+            }
+          } catch (e) {
+            if (!activeProjectIdRef.current) return
+            setSystemIllustrationStatus("failed")
+            setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+          }
+        }
+      }
+      trackB().catch(() => {})
+
+      // Track C: Background tasks (fire-and-forget)
+      // INTENT: These don't need full modules — they can start with skeleton data
+      // and will use whatever module data is available.
+      const trackC = async () => {
+        // Diagnostics need full modules, so we start them but they'll run on the
+        // expanding modules. We'll re-run after all expansions complete.
+        // Checkpoints can start with skeleton data
         if (activeProjectId) {
           setIsCheckpointing(true)
           requestDecompositionCheckpoints({
             projectId: activeProjectId,
             projectSubject: subject,
-            modules: res.modules,
+            modules: skeletonAsCadModules,
             researchReport: editableReport,
           })
-            .then((checkpointRes) => {
-              if (!activeProjectIdRef.current) return
-              if ("checkpoints" in checkpointRes) {
-                setCheckpoints(checkpointRes.checkpoints)
-              }
-            })
-            .catch((e) => console.error("[CAD-LAB] Checkpoint failed:", e))
+            .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
+            .catch(() => {})
             .finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
         }
-      } else {
-        // Decomposition returned but failed — show the user why
-        paddingTimers.forEach(clearTimeout)
-        const errorMsg = res.error
-          ? String(res.error)
-          : "Decomposition returned no modules"
-        setProgressLines([
-          `Response received in ${elapsed}s`,
-          `Decomposition failed: ${errorMsg}`,
-        ])
-        setDecompositionError(errorMsg)
-        toast.error(errorMsg)
       }
+      trackC().catch(() => {})
+
+      // Track A: Sequential module expansion + per-module image generation
+      const expandedModules: CadLabModule[] = [...skeletonAsCadModules]
+      const style = await visualStyleReady
+
+      // INTENT: Fetch hero reference + crops for module images (same pattern as old flow)
+      let referenceBase64: string | undefined
+      const moduleCrops = new Map<string, string>()
+
+      // Try to get hero reference from system illustration (may still be generating)
+      // We don't block on it — just use whatever is available
+
+      for (let i = 0; i < skeletonRes.modules.length; i++) {
+        const skeleton = skeletonRes.modules[i]
+        if (!activeProjectIdRef.current) break // Stale closure guard
+
+        addProgressLine(`Expanding ${skeleton.name} (${i + 1}/${skeletonRes.modules.length})...`)
+
+        const expRes = await expandModuleDetail(
+          skeletonRes.modules,
+          skeleton.id,
+          subject,
+          editableReport,
+          modelId,
+          domainHint,
+        )
+
+        if (expRes.success && expRes.expansion) {
+          // Merge expansion into the module
+          expandedModules[i] = {
+            ...expandedModules[i],
+            keyParts: expRes.expansion.keyParts,
+            leadWeeks: expRes.expansion.leadWeeks,
+            description: expRes.expansion.description,
+            whyItMatters: expRes.expansion.whyItMatters,
+            failureModes: expRes.expansion.failureModes,
+            unknowns: expRes.expansion.unknowns,
+          }
+
+          addProgressLine(`  ${skeleton.name} expanded — ${expRes.expansion.keyParts.length} components`)
+
+          // Update state with merged module
+          if (activeProjectIdRef.current) {
+            setModules([...expandedModules])
+          }
+        } else {
+          addProgressLine(`  ${skeleton.name} expansion failed — skeleton data preserved`)
+        }
+
+        // Generate image for this module (non-blocking)
+        if (activeProjectIdRef.current) {
+          const moduleForImage = expandedModules[i]
+          generateCadLabSingleImageAction(
+            activeProjectId ?? "",
+            {
+              id: moduleForImage.id,
+              name: moduleForImage.name,
+              purpose: moduleForImage.purpose,
+              keyParts: moduleForImage.keyParts,
+            } as ImageGenModuleInput,
+            style,
+            referenceBase64,
+            moduleCrops.get(moduleForImage.id),
+          ).then((imgRes) => {
+            if (!activeProjectIdRef.current) return
+            if ("imageUrl" in imgRes && imgRes.imageUrl) {
+              setModules((prev) => prev.map((m) =>
+                m.id === moduleForImage.id
+                  ? { ...m, imageUrl: imgRes.imageUrl, imageStatus: "complete" as const, imageModelUsed: imgRes.imageModelUsed }
+                  : m
+              ))
+            } else if ("error" in imgRes) {
+              setModules((prev) => prev.map((m) =>
+                m.id === moduleForImage.id
+                  ? { ...m, imageStatus: "failed" as const, imageError: (imgRes as { error: string }).error }
+                  : m
+              ))
+            }
+          }).catch(() => {
+            setModules((prev) => prev.map((m) =>
+              m.id === moduleForImage.id ? { ...m, imageStatus: "failed" as const, imageError: "Image generation failed" } : m
+            ))
+          })
+        }
+      }
+
+      // All expansions done — final save and summary
+      const finalModules = expandedModules
+      const totalParts = finalModules.reduce((s, m) => s + m.keyParts.length, 0)
+      const criticalPath = Math.max(...finalModules.map(m => m.leadWeeks))
+      const totalRisks = finalModules.reduce((s, m) => s + m.failureModes.length + m.unknowns.length, 0)
+      const criticalModule = finalModules.find(m => m.leadWeeks === criticalPath)
+      const totalElapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
+
+      addProgressLine("")
+      addProgressLine(`All ${finalModules.length} modules expanded in ${totalElapsed}s`)
+      addProgressLine(`${totalParts} components mapped across all sub-assemblies`)
+      if (criticalPath > 0) addProgressLine(`Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`)
+      if (totalRisks > 0) addProgressLine(`${totalRisks} risk items flagged for engineering review`)
+
+      // Final save with full expanded modules
+      if (activeProjectId) {
+        setModules(finalModules)
+        const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(finalModules))
+        if ("error" in saveRes) {
+          toast.error("Modules mapped but failed to save")
+        } else {
+          setLastSaved(new Date().toISOString())
+        }
+        refreshProjects()
+      }
+
+      // Fire diagnostics and contracts with full expanded modules
+      prefillDiagnostics(finalModules, editableReport, modelId)
+        .then((prefillRes) => {
+          if (!activeProjectIdRef.current) return
+          if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
+            setDiagnosticAnswers((prev) => {
+              const merged = { ...prefillRes.answers }
+              for (const [mid, existing] of Object.entries(prev)) merged[mid] = { ...(merged[mid] || {}), ...existing }
+              return merged
+            })
+            setAiPrefilled(true)
+            if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
+              setDiagnosticEnrichment(prefillRes.enrichment)
+              if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
+            }
+          }
+        }).catch(() => {})
+
+      if (finalModules.length >= 2) {
+        setIsExtractingContracts(true)
+        extractInterfaceContracts(finalModules, editableReport, modelId)
+          .then((contractRes) => {
+            if (!activeProjectIdRef.current) return
+            setInterfaceContracts(contractRes.contracts)
+            setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
+            setIsExtractingContracts(false)
+            if (activeProjectId) saveCadLabInterfaceContracts(activeProjectId, contractRes).catch(() => {})
+          })
+          .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
+      }
+
     } catch (err) {
-      paddingTimers.forEach(clearTimeout)
       console.error("[CAD-LAB] Decomposition failed:", err)
       const catchMsg = err instanceof Error ? err.message : "Decomposition failed"
       setDecompositionError(catchMsg)
@@ -1824,6 +2011,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       setResearchResult(res)
       setEditableReport(res.report)
+      if (res.modelUsed) setResearchModelUsed(res.modelUsed)
 
       // Seed product overview immediately so it's visible while illustration generates
       if (!productOverviewRef.current) {
@@ -1904,6 +2092,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
     setAssumptionNotes("")
     setModules([])
+    setResearchModelUsed(null)
+    setDecompositionModelUsed(null)
     setDecompositionError(null)
     setExpandedModuleId(null)
     setGeneratingModuleIds(new Set())
@@ -1922,6 +2112,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setSystemIllustrationStatus("idle")
     setCheckpoints(null)
     setProductOverview("")
+    setUnifiedResult(null)
+    setUnifiedCode(null)
   }, [])
 
   // ── Load a saved project ──
@@ -1932,7 +2124,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       const p = res.project
       setSubject(p.subject)
-      setModelId(p.modelId)
+      // DECISION: Do NOT restore modelId from saved project — Opus is the immutable default.
+      // Loading a project should not override the user's current model selection.
       setActiveProjectId(p.id)
       setLinkedRfqId(p.linkedRfqId)
 
@@ -2021,6 +2214,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (p.diagnosticEnrichment && Object.keys(p.diagnosticEnrichment).length > 0) {
         setDiagnosticEnrichment(p.diagnosticEnrichment)
       }
+
+      // Restore unified CAD result from database
+      setUnifiedResult((p.unifiedResult as CadLabResult | null) ?? null)
+      setUnifiedCode(p.unifiedCode ?? null)
 
       // Fetch manufacturing order count for this project
       const ordersRes = await getProjectOrders(projectId)
@@ -2236,6 +2433,189 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     return res.code
   }, [])
 
+  // ── Unified model generation ──
+  // INTENT: Generates a single CadQuery model for the entire product by concatenating
+  // all module descriptions into one prompt. Calls the same server actions as per-module
+  // generation but with the combined description.
+  const handleGenerateUnifiedModel = useCallback(async () => {
+    if (unifiedGuardRef.current) return
+    if (!activeProjectIdRef.current) {
+      toast.error("Project not initialized — try reloading the page")
+      return
+    }
+    if (modulesRef.current.length === 0) {
+      toast.error("No modules to generate — decompose first")
+      return
+    }
+
+    unifiedGuardRef.current = true
+    setIsGeneratingUnified(true)
+    // INTENT: Clear previous result so stale model isn't visible during regeneration
+    setUnifiedResult(null)
+    setUnifiedCode(null)
+    addProgressLine("Starting unified model generation...")
+
+    try {
+      const response = await fetch("/api/cad-lab/generate-unified", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify({
+          projectId: activeProjectIdRef.current,
+          ...(detectedDomain && { domainHint: detectedDomain }),
+        }),
+      })
+
+      if (!response.ok) {
+        const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+        throw new Error(errBody.error || `HTTP ${response.status}`)
+      }
+
+      // FLOW: Read SSE stream — same pattern as handleModuleGenerate
+      if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+
+          const messages = buffer.split("\n\n")
+          buffer = messages.pop() ?? ""
+
+          for (const msg of messages) {
+            for (const line of msg.split("\n")) {
+              if (!line.startsWith("data: ")) continue
+              try {
+                const event = JSON.parse(line.slice(6)) as { type: string; step?: string; message?: string; result?: CadLabResult; code?: string }
+                if (event.type === "status") {
+                  if (event.step === "interface") addProgressLine("Synthesizing interface definitions...")
+                  else if (event.step === "codegen") addProgressLine("Generating CadQuery code...")
+                  else if (event.step === "modal") addProgressLine("Executing CAD model on Modal...")
+                  else if (event.step === "upload") addProgressLine("Uploading assets...")
+                } else if (event.type === "progress" && event.message) {
+                  addProgressLine(event.message)
+                } else if (event.type === "unified_complete" && event.result) {
+                  setUnifiedResult(event.result as CadLabResult)
+                  setUnifiedCode(event.code ?? null)
+                  addProgressLine("Unified model generated successfully!")
+                  sendNotification("CAD Model Ready", `Unified model for "${subject}" is ready`)
+                  toast.success("Unified CAD model generated")
+                } else if (event.type === "error") {
+                  throw new Error(event.message || "Generation failed")
+                }
+              } catch (parseErr) {
+                if (parseErr instanceof Error && parseErr.message !== "Generation failed" && !parseErr.message.startsWith("HTTP ")) {
+                  // JSON parse error — skip this line
+                } else {
+                  throw parseErr
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Backward compat: non-SSE JSON response
+        const data = await response.json() as { result?: CadLabResult; code?: string }
+        if (data.result) {
+          setUnifiedResult(data.result)
+          setUnifiedCode(data.code ?? null)
+          addProgressLine("Unified model generated successfully!")
+          sendNotification("CAD Model Ready", `Unified model for "${subject}" is ready`)
+          toast.success("Unified CAD model generated")
+        }
+      }
+    } catch (err) {
+      console.error("[CAD-LAB] Unified generation failed:", err)
+      const msg = err instanceof Error ? err.message : "Unknown error"
+      addProgressLine(`Unified generation failed: ${msg}`)
+      toast.error(`Generation failed: ${msg}`)
+    } finally {
+      unifiedGuardRef.current = false
+      setIsGeneratingUnified(false)
+    }
+  }, [subject, detectedDomain, addProgressLine, sendNotification])
+
+  // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
+  // updates unifiedResult/unifiedCode instead of per-module state.
+  // GOTCHA: Uses functional update `setUnifiedResult(prev => ...)` to avoid stale closure —
+  // reading `unifiedResult` directly would be stale if called in rapid succession.
+  const handleExecuteUnifiedCode = useCallback(async (code: string) => {
+    try {
+      const res = await executeCadQueryAction(code)
+      if (!res.success) {
+        toast.error(res.error)
+        return
+      }
+
+      const { result: modalRes } = res
+      // INTENT: Capture updated result for DB persistence after state update
+      let updatedResult: CadLabResult | null = null
+      setUnifiedResult((prev) => {
+        const existing = prev ?? {} as Partial<CadLabResult>
+        const next = {
+          ...existing,
+          success: true as const,
+          code,
+          codeLines: code.split("\n").length,
+          stlData: modalRes.stlData ?? (existing as CadLabResult).stlData,
+          stepData: modalRes.stepData ?? (existing as CadLabResult).stepData,
+          svgIso: modalRes.svgIso ?? (existing as CadLabResult).svgIso,
+          svgTop: modalRes.svgTop ?? (existing as CadLabResult).svgTop,
+          svgFront: modalRes.svgFront ?? (existing as CadLabResult).svgFront,
+          svgBack: modalRes.svgBack ?? (existing as CadLabResult).svgBack,
+          svgRight: modalRes.svgRight ?? (existing as CadLabResult).svgRight,
+          svgLeft: modalRes.svgLeft ?? (existing as CadLabResult).svgLeft,
+          svgExploded: modalRes.svgExploded ?? (existing as CadLabResult).svgExploded,
+          bbox: modalRes.bbox ?? (existing as CadLabResult).bbox,
+          massGrams: modalRes.massGrams ?? (existing as CadLabResult).massGrams,
+          volumeMm3: modalRes.volumeMm3 ?? (existing as CadLabResult).volumeMm3,
+          fillRatio: modalRes.fillRatio ?? (existing as CadLabResult).fillRatio,
+          dfm: modalRes.dfm ?? (existing as CadLabResult).dfm,
+        } as unknown as CadLabResult
+        updatedResult = next
+        return next
+      })
+      setUnifiedCode(code)
+      toast.success("Code executed successfully")
+
+      // Persist to DB (fire-and-forget — don't block UI)
+      const pid = activeProjectIdRef.current
+      if (pid && updatedResult) {
+        const { stlData: _s, stepData: _t, ...withoutBinary } = updatedResult as CadLabResult
+        saveCadLabUnifiedResult(pid, withoutBinary, code).catch((err) =>
+          console.warn("[CAD-LAB] Failed to persist unified result:", err),
+        )
+      }
+    } catch (err) {
+      console.error("[CAD-LAB] Unified code execution failed:", err)
+      toast.error(err instanceof Error ? err.message : "Code execution failed")
+    }
+  }, [])
+
+  // INTENT: Refine unified code with natural language instruction.
+  const handleRefineUnifiedCode = useCallback(async (
+    currentCode: string,
+    instruction: string,
+  ): Promise<string | null> => {
+    const res = await refineCadQueryCodeAction(currentCode, instruction, {
+      name: subject || "Unified Product",
+      purpose: "Complete product assembly",
+      description: productOverviewRef.current || subject,
+    })
+
+    if (!res.success) {
+      toast.error(res.error)
+      return null
+    }
+
+    return res.code
+  }, [subject])
+
   // ── Download helper ──
   const handleDownload = useCallback((filename: string, base64Data: string, isBinary: boolean = true) => {
     try {
@@ -2269,6 +2649,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources, hasResearch, freshResearchRef,
     handleResearch, handleReset,
+    researchModelUsed, decompositionModelUsed,
     isDecomposing, decompositionError, modules, setModules,
     expandedModuleId, setExpandedModuleId, generatingModuleIds,
     diagnosticAnswers, setDiagnosticAnswers, diagnosticEnrichment, aiPrefilled,
@@ -2297,6 +2678,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     projectReviewVerdicts,
     handleExecuteModuleCode,
     handleRefineModuleCode,
+    unifiedResult,
+    unifiedCode,
+    isGeneratingUnified,
+    handleGenerateUnifiedModel,
+    handleExecuteUnifiedCode,
+    handleRefineUnifiedCode,
     initialized,
     initializeCadLab,
     handleDownload,

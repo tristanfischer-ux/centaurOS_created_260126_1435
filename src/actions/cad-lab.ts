@@ -34,6 +34,9 @@ import type {
   MashupSuggestion,
   InterfaceContractResult,
   InterfaceContract,
+  SkeletonModule,
+  SkeletonDecompositionResult,
+  ModuleExpansionResult,
 } from "@/lib/cad-lab-types"
 import { generateFromGrammar } from "@/actions/cad-grammar"
 import { checkRateLimit } from "@/lib/security/rate-limit"
@@ -49,6 +52,8 @@ import {
   detectDomainFromText,
   getResearchSynthesisPrompt,
   getModuleDecompositionPrompt,
+  getSkeletonDecompositionPrompt,
+  getModuleExpansionPrompt,
   getDiagnosticsSystemPrompt,
   getDomainLabel,
   getDomainDescription,
@@ -854,6 +859,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       researchTime: Date.now() - start,
       designBrief: options?.designBrief,
       assumptionNotes: options?.assumptionNotes,
+      modelUsed: "claude-opus-4-6",
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)
@@ -2218,6 +2224,262 @@ export async function prepareDecomposition(
   }
 }
 
+// ─── Skeleton Decomposition (Progressive Phase 1) ────────────────────
+
+/**
+ * Fast skeleton decomposition — returns module names, purposes, inputs/outputs
+ * and connections in ~10-15s. No keyParts, descriptions, or failure modes.
+ *
+ * @description Phase 1 of progressive decomposition. The lightweight prompt
+ * produces a small JSON (~500 tokens) so even complex products complete quickly.
+ * Phase 2 (expandModuleDetail) fills in the detail per-module.
+ *
+ * @param description - Product description
+ * @param researchReport - Research report from Step 1
+ * @param modelId - Claude model to use (always Opus for quality)
+ * @param domainHint - Pre-detected domain (skips re-detection)
+ * @returns Skeleton modules and connections
+ */
+export async function skeletonDecompose(
+  description: string,
+  researchReport: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+  domainHint?: CadLabDomain,
+): Promise<SkeletonDecompositionResult> {
+  // AUTH: Verify user is authenticated
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized", modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+
+  // SECURITY: Rate limit
+  const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
+  if (rateLimitError) return { success: false, error: rateLimitError, modules: [], decompositionTime: 0, tokensIn: 0, tokensOut: 0 }
+
+  const start = Date.now()
+
+  try {
+    const domain = domainHint ?? detectDomainFromText(researchReport)
+    const systemPrompt = getSkeletonDecompositionPrompt(domain)
+
+    // DECISION: Truncate research report — skeleton only needs high-level structure
+    const truncatedReport = researchReport.length > 12_000
+      ? researchReport.slice(0, 12_000) + "\n\n[Report truncated — full report available in later stages]"
+      : researchReport
+
+    const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
+
+    // DECISION: Direct call with Opus — small output (~500 tokens) means fast completion (~10-15s)
+    // No race needed since the prompt is lightweight
+    const { text, tokensIn, tokensOut } = await callClaude(
+      systemPrompt, userPrompt, modelId, 2048, 30_000, 1,
+    )
+
+    // Parse JSON response
+    let parsed: unknown
+    try {
+      const jsonText = extractJsonObject(text)
+      parsed = JSON.parse(jsonText)
+    } catch {
+      try {
+        const jsonArr = extractJsonArray(text)
+        parsed = JSON.parse(jsonArr)
+      } catch {
+        return {
+          success: false,
+          error: "Failed to parse skeleton — AI returned invalid JSON",
+          modules: [],
+          decompositionTime: Date.now() - start,
+          tokensIn, tokensOut,
+        }
+      }
+    }
+
+    let rawModules: unknown[]
+    let rawConnections: unknown[] | undefined
+
+    if (Array.isArray(parsed)) {
+      rawModules = parsed
+    } else if (parsed && typeof parsed === "object" && "modules" in (parsed as Record<string, unknown>)) {
+      const obj = parsed as Record<string, unknown>
+      rawModules = Array.isArray(obj.modules) ? obj.modules : []
+      rawConnections = Array.isArray(obj.connections) ? obj.connections : undefined
+    } else {
+      rawModules = []
+    }
+
+    if (rawModules.length === 0) {
+      return {
+        success: false,
+        error: "AI returned empty module array",
+        modules: [],
+        decompositionTime: Date.now() - start,
+        tokensIn, tokensOut,
+      }
+    }
+
+    // Validate skeleton modules (lightweight — just id, name, purpose, inputs, outputs)
+    const modules: SkeletonModule[] = rawModules.map((raw) => {
+      const m = raw as Record<string, unknown>
+      return {
+        id: String(m.id || "unknown").toLowerCase().replace(/\s+/g, "_"),
+        name: String(m.name || "Unnamed Module"),
+        purpose: String(m.purpose || ""),
+        inputs: Array.isArray(m.inputs) ? m.inputs.map(String) : ["Input"],
+        outputs: Array.isArray(m.outputs) ? m.outputs.map(String) : ["Output"],
+      }
+    })
+
+    // Validate connections against skeleton modules
+    const moduleIds = new Set(modules.map(m => m.id))
+    const modulePortLookup = new Map(modules.map(m => [m.id, { inputs: m.inputs, outputs: m.outputs }]))
+    let connections: ModuleConnection[] | undefined
+
+    if (rawConnections && rawConnections.length > 0) {
+      connections = []
+      for (const raw of rawConnections) {
+        const c = raw as Record<string, unknown>
+        const from = String(c.from || "")
+        const output = String(c.output || "")
+        const to = String(c.to || "")
+        const input = String(c.input || "")
+        if (!moduleIds.has(from) || !moduleIds.has(to)) continue
+        const sourcePorts = modulePortLookup.get(from)
+        const targetPorts = modulePortLookup.get(to)
+        if (!sourcePorts?.outputs.includes(output)) continue
+        if (!targetPorts?.inputs.includes(input)) continue
+        connections.push({ from, output, to, input })
+      }
+      if (connections.length === 0) connections = undefined
+    }
+
+    console.info(`[THE-FORGE] Skeleton decomposition: ${modules.length} modules in ${Date.now() - start}ms`)
+
+    return {
+      success: true,
+      modules,
+      connections,
+      decompositionTime: Date.now() - start,
+      tokensIn, tokensOut,
+      modelUsed: "Opus",
+    }
+  } catch (error) {
+    console.error("[THE-FORGE] Skeleton decomposition failed:", error instanceof Error ? error.message : error)
+    return {
+      success: false,
+      error: classifyDecompositionError(error),
+      modules: [],
+      decompositionTime: Date.now() - start,
+      tokensIn: 0, tokensOut: 0,
+    }
+  }
+}
+
+// ─── Module Expansion (Progressive Phase 2) ──────────────────────────
+
+/**
+ * Expands a single skeleton module with full details (keyParts, description,
+ * failureModes, unknowns, etc.).
+ *
+ * @description Phase 2 of progressive decomposition. Called once per module,
+ * sequentially, so the UI can show each module's details as they arrive.
+ * Takes the full skeleton list for inter-module context.
+ *
+ * @param skeletonModules - All skeleton modules (for context)
+ * @param targetModuleId - Which module to expand
+ * @param description - Product description
+ * @param researchReport - Research report from Step 1
+ * @param modelId - Claude model to use
+ * @param domainHint - Pre-detected domain
+ * @returns Expanded detail fields for the target module
+ */
+export async function expandModuleDetail(
+  skeletonModules: SkeletonModule[],
+  targetModuleId: string,
+  description: string,
+  researchReport: string,
+  modelId: ClaudeModelId = "claude-opus-4-6",
+  domainHint?: CadLabDomain,
+): Promise<ModuleExpansionResult> {
+  // AUTH: Verify user is authenticated (no separate rate limit — skeleton already rate-limited)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Unauthorized", moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
+
+  const target = skeletonModules.find(m => m.id === targetModuleId)
+  if (!target) return { success: false, error: `Module ${targetModuleId} not found in skeleton`, moduleId: targetModuleId, tokensIn: 0, tokensOut: 0 }
+
+  try {
+    const domain = domainHint ?? detectDomainFromText(researchReport)
+    const systemPrompt = getModuleExpansionPrompt(domain)
+
+    // DECISION: Truncate research report — expansion only needs context, not full detail
+    const truncatedReport = researchReport.length > 8_000
+      ? researchReport.slice(0, 8_000) + "\n\n[Report truncated]"
+      : researchReport
+
+    // INTENT: Include full skeleton for inter-module context so the AI understands
+    // how this module fits into the broader system
+    const skeletonSummary = skeletonModules.map(m =>
+      `- ${m.name} (${m.id}): ${m.purpose} | inputs: [${m.inputs.join(", ")}] | outputs: [${m.outputs.join(", ")}]`
+    ).join("\n")
+
+    const userPrompt = `Product: ${description}
+
+Research Report:
+${truncatedReport}
+
+Full product skeleton:
+${skeletonSummary}
+
+TARGET MODULE TO EXPAND: "${target.name}" (id: ${target.id})
+Purpose: ${target.purpose}
+Inputs: ${target.inputs.join(", ")}
+Outputs: ${target.outputs.join(", ")}
+
+Provide the detailed engineering specification for this module ONLY. Output ONLY the JSON object.`
+
+    const { text, tokensIn, tokensOut } = await callClaude(
+      systemPrompt, userPrompt, modelId, 2048, 30_000, 1,
+    )
+
+    // Parse expansion JSON
+    let parsed: Record<string, unknown>
+    try {
+      const jsonText = extractJsonObject(text)
+      parsed = JSON.parse(jsonText) as Record<string, unknown>
+    } catch {
+      return {
+        success: false,
+        error: "Failed to parse module expansion — AI returned invalid JSON",
+        moduleId: targetModuleId,
+        tokensIn, tokensOut,
+      }
+    }
+
+    return {
+      success: true,
+      moduleId: targetModuleId,
+      expansion: {
+        keyParts: Array.isArray(parsed.keyParts) ? parsed.keyParts.map(String) : [],
+        leadWeeks: typeof parsed.leadWeeks === "number" ? parsed.leadWeeks : 4,
+        description: String(parsed.description || ""),
+        whyItMatters: String(parsed.whyItMatters || ""),
+        failureModes: Array.isArray(parsed.failureModes) ? parsed.failureModes.map(String) : [],
+        unknowns: Array.isArray(parsed.unknowns) ? parsed.unknowns.map(String) : [],
+      },
+      tokensIn, tokensOut,
+    }
+  } catch (error) {
+    console.error(`[THE-FORGE] Module expansion failed for ${targetModuleId}:`, error instanceof Error ? error.message : error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Module expansion failed",
+      moduleId: targetModuleId,
+      tokensIn: 0, tokensOut: 0,
+    }
+  }
+}
+
 // ─── Decomposition Error Classification ──────────────────────────────
 
 /**
@@ -2341,6 +2603,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     dlog(`System prompt length: ${modulePrompt.length} chars`)
     dlog(`User prompt length: ${userPrompt.length} chars`)
     let text: string, tokensIn: number, tokensOut: number
+    let winnerModel = ""
 
     // Race user's chosen Claude model + Gemini in parallel — first success wins
     const claudeLabel = modelId.includes("opus") ? "Opus" : modelId.includes("haiku") ? "Haiku" : "Sonnet"
@@ -2376,6 +2639,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     try {
       const winner = await Promise.any([claudePromise, geminiPromise])
       text = winner.text; tokensIn = winner.tokensIn; tokensOut = winner.tokensOut
+      winnerModel = winner.model
       dlog(`<<< RACE WON by ${winner.model} in ${Date.now() - raceStart}ms`)
     } catch {
       // Both failed — try OpenAI as final resort
@@ -2383,6 +2647,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       const openaiStart = Date.now()
       try {
         ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 120_000))
+        winnerModel = "GPT-4o"
         dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
       } catch (openaiErr) {
         const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)
@@ -2535,6 +2800,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       decompositionTime: totalMs,
       tokensIn,
       tokensOut,
+      modelUsed: winnerModel,
     }
   } catch (error) {
     const totalMs = Date.now() - start

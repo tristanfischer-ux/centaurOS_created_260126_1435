@@ -337,6 +337,92 @@ export function getModuleDecompositionPrompt(domain: CadLabDomain): string {
   return `${MODULE_DECOMPOSITION_ROLE[domain]}\n\n${BASE_MODULE_DECOMPOSITION}`
 }
 
+// ─── Skeleton decomposition prompts (fast first pass) ─────────────────
+
+const BASE_SKELETON_DECOMPOSITION = `Given a product description and research report, break the product down into 4-8 distinct physical modules. Return ONLY the skeleton — no detailed descriptions, no keyParts, no failure modes.
+
+Output STRICTLY as a JSON object with two keys — "modules" and "connections":
+
+{
+  "modules": [
+    {
+      "id": "lowercase_no_spaces",
+      "name": "Human Readable Name",
+      "purpose": "One sentence: what this module does",
+      "inputs": ["Input stream or signal 1", "Input 2"],
+      "outputs": ["Output stream or signal 1"]
+    }
+  ],
+  "connections": [
+    { "from": "source_module_id", "output": "Exact output label", "to": "target_module_id", "input": "Exact input label" }
+  ]
+}
+
+RULES:
+- Generate 4-8 modules (more for complex products, fewer for simple ones)
+- Every module must have at least 1 input and 1 output
+- CRITICAL — connections array: Every inter-module output/input MUST appear in exactly one connection entry. "from"/"to" must be valid module IDs. "output"/"input" must match the source/target module's arrays EXACTLY.
+- IMPORTANT: Only list inter-module interfaces — NOT external/environmental interfaces. If a module interfaces with the outside world, describe that in its purpose — not in inputs/outputs.
+- Modules should cover the ENTIRE product — no gaps
+- Output ONLY the JSON object — no markdown, no explanation
+- Keep it lightweight — purpose should be ONE sentence`
+
+const SKELETON_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
+  electronics:
+    "You are a senior systems engineer specialising in electronics/PCB assemblies. Identify the physical sub-assemblies — names and interfaces only.",
+  mechanical:
+    "You are a senior systems engineer identifying the physical sub-assemblies (modules) of a product — names and interfaces only.",
+  electromechanical:
+    "You are a senior systems engineer specialising in electromechanical systems. Identify sub-assemblies — names and interfaces only.",
+  fluid:
+    "You are a senior systems engineer specialising in fluid systems. Identify sub-assemblies — names and interfaces only.",
+}
+
+export function getSkeletonDecompositionPrompt(domain: CadLabDomain): string {
+  return `${SKELETON_DECOMPOSITION_ROLE[domain]}\n\n${BASE_SKELETON_DECOMPOSITION}`
+}
+
+// ─── Module expansion prompts (per-module detail fill) ────────────────
+
+const BASE_MODULE_EXPANSION = `You are expanding a single module within a product decomposition. You are given:
+1. The full skeleton (all module names, purposes, inputs, outputs) for inter-module context
+2. The target module to expand
+
+For the target module, provide detailed engineering information. Output STRICTLY as JSON:
+
+{
+  "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
+  "leadWeeks": 6,
+  "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
+  "whyItMatters": "Why this module is critical to the overall system.",
+  "failureModes": ["Failure mode 1", "Failure mode 2"],
+  "unknowns": ["Open question 1", "Open question 2"]
+}
+
+RULES:
+- At least 3 keyParts with specific part names and specifications
+- leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
+- description should cover physical characteristics, operating principle, and material choices
+- failureModes: 2-4 realistic engineering failure modes
+- unknowns: 1-3 open questions that need resolution
+- Use dimensions from the research report — do not invent new ones
+- Output ONLY the JSON object — no markdown, no explanation`
+
+const MODULE_EXPANSION_ROLE: Record<CadLabDomain, string> = {
+  electronics:
+    "You are a senior electronics engineer providing detailed specifications for a single PCB/electronics sub-assembly.",
+  mechanical:
+    "You are a senior mechanical engineer providing detailed specifications for a single structural sub-assembly.",
+  electromechanical:
+    "You are a senior electromechanical engineer providing detailed specifications for a single electromechanical sub-assembly.",
+  fluid:
+    "You are a senior fluid-systems engineer providing detailed specifications for a single fluid system sub-assembly.",
+}
+
+export function getModuleExpansionPrompt(domain: CadLabDomain): string {
+  return `${MODULE_EXPANSION_ROLE[domain]}\n\n${BASE_MODULE_EXPANSION}`
+}
+
 // ─── Visual style spec prompt (cohesive illustrations) ────────────────
 
 const VISUAL_STYLE_SYSTEM_PROMPT = `You are an art director for a professional engineering specification document.
