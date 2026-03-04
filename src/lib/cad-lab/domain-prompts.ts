@@ -458,6 +458,44 @@ export function getVisualStyleSystemPrompt(): string {
   return VISUAL_STYLE_SYSTEM_PROMPT
 }
 
+// ─── Design Synthesis prompt (Opus holistic review) ───────────────────
+
+const DESIGN_SYNTHESIS_SYSTEM_PROMPT = `You are a senior industrial designer reviewing a complete engineering specification — all expanded modules, inter-module connections, and product research — to produce a cohesive visual design brief.
+
+Your job is to see the product AS A WHOLE and create visual specifications that unify every module image into one coherent product.
+
+Output STRICTLY as JSON with exactly these 6 fields:
+
+{
+  "colorPalette": "3-4 dominant colors described by name (e.g. 'steel blue, warm gray, copper accent, matte white'). Pick colors appropriate for the product's domain, materials, and industrial context.",
+  "materialRendering": "How surfaces and materials should be rendered across all illustrations (e.g. 'brushed metal with soft specular highlights and subtle anodized color tints'). Specific enough to be visually consistent.",
+  "unifyingContext": "A short phrase that frames every module as part of one system (e.g. 'sub-assemblies of a compact quadrotor drone with carbon-fiber arms').",
+  "productFormDescription": "150-300 words. A purely geometric description of the complete product's physical shape, silhouette, and spatial arrangement. Describe the overall form factor, proportions, volumes, and how major sections relate spatially. Example: 'A low rectangular chassis roughly twice as wide as it is tall, tapering slightly toward the front. Four cylindrical motor housings extend from booms at each corner, each containing a brushless motor with 10-inch propeller guards forming protective arcs. The top surface is dominated by a flat battery bay occupying the central third, with a raised sensor mast protruding 40mm above the chassis center-line. The rear houses a rectangular avionics bay with ventilation slots on both sides. Landing gear consists of four splayed carbon-fiber legs with rubber feet, creating a stable footprint roughly 1.5x the chassis width.' Do NOT reference module names, part numbers, or technical labels — describe only visible shapes, positions, and proportions.",
+  "moduleGeometryMap": { "Module Name": "50-100 words describing this module's visible geometry within the product: its shape, position relative to other modules, proportions, distinctive visual features, material appearance. Describe what a viewer would SEE — silhouettes, relative sizes, surface textures, spatial relationships to adjacent modules." },
+  "heroImagePrompt": "300-500 words. A complete image generation prompt for a hero illustration showing the entire product. Describe the product's silhouette and overall form, then describe each major section's geometry and position WITHOUT using module names (image models garble text). Use spatial language: 'the front-left quadrant contains...', 'centered on the top surface...', 'extending downward from the rear...'. Specify color coding for each section using the colorPalette. Include material rendering instructions. Specify camera angle (30-degree isometric, slightly above and to the right). Describe the exploded or semi-transparent view showing internal arrangement. End with rendering rules: white background, thin precise lines, engineering grid, no text/labels/annotations of any kind."
+}
+
+RULES:
+- Output ONLY valid JSON — no markdown, no explanation
+- Colors must be described by name, not hex codes (image models don't understand hex)
+- Keep colorPalette, materialRendering, and unifyingContext each under 30 words
+- productFormDescription: 150-300 words of purely geometric/visual description
+- moduleGeometryMap: one entry per module, each 50-100 words of geometric description
+- heroImagePrompt: 300-500 words, the COMPLETE prompt for generating a hero image — must be self-contained (no references to other fields)
+- CRITICAL: heroImagePrompt must contain ZERO module names, part numbers, or technical labels. Describe components by their geometry, position, and function only. Image models render text/names as garbled characters.
+- Use the connections list to understand spatial relationships between modules — connected modules are physically adjacent or interfacing`
+
+/**
+ * Returns the system prompt for Opus design synthesis.
+ *
+ * @description Used once per decomposition AFTER all modules are expanded.
+ * Opus reviews the full product holistically and crafts both the visual style
+ * AND the hero image prompt, ensuring visual coherence across all illustrations.
+ */
+export function getDesignSynthesisPrompt(): string {
+  return DESIGN_SYNTHESIS_SYSTEM_PROMPT
+}
+
 // ─── Diagnostics pre-fill prompts ─────────────────────────────────────
 
 const BASE_DIAGNOSTICS = `For each module, output exactly these 6 fields:

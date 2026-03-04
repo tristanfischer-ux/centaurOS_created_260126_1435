@@ -288,6 +288,8 @@ export interface VisualStyleSpec {
   productFormDescription?: string
   /** Per-module geometry descriptions mapping module name to a 30-50 word description of visible geometry within the product (shape, position, proportions, distinctive features). Used to constrain module image generation. */
   moduleGeometryMap?: Record<string, string>
+  /** Opus-crafted hero image prompt (300-500 words). When present, used directly as the Gemini prompt for the system illustration instead of the programmatic prompt. */
+  heroImagePrompt?: string
 }
 
 // ─── Module Types ────────────────────────────────────────────────────

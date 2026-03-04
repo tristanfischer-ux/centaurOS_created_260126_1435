@@ -1115,43 +1115,53 @@ export async function generateResearchIllustration(
   modulePurposes: string[],
   visualStyle?: VisualStyleSpec,
   researchExcerpt?: string,
+  customPrompt?: string,
 ): Promise<string> {
-  const hasModules = moduleNames.length > 0
+  let prompt: string
 
-  // DECISION: Don't list module names — image models render them as garbled
-  // text.  Use count-based description instead.
-  const moduleContext = hasModules
-    ? `\n\nThis is an engineering overview showing the complete system with its ${moduleNames.length} major sub-assemblies.`
-    : ""
+  if (customPrompt) {
+    // INTENT: When Opus design synthesis provides a hero prompt, use it directly.
+    // Prepend no-text enforcement and append cohesive rendering rules.
+    prompt = enforceNoText(customPrompt) + COHESIVE_STYLE_SUFFIX
+  } else {
+    // Existing programmatic prompt construction
+    const hasModules = moduleNames.length > 0
 
-  // INTENT: productFormDescription is the geometric shape description from the visual style step.
-  // It turns "draw a quadrotor drone" into "draw a product with a low rectangular chassis,
-  // four cylindrical motor housings..." — the single highest-impact prompt enrichment.
-  // Falls back to raw research excerpt when no visual style is available (Trigger A).
-  const formDescription = visualStyle?.productFormDescription
-    ? `\n\nPhysical form: ${visualStyle.productFormDescription}`
-    : researchExcerpt
-      ? `\n\nProduct description: ${researchExcerpt}`
+    // DECISION: Don't list module names — image models render them as garbled
+    // text.  Use count-based description instead.
+    const moduleContext = hasModules
+      ? `\n\nThis is an engineering overview showing the complete system with its ${moduleNames.length} major sub-assemblies.`
       : ""
 
-  // DECISION: Module purposes give the image model functional context about what the
-  // sub-assemblies do, without listing names that would render as garbled text.
-  const structuralContext = hasModules && modulePurposes.length > 0
-    ? `\n\nThe sub-assemblies handle: ${modulePurposes.join("; ")}.`
-    : ""
+    // INTENT: productFormDescription is the geometric shape description from the visual style step.
+    // It turns "draw a quadrotor drone" into "draw a product with a low rectangular chassis,
+    // four cylindrical motor housings..." — the single highest-impact prompt enrichment.
+    // Falls back to raw research excerpt when no visual style is available (Trigger A).
+    const formDescription = visualStyle?.productFormDescription
+      ? `\n\nPhysical form: ${visualStyle.productFormDescription}`
+      : researchExcerpt
+        ? `\n\nProduct description: ${researchExcerpt}`
+        : ""
 
-  const styleDirective = visualStyle
-    ? `\n\nColor palette: use ${visualStyle.colorPalette} as the dominant colors. Material rendering: ${visualStyle.materialRendering}. Context: ${visualStyle.unifyingContext}.`
-    : ""
+    // DECISION: Module purposes give the image model functional context about what the
+    // sub-assemblies do, without listing names that would render as garbled text.
+    const structuralContext = hasModules && modulePurposes.length > 0
+      ? `\n\nThe sub-assemblies handle: ${modulePurposes.join("; ")}.`
+      : ""
 
-  // DECISION: "engineering specification document" cues the image model to add labeled
-  // annotations with leader lines — Gemini/DALL-E can't spell, producing garbled text.
-  // Use "product render" framing instead, and triple-reinforce the no-text instruction.
-  const prompt = `IMPORTANT: This image must contain ZERO text — no labels, no annotations, no words, no letters, no numbers, no callouts, no captions anywhere.
+    const styleDirective = visualStyle
+      ? `\n\nColor palette: use ${visualStyle.colorPalette} as the dominant colors. Material rendering: ${visualStyle.materialRendering}. Context: ${visualStyle.unifyingContext}.`
+      : ""
+
+    // DECISION: "engineering specification document" cues the image model to add labeled
+    // annotations with leader lines — Gemini/DALL-E can't spell, producing garbled text.
+    // Use "product render" framing instead, and triple-reinforce the no-text instruction.
+    prompt = `IMPORTANT: This image must contain ZERO text — no labels, no annotations, no words, no letters, no numbers, no callouts, no captions anywhere.
 
 Create a clean, professional technical illustration of a ${subject}.${moduleContext}${formDescription}${structuralContext}${styleDirective}
 
 Style: Modern technical product render on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration. Remember: absolutely no text, labels, annotations, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
+  }
 
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",

@@ -56,7 +56,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -994,7 +994,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Persist connections from skeleton
       if (skeletonRes.connections && skeletonRes.connections.length > 0) {
         setDecompositionConnections(skeletonRes.connections)
-        if (activeProjectId) saveCadLabDecompositionConnections(activeProjectId, skeletonRes.connections).catch(() => {})
+        if (activeProjectIdRef.current) saveCadLabDecompositionConnections(activeProjectIdRef.current, skeletonRes.connections).catch(() => {})
       }
 
       // Seed product overview
@@ -1002,13 +1002,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const summary = extractExecutiveSummary(editableReport)
         if (summary) {
           setProductOverview(summary)
-          if (activeProjectId) saveCadLabProductOverview(activeProjectId, summary).catch(() => {})
+          if (activeProjectIdRef.current) saveCadLabProductOverview(activeProjectIdRef.current, summary).catch(() => {})
         }
       }
 
       // Save skeleton modules immediately
-      if (activeProjectId) {
-        const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(skeletonAsCadModules))
+      if (activeProjectIdRef.current) {
+        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(skeletonAsCadModules))
         if ("error" in saveRes) {
           toast.error("Modules mapped but failed to save")
         } else {
@@ -1017,95 +1017,25 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         refreshProjects()
       }
 
-      // ── Phase 2: Three concurrent tracks ──
-
-      // Track B: Visual style + system illustration (fire-and-forget)
-      // INTENT: visualStyleReady resolves when the visual style is generated (~2s),
-      // which Track A waits on before generating per-module images.
-      let resolveVisualStyle: (style: VisualStyleSpec | undefined) => void
-      const visualStyleReady = new Promise<VisualStyleSpec | undefined>((resolve) => { resolveVisualStyle = resolve })
-
-      const trackB = async () => {
-        if (activeProjectId) { setSystemIllustrationStatus("generating"); setSystemIllustrationError(null) }
-
-        // Visual style (~2s)
-        let visualStyle: VisualStyleSpec | undefined
-        try {
-          const styleRes = await generateVisualStyleAction(
-            subject,
-            skeletonRes.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
-            extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
-          )
-          if (!activeProjectIdRef.current) { resolveVisualStyle!(undefined); return }
-          if ("visualStyle" in styleRes) {
-            visualStyle = styleRes.visualStyle
-            setVisualStyle(visualStyle)
-            if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {})
-          }
-        } catch {
-          /* Non-critical */
-        }
-        resolveVisualStyle!(visualStyle)
-
-        // System illustration (~15-30s)
-        if (activeProjectId) {
-          try {
-            const illRes = await generateCadLabSystemIllustrationAction(
-              activeProjectId, subject,
-              skeletonRes.modules.map(m => m.name),
-              skeletonRes.modules.map(m => m.purpose),
-              visualStyle,
-              extractExecutiveSummary(editableReport)?.slice(0, 600),
-            )
-            if (!activeProjectIdRef.current) return
-            if ("url" in illRes) {
-              setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
-              saveCadLabSystemIllustration(activeProjectId!, illRes.url).catch(() => {})
-            } else {
-              setSystemIllustrationStatus("failed")
-              setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
-            }
-          } catch (e) {
-            if (!activeProjectIdRef.current) return
-            setSystemIllustrationStatus("failed")
-            setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
-          }
-        }
-      }
-      trackB().catch(() => {})
+      // ── Phase 2: Concurrent tracks (text expansion + background tasks) ──
 
       // Track C: Background tasks (fire-and-forget)
-      // INTENT: These don't need full modules — they can start with skeleton data
-      // and will use whatever module data is available.
-      const trackC = async () => {
-        // Diagnostics need full modules, so we start them but they'll run on the
-        // expanding modules. We'll re-run after all expansions complete.
-        // Checkpoints can start with skeleton data
-        if (activeProjectId) {
-          setIsCheckpointing(true)
-          requestDecompositionCheckpoints({
-            projectId: activeProjectId,
-            projectSubject: subject,
-            modules: skeletonAsCadModules,
-            researchReport: editableReport,
-          })
-            .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
-            .catch(() => {})
-            .finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
-        }
+      // INTENT: Checkpoints can start with skeleton data — no need to wait for expansions.
+      if (activeProjectId) {
+        setIsCheckpointing(true)
+        requestDecompositionCheckpoints({
+          projectId: activeProjectId,
+          projectSubject: subject,
+          modules: skeletonAsCadModules,
+          researchReport: editableReport,
+        })
+          .then((cr) => { if (activeProjectIdRef.current && "checkpoints" in cr) setCheckpoints(cr.checkpoints) })
+          .catch(() => {})
+          .finally(() => { if (activeProjectIdRef.current) setIsCheckpointing(false) })
       }
-      trackC().catch(() => {})
 
-      // Track A: Sequential module expansion + per-module image generation
+      // Track A: Sequential module expansion (TEXT ONLY — no images yet)
       const expandedModules: CadLabModule[] = [...skeletonAsCadModules]
-      const style = await visualStyleReady
-
-      // INTENT: Fetch hero reference + crops for module images (same pattern as old flow)
-      let referenceBase64: string | undefined
-      const moduleCrops = new Map<string, string>()
-
-      // Try to get hero reference from system illustration (may still be generating)
-      // We don't block on it — just use whatever is available
 
       for (let i = 0; i < skeletonRes.modules.length; i++) {
         const skeleton = skeletonRes.modules[i]
@@ -1123,7 +1053,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         )
 
         if (expRes.success && expRes.expansion) {
-          // Merge expansion into the module
           expandedModules[i] = {
             ...expandedModules[i],
             keyParts: expRes.expansion.keyParts,
@@ -1136,49 +1065,144 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
           addProgressLine(`  ${skeleton.name} expanded — ${expRes.expansion.keyParts.length} components`)
 
-          // Update state with merged module
           if (activeProjectIdRef.current) {
-            setModules([...expandedModules])
+            const exp = expandedModules[i]
+            setModules((prev) => prev.map((m) =>
+              m.id === exp.id
+                ? { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns }
+                : m
+            ))
           }
         } else {
+          console.error(`[CAD-LAB] Expansion failed for ${skeleton.name}:`, expRes.error)
           addProgressLine(`  ${skeleton.name} expansion failed — skeleton data preserved`)
         }
+      }
 
-        // Generate image for this module (non-blocking)
-        if (activeProjectIdRef.current) {
-          const moduleForImage = expandedModules[i]
-          generateCadLabSingleImageAction(
-            activeProjectId ?? "",
-            {
-              id: moduleForImage.id,
-              name: moduleForImage.name,
-              purpose: moduleForImage.purpose,
-              keyParts: moduleForImage.keyParts,
-            } as ImageGenModuleInput,
-            style,
-            referenceBase64,
-            moduleCrops.get(moduleForImage.id),
-          ).then((imgRes) => {
-            if (!activeProjectIdRef.current) return
-            if ("imageUrl" in imgRes && imgRes.imageUrl) {
-              setModules((prev) => prev.map((m) =>
-                m.id === moduleForImage.id
-                  ? { ...m, imageUrl: imgRes.imageUrl, imageStatus: "complete" as const, imageModelUsed: imgRes.imageModelUsed }
-                  : m
-              ))
-            } else if ("error" in imgRes) {
-              setModules((prev) => prev.map((m) =>
-                m.id === moduleForImage.id
-                  ? { ...m, imageStatus: "failed" as const, imageError: (imgRes as { error: string }).error }
-                  : m
-              ))
-            }
-          }).catch(() => {
-            setModules((prev) => prev.map((m) =>
-              m.id === moduleForImage.id ? { ...m, imageStatus: "failed" as const, imageError: "Image generation failed" } : m
-            ))
-          })
+      addProgressLine("")
+      addProgressLine(`All ${skeletonRes.modules.length} modules expanded`)
+
+      // ── Phase 3: Sequential image pipeline (after ALL text expansions) ──
+
+      // 3a: Opus design synthesis — reviews all expanded modules holistically
+      addProgressLine("Synthesising product design brief...")
+      let style: VisualStyleSpec | undefined
+
+      if (activeProjectIdRef.current) {
+        try {
+          const synthRes = await generateDesignSynthesisAction(
+            subject,
+            expandedModules.map(m => ({
+              name: m.name, purpose: m.purpose, description: m.description,
+              keyParts: m.keyParts, inputs: m.inputs, outputs: m.outputs,
+            })),
+            skeletonRes.connections,
+            extractExecutiveSummary(editableReport)?.slice(0, 1200) ?? editableReport.slice(0, 1200),
+          )
+          if (!activeProjectIdRef.current) { /* stale */ }
+          else if ("visualStyle" in synthRes) {
+            style = synthRes.visualStyle
+            setVisualStyle(style)
+            saveCadLabVisualStyle(activeProjectIdRef.current, style).catch(() => {})
+            addProgressLine("Design brief complete — generating system illustration...")
+          } else {
+            console.warn("[CAD-LAB] Design synthesis failed, falling back to Sonnet visual style")
+            addProgressLine("Design synthesis unavailable — falling back to quick visual style...")
+          }
+        } catch {
+          console.warn("[CAD-LAB] Design synthesis threw, falling back to Sonnet visual style")
+          addProgressLine("Design synthesis unavailable — falling back to quick visual style...")
         }
+
+        // Fallback: use Sonnet visual style if Opus synthesis failed
+        if (!style && activeProjectIdRef.current) {
+          try {
+            const styleRes = await generateVisualStyleAction(
+              subject,
+              skeletonRes.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
+              extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
+            )
+            if ("visualStyle" in styleRes) {
+              style = styleRes.visualStyle
+              setVisualStyle(style)
+              saveCadLabVisualStyle(activeProjectIdRef.current!, style).catch(() => {})
+              addProgressLine("Visual style generated — generating system illustration...")
+            }
+          } catch { /* Non-critical */ }
+        }
+      }
+
+      // 3b: Hero image generation — uses Opus-crafted prompt when available
+      let illustrationUrl: string | undefined
+      if (activeProjectIdRef.current) {
+        setSystemIllustrationStatus("generating"); setSystemIllustrationError(null)
+        try {
+          const illRes = await generateCadLabSystemIllustrationAction(
+            activeProjectIdRef.current, subject,
+            expandedModules.map(m => m.name),
+            expandedModules.map(m => m.purpose),
+            style,
+            extractExecutiveSummary(editableReport)?.slice(0, 600),
+            style?.heroImagePrompt,
+          )
+          if (!activeProjectIdRef.current) { /* stale */ }
+          else if ("url" in illRes) {
+            illustrationUrl = illRes.url
+            setSystemIllustrationUrl(illRes.url); setSystemIllustrationStatus("complete")
+            saveCadLabSystemIllustration(activeProjectIdRef.current!, illRes.url).catch(() => {})
+            addProgressLine("System illustration complete — preparing module image references...")
+          } else {
+            setSystemIllustrationStatus("failed")
+            setSystemIllustrationError("error" in illRes ? (illRes as { error: string }).error : "Generation failed")
+            addProgressLine("System illustration failed — proceeding with module images...")
+          }
+        } catch (e) {
+          if (activeProjectIdRef.current) {
+            setSystemIllustrationStatus("failed")
+            setSystemIllustrationError(e instanceof Error ? e.message : "Generation failed")
+            addProgressLine("System illustration failed — proceeding with module images...")
+          }
+        }
+      }
+
+      // 3c: Reference prep — crop hero + bounding boxes + module crops
+      let referenceBase64: string | undefined
+      const moduleCrops = new Map<string, string>()
+
+      if (illustrationUrl) {
+        try {
+          const cropRes = await fetchAndCropReferenceAction(illustrationUrl)
+          if ("base64" in cropRes) referenceBase64 = cropRes.base64
+        } catch { /* Non-critical — images generate without reference */ }
+
+        if (referenceBase64) {
+          try {
+            const bbRes = await analyseHeroForModulesAction(
+              referenceBase64,
+              expandedModules.map(m => m.name),
+            )
+            if ("boxes" in bbRes && Object.keys(bbRes.boxes).length > 0) {
+              const cropResults = await Promise.all(expandedModules.map(async (mod) => {
+                const box = bbRes.boxes[mod.name]
+                if (!box) return { id: mod.id, crop: undefined }
+                try {
+                  const cr = await cropModuleRegionAction(referenceBase64!, box)
+                  if ("base64" in cr) return { id: mod.id, crop: cr.base64 }
+                } catch { /* skip */ }
+                return { id: mod.id, crop: undefined }
+              }))
+              for (const cr of cropResults) { if (cr.crop) moduleCrops.set(cr.id, cr.crop) }
+            }
+          } catch { /* Non-critical */ }
+        }
+      }
+
+      // 3d + 3e: Per-module images via handleGenerateModuleImages
+      // INTENT: handleGenerateModuleImages handles its own shared asset upload internally,
+      // so we pass referenceBase64 and style directly — it will upload them once.
+      if (activeProjectIdRef.current) {
+        addProgressLine("Generating module blueprint illustrations...")
+        await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, style, referenceBase64, moduleCrops)
       }
 
       // All expansions done — final save and summary
@@ -1195,10 +1219,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (criticalPath > 0) addProgressLine(`Critical path: ${criticalPath} weeks${criticalModule ? ` (${criticalModule.name})` : ""}`)
       if (totalRisks > 0) addProgressLine(`${totalRisks} risk items flagged for engineering review`)
 
-      // Final save with full expanded modules
-      if (activeProjectId) {
-        setModules(finalModules)
-        const saveRes = await saveCadLabModules(activeProjectId, JSON.stringify(finalModules))
+      // Final save — merge expansion data without clobbering in-flight image state
+      if (activeProjectIdRef.current) {
+        setModules((prev) => prev.map((m) => {
+          const exp = finalModules.find(e => e.id === m.id)
+          if (!exp) return m
+          return { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns }
+        }))
+        const saveRes = await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(finalModules))
         if ("error" in saveRes) {
           toast.error("Modules mapped but failed to save")
         } else {
@@ -1233,7 +1261,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             setInterfaceContracts(contractRes.contracts)
             setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
             setIsExtractingContracts(false)
-            if (activeProjectId) saveCadLabInterfaceContracts(activeProjectId, contractRes).catch(() => {})
+            if (activeProjectIdRef.current) saveCadLabInterfaceContracts(activeProjectIdRef.current, contractRes).catch(() => {})
           })
           .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
       }

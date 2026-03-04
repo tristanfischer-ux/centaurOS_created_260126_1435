@@ -21,7 +21,8 @@ import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-ad
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration, prepareReferenceImage, cropReferenceFor3x2, analyseHeroBoundingBoxes, cropModuleRegion } from "@/app/(platform)/the-forge/services/image-generator"
 import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
-import { getVisualStyleSystemPrompt } from "@/lib/cad-lab/domain-prompts"
+import { getVisualStyleSystemPrompt, getDesignSynthesisPrompt } from "@/lib/cad-lab/domain-prompts"
+import type { ModuleConnection } from "@/lib/cad-lab-types"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
@@ -301,10 +302,11 @@ export async function generateCadLabSystemIllustrationAction(
   modulePurposes: string[],
   visualStyle?: VisualStyleSpec,
   researchExcerpt?: string,
+  heroPrompt?: string,
 ): Promise<{ url: string } | { error: string }> {
   return withAuth(async () => {
     try {
-      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt)
+      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt)
       return { url }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
@@ -468,6 +470,100 @@ export async function cropModuleRegionAction(
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.warn("[CAD-LAB-IMAGES] Module region crop failed:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Calls Opus 4.6 to synthesise a holistic design brief from fully expanded modules.
+ *
+ * @description Reviews ALL expanded modules, connections, and research to produce
+ * a cohesive visual style AND hero image prompt. This replaces the Sonnet visual
+ * style call in the skeleton-succeeded pipeline path. The hero prompt is crafted
+ * with full product knowledge (~300-500 words vs ~100 words from skeleton data).
+ *
+ * @param subject - Product name
+ * @param modules - Fully expanded modules with descriptions, keyParts, etc.
+ * @param connections - Inter-module connections from decomposition
+ * @param researchExcerpt - Executive summary or research excerpt
+ * @returns VisualStyleSpec with heroImagePrompt populated, or error
+ */
+export async function generateDesignSynthesisAction(
+  subject: string,
+  modules: Array<{ name: string; purpose: string; description: string; keyParts: string[]; inputs: string[]; outputs: string[] }>,
+  connections?: ModuleConnection[],
+  researchExcerpt?: string,
+): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
+  return withAuth(async () => {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping design synthesis")
+      return { error: "ANTHROPIC_API_KEY not configured" }
+    }
+
+    const moduleList = modules.map((m) =>
+      `### ${m.name}\n- Purpose: ${m.purpose}\n- Description: ${m.description}\n- Key Parts: ${m.keyParts.join(", ")}\n- Inputs: ${m.inputs.join(", ")}\n- Outputs: ${m.outputs.join(", ")}`
+    ).join("\n\n")
+
+    const connectionList = connections && connections.length > 0
+      ? `\n\nInter-module connections:\n${connections.map(c => `- ${c.from} (${c.output}) → ${c.to} (${c.input})`).join("\n")}`
+      : ""
+
+    const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
+
+    const userMessage = `Product: ${subject}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}`
+
+    try {
+      const response = await fetchWithTimeout(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-opus-4-6",
+            max_tokens: 4096,
+            system: getDesignSynthesisPrompt(),
+            messages: [{ role: "user", content: userMessage }],
+          }),
+        },
+        60_000,
+      )
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[CAD-LAB-IMAGES] Design synthesis API error:", { status: response.status, body: errText.slice(0, 200) })
+        return { error: `API error (${response.status})` }
+      }
+
+      const data = await response.json()
+      const text = data.content?.[0]?.text ?? ""
+
+      // Parse JSON — strip any markdown fences
+      const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+      const parsed = JSON.parse(jsonStr) as VisualStyleSpec & { heroImagePrompt?: string }
+
+      if (!parsed.colorPalette || !parsed.materialRendering || !parsed.unifyingContext) {
+        console.error("[CAD-LAB-IMAGES] Design synthesis missing required fields:", parsed)
+        return { error: "Incomplete design synthesis response" }
+      }
+
+      console.log("[CAD-LAB-IMAGES] Design synthesis complete:", {
+        colorPalette: parsed.colorPalette.slice(0, 60),
+        unifyingContext: parsed.unifyingContext.slice(0, 60),
+        hasProductForm: !!parsed.productFormDescription,
+        hasHeroPrompt: !!parsed.heroImagePrompt,
+        heroPromptLength: parsed.heroImagePrompt?.length ?? 0,
+      })
+
+      return { visualStyle: parsed }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Design synthesis failed:", errorMsg)
       return { error: errorMsg }
     }
   })
