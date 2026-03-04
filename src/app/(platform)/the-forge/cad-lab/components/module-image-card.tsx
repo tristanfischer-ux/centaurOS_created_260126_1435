@@ -17,7 +17,7 @@
  * - Build detail: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { ImageIcon, Loader2, RefreshCw } from "lucide-react"
+import { ImageIcon, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import type { CadLabModule } from "@/lib/cad-lab-types"
@@ -39,11 +39,12 @@ interface ModuleImageCardProps {
 function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () => void }): React.ReactNode {
   const status = module.imageStatus
 
-  // Pending — static skeleton
+  // Pending — awaiting illustration
   if (!status || status === "pending") {
     return (
-      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted animate-pulse flex items-center justify-center">
-        <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 flex flex-col items-center justify-center gap-2">
+        <Sparkles className="h-6 w-6 text-muted-foreground/40" />
+        <span className="text-xs text-muted-foreground/60">Illustration pending</span>
       </div>
     )
   }
@@ -51,9 +52,9 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
   // Generating — pulsing skeleton with spinner
   if (status === "generating") {
     return (
-      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted animate-pulse flex flex-col items-center justify-center gap-2">
+      <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 animate-pulse flex flex-col items-center justify-center gap-2">
         <Loader2 className="h-6 w-6 animate-spin text-international-orange/60" />
-        <span className="text-xs text-muted-foreground">Generating...</span>
+        <span className="text-xs text-muted-foreground">Generating illustration…</span>
       </div>
     )
   }

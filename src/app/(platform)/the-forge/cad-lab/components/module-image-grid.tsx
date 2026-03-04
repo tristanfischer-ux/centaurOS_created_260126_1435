@@ -18,7 +18,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Maximize2, Pencil, Wrench, X } from "lucide-react"
+import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, Sparkles, Wrench, X } from "lucide-react"
 import { ModuleImageCard } from "./module-image-card"
 import {
   Dialog,
@@ -187,8 +187,15 @@ function ModuleDetailDialog({
               </div>
             )}
             {module.imageStatus === "generating" && (
-              <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-48 flex items-center justify-center">
-                <p className="text-xs text-muted-foreground">Generating illustration...</p>
+              <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-48 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-international-orange/60" />
+                <p className="text-xs text-muted-foreground">Generating illustration…</p>
+              </div>
+            )}
+            {(!module.imageStatus || module.imageStatus === "pending") && !isEditing && (
+              <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-32 flex flex-col items-center justify-center gap-1.5">
+                <Sparkles className="h-5 w-5 text-muted-foreground/40" />
+                <p className="text-xs text-muted-foreground">Illustration will be generated shortly</p>
               </div>
             )}
 
@@ -362,6 +369,15 @@ function ModuleDetailDialog({
                 </Badge>
               </div>
             ) : null}
+
+            {/* Hint when detail is sparse (Design stage — before Specify enrichment) */}
+            {!isEditing && module.keyParts.length === 0 && module.inputs.length === 0 && module.outputs.length === 0 && (
+              <div className="rounded-md bg-muted/50 px-3 py-2.5 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Key components, interfaces, and failure modes will be added in the <span className="font-semibold">Specify</span> stage.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
