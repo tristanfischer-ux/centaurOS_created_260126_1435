@@ -940,7 +940,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           // stale null from the state value, causing handleGenerateModuleImages to silently return.
           const currentProjectId = activeProjectIdRef.current
           if (currentProjectId) {
-            handleGenerateModuleImages(fallbackModules, currentProjectId, visualStyle, referenceBase64, moduleCrops)
+            // DECISION: Strip heroImagePrompt — only needed for system illustration, not per-module images
+            const perModuleStyle = visualStyle ? { ...visualStyle, heroImagePrompt: undefined } : undefined
+            handleGenerateModuleImages(fallbackModules, currentProjectId, perModuleStyle, referenceBase64, moduleCrops)
               .catch((e) => console.error("[CAD-LAB] Fallback image pipeline failed:", e))
           } else {
             console.warn("[CAD-LAB] Skipping image generation — no active project ID")
@@ -1200,9 +1202,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // 3d + 3e: Per-module images via handleGenerateModuleImages
       // INTENT: handleGenerateModuleImages handles its own shared asset upload internally,
       // so we pass referenceBase64 and style directly — it will upload them once.
+      // DECISION: Strip heroImagePrompt — only needed for system illustration (3b), not per-module images.
+      // Reduces inline fallback payload by ~2-3KB, helping avoid React Flight nesting limits.
       if (activeProjectIdRef.current) {
         addProgressLine("Generating module blueprint illustrations...")
-        await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, style, referenceBase64, moduleCrops)
+        const perModuleStyle = style ? { ...style, heroImagePrompt: undefined } : undefined
+        await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, perModuleStyle, referenceBase64, moduleCrops)
       }
 
       // All expansions done — final save and summary
@@ -1300,17 +1305,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // INTENT: Upload shared assets (reference PNG ~500-800KB, visual style ~1-3KB) to
     // Supabase Storage ONCE so each module call fetches them server-side (~10ms) instead
     // of sending redundant base64 through React Flight per call.
+    // DECISION: Retry once on failure. If still fails, skip inline referenceBase64 (~800KB)
+    // to avoid React Flight "Maximum array nesting exceeded" serialization error.
     let referenceUrl: string | undefined
     let visualStyleUrl: string | undefined
     if (referenceBase64 || visualStyle) {
-      try {
-        const uploadRes = await uploadSharedImageAssetsAction(projectId, referenceBase64, visualStyle)
-        if ("referenceUrl" in uploadRes) {
-          referenceUrl = uploadRes.referenceUrl
-          visualStyleUrl = uploadRes.visualStyleUrl
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const uploadRes = await uploadSharedImageAssetsAction(projectId, referenceBase64, visualStyle)
+          if ("referenceUrl" in uploadRes) {
+            referenceUrl = uploadRes.referenceUrl
+            visualStyleUrl = uploadRes.visualStyleUrl
+            break
+          }
+        } catch (e) {
+          if (attempt === 0) { await new Promise(r => setTimeout(r, 1000)); continue }
+          console.warn("[CAD-LAB] Failed to upload shared image assets after retry:", e)
         }
-      } catch (e) {
-        console.warn("[CAD-LAB] Failed to upload shared image assets (falling back to inline):", e)
       }
     }
 
@@ -1347,9 +1358,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     // DECISION: Pass URLs when available (drops per-call payload from ~800KB to ~200-300KB).
-    // Falls back to raw base64/object if upload failed.
+    // If upload failed, skip inline referenceBase64 (~800KB) — it triggers React Flight
+    // "Maximum array nesting exceeded". Images generate fine without reference, just less consistent.
+    // Visual style is small (~1-3KB without heroImagePrompt) so safe to pass inline.
+    if (!referenceUrl && referenceBase64) {
+      console.warn("[CAD-LAB] Shared asset upload failed — generating images without reference to avoid React Flight limits")
+    }
     const effectiveVisualStyle = visualStyleUrl ?? visualStyle
-    const effectiveReference = referenceUrl ?? referenceBase64
+    const effectiveReference = referenceUrl ?? undefined
 
     const generateOne = async (mod: CadLabModule): Promise<void> => {
       try {

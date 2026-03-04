@@ -2268,10 +2268,10 @@ export async function skeletonDecompose(
 
     const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
-    // DECISION: Direct call with Opus — small output (~500 tokens) means fast completion (~10-15s)
-    // No race needed since the prompt is lightweight
+    // DECISION: Direct call with Opus — small output (~500 tokens) but complex products with
+    // 12K-char research reports need 30-60s. 60s stays well within Vercel 300s cap.
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 2048, 30_000, 1,
+      systemPrompt, userPrompt, modelId, 2048, 60_000, 1,
     )
 
     // Parse JSON response
@@ -2439,7 +2439,7 @@ Outputs: ${target.outputs.join(", ")}
 Provide the detailed engineering specification for this module ONLY. Output ONLY the JSON object.`
 
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 2048, 30_000, 1,
+      systemPrompt, userPrompt, modelId, 2048, 90_000, 2,
     )
 
     // Parse expansion JSON

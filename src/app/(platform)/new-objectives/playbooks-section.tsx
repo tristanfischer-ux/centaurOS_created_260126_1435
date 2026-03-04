@@ -39,7 +39,7 @@ export function PlaybooksSection({ playbooksData, members }: PlaybooksSectionPro
             Other ideas for you to be getting on with
           </h2>
           <p className="text-sm text-muted-foreground">
-            Pre-built objective packs and project templates to jump-start your next initiative
+            Pre-built objective packs to jump-start your next initiative
           </p>
         </div>
         {isExpanded ? (

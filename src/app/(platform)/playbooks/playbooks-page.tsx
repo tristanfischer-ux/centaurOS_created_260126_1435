@@ -11,10 +11,6 @@ import {
   ArrowRight,
   Heart,
   TrendingUp,
-  Hammer,
-  Clock,
-  Wrench,
-  DollarSign,
   Target,
   Cpu,
   Lightbulb,
@@ -40,20 +36,11 @@ import type { FoundryContext } from '@/actions/foundry-context'
 import { PackCard } from './components/pack-card'
 import { IndustrySelector } from './components/industry-selector'
 import { INDUSTRY_CATEGORIES, packMatchesCategory } from './components/utils'
-import { getProjectTemplates, type ProjectTemplateListItem } from '@/actions/project-templates'
 import { getSubsystemObjectivePack } from '@/actions/universal-subsystems'
-import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { UniversalSubsystemsGrid } from '@/components/blueprints/universal-subsystems-grid'
 import { SubsystemDetailDialog } from '@/components/blueprints/subsystem-detail-dialog'
 import { CreateSubsystemObjectiveDialog } from '@/components/blueprints/create-subsystem-objective-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
 
 // ---------------------------------------------------------------------------
 // "By Need" tab: packs grouped by business function category
@@ -78,7 +65,7 @@ const NEED_CATEGORIES = [
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-export type PlaybookTabId = 'by-need' | 'by-industry' | 'projects' | 'subsystems' | 'popular' | 'saved'
+export type PlaybookTabId = 'by-need' | 'by-industry' | 'subsystems' | 'popular' | 'saved'
 
 interface Tab {
   id: PlaybookTabId
@@ -161,26 +148,6 @@ export function PlaybooksPage({
 
   // "By Need" selected category
   const [selectedNeed, setSelectedNeed] = useState<string | null>(null)
-
-  // Projects state (lazy-loaded on tab switch)
-  const [projectTemplates, setProjectTemplates] = useState<ProjectTemplateListItem[]>([])
-  const [projectsTotal, setProjectsTotal] = useState(0)
-  const [projectsLoaded, setProjectsLoaded] = useState(false)
-  const [projectsLoading, setProjectsLoading] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<ProjectTemplateListItem | null>(null)
-
-  useEffect(() => {
-    if (activeTab !== 'projects' || projectsLoaded || projectsLoading) return
-    setProjectsLoading(true)
-    getProjectTemplates({ pageSize: 50 }).then((result) => {
-      if ('data' in result) {
-        setProjectTemplates(result.data)
-        setProjectsTotal(result.total)
-      }
-      setProjectsLoaded(true)
-      setProjectsLoading(false)
-    })
-  }, [activeTab, projectsLoaded, projectsLoading])
 
   // Search & filter (for by-need tab)
   const [searchQuery, setSearchQuery] = useState('')
@@ -342,16 +309,7 @@ export function PlaybooksPage({
       activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
       group: 'discover',
     },
-    {
-      id: 'projects',
-      label: 'Projects',
-      icon: Hammer,
-      count: projectsTotal,
-      iconColor: 'text-chart-4',
-      activeClasses: 'bg-chart-4/10 text-chart-4 border-chart-4',
-      group: 'discover',
-    },
-    {
+{
       id: 'subsystems',
       label: 'Subsystems',
       icon: Cpu,
@@ -378,7 +336,7 @@ export function PlaybooksPage({
       activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
       group: 'utility',
     },
-  ], [gapCount, allFunctionalPacks.length, industryCount, projectsTotal, universalSubsystems.length, popularPacks.length, savedPackIds.size])
+  ], [gapCount, allFunctionalPacks.length, industryCount, universalSubsystems.length, popularPacks.length, savedPackIds.size])
 
   // ---------------------------------------------------------------------------
   // Render
@@ -620,177 +578,6 @@ export function PlaybooksPage({
           defaultIndustry={ctx?.industry || undefined}
           members={members}
         />
-      )}
-
-      {/* ================================================================== */}
-      {/* PROJECTS tab                                                       */}
-      {/* ================================================================== */}
-      {activeTab === 'projects' && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Complete starter projects with bill of materials, step-by-step instructions, and cost estimates.
-          </p>
-
-          {projectsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 rounded-xl" />
-              ))}
-            </div>
-          ) : projectTemplates.length === 0 ? (
-            <EmptyState
-              title="Project templates are being prepared"
-              description="Check back soon as new project templates are added."
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-              {projectTemplates.map((project) => (
-                <Card
-                  key={project.id}
-                  className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 hover:border-international-orange/30"
-                  onClick={() => setSelectedProject(project)}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="space-y-1">
-                      <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
-                        {project.title}
-                      </h3>
-                      {project.description && (
-                        <p className="text-xs text-muted-foreground line-clamp-2">
-                          {project.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      {project.difficulty && (
-                        <Badge
-                          variant={
-                            project.difficulty === 'beginner' ? 'success' :
-                            project.difficulty === 'intermediate' ? 'warning' :
-                            'destructive'
-                          }
-                          className="text-[10px]"
-                        >
-                          {project.difficulty}
-                        </Badge>
-                      )}
-                      {project.category && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          {project.category}
-                        </Badge>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 border-t border-muted">
-                      {project.estimated_hours != null && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {project.estimated_hours}h
-                        </span>
-                      )}
-                      {project.estimated_cost_usd != null && (
-                        <span className="flex items-center gap-1">
-                          <DollarSign className="h-3 w-3" />
-                          ${project.estimated_cost_usd}
-                        </span>
-                      )}
-                      {project.step_count > 0 && (
-                        <span>{project.step_count} steps</span>
-                      )}
-                      {project.bom_count > 0 && (
-                        <span>{project.bom_count} parts</span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {/* Project Detail Dialog */}
-          <Dialog open={!!selectedProject} onOpenChange={(open) => !open && setSelectedProject(null)}>
-            <DialogContent size="lg" className="max-h-[90vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Hammer className="h-5 w-5 text-chart-4" />
-                  {selectedProject?.title}
-                </DialogTitle>
-              </DialogHeader>
-              {selectedProject && (
-                <div className="flex-1 overflow-y-auto space-y-6 pb-4">
-                  {selectedProject.description && (
-                    <p className="text-sm text-muted-foreground">{selectedProject.description}</p>
-                  )}
-
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProject.difficulty && (
-                      <Badge variant={
-                        selectedProject.difficulty === 'beginner' ? 'success' :
-                        selectedProject.difficulty === 'intermediate' ? 'warning' :
-                        'destructive'
-                      }>
-                        {selectedProject.difficulty}
-                      </Badge>
-                    )}
-                    {selectedProject.estimated_hours != null && (
-                      <Badge variant="secondary">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {selectedProject.estimated_hours} hours
-                      </Badge>
-                    )}
-                    {selectedProject.estimated_cost_usd != null && (
-                      <Badge variant="secondary">
-                        <DollarSign className="h-3 w-3 mr-1" />
-                        ${selectedProject.estimated_cost_usd} estimated
-                      </Badge>
-                    )}
-                  </div>
-
-                  {selectedProject.tools_required.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-2">Tools Required</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedProject.tools_required.map((tool, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            <Wrench className="h-3 w-3 mr-1" />
-                            {tool}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedProject.skills_required.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-2">Skills Required</h4>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedProject.skills_required.map((skill, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">{skill}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedProject.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedProject.tags.map((tag, i) => (
-                        <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setSelectedProject(null)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
       )}
 
       {/* ================================================================== */}
