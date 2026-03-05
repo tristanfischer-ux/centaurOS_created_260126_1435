@@ -125,6 +125,9 @@ export interface CadLabProjectData {
   /** Which design revision the images were last generated at */
   imagesGeneratedAtRevision: number
 
+  /** Whether the user explicitly skipped specialist reviews before finalization */
+  reviewSkipped: boolean
+
   createdAt: string
   updatedAt: string
 }
@@ -239,6 +242,7 @@ export async function loadCadLabProject(
         aiCostEstimates: (project.ai_cost_estimates as Record<string, AiCostEstimate> | null) ?? null,
         designRevision: (project.design_revision as number) ?? 1,
         imagesGeneratedAtRevision: (project.images_generated_at_revision as number) ?? 1,
+        reviewSkipped: (project.review_skipped as boolean) ?? false,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -1136,6 +1140,37 @@ export async function saveCadLabAiCostEstimates(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save AI cost estimates:", error.message)
       return { error: `Failed to save AI cost estimates: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Review Skipped ────────────────────────────────────────────
+
+/**
+ * Persists whether the user explicitly skipped specialist reviews.
+ *
+ * @description Called when the user clicks "Skip Reviews & Finalize"
+ * to proceed to Source without specialist reviews.
+ */
+export async function saveCadLabReviewSkipped(
+  projectId: string,
+  skipped: boolean,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+      return { error: "Invalid project ID" }
+    }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ review_skipped: skipped })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save review skipped:", error.message)
+      return { error: `Failed to save review skipped: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }

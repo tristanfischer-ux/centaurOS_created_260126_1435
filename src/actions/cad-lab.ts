@@ -195,7 +195,7 @@ async function callClaude(
           },
           {
             type: "text" as const,
-            text: "The above blueprint illustration shows the intended visual appearance and proportions of this module. Use it as geometric reference for your CadQuery model.\n\n" + userPrompt,
+            text: "CRITICAL: The image above is the product you must model. Your primary goal is to produce CadQuery code whose 3D shape closely matches the proportions, silhouette, and features visible in this image. Study it carefully — every major geometric feature you see must appear in your model.\n\n" + userPrompt,
           },
         ]
       : userPrompt
@@ -1182,7 +1182,15 @@ export async function generateCadLabModel(
     const librarySlugs = librarySummary.map((c) => c.slug)
     const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
-    const systemPrompt = `You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
+    const systemPrompt = `SHAPE FIDELITY IS YOUR #1 PRIORITY:
+- Study the provided product image carefully before writing any code
+- Your model MUST match the overall silhouette, proportions, and major features visible in the image
+- Break the shape down visually: identify the main body form, then each distinct feature (dome, cylinder, panel, limb, etc.)
+- Build each visible feature as a separate make_*() function, then assemble to match the image layout
+- If the image shows a cylindrical body with a domed top, your code must produce a cylinder + dome — not a box
+- Geometric accuracy takes priority over manufacturing details
+
+You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
 
 ${CAD_INSTRUCTIONS}
 
@@ -1244,39 +1252,27 @@ Use these as dimensional cross-references. If your dimensions differ significant
     // H4: Build manufacturing constraints section from design brief
     const manufacturingConstraints = designBrief ? formatDesignBriefForPrompt(designBrief) : ""
 
-    const baseUserPrompt = `Build a parametric CAD model of: ${description}
+    const baseUserPrompt = `Build a parametric CadQuery model that matches the provided product image.
 
-=== PRODUCT DESCRIPTION (engineering intent — use this to guide design decisions) ===
+=== PRODUCT ===
 ${description}
 
-=== RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
+=== RESEARCH DIMENSIONS (use real measurements — do NOT invent) ===
 ${researchReport}
 
-=== GEOMETRY SPECIFICATION ===
+=== GEOMETRY DESCRIPTION ===
 ${interfaceDefinition}
 ${referenceSection}
-${checkpointContext ?? ""}${manufacturingConstraints ? `\n\n=== MANUFACTURING CONSTRAINTS ===\n${manufacturingConstraints}\nApply these constraints when choosing wall thicknesses, tolerances, fillet radii, and assembly clearances.\n` : ""}
-SCALE PRESERVATION CRITICAL:
-- Use the EXACT scale from the research report and geometry specification
-- Large systems (shipping containers, buildings, vehicles) must be modeled at FULL SIZE
-- If the specification defines 6000mm dimensions, use 6000mm — do NOT scale down to 200mm
-- Example: shipping container = 6058×2438×2591mm (real ISO dimensions), not 200×150×100mm
-- Industrial equipment, structures, and vehicles should result in models with realistic masses and bounding boxes
+${checkpointContext ?? ""}${manufacturingConstraints ? `\n\n=== MANUFACTURING CONSTRAINTS ===\n${manufacturingConstraints}\n` : ""}
+Generate CadQuery Python code:
+1. "import cadquery as cq" and "import math" (if needed)
+2. Study the image — identify every distinct geometric feature
+3. Create a make_*() function for each major visual feature
+4. Use real dimensions from the research — do NOT scale down large objects
+5. Assemble all features into one "result", positioned to match the image
+6. Optionally create "result_exploded" (try/except)
 
-Generate the complete CadQuery Python code following the methodology. The code must:
-1. Start with "import cadquery as cq" and "import math" (if needed)
-2. Define ALL primary parameters at the top with comments showing source dimensions
-3. Calculate ALL derived values from primary parameters (never hardcode derived values)
-4. Organize code into make_*() functions for logical sub-features (e.g., make_body, make_lid, make_handle), but the final result is ONE assembled product — each must build REAL geometry, no stubs
-5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
-6. For simpler models: use the .union() assembly pattern
-7. CRITICAL: Every function you call MUST either come from the provided component library list OR be defined with \`def\` in your script.
-8. CHECK THE COMPONENT LIBRARY FIRST — for every make_*() function, verify no library equivalent exists before writing custom geometry.
-9. Verify all z-positions add up: the highest point should match the expected total height
-10. Assign the final assembly to a variable called "result"
-11. Optionally create "result_exploded" showing sub-features spread apart along Z for an exploded view (wrap in try/except — skip if model is a single continuous solid)
-
-If the research report or geometry specification contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
+Resolve any ambiguities with engineering judgment — do not ask for clarification.`
 
     // ── A3: Append interface warnings to first-attempt prompt ──
     let interfaceIssueSection = ""

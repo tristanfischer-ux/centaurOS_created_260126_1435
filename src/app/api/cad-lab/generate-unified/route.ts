@@ -83,9 +83,9 @@ async function uploadCadAsset(
 function buildEnrichedDescription(
   subject: string,
   productOverview: string,
-  designBrief: CadLabDesignBrief | undefined,
-  modules: CadLabModule[],
-  diagnosticAnswers: Record<string, Record<string, string>>,
+  _designBrief: CadLabDesignBrief | undefined,
+  _modules: CadLabModule[],
+  _diagnosticAnswers: Record<string, Record<string, string>>,
   _connections: ModuleConnection[],
   _contracts: InterfaceContract[],
   heroImagePrompt: string | null,
@@ -98,35 +98,9 @@ function buildEnrichedDescription(
 
   // ── 2. Visual geometry reference (PRIMARY — Opus-crafted description) ──
   if (heroImagePrompt) {
-    lines.push("## Visual Geometry Reference (PRIMARY)")
-    lines.push("This is THE product you are modeling. Match these proportions, features, and spatial relationships exactly:")
+    lines.push("## Shape to Model (PRIMARY)")
+    lines.push("This is THE shape you must replicate in CadQuery. Match every proportion, feature, and spatial relationship:")
     lines.push(heroImagePrompt, "")
-  }
-
-  // ── 3. Design specifications ──
-  if (designBrief) {
-    lines.push("## Design Specifications")
-    if (designBrief.useCase) lines.push(`Use Case: ${designBrief.useCase}`)
-    if (designBrief.targetProcess) lines.push(`Target Process: ${designBrief.targetProcess}`)
-    if (designBrief.targetMaterial) lines.push(`Target Material: ${designBrief.targetMaterial}`)
-    if (designBrief.toleranceTarget) lines.push(`Tolerance: ${designBrief.toleranceTarget}`)
-    if (designBrief.quantityTarget) lines.push(`Quantity: ${designBrief.quantityTarget}`)
-    lines.push("")
-  }
-
-  // ── 4. Manufacturing context (aggregate — no per-module breakdown) ──
-  const processes = new Set<string>()
-  const materials = new Set<string>()
-  for (const mod of modules) {
-    const diag = diagnosticAnswers[mod.id] ?? {}
-    if (diag.mfg_process) processes.add(diag.mfg_process)
-    if (diag.material) materials.add(diag.material)
-  }
-  if (processes.size > 0 || materials.size > 0) {
-    lines.push("## Manufacturing Context")
-    if (processes.size > 0) lines.push(`Processes: ${[...processes].join(", ")}`)
-    if (materials.size > 0) lines.push(`Materials: ${[...materials].join(", ")}`)
-    lines.push("")
   }
 
   return lines.join("\n")

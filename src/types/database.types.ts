@@ -3876,6 +3876,7 @@ export type Database = {
           quality_ratings: Json | null
           research: Json | null
           result: Json | null
+          review_skipped: boolean | null
           reviews: Json | null
           stage: string
           status: string
@@ -3915,6 +3916,7 @@ export type Database = {
           quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
+          review_skipped?: boolean | null
           reviews?: Json | null
           stage?: string
           status?: string
@@ -3954,6 +3956,7 @@ export type Database = {
           quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
+          review_skipped?: boolean | null
           reviews?: Json | null
           stage?: string
           status?: string
