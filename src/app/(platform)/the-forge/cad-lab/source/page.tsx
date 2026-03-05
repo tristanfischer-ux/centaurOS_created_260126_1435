@@ -396,6 +396,7 @@ export default function SourcePage(): React.ReactNode {
               }}
               onRemoveFromShortlist={handleRemoveFromShortlist}
               onOrderCreated={refreshManufacturingOrderCount}
+              aiCostEstimates={aiCostEstimates}
             />
           </motion.div>
         )}

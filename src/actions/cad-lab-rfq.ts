@@ -101,7 +101,7 @@ function computeModuleReadiness(
  */
 export async function createCadLabRfqAction(
   input: CreateCadLabRfqInput,
-): Promise<{ rfqId: string } | { error: string }> {
+): Promise<{ rfqId: string; broadcastCount: number } | { error: string }> {
   // DECISION: Accept both "specified" and "generated" modules for RFQ creation.
   // CAD artifacts (STEP/STL) are optional score bonuses, not requirements.
   // Specified modules use diagnostics + descriptions + illustrations as RFQ payload.
@@ -299,7 +299,7 @@ export async function createCadLabRfqAction(
     return { error: rfqResult.error || "Failed to create RFQ from Cad Lab package." }
   }
 
-  return { rfqId: rfqResult.data.id }
+  return { rfqId: rfqResult.data.id, broadcastCount: rfqResult.data.broadcastCount }
 }
 
 // ─── Mashup Lab RFQ ────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ import {
  * Create a new RFQ and broadcast to suppliers
  */
 export async function createNewRFQ(params: CreateRFQParams): Promise<{
-  data: { id: string } | null
+  data: { id: string; broadcastCount: number } | null
   error: string | null
 }> {
   const supabase = await createClient()
@@ -83,14 +83,14 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
   }
 
   // Broadcast to suppliers
-  const { error: broadcastError } = await broadcastRFQ(supabase, rfq.id)
-  if (broadcastError) {
-    console.error("Failed to broadcast RFQ:", broadcastError)
+  const broadcastResult = await broadcastRFQ(supabase, rfq.id)
+  if (broadcastResult.error) {
+    console.error("Failed to broadcast RFQ:", broadcastResult.error)
     // Don't fail the whole operation, RFQ is created
   }
 
   revalidatePath("/rfq")
-  return { data: { id: rfq.id }, error: null }
+  return { data: { id: rfq.id, broadcastCount: broadcastResult.broadcast_count }, error: null }
 }
 
 /**

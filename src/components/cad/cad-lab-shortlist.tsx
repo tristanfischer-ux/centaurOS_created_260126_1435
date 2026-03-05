@@ -33,8 +33,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import type { CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
+import type { AiCostEstimate, CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import { ShortlistCoverageFlow } from "./shortlist-coverage-flow"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
 import { getRFQDetail } from "@/actions/rfq"
 import { createOrderFromAward } from "@/actions/manufacturing-orders"
@@ -67,6 +68,8 @@ interface CadLabShortlistProps {
   onRemoveFromShortlist: (supplierId: string) => void
   /** Called after a manufacturing order is created */
   onOrderCreated?: () => void
+  /** AI cost estimates keyed by module ID — used for buy/make grouping in flow diagram */
+  aiCostEstimates?: Record<string, AiCostEstimate>
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -109,6 +112,7 @@ export function CadLabShortlist({
   onSupplierRfqCreated,
   onRemoveFromShortlist,
   onOrderCreated,
+  aiCostEstimates,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
@@ -119,6 +123,7 @@ export function CadLabShortlist({
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
   const [generatedDocs, setGeneratedDocs] = useState<Map<string, Map<DocType, string>>>(new Map())
   const [creatingRfqFor, setCreatingRfqFor] = useState<string | null>(null)
+  const [broadcastCounts, setBroadcastCounts] = useState<Map<string, number>>(new Map())
 
   // ── Per-supplier RFQ status polling ──
   const [rfqStatuses, setRfqStatuses] = useState<Map<string, { status: string; responseCount: number }>>(new Map())
@@ -173,20 +178,6 @@ export function CadLabShortlist({
     () => [...shortlistedSuppliers.values()].sort((a, b) => b.bestMatchScore - a.bestMatchScore),
     [shortlistedSuppliers],
   )
-
-  // ── Module coverage computation ──
-  const { coveredCount, totalCount, uncoveredModules } = useMemo(() => {
-    const coveredIds = new Set<string>()
-    for (const supplier of shortlistedSuppliers.values()) {
-      for (const mid of supplier.moduleIds) coveredIds.add(mid)
-    }
-    const uncovered = modules.filter((m) => !coveredIds.has(m.id))
-    return {
-      coveredCount: modules.length - uncovered.length,
-      totalCount: modules.length,
-      uncoveredModules: uncovered,
-    }
-  }, [shortlistedSuppliers, modules])
 
   // ── Document generation (per-supplier, filtered modules) ──
   const handleGenerateDoc = useCallback((supplierId: string, supplier: ShortlistedSupplier, type: DocType) => {
@@ -280,11 +271,19 @@ export function CadLabShortlist({
       }
 
       onSupplierRfqCreated(supplierId, res.rfqId)
+      if (res.broadcastCount > 0) {
+        setBroadcastCounts((prev) => new Map(prev).set(supplierId, res.broadcastCount))
+      }
       trackFeatureUse("cad_lab_shortlist_rfq_created", {
         supplierId,
         moduleCount: filteredModules.length,
+        broadcastCount: res.broadcastCount,
       })
-      toast.success(`Marketplace RFQ created for ${supplier.name}`)
+      toast.success(
+        res.broadcastCount > 0
+          ? `RFQ created and sent to ${res.broadcastCount} supplier${res.broadcastCount !== 1 ? "s" : ""}`
+          : `Marketplace RFQ created for ${supplier.name}`,
+      )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to create RFQ")
     } finally {
@@ -389,38 +388,14 @@ export function CadLabShortlist({
           </div>
         </div>
 
-        {/* ── Module coverage summary ── */}
-        {suppliers.length > 0 && totalCount > 0 && (
-          <div className="rounded-lg border p-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground">
-                {coveredCount} of {totalCount} module{totalCount !== 1 ? "s" : ""} covered
-              </span>
-              {uncoveredModules.length === 0 && (
-                <span className="text-[10px] font-medium text-status-success">Full coverage</span>
-              )}
-            </div>
-            {/* Segmented bar */}
-            <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden bg-muted">
-              {modules.map((mod) => {
-                const isCovered = !uncoveredModules.some((u) => u.id === mod.id)
-                return (
-                  <div
-                    key={mod.id}
-                    className={cn(
-                      "flex-1 rounded-full transition-colors",
-                      isCovered ? "bg-status-success" : "bg-muted-foreground/20",
-                    )}
-                  />
-                )
-              })}
-            </div>
-            {uncoveredModules.length > 0 && (
-              <p className="text-[10px] text-muted-foreground">
-                Not covered: {uncoveredModules.map((m) => m.name).join(", ")}
-              </p>
-            )}
-          </div>
+        {/* ── Procurement flow diagram ── */}
+        {suppliers.length > 0 && modules.length > 0 && (
+          <ShortlistCoverageFlow
+            modules={modules}
+            suppliers={suppliers}
+            diagnosticAnswers={diagnosticAnswers}
+            aiCostEstimates={aiCostEstimates}
+          />
         )}
 
         {/* ── Empty state ── */}
@@ -501,7 +476,9 @@ export function CadLabShortlist({
                                 : "bg-info/10 text-info border border-info/30",
                           )}
                         >
-                          {PROCUREMENT_STEPS.find((s) => s.key === stage)?.label ?? "RFQ Sent"}
+                          {broadcastCounts.get(supplier.id)
+                            ? `Sent to ${broadcastCounts.get(supplier.id)} supplier${broadcastCounts.get(supplier.id)! !== 1 ? "s" : ""}`
+                            : (PROCUREMENT_STEPS.find((s) => s.key === stage)?.label ?? "RFQ Sent")}
                         </span>
                         <Button
                           variant="ghost"
@@ -581,11 +558,23 @@ export function CadLabShortlist({
                         })}
                       </div>
                       {rfqId && (
-                        <p className="text-[10px] text-muted-foreground">
-                          RFQ <span className="font-mono">{rfqId.slice(0, 8)}…</span>
-                          {rfqStatus?.status ? ` · ${rfqStatus.status}` : ""}
-                          {rfqStatus?.responseCount ? ` · ${rfqStatus.responseCount} response(s)` : ""}
-                        </p>
+                        <div className="text-[10px] text-muted-foreground space-y-0.5">
+                          {broadcastCounts.get(supplier.id) ? (
+                            <p className="text-status-success font-medium">
+                              RFQ broadcast to {broadcastCounts.get(supplier.id)} supplier{broadcastCounts.get(supplier.id)! !== 1 ? "s" : ""} · Notifications sent
+                            </p>
+                          ) : (
+                            <p>
+                              RFQ <span className="font-mono">{rfqId.slice(0, 8)}…</span>
+                              {rfqStatus?.status ? ` · ${rfqStatus.status}` : ""}
+                            </p>
+                          )}
+                          <p>
+                            {rfqStatus?.responseCount
+                              ? `${rfqStatus.responseCount} response${rfqStatus.responseCount !== 1 ? "s" : ""} received`
+                              : "0 responses so far"}
+                          </p>
+                        </div>
                       )}
                     </div>
 

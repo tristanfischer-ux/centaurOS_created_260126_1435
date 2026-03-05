@@ -19,7 +19,7 @@ describe("cad-lab RFQ golden benchmarks", () => {
     "meets quality and RFQ thresholds for $id",
     async (benchmark) => {
       mockedCreateNewRFQ.mockResolvedValueOnce({
-        data: { id: `rfq-${benchmark.id}` },
+        data: { id: `rfq-${benchmark.id}`, broadcastCount: 0 },
         error: null,
       })
 

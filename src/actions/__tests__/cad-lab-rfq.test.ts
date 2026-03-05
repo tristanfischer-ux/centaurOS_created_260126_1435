@@ -120,7 +120,7 @@ describe("createCadLabRfqAction", () => {
 
   it("builds RFQ payload from drawing package artifacts", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
-      data: { id: "rfq-123" },
+      data: { id: "rfq-123", broadcastCount: 0 },
       error: null,
     })
 
@@ -266,7 +266,7 @@ describe("createCadLabRfqAction", () => {
 
   it("parses batch ranges with commas and suffixes", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
-      data: { id: "rfq-quantity" },
+      data: { id: "rfq-quantity", broadcastCount: 0 },
       error: null,
     })
 
@@ -363,7 +363,7 @@ describe("createCadLabRfqAction", () => {
 
   it("uses strongest quantity hint from mixed batch text", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
-      data: { id: "rfq-mixed-quantity" },
+      data: { id: "rfq-mixed-quantity", broadcastCount: 0 },
       error: null,
     })
 
@@ -421,7 +421,7 @@ describe("createCadLabRfqAction", () => {
 
   it("deduplicates and filters invalid artifact URLs", async () => {
     mockedCreateNewRFQ.mockResolvedValue({
-      data: { id: "rfq-artifacts" },
+      data: { id: "rfq-artifacts", broadcastCount: 0 },
       error: null,
     })
 
