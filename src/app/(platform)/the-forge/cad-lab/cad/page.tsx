@@ -171,7 +171,6 @@ export default function CadStagePage(): React.ReactNode {
             <div className="space-y-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">{subject}</p>
               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <span>{modules.length} component{modules.length !== 1 ? "s" : ""}</span>
                 {specSummary.processes.length > 0 && (
                   <span>Processes: {specSummary.processes.join(", ")}</span>
                 )}
@@ -220,10 +219,10 @@ export default function CadStagePage(): React.ReactNode {
           <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground">
-              Module Breakdown ({modules.length})
+              Design Reference ({modules.length})
             </p>
             <p className="text-xs text-muted-foreground">
-              Component reference from decomposition
+              Decomposition reference
             </p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -282,7 +281,7 @@ export default function CadStagePage(): React.ReactNode {
             <div className="flex items-center gap-3 mb-3">
               <Loader2 className="h-5 w-5 animate-spin text-international-orange flex-shrink-0" />
               <p className="text-sm font-medium text-foreground">
-                Generating unified model for {modules.length} components...
+                Generating CAD model...
               </p>
             </div>
             {progressLines.length > 0 && (

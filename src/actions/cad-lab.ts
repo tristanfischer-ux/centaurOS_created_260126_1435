@@ -981,10 +981,10 @@ Rule: if the numbers don't add up in text, they won't add up in 3D.
 === b) COMPONENT PLACEMENT TABLE ===
 | Component        | Qty | Dimensions (mm)     | Position (x,y,z)  | Material   | Source         | Notes              |
 |------------------|-----|---------------------|--------------------|-----------:|----------------|--------------------|
-One row per unique component type. Position is the centre point.
+One row per distinct feature or sub-part of the product. Position is the centre point.
 Material: primary material (PLA, aluminium, steel, etc.) — gives DFM context to code generation.
 Source: "LIBRARY: slug_name" if a library component matches, otherwise "CUSTOM".
-Minimum 6 unique component types for any model.
+Include enough rows to capture the product's geometry — typically 3-10 features depending on complexity.
 
 === c) CONNECTION MAP ===
 For assemblies with flows (water, air, electrical, structural loads), trace COMPLETE paths.
@@ -1193,7 +1193,7 @@ EXECUTION ENVIRONMENT RULES:
 - Do NOT include any cq.exporters calls — the execution environment handles export
 - Do NOT include any print() statements
 - Do NOT import os, sys, or use open(). Only import cadquery and math.
-- After assembling "result", also create "result_exploded" — a cq.Workplane that shows all major components translated apart along Z by 1.5× their height for visual separation. This produces an exploded assembly drawing. Wrap the result_exploded creation in a try/except so it never blocks the main result.
+- After assembling "result", optionally create "result_exploded" — a cq.Workplane that shows major sub-features translated apart along Z by 1.5× their height for visual separation. This is best-effort: if the model is a single continuous solid (e.g., one casting or 3D print), skip it. Always wrap result_exploded creation in try/except so it never blocks the main result.
 - Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
 
 SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
@@ -1246,20 +1246,20 @@ Use these as dimensional cross-references. If your dimensions differ significant
 
     const baseUserPrompt = `Build a parametric CAD model of: ${description}
 
-=== MODULE CONTEXT (engineering intent — use this to guide design decisions) ===
+=== PRODUCT DESCRIPTION (engineering intent — use this to guide design decisions) ===
 ${description}
 
 === RESEARCH REPORT (use these real dimensions — do NOT invent dimensions) ===
 ${researchReport}
 
-=== INTERFACE DEFINITION (implement EVERY component listed here) ===
+=== GEOMETRY SPECIFICATION ===
 ${interfaceDefinition}
 ${referenceSection}
 ${checkpointContext ?? ""}${manufacturingConstraints ? `\n\n=== MANUFACTURING CONSTRAINTS ===\n${manufacturingConstraints}\nApply these constraints when choosing wall thicknesses, tolerances, fillet radii, and assembly clearances.\n` : ""}
 SCALE PRESERVATION CRITICAL:
-- Use the EXACT scale from the research report and interface definition
+- Use the EXACT scale from the research report and geometry specification
 - Large systems (shipping containers, buildings, vehicles) must be modeled at FULL SIZE
-- If the interface defines 6000mm dimensions, use 6000mm — do NOT scale down to 200mm
+- If the specification defines 6000mm dimensions, use 6000mm — do NOT scale down to 200mm
 - Example: shipping container = 6058×2438×2591mm (real ISO dimensions), not 200×150×100mm
 - Industrial equipment, structures, and vehicles should result in models with realistic masses and bounding boxes
 
@@ -1267,16 +1267,16 @@ Generate the complete CadQuery Python code following the methodology. The code m
 1. Start with "import cadquery as cq" and "import math" (if needed)
 2. Define ALL primary parameters at the top with comments showing source dimensions
 3. Calculate ALL derived values from primary parameters (never hardcode derived values)
-4. Create a make_*() function for EACH component — each must build REAL geometry, no stubs
+4. Organize code into make_*() functions for logical sub-features (e.g., make_body, make_lid, make_handle), but the final result is ONE assembled product — each must build REAL geometry, no stubs
 5. For complex models (20+ components): use cq.Assembly() at the top level, .union() only in small sub-groups
 6. For simpler models: use the .union() assembly pattern
 7. CRITICAL: Every function you call MUST either come from the provided component library list OR be defined with \`def\` in your script.
 8. CHECK THE COMPONENT LIBRARY FIRST — for every make_*() function, verify no library equivalent exists before writing custom geometry.
 9. Verify all z-positions add up: the highest point should match the expected total height
 10. Assign the final assembly to a variable called "result"
-11. Create "result_exploded" showing all components spread apart along Z for an exploded view (wrap in try/except)
+11. Optionally create "result_exploded" showing sub-features spread apart along Z for an exploded view (wrap in try/except — skip if model is a single continuous solid)
 
-If the research report or interface definition contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
+If the research report or geometry specification contains any unresolved questions or ambiguities, resolve them with your best engineering judgment and proceed. Do not ask for clarification — make the best decision and add a code comment noting the assumption.`
 
     // ── A3: Append interface warnings to first-attempt prompt ──
     let interfaceIssueSection = ""

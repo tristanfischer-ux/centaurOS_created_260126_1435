@@ -76,28 +76,34 @@ async function uploadCadAsset(
 
 // ─── Enriched prompt builder ─────────────────────────────────────────
 
-// DECISION: Hero-product prompt — lead with the product identity and geometric
-// description (heroImagePrompt) so Claude's visual domain knowledge drives the
-// model. Modules are lightweight reference only (name + purpose + specs).
-// Historical evidence (commit 1f1f0005) showed better models from product-level
-// descriptions than from abstract module briefs.
+// DECISION: Hero-image-first prompt — the heroImagePrompt (300-500 word Opus
+// geometric description) is THE primary input for generating a single cohesive
+// product model. Modules are omitted from the prompt; only aggregate
+// manufacturing context (unique processes + materials) is included.
 function buildEnrichedDescription(
   subject: string,
   productOverview: string,
   designBrief: CadLabDesignBrief | undefined,
   modules: CadLabModule[],
   diagnosticAnswers: Record<string, Record<string, string>>,
-  connections: ModuleConnection[],
-  contracts: InterfaceContract[],
+  _connections: ModuleConnection[],
+  _contracts: InterfaceContract[],
   heroImagePrompt: string | null,
 ): string {
   const lines: string[] = []
 
-  // ── 1. Product identity (holistic understanding first) ──
+  // ── 1. Product identity ──
   lines.push(`# PRODUCT: ${subject}`, "")
   if (productOverview) lines.push(productOverview, "")
 
-  // ── 2. Design specifications ──
+  // ── 2. Visual geometry reference (PRIMARY — Opus-crafted description) ──
+  if (heroImagePrompt) {
+    lines.push("## Visual Geometry Reference (PRIMARY)")
+    lines.push("This is THE product you are modeling. Match these proportions, features, and spatial relationships exactly:")
+    lines.push(heroImagePrompt, "")
+  }
+
+  // ── 3. Design specifications ──
   if (designBrief) {
     lines.push("## Design Specifications")
     if (designBrief.useCase) lines.push(`Use Case: ${designBrief.useCase}`)
@@ -108,47 +114,19 @@ function buildEnrichedDescription(
     lines.push("")
   }
 
-  // ── 3. Visual geometry reference (Opus-crafted 300-500 word description) ──
-  if (heroImagePrompt) {
-    lines.push("## Visual Geometry Reference")
-    lines.push("The following describes the overall shape, proportions, and geometric relationships of this product:")
-    lines.push(heroImagePrompt, "")
-  }
-
-  // ── 4. Component reference (lightweight: name + purpose + specs only) ──
-  lines.push(`## Component Reference (${modules.length} modules)`, "")
-  for (let i = 0; i < modules.length; i++) {
-    const mod = modules[i]
+  // ── 4. Manufacturing context (aggregate — no per-module breakdown) ──
+  const processes = new Set<string>()
+  const materials = new Set<string>()
+  for (const mod of modules) {
     const diag = diagnosticAnswers[mod.id] ?? {}
-    lines.push(`### ${i + 1}. ${mod.name}`)
-    lines.push(`Purpose: ${mod.purpose}`)
-    const specParts: string[] = []
-    if (diag.mfg_process) specParts.push(`Manufacturing: ${diag.mfg_process}`)
-    if (diag.material) specParts.push(`Material: ${diag.material}`)
-    if (diag.tolerance) specParts.push(`Tolerance: ${diag.tolerance}`)
-    if (diag.finish) specParts.push(`Finish: ${diag.finish}`)
-    if (specParts.length > 0) lines.push(specParts.join(" | "))
-    lines.push("")
+    if (diag.mfg_process) processes.add(diag.mfg_process)
+    if (diag.material) materials.add(diag.material)
   }
-
-  // ── 5. Key connections (compact, only if present) ──
-  if (connections.length > 0) {
-    const nameMap = new Map(modules.map(m => [m.id, m.name]))
-    lines.push("## Key Connections")
-    for (const conn of connections) {
-      const fromName = nameMap.get(conn.from) ?? conn.from
-      const toName = nameMap.get(conn.to) ?? conn.to
-      lines.push(`- ${fromName}.${conn.output} → ${toName}.${conn.input}`)
-    }
+  if (processes.size > 0 || materials.size > 0) {
+    lines.push("## Manufacturing Context")
+    if (processes.size > 0) lines.push(`Processes: ${[...processes].join(", ")}`)
+    if (materials.size > 0) lines.push(`Materials: ${[...materials].join(", ")}`)
     lines.push("")
-  }
-
-  // ── 6. Generate instructions ──
-  lines.push("## Generate Instructions")
-  lines.push("Generate a single unified CadQuery script. Each module = separate function.")
-  lines.push("All solids positioned and combined in a final assembly function.")
-  if (contracts.length > 0) {
-    lines.push("Mating features must match dimensionally per interface contracts.")
   }
 
   return lines.join("\n")
@@ -336,38 +314,51 @@ export async function POST(request: Request): Promise<Response> {
         heroImagePrompt,
       )
 
-      // ── Step 2: Interface definition (synthesize or generate) ──
+      // ── Step 2: Interface / geometry specification ──
+      // DECISION: When heroImagePrompt exists, it IS the geometry spec — skip the
+      // expensive interface synthesis/generation step entirely. The hero prompt is
+      // a better spatial specification than a component placement table for a
+      // single-product model. Fallback: older projects without heroImagePrompt
+      // still use the module-based interface path.
       emit({ type: "status", step: "interface" })
-      emit({ type: "progress", message: "Synthesizing interface definitions..." })
 
-      let interfaceDefinition = synthesizeInterface(allModules, connections, contracts, diagnosticAnswers)
+      let interfaceDefinition: string | null = null
       let templateMatchResult: import("@/actions/step-template-matching").TemplateMatchResult | undefined
 
-      if (!interfaceDefinition) {
-        // Not enough per-module interfaces — fall back to Claude
-        emit({ type: "progress", message: "Generating interface definition with Claude..." })
-        try {
-          const res = await generateCadLabInterface(
-            enrichedDescription,
-            researchReport,
-            modelIdVal,
-          )
-          if (res.success) {
-            interfaceDefinition = res.interfaceDefinition
-            templateMatchResult = res.templateMatchResult
-            emit({ type: "progress", message: "Interface definition complete" })
-          } else {
-            emit({ type: "error", message: res.error || "Interface generation failed" })
+      if (heroImagePrompt) {
+        // Hero image prompt serves as the geometry specification
+        interfaceDefinition = heroImagePrompt
+        emit({ type: "progress", message: "Using hero image as geometry specification" })
+      } else {
+        // Fallback: synthesize or generate interface from modules
+        emit({ type: "progress", message: "Synthesizing interface definitions..." })
+        interfaceDefinition = synthesizeInterface(allModules, connections, contracts, diagnosticAnswers)
+
+        if (!interfaceDefinition) {
+          emit({ type: "progress", message: "Generating interface definition with Claude..." })
+          try {
+            const res = await generateCadLabInterface(
+              enrichedDescription,
+              researchReport,
+              modelIdVal,
+            )
+            if (res.success) {
+              interfaceDefinition = res.interfaceDefinition
+              templateMatchResult = res.templateMatchResult
+              emit({ type: "progress", message: "Interface definition complete" })
+            } else {
+              emit({ type: "error", message: res.error || "Interface generation failed" })
+              controller.close()
+              return
+            }
+          } catch (err) {
+            emit({ type: "error", message: `Interface error: ${err instanceof Error ? err.message : "Unknown error"}` })
             controller.close()
             return
           }
-        } catch (err) {
-          emit({ type: "error", message: `Interface error: ${err instanceof Error ? err.message : "Unknown error"}` })
-          controller.close()
-          return
+        } else {
+          emit({ type: "progress", message: "Interface synthesized from existing module definitions" })
         }
-      } else {
-        emit({ type: "progress", message: "Interface synthesized from existing module definitions" })
       }
 
       // ── Step 3: CAD code generation + Modal execution ──
