@@ -29,6 +29,7 @@ import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 
 const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 const NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview" // Nano Banana 2 — 2K resolution, native 3:2 support
+const NANO_BANANA_STABLE_MODEL = "gemini-2.5-flash-image" // Nano Banana (original) — stable fallback when 3.1 preview is flaky
 const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
 const STORAGE_BUCKET = "xray-images"
 
@@ -284,6 +285,7 @@ function toNanoBananaAspectRatio(aspectRatio?: string): string {
 async function callNanoBananaImage(
   prompt: string,
   aspectRatio?: string,
+  model: string = NANO_BANANA_MODEL,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) {
@@ -291,7 +293,7 @@ async function callNanoBananaImage(
   }
 
   // SECURITY: Use x-goog-api-key header instead of URL query param
-  const url = `${GOOGLE_AI_API_BASE}/${NANO_BANANA_MODEL}:generateContent`
+  const url = `${GOOGLE_AI_API_BASE}/${model}:generateContent`
 
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -313,21 +315,21 @@ async function callNanoBananaImage(
     })
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
-    console.error("[XRayImageGen] Fetch failed:", { model: NANO_BANANA_MODEL, error: msg })
-    throw new Error(`[XRayImageGen] Network error calling Nano Banana 2: ${msg}`)
+    console.error("[XRayImageGen] Fetch failed:", { model, error: msg })
+    throw new Error(`[XRayImageGen] Network error calling ${model}: ${msg}`)
   }
 
   if (!response.ok) {
     const errText = await response.text()
-    console.error("[XRayImageGen] Nano Banana 2 API error:", { status: response.status, body: errText.slice(0, 500) })
-    throw new Error(`[XRayImageGen] Nano Banana 2 API error (${response.status}): ${errText.slice(0, 200)}`)
+    console.error("[XRayImageGen] Gemini API error:", { model, status: response.status, body: errText.slice(0, 500) })
+    throw new Error(`[XRayImageGen] ${model} API error (${response.status}): ${errText.slice(0, 200)}`)
   }
 
   const data = (await response.json()) as NanoBananaResponse
 
   if (data.error) {
-    console.error("[XRayImageGen] Nano Banana 2 returned error:", { error: data.error.message })
-    throw new Error(`[XRayImageGen] Nano Banana 2 error: ${data.error.message}`)
+    console.error("[XRayImageGen] Gemini returned error:", { model, error: data.error.message })
+    throw new Error(`[XRayImageGen] ${model} error: ${data.error.message}`)
   }
 
   // DECISION: Walk candidates[0].content.parts[] to find the first inlineData with image data.
@@ -336,12 +338,12 @@ async function callNanoBananaImage(
   const imagePart = parts?.find((p) => p.inlineData?.data)
   const b64Data = imagePart?.inlineData?.data
   if (!b64Data) {
-    console.error("[XRayImageGen] No image in Nano Banana 2 response:", { candidatesCount: data.candidates?.length ?? 0, partsCount: parts?.length ?? 0 })
-    throw new Error("[XRayImageGen] No image data returned from Nano Banana 2")
+    console.error("[XRayImageGen] No image in Gemini response:", { model, candidatesCount: data.candidates?.length ?? 0, partsCount: parts?.length ?? 0 })
+    throw new Error(`[XRayImageGen] No image data returned from ${model}`)
   }
 
   const mimeType = imagePart?.inlineData?.mimeType ?? "image/png"
-  return { mimeType, data: b64Data, modelUsed: NANO_BANANA_MODEL }
+  return { mimeType, data: b64Data, modelUsed: model }
 }
 
 /** A reference image to send as multimodal input alongside the text prompt */
@@ -492,15 +494,17 @@ async function callOpenAIImage(
 }
 
 /**
- * Generates an image using Nano Banana 2 with automatic fallback.
+ * Generates an image with automatic multi-model fallback.
  *
  * When referenceBase64 is provided:
- * FLOW: callNanoBananaImageWithReference() → callNanoBananaImage() (text-only) → callOpenAIImage()
+ * FLOW: Nano Banana 2 multimodal → Nano Banana 2 text-only → Nano Banana (2.5, stable) → GPT Image 1
  *
  * When no reference:
- * FLOW: callNanoBananaImage() → callOpenAIImage()
+ * FLOW: Nano Banana 2 text-only → Nano Banana (2.5, stable) → GPT Image 1
  *
- * Falls back to OpenAI on ANY Nano Banana failure as long as OPENAI_API_KEY is set.
+ * INTENT: gemini-3.1-flash-image-preview is a preview model with intermittent 500 errors.
+ * gemini-2.5-flash-image is the stable GA model — same API, same key, reliable fallback
+ * before leaving Google's ecosystem entirely for OpenAI.
  */
 async function callImageWithFallback(
   prompt: string,
@@ -528,24 +532,31 @@ async function callImageWithFallback(
     }
   }
 
+  // Step 2: Nano Banana 2 text-only
   try {
     return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio)
-  } catch (nanoBananaError) {
-    const errorMessage = nanoBananaError instanceof Error ? nanoBananaError.message : String(nanoBananaError)
+  } catch (nb2Error) {
+    const msg = nb2Error instanceof Error ? nb2Error.message : String(nb2Error)
+    console.warn("[XRayImageGen] Nano Banana 2 text-only failed, trying stable model:", { error: msg.slice(0, 200) })
+  }
+
+  // Step 3: Nano Banana stable (gemini-2.5-flash-image) — same API, more reliable
+  try {
+    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio, NANO_BANANA_STABLE_MODEL)
+  } catch (nbStableError) {
+    const msg = nbStableError instanceof Error ? nbStableError.message : String(nbStableError)
 
     if (!process.env.OPENAI_API_KEY) {
-      console.warn("[XRayImageGen] Nano Banana 2 failed and OPENAI_API_KEY is not set — no fallback available")
-      throw nanoBananaError
+      console.warn("[XRayImageGen] All Gemini models failed and OPENAI_API_KEY is not set — no fallback available")
+      throw nbStableError
     }
 
-    console.warn(
-      "[XRayImageGen] Nano Banana 2 failed, falling back to OpenAI gpt-image-1:",
-      { error: errorMessage.slice(0, 200) },
-    )
-
-    const size = geminiAspectToOpenAISize(imageConfig.aspectRatio)
-    return await callOpenAIImage(safePrompt, size)
+    console.warn("[XRayImageGen] All Gemini models failed, falling back to OpenAI gpt-image-1:", { error: msg.slice(0, 200) })
   }
+
+  // Step 4: OpenAI GPT Image 1 — final fallback
+  const size = geminiAspectToOpenAISize(imageConfig.aspectRatio)
+  return await callOpenAIImage(safePrompt, size)
 }
 
 // ─── Storage Upload ──────────────────────────────────────────────────
