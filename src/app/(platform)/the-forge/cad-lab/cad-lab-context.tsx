@@ -57,7 +57,7 @@ import {
 } from "@/actions/cad-lab-projects"
 import { getProjectOrders } from "@/actions/manufacturing-orders"
 
-import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
+import { generateCadLabSingleImageAction, generateCadLabSystemIllustrationAction, generateVisualStyleAction, generateDesignSynthesisAction, generateProductIdentityAction, reconcileDesignAction, fetchAndCropReferenceAction, analyseHeroForModulesAction, cropModuleRegionAction, uploadSharedImageAssetsAction, cleanupSharedImageAssetsAction } from "@/actions/cad-lab-images"
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { toast } from "sonner"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -914,9 +914,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const apiStart = Date.now()
 
     try {
-      // ── Phase 1: Skeleton decomposition (~10-15s) ──
-      const skeletonRes = await skeletonDecompose(subject, editableReport, modelId, domainHint)
+      // ── Phase 1: Skeleton decomposition + product identity (parallel, ~60s) ──
+      addProgressLine("Establishing product design identity...")
+      const [skeletonRes, identityRes] = await Promise.all([
+        skeletonDecompose(subject, editableReport, modelId, domainHint),
+        generateProductIdentityAction(subject, editableReport),
+      ])
       const skeletonElapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
+
+      // Extract product identity for guided expansion (graceful degradation if it failed)
+      const productIdentity = "visualStyle" in identityRes ? identityRes.visualStyle : undefined
+      const consistencyBrief = productIdentity?.consistencyBrief
+      if (productIdentity) {
+        addProgressLine(`Design identity established: ${productIdentity.designLanguage ?? "unknown"}`)
+      } else {
+        console.warn("[CAD-LAB] Product identity failed — proceeding without consistency brief")
+        addProgressLine("Design identity unavailable — expanding without constraints...")
+      }
 
       // FALLBACK: If skeleton fails, fall back to the existing full decomposition
       if (!skeletonRes.success || skeletonRes.modules.length === 0) {
@@ -1180,6 +1194,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           editableReport,
           modelId,
           domainHint,
+          consistencyBrief,
         )
 
         if (expRes.success && expRes.expansion) {
@@ -1212,39 +1227,78 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       addProgressLine("")
       addProgressLine(`All ${skeletonRes.modules.length} modules expanded`)
 
+      // INTENT: Save expanded modules BEFORE reconciliation — prevents data loss if later steps fail
+      if (activeProjectIdRef.current) {
+        saveCadLabModules(activeProjectIdRef.current, JSON.stringify(expandedModules)).catch((err) =>
+          console.error("[CAD-LAB] Post-expansion save failed:", err)
+        )
+      }
+
       // ── Phase 3: Sequential image pipeline (after ALL text expansions) ──
 
-      // 3a: Opus design synthesis — reviews all expanded modules holistically
-      addProgressLine("Synthesising product design brief...")
+      // 3a: Cross-module reconciliation — reviews all expanded modules + product identity
+      addProgressLine("Reconciling cross-module design consistency...")
       let style: VisualStyleSpec | undefined
 
       if (activeProjectIdRef.current) {
         try {
-          const synthRes = await generateDesignSynthesisAction(
+          const reconcileRes = await reconcileDesignAction(
             subject,
             expandedModules.map(m => ({
-              name: m.name, purpose: m.purpose, description: m.description,
+              id: m.id, name: m.name, purpose: m.purpose, description: m.description,
               keyParts: m.keyParts, inputs: m.inputs, outputs: m.outputs,
             })),
             skeletonRes.connections,
-            extractExecutiveSummary(editableReport)?.slice(0, 1200) ?? editableReport.slice(0, 1200),
+            extractExecutiveSummary(editableReport)?.slice(0, 2000) ?? editableReport.slice(0, 2000),
+            productIdentity,
           )
           if (!activeProjectIdRef.current) { /* stale */ }
-          else if ("visualStyle" in synthRes) {
-            style = synthRes.visualStyle
+          else if ("visualStyle" in reconcileRes) {
+            style = reconcileRes.visualStyle
             setVisualStyle(style)
             saveCadLabVisualStyle(activeProjectIdRef.current, style).catch(() => {})
-            addProgressLine("Design brief complete — generating system illustration...")
+
+            // Apply module patches (light-touch corrections) + per-module image prompts
+            const patchCount = Object.keys(reconcileRes.modulePatch).length
+            const promptCount = Object.keys(reconcileRes.perModuleImagePrompts).length
+            if (patchCount > 0 || promptCount > 0) {
+              setModules(prev => prev.map(m => {
+                const patch = reconcileRes.modulePatch[m.id]
+                const imagePrompt = reconcileRes.perModuleImagePrompts[m.id]
+                if (!patch && !imagePrompt) return m
+                return {
+                  ...m,
+                  ...(patch?.description && { description: patch.description }),
+                  ...(imagePrompt && { moduleImagePrompt: imagePrompt }),
+                }
+              }))
+              // Also update expandedModules local array so diagnostics use corrected data
+              for (const mod of expandedModules) {
+                const patch = reconcileRes.modulePatch[mod.id]
+                if (patch?.description) mod.description = patch.description
+                const imagePrompt = reconcileRes.perModuleImagePrompts[mod.id]
+                if (imagePrompt) mod.moduleImagePrompt = imagePrompt
+              }
+            }
+
+            // Save modules again after reconciliation patches + moduleImagePrompts
+            if (activeProjectIdRef.current) {
+              saveCadLabModules(activeProjectIdRef.current, JSON.stringify(expandedModules)).catch((err) =>
+                console.error("[CAD-LAB] Post-reconciliation save failed:", err)
+              )
+            }
+
+            addProgressLine(`Design reconciled${patchCount > 0 ? ` — ${patchCount} modules corrected` : ""} — generating system illustration...`)
           } else {
-            console.warn("[CAD-LAB] Design synthesis failed, falling back to Sonnet visual style")
-            addProgressLine("Design synthesis unavailable — falling back to quick visual style...")
+            console.warn("[CAD-LAB] Reconciliation failed, falling back to Sonnet visual style")
+            addProgressLine("Reconciliation unavailable — falling back to quick visual style...")
           }
         } catch {
-          console.warn("[CAD-LAB] Design synthesis threw, falling back to Sonnet visual style")
-          addProgressLine("Design synthesis unavailable — falling back to quick visual style...")
+          console.warn("[CAD-LAB] Reconciliation threw, falling back to Sonnet visual style")
+          addProgressLine("Reconciliation unavailable — falling back to quick visual style...")
         }
 
-        // Fallback: use Sonnet visual style if Opus synthesis failed
+        // Fallback: use Sonnet visual style if reconciliation failed
         if (!style && activeProjectIdRef.current) {
           try {
             const styleRes = await generateVisualStyleAction(
@@ -1260,6 +1314,39 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           } catch { /* Non-critical */ }
         }
+      }
+
+      // INTENT: Fire diagnostics after reconciliation (before images) so they use
+      // corrected module data. Still fire-and-forget (non-blocking).
+      const finalModulesForDiagnostics = expandedModules
+      prefillDiagnostics(finalModulesForDiagnostics, editableReport, modelId)
+        .then((prefillRes) => {
+          if (!activeProjectIdRef.current) return
+          if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
+            setDiagnosticAnswers((prev) => {
+              const merged = { ...prefillRes.answers }
+              for (const [mid, existing] of Object.entries(prev)) merged[mid] = { ...(merged[mid] || {}), ...existing }
+              return merged
+            })
+            setAiPrefilled(true)
+            if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
+              setDiagnosticEnrichment(prefillRes.enrichment)
+              if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
+            }
+          }
+        }).catch(() => {})
+
+      if (finalModulesForDiagnostics.length >= 2) {
+        setIsExtractingContracts(true)
+        extractInterfaceContracts(finalModulesForDiagnostics, editableReport, modelId)
+          .then((contractRes) => {
+            if (!activeProjectIdRef.current) return
+            setInterfaceContracts(contractRes.contracts)
+            setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
+            setIsExtractingContracts(false)
+            if (activeProjectIdRef.current) saveCadLabInterfaceContracts(activeProjectIdRef.current, contractRes).catch(() => {})
+          })
+          .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
       }
 
       // 3b: Hero image generation — uses Opus-crafted prompt when available
@@ -1330,11 +1417,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // 3d + 3e: Per-module images via handleGenerateModuleImages
       // INTENT: handleGenerateModuleImages handles its own shared asset upload internally,
       // so we pass referenceBase64 and style directly — it will upload them once.
-      // DECISION: Strip heroImagePrompt — only needed for system illustration (3b), not per-module images.
-      // Reduces inline fallback payload by ~2-3KB, helping avoid React Flight nesting limits.
+      // DECISION: Strip heroImagePrompt + perModuleImagePrompts — only needed for system illustration
+      // and orchestration respectively, not per-module image calls. Reduces payload size.
       if (activeProjectIdRef.current) {
         addProgressLine("Generating module blueprint illustrations...")
-        const perModuleStyle = style ? { ...style, heroImagePrompt: undefined } : undefined
+        const perModuleStyle = style ? { ...style, heroImagePrompt: undefined, perModuleImagePrompts: undefined } : undefined
         await handleGenerateModuleImages(expandedModules, activeProjectIdRef.current, perModuleStyle, referenceBase64, moduleCrops, illustrationUrl)
       }
 
@@ -1366,37 +1453,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setLastSaved(new Date().toISOString())
         }
         refreshProjects()
-      }
-
-      // Fire diagnostics and contracts with full expanded modules
-      prefillDiagnostics(finalModules, editableReport, modelId)
-        .then((prefillRes) => {
-          if (!activeProjectIdRef.current) return
-          if (prefillRes.success && Object.keys(prefillRes.answers).length > 0) {
-            setDiagnosticAnswers((prev) => {
-              const merged = { ...prefillRes.answers }
-              for (const [mid, existing] of Object.entries(prev)) merged[mid] = { ...(merged[mid] || {}), ...existing }
-              return merged
-            })
-            setAiPrefilled(true)
-            if (prefillRes.enrichment && Object.keys(prefillRes.enrichment).length > 0) {
-              setDiagnosticEnrichment(prefillRes.enrichment)
-              if (activeProjectIdRef.current) saveCadLabDiagnosticEnrichment(activeProjectIdRef.current, prefillRes.enrichment).catch(() => {})
-            }
-          }
-        }).catch(() => {})
-
-      if (finalModules.length >= 2) {
-        setIsExtractingContracts(true)
-        extractInterfaceContracts(finalModules, editableReport, modelId)
-          .then((contractRes) => {
-            if (!activeProjectIdRef.current) return
-            setInterfaceContracts(contractRes.contracts)
-            setUnmatchedPorts({ outputs: contractRes.unmatchedOutputs, inputs: contractRes.unmatchedInputs })
-            setIsExtractingContracts(false)
-            if (activeProjectIdRef.current) saveCadLabInterfaceContracts(activeProjectIdRef.current, contractRes).catch(() => {})
-          })
-          .catch(() => { if (activeProjectIdRef.current) setIsExtractingContracts(false) })
       }
 
     } catch (err) {

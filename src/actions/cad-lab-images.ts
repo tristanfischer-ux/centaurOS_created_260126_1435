@@ -21,7 +21,7 @@ import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-ad
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration, prepareReferenceImage, cropReferenceFor3x2, analyseHeroBoundingBoxes, cropModuleRegion } from "@/app/(platform)/the-forge/services/image-generator"
 import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
-import { getVisualStyleSystemPrompt, getDesignSynthesisPrompt } from "@/lib/cad-lab/domain-prompts"
+import { getVisualStyleSystemPrompt, getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconciliationPrompt } from "@/lib/cad-lab/domain-prompts"
 import type { ModuleConnection } from "@/lib/cad-lab-types"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
@@ -391,7 +391,7 @@ export async function generateVisualStyleAction(
             messages: [{ role: "user", content: userMessage }],
           }),
         },
-        15_000,
+        30_000,
       )
 
       if (!response.ok) {
@@ -470,6 +470,82 @@ export async function cropModuleRegionAction(
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.warn("[CAD-LAB-IMAGES] Module region crop failed:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+/**
+ * Calls Opus 4.6 to establish product design identity from research data.
+ *
+ * @description Phase 1b of convergent refinement — runs parallel with skeleton.
+ * Produces product-level design constraints (materials, finishes, spatial rules)
+ * that are injected into every subsequent module expansion for consistency.
+ *
+ * @param subject - Product name
+ * @param researchReport - Full research report (Opus handles long context)
+ * @returns Partial VisualStyleSpec with identity fields, or error
+ */
+export async function generateProductIdentityAction(
+  subject: string,
+  researchReport: string,
+): Promise<{ visualStyle: Partial<VisualStyleSpec> } | { error: string }> {
+  return withAuth(async () => {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping product identity")
+      return { error: "ANTHROPIC_API_KEY not configured" }
+    }
+
+    const userMessage = `Product: ${subject}\n\nResearch Report:\n${researchReport}`
+
+    try {
+      const response = await fetchWithTimeout(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-opus-4-6",
+            max_tokens: 4096,
+            system: getProductIdentityPrompt(),
+            messages: [{ role: "user", content: userMessage }],
+          }),
+        },
+        60_000,
+      )
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[CAD-LAB-IMAGES] Product identity API error:", { status: response.status, body: errText.slice(0, 200) })
+        return { error: `API error (${response.status})` }
+      }
+
+      const data = await response.json()
+      const text = data.content?.[0]?.text ?? ""
+
+      const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+      const parsed = JSON.parse(jsonStr) as Partial<VisualStyleSpec>
+
+      if (!parsed.consistencyBrief || !parsed.designLanguage) {
+        console.error("[CAD-LAB-IMAGES] Product identity missing required fields:", parsed)
+        return { error: "Incomplete product identity response" }
+      }
+
+      console.log("[CAD-LAB-IMAGES] Product identity established:", {
+        designLanguage: parsed.designLanguage,
+        consistencyBrief: parsed.consistencyBrief?.slice(0, 80),
+        spatialPrinciples: parsed.spatialPrinciples?.length ?? 0,
+      })
+
+      return { visualStyle: parsed }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Product identity failed:", errorMsg)
       return { error: errorMsg }
     }
   })
@@ -564,6 +640,127 @@ export async function generateDesignSynthesisAction(
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
       console.error("[CAD-LAB-IMAGES] Design synthesis failed:", errorMsg)
+      return { error: errorMsg }
+    }
+  })
+}
+
+// ─── Reconciliation return type ─────────────────────────────────────────
+
+interface ReconciliationResult {
+  visualStyle: VisualStyleSpec
+  perModuleImagePrompts: Record<string, string>
+  modulePatch: Record<string, { description?: string; materialNotes?: string; dimensionNotes?: string }>
+}
+
+/**
+ * Calls Opus 4.6 to reconcile cross-module design inconsistencies and craft
+ * unified image prompts for the entire product.
+ *
+ * @description Phase 3 of convergent refinement — replaces design synthesis.
+ * Reviews all expanded modules + product identity holistically and produces:
+ * (1) module patches for inconsistencies, (2) complete VisualStyleSpec with heroImagePrompt,
+ * (3) per-module image prompts crafted TOGETHER for visual consistency.
+ *
+ * @param subject - Product name
+ * @param modules - Fully expanded modules
+ * @param connections - Inter-module connections
+ * @param researchExcerpt - Executive summary or research excerpt
+ * @param productIdentity - Product identity from Phase 1b (optional — graceful degradation)
+ * @returns ReconciliationResult with visualStyle, perModuleImagePrompts, modulePatch, or error
+ */
+export async function reconcileDesignAction(
+  subject: string,
+  modules: Array<{ id: string; name: string; purpose: string; description: string; keyParts: string[]; inputs: string[]; outputs: string[] }>,
+  connections?: ModuleConnection[],
+  researchExcerpt?: string,
+  productIdentity?: Partial<VisualStyleSpec>,
+): Promise<ReconciliationResult | { error: string }> {
+  return withAuth(async () => {
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping reconciliation")
+      return { error: "ANTHROPIC_API_KEY not configured" }
+    }
+
+    const moduleList = modules.map((m) =>
+      `### ${m.name} (id: ${m.id})\n- Purpose: ${m.purpose}\n- Description: ${m.description}\n- Key Parts: ${m.keyParts.join(", ")}\n- Inputs: ${m.inputs.join(", ")}\n- Outputs: ${m.outputs.join(", ")}`
+    ).join("\n\n")
+
+    const connectionList = connections && connections.length > 0
+      ? `\n\nInter-module connections:\n${connections.map(c => `- ${c.from} (${c.output}) → ${c.to} (${c.input})`).join("\n")}`
+      : ""
+
+    const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
+
+    const identityContext = productIdentity
+      ? `\n\nProduct Design Identity:\n- Design Language: ${productIdentity.designLanguage ?? "not established"}\n- Consistency Brief: ${productIdentity.consistencyBrief ?? "not established"}\n- Spatial Principles: ${productIdentity.spatialPrinciples?.join(", ") ?? "not established"}\n- Color Palette: ${productIdentity.colorPalette ?? "not established"}\n- Material Rendering: ${productIdentity.materialRendering ?? "not established"}`
+      : ""
+
+    const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}`
+
+    try {
+      const response = await fetchWithTimeout(
+        "https://api.anthropic.com/v1/messages",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-opus-4-6",
+            max_tokens: 16384,
+            system: getDesignReconciliationPrompt(),
+            messages: [{ role: "user", content: userMessage }],
+          }),
+        },
+        // GOTCHA: 90s and 120s both timed out for 8 modules with per-module prompts
+        // (16384 tokens structured JSON output). 240s needed. Still fits Vercel 300s cap.
+        240_000,
+      )
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[CAD-LAB-IMAGES] Reconciliation API error:", { status: response.status, body: errText.slice(0, 200) })
+        return { error: `API error (${response.status})` }
+      }
+
+      const data = await response.json()
+      const text = data.content?.[0]?.text ?? ""
+
+      const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+      const parsed = JSON.parse(jsonStr) as {
+        modulePatch?: Record<string, { description?: string; materialNotes?: string; dimensionNotes?: string }>
+        visualStyle?: VisualStyleSpec
+        perModuleImagePrompts?: Record<string, string>
+      }
+
+      if (!parsed.visualStyle?.colorPalette || !parsed.visualStyle?.materialRendering || !parsed.visualStyle?.unifyingContext) {
+        console.error("[CAD-LAB-IMAGES] Reconciliation missing required visual style fields:", parsed.visualStyle)
+        return { error: "Incomplete reconciliation response" }
+      }
+
+      const patchCount = Object.keys(parsed.modulePatch ?? {}).length
+      const promptCount = Object.keys(parsed.perModuleImagePrompts ?? {}).length
+
+      console.log("[CAD-LAB-IMAGES] Reconciliation complete:", {
+        colorPalette: parsed.visualStyle.colorPalette.slice(0, 60),
+        hasHeroPrompt: !!parsed.visualStyle.heroImagePrompt,
+        heroPromptLength: parsed.visualStyle.heroImagePrompt?.length ?? 0,
+        modulePatchCount: patchCount,
+        perModulePromptCount: promptCount,
+      })
+
+      return {
+        visualStyle: parsed.visualStyle,
+        perModuleImagePrompts: parsed.perModuleImagePrompts ?? {},
+        modulePatch: parsed.modulePatch ?? {},
+      }
+    } catch (err) {
+      const errorMsg = sanitizeErrorMessage(err)
+      console.error("[CAD-LAB-IMAGES] Reconciliation failed:", errorMsg)
       return { error: errorMsg }
     }
   })
