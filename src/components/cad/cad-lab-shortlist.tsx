@@ -174,6 +174,20 @@ export function CadLabShortlist({
     [shortlistedSuppliers],
   )
 
+  // ── Module coverage computation ──
+  const { coveredCount, totalCount, uncoveredModules } = useMemo(() => {
+    const coveredIds = new Set<string>()
+    for (const supplier of shortlistedSuppliers.values()) {
+      for (const mid of supplier.moduleIds) coveredIds.add(mid)
+    }
+    const uncovered = modules.filter((m) => !coveredIds.has(m.id))
+    return {
+      coveredCount: modules.length - uncovered.length,
+      totalCount: modules.length,
+      uncoveredModules: uncovered,
+    }
+  }, [shortlistedSuppliers, modules])
+
   // ── Document generation (per-supplier, filtered modules) ──
   const handleGenerateDoc = useCallback((supplierId: string, supplier: ShortlistedSupplier, type: DocType) => {
     const filteredModules = supplier.moduleIds
@@ -375,6 +389,40 @@ export function CadLabShortlist({
           </div>
         </div>
 
+        {/* ── Module coverage summary ── */}
+        {suppliers.length > 0 && totalCount > 0 && (
+          <div className="rounded-lg border p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">
+                {coveredCount} of {totalCount} module{totalCount !== 1 ? "s" : ""} covered
+              </span>
+              {uncoveredModules.length === 0 && (
+                <span className="text-[10px] font-medium text-status-success">Full coverage</span>
+              )}
+            </div>
+            {/* Segmented bar */}
+            <div className="flex gap-0.5 h-1.5 rounded-full overflow-hidden bg-muted">
+              {modules.map((mod) => {
+                const isCovered = !uncoveredModules.some((u) => u.id === mod.id)
+                return (
+                  <div
+                    key={mod.id}
+                    className={cn(
+                      "flex-1 rounded-full transition-colors",
+                      isCovered ? "bg-status-success" : "bg-muted-foreground/20",
+                    )}
+                  />
+                )
+              })}
+            </div>
+            {uncoveredModules.length > 0 && (
+              <p className="text-[10px] text-muted-foreground">
+                Not covered: {uncoveredModules.map((m) => m.name).join(", ")}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ── Empty state ── */}
         {suppliers.length === 0 && (
           <div className="text-center py-10 space-y-2">
@@ -427,6 +475,49 @@ export function CadLabShortlist({
                       {matchedModules.length} module{matchedModules.length !== 1 ? "s" : ""}
                     </span>
                   </button>
+                  <div className="flex items-center gap-1.5 ml-auto mr-1">
+                    {!rfqId ? (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCreateSupplierRfq(supplier.id, supplier)
+                        }}
+                        disabled={creatingRfqFor === supplier.id}
+                      >
+                        {creatingRfqFor === supplier.id ? "Creating…" : "Create RFQ"}
+                      </Button>
+                    ) : (
+                      <>
+                        <span
+                          className={cn(
+                            "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                            stage === "quoted"
+                              ? "bg-status-success/10 text-status-success border border-status-success/30"
+                              : stage === "awaiting"
+                                ? "bg-warning/10 text-warning border border-warning/30"
+                                : "bg-info/10 text-info border border-info/30",
+                          )}
+                        >
+                          {PROCUREMENT_STEPS.find((s) => s.key === stage)?.label ?? "RFQ Sent"}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")
+                          }}
+                        >
+                          View
+                          <ArrowRight className="h-2.5 w-2.5 ml-0.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                   <Button
                     variant="ghost"
                     size="sm"
