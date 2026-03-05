@@ -176,6 +176,8 @@ async function callClaude(
   maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback
   /** Optional base64-encoded image to include as multimodal content before the text prompt */
   imageBase64?: string,
+  /** Optional base64-encoded SVG of previous render — for visual comparison feedback loop */
+  renderedSvgBase64?: string,
 ): Promise<{
   text: string
   tokensIn: number
@@ -185,20 +187,42 @@ async function callClaude(
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   const makeRequest = async (model: ClaudeModelId) => {
-    // INTENT: Build multimodal content array when an image is provided,
-    // otherwise use plain string for backward compatibility
-    const userContent: string | Array<{ type: string; source?: { type: string; media_type: string; data: string }; text?: string }> = imageBase64
-      ? [
-          {
-            type: "image" as const,
-            source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
-          },
-          {
-            type: "text" as const,
-            text: "CRITICAL: The image above is the product you must model. Your primary goal is to produce CadQuery code whose 3D shape closely matches the proportions, silhouette, and features visible in this image. Study it carefully — every major geometric feature you see must appear in your model.\n\n" + userPrompt,
-          },
-        ]
-      : userPrompt
+    // INTENT: Build multimodal content array when images are provided.
+    // When both imageBase64 (hero) and renderedSvgBase64 (previous render) exist,
+    // send both for side-by-side comparison so Claude can see what it produced vs target.
+    type ContentBlock = { type: string; source?: { type: string; media_type: string; data: string }; text?: string }
+    let userContent: string | ContentBlock[]
+
+    if (imageBase64 && renderedSvgBase64) {
+      // INTENT: Visual feedback loop — show Claude the target AND its previous output
+      userContent = [
+        {
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
+        },
+        {
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: "image/svg+xml", data: renderedSvgBase64 },
+        },
+        {
+          type: "text" as const,
+          text: "Image 1 is the TARGET product you must model. Image 2 is what your previous code produced.\nCompare them carefully — identify SPECIFIC geometric differences (wrong shape primitives, missing features, wrong proportions).\nFix your code so the output matches Image 1.\n\n" + userPrompt,
+        },
+      ]
+    } else if (imageBase64) {
+      userContent = [
+        {
+          type: "image" as const,
+          source: { type: "base64" as const, media_type: "image/png", data: imageBase64 },
+        },
+        {
+          type: "text" as const,
+          text: "CRITICAL: The image above is the product you must model. Your primary goal is to produce CadQuery code whose 3D shape closely matches the proportions, silhouette, and features visible in this image. Study it carefully — every major geometric feature you see must appear in your model.\n\n" + userPrompt,
+        },
+      ]
+    } else {
+      userContent = userPrompt
+    }
 
     const response = await fetchWithTimeout(
       "https://api.anthropic.com/v1/messages",
@@ -1096,6 +1120,97 @@ Generate the complete interface definition following the exact 4-section format.
  * @param modelId - Claude model to use
  * @returns Generation result with SVGs, metrics, and code
  */
+
+// DECISION: When a hero image is provided, use a compact system prompt that keeps the vision
+// signal dominant. The full 500-line CAD_INSTRUCTIONS contains methodology examples (Nespresso
+// capsules, brine systems, drones) that prime Claude to think in those shapes, not the image.
+function buildImageFocusedSystemPrompt(libraryPromptSection: string, domainHints?: string): string {
+  return `SHAPE FIDELITY IS YOUR #1 PRIORITY:
+- The attached product image is your PRIMARY reference — study it before writing ANY code
+- Your model MUST match the overall silhouette, proportions, and every major visible feature
+- Break the image down: identify the main body form, then each distinct feature (dome, cylinder, panel, limb, slot, etc.)
+- Build each visible feature as a separate make_*() function, then assemble to match the image layout
+- If the image shows a cylindrical body with a domed top, your code MUST produce a cylinder + dome — not a box
+- Geometric accuracy takes priority over manufacturing details
+- When in doubt, match what you SEE in the image, not what you assume
+
+${libraryPromptSection}
+
+EXECUTION ENVIRONMENT RULES:
+- The final variable MUST be called "result" and be a cq.Workplane or cq.Compound object
+- Do NOT include any cq.exporters calls — the execution environment handles export
+- Do NOT include any print() statements
+- Do NOT import os, sys, or use open(). Only import cadquery and math.
+- After assembling "result", optionally create "result_exploded" (try/except, best-effort).
+- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
+
+SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
+- Your script MUST be executable with no unresolved names.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
+- If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
+
+ASSEMBLY STRATEGY FOR COMPLEX MODELS:
+- For models with 20+ components, use cq.Assembly() at the top level instead of chaining .union() calls.
+- .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
+- The final line should be: result = assy.toCompound()
+- For simpler models (<15 components), .union() chain is fine.${domainHints ? `\n\n${domainHints}` : ""}`
+}
+
+function buildFullSystemPrompt(libraryPromptSection: string, domainHints?: string): string {
+  return `SHAPE FIDELITY IS YOUR #1 PRIORITY:
+- Study the provided product image carefully before writing any code
+- Your model MUST match the overall silhouette, proportions, and major features visible in the image
+- Break the shape down visually: identify the main body form, then each distinct feature (dome, cylinder, panel, limb, etc.)
+- Build each visible feature as a separate make_*() function, then assemble to match the image layout
+- If the image shows a cylindrical body with a domed top, your code must produce a cylinder + dome — not a box
+- Geometric accuracy takes priority over manufacturing details
+
+You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
+
+${CAD_INSTRUCTIONS}
+
+${libraryPromptSection}
+
+EXECUTION ENVIRONMENT RULES:
+- The final variable MUST be called "result" and be a cq.Workplane or cq.Compound object
+- Do NOT include any cq.exporters calls — the execution environment handles export
+- Do NOT include any print() statements
+- Do NOT import os, sys, or use open(). Only import cadquery and math.
+- After assembling "result", optionally create "result_exploded" — a cq.Workplane that shows major sub-features translated apart along Z by 1.5× their height for visual separation. This is best-effort: if the model is a single continuous solid (e.g., one casting or 3D print), skip it. Always wrap result_exploded creation in try/except so it never blocks the main result.
+- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
+
+SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
+- Your script MUST be executable with no unresolved names.
+- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
+- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
+- If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
+- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
+
+COMPONENT LIBRARY PRIORITY (CRITICAL):
+- PREFER library components over custom geometry — they are pre-validated and produce correct CadQuery.
+- When a library function exists for a component type, USE IT rather than building from scratch.
+- Library parts include proper features that custom geometry typically omits.
+- Check the COMPONENT LIBRARY list BEFORE writing any make_*() function.
+
+Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
+- When positioning components vertically, use EXACTLY ONE reference frame. Either:
+  (a) All z-offsets are ABSOLUTE from z=0 (ground level), OR
+  (b) All z-offsets are RELATIVE to a named base variable
+- NEVER add a base_z that already includes wall_height and THEN add wall_height again. This doubles the height.
+- Example of the BUG: roof_z = foundation_h + floor_h + wall_h  ... then later ...  .transformed(offset=(0, 0, roof_z + wall_h + rise/2))  ← wall_h is counted TWICE
+- CORRECT pattern: define roof_base_z = foundation_h + floor_h + wall_h ONCE, then position roof at roof_base_z + rise/2
+- VERIFY: After writing all z-positions, check that the highest point of the model matches the expected total height. If a house should be ~6000mm tall, the roof peak must be near 6000mm — not 9000mm or 12000mm.
+
+ASSEMBLY STRATEGY FOR COMPLEX MODELS:
+- For models with 20+ components (buildings, vehicles, complex machines), use cq.Assembly() at the top level instead of chaining .union() calls.
+- .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
+- Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
+- The final line should be: result = assy.toCompound()
+- For simpler models (<15 components), the .union() chain pattern is fine.${domainHints ? `\n\n${domainHints}` : ""}`
+}
+
 export async function generateCadLabModel(
   description: string,
   researchReport: string,
@@ -1182,57 +1297,6 @@ export async function generateCadLabModel(
     const librarySlugs = librarySummary.map((c) => c.slug)
     const libraryPromptSection = await formatLibraryForPrompt(librarySummary)
 
-    const systemPrompt = `SHAPE FIDELITY IS YOUR #1 PRIORITY:
-- Study the provided product image carefully before writing any code
-- Your model MUST match the overall silhouette, proportions, and major features visible in the image
-- Break the shape down visually: identify the main body form, then each distinct feature (dome, cylinder, panel, limb, etc.)
-- Build each visible feature as a separate make_*() function, then assemble to match the image layout
-- If the image shows a cylindrical body with a domed top, your code must produce a cylinder + dome — not a box
-- Geometric accuracy takes priority over manufacturing details
-
-You are generating a complete CadQuery parametric CAD model. Follow the methodology in this document EXACTLY:
-
-${CAD_INSTRUCTIONS}
-
-${libraryPromptSection}
-
-EXECUTION ENVIRONMENT RULES:
-- The final variable MUST be called "result" and be a cq.Workplane or cq.Compound object
-- Do NOT include any cq.exporters calls — the execution environment handles export
-- Do NOT include any print() statements
-- Do NOT import os, sys, or use open(). Only import cadquery and math.
-- After assembling "result", optionally create "result_exploded" — a cq.Workplane that shows major sub-features translated apart along Z by 1.5× their height for visual separation. This is best-effort: if the model is a single continuous solid (e.g., one casting or 3D print), skip it. Always wrap result_exploded creation in try/except so it never blocks the main result.
-- Output ONLY the Python code inside a single \`\`\`python code fence. No explanations before or after.
-
-SELF-CONTAINED CODE (CRITICAL — violating this crashes execution):
-- Your script MUST be executable with no unresolved names.
-- You MAY call component-library functions that appear in the provided "COMPONENT LIBRARY" list.
-- Any non-library helper function you call MUST be defined with \`def\` in YOUR script.
-- If a needed part is not in the library, build it with your own make_*() function using cq.Workplane primitives (.box(), .cylinder(), .extrude(), .cut(), etc.).
-- PRE-FLIGHT CHECK: Before outputting code, mentally trace every function call and verify it is either (a) in the provided library list or (b) defined in your script.
-
-COMPONENT LIBRARY PRIORITY (CRITICAL):
-- PREFER library components over custom geometry — they are pre-validated and produce correct CadQuery.
-- When a library function exists for a component type, USE IT rather than building from scratch.
-- Library parts include proper features that custom geometry typically omits.
-- Check the COMPONENT LIBRARY list BEFORE writing any make_*() function.
-
-Z-COORDINATE / VERTICAL POSITION SANITY (prevents doubled heights):
-- When positioning components vertically, use EXACTLY ONE reference frame. Either:
-  (a) All z-offsets are ABSOLUTE from z=0 (ground level), OR
-  (b) All z-offsets are RELATIVE to a named base variable
-- NEVER add a base_z that already includes wall_height and THEN add wall_height again. This doubles the height.
-- Example of the BUG: roof_z = foundation_h + floor_h + wall_h  ... then later ...  .transformed(offset=(0, 0, roof_z + wall_h + rise/2))  ← wall_h is counted TWICE
-- CORRECT pattern: define roof_base_z = foundation_h + floor_h + wall_h ONCE, then position roof at roof_base_z + rise/2
-- VERIFY: After writing all z-positions, check that the highest point of the model matches the expected total height. If a house should be ~6000mm tall, the roof peak must be near 6000mm — not 9000mm or 12000mm.
-
-ASSEMBLY STRATEGY FOR COMPLEX MODELS:
-- For models with 20+ components (buildings, vehicles, complex machines), use cq.Assembly() at the top level instead of chaining .union() calls.
-- .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
-- Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
-- The final line should be: result = assy.toCompound()
-- For simpler models (<15 components), the .union() chain pattern is fine.${domainHints ? `\n\n${domainHints}` : ""}`
-
     // ── #10: Build reference template dimension section for prompt injection ──
     let referenceSection = ""
     if (referenceTemplatesForPrompt.length > 0) {
@@ -1314,6 +1378,22 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
       }
     }
 
+    // DECISION: Two system prompts — image-focused (compact, ~60 lines) vs full (with CAD_INSTRUCTIONS methodology).
+    // When a hero image exists, the image IS the spec. The 500-line methodology examples (Nespresso capsules,
+    // brine systems, drones) prime Claude to think in those shapes instead of the image. Stripping them lets
+    // the vision signal dominate.
+    const systemPrompt = blueprintImageBase64
+      ? buildImageFocusedSystemPrompt(libraryPromptSection, domainHints)
+      : buildFullSystemPrompt(libraryPromptSection, domainHints)
+
+    // INTENT: Diagnostic logging to verify prompt sizes and image-based path selection
+    console.info("[THE-FORGE] Prompt stats:", {
+      hasImage: !!blueprintImageBase64,
+      imageSizeKb: blueprintImageBase64 ? Math.round(blueprintImageBase64.length * 0.75 / 1024) : 0,
+      systemPromptChars: systemPrompt.length,
+      imageBasedPrompt: !!blueprintImageBase64,
+    })
+
     // ── #7: Iterative repair loop ──
     // QW2: Opus gets 4 attempts (better at using repair feedback), others get 3
     const MAX_REPAIR_ATTEMPTS = modelId.includes("opus") ? 4 : 3
@@ -1355,11 +1435,18 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
           ? `\n[${errorCategory.category}]: ${errorCategory.guidance}\nRaw error: ${lastModalError}`
           : lastModalError ? `\nModal execution error: ${lastModalError}` : ""
         const modalErrorSection = categorizedError
+        // INTENT: When hero image + rendered SVG both exist, tell Claude to compare them visually
+        const visualComparisonSection = (modalResult?.svg_iso && blueprintImageBase64)
+          ? `\n\n=== VISUAL COMPARISON ===
+Your previous code produced the SVG render shown as Image 2. Compare it to the hero image (Image 1).
+Identify SPECIFIC geometric differences (wrong shape primitives, missing features, wrong proportions).
+Fix the code to match the hero image more closely.`
+          : ""
         userPrompt = `${baseUserPrompt}
 
 === REPAIR REQUIRED (attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}) ===
 Previous code failed with ${allPreExecResults.filter((r) => r.severity !== "info").length} issue(s):
-${failureSummary}${modalErrorSection}
+${failureSummary}${modalErrorSection}${visualComparisonSection}
 Fix ONLY the listed issues. Previous code attached below.
 
 \`\`\`python
@@ -1368,8 +1455,12 @@ ${finalCode}
         console.info(`[THE-FORGE] Step 3: Repair attempt ${attempt + 1}/${MAX_REPAIR_ATTEMPTS}`)
       }
 
-      // INTENT: Include blueprint image on first attempt for geometric reference
-      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000, undefined, undefined, attempt === 0 ? blueprintImageBase64 : undefined)
+      // INTENT: Send hero image on EVERY attempt (not just first) so Claude always has the visual reference.
+      // On repair attempts, also send the rendered SVG from the previous attempt for side-by-side comparison.
+      const prevRenderedSvg = (attempt > 0 && blueprintImageBase64 && modalResult?.svg_iso)
+        ? modalResult.svg_iso
+        : undefined
+      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000, undefined, undefined, blueprintImageBase64, prevRenderedSvg)
       totalTokensIn += codeResult.tokensIn
       totalTokensOut += codeResult.tokensOut
 
@@ -1569,17 +1660,22 @@ ${finalCode}
       }
 
       // R6: Vision scoring runs independently of bbox — only needs SVG
+      // INTENT: Pass hero image as reference for visual comparison when available
       if (modalResult.svg_iso && attempt < MAX_REPAIR_ATTEMPTS - 1) {
-        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
+        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition, blueprintImageBase64)
         if (vr) {
           visionScoreResult = vr
-          if (vr.score < 5) {
-            qualityIssues.push(`Vision score ${vr.score}/10: ${vr.summary}`)
+          // DECISION: With a hero image reference, demand score ≥ 7 (not ≥ 5). Visual comparison
+          // is more accurate, so accepting 5-6 ("recognizable but wrong proportions") wastes the
+          // repair loop when we can do better.
+          const VISION_REPAIR_THRESHOLD = blueprintImageBase64 ? 7 : 5
+          if (vr.score < VISION_REPAIR_THRESHOLD) {
+            qualityIssues.push(`Vision score ${vr.score}/10 (threshold ${VISION_REPAIR_THRESHOLD}): ${vr.summary}`)
             allPreExecResults.push({
               ruleId: "postmodal-vision",
               severity: "warning",
               message: `Vision: ${vr.summary}`,
-              repairHint: `The render doesn't match the product description. Missing features: ${vr.issues.join(", ")}`,
+              repairHint: `The render doesn't match the ${blueprintImageBase64 ? "hero image" : "product description"}. Missing features: ${vr.issues.join(", ")}`,
             })
           }
         }
@@ -1624,7 +1720,7 @@ ${finalCode}
     // Runs only when the loop didn't already produce a vision score (avoids double-scoring on success)
     if (modalResult.svg_iso && !visionScoreResult) {
       try {
-        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition)
+        const vr = await scoreRenderVision(modalResult.svg_iso, description, description.slice(0, 60), interfaceDefinition, blueprintImageBase64)
         if (vr) visionScoreResult = vr
       } catch {
         // Silent — vision scoring is best-effort enrichment

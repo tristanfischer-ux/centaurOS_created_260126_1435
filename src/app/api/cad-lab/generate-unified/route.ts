@@ -300,8 +300,10 @@ export async function POST(request: Request): Promise<Response> {
       let templateMatchResult: import("@/actions/step-template-matching").TemplateMatchResult | undefined
 
       if (heroImagePrompt) {
-        // Hero image prompt serves as the geometry specification
-        interfaceDefinition = heroImagePrompt
+        // DECISION: heroImagePrompt already appears in enrichedDescription (via buildEnrichedDescription).
+        // Passing it again as interfaceDefinition duplicates 300-500 words, drowning the image signal.
+        // Instead, use a short cross-reference so the model knows geometry is in the product section.
+        interfaceDefinition = "Match the product image. Key geometric features are described in the product section above."
         emit({ type: "progress", message: "Using hero image as geometry specification" })
       } else {
         // Fallback: synthesize or generate interface from modules
