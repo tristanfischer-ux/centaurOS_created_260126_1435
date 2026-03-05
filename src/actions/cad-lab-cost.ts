@@ -72,7 +72,9 @@ export async function estimateModuleCostsAi(
       id: mod.id,
       name: mod.name,
       purpose: mod.purpose,
+      description: mod.description,
       keyParts: mod.keyParts,
+      failureModes: mod.failureModes,
       estimatedMassKg: mod.estimatedMassKg ?? null,
       diagnostics: {
         mfg_process: answers.mfg_process || "Not specified",
@@ -98,7 +100,7 @@ export async function estimateModuleCostsAi(
 
   const systemPrompt = `You are a manufacturing cost estimation expert specialising in hardware product development. You estimate costs in GBP (£).
 
-Given module specifications and diagnostic answers, produce a structured JSON cost estimate for each module. Your estimates should be realistic for UK-based manufacturing in 2026.
+Given specialist-reviewed module specifications and diagnostic answers, produce a structured JSON cost estimate for each module. These specs have been validated by domain specialists, so use the full module description, key parts, and failure modes to inform your mass and cost estimates. Your estimates should be realistic for UK-based manufacturing in 2026.
 
 IMPORTANT RULES:
 - Use the provided rate tables as calibration anchors, but adjust based on the specific module context

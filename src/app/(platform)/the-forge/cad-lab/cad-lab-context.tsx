@@ -40,7 +40,7 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
 import { estimateModuleCostsAi } from "@/actions/cad-lab-cost"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
@@ -284,6 +284,11 @@ export interface CadLabContextValue {
   handleGenerateUnifiedModel: () => Promise<void>
   handleExecuteUnifiedCode: (code: string) => Promise<void>
   handleRefineUnifiedCode: (currentCode: string, instruction: string) => Promise<string | null>
+
+  // Specialist review gating (three-state finalization)
+  reviewSkipped: boolean
+  allModulesReviewed: boolean
+  handleSkipReviews: () => void
 
   // Design revision (post-specialist-review versioning)
   designRevision: number
@@ -532,6 +537,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const designRevisionRef = useRef(designRevision)
   useEffect(() => { designRevisionRef.current = designRevision }, [designRevision])
 
+  // INTENT: Ref for handleRegenerateDrawingsAfterRevision so handleApplyReviewRevisions
+  // can auto-chain drawing regen without a forward-reference TDZ issue in deps.
+  const regenDrawingsRef = useRef<(() => Promise<void>) | null>(null)
+
   // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
   const [pendingReviewKeys, setPendingReviewKeys] = useState<Set<string>>(new Set())
@@ -559,6 +568,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       next.delete(`${moduleId}:${review.specialistId}`)
       return next
     })
+  }, [])
+
+  // ── Review gating (three-state finalization) ──
+  const [reviewSkipped, setReviewSkipped] = useState(false)
+
+  // INTENT: True when every module has at least one specialist review
+  const allModulesReviewed = modules.length > 0 && modules.every(m => {
+    const reviews = moduleReviews[m.id]
+    return reviews && reviews.length > 0
+  })
+
+  const handleSkipReviews = useCallback(() => {
+    setReviewSkipped(true)
+    if (activeProjectIdRef.current) {
+      saveCadLabReviewSkipped(activeProjectIdRef.current, true)
+        .catch(err => console.error("[CAD-LAB] Failed to save review skipped:", err))
+    }
   }, [])
 
   // ── Apply review revisions (AI-driven rewriting from accepted issues) ──
@@ -638,7 +664,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           .catch(err => console.error("[CAD-LAB] Failed to save design revision:", err))
       }
 
-      toast.success(`${revisedCount} module${revisedCount !== 1 ? "s" : ""} revised from specialist feedback`)
+      // INTENT: If user previously skipped reviews but then applies revisions,
+      // reset the skip flag so the flow re-evaluates properly (reviews are now done, not skipped)
+      setReviewSkipped(false)
+      if (activeProjectIdRef.current) {
+        saveCadLabReviewSkipped(activeProjectIdRef.current, false).catch(console.error)
+      }
+
+      toast.success(`${revisedCount} module${revisedCount !== 1 ? "s" : ""} revised — regenerating drawings...`)
+      // INTENT: Auto-chain drawing regeneration after revisions.
+      // 200ms delay lets setModules flush so modulesRef.current has revised data.
+      // Uses ref to avoid forward-reference TDZ issue (function defined later in file).
+      setTimeout(() => regenDrawingsRef.current?.(), 200)
     } catch (err) {
       console.error("[CAD-LAB] Review revision failed:", err)
       toast.error("Revision failed — please try again")
@@ -651,8 +688,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [productOverview, setProductOverview] = useState("")
 
   // ── AI cost estimation auto-trigger ──
+  // INTENT: Only estimate costs after reviews are done — costings tab requires it.
+  // The fingerprint includes module content, so post-revision changes auto-trigger re-estimation.
   useEffect(() => {
     if (!activeProjectIdRef.current || modules.length === 0 || isEstimatingCosts) return
+    // Gate: costs only calculated after specialist review (or explicit skip)
+    if (!allModulesReviewed && !reviewSkipped) return
     const allComplete = modules.every((mod) => {
       const answers = diagnosticAnswers[mod.id]
       if (!answers) return false
@@ -660,9 +701,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         .every((k) => answers[k] && answers[k].trim().length > 0)
     })
     if (!allComplete) return
+    // INTENT: Include module content (purpose, description, keyParts) in fingerprint
+    // so that when handleApplyReviewRevisions rewrites modules, the fingerprint changes
+    // and AI cost estimation re-fires automatically.
     const fp = modules.map((m) => {
       const a = diagnosticAnswers[m.id] || {}
-      return `${m.id}:${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
+      return `${m.id}:${m.purpose?.slice(0, 50)}|${m.description?.slice(0, 50)}|${m.keyParts?.length}|${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
     }).join(";")
     if (fp === aiCostFingerprintRef.current) return
     aiCostFingerprintRef.current = fp
@@ -679,7 +723,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
       .catch(console.error)
       .finally(() => setIsEstimatingCosts(false))
-  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview])
+  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview, allModulesReviewed, reviewSkipped])
 
   // ── Browser notification helper ──
   const sendNotification = useCallback((title: string, body: string) => {
@@ -1836,6 +1880,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [modules, activeProjectId, subject, decompositionConnections, visualStyle, systemIllustrationUrl, handleGenerateModuleImages, handleRefreshModuleImages, addProgressLine])
 
+  // Sync ref so handleApplyReviewRevisions can auto-chain regen without forward-reference
+  regenDrawingsRef.current = handleRegenerateDrawingsAfterRevision
+
   // ── Generate CAD for a specific module ──
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
     const mod = modules.find((m) => m.id === moduleId)
@@ -2620,7 +2667,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         if (p.diagnosticAnswers && p.modules) {
           aiCostFingerprintRef.current = p.modules.map((m) => {
             const a = p.diagnosticAnswers?.[m.id] || {}
-            return `${m.id}:${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
+            return `${m.id}:${m.purpose?.slice(0, 50)}|${m.description?.slice(0, 50)}|${m.keyParts?.length}|${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
           }).join(";")
         }
       } else {
@@ -2634,6 +2681,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore design revision state
       setDesignRevision(p.designRevision ?? 1)
       setImagesGeneratedAtRevision(p.imagesGeneratedAtRevision ?? 1)
+
+      // Restore review-skipped flag
+      setReviewSkipped(p.reviewSkipped ?? false)
 
       // Fetch manufacturing order count for this project
       const ordersRes = await getProjectOrders(projectId)
@@ -3220,6 +3270,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     handleGenerateUnifiedModel,
     handleExecuteUnifiedCode,
     handleRefineUnifiedCode,
+    reviewSkipped,
+    allModulesReviewed,
+    handleSkipReviews,
     designRevision,
     imagesStale,
     isRegeneratingImages,

@@ -327,14 +327,14 @@ export function parseBatchSize(batchStr: string): number {
  * First match wins — ordered from heaviest to lightest.
  */
 const MASS_KEYWORDS: [RegExp, number][] = [
-  [/frame|skid|chassis|structure|base/i, 5],
-  [/pump|motor|compressor|engine/i, 3],
-  [/tank|vessel|reservoir|housing/i, 2],
-  [/pipe|manifold|piping|tubing/i, 1.5],
-  [/valve|actuator/i, 0.8],
-  [/filter|strainer|cartridge/i, 0.5],
-  [/instrument|sensor|controller|pcb/i, 0.2],
-  [/seal|gasket|o-ring|insulation/i, 0.1],
+  [/frame|skid|chassis|structure|base/i, 2],
+  [/pump|motor|compressor|engine/i, 1.5],
+  [/tank|vessel|reservoir|housing/i, 1],
+  [/pipe|manifold|piping|tubing/i, 0.8],
+  [/valve|actuator/i, 0.5],
+  [/filter|strainer|cartridge/i, 0.3],
+  [/instrument|sensor|controller|pcb/i, 0.15],
+  [/seal|gasket|o-ring|insulation/i, 0.05],
 ]
 
 /**

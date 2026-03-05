@@ -11,7 +11,7 @@
  * description, key parts, editable diagnostics, contracts, failure modes, and
  * cost estimates all in one place.
  *
- * 3 tabs: Overview, Module Specs, Specialist Review.
+ * 4 tabs: Overview, Module Specs, Specialist Review, Costings.
  *
  * Gate: redirects to /the-forge/cad-lab (Design stage) if no research/modules exist.
  */
@@ -36,6 +36,9 @@ import {
   RefreshCw,
   PlayCircle,
   XCircle,
+  ClipboardCheck,
+  Lock,
+  PoundSterling,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -141,16 +144,16 @@ export default function SpecifyPage(): React.ReactNode {
     isEstimatingCosts,
     activeProjectId,
     generatingModuleIds,
-    isGeneratingImages,
-    handleRefreshModuleImages,
     researchModelUsed, decompositionModelUsed,
     revisedModuleIds,
     isApplyingReviewRevisions,
     handleApplyReviewRevisions,
+    reviewSkipped,
+    allModulesReviewed,
+    handleSkipReviews,
     designRevision,
     imagesStale,
     isRegeneratingImages,
-    handleRegenerateDrawingsAfterRevision,
     progressLines,
   } = useCadLab()
 
@@ -264,8 +267,9 @@ export default function SpecifyPage(): React.ReactNode {
   }, [moduleStatuses, modules, setModules])
 
   // ── Gate: can proceed to Source? ──
-  // INTENT: Diagnostics-complete is sufficient. Reviews are optional enrichment.
-  const canProceedToSource = allDiagnosticsComplete
+  // INTENT: Full pipeline — diagnostics + reviews + costings all done before sourcing.
+  const costingGateMet = (allModulesReviewed || reviewSkipped) && !imagesStale && !isRegeneratingImages
+  const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped) && Object.keys(aiCostEstimates).length > 0
 
   // ── Finalize summary: manufacturing process & material breakdown ──
   const finalizeSummary = useMemo(() => {
@@ -362,6 +366,7 @@ export default function SpecifyPage(): React.ReactNode {
     { id: "overview", label: "Overview" },
     { id: "specs", label: "Module Specs" },
     { id: "review", label: "Specialist Review" },
+    { id: "costing", label: "Costings" },
   ]
 
   const [activeTab, setActiveTab] = useState("overview")
@@ -449,20 +454,29 @@ export default function SpecifyPage(): React.ReactNode {
       {/* ── Tab navigation ── */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
         <div className="flex items-center gap-2">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabClick(tab.id)}
-              className={cn(
-                "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
-                activeTab === tab.id
-                  ? "bg-international-orange text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {TABS.map((tab) => {
+            const isCostingLocked = tab.id === "costing" && !costingGateMet
+            return (
+              <button
+                key={tab.id}
+                onClick={() => !isCostingLocked && handleTabClick(tab.id)}
+                disabled={isCostingLocked}
+                className={cn(
+                  "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
+                  isCostingLocked
+                    ? "text-muted-foreground/50 cursor-not-allowed"
+                    : activeTab === tab.id
+                      ? "bg-international-orange text-primary-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                )}
+              >
+                <span className="flex items-center gap-1.5">
+                  {isCostingLocked && <Lock className="h-3 w-3" />}
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
         </div>
       </nav>
 
@@ -998,72 +1012,32 @@ export default function SpecifyPage(): React.ReactNode {
               })}
             </div>
 
-            {/* Cost estimate summary */}
-            <CadLabCostEstimate
-              modules={modules}
-              diagnosticAnswers={diagnosticAnswers}
-              earlyCostEstimates={earlyCostEstimates}
-              aiCostEstimates={aiCostEstimates}
-              isEstimatingCosts={isEstimatingCosts}
-              onCostOverride={(moduleId, overrides) => {
-                setModules(prev => prev.map(m =>
-                  m.id === moduleId ? { ...m, costOverrides: overrides } : m
-                ))
-              }}
-            />
-
-            {/* Finalize / Navigation CTA */}
-            {canProceedToSource && finalizeSummary ? (
+            {/* Navigation CTA — two-state progression */}
+            {allDiagnosticsComplete ? (
+              /* Diagnostics done — continue to review */
               <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-full bg-success/10 p-1.5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
-                    </div>
-                    <div className="flex-1 space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        Design finalized
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        All {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""} fully specified.
-                      </p>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                        <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">Manufacturing:</span>{" "}
-                          {finalizeSummary.processBreakdown}
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          All diagnostics complete
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          <span className="font-medium text-foreground">Materials:</span>{" "}
-                          {finalizeSummary.materials}
+                          Continue to specialist review for expert feedback.
                         </p>
                       </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleRefreshModuleImages}
-                        disabled={isGeneratingImages}
-                        className="gap-1.5"
-                      >
-                        <RefreshCw className={cn("h-3.5 w-3.5", isGeneratingImages && "animate-spin")} />
-                        {isGeneratingImages ? "Refreshing..." : "Refresh Illustrations"}
-                      </Button>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Regenerate module images using your specifications.
-                      </p>
-                    </div>
-                    <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
-                      Continue to Source
+                    <Button onClick={() => handleTabClick("review")} className="gap-1.5">
+                      Continue to Review
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
               </Card>
             ) : (
+              /* Incomplete: diagnostics not done yet */
               <Card className="border-border">
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">
@@ -1085,9 +1059,11 @@ export default function SpecifyPage(): React.ReactNode {
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Specialist Reviews</h2>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {allDiagnosticsComplete
-                        ? "Diagnostics complete. Reviews are optional — request one for extra confidence."
-                        : "Complete diagnostics for all modules to unlock Source. Reviews are optional."}
+                      {!allDiagnosticsComplete
+                        ? "Complete diagnostics for all modules first."
+                        : allModulesReviewed
+                          ? "All modules reviewed. Design ready for sourcing."
+                          : `Review recommended before finalizing. ${unreviewedModuleCount} module${unreviewedModuleCount !== 1 ? "s" : ""} pending.`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1125,7 +1101,6 @@ export default function SpecifyPage(): React.ReactNode {
               revisedModuleCount={revisedModuleIds.size}
               isRegenerating={isRegeneratingImages}
               progressLines={progressLines}
-              onRegenerate={handleRegenerateDrawingsAfterRevision}
             />
 
             {/* Cross-module review issue summary with Apply Revisions — shown prominently before per-module panels */}
@@ -1205,22 +1180,122 @@ export default function SpecifyPage(): React.ReactNode {
               )
             })}
 
-            {/* Source CTA */}
-            {allDiagnosticsComplete && finalizeSummary && (
+            {/* Review CTA — proceeds to costings when review complete + images current */}
+            {(allModulesReviewed || reviewSkipped) && !imagesStale && !isRegeneratingImages ? (
               <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-success" />
                       <p className="text-sm font-semibold text-foreground">
-                        Design finalized
+                        Reviews complete
+                        {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
                       </p>
+                    </div>
+                    <Button onClick={() => handleTabClick("costing")} className="gap-1.5">
+                      View Costings
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : allDiagnosticsComplete && !allModulesReviewed && !reviewSkipped ? (
+              <Card className="border-warning/30 bg-gradient-to-r from-warning/5 to-background">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="h-4 w-4 text-warning" />
+                      <p className="text-sm font-semibold text-foreground">
+                        {unreviewedModuleCount} module{unreviewedModuleCount !== 1 ? "s" : ""} awaiting review
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={handleSkipReviews}
+                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+                      >
+                        Skip &amp; Finalize
+                      </button>
+                      {!batchReviewActive && unreviewedModuleCount > 0 && (
+                        <Button size="sm" onClick={startBatchReview} className="gap-1.5">
+                          <PlayCircle className="h-3.5 w-3.5" />
+                          Review All
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </motion.div>
+        )}
+
+        {/* ═══ Costings tab ═══ */}
+        {activeTab === "costing" && (
+          <motion.div key="costing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            {/* Header */}
+            <Card className="border-border">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-2">
+                  <PoundSterling className="h-4 w-4 text-international-orange" />
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Cost Estimation</h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {designRevision > 1
+                        ? `Based on specialist-reviewed specifications (v${designRevision}).`
+                        : "Based on your module specifications and diagnostics."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Cost estimate component (moved from Module Specs tab) */}
+            <CadLabCostEstimate
+              modules={modules}
+              diagnosticAnswers={diagnosticAnswers}
+              earlyCostEstimates={earlyCostEstimates}
+              aiCostEstimates={aiCostEstimates}
+              isEstimatingCosts={isEstimatingCosts}
+              onCostOverride={(moduleId, overrides) => {
+                setModules(prev => prev.map(m =>
+                  m.id === moduleId ? { ...m, costOverrides: overrides } : m
+                ))
+              }}
+            />
+
+            {/* Continue to Source CTA */}
+            {canProceedToSource && finalizeSummary ? (
+              <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-success" />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          Design finalized
+                          {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          All {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""} specified, reviewed, and costed.
+                        </p>
+                      </div>
                     </div>
                     <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
                       Continue to Source
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-border">
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">
+                    {isEstimatingCosts
+                      ? "Estimating costs..."
+                      : "Cost estimates will appear once the AI analysis completes."}
+                  </p>
                 </CardContent>
               </Card>
             )}
