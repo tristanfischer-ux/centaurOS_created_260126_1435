@@ -185,7 +185,7 @@ describe("createCadLabRfqAction", () => {
       ],
     })
 
-    expect(res).toEqual({ rfqId: "rfq-123" })
+    expect(res).toEqual({ rfqId: "rfq-123", broadcastCount: 0 })
     expect(mockedCreateNewRFQ).toHaveBeenCalledTimes(1)
 
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
@@ -356,7 +356,7 @@ describe("createCadLabRfqAction", () => {
       ],
     })
 
-    expect(res).toEqual({ rfqId: "rfq-quantity" })
+    expect(res).toEqual({ rfqId: "rfq-quantity", broadcastCount: 0 })
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
     expect(payload.specifications?.quantity).toBe(3000)
   })
@@ -414,7 +414,7 @@ describe("createCadLabRfqAction", () => {
       ],
     })
 
-    expect(res).toEqual({ rfqId: "rfq-mixed-quantity" })
+    expect(res).toEqual({ rfqId: "rfq-mixed-quantity", broadcastCount: 0 })
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
     expect(payload.specifications?.quantity).toBe(5000)
   })
@@ -507,7 +507,7 @@ describe("createCadLabRfqAction", () => {
       ],
     })
 
-    expect(res).toEqual({ rfqId: "rfq-artifacts" })
+    expect(res).toEqual({ rfqId: "rfq-artifacts", broadcastCount: 0 })
     const payload = mockedCreateNewRFQ.mock.calls[0][0]
     expect(payload.specifications?.attachments).toEqual([
       "https://example.com/shared/model.step",

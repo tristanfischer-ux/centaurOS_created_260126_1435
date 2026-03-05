@@ -42,7 +42,7 @@ describe("cad-lab RFQ golden benchmarks", () => {
         assumptionNotes: benchmark.assumptionNotes,
       })
 
-      expect(result).toEqual({ rfqId: `rfq-${benchmark.id}` })
+      expect(result).toEqual({ rfqId: `rfq-${benchmark.id}`, broadcastCount: 0 })
       expect(mockedCreateNewRFQ).toHaveBeenCalledTimes(1)
 
       const payload = mockedCreateNewRFQ.mock.calls[0][0]
