@@ -243,6 +243,7 @@ export interface CadLabContextValue {
   // AI-powered cost estimates (keyed by moduleId)
   aiCostEstimates: Record<string, AiCostEstimate>
   isEstimatingCosts: boolean
+  costEstimationError: string | null
 
   // Decomposition connections (highest-fidelity edge source)
   decompositionConnections: ModuleConnection[]
@@ -514,6 +515,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // AI cost estimates (keyed by moduleId)
   const [aiCostEstimates, setAiCostEstimates] = useState<Record<string, AiCostEstimate>>({})
   const [isEstimatingCosts, setIsEstimatingCosts] = useState(false)
+  const [costEstimationError, setCostEstimationError] = useState<string | null>(null)
   const aiCostFingerprintRef = useRef<string>("")
 
   // Decomposition connections (AI-declared inter-module topology)
@@ -692,8 +694,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // The fingerprint includes module content, so post-revision changes auto-trigger re-estimation.
   useEffect(() => {
     if (!activeProjectIdRef.current || modules.length === 0 || isEstimatingCosts) return
-    // Gate: costs only calculated after specialist review (or explicit skip)
-    if (!allModulesReviewed && !reviewSkipped) return
     const allComplete = modules.every((mod) => {
       const answers = diagnosticAnswers[mod.id]
       if (!answers) return false
@@ -712,18 +712,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     aiCostFingerprintRef.current = fp
     const pid = activeProjectIdRef.current
     setIsEstimatingCosts(true)
+    setCostEstimationError(null)
     estimateModuleCostsAi(modules, diagnosticAnswers, editableReport.slice(0, 2000), productOverview || undefined)
       .then((res) => {
         if (res.success) {
           setAiCostEstimates(res.estimates)
+          setCostEstimationError(null)
           if (pid) saveCadLabAiCostEstimates(pid, res.estimates).catch(console.error)
         } else {
           console.warn("[CAD-LAB] AI cost estimation failed:", res.error)
+          setCostEstimationError(res.error)
         }
       })
-      .catch(console.error)
+      .catch((err) => {
+        console.error("[CAD-LAB] AI cost estimation exception:", err)
+        setCostEstimationError(err instanceof Error ? err.message : "Unknown error")
+      })
       .finally(() => setIsEstimatingCosts(false))
-  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview, allModulesReviewed, reviewSkipped])
+  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview])
 
   // ── Browser notification helper ──
   const sendNotification = useCallback((title: string, body: string) => {
@@ -3246,6 +3252,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     earlyCostEstimates,
     aiCostEstimates,
     isEstimatingCosts,
+    costEstimationError,
     decompositionConnections,
     interfaceContracts,
     isExtractingContracts,

@@ -157,7 +157,7 @@ export type GenerationEvent =
   | { type: "cost_estimate"; estimate: EarlyCostEstimate }
   | { type: "progress"; message: string }
   | { type: "complete"; module: CadLabModule }
-  | { type: "unified_complete"; result: Omit<CadLabResult, "stlData" | "stepData">; code: string }
+  | { type: "unified_complete"; result: Omit<CadLabResult, "stepData">; code: string }
   | { type: "error"; message: string }
 
 // ─── Result Types ────────────────────────────────────────────────────
@@ -200,6 +200,8 @@ export interface CadLabResult {
   stlUrl?: string
   /** STL file size in KB */
   stlSize?: number
+  /** Persistent GLB file URL (from image-to-3D providers) */
+  glbUrl?: string
   /** Bounding box dimensions in mm */
   bbox?: { xLen: number; yLen: number; zLen: number }
   /** Volume fill ratio (%) */
@@ -305,6 +307,13 @@ export interface VisualStyleSpec {
   spatialPrinciples?: string[]
   /** AI-crafted per-module image prompts keyed by module ID — all crafted together for cross-module consistency */
   perModuleImagePrompts?: Record<string, string>
+
+  /** Opus-crafted CAD geometry prompt (300-500 words). Describes parametric shape,
+   * dimensional constraints, assembly hierarchy, and interface geometry for text-to-CAD
+   * APIs (Zoo.dev). Unlike heroImagePrompt (optimized for image generation), this focuses
+   * on engineering geometry: envelope dimensions, feature relationships, tolerances,
+   * and spatial constraints. */
+  cadGeometryPrompt?: string
 }
 
 // ─── Module Types ────────────────────────────────────────────────────
@@ -384,6 +393,8 @@ export interface CadLabModule {
     hoursPerKg?: number
     hourlyRate?: number
     massKg?: number
+    /** V2: simple total override per module */
+    totalPerUnit?: number
   }
 
   /** Snapshot of text fields before revision, for redline diff display */
@@ -774,24 +785,53 @@ export interface BomTreeNode {
 
 // ─── AI Cost Estimation Types ─────────────────────────────────────────
 
-/** Structured per-module cost estimate produced by AI (Claude Haiku). */
+/** A single part within a module cost estimate — either bought or manufactured. */
+export interface PartCostEstimate {
+  /** Part name (e.g. "NEMA 23 stepper motor", "Steel frame rails (×2)") */
+  name: string
+  /** "buy" = purchased/COTS part, "make" = manufactured in-house or by supplier */
+  type: "buy" | "make"
+  /** Estimated cost in GBP */
+  cost: number
+  /** Plain English reasoning for this part's cost */
+  reasoning: string
+}
+
+/** Structured per-module cost estimate produced by AI (Claude Haiku).
+ *
+ * V2 uses parts-level breakdown (parts, labourCost, labourReasoning).
+ * V1 fields (materialCostPerUnit, processingCostPerUnit, etc.) are kept
+ * optional for backward compatibility with saved DB data.
+ */
 export interface AiCostEstimate {
   moduleId: string
-  estimatedMassKg: number
-  massReasoning: string
-  materialCostPerUnit: number
-  materialBreakdown: string
-  processingCostPerUnit: number
-  processingBreakdown: string
-  toolingCost: number
-  toolingReasoning: string
-  toleranceMultiplier: number
-  finishMultiplier: number
-  environmentMultiplier: number
-  adjustmentReasoning: string
   totalPerUnit: number
   confidence: "low" | "medium" | "high"
   assumptions: string[]
+
+  // ── V2: Parts-level breakdown ──
+  /** Individual part cost estimates */
+  parts?: PartCostEstimate[]
+  /** Assembly/integration labour cost in GBP */
+  labourCost?: number
+  /** Reasoning for the labour estimate */
+  labourReasoning?: string
+  /** Overall reasoning / summary for the estimate */
+  reasoning?: string
+
+  // ── V1: Legacy formula fields (optional for backward compat) ──
+  estimatedMassKg?: number
+  massReasoning?: string
+  materialCostPerUnit?: number
+  materialBreakdown?: string
+  processingCostPerUnit?: number
+  processingBreakdown?: string
+  toolingCost?: number
+  toolingReasoning?: string
+  toleranceMultiplier?: number
+  finishMultiplier?: number
+  environmentMultiplier?: number
+  adjustmentReasoning?: string
 }
 
 /** Pipeline stage for the 4-stage product development flow */

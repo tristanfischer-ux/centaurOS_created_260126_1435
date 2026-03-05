@@ -142,6 +142,7 @@ export default function SpecifyPage(): React.ReactNode {
     earlyCostEstimates,
     aiCostEstimates,
     isEstimatingCosts,
+    costEstimationError,
     activeProjectId,
     generatingModuleIds,
     researchModelUsed, decompositionModelUsed,
@@ -1257,6 +1258,7 @@ export default function SpecifyPage(): React.ReactNode {
               earlyCostEstimates={earlyCostEstimates}
               aiCostEstimates={aiCostEstimates}
               isEstimatingCosts={isEstimatingCosts}
+              costEstimationError={costEstimationError}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m
