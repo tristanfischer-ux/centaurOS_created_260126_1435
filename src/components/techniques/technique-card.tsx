@@ -105,6 +105,8 @@ interface TechniqueCardProps {
   isSaved?: boolean
   /** Called to toggle save state. Receives technique ID. */
   onSaveToggle?: (techniqueId: string) => void
+  /** Number of real-world suppliers offering this technique (from enrichment) */
+  supplierCount?: number
   /** Additional CSS classes */
   className?: string
 }
@@ -117,6 +119,7 @@ export function TechniqueCard({
   onSelectionChange,
   isSaved = false,
   onSaveToggle,
+  supplierCount,
   className,
 }: TechniqueCardProps) {
   const Icon = CATEGORY_ICONS[technique.category]
@@ -222,6 +225,15 @@ export function TechniqueCard({
             </Badge>
           )}
         </div>
+
+        {/* Supplier count badge */}
+        {supplierCount != null && supplierCount > 0 && (
+          <div className="flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-international-orange border-international-orange/30">
+              {supplierCount} {supplierCount === 1 ? 'supplier' : 'suppliers'}
+            </Badge>
+          </div>
+        )}
 
         {/* Footer: batch size + lead time */}
         <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-1 border-t border-muted">

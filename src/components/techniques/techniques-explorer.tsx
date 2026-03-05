@@ -34,6 +34,7 @@ import type {
   BatchSize,
 } from '@/lib/manufacturing-techniques/types'
 import { useSavedTechniques } from '@/hooks/useSavedTechniques'
+import { getAllTechniqueEnrichments } from '@/actions/manufacturing-techniques'
 import { TechniqueCard } from './technique-card'
 import { TechniqueFilters } from './technique-filters'
 import { TechniqueDetailDialog } from './technique-detail-dialog'
@@ -65,6 +66,18 @@ export function TechniquesExplorer() {
 
   // Saved techniques (localStorage-backed)
   const { savedIds, savedCount, toggleSaved, isSaved } = useSavedTechniques()
+
+  // Enrichment supplier counts (from Supabase)
+  const [supplierCounts, setSupplierCounts] = useState<Record<string, number>>({})
+  useEffect(() => {
+    getAllTechniqueEnrichments().then(enrichments => {
+      const counts: Record<string, number> = {}
+      for (const e of enrichments) {
+        if (e.supplier_count > 0) counts[e.technique_slug] = e.supplier_count
+      }
+      setSupplierCounts(counts)
+    })
+  }, [])
 
   // Debounce search
   useEffect(() => {
@@ -314,6 +327,7 @@ export function TechniquesExplorer() {
               }
               isSaved={isSaved(technique.id)}
               onSaveToggle={toggleSaved}
+              supplierCount={supplierCounts[technique.slug]}
             />
           ))}
         </div>
