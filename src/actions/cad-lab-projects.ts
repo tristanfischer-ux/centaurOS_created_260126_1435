@@ -27,6 +27,7 @@ import type {
   InterfaceContractResult,
   ModuleConnection,
   SpecialistReview,
+  AiCostEstimate,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 
@@ -114,6 +115,15 @@ export interface CadLabProjectData {
 
   /** Specialist reviews per module (keyed by moduleId → array of reviews) */
   reviews: Record<string, SpecialistReview[]> | null
+
+  /** AI-powered cost estimates per module (keyed by moduleId) */
+  aiCostEstimates: Record<string, AiCostEstimate> | null
+
+  /** Project-level design version (v1 = initial, v2+ = post-review revision) */
+  designRevision: number
+
+  /** Which design revision the images were last generated at */
+  imagesGeneratedAtRevision: number
 
   createdAt: string
   updatedAt: string
@@ -226,6 +236,9 @@ export async function loadCadLabProject(
         unifiedResult: (project.unified_result as CadLabProjectData["unifiedResult"]) ?? null,
         unifiedCode: project.unified_code ?? null,
         reviews: (project.reviews as Record<string, SpecialistReview[]> | null) ?? null,
+        aiCostEstimates: (project.ai_cost_estimates as Record<string, AiCostEstimate> | null) ?? null,
+        designRevision: (project.design_revision as number) ?? 1,
+        imagesGeneratedAtRevision: (project.images_generated_at_revision as number) ?? 1,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },
@@ -730,6 +743,41 @@ export async function saveCadLabDecompositionConnections(
   })
 }
 
+// ─── Save Design Revision ─────────────────────────────────────────────
+
+/**
+ * Persists the project-level design revision + image freshness counters.
+ *
+ * @param projectId - Project to update
+ * @param designRevision - Current design version (v1 = initial, v2+ = post-review)
+ * @param imagesGeneratedAtRevision - Which revision the images were last generated at
+ * @returns Success or error
+ */
+export async function saveCadLabDesignRevision(
+  projectId: string,
+  designRevision: number,
+  imagesGeneratedAtRevision: number,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({
+        design_revision: designRevision,
+        images_generated_at_revision: imagesGeneratedAtRevision,
+      })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save design revision:", error.message)
+      return { error: `Failed to save design revision: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
 // ─── Link Project to RFQ ─────────────────────────────────────────────
 
 /**
@@ -1061,5 +1109,35 @@ export async function rateModuleQuality(
     })
 
     return { success: true }
+  })
+}
+
+// ─── Save AI Cost Estimates ──────────────────────────────────────────
+
+/**
+ * Persists AI-generated cost estimates for a Cad Lab project.
+ *
+ * @param projectId - Project to update
+ * @param estimates - AI cost estimates keyed by module ID
+ * @returns Success or error
+ */
+export async function saveCadLabAiCostEstimates(
+  projectId: string,
+  estimates: Record<string, AiCostEstimate>,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ ai_cost_estimates: estimates as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save AI cost estimates:", error.message)
+      return { error: `Failed to save AI cost estimates: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
   })
 }

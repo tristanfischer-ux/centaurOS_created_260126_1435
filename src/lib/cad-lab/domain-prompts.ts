@@ -421,8 +421,12 @@ const MODULE_EXPANSION_ROLE: Record<CadLabDomain, string> = {
     "You are a senior fluid-systems engineer providing detailed specifications for a single fluid system sub-assembly.",
 }
 
-export function getModuleExpansionPrompt(domain: CadLabDomain): string {
-  return `${MODULE_EXPANSION_ROLE[domain]}\n\n${BASE_MODULE_EXPANSION}`
+export function getModuleExpansionPrompt(domain: CadLabDomain, consistencyBrief?: string): string {
+  const role = MODULE_EXPANSION_ROLE[domain]
+  if (consistencyBrief) {
+    return `${role}\n\nPRODUCT DESIGN IDENTITY (your expansion MUST conform to these constraints):\n${consistencyBrief}\nYour materials, dimensions, and descriptions must be consistent with this identity.\n\n${BASE_MODULE_EXPANSION}`
+  }
+  return `${role}\n\n${BASE_MODULE_EXPANSION}`
 }
 
 // ─── Visual style spec prompt (cohesive illustrations) ────────────────
@@ -499,6 +503,104 @@ RULES:
  */
 export function getDesignSynthesisPrompt(): string {
   return DESIGN_SYNTHESIS_SYSTEM_PROMPT
+}
+
+// ─── Product Identity prompt (convergent refinement Phase 1b) ─────────
+
+const PRODUCT_IDENTITY_SYSTEM_PROMPT = `You are a senior industrial designer establishing a product's design identity from research data. Your output will constrain ALL subsequent module engineering to ensure cross-module consistency.
+
+Given a product description and research report, establish the product-level design language, form factor, materials, and consistency rules.
+
+Output STRICTLY as JSON with exactly these 8 fields:
+
+{
+  "designLanguage": "3-5 word description of the product's industrial design language (e.g. 'rugged modular industrial', 'sleek consumer minimalist', 'precision scientific instrument')",
+  "consistencyBrief": "2-4 sentences of concrete rules all modules must follow. Specify: primary material and finish, secondary materials, connector style, mounting approach, color coding scheme. Example: 'All structural housings use 6061-T6 aluminum with bead-blasted finish. Interface connectors face the rear panel. PCB enclosures use sheet steel with black powder coat. Fasteners are M3 stainless steel socket-head cap screws throughout.'",
+  "spatialPrinciples": ["Spatial arrangement rule 1", "Spatial arrangement rule 2"],
+  "colorPalette": "3-4 dominant colors described by name appropriate for this product's domain and materials",
+  "materialRendering": "How surfaces and materials should be rendered (specific enough to be visually consistent)",
+  "unifyingContext": "A short phrase framing every module as part of one system",
+  "productFormDescription": "60-120 words. Purely geometric description of the product's overall shape, silhouette, and proportions. No module names or part numbers.",
+  "overallDimensionsMm": "Overall product dimensions in 'W × D × H mm' format from research data, or null if not found"
+}
+
+RULES:
+- Output ONLY valid JSON — no markdown, no explanation
+- Be SPECIFIC about materials, finishes, and proportions — vague briefs produce inconsistent modules
+- spatialPrinciples: 2-4 rules about how modules arrange physically (e.g. "stacked vertically on DIN rail", "radial from central hub")
+- consistencyBrief is the most critical field — it directly constrains every module expansion
+- Use ONLY information present in the research report. Do NOT invent dimensions or materials.
+- This identity will be injected into every module expansion prompt, so keep it concise but complete`
+
+/**
+ * Returns the system prompt for establishing product design identity.
+ *
+ * @description Used in Phase 1b (parallel with skeleton) to establish
+ * product-level design constraints before module expansion begins.
+ */
+export function getProductIdentityPrompt(): string {
+  return PRODUCT_IDENTITY_SYSTEM_PROMPT
+}
+
+// ─── Design Reconciliation prompt (convergent refinement Phase 3) ─────
+
+const DESIGN_RECONCILIATION_SYSTEM_PROMPT = `You are a senior industrial designer reviewing all expanded modules for cross-module visual, dimensional, and material consistency. You have the complete product identity and all expanded modules.
+
+Your job: (1) correct any cross-module inconsistencies, (2) produce a unified visual style, (3) craft a hero image prompt, and (4) craft per-module image prompts — all TOGETHER so they share one visual language.
+
+Output STRICTLY as JSON with exactly these 3 top-level fields:
+
+{
+  "modulePatch": {
+    "module-id": {
+      "description": "corrected description (only if inconsistent with product identity)",
+      "materialNotes": "corrected material reference (only if mismatched at interfaces)",
+      "dimensionNotes": "corrected dimension/proportion (only if doesn't fit product envelope)"
+    }
+  },
+  "visualStyle": {
+    "colorPalette": "3-4 dominant colors by name",
+    "materialRendering": "How surfaces should be rendered consistently",
+    "unifyingContext": "Short phrase framing every module as part of one system",
+    "productFormDescription": "150-300 words. Purely geometric description of the complete product shape.",
+    "moduleGeometryMap": { "Module Name": "50-100 words of visible geometry description" },
+    "heroImagePrompt": "300-500 words. Complete self-contained image generation prompt for a hero illustration. Describe the product silhouette and form, then each major section by geometry and position WITHOUT module names. Use spatial language ('front-left quadrant contains...', 'centered on top surface...'). Specify color coding per section using colorPalette. Include material rendering. Camera angle: 30-degree isometric, slightly above and right. Describe exploded or semi-transparent view showing internal arrangement. End with: white background, thin precise lines, engineering grid, NO text/labels/annotations.",
+    "overallDimensionsMm": "W × D × H mm or null",
+    "moduleDimensionNotes": { "Module Name": "Absolute dims + proportional relationship to whole" },
+    "designLanguage": "The product's design language from the identity brief",
+    "consistencyBrief": "The consistency rules from the identity brief",
+    "spatialPrinciples": ["Spatial arrangement principles"]
+  },
+  "perModuleImagePrompts": {
+    "module-id": "150-200 words. Zoomed-in detail view of this module. Reference the same product context and visual language as the hero. Describe the module's geometry, materials, key visible components, and spatial relationship to adjacent modules. Use consistent color coding from visualStyle. Specify: isometric perspective, white background, engineering aesthetic, ZERO text/labels/annotations."
+  }
+}
+
+RULES:
+- Output ONLY valid JSON — no markdown, no explanation
+- modulePatch: ONLY include modules that need correction. Omit modules that are already consistent. Only adjust for cross-module consistency — do NOT rewrite engineering content.
+  - Fix dimensional mismatches (module dimensions must fit within product envelope)
+  - Align materials at interfaces (connected modules must agree on interface materials)
+  - Correct proportional inconsistencies
+- heroImagePrompt MUST be self-contained (300-500 words) — no references to other fields
+- CRITICAL: heroImagePrompt and ALL perModuleImagePrompts must contain ZERO module names, part numbers, or technical labels. Image models render text as garbled characters. Describe components by geometry, position, and function only.
+- perModuleImagePrompts: one entry per module (keyed by module ID), each 150-200 words
+- heroImagePrompt and perModuleImagePrompts must be crafted TOGETHER — they are views of the same product
+- perModuleImagePrompts should describe zoomed-in detail views that match the hero composition
+- Use consistent color coding, material language, and perspective across ALL prompts
+- Reference spatial relationships between modules (connected modules are physically adjacent)
+- DIMENSIONAL DATA: Use ONLY dimensions from source data. NEVER invent dimensions. Include proportional relationships.`
+
+/**
+ * Returns the system prompt for cross-module design reconciliation.
+ *
+ * @description Used in Phase 3 (after all modules are expanded) to reconcile
+ * cross-module inconsistencies and craft unified image prompts. Replaces the
+ * old design synthesis step with a more comprehensive reconciliation that also
+ * produces per-module image prompts for visual consistency.
+ */
+export function getDesignReconciliationPrompt(): string {
+  return DESIGN_RECONCILIATION_SYSTEM_PROMPT
 }
 
 // ─── Diagnostics pre-fill prompts ─────────────────────────────────────

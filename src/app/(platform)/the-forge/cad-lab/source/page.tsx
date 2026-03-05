@@ -79,6 +79,8 @@ export default function SourcePage(): React.ReactNode {
     manufacturingOrderCount,
     refreshManufacturingOrderCount,
     setModules,
+    aiCostEstimates,
+    isEstimatingCosts,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -405,6 +407,8 @@ export default function SourcePage(): React.ReactNode {
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
               shortlistedSupplierCount={shortlistedSuppliers.size}
+              aiCostEstimates={aiCostEstimates}
+              isEstimatingCosts={isEstimatingCosts}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

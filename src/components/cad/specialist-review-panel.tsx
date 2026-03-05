@@ -14,7 +14,7 @@
  * - Build page: src/app/(platform)/the-forge/cad-lab/build/page.tsx
  */
 
-import { useState, useCallback, useMemo } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import Image from "next/image"
 import {
     CheckCircle2,
@@ -80,6 +80,10 @@ interface SpecialistReviewPanelProps {
     onMarkPending?: (moduleId: string, specialistId: string) => void
     /** Clear a pending review (on error) */
     onClearPending?: (moduleId: string, specialistId: string) => void
+    /** Specialist ID to auto-trigger (set by batch review orchestrator) */
+    triggerReview?: string
+    /** Called when auto-triggered review fails (so batch can advance) */
+    onReviewError?: (error: string) => void
 }
 
 // ─── Verdict Badge ──────────────────────────────────────────────────
@@ -244,12 +248,25 @@ export function SpecialistReviewPanel({
     pendingReviewKeys,
     onMarkPending,
     onClearPending,
+    triggerReview,
+    onReviewError,
 }: SpecialistReviewPanelProps) {
     const [loadingSpecialist, setLoadingSpecialist] = useState<string | null>(null)
     const [detailLoading, setDetailLoading] = useState<string | null>(null)
     const [quickVerdicts, setQuickVerdicts] = useState<Record<string, QuickVerdictResult>>({})
     const [error, setError] = useState<string | null>(null)
     const [showOtherSpecialists, setShowOtherSpecialists] = useState(false)
+
+    // INTENT: Auto-trigger review when batch orchestrator sets triggerReview prop.
+    // Only fires when prop changes and no review is already in progress.
+    const triggerFiredRef = useRef<string | null>(null)
+    useEffect(() => {
+        if (triggerReview && triggerReview !== triggerFiredRef.current && !loadingSpecialist && !detailLoading) {
+            triggerFiredRef.current = triggerReview
+            handleRequestReview(triggerReview)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [triggerReview])
 
     // INTENT: Rank specialists by relevance to this module's text and diagnostics.
     // The top pick becomes the primary CTA; the rest are in an expandable section.
@@ -305,6 +322,7 @@ export function SpecialistReviewPanel({
             if ("error" in fullResult) {
                 setError(fullResult.error)
                 onClearPending?.(module.id, specialistId)
+                onReviewError?.(fullResult.error)
             } else {
                 // Clear quick verdict — full review replaces it
                 setQuickVerdicts(prev => {
@@ -316,12 +334,14 @@ export function SpecialistReviewPanel({
                 onReviewComplete?.(fullResult.review)
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Review failed")
+            const msg = err instanceof Error ? err.message : "Review failed"
+            setError(msg)
             setLoadingSpecialist(null)
             setDetailLoading(null)
             onClearPending?.(module.id, specialistId)
+            onReviewError?.(msg)
         }
-    }, [buildSlimRequest, onReviewComplete, onMarkPending, onClearPending, module.id])
+    }, [buildSlimRequest, onReviewComplete, onReviewError, onMarkPending, onClearPending, module.id])
 
     // Which specialists have already reviewed
     const reviewedBy = new Set(reviews.map(r => r.specialistId))

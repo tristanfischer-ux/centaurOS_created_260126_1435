@@ -40,7 +40,8 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { estimateModuleCostsAi } from "@/actions/cad-lab-cost"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { ReferenceModel } from "@/actions/reference-models"
@@ -73,6 +74,7 @@ import type {
   InterfaceContract,
   ModuleConnection,
   SpecialistReview,
+  AiCostEstimate,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints, reviseModulesFromReviews } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -238,6 +240,10 @@ export interface CadLabContextValue {
   // P9: Early cost estimates (keyed by moduleId)
   earlyCostEstimates: Record<string, EarlyCostEstimate>
 
+  // AI-powered cost estimates (keyed by moduleId)
+  aiCostEstimates: Record<string, AiCostEstimate>
+  isEstimatingCosts: boolean
+
   // Decomposition connections (highest-fidelity edge source)
   decompositionConnections: ModuleConnection[]
 
@@ -278,6 +284,12 @@ export interface CadLabContextValue {
   handleGenerateUnifiedModel: () => Promise<void>
   handleExecuteUnifiedCode: (code: string) => Promise<void>
   handleRefineUnifiedCode: (currentCode: string, instruction: string) => Promise<string | null>
+
+  // Design revision (post-specialist-review versioning)
+  designRevision: number
+  imagesStale: boolean
+  isRegeneratingImages: boolean
+  handleRegenerateDrawingsAfterRevision: () => Promise<void>
 
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
@@ -494,6 +506,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // P9: Early cost estimates keyed by moduleId
   const [earlyCostEstimates, setEarlyCostEstimates] = useState<Record<string, EarlyCostEstimate>>({})
 
+  // AI cost estimates (keyed by moduleId)
+  const [aiCostEstimates, setAiCostEstimates] = useState<Record<string, AiCostEstimate>>({})
+  const [isEstimatingCosts, setIsEstimatingCosts] = useState(false)
+  const aiCostFingerprintRef = useRef<string>("")
+
   // Decomposition connections (AI-declared inter-module topology)
   const [decompositionConnections, setDecompositionConnections] = useState<ModuleConnection[]>([])
 
@@ -504,6 +521,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isRevising, setIsRevising] = useState(false)
   const [revisedModuleIds, setRevisedModuleIds] = useState<Set<string>>(new Set())
   const [checkpointAcknowledged, setCheckpointAcknowledged] = useState(false)
+
+  // ── Design revision (post-specialist-review versioning) ──
+  const [designRevision, setDesignRevision] = useState(1)
+  const [imagesGeneratedAtRevision, setImagesGeneratedAtRevision] = useState(1)
+  const [isRegeneratingImages, setIsRegeneratingImages] = useState(false)
+  const imagesStale = designRevision > imagesGeneratedAtRevision
+
+  // Ref-mirror for closures
+  const designRevisionRef = useRef(designRevision)
+  useEffect(() => { designRevisionRef.current = designRevision }, [designRevision])
 
   // ── Specialist reviews (lifted from Build/Specify pages for persistence) ──
   const [moduleReviews, setModuleReviews] = useState<Record<string, SpecialistReview[]>>({})
@@ -602,6 +629,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       const revisedCount = Object.keys(revised).length
+
+      // INTENT: Bump project-level design revision so images become stale
+      const nextRevision = designRevisionRef.current + 1
+      setDesignRevision(nextRevision)
+      if (activeProjectIdRef.current) {
+        saveCadLabDesignRevision(activeProjectIdRef.current, nextRevision, imagesGeneratedAtRevision)
+          .catch(err => console.error("[CAD-LAB] Failed to save design revision:", err))
+      }
+
       toast.success(`${revisedCount} module${revisedCount !== 1 ? "s" : ""} revised from specialist feedback`)
     } catch (err) {
       console.error("[CAD-LAB] Review revision failed:", err)
@@ -609,10 +645,41 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } finally {
       setIsApplyingReviewRevisions(false)
     }
-  }, [subject])
+  }, [subject, imagesGeneratedAtRevision])
 
   // ── Product overview (editable executive summary) ──
   const [productOverview, setProductOverview] = useState("")
+
+  // ── AI cost estimation auto-trigger ──
+  useEffect(() => {
+    if (!activeProjectIdRef.current || modules.length === 0 || isEstimatingCosts) return
+    const allComplete = modules.every((mod) => {
+      const answers = diagnosticAnswers[mod.id]
+      if (!answers) return false
+      return ["mfg_process", "material", "tolerance", "finish", "environment", "batch_size"]
+        .every((k) => answers[k] && answers[k].trim().length > 0)
+    })
+    if (!allComplete) return
+    const fp = modules.map((m) => {
+      const a = diagnosticAnswers[m.id] || {}
+      return `${m.id}:${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
+    }).join(";")
+    if (fp === aiCostFingerprintRef.current) return
+    aiCostFingerprintRef.current = fp
+    const pid = activeProjectIdRef.current
+    setIsEstimatingCosts(true)
+    estimateModuleCostsAi(modules, diagnosticAnswers, editableReport.slice(0, 2000), productOverview || undefined)
+      .then((res) => {
+        if (res.success) {
+          setAiCostEstimates(res.estimates)
+          if (pid) saveCadLabAiCostEstimates(pid, res.estimates).catch(console.error)
+        } else {
+          console.warn("[CAD-LAB] AI cost estimation failed:", res.error)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsEstimatingCosts(false))
+  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview])
 
   // ── Browser notification helper ──
   const sendNotification = useCallback((title: string, body: string) => {
@@ -1666,6 +1733,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     ).length
     if (finalCompleted > 0) {
       toast.success(`Generated ${finalCompleted}/${modulesToProcess.length} blueprint illustrations`)
+      // INTENT: Mark images as current at the design revision when generation completed.
+      // This covers both initial pipeline and regeneration flows.
+      const currentRev = designRevisionRef.current
+      setImagesGeneratedAtRevision(currentRev)
+      if (projectId) {
+        saveCadLabDesignRevision(projectId, currentRev, currentRev)
+          .catch(err => console.error("[CAD-LAB] Failed to save images-at-revision:", err))
+      }
     } else if (modulesToProcess.length > 0) {
       toast.error("All blueprint illustrations failed to generate. Check your API key or try again.")
     }
@@ -1688,6 +1763,78 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       systemIllustrationUrl ?? undefined,   // hero URL for upload-failure fallback
     )
   }, [modules, activeProjectId, visualStyle, systemIllustrationUrl, handleGenerateModuleImages])
+
+  // ── Regenerate drawings after specialist review revision ──
+  // INTENT: Re-runs reconciliation to get updated perModuleImagePrompts from revised
+  // specs, then regenerates per-module images. Skips hero regen (layout unchanged).
+  const handleRegenerateDrawingsAfterRevision = useCallback(async () => {
+    if (modules.length === 0 || !activeProjectId) return
+    setIsRegeneratingImages(true)
+    addProgressLine("Re-reconciling design for updated image prompts...")
+
+    try {
+      // Step 1: Re-run reconciliation with revised module data → new image prompts + visual style
+      const currentModules = modulesRef.current.map(m => ({
+        id: m.id, name: m.name, purpose: m.purpose, description: m.description,
+        keyParts: m.keyParts, inputs: m.inputs, outputs: m.outputs,
+      }))
+      const reconcileRes = await reconcileDesignAction(
+        subject,
+        currentModules,
+        decompositionConnections.length > 0 ? decompositionConnections : undefined,
+        undefined,      // researchExcerpt — not needed for regen
+        visualStyle ?? undefined,  // productIdentity — seed from existing style
+      )
+
+      if ("error" in reconcileRes) {
+        console.warn("[CAD-LAB] Reconciliation failed during drawing regen, falling back to existing prompts:", reconcileRes.error)
+        addProgressLine("Reconciliation failed — regenerating with existing prompts...")
+        // Fallback: use existing style + prompts (still better than nothing)
+        await handleRefreshModuleImages()
+        return
+      }
+
+      // Step 2: Apply new moduleImagePrompts + updated visualStyle from reconciliation
+      const { perModuleImagePrompts, visualStyle: newVisualStyle } = reconcileRes
+
+      if (newVisualStyle) {
+        setVisualStyle(newVisualStyle)
+        await saveCadLabVisualStyle(activeProjectId, newVisualStyle)
+      }
+
+      if (perModuleImagePrompts && Object.keys(perModuleImagePrompts).length > 0) {
+        setModules(prev => prev.map(m => {
+          const prompt = perModuleImagePrompts[m.id]
+          return prompt ? { ...m, moduleImagePrompt: prompt } : m
+        }))
+        // Persist updated modules with new image prompts
+        setTimeout(async () => {
+          if (activeProjectIdRef.current) {
+            await saveCadLabModules(activeProjectIdRef.current, JSON.stringify(modulesRef.current))
+          }
+        }, 100)
+      }
+
+      addProgressLine("Generating updated blueprint illustrations...")
+
+      // Step 3: Re-generate per-module images (skip hero — layout unchanged)
+      await handleGenerateModuleImages(
+        modulesRef.current,
+        activeProjectId,
+        newVisualStyle ?? visualStyle ?? undefined,
+        undefined,                           // no referenceBase64
+        undefined,                           // no moduleCrops
+        systemIllustrationUrl ?? undefined,   // hero URL as reference
+      )
+
+      addProgressLine("Drawings updated to match revised specs.")
+    } catch (err) {
+      console.error("[CAD-LAB] Drawing regeneration failed:", err)
+      toast.error("Drawing regeneration failed — try again")
+    } finally {
+      setIsRegeneratingImages(false)
+    }
+  }, [modules, activeProjectId, subject, decompositionConnections, visualStyle, systemIllustrationUrl, handleGenerateModuleImages, handleRefreshModuleImages, addProgressLine])
 
   // ── Generate CAD for a specific module ──
   const handleModuleGenerate = useCallback(async (moduleId: string, step: "interface" | "generate") => {
@@ -2467,9 +2614,26 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setModuleReviews({})
       }
 
+      // Restore AI cost estimates from database
+      if (p.aiCostEstimates && Object.keys(p.aiCostEstimates).length > 0) {
+        setAiCostEstimates(p.aiCostEstimates)
+        if (p.diagnosticAnswers && p.modules) {
+          aiCostFingerprintRef.current = p.modules.map((m) => {
+            const a = p.diagnosticAnswers?.[m.id] || {}
+            return `${m.id}:${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
+          }).join(";")
+        }
+      } else {
+        setAiCostEstimates({})
+      }
+
       // Restore unified CAD result from database
       setUnifiedResult((p.unifiedResult as CadLabResult | null) ?? null)
       setUnifiedCode(p.unifiedCode ?? null)
+
+      // Restore design revision state
+      setDesignRevision(p.designRevision ?? 1)
+      setImagesGeneratedAtRevision(p.imagesGeneratedAtRevision ?? 1)
 
       // Fetch manufacturing order count for this project
       const ordersRes = await getProjectOrders(projectId)
@@ -3030,6 +3194,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     productOverview, setProductOverview: setProductOverviewAndSave,
     handleUpdateModule,
     earlyCostEstimates,
+    aiCostEstimates,
+    isEstimatingCosts,
     decompositionConnections,
     interfaceContracts,
     isExtractingContracts,
@@ -3054,6 +3220,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     handleGenerateUnifiedModel,
     handleExecuteUnifiedCode,
     handleRefineUnifiedCode,
+    designRevision,
+    imagesStale,
+    isRegeneratingImages,
+    handleRegenerateDrawingsAfterRevision,
     initialized,
     initializeCadLab,
     handleDownload,

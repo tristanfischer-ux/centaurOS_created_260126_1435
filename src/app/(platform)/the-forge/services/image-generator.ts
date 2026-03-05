@@ -1005,12 +1005,14 @@ export async function generateModuleImage(
   referenceBase64?: string,
   moduleCropBase64?: string,
 ): Promise<{ url: string; modelUsed: string }> {
-  // DECISION: When a reference image is available, use the reference-aware prompt
-  // that instructs Gemini to match the hero's visual style. The text-only prompt
-  // (buildModulePrompt) is still used as fallback when multimodal fails.
-  const prompt = referenceBase64
-    ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
-    : buildModulePrompt(module, brief, visualStyle)
+  // DECISION: Prefer AI-crafted prompt from reconciliation when available — these are
+  // crafted together across all modules for visual consistency. Fall through to
+  // existing programmatic prompts (reference-aware or text-only) when unset.
+  const prompt = module.moduleImagePrompt
+    ? enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
+    : referenceBase64
+      ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
+      : buildModulePrompt(module, brief, visualStyle)
 
   let imageData = await callImageWithFallback(prompt, {
     aspectRatio: "3:2",

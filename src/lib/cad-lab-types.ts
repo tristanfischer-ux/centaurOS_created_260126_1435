@@ -294,6 +294,17 @@ export interface VisualStyleSpec {
   overallDimensionsMm?: string
   /** Per-module approximate dimensions and proportional notes, keyed by module name (e.g. "Ø40mm × 60mm, roughly 12% of chassis width"). */
   moduleDimensionNotes?: Record<string, string>
+
+  // ── Convergent refinement pipeline fields ──
+
+  /** Product design language established before module expansion (e.g. "industrial, modular, compact") */
+  designLanguage?: string
+  /** Rules all modules must follow for consistency (e.g. "all housings use brushed aluminum, connectors face rear") */
+  consistencyBrief?: string
+  /** Spatial arrangement principles (e.g. "stacked vertically", "radial from central hub") */
+  spatialPrinciples?: string[]
+  /** AI-crafted per-module image prompts keyed by module ID — all crafted together for cross-module consistency */
+  perModuleImagePrompts?: Record<string, string>
 }
 
 // ─── Module Types ────────────────────────────────────────────────────
@@ -759,6 +770,28 @@ export interface BomTreeNode {
   totalCost: number
   /** Rolled-up total mass (this part × qty + sum of children) */
   totalMass: number
+}
+
+// ─── AI Cost Estimation Types ─────────────────────────────────────────
+
+/** Structured per-module cost estimate produced by AI (Claude Haiku). */
+export interface AiCostEstimate {
+  moduleId: string
+  estimatedMassKg: number
+  massReasoning: string
+  materialCostPerUnit: number
+  materialBreakdown: string
+  processingCostPerUnit: number
+  processingBreakdown: string
+  toolingCost: number
+  toolingReasoning: string
+  toleranceMultiplier: number
+  finishMultiplier: number
+  environmentMultiplier: number
+  adjustmentReasoning: string
+  totalPerUnit: number
+  confidence: "low" | "medium" | "high"
+  assumptions: string[]
 }
 
 /** Pipeline stage for the 4-stage product development flow */

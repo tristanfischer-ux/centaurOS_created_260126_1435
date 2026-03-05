@@ -64,7 +64,7 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
   }
 
-  const { skillId, userContext, tone, length, includeAutoData } = body
+  const { skillId, userContext, tone, length, includeAutoData, questionAnswers } = body
 
   // VALIDATION
   if (!skillId || !userContext?.trim()) {
@@ -136,8 +136,20 @@ export async function POST(request: Request): Promise<Response> {
           "Do not include any preamble or meta-commentary — begin directly with the document content.",
         ].join("\n")
 
+        // Format Q&A block if guided questions were answered
+        let qaBlock = ""
+        if (questionAnswers && typeof questionAnswers === "object") {
+          const entries = Object.entries(questionAnswers).filter(([, a]) => a?.trim())
+          if (entries.length > 0) {
+            qaBlock = "# Clarifying Questions & Answers\n\n" +
+              entries.map(([q, a]) => `Q: ${q}\nA: ${a.trim()}`).join("\n\n") +
+              "\n\n---\n\n"
+          }
+        }
+
         const userMessage = [
           autoDataText ? `# Company Context\n\n${autoDataText}\n\n---\n\n` : "",
+          qaBlock,
           `# User Brief\n\n${userContext.trim()}`,
         ].join("")
 

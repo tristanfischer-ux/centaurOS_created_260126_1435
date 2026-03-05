@@ -75,6 +75,8 @@ export default function CadLabReviewPage(): React.ReactNode {
     activeProjectId, linkedRfqId,
     systemIllustrationUrl, researchResult,
     handleDownload,
+    aiCostEstimates,
+    isEstimatingCosts,
   } = useCadLab()
 
   const [showBuildContext, setShowBuildContext] = useState(false)
@@ -597,7 +599,7 @@ export default function CadLabReviewPage(): React.ReactNode {
           {activeTab === "Commercial" && (
             <motion.div key="Commercial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div id="cost-estimate">
-                <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} />
+                <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} aiCostEstimates={aiCostEstimates} isEstimatingCosts={isEstimatingCosts} />
               </div>
               <div id="supply-chain">
                 <CadLabSupplyChain

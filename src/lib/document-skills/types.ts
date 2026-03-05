@@ -73,6 +73,17 @@ export interface DocumentSkill {
 }
 
 // ========================
+// Guided Questions
+// ========================
+
+export interface DocumentQuestion {
+  id: string
+  question: string
+  hint: string
+  required: boolean
+}
+
+// ========================
 // Generation Request / Result
 // ========================
 
@@ -82,6 +93,7 @@ export interface GenerateDocumentRequest {
   tone: DocumentTone
   length: DocumentLength
   includeAutoData: boolean
+  questionAnswers?: Record<string, string>
 }
 
 export interface SkillDocumentResult {

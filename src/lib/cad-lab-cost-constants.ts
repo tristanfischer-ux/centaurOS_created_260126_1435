@@ -168,6 +168,50 @@ export const TOOLING_COST: Record<string, number> = {
   "Other": 0,
 }
 
+// ─── Diagnostic Multiplier Tables ────────────────────────────────────
+
+/**
+ * Tolerance multiplier — tighter tolerances require slower machining,
+ * more QC passes, and specialised tooling. Keys match diagnostic UI options exactly.
+ */
+export const TOLERANCE_MULTIPLIER: Record<string, number> = {
+  "Loose (±1mm)": 1.0,
+  "Standard (±0.5mm)": 1.15,
+  "Precision (±0.1mm)": 1.5,
+  "Tight (±0.05mm)": 2.5,
+  "Ultra-tight (±0.01mm)": 5.0,
+}
+
+/**
+ * Surface finish multiplier — post-processing adds cost proportional
+ * to the complexity of the finish operation.
+ */
+export const FINISH_MULTIPLIER: Record<string, number> = {
+  "As-manufactured": 1.0,
+  "Sanded/Deburred": 1.05,
+  "Painted/Coated": 1.15,
+  "Anodized": 1.3,
+  "Polished": 1.4,
+  "Plated": 1.5,
+  "N/A": 1.0,
+}
+
+/**
+ * Operating environment multiplier — harsh environments require better
+ * materials, coatings, and tighter QC to meet reliability targets.
+ */
+export const ENVIRONMENT_MULTIPLIER: Record<string, number> = {
+  "Indoor (office)": 1.0,
+  "Indoor (industrial)": 1.05,
+  "Outdoor (temperate)": 1.15,
+  "Outdoor (harsh)": 1.3,
+  "High temperature": 1.25,
+  "Wet/Marine": 1.3,
+  "Corrosive": 1.4,
+  "Cleanroom": 1.5,
+  "Space/Vacuum": 2.0,
+}
+
 // ─── Supplier Category Mapping ──────────────────────────────────────
 
 /**

@@ -3849,17 +3849,20 @@ export type Database = {
       }
       cad_lab_projects: {
         Row: {
+          ai_cost_estimates: Json | null
           batch_started_at: string | null
           batch_status: string
           checkpoints: Json | null
           created_at: string
           created_by: string
           decomposition_connections: Json | null
+          design_revision: number
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
           foundry_id: string
           generated_code: string | null
           id: string
+          images_generated_at_revision: number
           integrated_assembly_code: string | null
           integrated_assembly_step_url: string | null
           integrated_assembly_stl_url: string | null
@@ -3885,17 +3888,20 @@ export type Database = {
           visual_style: Json | null
         }
         Insert: {
+          ai_cost_estimates?: Json | null
           batch_started_at?: string | null
           batch_status?: string
           checkpoints?: Json | null
           created_at?: string
           created_by: string
           decomposition_connections?: Json | null
+          design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
           foundry_id: string
           generated_code?: string | null
           id?: string
+          images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null
@@ -3921,17 +3927,20 @@ export type Database = {
           visual_style?: Json | null
         }
         Update: {
+          ai_cost_estimates?: Json | null
           batch_started_at?: string | null
           batch_status?: string
           checkpoints?: Json | null
           created_at?: string
           created_by?: string
           decomposition_connections?: Json | null
+          design_revision?: number
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
           foundry_id?: string
           generated_code?: string | null
           id?: string
+          images_generated_at_revision?: number
           integrated_assembly_code?: string | null
           integrated_assembly_step_url?: string | null
           integrated_assembly_stl_url?: string | null

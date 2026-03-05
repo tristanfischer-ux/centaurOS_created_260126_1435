@@ -51,6 +51,8 @@ export interface ReviewIssueSummaryProps {
   moduleReviews: Record<string, SpecialistReview[]>
   isApplying: boolean
   onApplyRevisions: (acceptedIssues: AggregatedIssue[]) => void
+  /** When true, revisions have been applied — issue list becomes read-only */
+  revisionsApplied?: boolean
 }
 
 // ─── Severity helpers ───────────────────────────────────────────────
@@ -86,6 +88,7 @@ export function ReviewIssueSummary({
   moduleReviews,
   isApplying,
   onApplyRevisions,
+  revisionsApplied = false,
 }: ReviewIssueSummaryProps) {
   // Aggregate all issues from all reviews across all modules.
   // INTENT: Also promote recommendations to issues when the structured issue
@@ -246,6 +249,38 @@ export function ReviewIssueSummary({
               <div className="space-y-1">
                 {items.map(item => {
                   const isAccepted = accepted.has(item.key)
+
+                  // Post-revision: read-only rows with static indicators
+                  if (revisionsApplied) {
+                    return (
+                      <div
+                        key={item.key}
+                        className={cn(
+                          "flex w-full items-start gap-3 rounded-md border p-3 text-left text-sm",
+                          isAccepted
+                            ? "border-border bg-card"
+                            : "border-border/50 bg-muted/30 opacity-50",
+                        )}
+                      >
+                        <div className="mt-0.5 flex-shrink-0">
+                          {isAccepted
+                            ? <CheckCircle2 className="h-4 w-4 text-success" />
+                            : <XCircle className="h-4 w-4 text-muted-foreground" />}
+                        </div>
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={severityBadgeVariant(item.issue.severity)} className="text-[10px]">
+                              {item.issue.category}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">{item.moduleName}</span>
+                            <span className="text-xs text-muted-foreground/60">by {item.specialistName}</span>
+                          </div>
+                          <p className="text-sm text-foreground">{item.issue.message}</p>
+                        </div>
+                      </div>
+                    )
+                  }
+
                   return (
                     <button
                       key={item.key}
@@ -301,28 +336,42 @@ export function ReviewIssueSummary({
           )
         })}
 
-        {/* Apply Revisions button */}
+        {/* Footer: Apply Revisions button or post-revision summary */}
         <div className="flex items-center justify-between border-t pt-4">
-          <p className="text-xs text-muted-foreground">
-            {acceptedIssues.length} of {allIssues.length} issue{allIssues.length !== 1 ? "s" : ""} selected for revision
-          </p>
-          <Button
-            onClick={() => onApplyRevisions(acceptedIssues)}
-            disabled={acceptedIssues.length === 0 || isApplying}
-            className="gap-2"
-          >
-            {isApplying ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Revising modules…
-              </>
-            ) : (
-              <>
-                <Wrench className="h-4 w-4" />
-                Apply Revisions ({acceptedIssues.length})
-              </>
-            )}
-          </Button>
+          {revisionsApplied ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {acceptedIssues.length} issue{acceptedIssues.length !== 1 ? "s" : ""} applied, {allIssues.length - acceptedIssues.length} rejected
+              </p>
+              <div className="flex items-center gap-1.5 text-xs font-medium text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {new Set(acceptedIssues.map(i => i.moduleId)).size} module{new Set(acceptedIssues.map(i => i.moduleId)).size !== 1 ? "s" : ""} revised
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {acceptedIssues.length} of {allIssues.length} issue{allIssues.length !== 1 ? "s" : ""} selected for revision
+              </p>
+              <Button
+                onClick={() => onApplyRevisions(acceptedIssues)}
+                disabled={acceptedIssues.length === 0 || isApplying}
+                className="gap-2"
+              >
+                {isApplying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Revising modules…
+                  </>
+                ) : (
+                  <>
+                    <Wrench className="h-4 w-4" />
+                    Apply Revisions ({acceptedIssues.length})
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

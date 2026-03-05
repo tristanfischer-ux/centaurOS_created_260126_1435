@@ -60,9 +60,13 @@ import {
   PROCESS_HOURLY_RATE,
   HOURS_PER_KG,
   TOOLING_COST,
+  TOLERANCE_MULTIPLIER,
+  FINISH_MULTIPLIER,
+  ENVIRONMENT_MULTIPLIER,
   parseBatchSize,
   getModuleMassKg,
 } from "@/lib/cad-lab-cost-constants"
+import type { AiCostEstimate } from "@/lib/cad-lab-types"
 
 // ─── Chart Colors ───────────────────────────────────────────────────
 
@@ -104,6 +108,12 @@ interface ModuleCost {
   hourlyRate: number
   /** Total tooling cost (before amortization) */
   toolingTotal: number
+  /** Tolerance multiplier applied to processing cost */
+  toleranceMultiplier: number
+  /** Finish multiplier applied to processing cost */
+  finishMultiplier: number
+  /** Environment multiplier applied to processing cost */
+  environmentMultiplier: number
   /** Default (lookup table) values for reset */
   defaults: {
     materialCostPerKg: number
@@ -115,6 +125,8 @@ interface ModuleCost {
   hasOverrides: boolean
   /** Current overrides from the module (for merging in cell popovers) */
   existingOverrides?: CadLabModule["costOverrides"]
+  /** AI cost estimate for this module (if available) */
+  aiEstimate?: AiCostEstimate
 }
 
 // ─── Component ──────────────────────────────────────────────────────
@@ -130,6 +142,10 @@ interface CadLabCostEstimateProps {
   shortlistedSupplierCount?: number
   /** Early cost estimates with dimension-based mass (keyed by moduleId) */
   earlyCostEstimates?: Record<string, EarlyCostEstimate>
+  /** AI-powered cost estimates per module (keyed by moduleId) */
+  aiCostEstimates?: Record<string, AiCostEstimate>
+  /** Whether AI cost estimation is currently in progress */
+  isEstimatingCosts?: boolean
 }
 
 /**
@@ -146,8 +162,11 @@ export function CadLabCostEstimate({
   onCostOverride,
   shortlistedSupplierCount = 0,
   earlyCostEstimates,
+  aiCostEstimates,
+  isEstimatingCosts = false,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(true)
+  const [expandedReasoningId, setExpandedReasoningId] = useState<string | null>(null)
 
   const costs = useMemo((): ModuleCost[] => {
     return modules.map((mod) => {
@@ -156,6 +175,11 @@ export function CadLabCostEstimate({
       const material = answers.material || "Other"
       const batchSizeStr = answers.batch_size || "1-10 (prototyping)"
       const batchSize = parseBatchSize(batchSizeStr)
+
+      // Diagnostic multipliers (default 1.0 when not set)
+      const toleranceMultiplier = TOLERANCE_MULTIPLIER[answers.tolerance] ?? 1.0
+      const finishMultiplier = FINISH_MULTIPLIER[answers.finish] ?? 1.0
+      const environmentMultiplier = ENVIRONMENT_MULTIPLIER[answers.environment] ?? 1.0
 
       // Get mass from CAD result or multi-tier estimation fallback
       const moduleText = [mod.name, mod.purpose, ...mod.keyParts].join(" ")
@@ -174,22 +198,38 @@ export function CadLabCostEstimate({
       const defaultHoursPerKg = HOURS_PER_KG[process] ?? 3
       const defaultHourlyRate = PROCESS_HOURLY_RATE[process] ?? 50
 
-      // Merge user overrides
+      // Check for AI estimate — priority: user overrides > AI > formula
+      const aiEst = aiCostEstimates?.[mod.id]
       const overrides = mod.costOverrides
-      const massKg = overrides?.massKg ?? defaultMassKg
+      const hasOverrides = !!(overrides?.materialCostPerKg != null || overrides?.hoursPerKg != null || overrides?.hourlyRate != null || overrides?.massKg != null)
+
+      // Resolve values: user override > AI estimate > formula
+      const massKg = overrides?.massKg ?? (aiEst ? aiEst.estimatedMassKg : defaultMassKg)
       const materialCostPerKg = overrides?.materialCostPerKg ?? defaultMaterialCostPerKg
       const hoursPerKg = overrides?.hoursPerKg ?? defaultHoursPerKg
       const hourlyRate = overrides?.hourlyRate ?? defaultHourlyRate
 
-      const hasOverrides = !!(overrides?.materialCostPerKg != null || overrides?.hoursPerKg != null || overrides?.hourlyRate != null || overrides?.massKg != null)
-
       const isCostEstimated = (MATERIAL_COST_CONFIDENCE[material] ?? "estimate") === "estimate"
-      const materialCost = massKg * materialCostPerKg
 
-      const processCost = massKg * hoursPerKg * hourlyRate
+      // When AI estimates exist and no user overrides, use AI numbers directly
+      let materialCost: number
+      let processCost: number
+      let toolingTotal: number
+      let toolingCostPerUnit: number
 
-      const toolingTotal = TOOLING_COST[process] ?? 0
-      const toolingCostPerUnit = batchSize > 0 ? toolingTotal / batchSize : toolingTotal
+      if (aiEst && !hasOverrides) {
+        materialCost = aiEst.materialCostPerUnit
+        processCost = aiEst.processingCostPerUnit
+        toolingTotal = aiEst.toolingCost
+        toolingCostPerUnit = batchSize > 0 ? toolingTotal / batchSize : toolingTotal
+      } else {
+        materialCost = massKg * materialCostPerKg
+        // Apply diagnostic multipliers to processing cost
+        const baseProcessCost = massKg * hoursPerKg * hourlyRate
+        processCost = baseProcessCost * toleranceMultiplier * finishMultiplier * environmentMultiplier
+        toolingTotal = TOOLING_COST[process] ?? 0
+        toolingCostPerUnit = batchSize > 0 ? toolingTotal / batchSize : toolingTotal
+      }
 
       const totalPerUnit = materialCost + processCost + toolingCostPerUnit
 
@@ -204,12 +244,15 @@ export function CadLabCostEstimate({
         process,
         material,
         batchSize,
-        isEstimated,
+        isEstimated: aiEst ? false : isEstimated,
         isCostEstimated,
         materialCostPerKg,
         hoursPerKg,
         hourlyRate,
         toolingTotal,
+        toleranceMultiplier,
+        finishMultiplier,
+        environmentMultiplier,
         defaults: {
           materialCostPerKg: defaultMaterialCostPerKg,
           hoursPerKg: defaultHoursPerKg,
@@ -218,9 +261,10 @@ export function CadLabCostEstimate({
         },
         hasOverrides,
         existingOverrides: overrides,
+        aiEstimate: aiEst,
       }
     })
-  }, [modules, diagnosticAnswers, earlyCostEstimates])
+  }, [modules, diagnosticAnswers, earlyCostEstimates, aiCostEstimates])
 
   // Build a stable index map: moduleId → original position (for numbering)
   const moduleIndexMap = useMemo(() => {
@@ -267,6 +311,11 @@ export function CadLabCostEstimate({
             <span className="text-xs font-normal font-mono text-foreground bg-muted px-2 py-0.5 rounded">
               {formatCurrency(systemTotal)} / unit
             </span>
+            {isEstimatingCosts && (
+              <span className="text-[10px] font-normal text-muted-foreground animate-pulse">
+                Refining estimates…
+              </span>
+            )}
           </CardTitle>
           {isExpanded ? (
             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -408,13 +457,66 @@ export function CadLabCostEstimate({
                           {moduleIndexMap.get(c.moduleId) ?? 0}
                         </span>
                         {c.moduleName}
-                        {c.isEstimated && (
+                        {c.aiEstimate ? (
+                          <span
+                            className={cn(
+                              "inline-block h-2 w-2 rounded-full flex-shrink-0",
+                              c.aiEstimate.confidence === "high" && "bg-success",
+                              c.aiEstimate.confidence === "medium" && "bg-status-warning",
+                              c.aiEstimate.confidence === "low" && "bg-destructive",
+                            )}
+                            title={`AI confidence: ${c.aiEstimate.confidence}`}
+                          />
+                        ) : c.isEstimated ? (
                           <span className="text-[10px] font-mono text-status-warning" title="Mass estimated">~</span>
+                        ) : null}
+                        {c.aiEstimate && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedReasoningId(expandedReasoningId === c.moduleId ? null : c.moduleId)}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                            title="Show AI reasoning"
+                          >
+                            {expandedReasoningId === c.moduleId ? (
+                              <ChevronDown className="h-3 w-3" />
+                            ) : (
+                              <ChevronRight className="h-3 w-3" />
+                            )}
+                          </button>
                         )}
                       </div>
                       <div className="text-[10px] text-muted-foreground font-mono mt-0.5 ml-[26px]">
                         {c.process} · {c.material} · {c.massKg.toFixed(1)}kg
+                        {(c.toleranceMultiplier !== 1 || c.finishMultiplier !== 1 || c.environmentMultiplier !== 1) && !c.aiEstimate && (
+                          <span className="text-international-orange ml-1">
+                            ×{(c.toleranceMultiplier * c.finishMultiplier * c.environmentMultiplier).toFixed(2)}
+                          </span>
+                        )}
                       </div>
+                      {/* Expandable AI reasoning panel */}
+                      {expandedReasoningId === c.moduleId && c.aiEstimate && (
+                        <div className="mt-2 ml-[26px] p-2 bg-muted/50 rounded text-[10px] text-muted-foreground space-y-1.5">
+                          <div><span className="font-semibold text-foreground">Mass:</span> {c.aiEstimate.massReasoning}</div>
+                          <div><span className="font-semibold text-foreground">Material:</span> {c.aiEstimate.materialBreakdown}</div>
+                          <div><span className="font-semibold text-foreground">Processing:</span> {c.aiEstimate.processingBreakdown}</div>
+                          {c.aiEstimate.toolingCost > 0 && (
+                            <div><span className="font-semibold text-foreground">Tooling:</span> {c.aiEstimate.toolingReasoning}</div>
+                          )}
+                          <div><span className="font-semibold text-foreground">Adjustments:</span> {c.aiEstimate.adjustmentReasoning}</div>
+                          {c.aiEstimate.assumptions.length > 0 && (
+                            <div>
+                              <span className="font-semibold text-foreground">Assumptions:</span>
+                              <ul className="list-disc ml-3 mt-0.5">
+                                {c.aiEstimate.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+                              </ul>
+                            </div>
+                          )}
+                          {/* Formula comparison */}
+                          <div className="pt-1 border-t border-border/50 text-[9px]">
+                            <span className="text-muted-foreground">Formula estimate: {formatCurrency(c.defaults.massKg * c.materialCostPerKg + c.defaults.massKg * c.hoursPerKg * c.hourlyRate * c.toleranceMultiplier * c.finishMultiplier * c.environmentMultiplier + (c.batchSize > 0 ? (TOOLING_COST[c.process] ?? 0) / c.batchSize : 0))}</span>
+                          </div>
+                        </div>
+                      )}
                     </td>
                     <td className="p-2 text-right font-mono text-foreground">
                       <MaterialCostCell cost={c} onCostOverride={onCostOverride} />

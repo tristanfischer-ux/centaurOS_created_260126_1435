@@ -2399,6 +2399,7 @@ export async function expandModuleDetail(
   researchReport: string,
   modelId: ClaudeModelId = "claude-opus-4-6",
   domainHint?: CadLabDomain,
+  consistencyBrief?: string,
 ): Promise<ModuleExpansionResult> {
   // AUTH: Verify user is authenticated (no separate rate limit — skeleton already rate-limited)
   const supabase = await createClient()
@@ -2410,7 +2411,7 @@ export async function expandModuleDetail(
 
   try {
     const domain = domainHint ?? detectDomainFromText(researchReport)
-    const systemPrompt = getModuleExpansionPrompt(domain)
+    const systemPrompt = getModuleExpansionPrompt(domain, consistencyBrief)
 
     // DECISION: Truncate research report — expansion only needs context, not full detail
     const truncatedReport = researchReport.length > 8_000

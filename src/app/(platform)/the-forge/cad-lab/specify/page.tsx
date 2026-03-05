@@ -16,7 +16,7 @@
  * Gate: redirects to /the-forge/cad-lab (Design stage) if no research/modules exist.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -34,6 +34,8 @@ import {
   Lightbulb,
   Zap,
   RefreshCw,
+  PlayCircle,
+  XCircle,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -71,6 +73,8 @@ import type { SpecialistReview } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { ReviewIssueSummary } from "@/components/cad/review-issue-summary"
 import type { AggregatedIssue } from "@/components/cad/review-issue-summary"
+import { DesignRevisionBanner } from "@/components/cad/design-revision-banner"
+import { recommendSpecialist } from "@/lib/cad-lab/recommend-specialist"
 import { RedlineDiff } from "../components/redline-diff"
 import { buildRevisionItems } from "../components/checkpoint-revision-diffs"
 
@@ -133,6 +137,8 @@ export default function SpecifyPage(): React.ReactNode {
     isExtractingContracts,
     unmatchedPorts,
     earlyCostEstimates,
+    aiCostEstimates,
+    isEstimatingCosts,
     activeProjectId,
     generatingModuleIds,
     isGeneratingImages,
@@ -141,6 +147,11 @@ export default function SpecifyPage(): React.ReactNode {
     revisedModuleIds,
     isApplyingReviewRevisions,
     handleApplyReviewRevisions,
+    designRevision,
+    imagesStale,
+    isRegeneratingImages,
+    handleRegenerateDrawingsAfterRevision,
+    progressLines,
   } = useCadLab()
 
   // INTENT: Compute model audit data from modules for attribution display.
@@ -278,6 +289,73 @@ export default function SpecifyPage(): React.ReactNode {
       materials: Array.from(materials).join(", ") || "Not specified",
     }
   }, [canProceedToSource, modules, diagnosticAnswers])
+
+  // ── Batch review orchestrator ──
+  // INTENT: Sequential auto-review of all unreviewed modules. Reuses SpecialistReviewPanel's
+  // existing two-phase flow (quick verdict → full review) by setting triggerReview prop
+  // on one module at a time, then advancing on completion or error.
+
+  const [batchReviewActive, setBatchReviewActive] = useState(false)
+  const [batchCurrentModuleId, setBatchCurrentModuleId] = useState<string | null>(null)
+  const [batchCompletedCount, setBatchCompletedCount] = useState(0)
+  const [batchQueue, setBatchQueue] = useState<Array<{ moduleId: string; specialistId: string }>>([])
+  const batchCancelledRef = useRef(false)
+
+  const unreviewedModuleCount = useMemo(() => {
+    if (!activeProjectId) return 0
+    return modules.filter((mod) => {
+      if (!isDiagnosticsFilledForModule(diagnosticAnswers, mod.id)) return false
+      const reviews = moduleReviews[mod.id] ?? []
+      const ranking = recommendSpecialist(mod, diagnosticAnswers)
+      const topSpecId = ranking[0]?.id
+      if (!topSpecId) return false
+      return !reviews.some((r) => r.specialistId === topSpecId)
+    }).length
+  }, [modules, diagnosticAnswers, moduleReviews, activeProjectId])
+
+  const startBatchReview = useCallback(() => {
+    const queue: Array<{ moduleId: string; specialistId: string }> = []
+    for (const mod of modules) {
+      if (!isDiagnosticsFilledForModule(diagnosticAnswers, mod.id)) continue
+      const ranking = recommendSpecialist(mod, diagnosticAnswers)
+      const topSpecId = ranking[0]?.id
+      if (!topSpecId) continue
+      const reviews = moduleReviews[mod.id] ?? []
+      if (reviews.some((r) => r.specialistId === topSpecId)) continue
+      queue.push({ moduleId: mod.id, specialistId: topSpecId })
+    }
+    if (queue.length === 0) return
+    batchCancelledRef.current = false
+    setBatchQueue(queue)
+    setBatchCompletedCount(0)
+    setBatchReviewActive(true)
+    setBatchCurrentModuleId(queue[0].moduleId)
+  }, [modules, diagnosticAnswers, moduleReviews])
+
+  const advanceBatchReview = useCallback(() => {
+    setBatchCompletedCount((prev) => prev + 1)
+    if (batchCancelledRef.current) {
+      setBatchReviewActive(false)
+      setBatchCurrentModuleId(null)
+      setBatchQueue([])
+      return
+    }
+    setBatchQueue((prev) => {
+      const remaining = prev.slice(1)
+      if (remaining.length === 0) {
+        setBatchReviewActive(false)
+        setBatchCurrentModuleId(null)
+        return []
+      }
+      setBatchCurrentModuleId(remaining[0].moduleId)
+      return remaining
+    })
+  }, [])
+
+  const cancelBatchReview = useCallback(() => {
+    batchCancelledRef.current = true
+    // Current in-flight review finishes naturally; no more will start
+  }, [])
 
   // ── Tab navigation ──
   const TABS = [
@@ -427,13 +505,24 @@ export default function SpecifyPage(): React.ReactNode {
                         </div>
                         <p className="text-xs text-muted-foreground line-clamp-2">{mod.purpose}</p>
                         {mod.imageUrl && (
-                          <div className="aspect-[4/3] rounded-md overflow-hidden bg-muted">
+                          <div className="relative aspect-[4/3] rounded-md overflow-hidden bg-muted">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={mod.imageUrl}
                               alt={mod.name}
-                              className="w-full h-full object-cover"
+                              className={cn(
+                                "w-full h-full object-cover",
+                                imagesStale && revisedModuleIds.has(mod.id) && "opacity-50",
+                              )}
                             />
+                            {imagesStale && revisedModuleIds.has(mod.id) && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="flex items-center gap-1 rounded-full bg-warning/90 px-2 py-1 text-[10px] font-medium text-white">
+                                  <RefreshCw className="h-3 w-3" />
+                                  Drawing outdated
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div className="flex flex-wrap gap-1">
@@ -584,9 +673,14 @@ export default function SpecifyPage(): React.ReactNode {
                       onClick={() => setExpandedModuleId(isExpanded ? null : mod.id)}
                     >
                       {mod.imageUrl ? (
-                        <div className="h-10 w-10 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                        <div className="relative h-10 w-10 rounded-md overflow-hidden bg-muted flex-shrink-0">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mod.imageUrl} alt={mod.name} className="w-full h-full object-cover" />
+                          <img src={mod.imageUrl} alt={mod.name} className={cn("w-full h-full object-cover", imagesStale && revisedModuleIds.has(mod.id) && "opacity-50")} />
+                          {imagesStale && revisedModuleIds.has(mod.id) && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <RefreshCw className="h-3 w-3 text-warning" />
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
@@ -909,6 +1003,8 @@ export default function SpecifyPage(): React.ReactNode {
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
               earlyCostEstimates={earlyCostEstimates}
+              aiCostEstimates={aiCostEstimates}
+              isEstimatingCosts={isEstimatingCosts}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m
@@ -994,12 +1090,43 @@ export default function SpecifyPage(): React.ReactNode {
                         : "Complete diagnostics for all modules to unlock Source. Reviews are optional."}
                     </p>
                   </div>
-                  {allDiagnosticsComplete && (
-                    <CheckCircle2 className="h-6 w-6 text-success flex-shrink-0" />
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Batch review button */}
+                    {allDiagnosticsComplete && !batchReviewActive && unreviewedModuleCount > 0 && (
+                      <Button variant="secondary" size="sm" onClick={startBatchReview} className="gap-1.5">
+                        <PlayCircle className="h-3.5 w-3.5" />
+                        Review All Modules
+                      </Button>
+                    )}
+                    {batchReviewActive && (
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-international-orange" />
+                          <span>{batchCompletedCount}/{batchQueue.length + batchCompletedCount} reviewed</span>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={cancelBatchReview} className="h-7 gap-1 text-xs">
+                          <XCircle className="h-3 w-3" />
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
+                    {allDiagnosticsComplete && !batchReviewActive && (
+                      <CheckCircle2 className="h-6 w-6 text-success" />
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Design revision banner — shows after specialist review revisions are applied */}
+            <DesignRevisionBanner
+              designRevision={designRevision}
+              imagesStale={imagesStale}
+              revisedModuleCount={revisedModuleIds.size}
+              isRegenerating={isRegeneratingImages}
+              progressLines={progressLines}
+              onRegenerate={handleRegenerateDrawingsAfterRevision}
+            />
 
             {/* Cross-module review issue summary with Apply Revisions — shown prominently before per-module panels */}
             {Object.keys(moduleReviews).length > 0 && (
@@ -1008,6 +1135,7 @@ export default function SpecifyPage(): React.ReactNode {
                 moduleReviews={moduleReviews}
                 isApplying={isApplyingReviewRevisions}
                 onApplyRevisions={(issues: AggregatedIssue[]) => handleApplyReviewRevisions(issues)}
+                revisionsApplied={revisedModuleIds.size > 0}
               />
             )}
 
@@ -1017,8 +1145,13 @@ export default function SpecifyPage(): React.ReactNode {
               const diagComplete = isDiagnosticsFilledForModule(diagnosticAnswers, mod.id)
               const reviews = moduleReviews[mod.id] ?? []
 
+              // INTENT: Batch orchestrator sets triggerReview only on the current target module.
+              // Other modules get undefined — their individual buttons still work normally.
+              const isBatchTarget = batchReviewActive && batchCurrentModuleId === mod.id
+              const batchEntry = isBatchTarget ? batchQueue.find((q) => q.moduleId === mod.id) : undefined
+
               return (
-                <Card key={mod.id}>
+                <Card key={mod.id} className={cn(isBatchTarget && "ring-2 ring-international-orange/30")}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1048,10 +1181,15 @@ export default function SpecifyPage(): React.ReactNode {
                         projectSubject={subject}
                         designBrief={designBrief}
                         diagnosticAnswers={diagnosticAnswers}
-                        onReviewComplete={(review) => handleReviewComplete(mod.id, review)}
+                        onReviewComplete={(review) => {
+                          handleReviewComplete(mod.id, review)
+                          if (isBatchTarget) advanceBatchReview()
+                        }}
                         pendingReviewKeys={pendingReviewKeys}
                         onMarkPending={markReviewPending}
                         onClearPending={clearReviewPending}
+                        triggerReview={batchEntry?.specialistId}
+                        onReviewError={isBatchTarget ? () => advanceBatchReview() : undefined}
                       />
                     ) : !activeProjectId ? (
                       <p className="text-xs text-muted-foreground italic">

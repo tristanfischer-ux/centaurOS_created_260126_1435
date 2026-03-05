@@ -29,6 +29,8 @@ import {
   ShieldCheck,
   TrendingUp,
   UserPlus,
+  HelpCircle,
+  Pen,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -42,8 +44,9 @@ import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
 import { SkillDocumentRenderer } from '@/components/reports/SkillDocumentRenderer'
 import { DOCUMENT_SKILLS } from '@/lib/document-skills'
 import { SKILL_CATEGORY_META } from '@/lib/document-skills/types'
+import { generateDocumentQuestions } from '@/actions/document-questions'
 
-import type { DocumentSkill, DocumentTone, DocumentLength, SkillDocumentResult, SkillCategory } from '@/lib/document-skills/types'
+import type { DocumentSkill, DocumentTone, DocumentLength, DocumentQuestion, SkillDocumentResult, SkillCategory } from '@/lib/document-skills/types'
 
 // ─── Icon map ───────────────────────────────────────────────────────
 
@@ -89,6 +92,12 @@ export function SkillDocumentSection() {
   const [tone, setTone] = useState<DocumentTone>('professional')
   const [length, setLength] = useState<DocumentLength>('standard')
 
+  // Guide Me state
+  const [mode, setMode] = useState<'direct' | 'guided'>('direct')
+  const [questions, setQuestions] = useState<DocumentQuestion[]>([])
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(false)
+
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false)
   const [progressMessage, setProgressMessage] = useState('')
@@ -100,7 +109,40 @@ export function SkillDocumentSection() {
     setTone(skill.defaultTone)
     setStreamedContent('')
     setResult(null)
+    setQuestions([])
+    setAnswers({})
+    setMode('direct')
   }, [])
+
+  const handleGenerateQuestions = useCallback(async () => {
+    if (!selectedSkill || !userContext.trim()) {
+      toast.error('Please provide some context first')
+      return
+    }
+
+    setIsLoadingQuestions(true)
+    try {
+      const result = await generateDocumentQuestions(
+        selectedSkill.id,
+        userContext.trim(),
+        includeAutoData,
+      )
+
+      if (!result.success || !result.questions) {
+        toast.error(result.error ?? 'Failed to generate questions')
+        return
+      }
+
+      setQuestions(result.questions)
+      setAnswers({})
+      toast.success(`${result.questions.length} questions generated`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to generate questions'
+      toast.error(message)
+    } finally {
+      setIsLoadingQuestions(false)
+    }
+  }, [selectedSkill, userContext, includeAutoData])
 
   const handleGenerate = useCallback(async () => {
     if (!selectedSkill || !userContext.trim()) {
@@ -126,6 +168,14 @@ export function SkillDocumentSection() {
           tone,
           length,
           includeAutoData,
+          // INTENT: Map question IDs → question text as keys so the route can build readable Q&A blocks
+          ...(mode === 'guided' && questions.length > 0 && {
+            questionAnswers: Object.fromEntries(
+              questions
+                .filter(q => answers[q.id]?.trim())
+                .map(q => [q.question, answers[q.id]])
+            ),
+          }),
         }),
       })
 
@@ -192,7 +242,7 @@ export function SkillDocumentSection() {
       setIsGenerating(false)
       setProgressMessage('')
     }
-  }, [selectedSkill, userContext, tone, length, includeAutoData])
+  }, [selectedSkill, userContext, tone, length, includeAutoData, mode, questions, answers])
 
   const handleExportPDF = useCallback(async () => {
     if (!documentRef.current) return
@@ -333,8 +383,97 @@ export function SkillDocumentSection() {
                     {userContext.length.toLocaleString()} / 20,000
                   </span>
                 </div>
+                {/* Mode Toggle: Write Directly / Guide Me */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setMode('direct'); setQuestions([]); setAnswers({}) }}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
+                      mode === 'direct'
+                        ? 'border-international-orange bg-international-orange/5 text-foreground'
+                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                    )}
+                  >
+                    <Pen className="h-3 w-3" />
+                    Write Directly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode('guided')}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
+                      mode === 'guided'
+                        ? 'border-international-orange bg-international-orange/5 text-foreground'
+                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                    )}
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                    Guide Me
+                  </button>
+                </div>
               </CardContent>
             </Card>
+
+            {/* Guide Me: Generate Questions button + Question Cards */}
+            {mode === 'guided' && (
+              <div className="space-y-4">
+                {questions.length === 0 && (
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    disabled={isLoadingQuestions || !userContext.trim()}
+                    onClick={handleGenerateQuestions}
+                  >
+                    {isLoadingQuestions ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Generating questions…
+                      </>
+                    ) : (
+                      <>
+                        <HelpCircle className="mr-2 h-4 w-4" />
+                        Generate Clarifying Questions
+                      </>
+                    )}
+                  </Button>
+                )}
+
+                {questions.length > 0 && (
+                  <div className="space-y-3">
+                    {questions.map((q, idx) => (
+                      <Card key={q.id}>
+                        <CardContent className="p-4 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="text-sm font-medium text-foreground">
+                              {idx + 1}. {q.question}
+                            </span>
+                            {q.required && (
+                              <Badge className="shrink-0 bg-international-orange/10 text-international-orange border-international-orange/20 text-[10px]">
+                                Required
+                              </Badge>
+                            )}
+                          </div>
+                          <textarea
+                            className="w-full min-h-[72px] rounded-lg border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
+                            placeholder={q.hint}
+                            value={answers[q.id] ?? ''}
+                            onChange={e => {
+                              const value = e.target.value.slice(0, 200)
+                              setAnswers(prev => ({ ...prev, [q.id]: value }))
+                            }}
+                            maxLength={200}
+                          />
+                          <span className="block text-right text-[11px] text-muted-foreground">
+                            {(answers[q.id] ?? '').length} / 200
+                          </span>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </section>
 
           {/* Tone & Length */}
