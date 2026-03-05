@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
+import { SupplierProcurementFlow } from "@/components/cad/supplier-procurement-flow"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { CadLabShortlist } from "@/components/cad/cad-lab-shortlist"
 import { useCadLab } from "../cad-lab-context"
@@ -345,9 +345,10 @@ export default function SourcePage(): React.ReactNode {
                 </CardContent>
               </Card>
             ) : (
-              <CadLabSupplyChain
+              <SupplierProcurementFlow
                 modules={eligibleModules}
                 diagnosticAnswers={diagnosticAnswers}
+                aiCostEstimates={aiCostEstimates}
                 supplierMatches={supplierMatches}
                 loadingModules={loadingModules}
                 matchAllLoading={matchAllLoading}
