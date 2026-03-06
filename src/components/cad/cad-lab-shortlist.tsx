@@ -87,8 +87,8 @@ interface CadLabShortlistProps {
   categoryRankings: Map<string, string[]>
   /** Per-category supplier entries */
   categorySupplierEntries: Map<string, CategorySupplierEntry[]>
-  /** Promote a supplier within a category */
-  onPromoteSupplier: (categoryId: string, supplierId: string) => void
+  /** Promote a supplier within a category. Optional targetRank (0-indexed) for direct placement. */
+  onPromoteSupplier: (categoryId: string, supplierId: string, targetRank?: number) => void
   /** Buy part search results */
   buyPartResults?: BuyPartSearchResult[]
   /** Trigger buy part search */
@@ -162,12 +162,16 @@ export function CadLabShortlist({
   // ── Supplier detail dialog state ──
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null)
   const [detailSupplierName, setDetailSupplierName] = useState<string | undefined>()
+  const [detailMatchScore, setDetailMatchScore] = useState<number | undefined>()
+  const [detailMatchReasons, setDetailMatchReasons] = useState<string[] | undefined>()
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
   const supplierDetailCache = useRef<Map<string, SupplierDetail>>(new Map())
 
-  const handleOpenSupplierDetail = useCallback((supplierId: string, name?: string) => {
+  const handleOpenSupplierDetail = useCallback((supplierId: string, name?: string, score?: number, reasons?: string[]) => {
     setDetailSupplierId(supplierId)
     setDetailSupplierName(name)
+    setDetailMatchScore(score)
+    setDetailMatchReasons(reasons)
     setDetailDialogOpen(true)
   }, [])
 
@@ -525,16 +529,24 @@ export function CadLabShortlist({
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
-                    <button
-                      type="button"
-                      className="text-sm font-semibold text-foreground truncate hover:text-international-orange transition-colors"
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      className="text-sm font-semibold text-foreground truncate hover:text-international-orange transition-colors cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleOpenSupplierDetail(supplier.id, supplier.name)
+                        handleOpenSupplierDetail(supplier.id, supplier.name, supplier.bestMatchScore, supplier.allMatchReasons)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation()
+                          e.preventDefault()
+                          handleOpenSupplierDetail(supplier.id, supplier.name, supplier.bestMatchScore, supplier.allMatchReasons)
+                        }
                       }}
                     >
                       {supplier.name}
-                    </button>
+                    </span>
                     {supplier.isVerified && (
                       <BadgeCheck className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
                     )}
@@ -782,6 +794,8 @@ export function CadLabShortlist({
         supplierId={detailSupplierId}
         supplierName={detailSupplierName}
         cache={supplierDetailCache}
+        matchScore={detailMatchScore}
+        matchReasons={detailMatchReasons}
       />
     </Card>
   )

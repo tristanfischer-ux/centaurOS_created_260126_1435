@@ -214,6 +214,12 @@ export default function SourcePage(): React.ReactNode {
       const idx = current.indexOf(supplierId)
 
       if (targetRank != null) {
+        // Sentinel: -1 means "remove from rankings entirely"
+        if (targetRank === -1) {
+          if (idx >= 0) current.splice(idx, 1)
+          next.set(categoryId, current)
+          return next
+        }
         // Explicit rank target (0-indexed): remove from current position and insert
         if (idx >= 0) current.splice(idx, 1)
         current.splice(targetRank, 0, supplierId)
@@ -387,12 +393,19 @@ export default function SourcePage(): React.ReactNode {
       return next
     })
 
-    // INTENT: Also auto-populate per-category rankings with top 3 per category
+    // INTENT: Auto-populate per-category rankings with top 3 per category.
+    // Also prune stale supplier IDs that no longer exist in the current match results.
     setCategoryRankings((prev) => {
       const next = new Map(prev)
       for (const [catId, entries] of categorySupplierEntries) {
-        if (!next.has(catId) || next.get(catId)!.length === 0) {
+        const currentIds = new Set(entries.map((e) => e.supplierId))
+        const existing = next.get(catId) ?? []
+        const hasValidRanking = existing.some((id) => currentIds.has(id))
+        if (!hasValidRanking) {
           next.set(catId, entries.slice(0, 3).map((e) => e.supplierId))
+        } else {
+          const pruned = existing.filter((id) => currentIds.has(id))
+          if (pruned.length !== existing.length) next.set(catId, pruned)
         }
       }
       return next
@@ -593,6 +606,9 @@ export default function SourcePage(): React.ReactNode {
               categoryRankings={categoryRankings}
               categorySupplierEntries={categorySupplierEntries}
               buyPartResults={buyPartResults}
+              onSearchBuyParts={handleSearchBuyParts}
+              buySearchLoading={buySearchLoading}
+              onPromoteSupplier={handlePromoteSupplier}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

@@ -19,6 +19,8 @@ import {
   Loader2,
   AlertTriangle,
   RotateCcw,
+  ShoppingCart,
+  Search,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -81,6 +83,14 @@ interface CadLabCostEstimateProps {
   categorySupplierEntries?: Map<string, CategorySupplierEntry[]>
   /** Buy part search results */
   buyPartResults?: BuyPartSearchResult[]
+  /** Trigger buy part search */
+  onSearchBuyParts?: () => void
+  /** Whether buy search is loading */
+  buySearchLoading?: boolean
+  /** Callback: promote a supplier within a category */
+  onPromoteSupplier?: (categoryId: string, supplierId: string, targetRank?: number) => void
+  /** Callback: click supplier to view details */
+  onSupplierClick?: (supplierId: string, supplierName?: string, matchScore?: number, matchReasons?: string[]) => void
 }
 
 export function CadLabCostEstimate({
@@ -94,6 +104,10 @@ export function CadLabCostEstimate({
   categoryRankings,
   categorySupplierEntries,
   buyPartResults,
+  onSearchBuyParts,
+  buySearchLoading,
+  onPromoteSupplier,
+  onSupplierClick,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
@@ -551,9 +565,20 @@ export function CadLabCostEstimate({
                               ? 0
                               : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (ei - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
                             const barY = group.y + CATEGORY_NAME_H
+                            const cat = sortedCategories.find((c) => c.id === group.catId)
+                            const partCount = cat?.partCount ?? 0
+
+                            // INTENT: Cost label with "(N parts)" clarifier when category has >1 part
+                            const costLabel = isFirst && entry.allocatedCost > 0
+                              ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` (${partCount} parts)` : ""}`
+                              : `${Math.round(entry.aggregateScore)}%`
 
                             return (
-                              <g key={entry.supplierId}>
+                              <g
+                                key={entry.supplierId}
+                                style={{ cursor: onPromoteSupplier ? "pointer" : undefined }}
+                                onClick={onPromoteSupplier ? () => onPromoteSupplier(group.catId, entry.supplierId) : undefined}
+                              >
                                 <rect
                                   x={barX}
                                   y={barY}
@@ -567,27 +592,59 @@ export function CadLabCostEstimate({
                                 {/* Supplier name */}
                                 <text
                                   x={barX + 6}
-                                  y={barY + 14}
+                                  y={barY + 11}
                                   fontSize={9}
                                   fontWeight={isFirst ? 700 : 500}
                                   fill={isFirst ? "#ffffff" : "#334155"}
                                 >
                                   {truncate(entry.name, isFirst ? 18 : 12)}
+                                  <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
                                 </text>
                                 {/* Cost (for 1st choice) or score (for backups) */}
                                 <text
-                                  x={barX + barW - 6}
-                                  y={barY + 14}
+                                  x={barX + barW - (onSupplierClick ? 18 : 6)}
+                                  y={barY + 11}
                                   fontSize={8}
                                   fontFamily={isFirst && entry.allocatedCost > 0 ? "monospace" : undefined}
                                   fontWeight={isFirst && entry.allocatedCost > 0 ? 600 : 400}
                                   fill={isFirst ? "#ffffffcc" : "#94a3b8"}
                                   textAnchor="end"
                                 >
-                                  {isFirst && entry.allocatedCost > 0
-                                    ? formatCurrency(entry.allocatedCost)
-                                    : `${Math.round(entry.aggregateScore)}%`}
+                                  {costLabel}
                                 </text>
+                                {/* Info icon — opens supplier detail dialog */}
+                                {onSupplierClick && (
+                                  <g
+                                    style={{ cursor: "pointer" }}
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onSupplierClick(
+                                        entry.supplierId,
+                                        entry.name,
+                                        entry.aggregateScore,
+                                        entry.originalMatch?.matchReasons,
+                                      )
+                                    }}
+                                  >
+                                    <circle
+                                      cx={barX + barW - 8}
+                                      cy={barY + SUPPLIER_BAR.BAR_H / 2}
+                                      r={6}
+                                      fill={isFirst ? "rgba(255,255,255,0.2)" : "#e2e8f0"}
+                                    />
+                                    <text
+                                      x={barX + barW - 8}
+                                      y={barY + SUPPLIER_BAR.BAR_H / 2 + 3}
+                                      fontSize={8}
+                                      fontWeight={700}
+                                      fill={isFirst ? "#ffffff" : "#64748b"}
+                                      textAnchor="middle"
+                                    >
+                                      i
+                                    </text>
+                                    <title>View supplier details</title>
+                                  </g>
+                                )}
                               </g>
                             )
                           })}
@@ -631,13 +688,14 @@ export function CadLabCostEstimate({
 
                 </svg>
 
-                {/* HTML overlay: Buy category product links (clickable) */}
+                {/* HTML overlay: Buy category purchase cards */}
                 {(() => {
                   const svgScale = costSvgWidth > 0 ? costSvgWidth / VB_W : 1
                   return (
                     <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
                       {layout.buyGroups.map((group) => {
-                        const hasResults = group.results.length > 0
+                        const resultsWithProducts = group.results.filter((r) => r.products.length > 0)
+                        const hasResults = resultsWithProducts.length > 0
                         return (
                           <div
                             key={`buy-${group.catId}`}
@@ -650,42 +708,79 @@ export function CadLabCostEstimate({
                               maxWidth: (VB_W - group.x) * svgScale,
                             }}
                           >
-                            <p className="text-[9px] font-semibold text-muted-foreground mb-1">
-                              Product Links
-                            </p>
+                            <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
+                              {/* Header */}
+                              <div className="flex items-center gap-1.5 mb-2">
+                                <ShoppingCart className="h-3 w-3 text-international-orange" />
+                                <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
+                                <span className="text-[9px] text-muted-foreground ml-auto">
+                                  {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
+                                </span>
+                              </div>
 
-                            {hasResults ? (
-                              <div className="space-y-2">
-                                {group.results.map((result, ri) => (
-                                  <div key={ri}>
-                                    <p className="text-[10px] font-medium text-foreground">{result.partName}</p>
-                                    <div className="ml-2 space-y-0.5">
-                                      {result.products.slice(0, 2).map((product, pi) => (
-                                        <a
-                                          key={pi}
-                                          href={product.url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="flex items-center gap-1 text-[9px] text-info hover:text-info/80 transition-colors"
-                                        >
-                                          <ExternalLink className="h-2.5 w-2.5 flex-shrink-0" />
-                                          <span>{product.source}</span>
-                                          {product.estimatedPrice && (
-                                            <span className="font-mono font-medium">{product.estimatedPrice}</span>
-                                          )}
-                                        </a>
-                                      ))}
+                              {hasResults ? (
+                                <div className="space-y-2">
+                                  {resultsWithProducts.map((result, ri) => (
+                                    <div key={ri}>
+                                      <p className="text-[10px] font-medium text-foreground">{result.partName}</p>
+                                      <div className="ml-1 mt-0.5 space-y-0.5">
+                                        {result.products.slice(0, 2).map((product, pi) => (
+                                          <a
+                                            key={pi}
+                                            href={product.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1.5 text-[9px] text-foreground hover:text-international-orange transition-colors"
+                                          >
+                                            <ExternalLink className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground" />
+                                            <span className="bg-muted rounded px-1.5 py-0.5 text-[9px] text-muted-foreground font-medium">
+                                              {product.source}
+                                            </span>
+                                            {product.estimatedPrice && (
+                                              <span className="font-mono font-medium text-foreground">{product.estimatedPrice}</span>
+                                            )}
+                                          </a>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="space-y-0.5">
-                                {group.parts.map((part, pi) => (
-                                  <p key={pi} className="text-[9px] text-muted-foreground">{part.name}</p>
-                                ))}
-                              </div>
-                            )}
+                                  ))}
+                                  {onSearchBuyParts && (
+                                    <button
+                                      className="flex items-center justify-center gap-1.5 w-full mt-1 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
+                                      onClick={onSearchBuyParts}
+                                      disabled={buySearchLoading}
+                                    >
+                                      {buySearchLoading ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Search className="h-3 w-3" />
+                                      )}
+                                      {buySearchLoading ? "Searching…" : "Search Again"}
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-1">
+                                  {group.parts.map((part, pi) => (
+                                    <p key={pi} className="text-[9px] text-muted-foreground">{part.name}</p>
+                                  ))}
+                                  {onSearchBuyParts && (
+                                    <button
+                                      className="flex items-center justify-center gap-1.5 w-full mt-2 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
+                                      onClick={onSearchBuyParts}
+                                      disabled={buySearchLoading}
+                                    >
+                                      {buySearchLoading ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <Search className="h-3 w-3" />
+                                      )}
+                                      {buySearchLoading ? "Searching…" : "Search Products"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )
                       })}

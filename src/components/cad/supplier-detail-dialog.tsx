@@ -29,6 +29,10 @@ interface SupplierDetailDialogProps {
   supplierName?: string
   /** Parent-managed cache — avoids re-fetching */
   cache: React.MutableRefObject<Map<string, SupplierDetail>>
+  /** Optional match score (0-100) from supplier matching */
+  matchScore?: number
+  /** Optional match reasons from supplier matching */
+  matchReasons?: string[]
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -39,6 +43,8 @@ export function SupplierDetailDialog({
   supplierId,
   supplierName,
   cache,
+  matchScore,
+  matchReasons,
 }: SupplierDetailDialogProps): React.ReactNode {
   const [detail, setDetail] = useState<SupplierDetail | null>(null)
   const [loading, setLoading] = useState(false)
@@ -74,8 +80,19 @@ export function SupplierDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-base">
+          <DialogTitle className="text-base flex items-center gap-2">
             {detail?.name ?? supplierName ?? "Supplier Details"}
+            {matchScore != null && matchScore > 0 && (
+              <span className="inline-flex items-center gap-1.5 bg-international-orange/10 text-international-orange text-xs font-medium px-2 py-0.5 rounded-full">
+                <span className="inline-block h-1.5 w-8 rounded-full bg-international-orange/20 overflow-hidden">
+                  <span
+                    className="block h-full rounded-full bg-international-orange"
+                    style={{ width: `${matchScore}%` }}
+                  />
+                </span>
+                {Math.round(matchScore)}% match
+              </span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -94,7 +111,7 @@ export function SupplierDetailDialog({
         {!loading && detail && (
           <div className="space-y-4">
             {/* Website */}
-            {detail.websiteUrl && (
+            {detail.websiteUrl ? (
               <a
                 href={detail.websiteUrl}
                 target="_blank"
@@ -104,6 +121,25 @@ export function SupplierDetailDialog({
                 <ExternalLink className="h-3.5 w-3.5" />
                 {detail.websiteUrl.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
               </a>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No website on file</p>
+            )}
+
+            {/* Match context — why this supplier matches */}
+            {matchReasons && matchReasons.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Why This Supplier Matches</p>
+                <div className="flex flex-wrap gap-1">
+                  {matchReasons.map((reason, i) => (
+                    <span
+                      key={i}
+                      className="text-[9px] bg-international-orange/10 text-international-orange px-1.5 py-0.5 rounded-full font-mono"
+                    >
+                      {reason}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
 
             {/* Key info grid */}
