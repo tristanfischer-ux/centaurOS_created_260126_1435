@@ -21,12 +21,22 @@ import {
   Layers,
   Paintbrush,
   Truck,
+  MapPin,
+  Clock,
+  ShieldCheck,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchAssemblyCompanies } from "@/actions/assembly-match"
@@ -255,18 +265,32 @@ export default function AssemblePage(): React.ReactNode {
   }, [tierKey])
 
   // ── Computed totals ──
+  // INTENT: Use totalPerUnit (includes labour) to match Source Costs tab, not parts[].cost
   const totalEstimatedCost = useMemo(() => {
     if (!aiCostEstimates) return null
     let total = 0
     for (const est of Object.values(aiCostEstimates)) {
-      if (est.parts) {
-        for (const part of est.parts) {
-          total += part.cost ?? 0
-        }
-      }
+      total += est.totalPerUnit ?? 0
     }
-    return Math.round(total * 100) / 100
+    return total > 0 ? Math.round(total * 100) / 100 : null
   }, [aiCostEstimates])
+
+  // ── Clean product display name (strip conversational prefixes) ──
+  const productDisplayName = useMemo(() => {
+    let name = subject.trim()
+    const prefixes = [
+      /^i\s+want\s+to\s+(create|build|make|design|develop)\s+(a|an|the)\s+/i,
+      /^i\s+want\s+to\s+(create|build|make|design|develop)\s+/i,
+      /^(create|build|make|design|develop)\s+(a|an|the)\s+/i,
+      /^(a|an|the)\s+/i,
+    ]
+    for (const prefix of prefixes) {
+      const match = name.match(prefix)
+      if (match) { name = name.slice(match[0].length); break }
+    }
+    if (name.endsWith(".")) name = name.slice(0, -1)
+    return name.charAt(0).toUpperCase() + name.slice(1)
+  }, [subject])
 
   // Lead time from best assembler match
   const assemblyDays = assemblerMatches[0]?.typicalLeadDays ?? 10
@@ -290,6 +314,7 @@ export default function AssemblePage(): React.ReactNode {
   )
 
   const [activeTab, setActiveTab] = useState("flow")
+  const [selectedAssembler, setSelectedAssembler] = useState<AssemblyCompanyMatch | null>(null)
 
   // INTENT: Read tab from URL after hydration — avoids React #418.
   useEffect(() => {
@@ -400,7 +425,7 @@ export default function AssemblePage(): React.ReactNode {
                   modules={eligibleModules}
                   diagnosticAnswers={diagnosticAnswers}
                   aiCostEstimates={aiCostEstimates}
-                  subject={subject}
+                  subject={productDisplayName}
                   assemblerMatches={assemblerMatches}
                   tierConfig={tierConfig}
                   onAssignCategory={handleAssignCategory}
@@ -418,73 +443,252 @@ export default function AssemblePage(): React.ReactNode {
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                     Matched Assembly Companies
                   </p>
-                  <div className="space-y-2">
-                    {assemblerMatches.map((match) => (
-                      <div
-                        key={match.id}
-                        className="flex items-center justify-between p-3 rounded-lg border border-border hover:-translate-y-0.5 transition-all duration-200"
-                      >
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{match.name}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {match.isVerified && <span className="text-xs text-success">Verified</span>}
-                            {match.capabilities.map((c) => (
-                              <span key={c} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                                {c.replace(/_/g, " ")}
-                              </span>
-                            ))}
-                            {match.typicalLeadDays && (
-                              <span className="text-xs text-muted-foreground">{match.typicalLeadDays}d lead</span>
-                            )}
-                            {match.locationCountry && (
-                              <span className="text-xs text-muted-foreground">{match.locationCountry}</span>
-                            )}
-                          </div>
-                          {match.matchReasons.length > 0 && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {match.matchReasons.join(" \u00b7 ")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* Score breakdown */}
-                          <div className="flex items-center gap-1">
-                            {[
-                              { label: "S", value: match.scoreBreakdown.semantic, max: 30 },
-                              { label: "C", value: match.scoreBreakdown.capability, max: 25 },
-                              { label: "F", value: match.scoreBreakdown.capacity, max: 15 },
-                              { label: "Q", value: match.scoreBreakdown.quality, max: 15 },
-                              { label: "K", value: match.scoreBreakdown.keyword, max: 15 },
-                            ].map(({ label, value, max }) => (
-                              <div
-                                key={label}
-                                className="h-5 w-5 rounded text-[8px] font-bold flex items-center justify-center"
-                                style={{
-                                  backgroundColor: value > max * 0.5 ? "#05966920" : value > 0 ? "#d9770620" : "#f1f5f9",
-                                  color: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
-                                }}
-                                title={`${label}: ${value}/${max}`}
-                              >
-                                {label}
-                              </div>
-                            ))}
-                          </div>
-                          <span className={`text-sm font-semibold font-mono px-2 py-0.5 rounded-full ${
-                            match.matchScore >= 50
-                              ? "bg-success/10 text-success"
-                              : match.matchScore >= 30
-                                ? "bg-warning/10 text-warning"
-                                : "bg-muted text-muted-foreground"
-                          }`}>
-                            {Math.round(match.matchScore)}
-                          </span>
-                        </div>
-                      </div>
+
+                  {/* ── Scoring legend ── */}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 px-1 py-2 rounded-lg bg-muted/50">
+                    {[
+                      { label: "S", full: "Semantic", max: 30 },
+                      { label: "C", full: "Capability", max: 25 },
+                      { label: "F", full: "Capacity", max: 15 },
+                      { label: "Q", full: "Quality", max: 15 },
+                      { label: "K", full: "Keyword", max: 15 },
+                    ].map(({ label, full, max }) => (
+                      <span key={label} className="text-[10px] text-muted-foreground">
+                        <span className="font-bold text-foreground">{label}</span> = {full} ({max})
+                      </span>
                     ))}
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 ml-2">
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#059669" }} /> Strong
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1" style={{ backgroundColor: "#d97706" }} /> Partial
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1" style={{ backgroundColor: "#94a3b8" }} /> None
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {assemblerMatches.map((match) => {
+                      const scoreItems = [
+                        { label: "S", full: "Semantic", value: match.scoreBreakdown.semantic, max: 30 },
+                        { label: "C", full: "Capability", value: match.scoreBreakdown.capability, max: 25 },
+                        { label: "F", full: "Capacity", value: match.scoreBreakdown.capacity, max: 15 },
+                        { label: "Q", full: "Quality", value: match.scoreBreakdown.quality, max: 15 },
+                        { label: "K", full: "Keyword", value: match.scoreBreakdown.keyword, max: 15 },
+                      ]
+                      return (
+                        <div
+                          key={match.id}
+                          onClick={() => setSelectedAssembler(match)}
+                          className="p-3 rounded-lg border border-border hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            {/* Left: name, meta, reasons */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-foreground truncate">{match.name}</p>
+                                {match.isVerified && (
+                                  <ShieldCheck className="h-3.5 w-3.5 text-success shrink-0" />
+                                )}
+                                <span className={`text-xs font-semibold font-mono px-2 py-0.5 rounded-full shrink-0 ${
+                                  match.matchScore >= 50
+                                    ? "bg-success/10 text-success"
+                                    : match.matchScore >= 30
+                                      ? "bg-warning/10 text-warning"
+                                      : "bg-muted text-muted-foreground"
+                                }`}>
+                                  {Math.round(match.matchScore)}
+                                </span>
+                              </div>
+                              {/* Location, lead time, capabilities row */}
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                {match.locationCountry && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" />
+                                    {match.locationCountry}
+                                  </span>
+                                )}
+                                {match.typicalLeadDays && (
+                                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {match.typicalLeadDays}d lead
+                                  </span>
+                                )}
+                                {match.capabilities.map((c) => (
+                                  <span key={c} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                    {c.replace(/_/g, " ")}
+                                  </span>
+                                ))}
+                              </div>
+                              {/* Certifications */}
+                              {match.certifications.length > 0 && (
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                  {match.certifications.map((cert) => (
+                                    <span key={cert} className="text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded">
+                                      {cert}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {match.matchReasons.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {match.matchReasons.join(" \u00b7 ")}
+                                </p>
+                              )}
+                            </div>
+                            {/* Right: score breakdown mini-bars */}
+                            <div className="shrink-0 w-36 space-y-1">
+                              {scoreItems.map(({ label, value, max }) => (
+                                <div key={label} className="flex items-center gap-1.5">
+                                  <span className="text-[9px] font-bold text-muted-foreground w-3 text-right">{label}</span>
+                                  <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                    <div
+                                      className="h-full rounded-full"
+                                      style={{
+                                        width: `${(value / max) * 100}%`,
+                                        backgroundColor: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
+                                      }}
+                                    />
+                                  </div>
+                                  <span className="text-[9px] text-muted-foreground font-mono w-7 text-right">{value}/{max}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
             )}
+
+            {/* ── Assembler detail Dialog ── */}
+            <Dialog open={!!selectedAssembler} onOpenChange={(open) => { if (!open) setSelectedAssembler(null) }}>
+              <DialogContent size="md">
+                {selectedAssembler && (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        {selectedAssembler.name}
+                        {selectedAssembler.isVerified && (
+                          <ShieldCheck className="h-4 w-4 text-success" />
+                        )}
+                      </DialogTitle>
+                      <DialogDescription>
+                        Assembly company details and match breakdown
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 mt-2">
+                      {/* Quick facts */}
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        {selectedAssembler.locationCountry && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {selectedAssembler.locationCountry}
+                          </span>
+                        )}
+                        {selectedAssembler.typicalLeadDays && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            {selectedAssembler.typicalLeadDays} days lead time
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Capabilities */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Capabilities</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedAssembler.capabilities.map((c) => (
+                            <span key={c} className="text-xs text-foreground bg-muted px-2 py-1 rounded-md">
+                              {c.replace(/_/g, " ")}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Score breakdown */}
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Score Breakdown</p>
+                        <div className="space-y-1.5">
+                          {[
+                            { label: "S", full: "Semantic match", value: selectedAssembler.scoreBreakdown.semantic, max: 30 },
+                            { label: "C", full: "Capability match", value: selectedAssembler.scoreBreakdown.capability, max: 25 },
+                            { label: "F", full: "Capacity/availability", value: selectedAssembler.scoreBreakdown.capacity, max: 15 },
+                            { label: "Q", full: "Quality signals", value: selectedAssembler.scoreBreakdown.quality, max: 15 },
+                            { label: "K", full: "Keyword match", value: selectedAssembler.scoreBreakdown.keyword, max: 15 },
+                          ].map(({ label, full, value, max }) => (
+                            <div key={label} className="flex items-center gap-2">
+                              <div
+                                className="h-5 w-5 rounded text-[8px] font-bold flex items-center justify-center shrink-0"
+                                style={{
+                                  backgroundColor: value > max * 0.5 ? "#05966920" : value > 0 ? "#d9770620" : "#f1f5f9",
+                                  color: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
+                                }}
+                              >
+                                {label}
+                              </div>
+                              <span className="text-sm text-foreground w-40">{full}</span>
+                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all"
+                                  style={{
+                                    width: `${(value / max) * 100}%`,
+                                    backgroundColor: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
+                                  }}
+                                />
+                              </div>
+                              <span className="text-xs text-muted-foreground font-mono w-12 text-right">{value}/{max}</span>
+                            </div>
+                          ))}
+                          <div className="flex items-center gap-2 pt-1 border-t border-border">
+                            <span className="text-sm font-semibold text-foreground ml-7 w-40">Total</span>
+                            <div className="flex-1" />
+                            <span className={`text-sm font-bold font-mono px-2 py-0.5 rounded-full ${
+                              selectedAssembler.matchScore >= 50
+                                ? "bg-success/10 text-success"
+                                : selectedAssembler.matchScore >= 30
+                                  ? "bg-warning/10 text-warning"
+                                  : "bg-muted text-muted-foreground"
+                            }`}>
+                              {Math.round(selectedAssembler.matchScore)}/100
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Match reasons */}
+                      {selectedAssembler.matchReasons.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Why this match</p>
+                          <ul className="space-y-1">
+                            {selectedAssembler.matchReasons.map((reason, i) => (
+                              <li key={i} className="text-sm text-muted-foreground flex items-start gap-1.5">
+                                <span className="text-international-orange mt-0.5">&#x2022;</span>
+                                {reason}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Certifications */}
+                      {selectedAssembler.certifications.length > 0 && (
+                        <div>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Certifications</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {selectedAssembler.certifications.map((cert) => (
+                              <span key={cert} className="text-xs text-foreground bg-success/10 text-success px-2 py-1 rounded-md">
+                                {cert}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
           </motion.div>
         )}
 
