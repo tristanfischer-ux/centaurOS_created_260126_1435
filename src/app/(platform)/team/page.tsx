@@ -164,10 +164,11 @@ export default async function TeamPage() {
         .from('marketplace_listings')
         .select('id, title, subcategory, description, attributes')
         .eq('category', 'People')
-        .eq('is_verified', true)
 
     if (marketplaceError) {
         console.error('[TeamPage] Failed to fetch marketplace listings:', { error: marketplaceError.message })
+    } else if (!marketplacePeople || marketplacePeople.length === 0) {
+        console.warn('[TeamPage] No marketplace People listings found — orbit outer ring will be empty')
     }
 
     // Fetch teams with members
