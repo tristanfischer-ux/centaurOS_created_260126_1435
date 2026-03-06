@@ -13,12 +13,13 @@
 "use client"
 
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
-import { ExternalLink, Search, Loader2, ShoppingCart, X, Info } from "lucide-react"
+import { ExternalLink, ShoppingCart, X, Info, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
+import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import { formatCurrency } from "@/lib/format"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
-import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import {
   type CategoryNode,
   type CategorySupplierEntry,
@@ -45,15 +46,23 @@ export interface ShortlistCoverageFlowProps {
   categorySupplierEntries: Map<string, CategorySupplierEntry[]>
   /** Callback: promote a supplier within a category. Optional targetRank (0-indexed) for direct placement. */
   onPromoteSupplier: (categoryId: string, supplierId: string, targetRank?: number) => void
-  /** Buy part search results */
-  buyPartResults?: BuyPartSearchResult[]
-  /** Trigger buy part search */
-  onSearchBuyParts?: () => void
-  /** Whether buy search is loading */
-  buySearchLoading?: boolean
   /** Callback: click supplier to view details. Optional score + match reasons for dialog enrichment. */
   onSupplierClick?: (supplierId: string, supplierName?: string, matchScore?: number, matchReasons?: string[]) => void
+  /** Buy part search results — used to render supplier bars for buy categories */
+  buyPartResults?: BuyPartSearchResult[]
+  /** Whether buy search is in progress */
+  buySearchLoading?: boolean
+  /** Trigger buy part search */
+  onSearchBuyParts?: (partNames: string[]) => void
 }
+
+// ─── Buy part supplier search URLs ──────────────────────────────────
+
+const BUY_SUPPLIERS = [
+  { label: "RS", url: (q: string) => `https://uk.rs-online.com/web/c/?searchTerm=${encodeURIComponent(q)}` },
+  { label: "Farnell", url: (q: string) => `https://uk.farnell.com/search?st=${encodeURIComponent(q)}` },
+  { label: "Misumi", url: (q: string) => `https://uk.misumi-ec.com/vona2/result/?Keyword=${encodeURIComponent(q)}` },
+] as const
 
 // ─── SVG layout constants ────────────────────────────────────────────
 
@@ -63,7 +72,7 @@ const COL_SUPS_X = 680
 const PART_LIST_X = 32
 const PART_ROW_H = 13
 const PART_DOT_R = 3
-const CATEGORY_NAME_H = 16
+const CATEGORY_NAME_H = 28
 
 // ─── Layout types ────────────────────────────────────────────────────
 
@@ -85,7 +94,6 @@ interface RankedLayout {
     x: number
     y: number
     parts: Array<{ name: string }>
-    results: BuyPartSearchResult[]
   }>
   /** Flow ribbons from category to 1st-choice supplier */
   flows: Array<{
@@ -106,10 +114,10 @@ export function ShortlistCoverageFlow({
   categoryRankings,
   categorySupplierEntries,
   onPromoteSupplier,
-  buyPartResults,
-  onSearchBuyParts,
-  buySearchLoading,
   onSupplierClick,
+  buyPartResults,
+  buySearchLoading,
+  onSearchBuyParts,
 }: ShortlistCoverageFlowProps): React.ReactNode {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [dropdownCatId, setDropdownCatId] = useState<string | null>(null)
@@ -168,16 +176,32 @@ export function ShortlistCoverageFlow({
     return map
   }, [sortedCategories])
 
-  // Build buy part results lookup (partName → results)
-  const buyResultsMap = useMemo(() => {
-    const map = new Map<string, BuyPartSearchResult>()
-    if (buyPartResults) {
-      for (const r of buyPartResults) {
-        map.set(r.partName, r)
+  // ── Aggregate buy part results by supplier ──
+  const buySupplierAggregates = useMemo(() => {
+    if (!buyPartResults || buyPartResults.length === 0) return []
+    const agg = new Map<string, { source: string; totalCost: number; partCount: number; sampleUrl: string }>()
+    for (const result of buyPartResults) {
+      for (const product of result.products) {
+        const price = product.numericPrice ?? 0
+        const existing = agg.get(product.source)
+        if (existing) {
+          existing.totalCost += price
+          existing.partCount += 1
+          if (!existing.sampleUrl && product.url) existing.sampleUrl = product.url
+        } else {
+          agg.set(product.source, {
+            source: product.source,
+            totalCost: price,
+            partCount: 1,
+            sampleUrl: product.url ?? "",
+          })
+        }
       }
     }
-    return map
+    return [...agg.values()].sort((a, b) => a.totalCost - b.totalCost)
   }, [buyPartResults])
+
+  const hasBuyResults = buySupplierAggregates.length > 0
 
   // ── Compute layout ──
   const layout = useMemo((): RankedLayout => {
@@ -193,11 +217,6 @@ export function ShortlistCoverageFlow({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        // Buy category — right side shows product results via HTML overlay
-        const buyResults = cat.parts
-          .map((p) => buyResultsMap.get(p.name))
-          .filter((r): r is BuyPartSearchResult => r != null)
-
         // Height: category name + one supplier bar row (for layout spacing)
         const buyContentH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
         const h = Math.max(catPartsH, buyContentH, SANKEY.BAR_MIN_H)
@@ -208,7 +227,6 @@ export function ShortlistCoverageFlow({
           x: COL_SUPS_X,
           y: cy,
           parts: cat.parts.map((p) => ({ name: p.name })),
-          results: buyResults,
         })
 
         cy += h + SANKEY.CAT_GAP
@@ -280,7 +298,7 @@ export function ShortlistCoverageFlow({
     const viewBoxHeight = cy + SANKEY.PADDING_BOTTOM
 
     return { categories: layoutCats, rankGroups, buyGroups, flows, viewBoxHeight }
-  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, buyResultsMap])
+  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries])
 
   // ── Coverage stats ──
   const makeCatCount = layout.categories.filter((c) => c.type !== "buy").length
@@ -847,101 +865,179 @@ export function ShortlistCoverageFlow({
           )
         })()}
 
-        {/* HTML overlay: Buy category purchase cards */}
-        <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-          {layout.buyGroups.map((group) => {
-            const resultsWithProducts = group.results.filter((r) => r.products.length > 0)
-            const hasResults = resultsWithProducts.length > 0
+        {/* Buy category overlays: SVG bars (with results) or HTML fallback (static links) */}
+        {layout.buyGroups.length > 0 && (() => {
+          if (buySearchLoading) {
+            // Loading state
             return (
-              <div
-                key={`buy-${group.catId}`}
-                className="absolute pointer-events-auto"
-                style={{
-                  left: group.x * svgScale,
-                  top: group.y * svgScale,
-                  transform: `scale(${Math.min(svgScale, 1)})`,
-                  transformOrigin: "left top",
-                  maxWidth: (VB_W - group.x) * svgScale,
-                }}
-              >
-                <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
-                  {/* Header */}
-                  <div className="flex items-center gap-1.5 mb-2">
-                    <ShoppingCart className="h-3 w-3 text-international-orange" />
-                    <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
-                    <span className="text-[9px] text-muted-foreground ml-auto">
-                      {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
-                    </span>
+              <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+                {layout.buyGroups.map((group) => (
+                  <div
+                    key={`buy-load-${group.catId}`}
+                    className="absolute pointer-events-auto"
+                    style={{
+                      left: group.x * svgScale,
+                      top: (group.y + CATEGORY_NAME_H) * svgScale,
+                      transformOrigin: "left top",
+                    }}
+                  >
+                    <div className="flex items-center gap-1.5 text-muted-foreground animate-pulse">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="text-[10px] font-medium">Searching suppliers…</span>
+                    </div>
                   </div>
+                ))}
+              </div>
+            )
+          }
 
-                  {hasResults ? (
-                    <div className="space-y-2">
-                      {resultsWithProducts.map((result, ri) => (
-                        <div key={ri}>
-                          <p className="text-[10px] font-medium text-foreground">{result.partName}</p>
-                          <div className="ml-1 mt-0.5 space-y-0.5">
-                            {result.products.map((product, pi) => (
+          if (hasBuyResults) {
+            // SVG supplier bars overlay (matching make-category pattern)
+            return (
+              <svg
+                viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
+                className="absolute inset-0 w-full h-auto pointer-events-none"
+                style={{ display: "block" }}
+              >
+                {layout.buyGroups.map((group) => {
+                  const catColor = catColorMap.get(group.catId) ?? "#d97706"
+                  return (
+                    <g key={`buy-bars-${group.catId}`}>
+                      {/* Category header */}
+                      <text
+                        x={group.x}
+                        y={group.y + 12}
+                        fontSize={9}
+                        fontWeight={600}
+                        fill="#64748b"
+                      >
+                        Purchasing · {buySupplierAggregates.length} supplier{buySupplierAggregates.length !== 1 ? "s" : ""}
+                      </text>
+
+                      {/* Horizontal supplier bars — sorted lowest cost first */}
+                      {buySupplierAggregates.slice(0, SUPPLIER_BAR.MAX_VISIBLE).map((sup, si) => {
+                        const isFirst = si === 0
+                        const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
+                        const barX = group.x + (si === 0
+                          ? 0
+                          : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (si - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
+                        const barY = group.y + CATEGORY_NAME_H
+                        const costLabel = sup.totalCost > 0
+                          ? `${formatCurrency(sup.totalCost)} (${sup.partCount} part${sup.partCount !== 1 ? "s" : ""})`
+                          : `${sup.partCount} part${sup.partCount !== 1 ? "s" : ""}`
+
+                        return (
+                          <a
+                            key={sup.source}
+                            href={sup.sampleUrl || undefined}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ pointerEvents: "auto" }}
+                          >
+                            <rect
+                              x={barX}
+                              y={barY}
+                              width={barW}
+                              height={SUPPLIER_BAR.BAR_H}
+                              fill={isFirst ? catColor : "#f1f5f9"}
+                              stroke={isFirst ? undefined : "#e2e8f0"}
+                              strokeWidth={isFirst ? 0 : 1}
+                              rx={SUPPLIER_BAR.BAR_R}
+                              style={{ cursor: "pointer" }}
+                            />
+                            <text
+                              x={barX + 6}
+                              y={barY + 11}
+                              fontSize={9}
+                              fontWeight={isFirst ? 700 : 500}
+                              fill={isFirst ? "#ffffff" : "#334155"}
+                              style={{ pointerEvents: "none" }}
+                            >
+                              {truncate(sup.source, isFirst ? 18 : 12)}
+                            </text>
+                            <text
+                              x={barX + barW - 6}
+                              y={barY + 11}
+                              fontSize={8}
+                              fontFamily="monospace"
+                              fontWeight={isFirst ? 600 : 400}
+                              fill={isFirst ? "#ffffffcc" : "#94a3b8"}
+                              textAnchor="end"
+                              style={{ pointerEvents: "none" }}
+                            >
+                              {costLabel}
+                            </text>
+                            <title>{sup.source} — {costLabel}</title>
+                          </a>
+                        )
+                      })}
+                    </g>
+                  )
+                })}
+              </svg>
+            )
+          }
+
+          // Fallback: static search URL badges + search button
+          return (
+            <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+              {layout.buyGroups.map((group) => (
+                <div
+                  key={`buy-${group.catId}`}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: group.x * svgScale,
+                    top: group.y * svgScale,
+                    transform: `scale(${Math.min(svgScale, 1)})`,
+                    transformOrigin: "left top",
+                    maxWidth: (VB_W - group.x) * svgScale,
+                  }}
+                >
+                  <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <ShoppingCart className="h-3 w-3 text-international-orange" />
+                      <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
+                      {onSearchBuyParts && (
+                        <button
+                          onClick={() => onSearchBuyParts(group.parts.map((p) => p.name))}
+                          className="ml-auto inline-flex items-center gap-0.5 bg-international-orange/10 hover:bg-international-orange/20 rounded px-1.5 py-0.5 text-[9px] text-international-orange font-semibold transition-colors"
+                        >
+                          Search prices
+                        </button>
+                      )}
+                      {!onSearchBuyParts && (
+                        <span className="text-[9px] text-muted-foreground ml-auto">
+                          {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-1.5">
+                      {group.parts.map((part, pi) => (
+                        <div key={pi}>
+                          <p className="text-[10px] font-medium text-foreground truncate">{part.name}</p>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            {BUY_SUPPLIERS.map((s) => (
                               <a
-                                key={pi}
-                                href={product.url}
+                                key={s.label}
+                                href={s.url(part.name)}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 text-[9px] text-foreground hover:text-international-orange transition-colors"
+                                className="inline-flex items-center gap-0.5 bg-muted hover:bg-international-orange/10 rounded px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-international-orange font-medium transition-colors"
                               >
-                                <ExternalLink className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground" />
-                                <span className="bg-muted rounded px-1.5 py-0.5 text-[9px] text-muted-foreground font-medium">
-                                  {product.source}
-                                </span>
-                                {product.estimatedPrice && (
-                                  <span className="font-mono font-medium text-foreground">{product.estimatedPrice}</span>
-                                )}
+                                <ExternalLink className="h-2 w-2" />
+                                {s.label}
                               </a>
                             ))}
                           </div>
                         </div>
                       ))}
-                      {/* Search again CTA */}
-                      {onSearchBuyParts && (
-                        <button
-                          className="flex items-center justify-center gap-1.5 w-full mt-1 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
-                          onClick={onSearchBuyParts}
-                          disabled={buySearchLoading}
-                        >
-                          {buySearchLoading ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Search className="h-3 w-3" />
-                          )}
-                          {buySearchLoading ? "Searching…" : "Search Again"}
-                        </button>
-                      )}
                     </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {group.parts.map((part, pi) => (
-                        <p key={pi} className="text-[9px] text-muted-foreground">{part.name}</p>
-                      ))}
-                      {onSearchBuyParts && (
-                        <button
-                          className="flex items-center justify-center gap-1.5 w-full mt-2 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
-                          onClick={onSearchBuyParts}
-                          disabled={buySearchLoading}
-                        >
-                          {buySearchLoading ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Search className="h-3 w-3" />
-                          )}
-                          {buySearchLoading ? "Searching…" : "Search Products"}
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              ))}
+            </div>
+          )
+        })()}
       </div>
     </div>
   )

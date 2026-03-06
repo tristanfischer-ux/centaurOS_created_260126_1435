@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import type { AiCostEstimate, CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
-import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import type { CategorySupplierEntry } from "@/lib/sankey-utils"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { ShortlistCoverageFlow } from "./shortlist-coverage-flow"
@@ -49,6 +48,7 @@ import { createOrderFromAward } from "@/actions/manufacturing-orders"
 import { trackFeatureUse } from "@/hooks/useActivityTracker"
 import { generateRfq, generateSow, generateNda } from "@/lib/cad-lab-document-generators"
 import type { ShortlistedSupplier } from "@/app/(platform)/the-forge/cad-lab/source/page"
+import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -89,16 +89,16 @@ interface CadLabShortlistProps {
   categorySupplierEntries: Map<string, CategorySupplierEntry[]>
   /** Promote a supplier within a category. Optional targetRank (0-indexed) for direct placement. */
   onPromoteSupplier: (categoryId: string, supplierId: string, targetRank?: number) => void
-  /** Buy part search results */
-  buyPartResults?: BuyPartSearchResult[]
-  /** Trigger buy part search */
-  onSearchBuyParts?: () => void
-  /** Whether buy search is loading */
-  buySearchLoading?: boolean
   /** Whether "Match All Modules" is loading */
   matchAllLoading?: boolean
   /** Trigger match-all supplier search */
   onMatchAll?: () => void
+  /** Buy part search results */
+  buyPartResults?: BuyPartSearchResult[]
+  /** Whether buy search is loading */
+  buySearchLoading?: boolean
+  /** Trigger buy part search */
+  onSearchBuyParts?: (partNames: string[]) => void
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -148,11 +148,11 @@ export function CadLabShortlist({
   categoryRankings,
   categorySupplierEntries,
   onPromoteSupplier,
-  buyPartResults,
-  onSearchBuyParts,
-  buySearchLoading,
   matchAllLoading,
   onMatchAll,
+  buyPartResults,
+  buySearchLoading,
+  onSearchBuyParts,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
@@ -174,21 +174,6 @@ export function CadLabShortlist({
     setDetailMatchReasons(reasons)
     setDetailDialogOpen(true)
   }, [])
-
-  // ── Auto-trigger buy part search on mount if results are empty ──
-  const buyAutoSearchRef = useRef(false)
-
-  useEffect(() => {
-    if (
-      !buyAutoSearchRef.current &&
-      onSearchBuyParts &&
-      (!buyPartResults || buyPartResults.length === 0) &&
-      !buySearchLoading
-    ) {
-      buyAutoSearchRef.current = true
-      onSearchBuyParts()
-    }
-  }, [onSearchBuyParts, buyPartResults, buySearchLoading])
 
   // ── Per-supplier expanded document state ──
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
@@ -483,10 +468,10 @@ export function CadLabShortlist({
             categoryRankings={categoryRankings}
             categorySupplierEntries={categorySupplierEntries}
             onPromoteSupplier={onPromoteSupplier}
-            buyPartResults={buyPartResults}
-            onSearchBuyParts={onSearchBuyParts}
-            buySearchLoading={buySearchLoading}
             onSupplierClick={handleOpenSupplierDetail}
+            buyPartResults={buyPartResults}
+            buySearchLoading={buySearchLoading}
+            onSearchBuyParts={onSearchBuyParts}
           />
         )}
 

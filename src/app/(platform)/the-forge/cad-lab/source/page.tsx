@@ -33,10 +33,10 @@ import { CadLabShortlist } from "@/components/cad/cad-lab-shortlist"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
-import { toast } from "sonner"
-import { buildUniqueSuppliers, buildSankeyData, buildPerCategorySuppliers } from "@/lib/sankey-utils"
 import { searchBuyPartProducts } from "@/actions/buy-part-search"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import { toast } from "sonner"
+import { buildUniqueSuppliers, buildSankeyData, buildPerCategorySuppliers } from "@/lib/sankey-utils"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch, ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
 
@@ -193,6 +193,47 @@ export default function SourcePage(): React.ReactNode {
     })
   }, [categoryRankingsKey])
 
+  // ── Buy part search state (persisted to localStorage per project) ──
+  const buySearchKey = activeProjectId ? `forge-buy-search-${activeProjectId}` : null
+
+  const [buyPartResults, setBuyPartResultsRaw] = useState<BuyPartSearchResult[]>(() => {
+    if (!buySearchKey) return []
+    try {
+      const stored = localStorage.getItem(buySearchKey)
+      if (stored) return JSON.parse(stored) as BuyPartSearchResult[]
+    } catch { /* ignore corrupt data */ }
+    return []
+  })
+
+  const setBuyPartResults = useCallback((results: BuyPartSearchResult[]) => {
+    setBuyPartResultsRaw(results)
+    if (buySearchKey) {
+      try { localStorage.setItem(buySearchKey, JSON.stringify(results)) } catch { /* quota */ }
+    }
+  }, [buySearchKey])
+
+  const [buySearchLoading, setBuySearchLoading] = useState(false)
+
+  const handleSearchBuyParts = useCallback(async (partNames: string[]) => {
+    if (partNames.length === 0) return
+    setBuySearchLoading(true)
+    try {
+      const results = await searchBuyPartProducts(partNames)
+      setBuyPartResults(results)
+      const withProducts = results.filter((r) => r.products.length > 0).length
+      if (withProducts > 0) {
+        toast.success(`Found products for ${withProducts} of ${results.length} buy parts`)
+      } else {
+        toast.info("No supplier products found — showing search links instead")
+      }
+    } catch (err) {
+      console.error("[SOURCE] Buy part search failed:", err)
+      toast.error("Buy part search failed")
+    } finally {
+      setBuySearchLoading(false)
+    }
+  }, [setBuyPartResults])
+
   // Build per-category supplier entries
   const { categories: sankeyCategories } = useMemo(
     () => buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates),
@@ -204,6 +245,36 @@ export default function SourcePage(): React.ReactNode {
     () => buildPerCategorySuppliers(sankeyCategories, supplierMatches),
     [sankeyCategories, supplierMatches],
   )
+
+  // ── Buy part names from Sankey categories ──
+  const buyPartNames = useMemo(() => {
+    const names: string[] = []
+    for (const cat of sankeyCategories) {
+      if (cat.type === "buy") {
+        for (const part of cat.parts) names.push(part.name)
+      }
+    }
+    return names
+  }, [sankeyCategories])
+
+  // DECISION: activeTab declared here (before effects that reference it) to avoid block-scoping TDZ error.
+  const [activeTab, setActiveTab] = useState("suppliers")
+
+  // ── Auto-trigger buy search when buy parts exist but no results cached ──
+  const buySearchTriggeredRef = useRef(false)
+
+  useEffect(() => {
+    if (
+      buyPartNames.length > 0 &&
+      buyPartResults.length === 0 &&
+      !buySearchLoading &&
+      !buySearchTriggeredRef.current &&
+      (activeTab === "costs" || activeTab === "shortlist")
+    ) {
+      buySearchTriggeredRef.current = true
+      handleSearchBuyParts(buyPartNames)
+    }
+  }, [buyPartNames, buyPartResults.length, buySearchLoading, activeTab, handleSearchBuyParts])
 
   // INTENT: Clicking a supplier cycles its rank: unranked→1st→2nd→3rd→unranked.
   // Max 3 ranked per category. If a slot is occupied, the displaced supplier shifts down.
@@ -248,43 +319,6 @@ export default function SourcePage(): React.ReactNode {
       return next
     })
   }, [setCategoryRankings])
-
-  // ── Buy part search state ──
-  const buyPartsKey = activeProjectId ? `forge-buy-parts-${activeProjectId}` : null
-
-  const [buyPartResults, setBuyPartResults] = useState<BuyPartSearchResult[]>(() => {
-    if (!buyPartsKey) return []
-    try {
-      const stored = localStorage.getItem(buyPartsKey)
-      if (stored) return JSON.parse(stored) as BuyPartSearchResult[]
-    } catch { /* ignore */ }
-    return []
-  })
-
-  const [buySearchLoading, setBuySearchLoading] = useState(false)
-
-  const handleSearchBuyParts = useCallback(async () => {
-    // Collect all buy part names from categories
-    const buyParts = sankeyCategories
-      .filter((c) => c.type === "buy")
-      .flatMap((c) => c.parts.map((p) => p.name))
-
-    if (buyParts.length === 0) return
-
-    setBuySearchLoading(true)
-    try {
-      const results = await searchBuyPartProducts(buyParts)
-      setBuyPartResults(results)
-      if (buyPartsKey) {
-        try { localStorage.setItem(buyPartsKey, JSON.stringify(results)) } catch { /* quota */ }
-      }
-    } catch (err) {
-      console.error("[SOURCE] Buy part search failed:", err)
-      toast.error("Failed to search for buy parts")
-    } finally {
-      setBuySearchLoading(false)
-    }
-  }, [sankeyCategories, buyPartsKey])
 
   const handleShortlistSupplier = useCallback((supplier: CadLabSupplierMatch, moduleId: string) => {
     setShortlistedSuppliers((prev) => {
@@ -421,8 +455,6 @@ export default function SourcePage(): React.ReactNode {
     ],
     [],
   )
-
-  const [activeTab, setActiveTab] = useState("suppliers")
 
   // INTENT: Read tab from URL after hydration — avoids React #418.
   // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
@@ -584,11 +616,11 @@ export default function SourcePage(): React.ReactNode {
               categoryRankings={categoryRankings}
               categorySupplierEntries={categorySupplierEntries}
               onPromoteSupplier={handlePromoteSupplier}
-              buyPartResults={buyPartResults}
-              onSearchBuyParts={handleSearchBuyParts}
-              buySearchLoading={buySearchLoading}
               matchAllLoading={matchAllLoading}
               onMatchAll={handleMatchAll}
+              buyPartResults={buyPartResults}
+              buySearchLoading={buySearchLoading}
+              onSearchBuyParts={handleSearchBuyParts}
             />
           </motion.div>
         )}
@@ -605,10 +637,10 @@ export default function SourcePage(): React.ReactNode {
               supplierMatches={supplierMatches}
               categoryRankings={categoryRankings}
               categorySupplierEntries={categorySupplierEntries}
-              buyPartResults={buyPartResults}
-              onSearchBuyParts={handleSearchBuyParts}
-              buySearchLoading={buySearchLoading}
               onPromoteSupplier={handlePromoteSupplier}
+              buyPartResults={buyPartResults}
+              buySearchLoading={buySearchLoading}
+              onSearchBuyParts={handleSearchBuyParts}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

@@ -20,15 +20,14 @@ import {
   AlertTriangle,
   RotateCcw,
   ShoppingCart,
-  Search,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { formatCurrency } from "@/lib/format"
 import type { CadLabModule, EarlyCostEstimate, AiCostEstimate } from "@/lib/cad-lab-types"
-import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { CategorySupplierEntry } from "@/lib/sankey-utils"
 import {
@@ -42,6 +41,14 @@ import {
   buildSankeyData,
   sortCategoriesBuyLast,
 } from "@/lib/sankey-utils"
+
+// ─── Buy part supplier search URLs ──────────────────────────────────
+
+const BUY_SUPPLIERS = [
+  { label: "RS", url: (q: string) => `https://uk.rs-online.com/web/c/?searchTerm=${encodeURIComponent(q)}` },
+  { label: "Farnell", url: (q: string) => `https://uk.farnell.com/search?st=${encodeURIComponent(q)}` },
+  { label: "Misumi", url: (q: string) => `https://uk.misumi-ec.com/vona2/result/?Keyword=${encodeURIComponent(q)}` },
+] as const
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -62,7 +69,7 @@ const COL_SUPS_X = 680
 const PART_LIST_X = 32
 const PART_ROW_H = 13
 const PART_DOT_R = 3
-const CATEGORY_NAME_H = 16
+const CATEGORY_NAME_H = 28
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -81,16 +88,16 @@ interface CadLabCostEstimateProps {
   categoryRankings?: Map<string, string[]>
   /** Per-category supplier entries */
   categorySupplierEntries?: Map<string, CategorySupplierEntry[]>
-  /** Buy part search results */
-  buyPartResults?: BuyPartSearchResult[]
-  /** Trigger buy part search */
-  onSearchBuyParts?: () => void
-  /** Whether buy search is loading */
-  buySearchLoading?: boolean
   /** Callback: promote a supplier within a category */
   onPromoteSupplier?: (categoryId: string, supplierId: string, targetRank?: number) => void
   /** Callback: click supplier to view details */
   onSupplierClick?: (supplierId: string, supplierName?: string, matchScore?: number, matchReasons?: string[]) => void
+  /** Buy part search results */
+  buyPartResults?: BuyPartSearchResult[]
+  /** Whether buy search is loading */
+  buySearchLoading?: boolean
+  /** Trigger buy part search */
+  onSearchBuyParts?: (partNames: string[]) => void
 }
 
 export function CadLabCostEstimate({
@@ -103,11 +110,11 @@ export function CadLabCostEstimate({
   costEstimationError,
   categoryRankings,
   categorySupplierEntries,
-  buyPartResults,
-  onSearchBuyParts,
-  buySearchLoading,
   onPromoteSupplier,
   onSupplierClick,
+  buyPartResults,
+  buySearchLoading,
+  onSearchBuyParts,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
@@ -189,15 +196,6 @@ export function CadLabCostEstimate({
     return map
   }, [sortedCategories])
 
-  // Buy results lookup
-  const buyResultsMap = useMemo(() => {
-    const map = new Map<string, BuyPartSearchResult>()
-    if (buyPartResults) {
-      for (const r of buyPartResults) map.set(r.partName, r)
-    }
-    return map
-  }, [buyPartResults])
-
   // ── Compute category costs ──
   const categoryCostMap = useMemo(() => {
     const map = new Map<string, number>()
@@ -211,6 +209,33 @@ export function CadLabCostEstimate({
     return map
   }, [sortedCategories, partCostMap])
 
+  // ── Aggregate buy part results by supplier ──
+  const buySupplierAggregates = useMemo(() => {
+    if (!buyPartResults || buyPartResults.length === 0) return []
+    const agg = new Map<string, { source: string; totalCost: number; partCount: number; sampleUrl: string }>()
+    for (const result of buyPartResults) {
+      for (const product of result.products) {
+        const price = product.numericPrice ?? 0
+        const existing = agg.get(product.source)
+        if (existing) {
+          existing.totalCost += price
+          existing.partCount += 1
+          if (!existing.sampleUrl && product.url) existing.sampleUrl = product.url
+        } else {
+          agg.set(product.source, {
+            source: product.source,
+            totalCost: price,
+            partCount: 1,
+            sampleUrl: product.url ?? "",
+          })
+        }
+      }
+    }
+    return [...agg.values()].sort((a, b) => a.totalCost - b.totalCost)
+  }, [buyPartResults])
+
+  const hasBuyResults = buySupplierAggregates.length > 0
+
   // ── Compute layout ──
   const layout = useMemo(() => {
     const layoutCats: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }> = []
@@ -222,7 +247,6 @@ export function CadLabCostEstimate({
     const buyGroups: Array<{
       catId: string; x: number; y: number
       parts: Array<{ name: string }>
-      results: BuyPartSearchResult[]
     }> = []
     const flows: Array<{
       catId: string
@@ -238,10 +262,6 @@ export function CadLabCostEstimate({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        const buyResults = cat.parts
-          .map((p) => buyResultsMap.get(p.name))
-          .filter((r): r is BuyPartSearchResult => r != null)
-
         const buyContentH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
         const h = Math.max(catPartsH, buyContentH, SANKEY.BAR_MIN_H)
         layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
@@ -251,7 +271,6 @@ export function CadLabCostEstimate({
           x: COL_SUPS_X,
           y: cy,
           parts: cat.parts.map((p) => ({ name: p.name })),
-          results: buyResults,
         })
 
         cy += h + SANKEY.CAT_GAP
@@ -321,7 +340,7 @@ export function CadLabCostEstimate({
 
     const viewBoxHeight = cy + SANKEY.PADDING_BOTTOM
     return { categories: layoutCats, rankGroups, buyGroups, flows, viewBoxHeight }
-  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, buyResultsMap, categoryCostMap])
+  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, categoryCostMap])
 
   // ── Handlers ──
   const handleOverrideApply = useCallback((moduleId: string, value: string) => {
@@ -568,9 +587,9 @@ export function CadLabCostEstimate({
                             const cat = sortedCategories.find((c) => c.id === group.catId)
                             const partCount = cat?.partCount ?? 0
 
-                            // INTENT: Cost label with "(N parts)" clarifier when category has >1 part
+                            // INTENT: Cost label with per-part average + (est.) qualifier
                             const costLabel = isFirst && entry.allocatedCost > 0
-                              ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` (${partCount} parts)` : ""}`
+                              ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.allocatedCost / partCount))}/pt` : ""} (est.)`
                               : `${Math.round(entry.aggregateScore)}%`
 
                             return (
@@ -688,106 +707,189 @@ export function CadLabCostEstimate({
 
                 </svg>
 
-                {/* HTML overlay: Buy category purchase cards */}
-                {(() => {
+                {/* Buy category overlays: SVG bars (with results) or HTML fallback (static links) */}
+                {layout.buyGroups.length > 0 && (() => {
                   const svgScale = costSvgWidth > 0 ? costSvgWidth / VB_W : 1
-                  return (
-                    <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-                      {layout.buyGroups.map((group) => {
-                        const resultsWithProducts = group.results.filter((r) => r.products.length > 0)
-                        const hasResults = resultsWithProducts.length > 0
-                        return (
+
+                  if (buySearchLoading) {
+                    return (
+                      <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+                        {layout.buyGroups.map((group) => (
                           <div
-                            key={`buy-${group.catId}`}
+                            key={`buy-load-${group.catId}`}
                             className="absolute pointer-events-auto"
                             style={{
                               left: group.x * svgScale,
-                              top: group.y * svgScale,
-                              transform: `scale(${Math.min(svgScale, 1)})`,
+                              top: (group.y + CATEGORY_NAME_H) * svgScale,
                               transformOrigin: "left top",
-                              maxWidth: (VB_W - group.x) * svgScale,
                             }}
                           >
-                            <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
-                              {/* Header */}
-                              <div className="flex items-center gap-1.5 mb-2">
-                                <ShoppingCart className="h-3 w-3 text-international-orange" />
-                                <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
+                            <div className="flex items-center gap-1.5 text-muted-foreground animate-pulse">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="text-[10px] font-medium">Searching suppliers…</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+
+                  if (hasBuyResults) {
+                    return (
+                      <svg
+                        viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
+                        className="absolute inset-0 w-full h-auto pointer-events-none"
+                        style={{ display: "block" }}
+                      >
+                        {layout.buyGroups.map((group) => {
+                          const catColor = catColorMap.get(group.catId) ?? "#d97706"
+                          return (
+                            <g key={`buy-bars-${group.catId}`}>
+                              <text
+                                x={group.x}
+                                y={group.y + 12}
+                                fontSize={9}
+                                fontWeight={600}
+                                fill="#64748b"
+                              >
+                                Purchasing · {buySupplierAggregates.length} supplier{buySupplierAggregates.length !== 1 ? "s" : ""}
+                              </text>
+
+                              {buySupplierAggregates.slice(0, SUPPLIER_BAR.MAX_VISIBLE).map((sup, si) => {
+                                const isFirst = si === 0
+                                const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
+                                const barX = group.x + (si === 0
+                                  ? 0
+                                  : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (si - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
+                                const barY = group.y + CATEGORY_NAME_H
+                                const costLabel = sup.totalCost > 0
+                                  ? `${formatCurrency(sup.totalCost)} (${sup.partCount} part${sup.partCount !== 1 ? "s" : ""})`
+                                  : `${sup.partCount} part${sup.partCount !== 1 ? "s" : ""}`
+
+                                return (
+                                  <a
+                                    key={sup.source}
+                                    href={sup.sampleUrl || undefined}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{ pointerEvents: "auto" }}
+                                  >
+                                    <rect
+                                      x={barX}
+                                      y={barY}
+                                      width={barW}
+                                      height={SUPPLIER_BAR.BAR_H}
+                                      fill={isFirst ? catColor : "#f1f5f9"}
+                                      stroke={isFirst ? undefined : "#e2e8f0"}
+                                      strokeWidth={isFirst ? 0 : 1}
+                                      rx={SUPPLIER_BAR.BAR_R}
+                                      style={{ cursor: "pointer" }}
+                                    />
+                                    <text
+                                      x={barX + 6}
+                                      y={barY + 11}
+                                      fontSize={9}
+                                      fontWeight={isFirst ? 700 : 500}
+                                      fill={isFirst ? "#ffffff" : "#334155"}
+                                      style={{ pointerEvents: "none" }}
+                                    >
+                                      {truncate(sup.source, isFirst ? 18 : 12)}
+                                    </text>
+                                    <text
+                                      x={barX + barW - 6}
+                                      y={barY + 11}
+                                      fontSize={8}
+                                      fontFamily="monospace"
+                                      fontWeight={isFirst ? 600 : 400}
+                                      fill={isFirst ? "#ffffffcc" : "#94a3b8"}
+                                      textAnchor="end"
+                                      style={{ pointerEvents: "none" }}
+                                    >
+                                      {costLabel}
+                                    </text>
+                                    <title>{sup.source} — {costLabel}</title>
+                                  </a>
+                                )
+                              })}
+                            </g>
+                          )
+                        })}
+                      </svg>
+                    )
+                  }
+
+                  // Fallback: static search URL badges + search button
+                  return (
+                    <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+                      {layout.buyGroups.map((group) => (
+                        <div
+                          key={`buy-${group.catId}`}
+                          className="absolute pointer-events-auto"
+                          style={{
+                            left: group.x * svgScale,
+                            top: group.y * svgScale,
+                            transform: `scale(${Math.min(svgScale, 1)})`,
+                            transformOrigin: "left top",
+                            maxWidth: (VB_W - group.x) * svgScale,
+                          }}
+                        >
+                          <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <ShoppingCart className="h-3 w-3 text-international-orange" />
+                              <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
+                              {onSearchBuyParts && (
+                                <button
+                                  onClick={() => onSearchBuyParts(group.parts.map((p) => p.name))}
+                                  className="ml-auto inline-flex items-center gap-0.5 bg-international-orange/10 hover:bg-international-orange/20 rounded px-1.5 py-0.5 text-[9px] text-international-orange font-semibold transition-colors"
+                                >
+                                  Search prices
+                                </button>
+                              )}
+                              {!onSearchBuyParts && (
                                 <span className="text-[9px] text-muted-foreground ml-auto">
                                   {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
                                 </span>
-                              </div>
-
-                              {hasResults ? (
-                                <div className="space-y-2">
-                                  {resultsWithProducts.map((result, ri) => (
-                                    <div key={ri}>
-                                      <p className="text-[10px] font-medium text-foreground">{result.partName}</p>
-                                      <div className="ml-1 mt-0.5 space-y-0.5">
-                                        {result.products.slice(0, 2).map((product, pi) => (
-                                          <a
-                                            key={pi}
-                                            href={product.url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1.5 text-[9px] text-foreground hover:text-international-orange transition-colors"
-                                          >
-                                            <ExternalLink className="h-2.5 w-2.5 flex-shrink-0 text-muted-foreground" />
-                                            <span className="bg-muted rounded px-1.5 py-0.5 text-[9px] text-muted-foreground font-medium">
-                                              {product.source}
-                                            </span>
-                                            {product.estimatedPrice && (
-                                              <span className="font-mono font-medium text-foreground">{product.estimatedPrice}</span>
-                                            )}
-                                          </a>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                  {onSearchBuyParts && (
-                                    <button
-                                      className="flex items-center justify-center gap-1.5 w-full mt-1 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
-                                      onClick={onSearchBuyParts}
-                                      disabled={buySearchLoading}
-                                    >
-                                      {buySearchLoading ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <Search className="h-3 w-3" />
-                                      )}
-                                      {buySearchLoading ? "Searching…" : "Search Again"}
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="space-y-1">
-                                  {group.parts.map((part, pi) => (
-                                    <p key={pi} className="text-[9px] text-muted-foreground">{part.name}</p>
-                                  ))}
-                                  {onSearchBuyParts && (
-                                    <button
-                                      className="flex items-center justify-center gap-1.5 w-full mt-2 bg-international-orange/10 text-international-orange hover:bg-international-orange/20 rounded-md px-3 py-1.5 text-[10px] font-medium transition-colors"
-                                      onClick={onSearchBuyParts}
-                                      disabled={buySearchLoading}
-                                    >
-                                      {buySearchLoading ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                      ) : (
-                                        <Search className="h-3 w-3" />
-                                      )}
-                                      {buySearchLoading ? "Searching…" : "Search Products"}
-                                    </button>
-                                  )}
-                                </div>
                               )}
                             </div>
+                            <div className="space-y-1.5">
+                              {group.parts.map((part, pi) => (
+                                <div key={pi}>
+                                  <p className="text-[10px] font-medium text-foreground truncate">{part.name}</p>
+                                  <div className="flex items-center gap-1 mt-0.5">
+                                    {BUY_SUPPLIERS.map((s) => (
+                                      <a
+                                        key={s.label}
+                                        href={s.url(part.name)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-0.5 bg-muted hover:bg-international-orange/10 rounded px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-international-orange font-medium transition-colors"
+                                      >
+                                        <ExternalLink className="h-2 w-2" />
+                                        {s.label}
+                                      </a>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        )
-                      })}
+                        </div>
+                      ))}
                     </div>
                   )
                 })()}
               </div>
+            </div>
+
+            {/* Estimate disclaimer — inline info banner below Sankey */}
+            <div className="flex items-center gap-2 rounded-md border border-status-info/30 bg-status-info-light/20 px-3 py-2">
+              <AlertTriangle className="h-3.5 w-3.5 text-status-info flex-shrink-0" />
+              <p className="text-[11px] text-muted-foreground">
+                All costs are internal budget estimates based on industry rates.{" "}
+                {shortlistedSupplierCount > 0
+                  ? `${shortlistedSupplierCount} supplier${shortlistedSupplierCount !== 1 ? "s" : ""} shortlisted — send RFQs for real pricing.`
+                  : "Compare against real supplier quotes on the Shortlist tab."}
+              </p>
             </div>
 
             {/* System total */}
@@ -858,21 +960,6 @@ export function CadLabCostEstimate({
           </>
         )}
 
-        {/* Disclaimer */}
-        <div className="rounded-lg border border-status-info/30 bg-status-info-light/20 p-3 space-y-1">
-          <p className="text-xs font-medium text-foreground">
-            These are internal budget estimates based on industry rates.
-          </p>
-          {shortlistedSupplierCount > 0 ? (
-            <p className="text-[11px] text-muted-foreground">
-              {shortlistedSupplierCount} supplier{shortlistedSupplierCount !== 1 ? "s" : ""} shortlisted — send RFQs from the Shortlist tab to get real pricing.
-            </p>
-          ) : (
-            <p className="text-[11px] text-muted-foreground">
-              Compare against real supplier quotes on the Shortlist tab.
-            </p>
-          )}
-        </div>
       </CardContent>
     </Card>
   )
