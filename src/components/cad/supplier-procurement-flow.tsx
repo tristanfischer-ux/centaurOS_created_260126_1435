@@ -1,47 +1,36 @@
 /**
- * @file supplier-procurement-flow.tsx — 3-column procurement flow on Suppliers tab.
+ * @file supplier-procurement-flow.tsx — 2-column SVG Sankey: Modules → Categories.
  *
- * @description Interactive diagram: Modules → Component Groups → Matched Suppliers.
- * Auto-selects top 3 suppliers by match score after matching completes.
- * Replaces CadLabSupplyChain on the Suppliers tab for visual discovery.
+ * @description Decomposition diagram showing how modules break down into
+ * manufacturing/buy categories. Supplier matching is still triggered here
+ * but allocation (Categories → Suppliers) lives on the Shortlist tab.
  *
  * FLOW: source/page.tsx → this component (Suppliers tab)
  */
 
 "use client"
 
-import {
-  useMemo,
-  useState,
-  useCallback,
-  useRef,
-  useLayoutEffect,
-  useEffect,
-} from "react"
-import {
-  AlertTriangle,
-  BadgeCheck,
-  Search,
-  Loader2,
-  Plus,
-  Check,
-} from "lucide-react"
+import { useMemo, useState, useCallback, useRef, useEffect } from "react"
+import { Search, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
+import {
+  type ModuleNode,
+  type CategoryNode,
+  type PartWithCategory,
+  SANKEY,
+  CAT_COLORS,
+  moduleColorFn,
+  flowFill,
+  flowPath,
+  truncate,
+  buildSankeyData,
+  sortCategoriesBuyLast,
+} from "@/lib/sankey-utils"
 
-// ─── Types ──────────────────────────────────────────────────────────
-
-interface RequirementGroup {
-  id: string
-  process: string
-  material: string
-  type: "buy" | "make"
-  label: string
-  parts: { name: string; moduleId: string; moduleName: string }[]
-}
+// ─── Props ───────────────────────────────────────────────────────────
 
 export interface SupplierProcurementFlowProps {
   modules: CadLabModule[]
@@ -52,139 +41,145 @@ export interface SupplierProcurementFlowProps {
   matchAllLoading: boolean
   onMatchModule: (mod: CadLabModule) => void
   onMatchAll: () => void
-  shortlistedSupplierIds: Set<string>
-  onShortlistSupplier: (supplier: CadLabSupplierMatch, moduleId: string) => void
 }
 
-/** Deduplicated supplier with best score and aggregated module IDs */
-interface UniqueSupplier {
-  id: string
-  name: string
-  isVerified: boolean
-  bestScore: number
-  moduleIds: string[]
-  /** Keep the original match object for the onShortlistSupplier callback */
-  originalMatch: CadLabSupplierMatch
-  /** First moduleId that matched — used for the shortlist callback */
-  firstModuleId: string
+// ─── SVG layout constants ────────────────────────────────────────────
+
+const VB_W = 1300
+const COL_MODS_X = 10
+const COL_CATS_X = 780
+const PART_LIST_X = 32
+const PART_ROW_H = 13
+const PART_DOT_R = 3
+const MODULE_NAME_H = 16
+const CATEGORY_NAME_H = 16
+
+// ─── Layout types ────────────────────────────────────────────────────
+
+interface DecompositionLayout {
+  modules: Array<ModuleNode & { x: number; y: number; h: number; color: string }>
+  categories: Array<CategoryNode & { x: number; y: number; h: number }>
+  modToCatFlows: Array<{
+    moduleId: string; catId: string
+    x1: number; y1t: number; y1b: number
+    x2: number; y2t: number; y2b: number
+    color: string; partCount: number
+  }>
+  viewBoxHeight: number
 }
 
-// ─── Color helpers (same as shortlist-coverage-flow) ─────────────────
+// ─── Compute layout ──────────────────────────────────────────────────
 
-const CHART_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(var(--chart-6))",
-]
+function computeLayout(
+  moduleNodes: ModuleNode[],
+  categories: CategoryNode[],
+  moduleColorMap: Map<string, string>,
+): DecompositionLayout {
+  // --- Modules column (left) ---
+  const layoutModules: DecompositionLayout["modules"] = []
+  let my = SANKEY.CONTENT_TOP
 
-function chipColor(id: string): string {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return CHART_COLORS[h % CHART_COLORS.length]
-}
+  for (const mod of moduleNodes) {
+    const h = Math.max(MODULE_NAME_H + mod.partCount * PART_ROW_H + 4, SANKEY.BAR_MIN_H)
+    const color = moduleColorMap.get(mod.id) ?? "hsl(0,0%,60%)"
+    layoutModules.push({ ...mod, x: COL_MODS_X, y: my, h, color })
+    my += h + SANKEY.MODULE_GAP
+  }
 
-// ─── Build requirement groups ───────────────────────────────────────
+  const totalModsHeight = my
 
-function buildGroups(
-  modules: CadLabModule[],
-  diagnosticAnswers?: DiagnosticAnswers,
-  aiCostEstimates?: Record<string, AiCostEstimate>,
-): RequirementGroup[] {
-  const groupMap = new Map<string, RequirementGroup>()
+  // --- Categories column (right): sort by center-of-gravity of source modules ---
+  const modYMap = new Map<string, number>()
+  for (const lm of layoutModules) modYMap.set(lm.id, lm.y + lm.h / 2)
 
-  for (const mod of modules) {
-    const diag = diagnosticAnswers?.[mod.id]
-    const costEstimate = aiCostEstimates?.[mod.id]
-    const hasParts = costEstimate?.parts && costEstimate.parts.length > 0
-
-    if (hasParts) {
-      for (const part of costEstimate.parts!) {
-        const process = part.type === "buy" ? "Buy" : (diag?.mfg_process ?? "Unknown Process")
-        const material = part.type === "buy" ? "Off-the-shelf" : (diag?.material ?? "Unknown Material")
-        const key = `${process}-${material}-${part.type}`.toLowerCase().replace(/\s+/g, "_")
-
-        let group = groupMap.get(key)
-        if (!group) {
-          const label = part.type === "buy"
-            ? "Buy \u00b7 Off-the-shelf"
-            : `${process} \u00b7 ${material}`
-          group = { id: key, process, material, type: part.type, label, parts: [] }
-          groupMap.set(key, group)
-        }
-        group.parts.push({ name: part.name, moduleId: mod.id, moduleName: mod.name })
+  const catsWithCoG = categories.map((cat) => {
+    let totalY = 0, totalWeight = 0
+    for (const [modId, count] of cat.moduleContributions) {
+      const modCenter = modYMap.get(modId)
+      if (modCenter !== undefined) {
+        totalY += modCenter * count
+        totalWeight += count
       }
-    } else {
-      const process = diag?.mfg_process ?? "Unknown Process"
-      const material = diag?.material ?? "Unknown Material"
-      const type = "make" as const
-      const key = `${process}-${material}-${type}`.toLowerCase().replace(/\s+/g, "_")
+    }
+    return { cat, centerOfGravity: totalWeight > 0 ? totalY / totalWeight : 0 }
+  })
+  catsWithCoG.sort((a, b) =>
+    sortCategoriesBuyLast(
+      { type: a.cat.type, centerOfGravity: a.centerOfGravity },
+      { type: b.cat.type, centerOfGravity: b.centerOfGravity },
+    )
+  )
 
-      let group = groupMap.get(key)
-      if (!group) {
-        const label = `${process} \u00b7 ${material}`
-        group = { id: key, process, material, type, label, parts: [] }
-        groupMap.set(key, group)
-      }
-      for (const part of mod.keyParts) {
-        group.parts.push({ name: part, moduleId: mod.id, moduleName: mod.name })
-      }
+  const layoutCats: DecompositionLayout["categories"] = []
+  let cy = SANKEY.CONTENT_TOP
+  for (const { cat } of catsWithCoG) {
+    const h = Math.max(CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4, SANKEY.BAR_MIN_H)
+    layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h })
+    cy += h + SANKEY.CAT_GAP
+  }
+
+  // Re-center categories so their center aligns with modules center
+  const catsTotalH = cy - SANKEY.CAT_GAP
+  const centerOffset = (totalModsHeight / 2) - (catsTotalH / 2)
+  if (centerOffset > 0) {
+    for (const lc of layoutCats) lc.y += centerOffset
+  }
+
+  // --- Module → Category flows ---
+  const modOutCursors = new Map<string, number>()
+  for (const lm of layoutModules) modOutCursors.set(lm.id, lm.y)
+
+  const catInCursors = new Map<string, number>()
+  for (const lc of layoutCats) catInCursors.set(lc.id, lc.y)
+
+  const modToCatFlows: DecompositionLayout["modToCatFlows"] = []
+
+  for (const lm of layoutModules) {
+    for (const catKey of lm.categoryKeys) {
+      const lc = layoutCats.find((c) => c.id === catKey)
+      if (!lc) continue
+
+      const cat = categories.find((c) => c.id === catKey)
+      if (!cat) continue
+
+      const partCount = cat.moduleContributions.get(lm.id) ?? 0
+      if (partCount === 0) continue
+
+      const modSlice = (lm.h / Math.max(lm.partCount, 1)) * partCount
+      const modCursor = modOutCursors.get(lm.id) ?? lm.y
+
+      const catSlice = (lc.h / Math.max(cat.partCount, 1)) * partCount
+      const catCursor = catInCursors.get(lc.id) ?? lc.y
+
+      modToCatFlows.push({
+        moduleId: lm.id,
+        catId: lc.id,
+        x1: lm.x + SANKEY.BAR_W,
+        y1t: modCursor,
+        y1b: modCursor + modSlice,
+        x2: lc.x,
+        y2t: catCursor,
+        y2b: catCursor + catSlice,
+        color: lm.color,
+        partCount,
+      })
+
+      modOutCursors.set(lm.id, modCursor + modSlice)
+      catInCursors.set(lc.id, catCursor + catSlice)
     }
   }
 
-  return [...groupMap.values()]
+  // ViewBox height
+  const maxY = Math.max(
+    totalModsHeight,
+    ...layoutCats.map((c) => c.y + c.h),
+  )
+  const viewBoxHeight = maxY + SANKEY.PADDING_BOTTOM
+
+  return { modules: layoutModules, categories: layoutCats, modToCatFlows, viewBoxHeight }
 }
 
-// ─── Build unique suppliers from matches map ────────────────────────
-
-function buildUniqueSuppliers(
-  supplierMatches: Map<string, CadLabSupplierMatch[]>,
-): UniqueSupplier[] {
-  const map = new Map<string, UniqueSupplier>()
-
-  for (const [moduleId, matches] of supplierMatches) {
-    for (const match of matches) {
-      const existing = map.get(match.id)
-      if (existing) {
-        if (match.matchScore > existing.bestScore) {
-          existing.bestScore = match.matchScore
-          existing.originalMatch = match
-        }
-        if (!existing.moduleIds.includes(moduleId)) {
-          existing.moduleIds.push(moduleId)
-        }
-      } else {
-        map.set(match.id, {
-          id: match.id,
-          name: match.name,
-          isVerified: match.isVerified,
-          bestScore: match.matchScore,
-          moduleIds: [moduleId],
-          originalMatch: match,
-          firstModuleId: moduleId,
-        })
-      }
-    }
-  }
-
-  // Sort by best score descending
-  return [...map.values()].sort((a, b) => b.bestScore - a.bestScore)
-}
-
-// ─── Edge position types ────────────────────────────────────────────
-
-interface CardRect {
-  id: string
-  top: number
-  bottom: number
-  right: number
-  left: number
-  centerY: number
-}
-
-// ─── Component ──────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────
 
 export function SupplierProcurementFlow({
   modules,
@@ -195,191 +190,90 @@ export function SupplierProcurementFlow({
   matchAllLoading,
   onMatchModule,
   onMatchAll,
-  shortlistedSupplierIds,
-  onShortlistSupplier,
 }: SupplierProcurementFlowProps): React.ReactNode {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const moduleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const groupRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const supplierRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [edgePositions, setEdgePositions] = useState<{
-    moduleToGroup: { from: CardRect; to: CardRect; moduleId: string; groupId: string }[]
-    groupToSupplier: { from: CardRect; to: CardRect; groupId: string; supplierId: string }[]
-  }>({ moduleToGroup: [], groupToSupplier: [] })
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
-  const groups = useMemo(
-    () => buildGroups(modules, diagnosticAnswers, aiCostEstimates),
+  // Observe container width for scaling HTML overlays
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width)
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const moduleColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    modules.forEach((mod, i) => map.set(mod.id, moduleColorFn(i)))
+    return map
+  }, [modules])
+
+  const { moduleNodes, categories, totalParts } = useMemo(
+    () => buildSankeyData(modules, diagnosticAnswers, aiCostEstimates),
     [modules, diagnosticAnswers, aiCostEstimates],
   )
 
-  const uniqueSuppliers = useMemo(
-    () => buildUniqueSuppliers(supplierMatches),
-    [supplierMatches],
+  const layout = useMemo(
+    () => computeLayout(moduleNodes, categories, moduleColorMap),
+    [moduleNodes, categories, moduleColorMap],
   )
+
+  // Build category → color map from sorted layout order
+  const catColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    layout.categories.forEach((c, i) => map.set(c.id, CAT_COLORS[i % CAT_COLORS.length]))
+    return map
+  }, [layout.categories])
 
   const matchedModuleCount = supplierMatches.size
 
-  // ── Map suppliers to groups ──
-  // A supplier covers a group when any of its moduleIds contributes parts to that group
-  const groupSupplierMap = useMemo(() => {
-    const result = new Map<string, string[]>()
-    for (const group of groups) {
-      const contributingModuleIds = new Set(group.parts.map((p) => p.moduleId))
-      const matchedSupplierIds = new Set<string>()
-      for (const supplier of uniqueSuppliers) {
-        for (const mid of supplier.moduleIds) {
-          if (contributingModuleIds.has(mid)) {
-            matchedSupplierIds.add(supplier.id)
-            break
-          }
-        }
-      }
-      result.set(group.id, [...matchedSupplierIds])
-    }
-    return result
-  }, [groups, uniqueSuppliers])
-
-  // ── Build edge links ──
-  const moduleGroupLinks = useMemo(() => {
-    const links: { moduleId: string; groupId: string }[] = []
-    const seen = new Set<string>()
-    for (const group of groups) {
-      for (const part of group.parts) {
-        const key = `${part.moduleId}→${group.id}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          links.push({ moduleId: part.moduleId, groupId: group.id })
-        }
-      }
-    }
-    return links
-  }, [groups])
-
-  const groupSupplierLinks = useMemo(() => {
-    const links: { groupId: string; supplierId: string }[] = []
-    for (const [groupId, supplierIds] of groupSupplierMap) {
-      for (const sid of supplierIds) {
-        links.push({ groupId, supplierId: sid })
-      }
-    }
-    return links
-  }, [groupSupplierMap])
-
-  // ── Hover connectivity ──
+  // ── Hover connectivity (module ↔ category only) ──
   const connectedToHover = useMemo(() => {
     if (!hoveredId) return null
     const connected = new Set<string>([hoveredId])
 
-    // Module hovered → find groups → find suppliers
-    for (const link of moduleGroupLinks) {
-      if (link.moduleId === hoveredId) {
-        connected.add(`group-${link.groupId}`)
-        const sids = groupSupplierMap.get(link.groupId)
-        if (sids) for (const sid of sids) connected.add(`supplier-${sid}`)
+    if (hoveredId.startsWith("mod-")) {
+      const modId = hoveredId.slice(4)
+      for (const f of layout.modToCatFlows) {
+        if (f.moduleId === modId) connected.add(`cat-${f.catId}`)
       }
     }
-    // Group hovered → find modules and suppliers
-    const gid = hoveredId.replace("group-", "")
-    for (const link of moduleGroupLinks) {
-      if (link.groupId === gid) connected.add(link.moduleId)
-    }
-    for (const link of groupSupplierLinks) {
-      if (link.groupId === gid) connected.add(`supplier-${link.supplierId}`)
-    }
-    // Supplier hovered → find groups → find modules
-    const sid = hoveredId.replace("supplier-", "")
-    for (const link of groupSupplierLinks) {
-      if (link.supplierId === sid) {
-        connected.add(`group-${link.groupId}`)
-        for (const ml of moduleGroupLinks) {
-          if (ml.groupId === link.groupId) connected.add(ml.moduleId)
-        }
+
+    if (hoveredId.startsWith("cat-")) {
+      const catId = hoveredId.slice(4)
+      for (const f of layout.modToCatFlows) {
+        if (f.catId === catId) connected.add(`mod-${f.moduleId}`)
       }
     }
+
     return connected
-  }, [hoveredId, moduleGroupLinks, groupSupplierLinks, groupSupplierMap])
+  }, [hoveredId, layout])
 
   const getOpacity = useCallback(
-    (cardId: string) => {
+    (id: string) => {
       if (!connectedToHover) return 1
-      return connectedToHover.has(cardId) ? 1 : 0.2
+      return connectedToHover.has(id) ? 1 : 0.1
     },
     [connectedToHover],
   )
 
-  // ── Measure card positions for SVG edges ──
-  const measurePositions = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const containerRect = container.getBoundingClientRect()
-
-    const getRect = (el: HTMLDivElement | undefined): CardRect | null => {
-      if (!el) return null
-      const r = el.getBoundingClientRect()
-      return {
-        id: "",
-        top: r.top - containerRect.top,
-        bottom: r.bottom - containerRect.top,
-        right: r.right - containerRect.left,
-        left: r.left - containerRect.left,
-        centerY: (r.top + r.bottom) / 2 - containerRect.top,
-      }
-    }
-
-    const mtg: typeof edgePositions.moduleToGroup = []
-    for (const link of moduleGroupLinks) {
-      const from = getRect(moduleRefs.current.get(link.moduleId))
-      const to = getRect(groupRefs.current.get(link.groupId))
-      if (from && to) {
-        mtg.push({ from, to, moduleId: link.moduleId, groupId: link.groupId })
-      }
-    }
-
-    const gts: typeof edgePositions.groupToSupplier = []
-    for (const link of groupSupplierLinks) {
-      const from = getRect(groupRefs.current.get(link.groupId))
-      const to = getRect(supplierRefs.current.get(link.supplierId))
-      if (from && to) {
-        gts.push({ from, to, groupId: link.groupId, supplierId: link.supplierId })
-      }
-    }
-
-    setEdgePositions({ moduleToGroup: mtg, groupToSupplier: gts })
-  }, [moduleGroupLinks, groupSupplierLinks])
-
-  useLayoutEffect(() => {
-    measurePositions()
-    const observer = new ResizeObserver(measurePositions)
-    if (containerRef.current) observer.observe(containerRef.current)
-    return () => observer.disconnect()
-  }, [measurePositions, modules, groups, uniqueSuppliers])
-
-  // ── Auto-select top 3 suppliers after matching ──
-  // INTENT: Guard with matchKey ref to prevent re-triggering on the same set
-  const autoSelectKeyRef = useRef<string>("")
-
-  useEffect(() => {
-    if (uniqueSuppliers.length === 0) return
-
-    // Build a stable key from the current match state
-    const matchKey = [...supplierMatches.keys()].sort().join(",")
-    if (matchKey === autoSelectKeyRef.current) return
-    autoSelectKeyRef.current = matchKey
-
-    // Find top 3 not already shortlisted
-    const toAutoSelect = uniqueSuppliers
-      .filter((s) => !shortlistedSupplierIds.has(s.id))
-      .slice(0, 3)
-
-    for (const supplier of toAutoSelect) {
-      onShortlistSupplier(supplier.originalMatch, supplier.firstModuleId)
-    }
-  }, [uniqueSuppliers, supplierMatches, shortlistedSupplierIds, onShortlistSupplier])
+  const getFlowOpacity = useCallback(
+    (ids: string[]) => {
+      if (!connectedToHover) return 0.35
+      return ids.every((id) => connectedToHover.has(id)) ? 0.55 : 0.06
+    },
+    [connectedToHover],
+  )
 
   if (modules.length === 0) return null
+
+  const svgScale = containerWidth > 0 ? containerWidth / VB_W : 1
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
@@ -389,6 +283,10 @@ export function SupplierProcurementFlow({
           <span className="text-xs font-semibold text-foreground">Procurement Flow</span>
           <span className="text-[10px] font-medium text-muted-foreground">
             {matchedModuleCount} of {modules.length} module{modules.length !== 1 ? "s" : ""} matched
+            {" \u00b7 "}
+            {totalParts} part{totalParts !== 1 ? "s" : ""}
+            {" \u00b7 "}
+            {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
           </span>
         </div>
         <Button
@@ -403,248 +301,213 @@ export function SupplierProcurementFlow({
         </Button>
       </div>
 
-      {/* 3-column layout with SVG overlay */}
-      <div ref={containerRef} className="relative">
-        {/* SVG edge overlay */}
+      {/* Column headers */}
+      <div className="grid grid-cols-2 gap-0">
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modules</p>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider" style={{ paddingLeft: ((COL_CATS_X / VB_W) * 100) + "%" }}>Categories</p>
+      </div>
+
+      {/* SVG + HTML overlays */}
+      <div ref={containerRef} className="relative overflow-x-auto">
         <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ zIndex: 1 }}
+          viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
+          className="w-full h-auto"
+          style={{ display: "block" }}
         >
-          {/* Module → Group edges */}
-          {edgePositions.moduleToGroup.map((edge, i) => {
-            const x1 = edge.from.right
-            const y1 = edge.from.centerY
-            const x2 = edge.to.left
-            const y2 = edge.to.centerY
-            const mx = (x1 + x2) / 2
-            const isHighlighted = !connectedToHover
-              || (connectedToHover.has(edge.moduleId) && connectedToHover.has(`group-${edge.groupId}`))
-
-            return (
+          {/* Layer 1: Flow ribbons */}
+          <g>
+            {layout.modToCatFlows.map((f, i) => (
               <path
-                key={`mg-${i}`}
-                d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-                fill="none"
-                stroke={chipColor(edge.moduleId)}
-                strokeWidth={1.5}
-                opacity={isHighlighted ? 0.5 : 0.08}
-                className="transition-opacity duration-200"
+                key={`mc-${i}`}
+                d={flowPath(f.x1, f.y1t, f.y1b, f.x2, f.y2t, f.y2b)}
+                fill={flowFill(f.color, getFlowOpacity([`mod-${f.moduleId}`, `cat-${f.catId}`]))}
+                className="transition-all duration-200"
               />
-            )
-          })}
-          {/* Group → Supplier edges */}
-          {edgePositions.groupToSupplier.map((edge, i) => {
-            const x1 = edge.from.right
-            const y1 = edge.from.centerY
-            const x2 = edge.to.left
-            const y2 = edge.to.centerY
-            const mx = (x1 + x2) / 2
-            const isHighlighted = !connectedToHover
-              || (connectedToHover.has(`group-${edge.groupId}`) && connectedToHover.has(`supplier-${edge.supplierId}`))
+            ))}
+          </g>
 
-            return (
-              <path
-                key={`gs-${i}`}
-                d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-                fill="none"
-                stroke={chipColor(edge.groupId)}
-                strokeWidth={1.5}
-                opacity={isHighlighted ? 0.5 : 0.08}
-                className="transition-opacity duration-200"
-              />
-            )
-          })}
+          {/* Layer 2: Module bars with inline parts */}
+          <g>
+            {layout.modules.map((m) => {
+              const modId = `mod-${m.id}`
+              return (
+                <g key={m.id}>
+                  <rect
+                    x={m.x}
+                    y={m.y}
+                    width={SANKEY.BAR_W}
+                    height={m.h}
+                    fill={m.color}
+                    rx={3}
+                    opacity={getOpacity(modId)}
+                    className="transition-opacity duration-200"
+                  />
+                  {/* Module name */}
+                  <text
+                    x={m.x + SANKEY.LABEL_OFFSET_RIGHT}
+                    y={m.y + 12}
+                    fontSize={10}
+                    fontWeight={600}
+                    fill="#1e293b"
+                    opacity={getOpacity(modId)}
+                    className="transition-opacity duration-200"
+                  >
+                    {truncate(m.name, 60)}
+                    <title>{m.name}</title>
+                  </text>
+                  {/* Inline parts with colored dots */}
+                  {m.partsWithCategories.map((part, pi) => {
+                    const dotColor = catColorMap.get(part.categoryKey) ?? "#94a3b8"
+                    const py = m.y + MODULE_NAME_H + pi * PART_ROW_H + 4
+                    return (
+                      <g key={pi} opacity={getOpacity(modId)} className="transition-opacity duration-200">
+                        <circle
+                          cx={m.x + PART_LIST_X}
+                          cy={py}
+                          r={PART_DOT_R}
+                          fill={dotColor}
+                        />
+                        <text
+                          x={m.x + PART_LIST_X + 8}
+                          y={py + 3}
+                          fontSize={9}
+                          fill="#475569"
+                        >
+                          {truncate(part.name, 75)}
+                        </text>
+                      </g>
+                    )
+                  })}
+                  {/* Hit area for hover */}
+                  <rect
+                    x={m.x - 2}
+                    y={m.y - 1}
+                    width={COL_CATS_X - COL_MODS_X - 10}
+                    height={m.h + 2}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredId(modId)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ cursor: "default" }}
+                  />
+                </g>
+              )
+            })}
+          </g>
+
+          {/* Layer 3: Category bars with inline parts (colored per-category) */}
+          <g>
+            {layout.categories.map((c) => {
+              const catId = `cat-${c.id}`
+              const barColor = catColorMap.get(c.id) ?? "#475569"
+              return (
+                <g key={c.id}>
+                  <rect
+                    x={c.x}
+                    y={c.y}
+                    width={SANKEY.BAR_W}
+                    height={c.h}
+                    fill={barColor}
+                    rx={3}
+                    opacity={getOpacity(catId)}
+                    className="transition-opacity duration-200"
+                  />
+                  {/* Category label */}
+                  <text
+                    x={c.x + SANKEY.LABEL_OFFSET_RIGHT}
+                    y={c.y + 12}
+                    fontSize={10}
+                    fontWeight={600}
+                    fill="#1e293b"
+                    opacity={getOpacity(catId)}
+                    className="transition-opacity duration-200"
+                  >
+                    {truncate(c.label, 45)}
+                    <title>{c.label} — {c.partCount} part{c.partCount !== 1 ? "s" : ""}</title>
+                  </text>
+                  {/* Inline parts with colored dots */}
+                  {c.parts.map((part, pi) => {
+                    const modColor = moduleColorMap.get(part.moduleId) ?? "#94a3b8"
+                    const py = c.y + CATEGORY_NAME_H + pi * PART_ROW_H + 4
+                    return (
+                      <g key={pi} opacity={getOpacity(catId)} className="transition-opacity duration-200">
+                        <circle
+                          cx={c.x + PART_LIST_X}
+                          cy={py}
+                          r={PART_DOT_R}
+                          fill={modColor}
+                        />
+                        <text
+                          x={c.x + PART_LIST_X + 8}
+                          y={py + 3}
+                          fontSize={9}
+                          fill="#475569"
+                        >
+                          {truncate(part.name, 55)}
+                        </text>
+                      </g>
+                    )
+                  })}
+                  {/* Hit area */}
+                  <rect
+                    x={c.x - 4}
+                    y={c.y - 2}
+                    width={VB_W - c.x + 4}
+                    height={c.h + 4}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredId(catId)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ cursor: "default" }}
+                  />
+                </g>
+              )
+            })}
+          </g>
+
         </svg>
 
-        {/* 3-column grid */}
-        <div className="grid grid-cols-3 gap-6" style={{ position: "relative", zIndex: 2 }}>
-          {/* Column 1: Modules */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Modules
-            </p>
-            {modules.map((mod) => {
-              const diag = diagnosticAnswers?.[mod.id]
-              const isLoading = loadingModules.has(mod.id)
-              const hasMatches = supplierMatches.has(mod.id)
-              return (
-                <div
-                  key={mod.id}
-                  ref={(el) => { if (el) moduleRefs.current.set(mod.id, el); else moduleRefs.current.delete(mod.id) }}
-                  className={cn(
-                    "rounded-md border p-2 transition-opacity duration-200 bg-card",
-                    !hasMatches && !isLoading && "border-dashed",
-                  )}
-                  style={{ opacity: getOpacity(mod.id) }}
-                  onMouseEnter={() => setHoveredId(mod.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {isLoading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground flex-shrink-0" />}
-                    <span className="text-xs font-semibold text-foreground truncate">{mod.name}</span>
-                  </div>
-                  {mod.keyParts.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {mod.keyParts.slice(0, 5).map((part, i) => (
-                        <li key={i} className="text-[10px] text-muted-foreground truncate pl-2">
-                          {part}
-                        </li>
-                      ))}
-                      {mod.keyParts.length > 5 && (
-                        <li className="text-[10px] text-muted-foreground pl-2">
-                          +{mod.keyParts.length - 5} more
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                  {diag?.mfg_process && (
-                    <span className="mt-1 inline-block text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                      {diag.mfg_process}{diag.material ? ` \u00b7 ${diag.material}` : ""}
-                    </span>
-                  )}
-                  {/* Per-module match button when not yet matched */}
-                  {!hasMatches && !isLoading && (
-                    <button
-                      className="mt-1.5 flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors"
-                      onClick={() => onMatchModule(mod)}
-                    >
-                      <Search className="h-2.5 w-2.5" />
-                      Find suppliers
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Column 2: Component Groups */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Component Groups
-            </p>
-            {groups.map((group) => {
-              const supplierIds = groupSupplierMap.get(group.id) ?? []
-              const isUncovered = supplierIds.length === 0 && matchedModuleCount > 0
-              const cardId = `group-${group.id}`
-              return (
-                <div
-                  key={group.id}
-                  ref={(el) => { if (el) groupRefs.current.set(group.id, el); else groupRefs.current.delete(group.id) }}
-                  className={cn(
-                    "rounded-md border p-2 transition-opacity duration-200 bg-card",
-                    isUncovered && "border-destructive/30 bg-destructive/5",
-                  )}
-                  style={{ opacity: getOpacity(cardId) }}
-                  onMouseEnter={() => setHoveredId(cardId)}
-                  onMouseLeave={() => setHoveredId(null)}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {isUncovered && <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" />}
-                      <span className="text-xs font-semibold text-foreground truncate">{group.label}</span>
-                    </div>
-                    <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground flex-shrink-0">
-                      {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <ul className="mt-1 space-y-0.5">
-                    {group.parts.slice(0, 4).map((part, i) => (
-                      <li key={i} className="text-[10px] text-muted-foreground truncate pl-2">
-                        {part.name}{" "}
-                        <span className="text-muted-foreground/60">({part.moduleName})</span>
-                      </li>
-                    ))}
-                    {group.parts.length > 4 && (
-                      <li className="text-[10px] text-muted-foreground pl-2">
-                        +{group.parts.length - 4} more
-                      </li>
-                    )}
-                  </ul>
-                  {isUncovered && (
-                    <p className="mt-1 text-[9px] text-destructive font-medium">No supplier</p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Column 3: Matched Suppliers */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Suppliers
-            </p>
-            {uniqueSuppliers.length === 0 ? (
-              <div className="rounded-md border border-dashed p-4 text-center">
-                <p className="text-[10px] text-muted-foreground">
-                  {matchAllLoading
-                    ? "Matching suppliers…"
-                    : "Match modules to discover suppliers"}
-                </p>
-              </div>
-            ) : (
-              uniqueSuppliers.map((supplier) => {
-                const cardId = `supplier-${supplier.id}`
-                const isShortlisted = shortlistedSupplierIds.has(supplier.id)
+        {/* HTML overlay: per-module "Find suppliers" buttons */}
+        <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+          {layout.modules.map((lm) => {
+            const mod = modules.find((m) => m.id === lm.id)
+            if (!mod) return null
+            const hasMatches = supplierMatches.has(lm.id)
+            const isLoading = loadingModules.has(lm.id)
+            if (hasMatches || isLoading) {
+              if (isLoading) {
                 return (
                   <div
-                    key={supplier.id}
-                    ref={(el) => { if (el) supplierRefs.current.set(supplier.id, el); else supplierRefs.current.delete(supplier.id) }}
-                    className={cn(
-                      "rounded-md border p-2 transition-opacity duration-200 bg-card",
-                      isShortlisted && "border-status-success/40 bg-status-success-light/20",
-                    )}
-                    style={{ opacity: getOpacity(cardId) }}
-                    onMouseEnter={() => setHoveredId(cardId)}
-                    onMouseLeave={() => setHoveredId(null)}
+                    key={`btn-${lm.id}`}
+                    className="absolute pointer-events-auto"
+                    style={{
+                      left: (lm.x + 230) * svgScale,
+                      top: (lm.y + lm.h / 2 - 6) * svgScale,
+                      transform: `scale(${Math.min(svgScale, 1)})`,
+                      transformOrigin: "left top",
+                    }}
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-xs font-semibold text-foreground truncate">{supplier.name}</span>
-                        {supplier.isVerified && (
-                          <BadgeCheck className="h-3 w-3 text-status-success flex-shrink-0" />
-                        )}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
-                        {Math.round(supplier.bestScore)}%
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className="text-[9px] text-muted-foreground">
-                        {supplier.moduleIds.length} module{supplier.moduleIds.length !== 1 ? "s" : ""}
-                      </span>
-                      <button
-                        className={cn(
-                          "flex items-center gap-0.5 text-[9px] font-medium transition-colors",
-                          isShortlisted
-                            ? "text-status-success"
-                            : "text-muted-foreground hover:text-foreground",
-                        )}
-                        onClick={() => onShortlistSupplier(supplier.originalMatch, supplier.firstModuleId)}
-                      >
-                        {isShortlisted ? (
-                          <>
-                            <Check className="h-2.5 w-2.5" />
-                            Shortlisted
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="h-2.5 w-2.5" />
-                            Shortlist
-                          </>
-                        )}
-                      </button>
-                    </div>
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                   </div>
                 )
-              })
-            )}
-            {/* Uncovered groups hint */}
-            {matchedModuleCount > 0 && groups.some((g) => (groupSupplierMap.get(g.id) ?? []).length === 0) && (
-              <div className="rounded-md border border-dashed border-destructive/30 p-2 text-center">
-                <p className="text-[10px] text-destructive">Uncovered groups need suppliers</p>
-              </div>
-            )}
-          </div>
+              }
+              return null
+            }
+            return (
+              <button
+                key={`btn-${lm.id}`}
+                className="absolute pointer-events-auto flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors"
+                style={{
+                  left: (lm.x + SANKEY.LABEL_OFFSET_RIGHT) * svgScale,
+                  top: (lm.y + Math.min(lm.h / 2, 14) + 18) * svgScale,
+                  transform: `scale(${Math.min(svgScale, 1)})`,
+                  transformOrigin: "left top",
+                }}
+                onClick={() => onMatchModule(mod)}
+              >
+                <Search className="h-2.5 w-2.5" />
+                Find suppliers
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>

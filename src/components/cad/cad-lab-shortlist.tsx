@@ -34,6 +34,9 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import type { AiCostEstimate, CadLabDesignBrief, CadLabModule } from "@/lib/cad-lab-types"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
+import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import type { CategorySupplierEntry } from "@/lib/sankey-utils"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { ShortlistCoverageFlow } from "./shortlist-coverage-flow"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
@@ -70,6 +73,24 @@ interface CadLabShortlistProps {
   onOrderCreated?: () => void
   /** AI cost estimates keyed by module ID — used for buy/make grouping in flow diagram */
   aiCostEstimates?: Record<string, AiCostEstimate>
+  /** All supplier matches (for allocation Sankey) */
+  supplierMatches: Map<string, CadLabSupplierMatch[]>
+  /** IDs of shortlisted suppliers */
+  shortlistedSupplierIds: Set<string>
+  /** Toggle supplier on/off shortlist */
+  onShortlistSupplier: (supplier: CadLabSupplierMatch, moduleId: string) => void
+  /** Per-category ranked supplier IDs (index 0 = 1st choice) */
+  categoryRankings: Map<string, string[]>
+  /** Per-category supplier entries */
+  categorySupplierEntries: Map<string, CategorySupplierEntry[]>
+  /** Promote a supplier within a category */
+  onPromoteSupplier: (categoryId: string, supplierId: string) => void
+  /** Buy part search results */
+  buyPartResults?: BuyPartSearchResult[]
+  /** Trigger buy part search */
+  onSearchBuyParts?: () => void
+  /** Whether buy search is loading */
+  buySearchLoading?: boolean
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -113,6 +134,15 @@ export function CadLabShortlist({
   onRemoveFromShortlist,
   onOrderCreated,
   aiCostEstimates,
+  supplierMatches,
+  shortlistedSupplierIds,
+  onShortlistSupplier,
+  categoryRankings,
+  categorySupplierEntries,
+  onPromoteSupplier,
+  buyPartResults,
+  onSearchBuyParts,
+  buySearchLoading,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
@@ -388,13 +418,19 @@ export function CadLabShortlist({
           </div>
         </div>
 
-        {/* ── Procurement flow diagram ── */}
+        {/* ── Allocation flow diagram (Categories → Suppliers) ── */}
         {suppliers.length > 0 && modules.length > 0 && (
           <ShortlistCoverageFlow
             modules={modules}
-            suppliers={suppliers}
             diagnosticAnswers={diagnosticAnswers}
             aiCostEstimates={aiCostEstimates}
+            supplierMatches={supplierMatches}
+            categoryRankings={categoryRankings}
+            categorySupplierEntries={categorySupplierEntries}
+            onPromoteSupplier={onPromoteSupplier}
+            buyPartResults={buyPartResults}
+            onSearchBuyParts={onSearchBuyParts}
+            buySearchLoading={buySearchLoading}
           />
         )}
 

@@ -12,7 +12,7 @@
  * Gate: redirects to Specify if no specified modules exist.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -34,6 +34,9 @@ import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
 import { toast } from "sonner"
+import { buildUniqueSuppliers, buildSankeyData, buildPerCategorySuppliers } from "@/lib/sankey-utils"
+import { searchBuyPartProducts } from "@/actions/buy-part-search"
+import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch, ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
 
@@ -116,7 +119,8 @@ export default function SourcePage(): React.ReactNode {
   const [matchAllLoading, setMatchAllLoading] = useState(false)
 
   // ── Shortlisted suppliers (persisted to localStorage per project) ──
-  const shortlistKey = activeProjectId ? `forge-supplier-shortlist-${activeProjectId}` : null
+  // INTENT: v2 key flushes stale shortlist data from the old infinite-loop bug
+  const shortlistKey = activeProjectId ? `forge-supplier-shortlist-v2-${activeProjectId}` : null
   const rfqIdsKey = activeProjectId ? `forge-supplier-rfqs-${activeProjectId}` : null
 
   const [shortlistedSuppliers, setShortlistedSuppliersRaw] = useState<Map<string, ShortlistedSupplier>>(() => {
@@ -162,6 +166,105 @@ export default function SourcePage(): React.ReactNode {
     [shortlistedSuppliers],
   )
 
+  const eligibleModules = useMemo(
+    () => modules.filter((m) => m.status === "specified" || m.status === "generated"),
+    [modules],
+  )
+
+  // ── Per-category ranked supplier state (v3 localStorage key) ──
+  const categoryRankingsKey = activeProjectId ? `forge-supplier-shortlist-v3-${activeProjectId}` : null
+
+  const [categoryRankings, setCategoryRankingsRaw] = useState<Map<string, string[]>>(() => {
+    if (!categoryRankingsKey) return new Map()
+    try {
+      const stored = localStorage.getItem(categoryRankingsKey)
+      if (stored) return new Map(JSON.parse(stored) as [string, string[]][])
+    } catch { /* ignore corrupt data */ }
+    return new Map()
+  })
+
+  const setCategoryRankings = useCallback((updater: (prev: Map<string, string[]>) => Map<string, string[]>) => {
+    setCategoryRankingsRaw((prev) => {
+      const next = updater(prev)
+      if (categoryRankingsKey) {
+        try { localStorage.setItem(categoryRankingsKey, JSON.stringify([...next.entries()])) } catch { /* quota */ }
+      }
+      return next
+    })
+  }, [categoryRankingsKey])
+
+  // Build per-category supplier entries
+  const { categories: sankeyCategories } = useMemo(
+    () => buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [eligibleModules, diagnosticAnswers, aiCostEstimates],
+  )
+
+  const categorySupplierEntries = useMemo(
+    () => buildPerCategorySuppliers(sankeyCategories, supplierMatches),
+    [sankeyCategories, supplierMatches],
+  )
+
+  const handlePromoteSupplier = useCallback((categoryId: string, supplierId: string) => {
+    setCategoryRankings((prev) => {
+      const next = new Map(prev)
+      const current = [...(next.get(categoryId) ?? [])]
+      const idx = current.indexOf(supplierId)
+
+      if (idx === 0) {
+        // Already 1st — remove (de-select)
+        current.splice(0, 1)
+      } else if (idx > 0) {
+        // Ranked but not 1st — swap to position 0
+        current.splice(idx, 1)
+        current.unshift(supplierId)
+      } else {
+        // Not ranked — insert at position 0
+        current.unshift(supplierId)
+      }
+
+      next.set(categoryId, current)
+      return next
+    })
+  }, [setCategoryRankings])
+
+  // ── Buy part search state ──
+  const buyPartsKey = activeProjectId ? `forge-buy-parts-${activeProjectId}` : null
+
+  const [buyPartResults, setBuyPartResults] = useState<BuyPartSearchResult[]>(() => {
+    if (!buyPartsKey) return []
+    try {
+      const stored = localStorage.getItem(buyPartsKey)
+      if (stored) return JSON.parse(stored) as BuyPartSearchResult[]
+    } catch { /* ignore */ }
+    return []
+  })
+
+  const [buySearchLoading, setBuySearchLoading] = useState(false)
+
+  const handleSearchBuyParts = useCallback(async () => {
+    // Collect all buy part names from categories
+    const buyParts = sankeyCategories
+      .filter((c) => c.type === "buy")
+      .flatMap((c) => c.parts.map((p) => p.name))
+
+    if (buyParts.length === 0) return
+
+    setBuySearchLoading(true)
+    try {
+      const results = await searchBuyPartProducts(buyParts)
+      setBuyPartResults(results)
+      if (buyPartsKey) {
+        try { localStorage.setItem(buyPartsKey, JSON.stringify(results)) } catch { /* quota */ }
+      }
+    } catch (err) {
+      console.error("[SOURCE] Buy part search failed:", err)
+      toast.error("Failed to search for buy parts")
+    } finally {
+      setBuySearchLoading(false)
+    }
+  }, [sankeyCategories, buyPartsKey])
+
   const handleShortlistSupplier = useCallback((supplier: CadLabSupplierMatch, moduleId: string) => {
     setShortlistedSuppliers((prev) => {
       const next = new Map(prev)
@@ -201,11 +304,6 @@ export default function SourcePage(): React.ReactNode {
     })
   }, [setShortlistedSuppliers])
 
-  const eligibleModules = useMemo(
-    () => modules.filter((m) => m.status === "specified" || m.status === "generated"),
-    [modules],
-  )
-
   const handleMatchModule = useCallback(async (mod: CadLabModule) => {
     setLoadingModules((prev) => new Set(prev).add(mod.id))
     try {
@@ -240,6 +338,51 @@ export default function SourcePage(): React.ReactNode {
       setMatchAllLoading(false)
     }
   }, [eligibleModules, handleMatchModule])
+
+  // ── Auto-select top 3 suppliers after matching ──
+  const autoSelectKeyRef = useRef<string>("")
+
+  useEffect(() => {
+    const uniqueSuppliers = buildUniqueSuppliers(supplierMatches)
+    if (uniqueSuppliers.length === 0) return
+
+    const matchKey = [...supplierMatches.keys()].sort().join(",")
+    if (matchKey === autoSelectKeyRef.current) return
+    autoSelectKeyRef.current = matchKey
+
+    // INTENT: Use setShortlistedSuppliers directly (stable ref) to avoid
+    // re-triggering this effect via shortlistedSupplierIds / handleShortlistSupplier.
+    const top3 = uniqueSuppliers.slice(0, 3)
+    setShortlistedSuppliers((prev) => {
+      const next = new Map(prev)
+      for (const sup of top3) {
+        if (!next.has(sup.id)) {
+          next.set(sup.id, {
+            id: sup.id,
+            name: sup.name,
+            isVerified: sup.isVerified,
+            supplierType: sup.originalMatch.supplierType,
+            moduleIds: [sup.firstModuleId],
+            bestMatchScore: sup.bestScore,
+            bestScoreBreakdown: sup.originalMatch.scoreBreakdown,
+            allMatchReasons: [...sup.originalMatch.matchReasons],
+          })
+        }
+      }
+      return next
+    })
+
+    // INTENT: Also auto-populate per-category rankings with top 3 per category
+    setCategoryRankings((prev) => {
+      const next = new Map(prev)
+      for (const [catId, entries] of categorySupplierEntries) {
+        if (!next.has(catId) || next.get(catId)!.length === 0) {
+          next.set(catId, entries.slice(0, 3).map((e) => e.supplierId))
+        }
+      }
+      return next
+    })
+  }, [supplierMatches, setShortlistedSuppliers, categorySupplierEntries, setCategoryRankings])
 
   // ── Tab navigation ──
   const TABS = useMemo(
@@ -354,8 +497,6 @@ export default function SourcePage(): React.ReactNode {
                 matchAllLoading={matchAllLoading}
                 onMatchModule={handleMatchModule}
                 onMatchAll={handleMatchAll}
-                shortlistedSupplierIds={shortlistedSupplierIds}
-                onShortlistSupplier={handleShortlistSupplier}
               />
             )}
 
@@ -398,6 +539,15 @@ export default function SourcePage(): React.ReactNode {
               onRemoveFromShortlist={handleRemoveFromShortlist}
               onOrderCreated={refreshManufacturingOrderCount}
               aiCostEstimates={aiCostEstimates}
+              supplierMatches={supplierMatches}
+              shortlistedSupplierIds={shortlistedSupplierIds}
+              onShortlistSupplier={handleShortlistSupplier}
+              categoryRankings={categoryRankings}
+              categorySupplierEntries={categorySupplierEntries}
+              onPromoteSupplier={handlePromoteSupplier}
+              buyPartResults={buyPartResults}
+              onSearchBuyParts={handleSearchBuyParts}
+              buySearchLoading={buySearchLoading}
             />
           </motion.div>
         )}

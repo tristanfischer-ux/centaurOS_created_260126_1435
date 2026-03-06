@@ -1,514 +1,686 @@
 /**
- * @file shortlist-coverage-flow.tsx — 3-column procurement flow diagram.
+ * @file shortlist-coverage-flow.tsx — 2-column SVG: Categories (with parts) → Per-category ranked suppliers.
  *
- * @description Decomposes modules into requirement groups (by process/material/buy-make)
- * and maps them to shortlisted suppliers. Renders CSS flex columns with SVG Bézier edges.
+ * @description Left column shows categories with inline parts (same visual treatment
+ * as the Suppliers tab right column). Right column shows per-category supplier rankings
+ * (1st/2nd/3rd + more options). Click any non-1st supplier to promote it to 1st (swap).
+ * Click 1st supplier to de-select. Buy categories show product search results.
  *
- * FLOW: source/page.tsx → CadLabShortlist → this component
+ * FLOW: source/page.tsx → CadLabShortlist → this component (Shortlist tab)
  */
 
 "use client"
 
-import { useMemo, useState, useCallback, useRef, useLayoutEffect } from "react"
-import { AlertTriangle, BadgeCheck } from "lucide-react"
+import { useMemo, useState, useCallback, useRef, useEffect } from "react"
+import { ExternalLink, Search, Loader2, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
+import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
-import type { ShortlistedSupplier } from "@/app/(platform)/the-forge/cad-lab/source/page"
+import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import {
+  type CategoryNode,
+  type CategorySupplierEntry,
+  SANKEY,
+  CAT_COLORS,
+  moduleColorFn,
+  flowFill,
+  flowPath,
+  truncate,
+  buildSankeyData,
+  sortCategoriesBuyLast,
+} from "@/lib/sankey-utils"
 
-// ─── Types ──────────────────────────────────────────────────────────
-
-interface RequirementGroup {
-  id: string
-  process: string
-  material: string
-  type: "buy" | "make"
-  label: string
-  parts: { name: string; moduleId: string; moduleName: string }[]
-  supplierIds: string[]
-}
+// ─── Props ───────────────────────────────────────────────────────────
 
 export interface ShortlistCoverageFlowProps {
   modules: CadLabModule[]
-  suppliers: ShortlistedSupplier[]
   diagnosticAnswers?: DiagnosticAnswers
   aiCostEstimates?: Record<string, AiCostEstimate>
+  supplierMatches: Map<string, CadLabSupplierMatch[]>
+  /** categoryId → ordered supplier IDs (index 0 = 1st choice) */
+  categoryRankings: Map<string, string[]>
+  /** Per-category supplier entries from buildPerCategorySuppliers() */
+  categorySupplierEntries: Map<string, CategorySupplierEntry[]>
+  /** Callback: promote a supplier within a category */
+  onPromoteSupplier: (categoryId: string, supplierId: string) => void
+  /** Buy part search results */
+  buyPartResults?: BuyPartSearchResult[]
+  /** Trigger buy part search */
+  onSearchBuyParts?: () => void
+  /** Whether buy search is loading */
+  buySearchLoading?: boolean
 }
 
-// ─── Color helpers (same as supply-flow-diagram.tsx) ─────────────────
+// ─── SVG layout constants ────────────────────────────────────────────
 
-const CHART_COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(var(--chart-6))",
-]
+const VB_W = 1300
+const COL_CATS_X = 10
+const COL_SUPS_X = 680
+const PART_LIST_X = 32
+const PART_ROW_H = 13
+const PART_DOT_R = 3
+const CATEGORY_NAME_H = 16
+const RANK_ROW_H = 22
+const RANK_BAR_W = 380
+const RANK_BAR_H = 18
+const RANK_BAR_R = 4
+const MAX_VISIBLE_RANKED = 3
+const MORE_ROW_H = 16
 
-function chipColor(id: string): string {
-  let h = 0
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0
-  return CHART_COLORS[h % CHART_COLORS.length]
+// ─── Layout types ────────────────────────────────────────────────────
+
+interface RankedLayout {
+  categories: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }>
+  /** Per-category supplier ranking groups, positioned at matching Y */
+  rankGroups: Array<{
+    catId: string
+    x: number
+    y: number
+    entries: Array<CategorySupplierEntry & { rank: number }>
+    moreCount: number
+    isExpanded: boolean
+  }>
+  /** Buy category product groups */
+  buyGroups: Array<{
+    catId: string
+    x: number
+    y: number
+    results: BuyPartSearchResult[]
+  }>
+  /** Flow ribbons from category 1st-choice supplier only */
+  flows: Array<{
+    catId: string
+    x1: number; y1t: number; y1b: number
+    x2: number; y2t: number; y2b: number
+    color: string
+  }>
+  viewBoxHeight: number
 }
 
-// ─── Build requirement groups ───────────────────────────────────────
-
-function buildGroups(
-  modules: CadLabModule[],
-  suppliers: ShortlistedSupplier[],
-  diagnosticAnswers?: DiagnosticAnswers,
-  aiCostEstimates?: Record<string, AiCostEstimate>,
-): RequirementGroup[] {
-  const groupMap = new Map<string, RequirementGroup>()
-
-  // Set of module IDs each supplier covers
-  const supplierModuleMap = new Map<string, Set<string>>()
-  for (const sup of suppliers) {
-    supplierModuleMap.set(sup.id, new Set(sup.moduleIds))
-  }
-
-  for (const mod of modules) {
-    const diag = diagnosticAnswers?.[mod.id]
-    const costEstimate = aiCostEstimates?.[mod.id]
-    const hasParts = costEstimate?.parts && costEstimate.parts.length > 0
-
-    if (hasParts) {
-      // INTENT: When AI cost data is available, group parts individually by their
-      // process/material/buy-make characteristics — parts from different modules
-      // sharing the same traits end up in the same group.
-      for (const part of costEstimate.parts!) {
-        const process = part.type === "buy" ? "Buy" : (diag?.mfg_process ?? "Unknown Process")
-        const material = part.type === "buy" ? "Off-the-shelf" : (diag?.material ?? "Unknown Material")
-        const key = `${process}-${material}-${part.type}`.toLowerCase().replace(/\s+/g, "_")
-
-        let group = groupMap.get(key)
-        if (!group) {
-          const label = part.type === "buy"
-            ? "Buy \u00b7 Off-the-shelf"
-            : `${process} \u00b7 ${material}`
-          group = { id: key, process, material, type: part.type, label, parts: [], supplierIds: [] }
-          groupMap.set(key, group)
-        }
-        group.parts.push({ name: part.name, moduleId: mod.id, moduleName: mod.name })
-      }
-    } else {
-      // Fallback: all keyParts in a module share the module's diagnostic process/material
-      const process = diag?.mfg_process ?? "Unknown Process"
-      const material = diag?.material ?? "Unknown Material"
-      const type = "make" as const
-      const key = `${process}-${material}-${type}`.toLowerCase().replace(/\s+/g, "_")
-
-      let group = groupMap.get(key)
-      if (!group) {
-        const label = `${process} \u00b7 ${material}`
-        group = { id: key, process, material, type, label, parts: [], supplierIds: [] }
-        groupMap.set(key, group)
-      }
-      for (const part of mod.keyParts) {
-        group.parts.push({ name: part, moduleId: mod.id, moduleName: mod.name })
-      }
-    }
-  }
-
-  // Map suppliers to groups: a supplier covers a group when any of its moduleIds
-  // contributes parts to that group.
-  for (const group of groupMap.values()) {
-    const contributingModuleIds = new Set(group.parts.map((p) => p.moduleId))
-    const matchedSupplierIds = new Set<string>()
-    for (const [supplierId, moduleSet] of supplierModuleMap) {
-      for (const mid of contributingModuleIds) {
-        if (moduleSet.has(mid)) {
-          matchedSupplierIds.add(supplierId)
-          break
-        }
-      }
-    }
-    group.supplierIds = [...matchedSupplierIds]
-  }
-
-  return [...groupMap.values()]
-}
-
-// ─── Edge position types ────────────────────────────────────────────
-
-interface CardRect {
-  id: string
-  top: number
-  bottom: number
-  right: number
-  left: number
-  centerY: number
-}
-
-// ─── Component ──────────────────────────────────────────────────────
+// ─── Component ───────────────────────────────────────────────────────
 
 export function ShortlistCoverageFlow({
   modules,
-  suppliers,
   diagnosticAnswers,
   aiCostEstimates,
+  supplierMatches,
+  categoryRankings,
+  categorySupplierEntries,
+  onPromoteSupplier,
+  buyPartResults,
+  onSearchBuyParts,
+  buySearchLoading,
 }: ShortlistCoverageFlowProps): React.ReactNode {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const moduleRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const groupRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const supplierRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [edgePositions, setEdgePositions] = useState<{
-    moduleToGroup: { from: CardRect; to: CardRect; moduleId: string; groupId: string }[]
-    groupToSupplier: { from: CardRect; to: CardRect; groupId: string; supplierId: string }[]
-    containerRect: DOMRect | null
-  }>({ moduleToGroup: [], groupToSupplier: [], containerRect: null })
+  const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(0)
 
-  const groups = useMemo(
-    () => buildGroups(modules, suppliers, diagnosticAnswers, aiCostEstimates),
-    [modules, suppliers, diagnosticAnswers, aiCostEstimates],
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width)
+      }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const moduleColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    modules.forEach((mod, i) => map.set(mod.id, moduleColorFn(i)))
+    return map
+  }, [modules])
+
+  const { categories } = useMemo(
+    () => buildSankeyData(modules, diagnosticAnswers, aiCostEstimates),
+    [modules, diagnosticAnswers, aiCostEstimates],
   )
 
-  // Unique supplier IDs that appear in at least one group
-  const connectedSupplierIds = useMemo(() => {
-    const set = new Set<string>()
-    for (const g of groups) for (const sid of g.supplierIds) set.add(sid)
-    return set
-  }, [groups])
+  // Sort categories: buy last, then by center-of-gravity
+  const sortedCategories = useMemo(() => {
+    const withCoG = categories.map((cat) => {
+      let totalWeight = 0
+      for (const [, count] of cat.moduleContributions) {
+        totalWeight += count
+      }
+      return { cat, centerOfGravity: totalWeight, type: cat.type }
+    })
+    withCoG.sort((a, b) => sortCategoriesBuyLast(a, b))
+    return withCoG.map((c) => c.cat)
+  }, [categories])
 
-  // Coverage stats
-  const coveredCount = useMemo(() => {
-    const coveredModuleIds = new Set<string>()
-    for (const g of groups) {
-      if (g.supplierIds.length > 0) {
-        for (const p of g.parts) coveredModuleIds.add(p.moduleId)
+  // Category color map (consistent with Suppliers tab)
+  const catColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    sortedCategories.forEach((cat, i) => {
+      map.set(cat.id, CAT_COLORS[i % CAT_COLORS.length])
+    })
+    return map
+  }, [sortedCategories])
+
+  // Build buy part results lookup (partName → results)
+  const buyResultsMap = useMemo(() => {
+    const map = new Map<string, BuyPartSearchResult>()
+    if (buyPartResults) {
+      for (const r of buyPartResults) {
+        map.set(r.partName, r)
       }
     }
-    return coveredModuleIds.size
-  }, [groups])
+    return map
+  }, [buyPartResults])
 
-  // ── Build edges from module cards to group cards ──
-  // Each module connects to every group that contains one of its parts
-  const moduleGroupLinks = useMemo(() => {
-    const links: { moduleId: string; groupId: string }[] = []
-    const seen = new Set<string>()
-    for (const group of groups) {
-      for (const part of group.parts) {
-        const key = `${part.moduleId}→${group.id}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          links.push({ moduleId: part.moduleId, groupId: group.id })
+  // ── Compute layout ──
+  const layout = useMemo((): RankedLayout => {
+    const layoutCats: RankedLayout["categories"] = []
+    const rankGroups: RankedLayout["rankGroups"] = []
+    const buyGroups: RankedLayout["buyGroups"] = []
+    const flows: RankedLayout["flows"] = []
+
+    let cy = SANKEY.CONTENT_TOP
+
+    for (const cat of sortedCategories) {
+      const barColor = catColorMap.get(cat.id) ?? "#475569"
+      const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
+
+      if (cat.type === "buy") {
+        // Buy category — right side shows product results
+        const buyResults = cat.parts
+          .map((p) => buyResultsMap.get(p.name))
+          .filter((r): r is BuyPartSearchResult => r != null)
+
+        const buyH = buyResults.length > 0
+          ? CATEGORY_NAME_H + buyResults.reduce((acc, r) => acc + PART_ROW_H + r.products.length * PART_ROW_H, 0) + 4
+          : CATEGORY_NAME_H + 20
+
+        const h = Math.max(catPartsH, buyH, SANKEY.BAR_MIN_H)
+        layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
+
+        if (buyResults.length > 0) {
+          buyGroups.push({
+            catId: cat.id,
+            x: COL_SUPS_X,
+            y: cy,
+            results: buyResults,
+          })
+        }
+
+        cy += h + SANKEY.CAT_GAP
+        continue
+      }
+
+      // Make category — right side shows ranked suppliers
+      const rankedIds = categoryRankings.get(cat.id) ?? []
+      const allEntries = categorySupplierEntries.get(cat.id) ?? []
+      const isExpanded = expandedCats.has(cat.id)
+
+      // Build ranked list: first from rankings, then remaining sorted by score
+      const ranked: Array<CategorySupplierEntry & { rank: number }> = []
+      const usedIds = new Set<string>()
+
+      for (let i = 0; i < rankedIds.length; i++) {
+        const entry = allEntries.find((e) => e.supplierId === rankedIds[i])
+        if (entry) {
+          ranked.push({ ...entry, rank: i + 1 })
+          usedIds.add(entry.supplierId)
         }
       }
-    }
-    return links
-  }, [groups])
 
-  // Group → supplier links
-  const groupSupplierLinks = useMemo(() => {
-    const links: { groupId: string; supplierId: string }[] = []
-    for (const group of groups) {
-      for (const sid of group.supplierIds) {
-        links.push({ groupId: group.id, supplierId: sid })
+      // Add unranked suppliers below
+      for (const entry of allEntries) {
+        if (!usedIds.has(entry.supplierId)) {
+          ranked.push({ ...entry, rank: ranked.length + 1 })
+        }
       }
+
+      const visibleCount = isExpanded ? ranked.length : Math.min(ranked.length, MAX_VISIBLE_RANKED)
+      const moreCount = ranked.length - MAX_VISIBLE_RANKED
+      const visibleEntries = ranked.slice(0, visibleCount)
+
+      const rankH = CATEGORY_NAME_H + visibleCount * RANK_ROW_H + (moreCount > 0 && !isExpanded ? MORE_ROW_H : 0) + 4
+      const h = Math.max(catPartsH, rankH, SANKEY.BAR_MIN_H)
+
+      layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
+
+      rankGroups.push({
+        catId: cat.id,
+        x: COL_SUPS_X,
+        y: cy,
+        entries: visibleEntries,
+        moreCount: Math.max(moreCount, 0),
+        isExpanded,
+      })
+
+      // Flow ribbon from category to 1st-choice supplier position
+      if (rankedIds.length > 0) {
+        const firstEntry = visibleEntries[0]
+        if (firstEntry) {
+          const flowH = Math.min(h * 0.6, 24)
+          const catMidY = cy + h / 2
+          const supY = cy + CATEGORY_NAME_H + RANK_ROW_H / 2
+
+          flows.push({
+            catId: cat.id,
+            x1: COL_CATS_X + SANKEY.BAR_W,
+            y1t: catMidY - flowH / 2,
+            y1b: catMidY + flowH / 2,
+            x2: COL_SUPS_X,
+            y2t: supY - flowH / 2,
+            y2b: supY + flowH / 2,
+            color: barColor,
+          })
+        }
+      }
+
+      cy += h + SANKEY.CAT_GAP
     }
-    return links
-  }, [groups])
+
+    const viewBoxHeight = cy + SANKEY.PADDING_BOTTOM
+
+    return { categories: layoutCats, rankGroups, buyGroups, flows, viewBoxHeight }
+  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, expandedCats, buyResultsMap])
+
+  // ── Coverage stats ──
+  const makeCatCount = layout.categories.filter((c) => c.type !== "buy").length
+  const coveredCount = layout.rankGroups.filter((g) => {
+    const rankedIds = categoryRankings.get(g.catId)
+    return rankedIds && rankedIds.length > 0
+  }).length
 
   // ── Hover connectivity ──
   const connectedToHover = useMemo(() => {
     if (!hoveredId) return null
     const connected = new Set<string>([hoveredId])
-    // Module hovered → find groups → find suppliers
-    for (const link of moduleGroupLinks) {
-      if (link.moduleId === hoveredId) {
-        connected.add(`group-${link.groupId}`)
-        // Also connect suppliers of that group
-        const group = groups.find((g) => g.id === link.groupId)
-        if (group) for (const sid of group.supplierIds) connected.add(`supplier-${sid}`)
-      }
+
+    if (hoveredId.startsWith("cat-")) {
+      const catId = hoveredId.slice(4)
+      connected.add(`rank-${catId}`)
     }
-    // Group hovered → find modules and suppliers
-    const gid = hoveredId.replace("group-", "")
-    for (const link of moduleGroupLinks) {
-      if (link.groupId === gid) connected.add(link.moduleId)
+
+    if (hoveredId.startsWith("rank-")) {
+      const catId = hoveredId.slice(5)
+      connected.add(`cat-${catId}`)
     }
-    for (const link of groupSupplierLinks) {
-      if (link.groupId === gid) connected.add(`supplier-${link.supplierId}`)
-    }
-    // Supplier hovered → find groups → find modules
-    const sid = hoveredId.replace("supplier-", "")
-    for (const link of groupSupplierLinks) {
-      if (link.supplierId === sid) {
-        connected.add(`group-${link.groupId}`)
-        // Also find modules for that group
-        for (const ml of moduleGroupLinks) {
-          if (ml.groupId === link.groupId) connected.add(ml.moduleId)
-        }
-      }
-    }
+
     return connected
-  }, [hoveredId, moduleGroupLinks, groupSupplierLinks, groups])
+  }, [hoveredId])
 
   const getOpacity = useCallback(
-    (cardId: string) => {
+    (id: string) => {
       if (!connectedToHover) return 1
-      return connectedToHover.has(cardId) ? 1 : 0.2
+      return connectedToHover.has(id) ? 1 : 0.15
     },
     [connectedToHover],
   )
 
-  // ── Measure card positions for SVG edges ──
-  const measurePositions = useCallback(() => {
-    const container = containerRef.current
-    if (!container) return
+  const getFlowOpacity = useCallback(
+    (catId: string) => {
+      if (!connectedToHover) return 0.25
+      return connectedToHover.has(`cat-${catId}`) ? 0.45 : 0.06
+    },
+    [connectedToHover],
+  )
 
-    const containerRect = container.getBoundingClientRect()
-
-    const getRect = (el: HTMLDivElement | undefined): CardRect | null => {
-      if (!el) return null
-      const r = el.getBoundingClientRect()
-      return {
-        id: "",
-        top: r.top - containerRect.top,
-        bottom: r.bottom - containerRect.top,
-        right: r.right - containerRect.left,
-        left: r.left - containerRect.left,
-        centerY: (r.top + r.bottom) / 2 - containerRect.top,
-      }
-    }
-
-    const mtg: { from: CardRect; to: CardRect; moduleId: string; groupId: string }[] = []
-    for (const link of moduleGroupLinks) {
-      const from = getRect(moduleRefs.current.get(link.moduleId))
-      const to = getRect(groupRefs.current.get(link.groupId))
-      if (from && to) {
-        mtg.push({ from, to, moduleId: link.moduleId, groupId: link.groupId })
-      }
-    }
-
-    const gts: { from: CardRect; to: CardRect; groupId: string; supplierId: string }[] = []
-    for (const link of groupSupplierLinks) {
-      const from = getRect(groupRefs.current.get(link.groupId))
-      const to = getRect(supplierRefs.current.get(link.supplierId))
-      if (from && to) {
-        gts.push({ from, to, groupId: link.groupId, supplierId: link.supplierId })
-      }
-    }
-
-    setEdgePositions({ moduleToGroup: mtg, groupToSupplier: gts, containerRect })
-  }, [moduleGroupLinks, groupSupplierLinks])
-
-  useLayoutEffect(() => {
-    measurePositions()
-    const observer = new ResizeObserver(measurePositions)
-    if (containerRef.current) observer.observe(containerRef.current)
-    return () => observer.disconnect()
-  }, [measurePositions, modules, groups, suppliers])
+  const toggleExpanded = useCallback((catId: string) => {
+    setExpandedCats((prev) => {
+      const next = new Set(prev)
+      if (next.has(catId)) next.delete(catId)
+      else next.add(catId)
+      return next
+    })
+  }, [])
 
   if (modules.length === 0) return null
+
+  const svgScale = containerWidth > 0 ? containerWidth / VB_W : 1
 
   return (
     <div className="rounded-lg border p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-foreground">Procurement Flow</span>
+        <span className="text-xs font-semibold text-foreground">Supplier Allocation</span>
         <span className="text-[10px] font-medium text-muted-foreground">
-          {coveredCount} of {modules.length} module{modules.length !== 1 ? "s" : ""} covered
+          {coveredCount} of {makeCatCount} make categor{makeCatCount !== 1 ? "ies" : "y"} allocated
         </span>
       </div>
 
-      {/* 3-column layout with SVG overlay */}
-      <div ref={containerRef} className="relative">
-        {/* SVG edge overlay */}
+      {/* Column headers */}
+      <div className="grid grid-cols-2 gap-0">
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Categories</p>
+        <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider" style={{ paddingLeft: ((COL_SUPS_X / VB_W) * 100) + "%" }}>Ranked Suppliers</p>
+      </div>
+
+      {/* SVG + HTML overlays */}
+      <div ref={containerRef} className="relative overflow-x-auto">
         <svg
-          className="absolute inset-0 w-full h-full pointer-events-none"
-          style={{ zIndex: 1 }}
+          viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
+          className="w-full h-auto"
+          style={{ display: "block" }}
         >
-          {/* Module → Group edges */}
-          {edgePositions.moduleToGroup.map((edge, i) => {
-            const x1 = edge.from.right
-            const y1 = edge.from.centerY
-            const x2 = edge.to.left
-            const y2 = edge.to.centerY
-            const mx = (x1 + x2) / 2
-            const isHighlighted = !connectedToHover
-              || (connectedToHover.has(edge.moduleId) && connectedToHover.has(`group-${edge.groupId}`))
-
-            return (
+          {/* Layer 1: Flow ribbons — category → 1st choice supplier */}
+          <g>
+            {layout.flows.map((f, i) => (
               <path
-                key={`mg-${i}`}
-                d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-                fill="none"
-                stroke={chipColor(edge.moduleId)}
-                strokeWidth={1.5}
-                opacity={isHighlighted ? 0.5 : 0.08}
-                className="transition-opacity duration-200"
+                key={`fl-${i}`}
+                d={flowPath(f.x1, f.y1t, f.y1b, f.x2, f.y2t, f.y2b)}
+                fill={`${f.color}${Math.round(getFlowOpacity(f.catId) * 255).toString(16).padStart(2, "0")}`}
+                className="transition-all duration-200"
               />
-            )
-          })}
-          {/* Group → Supplier edges */}
-          {edgePositions.groupToSupplier.map((edge, i) => {
-            const x1 = edge.from.right
-            const y1 = edge.from.centerY
-            const x2 = edge.to.left
-            const y2 = edge.to.centerY
-            const mx = (x1 + x2) / 2
-            const isHighlighted = !connectedToHover
-              || (connectedToHover.has(`group-${edge.groupId}`) && connectedToHover.has(`supplier-${edge.supplierId}`))
+            ))}
+          </g>
 
-            return (
-              <path
-                key={`gs-${i}`}
-                d={`M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`}
-                fill="none"
-                stroke={chipColor(edge.groupId)}
-                strokeWidth={1.5}
-                opacity={isHighlighted ? 0.5 : 0.08}
-                className="transition-opacity duration-200"
-              />
-            )
-          })}
+          {/* Layer 2: Category bars with inline parts */}
+          <g>
+            {layout.categories.map((c) => {
+              const catId = `cat-${c.id}`
+              return (
+                <g key={c.id}>
+                  <rect
+                    x={c.x}
+                    y={c.y}
+                    width={SANKEY.BAR_W}
+                    height={c.h}
+                    fill={c.barColor}
+                    rx={3}
+                    opacity={getOpacity(catId)}
+                    className="transition-opacity duration-200"
+                  />
+                  {/* Category label */}
+                  <text
+                    x={c.x + SANKEY.LABEL_OFFSET_RIGHT}
+                    y={c.y + 12}
+                    fontSize={10}
+                    fontWeight={600}
+                    fill="#1e293b"
+                    opacity={getOpacity(catId)}
+                    className="transition-opacity duration-200"
+                  >
+                    {truncate(c.label, 55)}
+                    <title>{c.label} — {c.partCount} part{c.partCount !== 1 ? "s" : ""}</title>
+                  </text>
+                  {/* Inline parts with colored dots */}
+                  {c.parts.map((part, pi) => {
+                    const modColor = moduleColorMap.get(part.moduleId) ?? "#94a3b8"
+                    const py = c.y + CATEGORY_NAME_H + pi * PART_ROW_H + 4
+                    return (
+                      <g key={pi} opacity={getOpacity(catId)} className="transition-opacity duration-200">
+                        <circle
+                          cx={c.x + PART_LIST_X}
+                          cy={py}
+                          r={PART_DOT_R}
+                          fill={modColor}
+                        />
+                        <text
+                          x={c.x + PART_LIST_X + 8}
+                          y={py + 3}
+                          fontSize={9}
+                          fill="#475569"
+                        >
+                          {truncate(part.name, 55)}
+                        </text>
+                      </g>
+                    )
+                  })}
+                  {/* Hit area */}
+                  <rect
+                    x={c.x - 4}
+                    y={c.y - 2}
+                    width={COL_SUPS_X - COL_CATS_X}
+                    height={c.h + 4}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredId(catId)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ cursor: "default" }}
+                  />
+                </g>
+              )
+            })}
+          </g>
+
+          {/* Layer 3: Per-category ranked supplier bars */}
+          <g>
+            {layout.rankGroups.map((group) => {
+              const rankId = `rank-${group.catId}`
+              const catColor = catColorMap.get(group.catId) ?? "#475569"
+              const rankedIds = categoryRankings.get(group.catId) ?? []
+
+              return (
+                <g key={group.catId}>
+                  {/* Category header on right side */}
+                  <text
+                    x={group.x}
+                    y={group.y + 12}
+                    fontSize={9}
+                    fontWeight={600}
+                    fill="#64748b"
+                    opacity={getOpacity(rankId)}
+                    className="transition-opacity duration-200"
+                  >
+                    {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 40)}
+                  </text>
+
+                  {/* Ranked supplier bars */}
+                  {group.entries.map((entry, ei) => {
+                    const isFirst = rankedIds[0] === entry.supplierId
+                    const isRanked = rankedIds.includes(entry.supplierId)
+                    const barY = group.y + CATEGORY_NAME_H + ei * RANK_ROW_H
+                    const rankLabel = isRanked
+                      ? `${rankedIds.indexOf(entry.supplierId) + 1}${ordinalSuffix(rankedIds.indexOf(entry.supplierId) + 1)}`
+                      : ""
+
+                    return (
+                      <g
+                        key={entry.supplierId}
+                        opacity={getOpacity(rankId)}
+                        className="transition-opacity duration-200"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => onPromoteSupplier(group.catId, entry.supplierId)}
+                      >
+                        {/* Rank bar background */}
+                        <rect
+                          x={group.x}
+                          y={barY}
+                          width={RANK_BAR_W}
+                          height={RANK_BAR_H}
+                          fill={isFirst ? catColor : "#f1f5f9"}
+                          stroke={isFirst ? undefined : "#e2e8f0"}
+                          strokeWidth={isFirst ? 0 : 1}
+                          rx={RANK_BAR_R}
+                        />
+                        {/* Rank ordinal */}
+                        {rankLabel && (
+                          <text
+                            x={group.x + 8}
+                            y={barY + 12}
+                            fontSize={8}
+                            fontWeight={700}
+                            fill={isFirst ? "#ffffff" : "#94a3b8"}
+                          >
+                            {rankLabel}
+                          </text>
+                        )}
+                        {/* Supplier name */}
+                        <text
+                          x={group.x + (rankLabel ? 32 : 8)}
+                          y={barY + 12}
+                          fontSize={9}
+                          fontWeight={isFirst ? 700 : 500}
+                          fill={isFirst ? "#ffffff" : "#334155"}
+                        >
+                          {truncate(entry.name, 40)}
+                          <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
+                        </text>
+                        {/* Score */}
+                        <text
+                          x={group.x + RANK_BAR_W - 8}
+                          y={barY + 12}
+                          fontSize={8}
+                          fill={isFirst ? "#ffffffcc" : "#94a3b8"}
+                          textAnchor="end"
+                        >
+                          {Math.round(entry.aggregateScore)}%
+                          {entry.isVerified ? " \u00b7 Verified" : ""}
+                        </text>
+                      </g>
+                    )
+                  })}
+
+                  {/* "+N more" expander */}
+                  {group.moreCount > 0 && !group.isExpanded && (
+                    <g
+                      style={{ cursor: "pointer" }}
+                      onClick={() => toggleExpanded(group.catId)}
+                    >
+                      <text
+                        x={group.x + 8}
+                        y={group.y + CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + 12}
+                        fontSize={8}
+                        fill="#64748b"
+                        opacity={getOpacity(rankId)}
+                        className="transition-opacity duration-200"
+                      >
+                        +{group.moreCount} more option{group.moreCount !== 1 ? "s" : ""}
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Collapse when expanded */}
+                  {group.isExpanded && group.moreCount > 0 && (
+                    <g
+                      style={{ cursor: "pointer" }}
+                      onClick={() => toggleExpanded(group.catId)}
+                    >
+                      <text
+                        x={group.x + 8}
+                        y={group.y + CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + 12}
+                        fontSize={8}
+                        fill="#64748b"
+                        opacity={getOpacity(rankId)}
+                      >
+                        Show less
+                      </text>
+                    </g>
+                  )}
+
+                  {/* Hit area for hover */}
+                  <rect
+                    x={group.x - 4}
+                    y={group.y - 2}
+                    width={RANK_BAR_W + 8}
+                    height={CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + (group.moreCount > 0 ? MORE_ROW_H : 0) + 8}
+                    fill="transparent"
+                    onMouseEnter={() => setHoveredId(rankId)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    style={{ cursor: "default" }}
+                  />
+                </g>
+              )
+            })}
+          </g>
+
+          {/* Layer 4: Buy category product groups */}
+          <g>
+            {layout.buyGroups.map((group) => {
+              let py = group.y + CATEGORY_NAME_H
+              return (
+                <g key={`buy-${group.catId}`}>
+                  <text
+                    x={group.x}
+                    y={group.y + 12}
+                    fontSize={9}
+                    fontWeight={600}
+                    fill="#64748b"
+                  >
+                    Product Links
+                  </text>
+                  {group.results.map((result, ri) => {
+                    const startY = py
+                    py += PART_ROW_H // part name row
+                    const productRows = result.products.map((product, pri) => {
+                      const rowY = py
+                      py += PART_ROW_H
+                      return (
+                        <g key={`${ri}-${pri}`}>
+                          <text
+                            x={group.x + 16}
+                            y={rowY + 3}
+                            fontSize={8}
+                            fill="#0891b2"
+                            style={{ cursor: "pointer" }}
+                            textDecoration="underline"
+                            onClick={() => window.open(product.url, "_blank", "noopener,noreferrer")}
+                          >
+                            {truncate(product.source, 20)}
+                            {product.estimatedPrice ? ` ${product.estimatedPrice}` : ""}
+                          </text>
+                        </g>
+                      )
+                    })
+                    return (
+                      <g key={ri}>
+                        <text
+                          x={group.x + 4}
+                          y={startY + 3}
+                          fontSize={9}
+                          fontWeight={500}
+                          fill="#334155"
+                        >
+                          {truncate(result.partName, 45)}
+                        </text>
+                        {productRows}
+                      </g>
+                    )
+                  })}
+                </g>
+              )
+            })}
+          </g>
         </svg>
 
-        {/* 3-column grid */}
-        <div className="grid grid-cols-3 gap-6" style={{ position: "relative", zIndex: 2 }}>
-          {/* Column 1: Modules */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Modules
-            </p>
-            {modules.map((mod) => {
-              const diag = diagnosticAnswers?.[mod.id]
-              const isUncovered = !groups.some(
-                (g) => g.supplierIds.length > 0 && g.parts.some((p) => p.moduleId === mod.id),
-              )
-              return (
-                <div
-                  key={mod.id}
-                  ref={(el) => { if (el) moduleRefs.current.set(mod.id, el); else moduleRefs.current.delete(mod.id) }}
-                  className={cn(
-                    "rounded-md border p-2 transition-opacity duration-200 bg-card",
-                    isUncovered && "border-destructive/30 bg-destructive/5",
-                  )}
-                  style={{ opacity: getOpacity(mod.id) }}
-                  onMouseEnter={() => setHoveredId(mod.id)}
-                  onMouseLeave={() => setHoveredId(null)}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {isUncovered && <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" />}
-                    <span className="text-xs font-semibold text-foreground truncate">{mod.name}</span>
-                  </div>
-                  {mod.keyParts.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {mod.keyParts.slice(0, 5).map((part, i) => (
-                        <li key={i} className="text-[10px] text-muted-foreground truncate pl-2">
-                          {part}
-                        </li>
-                      ))}
-                      {mod.keyParts.length > 5 && (
-                        <li className="text-[10px] text-muted-foreground pl-2">
-                          +{mod.keyParts.length - 5} more
-                        </li>
-                      )}
-                    </ul>
-                  )}
-                  {diag?.mfg_process && (
-                    <span className="mt-1 inline-block text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                      {diag.mfg_process}{diag.material ? ` \u00b7 ${diag.material}` : ""}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Column 2: Requirement Groups */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Requirement Groups
-            </p>
-            {groups.map((group) => {
-              const isUncovered = group.supplierIds.length === 0
-              const cardId = `group-${group.id}`
-              return (
-                <div
-                  key={group.id}
-                  ref={(el) => { if (el) groupRefs.current.set(group.id, el); else groupRefs.current.delete(group.id) }}
-                  className={cn(
-                    "rounded-md border p-2 transition-opacity duration-200 bg-card",
-                    isUncovered && "border-destructive/30 bg-destructive/5",
-                  )}
-                  style={{ opacity: getOpacity(cardId) }}
-                  onMouseEnter={() => setHoveredId(cardId)}
-                  onMouseLeave={() => setHoveredId(null)}
-                >
-                  <div className="flex items-center justify-between gap-1">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      {isUncovered && <AlertTriangle className="h-3 w-3 text-destructive flex-shrink-0" />}
-                      <span className="text-xs font-semibold text-foreground truncate">{group.label}</span>
-                    </div>
-                    <span className="text-[9px] bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground flex-shrink-0">
-                      {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <ul className="mt-1 space-y-0.5">
-                    {group.parts.slice(0, 4).map((part, i) => (
-                      <li key={i} className="text-[10px] text-muted-foreground truncate pl-2">
-                        {part.name}{" "}
-                        <span className="text-muted-foreground/60">({part.moduleName})</span>
-                      </li>
-                    ))}
-                    {group.parts.length > 4 && (
-                      <li className="text-[10px] text-muted-foreground pl-2">
-                        +{group.parts.length - 4} more
-                      </li>
-                    )}
-                  </ul>
-                  {isUncovered && (
-                    <p className="mt-1 text-[9px] text-destructive font-medium">No supplier</p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Column 3: Suppliers */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Suppliers
-            </p>
-            {suppliers
-              .filter((s) => connectedSupplierIds.has(s.id))
-              .map((supplier) => {
-                const cardId = `supplier-${supplier.id}`
+        {/* HTML overlay: "Search Products" button for buy categories */}
+        {onSearchBuyParts && (
+          <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+            {layout.categories
+              .filter((c) => c.type === "buy")
+              .map((c) => {
+                const hasResults = layout.buyGroups.some((g) => g.catId === c.id && g.results.length > 0)
+                if (hasResults) return null
                 return (
-                  <div
-                    key={supplier.id}
-                    ref={(el) => { if (el) supplierRefs.current.set(supplier.id, el); else supplierRefs.current.delete(supplier.id) }}
-                    className="rounded-md border p-2 transition-opacity duration-200 bg-card"
-                    style={{ opacity: getOpacity(cardId) }}
-                    onMouseEnter={() => setHoveredId(cardId)}
-                    onMouseLeave={() => setHoveredId(null)}
+                  <button
+                    key={`buy-btn-${c.id}`}
+                    className="absolute pointer-events-auto flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors"
+                    style={{
+                      left: COL_SUPS_X * svgScale,
+                      top: (c.y + c.h / 2 - 6) * svgScale,
+                      transform: `scale(${Math.min(svgScale, 1)})`,
+                      transformOrigin: "left top",
+                    }}
+                    onClick={onSearchBuyParts}
+                    disabled={buySearchLoading}
                   >
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-foreground truncate">{supplier.name}</span>
-                      {supplier.isVerified && (
-                        <BadgeCheck className="h-3 w-3 text-status-success flex-shrink-0" />
-                      )}
-                    </div>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {Math.round(supplier.bestMatchScore)}% match
-                    </span>
-                  </div>
+                    {buySearchLoading ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Search className="h-3 w-3" />
+                    )}
+                    {buySearchLoading ? "Searching…" : "Search Products"}
+                  </button>
                 )
               })}
-            {/* Uncovered groups hint */}
-            {groups.some((g) => g.supplierIds.length === 0) && (
-              <div className="rounded-md border border-dashed border-destructive/30 p-2 text-center">
-                <p className="text-[10px] text-destructive">Uncovered groups need suppliers</p>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────
+
+function ordinalSuffix(n: number): string {
+  const s = ["th", "st", "nd", "rd"]
+  const v = n % 100
+  return s[(v - 20) % 10] || s[v] || s[0]
 }
