@@ -21,7 +21,7 @@ import { cadLabModuleToModuleSpec } from "@/lib/cad-lab/module-to-module-spec-ad
 import type { ImageGenModuleInput } from "@/lib/cad-lab/module-to-module-spec-adapter"
 import { generateModuleImage, generateResearchIllustration, prepareReferenceImage, cropReferenceFor3x2, analyseHeroBoundingBoxes, cropModuleRegion } from "@/app/(platform)/the-forge/services/image-generator"
 import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
-import { getVisualStyleSystemPrompt, getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconciliationPrompt } from "@/lib/cad-lab/domain-prompts"
+import { getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconciliationPrompt } from "@/lib/cad-lab/domain-prompts"
 import type { ModuleConnection } from "@/lib/cad-lab-types"
 import { withAuth } from "@/lib/server-action-utils"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
@@ -386,12 +386,12 @@ export async function generateVisualStyleAction(
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
-            max_tokens: 1024,
-            system: getVisualStyleSystemPrompt(),
+            max_tokens: 4096,
+            system: getDesignSynthesisPrompt(),
             messages: [{ role: "user", content: userMessage }],
           }),
         },
-        30_000,
+        60_000,
       )
 
       if (!response.ok) {
@@ -412,10 +412,11 @@ export async function generateVisualStyleAction(
         return { error: "Incomplete visual style response" }
       }
 
-      console.log("[CAD-LAB-IMAGES] Generated visual style:", {
-        colorPalette: parsed.colorPalette.slice(0, 60),
-        unifyingContext: parsed.unifyingContext.slice(0, 60),
-        hasProductForm: !!parsed.productFormDescription,
+      console.log("[CAD-LAB-IMAGES] Generated visual style (design synthesis):", {
+        colorPalette: parsed.colorPalette?.slice(0, 60),
+        unifyingContext: parsed.unifyingContext?.slice(0, 60),
+        hasHeroImagePrompt: !!parsed.heroImagePrompt,
+        hasCadGeometryPrompt: !!parsed.cadGeometryPrompt,
       })
 
       return { visualStyle: parsed }
