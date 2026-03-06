@@ -2,7 +2,7 @@
  * @file assembly-convergence-flow.tsx — 3-column Convergence Sankey SVG.
  *
  * @description Category-first convergence diagram:
- *   Left: Agreed Suppliers (with embedded awarded supplier name)
+ *   Left: Selected Suppliers (with embedded supplier name)
  *   Middle: First Assembly (one or more assembler companies)
  *   Right: Final Assembly & Despatch
  *
@@ -159,7 +159,7 @@ export function AssemblyConvergenceFlow({
           }
         }
 
-        // INTENT: Fallback — if no explicit categoryRanking, find shortlisted suppliers
+        // INTENT: Fallback 1 — if no explicit categoryRanking, find shortlisted suppliers
         // whose moduleIds overlap with this category's contributing modules.
         // Covers CNC Machining, Manual/Assembly, etc. that may not have auto-populated rankings.
         if (!awardedSupplierName) {
@@ -175,6 +175,27 @@ export function AssemblyConvergenceFlow({
           if (bestFallback) {
             awardedSupplierName = bestFallback.name
             awardedSupplierScore = bestFallback.bestMatchScore
+          }
+        }
+
+        // INTENT: Fallback 2 — match by supplierType against category label/process.
+        // Each ShortlistedSupplier has a supplierType (e.g. "CNC Machining", "Sheet Metal")
+        // which directly corresponds to manufacturing process categories.
+        if (!awardedSupplierName) {
+          const catLabel = cat.label.toLowerCase()
+          let bestTypeFallback: ShortlistedSupplier | null = null
+          for (const [, supplier] of shortlistedSuppliers) {
+            const sType = supplier.supplierType.toLowerCase()
+            // Match if supplierType contains category label or vice versa
+            if (sType.includes(catLabel) || catLabel.includes(sType)) {
+              if (!bestTypeFallback || supplier.bestMatchScore > bestTypeFallback.bestMatchScore) {
+                bestTypeFallback = supplier
+              }
+            }
+          }
+          if (bestTypeFallback) {
+            awardedSupplierName = bestTypeFallback.name
+            awardedSupplierScore = bestTypeFallback.bestMatchScore
           }
         }
       }
@@ -372,7 +393,7 @@ export function AssemblyConvergenceFlow({
       >
         {/* ── Column headers (9px, matching Source page) ── */}
         <text x={COL.LEFT_X} y={14} className="fill-muted-foreground" style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>
-          Agreed Suppliers
+          Selected Suppliers
         </text>
         <text x={COL.MID_X} y={14} className="fill-muted-foreground" style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>
           {assemblerLayout.length > 0 ? "First Assembly" : "First Assembly (none matched)"}
@@ -475,7 +496,7 @@ export function AssemblyConvergenceFlow({
                         </>
                       ) : (
                         <span style={{ fontSize: 9, color: "#9ca3af", fontStyle: "italic" }}>
-                          No supplier awarded
+                          No supplier selected
                         </span>
                       )}
                     </div>

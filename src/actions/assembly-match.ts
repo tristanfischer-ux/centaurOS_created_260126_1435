@@ -12,7 +12,10 @@
  * | Quality & trust   | 15  | is_verified, certifications                      |
  * | Keyword relevance | 15  | ASSEMBLY_KEYWORDS text match on title/desc       |
  *
- * Falls back to keyword-only when embedding is unavailable.
+ * DECISION: Only matches companies that explicitly offer assembly services —
+ * either via fulfillment_capabilities OR marketplace_listings with
+ * specialties containing 'contract_assembly' or assembly_verified attribute.
+ * Generic keyword search removed to prevent false positives.
  *
  * @related
  * - Pattern reference: src/actions/cad-lab-supplier-match.ts
@@ -22,7 +25,6 @@
 "use server"
 
 import { createClient } from "@/lib/supabase/server"
-import { embedText } from "@/lib/search/semantic-search"
 import { ASSEMBLY_KEYWORDS } from "@/lib/assembly-utils"
 import type { AssemblyCompanyMatch, AssemblyScoreBreakdown } from "@/lib/assembly-utils"
 
@@ -76,31 +78,7 @@ export async function matchAssemblyCompanies(
 ): Promise<AssemblyCompanyMatch[]> {
   const supabase = await createClient()
 
-  // ── Step 1: Semantic matching via embeddings ──
-
-  const semanticScores = new Map<string, number>()
-  try {
-    const embeddingText = `${input.productName} ${input.productDescription} assembly fulfillment ${input.processTypes.join(" ")} ${input.materialTypes.join(" ")}`
-    const embedding = await embedText(embeddingText)
-
-    if (embedding) {
-      const { data: mlSemantic } = await supabase.rpc("match_marketplace_listings", {
-        query_embedding: JSON.stringify(embedding),
-        match_threshold: 0.2,
-        match_count: 40,
-      })
-
-      if (mlSemantic) {
-        for (const ml of mlSemantic) {
-          semanticScores.set(ml.id, ml.similarity as number)
-        }
-      }
-    }
-  } catch (err) {
-    console.warn("[AssemblyMatch] Semantic matching failed, falling back to keyword-only:", err instanceof Error ? err.message : "Unknown")
-  }
-
-  // ── Step 2: Query fulfillment_capabilities for assemblers ──
+  // ── Step 1: Query fulfillment_capabilities for assemblers (primary) ──
 
   const { data: assemblerCaps } = await supabase
     .from("fulfillment_capabilities")
@@ -122,30 +100,21 @@ export async function matchAssemblyCompanies(
     .in("capability", ["assemble", "kit_and_ship"])
     .eq("is_active", true)
 
-  // ── Step 3: Fallback — also query marketplace listings with assembly keywords ──
+  // ── Step 2: Query marketplace listings with EXPLICIT assembly capability ──
+  // DECISION: Only include listings where specialties contains 'contract_assembly'
+  // OR attributes->>'assembly_verified' is 'true'. This prevents generic keyword
+  // matches from polluting assembly results with non-assembly companies.
 
-  const candidateIds = new Set(semanticScores.keys())
-  for (const keyword of ASSEMBLY_KEYWORDS.slice(0, 5)) {
-    const { data: kwHits } = await supabase
-      .from("marketplace_listings")
-      .select("id")
-      .or(`title.ilike.%${keyword}%,description.ilike.%${keyword}%`)
-      .limit(15)
-    if (kwHits) {
-      for (const h of kwHits) candidateIds.add(h.id)
-    }
-  }
+  const { data: verifiedListings } = await supabase
+    .from("marketplace_listings")
+    .select("id, title, description, is_verified, subcategory, category, specialties, certifications, attributes, lead_time, company_size, city, country")
+    .or("specialties.cs.[\"contract_assembly\"],attributes->>assembly_verified.eq.true")
+    .eq("approval_status", "approved")
+    .limit(40)
 
-  // Fetch full listing data for all candidates
-  const listings = candidateIds.size > 0
-    ? (await supabase
-        .from("marketplace_listings")
-        .select("id, title, description, is_verified, subcategory, category")
-        .in("id", [...candidateIds])
-      ).data ?? []
-    : []
+  const listings = verifiedListings ?? []
 
-  // ── Step 4: Score and merge all candidates ──
+  // ── Step 3: Score and merge all candidates ──
 
   const matchMap = new Map<string, AssemblyCompanyMatch>()
 
@@ -222,31 +191,33 @@ export async function matchAssemblyCompanies(
     }
   }
 
-  // Score marketplace listing candidates
+  // Score verified assembly listings from marketplace
+  // INTENT: These listings passed the explicit assembly filter (specialties or assembly_verified),
+  // so they get a higher base capability score than the old generic keyword approach.
   for (const listing of listings) {
     const listingText = `${listing.title} ${listing.description ?? ""} ${listing.subcategory ?? ""}`.toLowerCase()
 
-    // Semantic
-    const semanticRaw = semanticScores.get(listing.id) ?? 0
-    const semanticScore = Math.round(semanticRaw * 30 * 10) / 10
+    // Capability: verified assembly companies get full 25pts
+    const capabilityScore = 25
 
-    // Capability: listings don't have structured capability data, give partial credit
-    // if their text mentions assembly keywords
-    const { score: kwRaw, matchedTerms } = scoreKeywords(listingText)
-    const hasAssemblyKeywords = kwRaw > 0
-    const capabilityScore = hasAssemblyKeywords ? 15 : 0
-
-    // Capacity: unknown from listings, give 0
-    const capacityScore = 0
+    // Capacity: extract from promoted columns if available
+    let capacityScore = 0
+    if (listing.lead_time) capacityScore += 5
+    const listingCerts = (listing.certifications ?? []) as string[]
+    if (listingCerts.length > 0) capacityScore += 5
+    if (listing.company_size && listing.company_size !== "Unknown" && listing.company_size !== "Dormant") capacityScore += 5
 
     // Quality
-    const qualityScore = listing.is_verified ? 10 : 2
+    let qualityScore = listing.is_verified ? 10 : 2
+    if (listingCerts.length > 0) qualityScore += 5
+    qualityScore = Math.min(qualityScore, 15)
 
-    // Keyword
+    // Keyword relevance
+    const { score: kwRaw, matchedTerms } = scoreKeywords(listingText)
     const keywordScore = Math.round(kwRaw * 15 * 10) / 10
 
-    // Relevance gate: need semantic or keyword relevance
-    if (semanticRaw < 0.25 && !hasAssemblyKeywords) continue
+    // Semantic: 0 (no embedding lookup for targeted query)
+    const semanticScore = 0
 
     const breakdown: AssemblyScoreBreakdown = {
       semantic: semanticScore,
@@ -260,10 +231,9 @@ export async function matchAssemblyCompanies(
     ) / 10
 
     if (total >= MIN_SCORE_THRESHOLD) {
-      const reasons: string[] = []
-      if (semanticScore >= 10) reasons.push("Semantic match")
-      if (hasAssemblyKeywords) reasons.push("Assembly capability")
+      const reasons: string[] = ["Verified assembly company"]
       if (listing.subcategory) reasons.push(listing.subcategory)
+      if (listingCerts.length > 0) reasons.push(`Certs: ${listingCerts.slice(0, 2).join(", ")}`)
       if (matchedTerms.length > 0 && reasons.length < 3) reasons.push(`Keywords: ${matchedTerms.slice(0, 2).join(", ")}`)
 
       const existing = matchMap.get(listing.id)
@@ -275,16 +245,16 @@ export async function matchAssemblyCompanies(
           scoreBreakdown: breakdown,
           matchReasons: reasons.slice(0, 3),
           isVerified: listing.is_verified ?? false,
-          capabilities: hasAssemblyKeywords ? ["assemble"] : [],
-          typicalLeadDays: null,
-          locationCountry: null,
-          certifications: [],
+          capabilities: ["assemble"],
+          typicalLeadDays: listing.lead_time ? parseInt(listing.lead_time.match(/\d+/)?.[0] ?? "0", 10) || null : null,
+          locationCountry: listing.country ?? null,
+          certifications: listingCerts,
         })
       }
     }
   }
 
-  // ── Step 5: Sort, deduplicate by name, return top 8 ──
+  // ── Step 4: Sort, deduplicate by name, return top 8 ──
 
   const deduped = new Map<string, AssemblyCompanyMatch>()
   for (const m of matchMap.values()) {
