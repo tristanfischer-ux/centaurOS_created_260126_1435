@@ -2475,6 +2475,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const summary = extractExecutiveSummary(res.report)
         if (summary) {
           setProductOverview(summary)
+          productOverviewRef.current = summary // INTENT: sync ref immediately so the post-ensureProject save sees it
         }
       }
 
@@ -2486,14 +2487,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsSaving(true)
           await saveCadLabResearch(projId, res)
           // Persist seeded overview alongside research
-          if (!productOverviewRef.current) {
-            const summary = extractExecutiveSummary(res.report)
-            if (summary) {
-              setProductOverview(summary)
-              saveCadLabProductOverview(projId, summary).catch(() => {
-                console.error("[CAD-LAB] Failed to persist seeded overview")
-              })
-            }
+          if (productOverviewRef.current) {
+            saveCadLabProductOverview(projId, productOverviewRef.current).catch(() => {
+              console.error("[CAD-LAB] Failed to persist seeded overview")
+            })
           }
           setLastSaved(new Date().toISOString())
           setIsSaving(false)
@@ -3084,8 +3081,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   throw new Error(event.message || "Generation failed")
                 }
               } catch (parseErr) {
-                if (parseErr instanceof Error && parseErr.message !== "Generation failed" && !parseErr.message.startsWith("HTTP ")) {
-                  // JSON parse error — skip this line
+                if (parseErr instanceof SyntaxError) {
+                  // Actual JSON parse error — skip this malformed SSE line
                 } else {
                   throw parseErr
                 }
@@ -3115,6 +3112,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // fall back to DB polling instead of immediately declaring failure.
       // Only truly fatal errors (HTTP 4xx, rate limit) skip polling.
       const isFatalError = msg.includes("HTTP 4") || msg.includes("Rate limit") || msg.includes("Invalid")
+        || msg.includes("CAD generation failed") || msg.includes("No product illustration")
+        || msg.includes("Zoo requires a textPrompt")
       if (!isFatalError && activeProjectIdRef.current) {
         addProgressLine(`Stream interrupted: ${msg}`)
         startUnifiedResultPolling(activeProjectIdRef.current)

@@ -24,6 +24,8 @@ import {
   MapPin,
   Clock,
   ShieldCheck,
+  CircleDot,
+  Circle,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -264,6 +266,25 @@ export default function AssemblePage(): React.ReactNode {
     })
   }, [tierKey])
 
+  // ── Select a different assembler as Tier 2 (final assembly) ──
+  const handleSelectAssembler = useCallback(async (match: AssemblyCompanyMatch) => {
+    const { buildSankeyData } = await import("@/lib/sankey-utils")
+    const { categories } = buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates)
+    setTierConfig([[match.id, {
+      assemblerId: match.id,
+      assemblerName: match.name,
+      tierLevel: 2,
+      assignedCategories: categories.map((c) => c.id),
+    }]])
+    toast.success(`${match.name} set as assembler`)
+  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, setTierConfig])
+
+  // ── Active assembler ID (the Tier 2 entry) ──
+  const activeAssemblerId = useMemo(() => {
+    const tier2 = tierConfig.find(([, node]) => node.tierLevel === 2)
+    return tier2?.[0] ?? (assemblerMatches.length > 0 ? assemblerMatches[0].id : null)
+  }, [tierConfig, assemblerMatches])
+
   // ── Computed totals ──
   // INTENT: Use totalPerUnit (includes labour) to match Source Costs tab, not parts[].cost
   const totalEstimatedCost = useMemo(() => {
@@ -466,6 +487,7 @@ export default function AssemblePage(): React.ReactNode {
 
                   <div className="space-y-2">
                     {assemblerMatches.map((match) => {
+                      const isActive = match.id === activeAssemblerId
                       const scoreItems = [
                         { label: "S", full: "Semantic", value: match.scoreBreakdown.semantic, max: 30 },
                         { label: "C", full: "Capability", value: match.scoreBreakdown.capability, max: 25 },
@@ -477,12 +499,22 @@ export default function AssemblePage(): React.ReactNode {
                         <div
                           key={match.id}
                           onClick={() => setSelectedAssembler(match)}
-                          className="p-3 rounded-lg border border-border hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer"
+                          className={cn(
+                            "p-3 rounded-lg border hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer",
+                            isActive
+                              ? "border-international-orange ring-1 ring-international-orange/30"
+                              : "border-border",
+                          )}
                         >
                           <div className="flex items-start justify-between gap-4">
-                            {/* Left: name, meta, reasons */}
+                            {/* Left: radio dot + name, meta, reasons */}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
+                                {isActive ? (
+                                  <CircleDot className="h-4 w-4 text-international-orange shrink-0" />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                                )}
                                 <p className="text-sm font-medium text-foreground truncate">{match.name}</p>
                                 {match.isVerified && (
                                   <ShieldCheck className="h-3.5 w-3.5 text-success shrink-0" />
@@ -496,9 +528,14 @@ export default function AssemblePage(): React.ReactNode {
                                 }`}>
                                   {Math.round(match.matchScore)}
                                 </span>
+                                {isActive && (
+                                  <span className="text-[10px] font-semibold text-international-orange bg-international-orange/10 px-2 py-0.5 rounded-full shrink-0">
+                                    Active
+                                  </span>
+                                )}
                               </div>
                               {/* Location, lead time, capabilities row */}
-                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap ml-6">
                                 {match.locationCountry && (
                                   <span className="text-xs text-muted-foreground flex items-center gap-1">
                                     <MapPin className="h-3 w-3" />
@@ -519,7 +556,7 @@ export default function AssemblePage(): React.ReactNode {
                               </div>
                               {/* Certifications */}
                               {match.certifications.length > 0 && (
-                                <div className="flex items-center gap-1.5 mt-1.5">
+                                <div className="flex items-center gap-1.5 mt-1.5 ml-6">
                                   {match.certifications.map((cert) => (
                                     <span key={cert} className="text-[10px] text-success bg-success/10 px-1.5 py-0.5 rounded">
                                       {cert}
@@ -528,12 +565,12 @@ export default function AssemblePage(): React.ReactNode {
                                 </div>
                               )}
                               {match.matchReasons.length > 0 && (
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-muted-foreground mt-1 ml-6">
                                   {match.matchReasons.join(" \u00b7 ")}
                                 </p>
                               )}
                             </div>
-                            {/* Right: score breakdown mini-bars */}
+                            {/* Right: score bars + action button */}
                             <div className="shrink-0 w-36 space-y-1">
                               {scoreItems.map(({ label, value, max }) => (
                                 <div key={label} className="flex items-center gap-1.5">
@@ -550,6 +587,17 @@ export default function AssemblePage(): React.ReactNode {
                                   <span className="text-[9px] text-muted-foreground font-mono w-7 text-right">{value}/{max}</span>
                                 </div>
                               ))}
+                              {!isActive && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSelectAssembler(match)
+                                  }}
+                                  className="w-full mt-1.5 text-[10px] font-medium text-international-orange hover:bg-international-orange/10 rounded px-2 py-1 transition-colors"
+                                >
+                                  Use as Assembler
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -682,6 +730,22 @@ export default function AssemblePage(): React.ReactNode {
                               </span>
                             ))}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Use as Assembler action */}
+                      {selectedAssembler.id !== activeAssemblerId && (
+                        <div className="pt-2 border-t border-border">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              handleSelectAssembler(selectedAssembler)
+                              setSelectedAssembler(null)
+                            }}
+                            className="w-full"
+                          >
+                            Use as Assembler
+                          </Button>
                         </div>
                       )}
                     </div>

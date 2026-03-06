@@ -34,16 +34,16 @@ import type { ShortlistedSupplier } from "@/app/(platform)/the-forge/cad-lab/sou
 // INTENT: Compact layout matching Source page font sizes (10px/9px)
 
 const COL = {
-  LEFT_X: 10,
-  LEFT_CARD_W: 200,
+  LEFT_X: 15,
+  LEFT_CARD_W: 290,
   CARD_H: 52,           // Fixed compact height for all category cards
-  MID_X: 290,
-  MID_BAR_W: 180,
+  MID_X: 420,
+  MID_BAR_W: 260,
   ASM_CARD_H: 68,       // Fixed compact height per assembler card
   ASM_GAP: 6,           // Gap between stacked assembler cards
-  RIGHT_X: 560,
-  RIGHT_W: 150,
-  SVG_W: 750,
+  RIGHT_X: 800,
+  RIGHT_W: 220,
+  SVG_W: 1100,          // INTENT: Match Source page ~1300px viewBox so 10px fonts render at ~10px
   CONTENT_TOP: 22,
   GAP: 6,
   PRODUCT_MIN_H: 90,
@@ -156,6 +156,25 @@ export function AssemblyConvergenceFlow({
           if (supplier) {
             awardedSupplierName = supplier.name
             awardedSupplierScore = supplier.bestMatchScore
+          }
+        }
+
+        // INTENT: Fallback — if no explicit categoryRanking, find shortlisted suppliers
+        // whose moduleIds overlap with this category's contributing modules.
+        // Covers CNC Machining, Manual/Assembly, etc. that may not have auto-populated rankings.
+        if (!awardedSupplierName) {
+          const catModuleIds = new Set(cat.moduleContributions.keys())
+          let bestFallback: ShortlistedSupplier | null = null
+          for (const [, supplier] of shortlistedSuppliers) {
+            if (supplier.moduleIds.some((mid) => catModuleIds.has(mid))) {
+              if (!bestFallback || supplier.bestMatchScore > bestFallback.bestMatchScore) {
+                bestFallback = supplier
+              }
+            }
+          }
+          if (bestFallback) {
+            awardedSupplierName = bestFallback.name
+            awardedSupplierScore = bestFallback.bestMatchScore
           }
         }
       }
@@ -348,8 +367,8 @@ export function AssemblyConvergenceFlow({
     <div className="w-full overflow-x-auto">
       <svg
         viewBox={`0 0 ${COL.SVG_W} ${svgHeight}`}
-        className="w-full"
-        style={{ minHeight: Math.min(svgHeight, 400) }}
+        className="w-full h-auto"
+        style={{ display: "block" }}
       >
         {/* ── Column headers (9px, matching Source page) ── */}
         <text x={COL.LEFT_X} y={14} className="fill-muted-foreground" style={{ fontSize: 9, fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: 0.5 }}>
@@ -438,7 +457,7 @@ export function AssemblyConvergenceFlow({
                     <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 1 }}>
                       {node.awardedSupplierName ? (
                         <>
-                          <span style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
+                          <span style={{ fontSize: 9, color: "#6b7280", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>
                             {node.awardedSupplierName}
                           </span>
                           {node.awardedSupplierScore != null && node.awardedSupplierScore > 0 && (
@@ -536,7 +555,7 @@ export function AssemblyConvergenceFlow({
                   </div>
                   {/* Name */}
                   <div style={{ fontSize: 10, fontWeight: 600, color: "#111827", lineHeight: "13px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {truncate(asm.name, 22)}
+                    {truncate(asm.name, 32)}
                   </div>
                   {/* Location + Lead time + capabilities */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: "auto" }}>
@@ -650,7 +669,7 @@ export function AssemblyConvergenceFlow({
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
             }}>
-              {truncate(subject, 36)}
+              {truncate(subject, 48)}
             </div>
             {/* Part count */}
             <div style={{ fontSize: 9, color: "#9ca3af" }}>
