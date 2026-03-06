@@ -15,11 +15,9 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
 import {
   PoundSterling,
-  ExternalLink,
   Loader2,
   AlertTriangle,
   RotateCcw,
-  ShoppingCart,
 } from "lucide-react"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,14 +39,6 @@ import {
   buildSankeyData,
   sortCategoriesBuyLast,
 } from "@/lib/sankey-utils"
-
-// ─── Buy part supplier search URLs ──────────────────────────────────
-
-const BUY_SUPPLIERS = [
-  { label: "RS", url: (q: string) => `https://uk.rs-online.com/web/c/?searchTerm=${encodeURIComponent(q)}` },
-  { label: "Farnell", url: (q: string) => `https://uk.farnell.com/search?st=${encodeURIComponent(q)}` },
-  { label: "Misumi", url: (q: string) => `https://uk.misumi-ec.com/vona2/result/?Keyword=${encodeURIComponent(q)}` },
-] as const
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -96,8 +86,6 @@ interface CadLabCostEstimateProps {
   buyPartResults?: BuyPartSearchResult[]
   /** Whether buy search is loading */
   buySearchLoading?: boolean
-  /** Trigger buy part search */
-  onSearchBuyParts?: (partNames: string[]) => void
 }
 
 export function CadLabCostEstimate({
@@ -114,7 +102,6 @@ export function CadLabCostEstimate({
   onSupplierClick,
   buyPartResults,
   buySearchLoading,
-  onSearchBuyParts,
 }: CadLabCostEstimateProps): React.ReactNode {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState("")
@@ -209,44 +196,49 @@ export function CadLabCostEstimate({
     return map
   }, [sortedCategories, partCostMap])
 
-  // ── Aggregate buy part results by supplier ──
-  const buySupplierAggregates = useMemo(() => {
+  // ── Build buy supplier entries per category (for costs page) ──
+  const buildBuyCostEntries = useCallback((cat: CategoryNode): Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number }> => {
     if (!buyPartResults || buyPartResults.length === 0) return []
-    const agg = new Map<string, { source: string; totalCost: number; partCount: number; sampleUrl: string }>()
+    const catPartNames = new Set(cat.parts.map((p) => p.name.toLowerCase()))
+
+    const sourceAgg = new Map<string, { totalCost: number; partCount: number; url: string }>()
     for (const result of buyPartResults) {
+      if (!catPartNames.has(result.partName.toLowerCase())) continue
       for (const product of result.products) {
         const price = product.numericPrice ?? 0
-        const existing = agg.get(product.source)
+        const existing = sourceAgg.get(product.source)
         if (existing) {
           existing.totalCost += price
           existing.partCount += 1
-          if (!existing.sampleUrl && product.url) existing.sampleUrl = product.url
         } else {
-          agg.set(product.source, {
-            source: product.source,
-            totalCost: price,
-            partCount: 1,
-            sampleUrl: product.url ?? "",
-          })
+          sourceAgg.set(product.source, { totalCost: price, partCount: 1, url: product.url ?? "" })
         }
       }
     }
-    return [...agg.values()].sort((a, b) => a.totalCost - b.totalCost)
-  }, [buyPartResults])
 
-  const hasBuyResults = buySupplierAggregates.length > 0
+    return [...sourceAgg.entries()]
+      .sort(([, a], [, b]) => a.totalCost - b.totalCost)
+      .map(([source, data], i) => ({
+        supplierId: `buy-${source}`,
+        name: source,
+        isVerified: false,
+        aggregateScore: data.totalCost,
+        rank: i + 1,
+        // INTENT: 1st choice (cheapest) gets cost allocation
+        allocatedCost: i === 0 ? data.totalCost : 0,
+        buyTotalCost: data.totalCost,
+        originalMatch: null as unknown as CategorySupplierEntry["originalMatch"],
+        contributingModuleIds: [],
+      }))
+  }, [buyPartResults])
 
   // ── Compute layout ──
   const layout = useMemo(() => {
     const layoutCats: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }> = []
     const rankGroups: Array<{
-      catId: string; x: number; y: number
-      entries: Array<CategorySupplierEntry & { rank: number; allocatedCost: number }>
+      catId: string; catType: "make" | "buy"; x: number; y: number
+      entries: Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number }>
       moreCount: number
-    }> = []
-    const buyGroups: Array<{
-      catId: string; x: number; y: number
-      parts: Array<{ name: string }>
     }> = []
     const flows: Array<{
       catId: string
@@ -262,16 +254,34 @@ export function CadLabCostEstimate({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        const buyContentH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
-        const h = Math.max(catPartsH, buyContentH, SANKEY.BAR_MIN_H)
+        // INTENT: Buy categories use same horizontal bar layout as make categories.
+        const buyEntries = buildBuyCostEntries(cat)
+        const visibleEntries = buyEntries.slice(0, SUPPLIER_BAR.MAX_VISIBLE)
+
+        const rankH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
+        const h = Math.max(catPartsH, rankH, SANKEY.BAR_MIN_H)
         layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
 
-        buyGroups.push({
+        rankGroups.push({
           catId: cat.id,
+          catType: "buy",
           x: COL_SUPS_X,
           y: cy,
-          parts: cat.parts.map((p) => ({ name: p.name })),
+          entries: visibleEntries,
+          moreCount: Math.max(buyEntries.length - SUPPLIER_BAR.MAX_VISIBLE, 0),
         })
+
+        if (visibleEntries.length > 0) {
+          const flowH = Math.min(h * 0.6, 24)
+          const catMidY = cy + h / 2
+          const supMidY = cy + CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H / 2
+          flows.push({
+            catId: cat.id,
+            x1: COL_CATS_X + SANKEY.BAR_W, y1t: catMidY - flowH / 2, y1b: catMidY + flowH / 2,
+            x2: COL_SUPS_X, y2t: supMidY - flowH / 2, y2b: supMidY + flowH / 2,
+            color: barColor,
+          })
+        }
 
         cy += h + SANKEY.CAT_GAP
         continue
@@ -311,6 +321,7 @@ export function CadLabCostEstimate({
 
       rankGroups.push({
         catId: cat.id,
+        catType: "make",
         x: COL_SUPS_X,
         y: cy,
         entries: visibleEntries,
@@ -339,8 +350,8 @@ export function CadLabCostEstimate({
     }
 
     const viewBoxHeight = cy + SANKEY.PADDING_BOTTOM
-    return { categories: layoutCats, rankGroups, buyGroups, flows, viewBoxHeight }
-  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, categoryCostMap])
+    return { categories: layoutCats, rankGroups, flows, viewBoxHeight }
+  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, categoryCostMap, buildBuyCostEntries])
 
   // ── Handlers ──
   const handleOverrideApply = useCallback((moduleId: string, value: string) => {
@@ -562,6 +573,7 @@ export function CadLabCostEstimate({
                     {layout.rankGroups.map((group) => {
                       const catColor = catColorMap.get(group.catId) ?? "#475569"
                       const rankedIds = categoryRankings?.get(group.catId) ?? []
+                      const isBuy = group.catType === "buy"
 
                       return (
                         <g key={group.catId}>
@@ -578,7 +590,7 @@ export function CadLabCostEstimate({
 
                           {/* Horizontal supplier bars */}
                           {group.entries.map((entry, ei) => {
-                            const isFirst = ei === 0 && rankedIds[0] === entry.supplierId
+                            const isFirst = ei === 0 && (isBuy || rankedIds[0] === entry.supplierId)
                             const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
                             const barX = group.x + (ei === 0
                               ? 0
@@ -587,16 +599,18 @@ export function CadLabCostEstimate({
                             const cat = sortedCategories.find((c) => c.id === group.catId)
                             const partCount = cat?.partCount ?? 0
 
-                            // INTENT: Cost label with per-part average + (est.) qualifier
-                            const costLabel = isFirst && entry.allocatedCost > 0
-                              ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.allocatedCost / partCount))}/pt` : ""} (est.)`
-                              : `${Math.round(entry.aggregateScore)}%`
+                            // Buy: show price. Make: show allocated cost or score.
+                            const costLabel = isBuy && entry.buyTotalCost != null
+                              ? `${formatCurrency(entry.buyTotalCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.buyTotalCost / partCount))}/pt` : ""}`
+                              : isFirst && entry.allocatedCost > 0
+                                ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.allocatedCost / partCount))}/pt` : ""} (est.)`
+                                : `${Math.round(entry.aggregateScore)}%`
 
                             return (
                               <g
                                 key={entry.supplierId}
-                                style={{ cursor: onPromoteSupplier ? "pointer" : undefined }}
-                                onClick={onPromoteSupplier ? () => onPromoteSupplier(group.catId, entry.supplierId) : undefined}
+                                style={{ cursor: isBuy ? undefined : onPromoteSupplier ? "pointer" : undefined }}
+                                onClick={!isBuy && onPromoteSupplier ? () => onPromoteSupplier(group.catId, entry.supplierId) : undefined}
                               >
                                 <rect
                                   x={barX}
@@ -617,7 +631,7 @@ export function CadLabCostEstimate({
                                   fill={isFirst ? "#ffffff" : "#334155"}
                                 >
                                   {truncate(entry.name, isFirst ? 18 : 12)}
-                                  <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
+                                  <title>{entry.name} — {isBuy && entry.buyTotalCost != null ? formatCurrency(entry.buyTotalCost) : `${Math.round(entry.aggregateScore)}% match`}</title>
                                 </text>
                                 {/* Cost (for 1st choice) or score (for backups) */}
                                 <text
@@ -707,177 +721,14 @@ export function CadLabCostEstimate({
 
                 </svg>
 
-                {/* Buy category overlays: SVG bars (with results) or HTML fallback (static links) */}
-                {layout.buyGroups.length > 0 && (() => {
-                  const svgScale = costSvgWidth > 0 ? costSvgWidth / VB_W : 1
+                {/* Buy search loading indicator */}
+                {buySearchLoading && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 text-muted-foreground animate-pulse pointer-events-none">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span className="text-[10px] font-medium">Searching suppliers…</span>
+                  </div>
+                )}
 
-                  if (buySearchLoading) {
-                    return (
-                      <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-                        {layout.buyGroups.map((group) => (
-                          <div
-                            key={`buy-load-${group.catId}`}
-                            className="absolute pointer-events-auto"
-                            style={{
-                              left: group.x * svgScale,
-                              top: (group.y + CATEGORY_NAME_H) * svgScale,
-                              transformOrigin: "left top",
-                            }}
-                          >
-                            <div className="flex items-center gap-1.5 text-muted-foreground animate-pulse">
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                              <span className="text-[10px] font-medium">Searching suppliers…</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }
-
-                  if (hasBuyResults) {
-                    return (
-                      <svg
-                        viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
-                        className="absolute inset-0 w-full h-auto pointer-events-none"
-                        style={{ display: "block" }}
-                      >
-                        {layout.buyGroups.map((group) => {
-                          const catColor = catColorMap.get(group.catId) ?? "#d97706"
-                          return (
-                            <g key={`buy-bars-${group.catId}`}>
-                              <text
-                                x={group.x}
-                                y={group.y + 12}
-                                fontSize={9}
-                                fontWeight={600}
-                                fill="#64748b"
-                              >
-                                Purchasing · {buySupplierAggregates.length} supplier{buySupplierAggregates.length !== 1 ? "s" : ""}
-                              </text>
-
-                              {buySupplierAggregates.slice(0, SUPPLIER_BAR.MAX_VISIBLE).map((sup, si) => {
-                                const isFirst = si === 0
-                                const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
-                                const barX = group.x + (si === 0
-                                  ? 0
-                                  : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (si - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
-                                const barY = group.y + CATEGORY_NAME_H
-                                const costLabel = sup.totalCost > 0
-                                  ? `${formatCurrency(sup.totalCost)} (${sup.partCount} part${sup.partCount !== 1 ? "s" : ""})`
-                                  : `${sup.partCount} part${sup.partCount !== 1 ? "s" : ""}`
-
-                                return (
-                                  <a
-                                    key={sup.source}
-                                    href={sup.sampleUrl || undefined}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{ pointerEvents: "auto" }}
-                                  >
-                                    <rect
-                                      x={barX}
-                                      y={barY}
-                                      width={barW}
-                                      height={SUPPLIER_BAR.BAR_H}
-                                      fill={isFirst ? catColor : "#f1f5f9"}
-                                      stroke={isFirst ? undefined : "#e2e8f0"}
-                                      strokeWidth={isFirst ? 0 : 1}
-                                      rx={SUPPLIER_BAR.BAR_R}
-                                      style={{ cursor: "pointer" }}
-                                    />
-                                    <text
-                                      x={barX + 6}
-                                      y={barY + 11}
-                                      fontSize={9}
-                                      fontWeight={isFirst ? 700 : 500}
-                                      fill={isFirst ? "#ffffff" : "#334155"}
-                                      style={{ pointerEvents: "none" }}
-                                    >
-                                      {truncate(sup.source, isFirst ? 18 : 12)}
-                                    </text>
-                                    <text
-                                      x={barX + barW - 6}
-                                      y={barY + 11}
-                                      fontSize={8}
-                                      fontFamily="monospace"
-                                      fontWeight={isFirst ? 600 : 400}
-                                      fill={isFirst ? "#ffffffcc" : "#94a3b8"}
-                                      textAnchor="end"
-                                      style={{ pointerEvents: "none" }}
-                                    >
-                                      {costLabel}
-                                    </text>
-                                    <title>{sup.source} — {costLabel}</title>
-                                  </a>
-                                )
-                              })}
-                            </g>
-                          )
-                        })}
-                      </svg>
-                    )
-                  }
-
-                  // Fallback: static search URL badges + search button
-                  return (
-                    <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-                      {layout.buyGroups.map((group) => (
-                        <div
-                          key={`buy-${group.catId}`}
-                          className="absolute pointer-events-auto"
-                          style={{
-                            left: group.x * svgScale,
-                            top: group.y * svgScale,
-                            transform: `scale(${Math.min(svgScale, 1)})`,
-                            transformOrigin: "left top",
-                            maxWidth: (VB_W - group.x) * svgScale,
-                          }}
-                        >
-                          <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
-                            <div className="flex items-center gap-1.5 mb-2">
-                              <ShoppingCart className="h-3 w-3 text-international-orange" />
-                              <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
-                              {onSearchBuyParts && (
-                                <button
-                                  onClick={() => onSearchBuyParts(group.parts.map((p) => p.name))}
-                                  className="ml-auto inline-flex items-center gap-0.5 bg-international-orange/10 hover:bg-international-orange/20 rounded px-1.5 py-0.5 text-[9px] text-international-orange font-semibold transition-colors"
-                                >
-                                  Search prices
-                                </button>
-                              )}
-                              {!onSearchBuyParts && (
-                                <span className="text-[9px] text-muted-foreground ml-auto">
-                                  {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
-                                </span>
-                              )}
-                            </div>
-                            <div className="space-y-1.5">
-                              {group.parts.map((part, pi) => (
-                                <div key={pi}>
-                                  <p className="text-[10px] font-medium text-foreground truncate">{part.name}</p>
-                                  <div className="flex items-center gap-1 mt-0.5">
-                                    {BUY_SUPPLIERS.map((s) => (
-                                      <a
-                                        key={s.label}
-                                        href={s.url(part.name)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-0.5 bg-muted hover:bg-international-orange/10 rounded px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-international-orange font-medium transition-colors"
-                                      >
-                                        <ExternalLink className="h-2 w-2" />
-                                        {s.label}
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )
-                })()}
               </div>
             </div>
 

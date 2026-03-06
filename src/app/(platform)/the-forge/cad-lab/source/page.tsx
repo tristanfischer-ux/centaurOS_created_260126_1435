@@ -620,7 +620,6 @@ export default function SourcePage(): React.ReactNode {
               onMatchAll={handleMatchAll}
               buyPartResults={buyPartResults}
               buySearchLoading={buySearchLoading}
-              onSearchBuyParts={handleSearchBuyParts}
             />
           </motion.div>
         )}
@@ -640,7 +639,6 @@ export default function SourcePage(): React.ReactNode {
               onPromoteSupplier={handlePromoteSupplier}
               buyPartResults={buyPartResults}
               buySearchLoading={buySearchLoading}
-              onSearchBuyParts={handleSearchBuyParts}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

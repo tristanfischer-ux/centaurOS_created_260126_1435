@@ -13,7 +13,7 @@
 "use client"
 
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
-import { ExternalLink, ShoppingCart, X, Info, Loader2 } from "lucide-react"
+import { X, Info, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
@@ -52,17 +52,7 @@ export interface ShortlistCoverageFlowProps {
   buyPartResults?: BuyPartSearchResult[]
   /** Whether buy search is in progress */
   buySearchLoading?: boolean
-  /** Trigger buy part search */
-  onSearchBuyParts?: (partNames: string[]) => void
 }
-
-// ─── Buy part supplier search URLs ──────────────────────────────────
-
-const BUY_SUPPLIERS = [
-  { label: "RS", url: (q: string) => `https://uk.rs-online.com/web/c/?searchTerm=${encodeURIComponent(q)}` },
-  { label: "Farnell", url: (q: string) => `https://uk.farnell.com/search?st=${encodeURIComponent(q)}` },
-  { label: "Misumi", url: (q: string) => `https://uk.misumi-ec.com/vona2/result/?Keyword=${encodeURIComponent(q)}` },
-] as const
 
 // ─── SVG layout constants ────────────────────────────────────────────
 
@@ -76,24 +66,25 @@ const CATEGORY_NAME_H = 28
 
 // ─── Layout types ────────────────────────────────────────────────────
 
+interface RankEntry extends CategorySupplierEntry {
+  rank: number
+  /** For buy entries: total price from search results */
+  buyTotalCost?: number
+  /** For buy entries: clickable product URL */
+  buyUrl?: string
+}
+
 interface RankedLayout {
   categories: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }>
-  /** Per-category horizontal supplier groups */
+  /** Per-category horizontal supplier groups (make AND buy) */
   rankGroups: Array<{
     catId: string
+    catType: "make" | "buy"
     x: number
     y: number
-    entries: Array<CategorySupplierEntry & { rank: number }>
-    /** All entries including overflow (for dropdown) */
-    allEntries: Array<CategorySupplierEntry & { rank: number }>
+    entries: Array<RankEntry>
+    allEntries: Array<RankEntry>
     moreCount: number
-  }>
-  /** Buy category groups (for HTML overlay) */
-  buyGroups: Array<{
-    catId: string
-    x: number
-    y: number
-    parts: Array<{ name: string }>
   }>
   /** Flow ribbons from category to 1st-choice supplier */
   flows: Array<{
@@ -117,7 +108,6 @@ export function ShortlistCoverageFlow({
   onSupplierClick,
   buyPartResults,
   buySearchLoading,
-  onSearchBuyParts,
 }: ShortlistCoverageFlowProps): React.ReactNode {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [dropdownCatId, setDropdownCatId] = useState<string | null>(null)
@@ -176,38 +166,60 @@ export function ShortlistCoverageFlow({
     return map
   }, [sortedCategories])
 
-  // ── Aggregate buy part results by supplier ──
-  const buySupplierAggregates = useMemo(() => {
+  // ── Build buy supplier rank entries per category ──
+  const buyResultsMap = useMemo(() => {
+    if (!buyPartResults || buyPartResults.length === 0) return new Map<string, Map<string, BuyPartSearchResult>>()
+    const map = new Map<string, Map<string, BuyPartSearchResult>>()
+    // Index by lowercased partName for matching
+    for (const r of buyPartResults) {
+      // We'll match against category parts later; store by partName
+      map.set("__all__", (map.get("__all__") ?? new Map()).set(r.partName.toLowerCase(), r))
+    }
+    return map
+  }, [buyPartResults])
+
+  /** Build ranked buy supplier entries for a specific category's parts */
+  const buildBuyRankEntries = useCallback((cat: CategoryNode): RankEntry[] => {
     if (!buyPartResults || buyPartResults.length === 0) return []
-    const agg = new Map<string, { source: string; totalCost: number; partCount: number; sampleUrl: string }>()
+    const catPartNames = new Set(cat.parts.map((p) => p.name.toLowerCase()))
+
+    // Collect products that match parts in this category
+    const sourceAgg = new Map<string, { totalCost: number; partCount: number; url: string }>()
     for (const result of buyPartResults) {
+      if (!catPartNames.has(result.partName.toLowerCase())) continue
       for (const product of result.products) {
         const price = product.numericPrice ?? 0
-        const existing = agg.get(product.source)
+        const existing = sourceAgg.get(product.source)
         if (existing) {
           existing.totalCost += price
           existing.partCount += 1
-          if (!existing.sampleUrl && product.url) existing.sampleUrl = product.url
+          if (!existing.url && product.url) existing.url = product.url
         } else {
-          agg.set(product.source, {
-            source: product.source,
-            totalCost: price,
-            partCount: 1,
-            sampleUrl: product.url ?? "",
-          })
+          sourceAgg.set(product.source, { totalCost: price, partCount: 1, url: product.url ?? "" })
         }
       }
     }
-    return [...agg.values()].sort((a, b) => a.totalCost - b.totalCost)
-  }, [buyPartResults])
 
-  const hasBuyResults = buySupplierAggregates.length > 0
+    // Sort by total cost ascending (cheapest = 1st)
+    return [...sourceAgg.entries()]
+      .sort(([, a], [, b]) => a.totalCost - b.totalCost)
+      .map(([source, data], i) => ({
+        supplierId: `buy-${source}`,
+        name: source,
+        isVerified: false,
+        aggregateScore: data.totalCost, // Store price as score for display
+        rank: i + 1,
+        buyTotalCost: data.totalCost,
+        buyUrl: data.url,
+        originalMatch: null as unknown as CategorySupplierEntry["originalMatch"],
+        contributingModuleIds: [],
+      }))
+  }, [buyPartResults])
 
   // ── Compute layout ──
   const layout = useMemo((): RankedLayout => {
     const layoutCats: RankedLayout["categories"] = []
     const rankGroups: RankedLayout["rankGroups"] = []
-    const buyGroups: RankedLayout["buyGroups"] = []
     const flows: RankedLayout["flows"] = []
 
     let cy = SANKEY.CONTENT_TOP
@@ -217,17 +229,37 @@ export function ShortlistCoverageFlow({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        // Height: category name + one supplier bar row (for layout spacing)
-        const buyContentH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
-        const h = Math.max(catPartsH, buyContentH, SANKEY.BAR_MIN_H)
+        // INTENT: Buy categories use the SAME horizontal bar layout as make categories.
+        // Entries come from buyPartResults (sorted by price) instead of supplierMatches.
+        const buyEntries = buildBuyRankEntries(cat)
+        const visibleEntries = buyEntries.slice(0, SUPPLIER_BAR.MAX_VISIBLE)
+
+        const rankH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
+        const h = Math.max(catPartsH, rankH, SANKEY.BAR_MIN_H)
         layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
 
-        buyGroups.push({
+        rankGroups.push({
           catId: cat.id,
+          catType: "buy",
           x: COL_SUPS_X,
           y: cy,
-          parts: cat.parts.map((p) => ({ name: p.name })),
+          entries: visibleEntries,
+          allEntries: buyEntries,
+          moreCount: Math.max(buyEntries.length - SUPPLIER_BAR.MAX_VISIBLE, 0),
         })
+
+        // Flow ribbon (same as make categories)
+        if (visibleEntries.length > 0) {
+          const flowH = Math.min(h * 0.6, 24)
+          const catMidY = cy + h / 2
+          const supMidY = cy + CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H / 2
+          flows.push({
+            catId: cat.id,
+            x1: COL_CATS_X + SANKEY.BAR_W, y1t: catMidY - flowH / 2, y1b: catMidY + flowH / 2,
+            x2: COL_SUPS_X, y2t: supMidY - flowH / 2, y2b: supMidY + flowH / 2,
+            color: barColor,
+          })
+        }
 
         cy += h + SANKEY.CAT_GAP
         continue
@@ -267,6 +299,7 @@ export function ShortlistCoverageFlow({
 
       rankGroups.push({
         catId: cat.id,
+        catType: "make",
         x: COL_SUPS_X,
         y: cy,
         entries: visibleEntries,
@@ -297,8 +330,8 @@ export function ShortlistCoverageFlow({
 
     const viewBoxHeight = cy + SANKEY.PADDING_BOTTOM
 
-    return { categories: layoutCats, rankGroups, buyGroups, flows, viewBoxHeight }
-  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries])
+    return { categories: layoutCats, rankGroups, flows, viewBoxHeight }
+  }, [sortedCategories, catColorMap, categoryRankings, categorySupplierEntries, buildBuyRankEntries])
 
   // ── Coverage stats ──
   const makeCatCount = layout.categories.filter((c) => c.type !== "buy").length
@@ -463,12 +496,13 @@ export function ShortlistCoverageFlow({
             })}
           </g>
 
-          {/* Layer 3: Horizontal ranked supplier bars */}
+          {/* Layer 3: Horizontal ranked supplier bars (make AND buy) */}
           <g>
             {layout.rankGroups.map((group) => {
               const rankId = `rank-${group.catId}`
               const catColor = catColorMap.get(group.catId) ?? "#475569"
               const rankedIds = categoryRankings.get(group.catId) ?? []
+              const isBuy = group.catType === "buy"
 
               return (
                 <g
@@ -491,15 +525,28 @@ export function ShortlistCoverageFlow({
 
                   {/* Horizontal supplier bars — all on one row */}
                   {group.entries.map((entry, ei) => {
-                    const isFirst = ei === 0 && rankedIds[0] === entry.supplierId
+                    const isFirst = ei === 0 && (isBuy || rankedIds[0] === entry.supplierId)
                     const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
                     const barX = group.x + (ei === 0
                       ? 0
                       : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (ei - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
                     const barY = group.y + CATEGORY_NAME_H
-                    const rankLabel = rankedIds.includes(entry.supplierId)
-                      ? `${rankedIds.indexOf(entry.supplierId) + 1}${ordinalSuffix(rankedIds.indexOf(entry.supplierId) + 1)}`
-                      : ""
+
+                    // Buy: show rank by price position. Make: show from categoryRankings.
+                    const rankLabel = isBuy
+                      ? `${ei + 1}${ordinalSuffix(ei + 1)}`
+                      : rankedIds.includes(entry.supplierId)
+                        ? `${rankedIds.indexOf(entry.supplierId) + 1}${ordinalSuffix(rankedIds.indexOf(entry.supplierId) + 1)}`
+                        : ""
+
+                    // Buy: show price. Make: show match score.
+                    const valueLabel = isBuy && entry.buyTotalCost != null
+                      ? formatCurrency(entry.buyTotalCost)
+                      : `${Math.round(entry.aggregateScore)}%`
+
+                    const titleText = isBuy
+                      ? `${entry.name} — ${entry.buyTotalCost != null ? formatCurrency(entry.buyTotalCost) : "no price"}`
+                      : `${entry.name} — ${Math.round(entry.aggregateScore)}% match`
 
                     return (
                       <g
@@ -508,12 +555,16 @@ export function ShortlistCoverageFlow({
                         className="transition-opacity duration-200"
                         style={{ cursor: "pointer" }}
                         onClick={() => {
-                          // INTENT: Open rank popover instead of blind cycle
-                          setRankPopover((prev) =>
-                            prev?.supplierId === entry.supplierId && prev?.catId === group.catId
-                              ? null
-                              : { catId: group.catId, supplierId: entry.supplierId, x: barX, y: barY + SUPPLIER_BAR.BAR_H + 4, entry }
-                          )
+                          // Buy entries: open product URL. Make entries: rank popover.
+                          if (isBuy && entry.buyUrl) {
+                            window.open(entry.buyUrl, "_blank", "noopener,noreferrer")
+                          } else {
+                            setRankPopover((prev) =>
+                              prev?.supplierId === entry.supplierId && prev?.catId === group.catId
+                                ? null
+                                : { catId: group.catId, supplierId: entry.supplierId, x: barX, y: barY + SUPPLIER_BAR.BAR_H + 4, entry }
+                            )
+                          }
                         }}
                       >
                         {/* Bar background */}
@@ -527,15 +578,17 @@ export function ShortlistCoverageFlow({
                           strokeWidth={isFirst ? 0 : 1}
                           rx={SUPPLIER_BAR.BAR_R}
                         />
-                        {/* Score progress bar — thin indicator at bottom of bar */}
-                        <rect
-                          x={barX}
-                          y={barY + SUPPLIER_BAR.BAR_H - 3}
-                          width={barW * (entry.aggregateScore / 100)}
-                          height={3}
-                          fill={isFirst ? "rgba(255,255,255,0.25)" : `${catColor}60`}
-                          rx={1.5}
-                        />
+                        {/* Score/price progress bar — thin indicator at bottom */}
+                        {!isBuy && (
+                          <rect
+                            x={barX}
+                            y={barY + SUPPLIER_BAR.BAR_H - 3}
+                            width={barW * (entry.aggregateScore / 100)}
+                            height={3}
+                            fill={isFirst ? "rgba(255,255,255,0.25)" : `${catColor}60`}
+                            rx={1.5}
+                          />
+                        )}
                         {/* Rank ordinal */}
                         {rankLabel && (
                           <text
@@ -557,20 +610,22 @@ export function ShortlistCoverageFlow({
                           fill={isFirst ? "#ffffff" : "#334155"}
                         >
                           {truncate(entry.name, isFirst ? 22 : 12)}
-                          <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
+                          <title>{titleText}</title>
                         </text>
-                        {/* Score */}
+                        {/* Value: price or score */}
                         <text
-                          x={barX + barW - (onSupplierClick ? 18 : 6)}
+                          x={barX + barW - ((!isBuy && onSupplierClick) ? 18 : 6)}
                           y={barY + 11}
                           fontSize={8}
+                          fontFamily={isBuy ? "monospace" : undefined}
+                          fontWeight={isBuy && isFirst ? 600 : undefined}
                           fill={isFirst ? "#ffffffcc" : "#94a3b8"}
                           textAnchor="end"
                         >
-                          {Math.round(entry.aggregateScore)}%
+                          {valueLabel}
                         </text>
-                        {/* Info icon — separate click target for supplier details */}
-                        {onSupplierClick && (
+                        {/* Info icon — make categories only */}
+                        {!isBuy && onSupplierClick && (
                           <g
                             style={{ cursor: "pointer" }}
                             onClick={(e) => {
@@ -865,179 +920,26 @@ export function ShortlistCoverageFlow({
           )
         })()}
 
-        {/* Buy category overlays: SVG bars (with results) or HTML fallback (static links) */}
-        {layout.buyGroups.length > 0 && (() => {
-          if (buySearchLoading) {
-            // Loading state
-            return (
-              <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-                {layout.buyGroups.map((group) => (
-                  <div
-                    key={`buy-load-${group.catId}`}
-                    className="absolute pointer-events-auto"
-                    style={{
-                      left: group.x * svgScale,
-                      top: (group.y + CATEGORY_NAME_H) * svgScale,
-                      transformOrigin: "left top",
-                    }}
-                  >
-                    <div className="flex items-center gap-1.5 text-muted-foreground animate-pulse">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      <span className="text-[10px] font-medium">Searching suppliers…</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )
-          }
-
-          if (hasBuyResults) {
-            // SVG supplier bars overlay (matching make-category pattern)
-            return (
-              <svg
-                viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
-                className="absolute inset-0 w-full h-auto pointer-events-none"
-                style={{ display: "block" }}
+        {/* Buy search loading indicator — overlaid on buy category areas */}
+        {buySearchLoading && (
+          <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+            {layout.rankGroups.filter((g) => g.catType === "buy" && g.entries.length === 0).map((group) => (
+              <div
+                key={`buy-load-${group.catId}`}
+                className="absolute"
+                style={{
+                  left: group.x * svgScale,
+                  top: (group.y + CATEGORY_NAME_H) * svgScale,
+                }}
               >
-                {layout.buyGroups.map((group) => {
-                  const catColor = catColorMap.get(group.catId) ?? "#d97706"
-                  return (
-                    <g key={`buy-bars-${group.catId}`}>
-                      {/* Category header */}
-                      <text
-                        x={group.x}
-                        y={group.y + 12}
-                        fontSize={9}
-                        fontWeight={600}
-                        fill="#64748b"
-                      >
-                        Purchasing · {buySupplierAggregates.length} supplier{buySupplierAggregates.length !== 1 ? "s" : ""}
-                      </text>
-
-                      {/* Horizontal supplier bars — sorted lowest cost first */}
-                      {buySupplierAggregates.slice(0, SUPPLIER_BAR.MAX_VISIBLE).map((sup, si) => {
-                        const isFirst = si === 0
-                        const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
-                        const barX = group.x + (si === 0
-                          ? 0
-                          : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (si - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
-                        const barY = group.y + CATEGORY_NAME_H
-                        const costLabel = sup.totalCost > 0
-                          ? `${formatCurrency(sup.totalCost)} (${sup.partCount} part${sup.partCount !== 1 ? "s" : ""})`
-                          : `${sup.partCount} part${sup.partCount !== 1 ? "s" : ""}`
-
-                        return (
-                          <a
-                            key={sup.source}
-                            href={sup.sampleUrl || undefined}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{ pointerEvents: "auto" }}
-                          >
-                            <rect
-                              x={barX}
-                              y={barY}
-                              width={barW}
-                              height={SUPPLIER_BAR.BAR_H}
-                              fill={isFirst ? catColor : "#f1f5f9"}
-                              stroke={isFirst ? undefined : "#e2e8f0"}
-                              strokeWidth={isFirst ? 0 : 1}
-                              rx={SUPPLIER_BAR.BAR_R}
-                              style={{ cursor: "pointer" }}
-                            />
-                            <text
-                              x={barX + 6}
-                              y={barY + 11}
-                              fontSize={9}
-                              fontWeight={isFirst ? 700 : 500}
-                              fill={isFirst ? "#ffffff" : "#334155"}
-                              style={{ pointerEvents: "none" }}
-                            >
-                              {truncate(sup.source, isFirst ? 18 : 12)}
-                            </text>
-                            <text
-                              x={barX + barW - 6}
-                              y={barY + 11}
-                              fontSize={8}
-                              fontFamily="monospace"
-                              fontWeight={isFirst ? 600 : 400}
-                              fill={isFirst ? "#ffffffcc" : "#94a3b8"}
-                              textAnchor="end"
-                              style={{ pointerEvents: "none" }}
-                            >
-                              {costLabel}
-                            </text>
-                            <title>{sup.source} — {costLabel}</title>
-                          </a>
-                        )
-                      })}
-                    </g>
-                  )
-                })}
-              </svg>
-            )
-          }
-
-          // Fallback: static search URL badges + search button
-          return (
-            <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-              {layout.buyGroups.map((group) => (
-                <div
-                  key={`buy-${group.catId}`}
-                  className="absolute pointer-events-auto"
-                  style={{
-                    left: group.x * svgScale,
-                    top: group.y * svgScale,
-                    transform: `scale(${Math.min(svgScale, 1)})`,
-                    transformOrigin: "left top",
-                    maxWidth: (VB_W - group.x) * svgScale,
-                  }}
-                >
-                  <div className="rounded-lg border bg-card shadow-sm p-3 max-w-[360px]">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <ShoppingCart className="h-3 w-3 text-international-orange" />
-                      <span className="text-[10px] font-semibold text-foreground">Purchasing</span>
-                      {onSearchBuyParts && (
-                        <button
-                          onClick={() => onSearchBuyParts(group.parts.map((p) => p.name))}
-                          className="ml-auto inline-flex items-center gap-0.5 bg-international-orange/10 hover:bg-international-orange/20 rounded px-1.5 py-0.5 text-[9px] text-international-orange font-semibold transition-colors"
-                        >
-                          Search prices
-                        </button>
-                      )}
-                      {!onSearchBuyParts && (
-                        <span className="text-[9px] text-muted-foreground ml-auto">
-                          {group.parts.length} part{group.parts.length !== 1 ? "s" : ""}
-                        </span>
-                      )}
-                    </div>
-                    <div className="space-y-1.5">
-                      {group.parts.map((part, pi) => (
-                        <div key={pi}>
-                          <p className="text-[10px] font-medium text-foreground truncate">{part.name}</p>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            {BUY_SUPPLIERS.map((s) => (
-                              <a
-                                key={s.label}
-                                href={s.url(part.name)}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-0.5 bg-muted hover:bg-international-orange/10 rounded px-1.5 py-0.5 text-[9px] text-muted-foreground hover:text-international-orange font-medium transition-colors"
-                              >
-                                <ExternalLink className="h-2 w-2" />
-                                {s.label}
-                              </a>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground animate-pulse">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span className="text-[10px] font-medium">Searching suppliers…</span>
                 </div>
-              ))}
-            </div>
-          )
-        })()}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
