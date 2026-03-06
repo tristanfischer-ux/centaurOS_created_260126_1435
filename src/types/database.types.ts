@@ -8460,6 +8460,57 @@ export type Database = {
           },
         ]
       }
+      manufacturing_technique_enrichments: {
+        Row: {
+          article_markdown: string | null
+          common_applications: Json | null
+          created_at: string | null
+          id: string
+          real_world_equipment: Json | null
+          real_world_materials: Json | null
+          real_world_surface_finishes: Json | null
+          real_world_tolerances: Json | null
+          source: string | null
+          supplier_count: number | null
+          technique_slug: string
+          tips_and_insights: Json | null
+          typical_batch_sizes: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          article_markdown?: string | null
+          common_applications?: Json | null
+          created_at?: string | null
+          id?: string
+          real_world_equipment?: Json | null
+          real_world_materials?: Json | null
+          real_world_surface_finishes?: Json | null
+          real_world_tolerances?: Json | null
+          source?: string | null
+          supplier_count?: number | null
+          technique_slug: string
+          tips_and_insights?: Json | null
+          typical_batch_sizes?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          article_markdown?: string | null
+          common_applications?: Json | null
+          created_at?: string | null
+          id?: string
+          real_world_equipment?: Json | null
+          real_world_materials?: Json | null
+          real_world_surface_finishes?: Json | null
+          real_world_tolerances?: Json | null
+          source?: string | null
+          supplier_count?: number | null
+          technique_slug?: string
+          tips_and_insights?: Json | null
+          typical_batch_sizes?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       marketplace_listings: {
         Row: {
           address: string | null

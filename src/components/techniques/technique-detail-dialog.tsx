@@ -40,6 +40,7 @@ import {
   Lightbulb,
   Wrench,
   FlaskConical as FlaskIcon,
+  ChevronRight,
 } from 'lucide-react'
 import {
   Dialog,
@@ -92,6 +93,23 @@ function CostDisplay({ tier }: { tier: CostTier }) {
       <span className="text-sm text-muted-foreground">{COST_LABELS[tier]}</span>
     </div>
   )
+}
+
+// ---------------------------------------------------------------------------
+// Markdown → HTML helper (simple subset)
+// ---------------------------------------------------------------------------
+
+function renderSimpleMarkdown(md: string): string {
+  return md
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^- (.*$)/gim, '<li>$1</li>')
+    .replace(/(<li>[\s\S]*<\/li>)/, '<ul>$1</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hul])(.+)$/gim, '<p>$1</p>')
 }
 
 // ---------------------------------------------------------------------------
@@ -223,6 +241,169 @@ export function TechniqueDetailDialog({
                 {technique.description}
               </p>
             </div>
+
+            {/* ------------------------------------------------------------ */}
+            {/* Real-World Insights callout (position 2, right after desc)    */}
+            {/* ------------------------------------------------------------ */}
+            {enrichment && (
+              <div className="rounded-xl border border-international-orange/20 bg-international-orange/[0.02] p-5 space-y-4">
+                {/* Header */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center rounded-lg h-9 w-9 shrink-0 bg-international-orange/10 text-international-orange">
+                    <Factory className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold">Real-World Insights</h4>
+                    <p className="text-xs text-muted-foreground">
+                      Aggregated from{' '}
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-international-orange border-international-orange/30">
+                        {enrichment.supplier_count} {enrichment.supplier_count === 1 ? 'supplier' : 'suppliers'}
+                      </Badge>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick stats row */}
+                <div className="grid grid-cols-3 gap-3">
+                  {enrichment.real_world_tolerances?.typical_mm != null && (
+                    <div className="rounded-lg border bg-card p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Typical Tolerance</p>
+                      <p className="text-sm font-semibold text-international-orange">&plusmn;{enrichment.real_world_tolerances.typical_mm}mm</p>
+                    </div>
+                  )}
+                  {enrichment.real_world_materials.length > 0 && (
+                    <div className="rounded-lg border bg-card p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Top Material</p>
+                      <p className="text-sm font-semibold truncate">{enrichment.real_world_materials[0].material}</p>
+                    </div>
+                  )}
+                  {enrichment.real_world_equipment.length > 0 && (
+                    <div className="rounded-lg border bg-card p-3 text-center">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">Common Equipment</p>
+                      <p className="text-sm font-semibold truncate">{enrichment.real_world_equipment[0].brand_model}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Practical tips (first 3) */}
+                {enrichment.tips_and_insights.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                      <Lightbulb className="h-3 w-3" />
+                      Practical Tips
+                    </p>
+                    <ul className="space-y-1.5">
+                      {enrichment.tips_and_insights.slice(0, 3).map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="text-international-orange shrink-0 mt-0.5 text-xs font-bold">{i + 1}.</span>
+                          <span className="text-muted-foreground">{tip}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Collapsible full article */}
+                {enrichment.article_markdown && (
+                  <details className="group">
+                    <summary className="cursor-pointer text-xs font-medium text-international-orange hover:underline list-none flex items-center gap-1">
+                      <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                      Read full article
+                    </summary>
+                    <div className="mt-3">
+                      <div
+                        className="prose prose-sm max-w-none text-muted-foreground [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-foreground [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-foreground [&_p]:text-sm [&_p]:leading-relaxed [&_li]:text-sm [&_strong]:text-foreground"
+                        dangerouslySetInnerHTML={{ __html: renderSimpleMarkdown(enrichment.article_markdown) }}
+                      />
+                    </div>
+                  </details>
+                )}
+
+                {/* Extended data below the fold */}
+                {(enrichment.real_world_materials.length > 0 || enrichment.real_world_equipment.length > 0 || (enrichment.real_world_tolerances && (enrichment.real_world_tolerances.min_mm != null || enrichment.real_world_tolerances.max_mm != null))) && (
+                  <details className="group">
+                    <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground list-none flex items-center gap-1">
+                      <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                      Materials, equipment &amp; tolerances
+                    </summary>
+                    <div className="mt-3 space-y-4">
+                      {/* Full tolerances */}
+                      {enrichment.real_world_tolerances && (enrichment.real_world_tolerances.min_mm != null || enrichment.real_world_tolerances.typical_mm != null) && (
+                        <div>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <Ruler className="h-3 w-3" />
+                            Real-World Tolerances
+                          </p>
+                          <div className="grid grid-cols-3 gap-3">
+                            {enrichment.real_world_tolerances.min_mm != null && (
+                              <div className="rounded-lg border p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground mb-0.5">Best</p>
+                                <p className="text-sm font-semibold">&plusmn;{enrichment.real_world_tolerances.min_mm}mm</p>
+                              </div>
+                            )}
+                            {enrichment.real_world_tolerances.typical_mm != null && (
+                              <div className="rounded-lg border border-international-orange/30 bg-international-orange/5 p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground mb-0.5">Typical</p>
+                                <p className="text-sm font-semibold text-international-orange">&plusmn;{enrichment.real_world_tolerances.typical_mm}mm</p>
+                              </div>
+                            )}
+                            {enrichment.real_world_tolerances.max_mm != null && (
+                              <div className="rounded-lg border p-3 text-center">
+                                <p className="text-[10px] text-muted-foreground mb-0.5">Widest</p>
+                                <p className="text-sm font-semibold">&plusmn;{enrichment.real_world_tolerances.max_mm}mm</p>
+                              </div>
+                            )}
+                          </div>
+                          {enrichment.real_world_tolerances.notes && (
+                            <p className="text-xs text-muted-foreground mt-1.5 italic">{enrichment.real_world_tolerances.notes}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Equipment */}
+                      {enrichment.real_world_equipment.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <Wrench className="h-3 w-3" />
+                            Equipment in Use
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {enrichment.real_world_equipment.map((eq, i) => (
+                              <Badge key={i} variant="secondary" className="text-xs">
+                                {eq.brand_model}
+                                {eq.frequency > 1 && (
+                                  <span className="ml-1 text-international-orange">({eq.frequency})</span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Materials */}
+                      {enrichment.real_world_materials.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+                            <FlaskIcon className="h-3 w-3" />
+                            Materials (Real-World)
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {enrichment.real_world_materials.map((mat, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {mat.material}
+                                {mat.frequency > 1 && (
+                                  <span className="ml-1 text-muted-foreground">({mat.frequency})</span>
+                                )}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
 
             {/* How it works */}
             <div>
@@ -377,159 +558,6 @@ export function TechniqueDetailDialog({
               </div>
             )}
 
-            {/* ------------------------------------------------------------ */}
-            {/* Real-World Insights (from enrichment)                         */}
-            {/* ------------------------------------------------------------ */}
-            {enrichment && (
-              <>
-                <Separator />
-                <div className="space-y-5">
-                  {/* Section header */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center rounded-lg h-9 w-9 shrink-0 bg-international-orange/10 text-international-orange">
-                      <Factory className="h-4.5 w-4.5" />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold">Real-World Insights</h4>
-                      <p className="text-xs text-muted-foreground">
-                        Aggregated from{' '}
-                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-international-orange border-international-orange/30">
-                          {enrichment.supplier_count} {enrichment.supplier_count === 1 ? 'supplier' : 'suppliers'}
-                        </Badge>
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Article */}
-                  {enrichment.article_markdown && (
-                    <div>
-                      <div
-                        className="prose prose-sm max-w-none text-muted-foreground [&_h1]:text-base [&_h1]:font-semibold [&_h1]:text-foreground [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:text-foreground [&_h3]:text-sm [&_h3]:font-medium [&_h3]:text-foreground [&_p]:text-sm [&_p]:leading-relaxed [&_li]:text-sm [&_strong]:text-foreground"
-                        dangerouslySetInnerHTML={{
-                          __html: enrichment.article_markdown
-                            .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-                            .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-                            .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-                            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                            .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                            .replace(/^- (.*$)/gim, '<li>$1</li>')
-                            .replace(/(<li>[\s\S]*<\/li>)/, '<ul>$1</ul>')
-                            .replace(/\n\n/g, '</p><p>')
-                            .replace(/^(?!<[hul])(.+)$/gim, '<p>$1</p>'),
-                        }}
-                      />
-                    </div>
-                  )}
-
-                  {/* Real-world tolerances */}
-                  {enrichment.real_world_tolerances && (enrichment.real_world_tolerances.min_mm != null || enrichment.real_world_tolerances.typical_mm != null) && (
-                    <div>
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <Ruler className="h-3 w-3" />
-                        Real-World Tolerances
-                      </p>
-                      <div className="grid grid-cols-3 gap-3">
-                        {enrichment.real_world_tolerances.min_mm != null && (
-                          <div className="rounded-lg border p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Best</p>
-                            <p className="text-sm font-semibold">&plusmn;{enrichment.real_world_tolerances.min_mm}mm</p>
-                          </div>
-                        )}
-                        {enrichment.real_world_tolerances.typical_mm != null && (
-                          <div className="rounded-lg border border-international-orange/30 bg-international-orange/5 p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Typical</p>
-                            <p className="text-sm font-semibold text-international-orange">&plusmn;{enrichment.real_world_tolerances.typical_mm}mm</p>
-                          </div>
-                        )}
-                        {enrichment.real_world_tolerances.max_mm != null && (
-                          <div className="rounded-lg border p-3 text-center">
-                            <p className="text-[10px] text-muted-foreground mb-0.5">Widest</p>
-                            <p className="text-sm font-semibold">&plusmn;{enrichment.real_world_tolerances.max_mm}mm</p>
-                          </div>
-                        )}
-                      </div>
-                      {enrichment.real_world_tolerances.notes && (
-                        <p className="text-xs text-muted-foreground mt-1.5 italic">{enrichment.real_world_tolerances.notes}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Equipment in use */}
-                  {enrichment.real_world_equipment.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <Wrench className="h-3 w-3" />
-                        Equipment in Use
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {enrichment.real_world_equipment.map((eq, i) => (
-                          <Badge key={i} variant="secondary" className="text-xs">
-                            {eq.brand_model}
-                            {eq.frequency > 1 && (
-                              <span className="ml-1 text-international-orange">({eq.frequency})</span>
-                            )}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Materials with grades */}
-                  {enrichment.real_world_materials.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <FlaskIcon className="h-3 w-3" />
-                        Materials (Real-World)
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {enrichment.real_world_materials.map((mat, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
-                            {mat.material}
-                            {mat.frequency > 1 && (
-                              <span className="ml-1 text-muted-foreground">({mat.frequency})</span>
-                            )}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Practical tips */}
-                  {enrichment.tips_and_insights.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
-                        <Lightbulb className="h-3 w-3" />
-                        Practical Tips
-                      </p>
-                      <ul className="space-y-1.5">
-                        {enrichment.tips_and_insights.map((tip, i) => (
-                          <li key={i} className="flex items-start gap-2 text-sm">
-                            <span className="text-international-orange shrink-0 mt-0.5 text-xs font-bold">{i + 1}.</span>
-                            <span className="text-muted-foreground">{tip}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Common applications */}
-                  {enrichment.common_applications.length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
-                        Applications (From Suppliers)
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {enrichment.common_applications.map((app, i) => (
-                          <Badge key={i} variant="outline" className="text-xs">
-                            {app}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
           </div>
         </ScrollArea>
 

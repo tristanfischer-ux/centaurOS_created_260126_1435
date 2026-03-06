@@ -125,7 +125,7 @@ export function getStageAccess(
     design: { enabled: true, completed: hasResearch && moduleCount > 0 },
     specify: { enabled: hasResearch && moduleCount > 0, completed: specifiedModuleCount > 0 && specifiedModuleCount === moduleCount },
     source: { enabled: specifiedModuleCount > 0, completed: manufacturingOrderCount > 0 },
-    assemble: { enabled: manufacturingOrderCount > 0, completed: false },
+    assemble: { enabled: hasResearch && moduleCount > 0, completed: manufacturingOrderCount > 0 },
     cad: { enabled: hasResearch && moduleCount > 0, completed: false },
   }
 }

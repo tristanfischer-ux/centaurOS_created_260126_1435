@@ -1,10 +1,11 @@
 /**
- * @file shortlist-coverage-flow.tsx — 2-column SVG: Categories (with parts) → Per-category ranked suppliers.
+ * @file shortlist-coverage-flow.tsx — 2-column SVG: Categories → Horizontal ranked suppliers.
  *
- * @description Left column shows categories with inline parts (same visual treatment
- * as the Suppliers tab right column). Right column shows per-category supplier rankings
- * (1st/2nd/3rd + more options). Click any non-1st supplier to promote it to 1st (swap).
- * Click 1st supplier to de-select. Buy categories show product search results.
+ * @description Left column shows categories with inline parts. Right column shows
+ * per-category supplier rankings in a HORIZONTAL layout: 1st choice prominent on left,
+ * 2nd/3rd extending right, with a "+N more" chip. Click any non-1st supplier to
+ * promote to 1st (swap). Click 1st to de-select. Buy categories show real clickable
+ * product links with prices as HTML overlays.
  *
  * FLOW: source/page.tsx → CadLabShortlist → this component (Shortlist tab)
  */
@@ -12,8 +13,7 @@
 "use client"
 
 import { useMemo, useState, useCallback, useRef, useEffect } from "react"
-import { ExternalLink, Search, Loader2, ChevronDown, ChevronRight } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { ExternalLink, Search, Loader2, Info } from "lucide-react"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
@@ -23,8 +23,8 @@ import {
   type CategorySupplierEntry,
   SANKEY,
   CAT_COLORS,
+  SUPPLIER_BAR,
   moduleColorFn,
-  flowFill,
   flowPath,
   truncate,
   buildSankeyData,
@@ -50,6 +50,8 @@ export interface ShortlistCoverageFlowProps {
   onSearchBuyParts?: () => void
   /** Whether buy search is loading */
   buySearchLoading?: boolean
+  /** Callback: click supplier to view details */
+  onSupplierClick?: (supplierId: string, supplierName?: string) => void
 }
 
 // ─── SVG layout constants ────────────────────────────────────────────
@@ -61,34 +63,28 @@ const PART_LIST_X = 32
 const PART_ROW_H = 13
 const PART_DOT_R = 3
 const CATEGORY_NAME_H = 16
-const RANK_ROW_H = 22
-const RANK_BAR_W = 380
-const RANK_BAR_H = 18
-const RANK_BAR_R = 4
-const MAX_VISIBLE_RANKED = 3
-const MORE_ROW_H = 16
 
 // ─── Layout types ────────────────────────────────────────────────────
 
 interface RankedLayout {
   categories: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }>
-  /** Per-category supplier ranking groups, positioned at matching Y */
+  /** Per-category horizontal supplier groups */
   rankGroups: Array<{
     catId: string
     x: number
     y: number
     entries: Array<CategorySupplierEntry & { rank: number }>
     moreCount: number
-    isExpanded: boolean
   }>
-  /** Buy category product groups */
+  /** Buy category groups (for HTML overlay) */
   buyGroups: Array<{
     catId: string
     x: number
     y: number
+    parts: Array<{ name: string }>
     results: BuyPartSearchResult[]
   }>
-  /** Flow ribbons from category 1st-choice supplier only */
+  /** Flow ribbons from category to 1st-choice supplier */
   flows: Array<{
     catId: string
     x1: number; y1t: number; y1b: number
@@ -104,13 +100,13 @@ export function ShortlistCoverageFlow({
   modules,
   diagnosticAnswers,
   aiCostEstimates,
-  supplierMatches,
   categoryRankings,
   categorySupplierEntries,
   onPromoteSupplier,
   buyPartResults,
   onSearchBuyParts,
   buySearchLoading,
+  onSupplierClick,
 }: ShortlistCoverageFlowProps): React.ReactNode {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [expandedCats, setExpandedCats] = useState<Set<string>>(new Set())
@@ -187,32 +183,29 @@ export function ShortlistCoverageFlow({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        // Buy category — right side shows product results
+        // Buy category — right side shows product results via HTML overlay
         const buyResults = cat.parts
           .map((p) => buyResultsMap.get(p.name))
           .filter((r): r is BuyPartSearchResult => r != null)
 
-        const buyH = buyResults.length > 0
-          ? CATEGORY_NAME_H + buyResults.reduce((acc, r) => acc + PART_ROW_H + r.products.length * PART_ROW_H, 0) + 4
-          : CATEGORY_NAME_H + 20
-
-        const h = Math.max(catPartsH, buyH, SANKEY.BAR_MIN_H)
+        // Height: category name + one supplier bar row (for layout spacing)
+        const buyContentH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
+        const h = Math.max(catPartsH, buyContentH, SANKEY.BAR_MIN_H)
         layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
 
-        if (buyResults.length > 0) {
-          buyGroups.push({
-            catId: cat.id,
-            x: COL_SUPS_X,
-            y: cy,
-            results: buyResults,
-          })
-        }
+        buyGroups.push({
+          catId: cat.id,
+          x: COL_SUPS_X,
+          y: cy,
+          parts: cat.parts.map((p) => ({ name: p.name })),
+          results: buyResults,
+        })
 
         cy += h + SANKEY.CAT_GAP
         continue
       }
 
-      // Make category — right side shows ranked suppliers
+      // Make category — right side shows horizontal ranked suppliers
       const rankedIds = categoryRankings.get(cat.id) ?? []
       const allEntries = categorySupplierEntries.get(cat.id) ?? []
       const isExpanded = expandedCats.has(cat.id)
@@ -236,11 +229,12 @@ export function ShortlistCoverageFlow({
         }
       }
 
-      const visibleCount = isExpanded ? ranked.length : Math.min(ranked.length, MAX_VISIBLE_RANKED)
-      const moreCount = ranked.length - MAX_VISIBLE_RANKED
+      const visibleCount = isExpanded ? ranked.length : Math.min(ranked.length, SUPPLIER_BAR.MAX_VISIBLE)
+      const moreCount = ranked.length - SUPPLIER_BAR.MAX_VISIBLE
       const visibleEntries = ranked.slice(0, visibleCount)
 
-      const rankH = CATEGORY_NAME_H + visibleCount * RANK_ROW_H + (moreCount > 0 && !isExpanded ? MORE_ROW_H : 0) + 4
+      // INTENT: Horizontal layout = one row per category: category name + supplier bar row
+      const rankH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
       const h = Math.max(catPartsH, rankH, SANKEY.BAR_MIN_H)
 
       layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
@@ -251,28 +245,24 @@ export function ShortlistCoverageFlow({
         y: cy,
         entries: visibleEntries,
         moreCount: Math.max(moreCount, 0),
-        isExpanded,
       })
 
       // Flow ribbon from category to 1st-choice supplier position
-      if (rankedIds.length > 0) {
-        const firstEntry = visibleEntries[0]
-        if (firstEntry) {
-          const flowH = Math.min(h * 0.6, 24)
-          const catMidY = cy + h / 2
-          const supY = cy + CATEGORY_NAME_H + RANK_ROW_H / 2
+      if (rankedIds.length > 0 && visibleEntries.length > 0) {
+        const flowH = Math.min(h * 0.6, 24)
+        const catMidY = cy + h / 2
+        const supMidY = cy + CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H / 2
 
-          flows.push({
-            catId: cat.id,
-            x1: COL_CATS_X + SANKEY.BAR_W,
-            y1t: catMidY - flowH / 2,
-            y1b: catMidY + flowH / 2,
-            x2: COL_SUPS_X,
-            y2t: supY - flowH / 2,
-            y2b: supY + flowH / 2,
-            color: barColor,
-          })
-        }
+        flows.push({
+          catId: cat.id,
+          x1: COL_CATS_X + SANKEY.BAR_W,
+          y1t: catMidY - flowH / 2,
+          y1b: catMidY + flowH / 2,
+          x2: COL_SUPS_X,
+          y2t: supMidY - flowH / 2,
+          y2b: supMidY + flowH / 2,
+          color: barColor,
+        })
       }
 
       cy += h + SANKEY.CAT_GAP
@@ -440,7 +430,7 @@ export function ShortlistCoverageFlow({
             })}
           </g>
 
-          {/* Layer 3: Per-category ranked supplier bars */}
+          {/* Layer 3: Horizontal ranked supplier bars */}
           <g>
             {layout.rankGroups.map((group) => {
               const rankId = `rank-${group.catId}`
@@ -462,12 +452,15 @@ export function ShortlistCoverageFlow({
                     {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 40)}
                   </text>
 
-                  {/* Ranked supplier bars */}
+                  {/* Horizontal supplier bars — all on one row */}
                   {group.entries.map((entry, ei) => {
-                    const isFirst = rankedIds[0] === entry.supplierId
-                    const isRanked = rankedIds.includes(entry.supplierId)
-                    const barY = group.y + CATEGORY_NAME_H + ei * RANK_ROW_H
-                    const rankLabel = isRanked
+                    const isFirst = ei === 0 && rankedIds[0] === entry.supplierId
+                    const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
+                    const barX = group.x + (ei === 0
+                      ? 0
+                      : SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP + (ei - 1) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP))
+                    const barY = group.y + CATEGORY_NAME_H
+                    const rankLabel = rankedIds.includes(entry.supplierId)
                       ? `${rankedIds.indexOf(entry.supplierId) + 1}${ordinalSuffix(rankedIds.indexOf(entry.supplierId) + 1)}`
                       : ""
 
@@ -479,22 +472,22 @@ export function ShortlistCoverageFlow({
                         style={{ cursor: "pointer" }}
                         onClick={() => onPromoteSupplier(group.catId, entry.supplierId)}
                       >
-                        {/* Rank bar background */}
+                        {/* Bar background */}
                         <rect
-                          x={group.x}
+                          x={barX}
                           y={barY}
-                          width={RANK_BAR_W}
-                          height={RANK_BAR_H}
+                          width={barW}
+                          height={SUPPLIER_BAR.BAR_H}
                           fill={isFirst ? catColor : "#f1f5f9"}
                           stroke={isFirst ? undefined : "#e2e8f0"}
                           strokeWidth={isFirst ? 0 : 1}
-                          rx={RANK_BAR_R}
+                          rx={SUPPLIER_BAR.BAR_R}
                         />
                         {/* Rank ordinal */}
                         {rankLabel && (
                           <text
-                            x={group.x + 8}
-                            y={barY + 12}
+                            x={barX + 6}
+                            y={barY + 14}
                             fontSize={8}
                             fontWeight={700}
                             fill={isFirst ? "#ffffff" : "#94a3b8"}
@@ -504,64 +497,93 @@ export function ShortlistCoverageFlow({
                         )}
                         {/* Supplier name */}
                         <text
-                          x={group.x + (rankLabel ? 32 : 8)}
-                          y={barY + 12}
+                          x={barX + (rankLabel ? 26 : 6)}
+                          y={barY + 14}
                           fontSize={9}
                           fontWeight={isFirst ? 700 : 500}
                           fill={isFirst ? "#ffffff" : "#334155"}
                         >
-                          {truncate(entry.name, 40)}
-                          <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
+                          {truncate(entry.name, isFirst ? 22 : 12)}
+                          <title>{entry.name} — {Math.round(entry.aggregateScore)}% match · Click to change rank</title>
                         </text>
                         {/* Score */}
                         <text
-                          x={group.x + RANK_BAR_W - 8}
-                          y={barY + 12}
+                          x={barX + barW - (onSupplierClick ? 18 : 6)}
+                          y={barY + 14}
                           fontSize={8}
                           fill={isFirst ? "#ffffffcc" : "#94a3b8"}
                           textAnchor="end"
                         >
                           {Math.round(entry.aggregateScore)}%
-                          {entry.isVerified ? " \u00b7 Verified" : ""}
                         </text>
+                        {/* Info icon — separate click target for supplier details */}
+                        {onSupplierClick && (
+                          <g
+                            style={{ cursor: "pointer" }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onSupplierClick(entry.supplierId, entry.name)
+                            }}
+                          >
+                            <circle
+                              cx={barX + barW - 8}
+                              cy={barY + SUPPLIER_BAR.BAR_H / 2}
+                              r={6}
+                              fill={isFirst ? "rgba(255,255,255,0.2)" : "#e2e8f0"}
+                            />
+                            <text
+                              x={barX + barW - 8}
+                              y={barY + SUPPLIER_BAR.BAR_H / 2 + 3}
+                              fontSize={8}
+                              fontWeight={700}
+                              fill={isFirst ? "#ffffff" : "#64748b"}
+                              textAnchor="middle"
+                            >
+                              i
+                            </text>
+                            <title>View supplier details</title>
+                          </g>
+                        )}
                       </g>
                     )
                   })}
 
-                  {/* "+N more" expander */}
-                  {group.moreCount > 0 && !group.isExpanded && (
+                  {/* "+N more" chip */}
+                  {group.moreCount > 0 && (
                     <g
                       style={{ cursor: "pointer" }}
                       onClick={() => toggleExpanded(group.catId)}
                     >
-                      <text
-                        x={group.x + 8}
-                        y={group.y + CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + 12}
-                        fontSize={8}
-                        fill="#64748b"
-                        opacity={getOpacity(rankId)}
-                        className="transition-opacity duration-200"
-                      >
-                        +{group.moreCount} more option{group.moreCount !== 1 ? "s" : ""}
-                      </text>
-                    </g>
-                  )}
-
-                  {/* Collapse when expanded */}
-                  {group.isExpanded && group.moreCount > 0 && (
-                    <g
-                      style={{ cursor: "pointer" }}
-                      onClick={() => toggleExpanded(group.catId)}
-                    >
-                      <text
-                        x={group.x + 8}
-                        y={group.y + CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + 12}
-                        fontSize={8}
-                        fill="#64748b"
-                        opacity={getOpacity(rankId)}
-                      >
-                        Show less
-                      </text>
+                      {(() => {
+                        const chipX = group.x
+                          + SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP
+                          + Math.max(0, Math.min(group.entries.length - 1, SUPPLIER_BAR.MAX_VISIBLE - 1)) * (SUPPLIER_BAR.BACKUP_W + SUPPLIER_BAR.BAR_GAP)
+                        const chipY = group.y + CATEGORY_NAME_H
+                        return (
+                          <>
+                            <rect
+                              x={chipX}
+                              y={chipY}
+                              width={SUPPLIER_BAR.MORE_W}
+                              height={SUPPLIER_BAR.BAR_H}
+                              fill="#f8fafc"
+                              stroke="#e2e8f0"
+                              strokeWidth={1}
+                              rx={SUPPLIER_BAR.BAR_R}
+                            />
+                            <text
+                              x={chipX + SUPPLIER_BAR.MORE_W / 2}
+                              y={chipY + 14}
+                              fontSize={8}
+                              fill="#64748b"
+                              textAnchor="middle"
+                              opacity={getOpacity(rankId)}
+                            >
+                              +{group.moreCount} more
+                            </text>
+                          </>
+                        )
+                      })()}
                     </g>
                   )}
 
@@ -569,8 +591,8 @@ export function ShortlistCoverageFlow({
                   <rect
                     x={group.x - 4}
                     y={group.y - 2}
-                    width={RANK_BAR_W + 8}
-                    height={CATEGORY_NAME_H + group.entries.length * RANK_ROW_H + (group.moreCount > 0 ? MORE_ROW_H : 0) + 8}
+                    width={VB_W - group.x}
+                    height={CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 12}
                     fill="transparent"
                     onMouseEnter={() => setHoveredId(rankId)}
                     onMouseLeave={() => setHoveredId(null)}
@@ -580,98 +602,93 @@ export function ShortlistCoverageFlow({
               )
             })}
           </g>
-
-          {/* Layer 4: Buy category product groups */}
-          <g>
-            {layout.buyGroups.map((group) => {
-              let py = group.y + CATEGORY_NAME_H
-              return (
-                <g key={`buy-${group.catId}`}>
-                  <text
-                    x={group.x}
-                    y={group.y + 12}
-                    fontSize={9}
-                    fontWeight={600}
-                    fill="#64748b"
-                  >
-                    Product Links
-                  </text>
-                  {group.results.map((result, ri) => {
-                    const startY = py
-                    py += PART_ROW_H // part name row
-                    const productRows = result.products.map((product, pri) => {
-                      const rowY = py
-                      py += PART_ROW_H
-                      return (
-                        <g key={`${ri}-${pri}`}>
-                          <text
-                            x={group.x + 16}
-                            y={rowY + 3}
-                            fontSize={8}
-                            fill="#0891b2"
-                            style={{ cursor: "pointer" }}
-                            textDecoration="underline"
-                            onClick={() => window.open(product.url, "_blank", "noopener,noreferrer")}
-                          >
-                            {truncate(product.source, 20)}
-                            {product.estimatedPrice ? ` ${product.estimatedPrice}` : ""}
-                          </text>
-                        </g>
-                      )
-                    })
-                    return (
-                      <g key={ri}>
-                        <text
-                          x={group.x + 4}
-                          y={startY + 3}
-                          fontSize={9}
-                          fontWeight={500}
-                          fill="#334155"
-                        >
-                          {truncate(result.partName, 45)}
-                        </text>
-                        {productRows}
-                      </g>
-                    )
-                  })}
-                </g>
-              )
-            })}
-          </g>
         </svg>
 
-        {/* HTML overlay: "Search Products" button for buy categories */}
-        {onSearchBuyParts && (
-          <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-            {layout.categories
-              .filter((c) => c.type === "buy")
-              .map((c) => {
-                const hasResults = layout.buyGroups.some((g) => g.catId === c.id && g.results.length > 0)
-                if (hasResults) return null
-                return (
-                  <button
-                    key={`buy-btn-${c.id}`}
-                    className="absolute pointer-events-auto flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors"
-                    style={{
-                      left: COL_SUPS_X * svgScale,
-                      top: (c.y + c.h / 2 - 6) * svgScale,
-                      transform: `scale(${Math.min(svgScale, 1)})`,
-                      transformOrigin: "left top",
-                    }}
-                    onClick={onSearchBuyParts}
-                    disabled={buySearchLoading}
-                  >
-                    {buySearchLoading ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Search className="h-3 w-3" />
+        {/* HTML overlay: Buy category product links */}
+        <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
+          {layout.buyGroups.map((group) => {
+            const hasResults = group.results.length > 0
+            return (
+              <div
+                key={`buy-${group.catId}`}
+                className="absolute pointer-events-auto"
+                style={{
+                  left: group.x * svgScale,
+                  top: group.y * svgScale,
+                  transform: `scale(${Math.min(svgScale, 1)})`,
+                  transformOrigin: "left top",
+                  maxWidth: (VB_W - group.x) * svgScale,
+                }}
+              >
+                <p className="text-[9px] font-semibold text-muted-foreground mb-1">
+                  Buy · Off-the-shelf
+                </p>
+
+                {hasResults ? (
+                  <div className="space-y-2">
+                    {group.results.map((result, ri) => (
+                      <div key={ri}>
+                        <p className="text-[10px] font-medium text-foreground">{result.partName}</p>
+                        <div className="ml-2 space-y-0.5">
+                          {result.products.map((product, pi) => (
+                            <a
+                              key={pi}
+                              href={product.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-[9px] text-info hover:text-info/80 transition-colors"
+                            >
+                              <ExternalLink className="h-2.5 w-2.5 flex-shrink-0" />
+                              <span>{product.source}</span>
+                              {product.estimatedPrice && (
+                                <span className="font-mono font-medium">{product.estimatedPrice}</span>
+                              )}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {/* Re-search button */}
+                    {onSearchBuyParts && (
+                      <button
+                        className="flex items-center gap-1 text-[9px] text-international-orange hover:text-international-orange/80 transition-colors mt-1"
+                        onClick={onSearchBuyParts}
+                        disabled={buySearchLoading}
+                      >
+                        {buySearchLoading ? (
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        ) : (
+                          <Search className="h-2.5 w-2.5" />
+                        )}
+                        Search Again
+                      </button>
                     )}
-                    {buySearchLoading ? "Searching…" : "Search Products"}
-                  </button>
-                )
-              })}
-          </div>
-        )}
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {group.parts.map((part, pi) => (
+                      <p key={pi} className="text-[9px] text-muted-foreground">{part.name}</p>
+                    ))}
+                    {onSearchBuyParts && (
+                      <button
+                        className="flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors mt-1"
+                        onClick={onSearchBuyParts}
+                        disabled={buySearchLoading}
+                      >
+                        {buySearchLoading ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Search className="h-3 w-3" />
+                        )}
+                        {buySearchLoading ? "Searching…" : "Search Products"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

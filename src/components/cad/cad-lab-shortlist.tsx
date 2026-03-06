@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useEffect, useMemo, useState, useCallback } from "react"
+import { useEffect, useMemo, useState, useCallback, useRef } from "react"
 import {
   ListChecks,
   Copy,
@@ -25,6 +25,8 @@ import {
   BadgeCheck,
   X,
   Users,
+  Search,
+  Loader2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -39,6 +41,8 @@ import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import type { CategorySupplierEntry } from "@/lib/sankey-utils"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import { ShortlistCoverageFlow } from "./shortlist-coverage-flow"
+import { SupplierDetailDialog } from "./supplier-detail-dialog"
+import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
 import { createCadLabRfqAction } from "@/actions/cad-lab-rfq"
 import { getRFQDetail } from "@/actions/rfq"
 import { createOrderFromAward } from "@/actions/manufacturing-orders"
@@ -91,6 +95,10 @@ interface CadLabShortlistProps {
   onSearchBuyParts?: () => void
   /** Whether buy search is loading */
   buySearchLoading?: boolean
+  /** Whether "Match All Modules" is loading */
+  matchAllLoading?: boolean
+  /** Trigger match-all supplier search */
+  onMatchAll?: () => void
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -143,11 +151,40 @@ export function CadLabShortlist({
   buyPartResults,
   onSearchBuyParts,
   buySearchLoading,
+  matchAllLoading,
+  onMatchAll,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
   const [deadline, setDeadline] = useState("")
   const [specialTerms, setSpecialTerms] = useState("")
+
+  // ── Supplier detail dialog state ──
+  const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null)
+  const [detailSupplierName, setDetailSupplierName] = useState<string | undefined>()
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const supplierDetailCache = useRef<Map<string, SupplierDetail>>(new Map())
+
+  const handleOpenSupplierDetail = useCallback((supplierId: string, name?: string) => {
+    setDetailSupplierId(supplierId)
+    setDetailSupplierName(name)
+    setDetailDialogOpen(true)
+  }, [])
+
+  // ── Auto-trigger buy part search on mount if results are empty ──
+  const buyAutoSearchRef = useRef(false)
+
+  useEffect(() => {
+    if (
+      !buyAutoSearchRef.current &&
+      onSearchBuyParts &&
+      (!buyPartResults || buyPartResults.length === 0) &&
+      !buySearchLoading
+    ) {
+      buyAutoSearchRef.current = true
+      onSearchBuyParts()
+    }
+  }, [onSearchBuyParts, buyPartResults, buySearchLoading])
 
   // ── Per-supplier expanded document state ──
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null)
@@ -367,15 +404,29 @@ export function CadLabShortlist({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          <ListChecks className="h-4 w-4" />
-          Supplier Shortlist
-          {suppliers.length > 0 && (
-            <span className="text-xs font-normal text-muted-foreground">
-              {suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}
-            </span>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ListChecks className="h-4 w-4" />
+            Supplier Shortlist
+            {suppliers.length > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">
+                {suppliers.length} supplier{suppliers.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </CardTitle>
+          {onMatchAll && (
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5 h-7 text-xs"
+              onClick={onMatchAll}
+              disabled={matchAllLoading || modules.length === 0}
+            >
+              {matchAllLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+              {matchAllLoading ? "Matching…" : "Re-match All"}
+            </Button>
           )}
-        </CardTitle>
+        </div>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* ── Shared buyer details form ── */}
@@ -431,6 +482,7 @@ export function CadLabShortlist({
             buyPartResults={buyPartResults}
             onSearchBuyParts={onSearchBuyParts}
             buySearchLoading={buySearchLoading}
+            onSupplierClick={handleOpenSupplierDetail}
           />
         )}
 
@@ -473,9 +525,16 @@ export function CadLabShortlist({
                     ) : (
                       <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
-                    <span className="text-sm font-semibold text-foreground truncate">
+                    <button
+                      type="button"
+                      className="text-sm font-semibold text-foreground truncate hover:text-international-orange transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenSupplierDetail(supplier.id, supplier.name)
+                      }}
+                    >
                       {supplier.name}
-                    </span>
+                    </button>
                     {supplier.isVerified && (
                       <BadgeCheck className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
                     )}
@@ -715,6 +774,15 @@ export function CadLabShortlist({
           </div>
         )}
       </CardContent>
+
+      {/* Supplier detail dialog */}
+      <SupplierDetailDialog
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        supplierId={detailSupplierId}
+        supplierName={detailSupplierName}
+        cache={supplierDetailCache}
+      />
     </Card>
   )
 }

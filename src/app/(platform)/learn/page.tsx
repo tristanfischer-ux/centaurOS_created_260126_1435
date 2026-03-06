@@ -3,6 +3,8 @@ import { LearnPage } from './learn-page'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getAdvisoryQuestions } from '@/actions/advisory'
 import { getTutorials, type TutorialListItem } from '@/actions/tutorials'
+import { getAllTechniqueEnrichments } from '@/actions/manufacturing-techniques'
+import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 
 export const metadata = {
   title: 'Inspiration | ForgeOS',
@@ -14,9 +16,10 @@ export const metadata = {
 // content (packs, projects, subsystems) is on /playbooks.
 
 async function LearnData(): Promise<React.ReactElement> {
-  const [tutorialsResult, questionsResult] = await Promise.all([
+  const [tutorialsResult, questionsResult, enrichments] = await Promise.all([
     getTutorials({ pageSize: 50 }),
     getAdvisoryQuestions({ limit: 50 }),
+    getAllTechniqueEnrichments(),
   ])
 
   const tutorials: TutorialListItem[] = 'data' in tutorialsResult ? tutorialsResult.data : []
@@ -44,6 +47,7 @@ async function LearnData(): Promise<React.ReactElement> {
     <LearnPage
       tutorials={tutorials}
       questions={transformedQuestions}
+      enrichments={enrichments}
     />
   )
 }

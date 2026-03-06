@@ -67,15 +67,19 @@ export function TechniquesExplorer() {
   // Saved techniques (localStorage-backed)
   const { savedIds, savedCount, toggleSaved, isSaved } = useSavedTechniques()
 
-  // Enrichment supplier counts (from Supabase)
+  // Enrichment supplier counts + enriched slugs (from Supabase)
   const [supplierCounts, setSupplierCounts] = useState<Record<string, number>>({})
+  const [enrichedSlugs, setEnrichedSlugs] = useState<Set<string>>(new Set())
   useEffect(() => {
     getAllTechniqueEnrichments().then(enrichments => {
       const counts: Record<string, number> = {}
+      const slugs = new Set<string>()
       for (const e of enrichments) {
         if (e.supplier_count > 0) counts[e.technique_slug] = e.supplier_count
+        slugs.add(e.technique_slug)
       }
       setSupplierCounts(counts)
+      setEnrichedSlugs(slugs)
     })
   }, [])
 
@@ -328,6 +332,7 @@ export function TechniquesExplorer() {
               isSaved={isSaved(technique.id)}
               onSaveToggle={toggleSaved}
               supplierCount={supplierCounts[technique.slug]}
+              hasEnrichment={enrichedSlugs.has(technique.slug)}
             />
           ))}
         </div>

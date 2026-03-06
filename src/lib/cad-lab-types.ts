@@ -152,7 +152,7 @@ export interface EarlyCostEstimate {
 
 /** SSE event types for streaming module generation progress */
 export type GenerationEvent =
-  | { type: "status"; step: "interface" | "codegen" | "modal" | "upload"; attempt?: number }
+  | { type: "status"; step: "interface" | "codegen" | "modal" | "zoo" | "upload"; attempt?: number }
   | { type: "validation"; findings: PreExecValidationResult[] }
   | { type: "cost_estimate"; estimate: EarlyCostEstimate }
   | { type: "progress"; message: string }

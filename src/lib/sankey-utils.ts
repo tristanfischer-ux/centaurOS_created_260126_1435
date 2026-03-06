@@ -80,6 +80,17 @@ export const SANKEY = {
   LABEL_OFFSET_RIGHT: 22,
 } as const
 
+/** Horizontal supplier bar sizing — shared by Shortlist and Costs diagrams */
+export const SUPPLIER_BAR = {
+  FIRST_W: 220,    // 1st choice: wider bar
+  BACKUP_W: 130,   // 2nd/3rd: narrower
+  MORE_W: 80,      // "+N more" chip
+  BAR_H: 22,       // All bars same height
+  BAR_GAP: 6,      // Horizontal gap
+  BAR_R: 4,        // Border radius
+  MAX_VISIBLE: 3,  // Show max 3 before collapsing
+} as const
+
 // Muted category color palette — shared by both Suppliers and Shortlist diagrams
 export const CAT_COLORS = [
   "#6366f1", "#0891b2", "#059669", "#d97706", "#dc2626",

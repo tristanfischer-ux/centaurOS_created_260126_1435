@@ -92,13 +92,26 @@ const MAX_CONCURRENCY = 2
 // ─── Extract executive summary from research report markdown ─────────
 
 function extractExecutiveSummary(report: string): string | null {
-  const startMatch = report.match(/^##\s+Executive\s+Summary/im)
-  if (!startMatch || startMatch.index === undefined) return null
-  const afterHeading = report.slice(startMatch.index + startMatch[0].length)
-  const nextHeading = afterHeading.search(/^##\s/m)
-  const body = nextHeading === -1 ? afterHeading : afterHeading.slice(0, nextHeading)
-  const trimmed = body.trim()
-  return trimmed.length > 0 ? trimmed : null
+  // Try exact "## Executive Summary" heading first
+  const startMatch = report.match(/^##?\s+Executive\s+Summary/im)
+  if (startMatch && startMatch.index !== undefined) {
+    const afterHeading = report.slice(startMatch.index + startMatch[0].length)
+    const nextHeading = afterHeading.search(/^##?\s/m)
+    const body = nextHeading === -1 ? afterHeading : afterHeading.slice(0, nextHeading)
+    const trimmed = body.trim()
+    if (trimmed.length > 0) return trimmed
+  }
+
+  // Fallback: first substantial paragraph of the report (skip headings and short lines)
+  const lines = report.split("\n")
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.length > 80 && !trimmed.startsWith("#")) return trimmed
+  }
+
+  // Last resort: first 500 chars of the report, stripped of markdown headings
+  const stripped = report.replace(/^#+\s+.*/gm, "").trim()
+  return stripped.length > 0 ? stripped.slice(0, 500) : null
 }
 
 // ─── Context Shape ───────────────────────────────────────────────────
@@ -788,7 +801,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   useEffect(() => { activeProjectIdRef.current = activeProjectId }, [activeProjectId])
 
   // INTENT: Prevents auto-restore from firing twice in React StrictMode.
-  const autoRestoreRef = useRef(false)
+  const isRestoringRef = useRef(false)
 
   // INTENT: Tracks whether research JUST completed in this session (vs loaded from a saved project).
   // Only set to true at the end of handleResearch — never during handleLoadProject.
@@ -2568,6 +2581,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if ("error" in res) return
 
       const p = res.project
+      console.log("[CAD-LAB] Loaded project:", {
+        id: p.id,
+        subject: p.subject?.slice(0, 40),
+        hasResearch: !!p.research,
+        moduleCount: p.modules?.length ?? 0,
+        hasVisualStyle: !!p.visualStyle,
+        hasIllustration: !!p.systemIllustrationUrl,
+        hasOverview: !!p.productOverview,
+      })
       setSubject(p.subject)
       // DECISION: Do NOT restore modelId from saved project — Opus is the immutable default.
       // Loading a project should not override the user's current model selection.
@@ -2707,23 +2729,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // activeProjectId initializes to null and nothing triggers a load.
   //
   // DECISION: Uses activeProjectId in deps so it re-fires when state is lost.
-  // The `autoRestoreRef` prevents double-fire in React StrictMode (cleared after
-  // 100ms so subsequent legitimate restores still work).
+  // The `isRestoringRef` guard stays true while the async load is in-flight,
+  // preventing StrictMode double-fire without relying on fragile timers.
   useEffect(() => {
     if (!initialized) return
     if (typeof window === "undefined") return
-    // Only restore when activeProjectId is null (state lost or fresh init)
     if (activeProjectId) return
-    // StrictMode guard — prevent double-fire within the same tick
-    if (autoRestoreRef.current) return
-    autoRestoreRef.current = true
-    // Reset guard after StrictMode's double-invoke window
-    const resetTimer = setTimeout(() => { autoRestoreRef.current = false }, 100)
+    if (isRestoringRef.current) return
+
     const storedProjectId = localStorage.getItem(CAD_LAB_ACTIVE_PROJECT_KEY)
     if (storedProjectId) {
-      handleLoadProject(storedProjectId)
+      isRestoringRef.current = true
+      handleLoadProject(storedProjectId).finally(() => {
+        isRestoringRef.current = false
+      })
     }
-    return () => clearTimeout(resetTimer)
   }, [initialized, activeProjectId, handleLoadProject])
 
   // ── Delete a project ──
@@ -3038,9 +3058,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 const event = JSON.parse(line.slice(6)) as { type: string; step?: string; message?: string; result?: CadLabResult; code?: string }
                 if (event.type === "status") {
                   const stepLabels: Record<string, string> = {
-                    interface: "Synthesizing interface definitions...",
+                    interface: "Preparing geometry specification...",
                     codegen: "Generating CadQuery code...",
-                    modal: "Executing CAD model on Modal...",
+                    modal: "Executing CAD model...",
+                    zoo: "Generating parametric model via Zoo.dev...",
                     upload: "Uploading assets...",
                   }
                   const label = event.step ? stepLabels[event.step] : undefined

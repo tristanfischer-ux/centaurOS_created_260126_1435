@@ -205,25 +205,40 @@ export default function SourcePage(): React.ReactNode {
     [sankeyCategories, supplierMatches],
   )
 
-  const handlePromoteSupplier = useCallback((categoryId: string, supplierId: string) => {
+  // INTENT: Clicking a supplier cycles its rank: unranked→1st→2nd→3rd→unranked.
+  // Max 3 ranked per category. If a slot is occupied, the displaced supplier shifts down.
+  const handlePromoteSupplier = useCallback((categoryId: string, supplierId: string, targetRank?: number) => {
     setCategoryRankings((prev) => {
       const next = new Map(prev)
       const current = [...(next.get(categoryId) ?? [])]
       const idx = current.indexOf(supplierId)
 
-      if (idx === 0) {
-        // Already 1st — remove (de-select)
-        current.splice(0, 1)
-      } else if (idx > 0) {
-        // Ranked but not 1st — swap to position 0
-        current.splice(idx, 1)
-        current.unshift(supplierId)
-      } else {
-        // Not ranked — insert at position 0
-        current.unshift(supplierId)
+      if (targetRank != null) {
+        // Explicit rank target (0-indexed): remove from current position and insert
+        if (idx >= 0) current.splice(idx, 1)
+        current.splice(targetRank, 0, supplierId)
+        // Cap at 3
+        next.set(categoryId, current.slice(0, 3))
+        return next
       }
 
-      next.set(categoryId, current)
+      // Cycle: unranked → 1st(0) → 2nd(1) → 3rd(2) → unranked
+      if (idx < 0) {
+        // Not ranked → insert at position 0 (1st)
+        current.unshift(supplierId)
+        // Cap at 3
+        next.set(categoryId, current.slice(0, 3))
+      } else if (idx < 2 && current.length > idx + 1) {
+        // Ranked at 1st or 2nd with room to demote → move down one position
+        current.splice(idx, 1)
+        current.splice(idx + 1, 0, supplierId)
+        next.set(categoryId, current.slice(0, 3))
+      } else {
+        // Already at 3rd (or only entry) → remove (unranked)
+        current.splice(idx, 1)
+        next.set(categoryId, current)
+      }
+
       return next
     })
   }, [setCategoryRankings])
@@ -418,6 +433,22 @@ export default function SourcePage(): React.ReactNode {
     [router, searchParams],
   )
 
+  // ── Auto-match on Shortlist tab load ──
+  const autoMatchTriggeredRef = useRef(false)
+
+  useEffect(() => {
+    if (
+      activeTab === "shortlist" &&
+      supplierMatches.size === 0 &&
+      eligibleModules.length > 0 &&
+      !matchAllLoading &&
+      !autoMatchTriggeredRef.current
+    ) {
+      autoMatchTriggeredRef.current = true
+      handleMatchAll()
+    }
+  }, [activeTab, supplierMatches.size, eligibleModules.length, matchAllLoading, handleMatchAll])
+
   // ── Screen context ──
   useRegisterScreenContext(
     useMemo(() => ({
@@ -492,11 +523,6 @@ export default function SourcePage(): React.ReactNode {
                 modules={eligibleModules}
                 diagnosticAnswers={diagnosticAnswers}
                 aiCostEstimates={aiCostEstimates}
-                supplierMatches={supplierMatches}
-                loadingModules={loadingModules}
-                matchAllLoading={matchAllLoading}
-                onMatchModule={handleMatchModule}
-                onMatchAll={handleMatchAll}
               />
             )}
 
@@ -548,6 +574,8 @@ export default function SourcePage(): React.ReactNode {
               buyPartResults={buyPartResults}
               onSearchBuyParts={handleSearchBuyParts}
               buySearchLoading={buySearchLoading}
+              matchAllLoading={matchAllLoading}
+              onMatchAll={handleMatchAll}
             />
           </motion.div>
         )}
@@ -561,6 +589,10 @@ export default function SourcePage(): React.ReactNode {
               shortlistedSupplierCount={shortlistedSuppliers.size}
               aiCostEstimates={aiCostEstimates}
               isEstimatingCosts={isEstimatingCosts}
+              supplierMatches={supplierMatches}
+              categoryRankings={categoryRankings}
+              categorySupplierEntries={categorySupplierEntries}
+              buyPartResults={buyPartResults}
               onCostOverride={(moduleId, overrides) => {
                 setModules(prev => prev.map(m =>
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m

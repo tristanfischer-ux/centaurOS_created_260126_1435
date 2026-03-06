@@ -30,7 +30,9 @@ import { typography } from '@/lib/design-system'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { TechniquesExplorer } from '@/components/techniques'
+import { InsightsExplorer } from '@/components/techniques/insights-explorer'
 import { ALL_TECHNIQUES } from '@/lib/manufacturing-techniques'
+import type { TechniqueEnrichment } from '@/types/manufacturing-techniques'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/ui/empty-state'
 import { QuestionCard } from '@/components/advisory/question-card'
@@ -53,7 +55,7 @@ import {
 // Tab definitions
 // ---------------------------------------------------------------------------
 
-type LearnTabId = 'techniques' | 'tutorials' | 'qa'
+type LearnTabId = 'techniques' | 'insights' | 'tutorials' | 'qa'
 
 interface Tab {
   id: LearnTabId
@@ -71,11 +73,13 @@ interface Tab {
 interface LearnPageProps {
   tutorials?: TutorialListItem[]
   questions?: Question[]
+  enrichments?: TechniqueEnrichment[]
 }
 
 export function LearnPage({
   tutorials = [],
   questions = [],
+  enrichments = [],
 }: LearnPageProps) {
   const [activeTab, setActiveTab] = useState<LearnTabId>('techniques')
 
@@ -162,6 +166,14 @@ export function LearnPage({
       activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
     },
     {
+      id: 'insights',
+      label: 'Real-World Insights',
+      icon: Factory,
+      count: enrichments.length,
+      iconColor: 'text-international-orange',
+      activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
+    },
+    {
       id: 'tutorials',
       label: 'Tutorials & Guides',
       icon: BookOpen,
@@ -177,7 +189,7 @@ export function LearnPage({
       iconColor: 'text-chart-5',
       activeClasses: 'bg-chart-5/10 text-chart-5 border-chart-5',
     },
-  ], [tutorials.length, questions.length])
+  ], [tutorials.length, questions.length, enrichments.length])
 
   // ---------------------------------------------------------------------------
   // Render
@@ -246,6 +258,11 @@ export function LearnPage({
       {/* TECHNIQUES tab                                                     */}
       {/* ================================================================== */}
       {activeTab === 'techniques' && <TechniquesExplorer />}
+
+      {/* ================================================================== */}
+      {/* INSIGHTS tab                                                       */}
+      {/* ================================================================== */}
+      {activeTab === 'insights' && <InsightsExplorer enrichments={enrichments} />}
 
       {/* ================================================================== */}
       {/* TUTORIALS tab                                                      */}

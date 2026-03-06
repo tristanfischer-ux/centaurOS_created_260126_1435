@@ -28,6 +28,7 @@ import {
   PoundSterling,
   Check,
   Heart,
+  Factory,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -107,6 +108,8 @@ interface TechniqueCardProps {
   onSaveToggle?: (techniqueId: string) => void
   /** Number of real-world suppliers offering this technique (from enrichment) */
   supplierCount?: number
+  /** Whether this technique has enrichment data from real suppliers */
+  hasEnrichment?: boolean
   /** Additional CSS classes */
   className?: string
 }
@@ -120,6 +123,7 @@ export function TechniqueCard({
   isSaved = false,
   onSaveToggle,
   supplierCount,
+  hasEnrichment = false,
   className,
 }: TechniqueCardProps) {
   const Icon = CATEGORY_ICONS[technique.category]
@@ -138,6 +142,7 @@ export function TechniqueCard({
         'cursor-pointer transition-all duration-200',
         'hover:shadow-lg hover:-translate-y-0.5',
         'border hover:border-international-orange/30',
+        hasEnrichment && 'border-l-[3px] border-l-international-orange',
         selectable && selected && 'border-international-orange ring-1 ring-international-orange/30',
         className,
       )}
@@ -226,12 +231,16 @@ export function TechniqueCard({
           )}
         </div>
 
-        {/* Supplier count badge */}
-        {supplierCount != null && supplierCount > 0 && (
-          <div className="flex items-center gap-1">
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-international-orange border-international-orange/30">
-              {supplierCount} {supplierCount === 1 ? 'supplier' : 'suppliers'}
-            </Badge>
+        {/* Enrichment indicator */}
+        {hasEnrichment && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-international-orange/5">
+            <Factory className="h-3 w-3 text-international-orange shrink-0" />
+            <span className="text-[10px] font-medium text-international-orange">Real-world data</span>
+            {supplierCount != null && supplierCount > 0 && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 ml-auto text-international-orange border-international-orange/30">
+                {supplierCount} {supplierCount === 1 ? 'supplier' : 'suppliers'}
+              </Badge>
+            )}
           </div>
         )}
 

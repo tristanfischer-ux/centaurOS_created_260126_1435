@@ -11,7 +11,7 @@
  * description, key parts, editable diagnostics, contracts, failure modes, and
  * cost estimates all in one place.
  *
- * 4 tabs: Overview, Module Specs, Specialist Review, Costings.
+ * 3 tabs: Overview, Module Specs, Specialist Review.
  *
  * Gate: redirects to /the-forge/cad-lab (Design stage) if no research/modules exist.
  */
@@ -37,8 +37,6 @@ import {
   PlayCircle,
   XCircle,
   ClipboardCheck,
-  Lock,
-  PoundSterling,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -61,7 +59,6 @@ import {
   inferRecommendations,
   inferRecommendationsWithReasons,
 } from "@/components/cad/cad-lab-diagnostics"
-import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
 import { SpecialistReviewPanel } from "@/components/cad/specialist-review-panel"
 import { ModuleFlowCanvas } from "../components/module-flow-canvas"
 import { ProductOverviewCard } from "../components/product-overview-card"
@@ -141,8 +138,6 @@ export default function SpecifyPage(): React.ReactNode {
     unmatchedPorts,
     earlyCostEstimates,
     aiCostEstimates,
-    isEstimatingCosts,
-    costEstimationError,
     activeProjectId,
     generatingModuleIds,
     researchModelUsed, decompositionModelUsed,
@@ -268,32 +263,8 @@ export default function SpecifyPage(): React.ReactNode {
   }, [moduleStatuses, modules, setModules])
 
   // ── Gate: can proceed to Source? ──
-  // INTENT: Full pipeline — diagnostics + reviews + costings all done before sourcing.
-  const costingGateMet = (allModulesReviewed || reviewSkipped) && !imagesStale && !isRegeneratingImages
-  const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped) && Object.keys(aiCostEstimates).length > 0
-
-  // ── Finalize summary: manufacturing process & material breakdown ──
-  const finalizeSummary = useMemo(() => {
-    if (!canProceedToSource) return null
-    const processCounts: Record<string, number> = {}
-    const materials = new Set<string>()
-    for (const mod of modules) {
-      const answers = diagnosticAnswers[mod.id] || {}
-      const proc = answers.mfg_process?.trim()
-      const mat = answers.material?.trim()
-      if (proc) {
-        processCounts[proc] = (processCounts[proc] || 0) + 1
-      }
-      if (mat) materials.add(mat)
-    }
-    const processEntries = Object.entries(processCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => `${name} (${count})`)
-    return {
-      processBreakdown: processEntries.join(", ") || "Not specified",
-      materials: Array.from(materials).join(", ") || "Not specified",
-    }
-  }, [canProceedToSource, modules, diagnosticAnswers])
+  // INTENT: Full pipeline — diagnostics + reviews done before sourcing. Costings live in Source/Assemble.
+  const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped)
 
   // ── Batch review orchestrator ──
   // INTENT: Sequential auto-review of all unreviewed modules. Reuses SpecialistReviewPanel's
@@ -367,7 +338,6 @@ export default function SpecifyPage(): React.ReactNode {
     { id: "overview", label: "Overview" },
     { id: "specs", label: "Module Specs" },
     { id: "review", label: "Specialist Review" },
-    { id: "costing", label: "Costings" },
   ]
 
   const [activeTab, setActiveTab] = useState("overview")
@@ -455,29 +425,20 @@ export default function SpecifyPage(): React.ReactNode {
       {/* ── Tab navigation ── */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
         <div className="flex items-center gap-2">
-          {TABS.map((tab) => {
-            const isCostingLocked = tab.id === "costing" && !costingGateMet
-            return (
-              <button
-                key={tab.id}
-                onClick={() => !isCostingLocked && handleTabClick(tab.id)}
-                disabled={isCostingLocked}
-                className={cn(
-                  "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
-                  isCostingLocked
-                    ? "text-muted-foreground/50 cursor-not-allowed"
-                    : activeTab === tab.id
-                      ? "bg-international-orange text-primary-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
-                )}
-              >
-                <span className="flex items-center gap-1.5">
-                  {isCostingLocked && <Lock className="h-3 w-3" />}
-                  {tab.label}
-                </span>
-              </button>
-            )
-          })}
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabClick(tab.id)}
+              className={cn(
+                "px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors",
+                activeTab === tab.id
+                  ? "bg-international-orange text-primary-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </nav>
 
@@ -1193,8 +1154,8 @@ export default function SpecifyPage(): React.ReactNode {
                         {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
                       </p>
                     </div>
-                    <Button onClick={() => handleTabClick("costing")} className="gap-1.5">
-                      View Costings
+                    <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
+                      Continue to Source
                       <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
@@ -1231,78 +1192,6 @@ export default function SpecifyPage(): React.ReactNode {
           </motion.div>
         )}
 
-        {/* ═══ Costings tab ═══ */}
-        {activeTab === "costing" && (
-          <motion.div key="costing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-            {/* Header */}
-            <Card className="border-border">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-2">
-                  <PoundSterling className="h-4 w-4 text-international-orange" />
-                  <div>
-                    <h2 className="text-sm font-semibold text-foreground">Cost Estimation</h2>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {designRevision > 1
-                        ? `Based on specialist-reviewed specifications (v${designRevision}).`
-                        : "Based on your module specifications and diagnostics."}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Cost estimate component (moved from Module Specs tab) */}
-            <CadLabCostEstimate
-              modules={modules}
-              diagnosticAnswers={diagnosticAnswers}
-              earlyCostEstimates={earlyCostEstimates}
-              aiCostEstimates={aiCostEstimates}
-              isEstimatingCosts={isEstimatingCosts}
-              costEstimationError={costEstimationError}
-              onCostOverride={(moduleId, overrides) => {
-                setModules(prev => prev.map(m =>
-                  m.id === moduleId ? { ...m, costOverrides: overrides } : m
-                ))
-              }}
-            />
-
-            {/* Continue to Source CTA */}
-            {canProceedToSource && finalizeSummary ? (
-              <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          Design finalized
-                          {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          All {diagStats.totalModules} module{diagStats.totalModules !== 1 ? "s" : ""} specified, reviewed, and costed.
-                        </p>
-                      </div>
-                    </div>
-                    <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
-                      Continue to Source
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-border">
-                <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">
-                    {isEstimatingCosts
-                      ? "Estimating costs..."
-                      : "Cost estimates will appear once the AI analysis completes."}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </motion.div>
-        )}
 
       </AnimatePresence>
     </div>

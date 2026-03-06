@@ -3,10 +3,9 @@
 /**
  * @file cad/page.tsx — The Forge: CAD stage (Stage 5).
  *
- * @description Unified CAD generation page. Generates a single CadQuery model
- * for the entire product instead of per-module models. Module decomposition is
- * shown as collapsible context, and all interactive features (code editor,
- * parameter sliders, refinement chat) work on the unified model.
+ * @description Unified CAD generation page. Generates a parametric CAD model
+ * via Zoo.dev for the entire product. Module decomposition is shown as
+ * collapsible context.
  *
  * Pipeline: Design → Specify → Source → Assemble → **CAD**
  *
@@ -54,11 +53,10 @@ export default function CadStagePage(): React.ReactNode {
     progressLines,
     // Unified generation
     unifiedResult,
-    unifiedCode,
     isGeneratingUnified,
     handleGenerateUnifiedModel,
-    handleExecuteUnifiedCode,
-    handleRefineUnifiedCode,
+    visualStyle,
+    systemIllustrationStatus,
   } = useCadLab()
 
   // INTENT: CAD stage gate — mirrors getStageAccess() logic.
@@ -72,18 +70,11 @@ export default function CadStagePage(): React.ReactNode {
   // ── Local UI state ──
   const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
-  const [showCode, setShowCode] = useState(false)
-  const [codeCopied, setCodeCopied] = useState(false)
   const [modulesExpanded, setModulesExpanded] = useState(false)
 
-  const handleCopyCode = useCallback((code: string) => {
-    navigator.clipboard.writeText(code)
-    setCodeCopied(true)
-    setTimeout(() => setCodeCopied(false), 2000)
-  }, [])
-
   // ── Derived state ──
-  const cadBusy = isResearching || isDecomposing || isGeneratingUnified
+  const designStillRunning = systemIllustrationStatus === "generating"
+  const cadBusy = isResearching || isDecomposing || isGeneratingUnified || designStillRunning
   const hasUnifiedResult = unifiedResult?.success === true
   const hasDownloadable = !!(unifiedResult?.stepData || unifiedResult?.stepUrl || unifiedResult?.stlData || unifiedResult?.stlUrl)
 
@@ -122,19 +113,6 @@ export default function CadStagePage(): React.ReactNode {
     }
   }, [unifiedResult, handleDownload, subject])
 
-  // ── Adapters: bridge unified handlers to per-module interface expected by ModuleResultsView ──
-  const handleExecuteCode = useCallback(async (_moduleId: string, code: string) => {
-    await handleExecuteUnifiedCode(code)
-  }, [handleExecuteUnifiedCode])
-
-  const handleRefineCode = useCallback(async (
-    _moduleId: string,
-    currentCode: string,
-    instruction: string,
-  ): Promise<string | null> => {
-    return handleRefineUnifiedCode(currentCode, instruction)
-  }, [handleRefineUnifiedCode])
-
   // Screen context for specialists
   useRegisterScreenContext(
     useMemo(() => ({
@@ -155,7 +133,7 @@ export default function CadStagePage(): React.ReactNode {
             CAD Generation
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Generate a unified CadQuery model for the complete product.
+            Generate a parametric CAD model for the complete product.
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabAssemble)}>
@@ -198,6 +176,8 @@ export default function CadStagePage(): React.ReactNode {
               >
                 {isGeneratingUnified ? (
                   <><Loader2 className="h-4 w-4 animate-spin" />Generating...</>
+                ) : designStillRunning ? (
+                  <><Loader2 className="h-4 w-4 animate-spin" />Waiting for Design...</>
                 ) : hasUnifiedResult ? (
                   <><Play className="h-4 w-4" />Regenerate Model</>
                 ) : (
@@ -209,70 +189,72 @@ export default function CadStagePage(): React.ReactNode {
         </CardContent>
       </Card>
 
-      {/* ── Collapsible module breakdown (reference context) ── */}
-      <Card>
-        <button
-          type="button"
-          className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
-          onClick={() => setModulesExpanded(!modulesExpanded)}
-        >
-          <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground">
-              Design Reference ({modules.length})
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Decomposition reference
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1 text-xs h-7"
-              onClick={(e) => {
-                e.stopPropagation()
-                router.push(FORGE_ROUTES.cadLabSpecify)
-              }}
-            >
-              <ClipboardList className="h-3 w-3" />
-              View Specs
-            </Button>
-            {modulesExpanded ? (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-        </button>
-        {modulesExpanded && (
-          <CardContent className="pt-0 border-t">
-            <div className="space-y-2 py-2">
-              {modules.map((mod, i) => (
-                <div key={mod.id} className="flex items-start gap-3 py-1.5">
-                  {mod.imageUrl ? (
-                    <div className="h-8 w-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={mod.imageUrl} alt={mod.name} className="w-full h-full object-cover" />
-                    </div>
-                  ) : (
-                    <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-medium text-muted-foreground">{i + 1}</span>
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{mod.name}</p>
-                    <p className="text-xs text-muted-foreground line-clamp-2">{mod.description || mod.purpose}</p>
-                  </div>
-                  <Badge variant="secondary" className="flex-shrink-0 text-xs">
-                    {diagnosticAnswers[mod.id]?.mfg_process || "Unspecified"}
-                  </Badge>
-                </div>
-              ))}
+      {/* ── Collapsible module breakdown — hidden when hero-image path is active ── */}
+      {!visualStyle?.heroImagePrompt && (
+        <Card>
+          <button
+            type="button"
+            className="w-full flex items-center gap-3 p-4 text-left hover:bg-muted/30 transition-colors"
+            onClick={() => setModulesExpanded(!modulesExpanded)}
+          >
+            <Layers className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                Design Context
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {modules.length} modules inform the unified model
+              </p>
             </div>
-          </CardContent>
-        )}
-      </Card>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1 text-xs h-7"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(FORGE_ROUTES.cadLabSpecify)
+                }}
+              >
+                <ClipboardList className="h-3 w-3" />
+                View Specs
+              </Button>
+              {modulesExpanded ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          </button>
+          {modulesExpanded && (
+            <CardContent className="pt-0 border-t">
+              <div className="space-y-2 py-2">
+                {modules.map((mod, i) => (
+                  <div key={mod.id} className="flex items-start gap-3 py-1.5">
+                    {mod.imageUrl ? (
+                      <div className="h-8 w-8 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mod.imageUrl} alt={mod.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="h-8 w-8 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-medium text-muted-foreground">{i + 1}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">{mod.name}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{mod.description || mod.purpose}</p>
+                    </div>
+                    <Badge variant="secondary" className="flex-shrink-0 text-xs">
+                      {diagnosticAnswers[mod.id]?.mfg_process || "Unspecified"}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* ── Generation in progress — streaming status ── */}
       {isGeneratingUnified && (
@@ -305,19 +287,15 @@ export default function CadStagePage(): React.ReactNode {
         <ModuleResultsView
           result={unifiedResult}
           moduleName={subject || "Unified Model"}
-          code={unifiedCode ?? undefined}
-          showCode={showCode}
-          setShowCode={setShowCode}
-          codeCopied={codeCopied}
-          onCopyCode={handleCopyCode}
+          showCode={false}
+          setShowCode={() => {}}
+          codeCopied={false}
+          onCopyCode={() => {}}
           activeViewTab={activeViewTab}
           setActiveViewTab={setActiveViewTab}
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          onFullscreen={(view, __) => setFullscreenView(view)}
+          onFullscreen={(view) => setFullscreenView(view)}
           moduleId={UNIFIED_MODULE_ID}
           onDownload={handleDownload}
-          onExecuteCode={handleExecuteCode}
-          onRefineCode={handleRefineCode}
         />
       )}
 

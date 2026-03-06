@@ -1,25 +1,21 @@
 /**
  * @file supplier-procurement-flow.tsx — 2-column SVG Sankey: Modules → Categories.
  *
- * @description Decomposition diagram showing how modules break down into
- * manufacturing/buy categories. Supplier matching is still triggered here
- * but allocation (Categories → Suppliers) lives on the Shortlist tab.
+ * @description Read-only decomposition diagram showing how modules break down into
+ * manufacturing/buy categories. No interactive supplier matching — that lives on
+ * the Shortlist tab via "Match All Modules".
  *
  * FLOW: source/page.tsx → this component (Suppliers tab)
  */
 
 "use client"
 
-import { useMemo, useState, useCallback, useRef, useEffect } from "react"
-import { Search, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useMemo, useState, useCallback } from "react"
 import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
-import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "./cad-lab-diagnostics"
 import {
   type ModuleNode,
   type CategoryNode,
-  type PartWithCategory,
   SANKEY,
   CAT_COLORS,
   moduleColorFn,
@@ -36,11 +32,6 @@ export interface SupplierProcurementFlowProps {
   modules: CadLabModule[]
   diagnosticAnswers?: DiagnosticAnswers
   aiCostEstimates?: Record<string, AiCostEstimate>
-  supplierMatches: Map<string, CadLabSupplierMatch[]>
-  loadingModules: Set<string>
-  matchAllLoading: boolean
-  onMatchModule: (mod: CadLabModule) => void
-  onMatchAll: () => void
 }
 
 // ─── SVG layout constants ────────────────────────────────────────────
@@ -185,28 +176,8 @@ export function SupplierProcurementFlow({
   modules,
   diagnosticAnswers,
   aiCostEstimates,
-  supplierMatches,
-  loadingModules,
-  matchAllLoading,
-  onMatchModule,
-  onMatchAll,
 }: SupplierProcurementFlowProps): React.ReactNode {
   const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  // Observe container width for scaling HTML overlays
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width)
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
 
   const moduleColorMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -230,8 +201,6 @@ export function SupplierProcurementFlow({
     layout.categories.forEach((c, i) => map.set(c.id, CAT_COLORS[i % CAT_COLORS.length]))
     return map
   }, [layout.categories])
-
-  const matchedModuleCount = supplierMatches.size
 
   // ── Hover connectivity (module ↔ category only) ──
   const connectedToHover = useMemo(() => {
@@ -273,32 +242,18 @@ export function SupplierProcurementFlow({
 
   if (modules.length === 0) return null
 
-  const svgScale = containerWidth > 0 ? containerWidth / VB_W : 1
-
   return (
     <div className="rounded-lg border p-4 space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-foreground">Procurement Flow</span>
-          <span className="text-[10px] font-medium text-muted-foreground">
-            {matchedModuleCount} of {modules.length} module{modules.length !== 1 ? "s" : ""} matched
-            {" \u00b7 "}
-            {totalParts} part{totalParts !== 1 ? "s" : ""}
-            {" \u00b7 "}
-            {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
-          </span>
-        </div>
-        <Button
-          variant="default"
-          size="sm"
-          className="gap-1.5 h-7 text-xs"
-          onClick={onMatchAll}
-          disabled={matchAllLoading || modules.length === 0}
-        >
-          {matchAllLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
-          Match All Modules
-        </Button>
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold text-foreground">Procurement Flow</span>
+        <span className="text-[10px] font-medium text-muted-foreground">
+          {modules.length} module{modules.length !== 1 ? "s" : ""}
+          {" \u00b7 "}
+          {totalParts} part{totalParts !== 1 ? "s" : ""}
+          {" \u00b7 "}
+          {categories.length} categor{categories.length !== 1 ? "ies" : "y"}
+        </span>
       </div>
 
       {/* Column headers */}
@@ -307,8 +262,8 @@ export function SupplierProcurementFlow({
         <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider" style={{ paddingLeft: ((COL_CATS_X / VB_W) * 100) + "%" }}>Categories</p>
       </div>
 
-      {/* SVG + HTML overlays */}
-      <div ref={containerRef} className="relative overflow-x-auto">
+      {/* SVG */}
+      <div className="overflow-x-auto">
         <svg
           viewBox={`0 0 ${VB_W} ${layout.viewBoxHeight}`}
           className="w-full h-auto"
@@ -352,7 +307,7 @@ export function SupplierProcurementFlow({
                     opacity={getOpacity(modId)}
                     className="transition-opacity duration-200"
                   >
-                    {truncate(m.name, 60)}
+                    {truncate(m.name, 120)}
                     <title>{m.name}</title>
                   </text>
                   {/* Inline parts with colored dots */}
@@ -373,7 +328,7 @@ export function SupplierProcurementFlow({
                           fontSize={9}
                           fill="#475569"
                         >
-                          {truncate(part.name, 75)}
+                          {truncate(part.name, 150)}
                         </text>
                       </g>
                     )
@@ -421,7 +376,7 @@ export function SupplierProcurementFlow({
                     opacity={getOpacity(catId)}
                     className="transition-opacity duration-200"
                   >
-                    {truncate(c.label, 45)}
+                    {truncate(c.label, 120)}
                     <title>{c.label} — {c.partCount} part{c.partCount !== 1 ? "s" : ""}</title>
                   </text>
                   {/* Inline parts with colored dots */}
@@ -442,7 +397,7 @@ export function SupplierProcurementFlow({
                           fontSize={9}
                           fill="#475569"
                         >
-                          {truncate(part.name, 55)}
+                          {truncate(part.name, 150)}
                         </text>
                       </g>
                     )
@@ -464,51 +419,6 @@ export function SupplierProcurementFlow({
           </g>
 
         </svg>
-
-        {/* HTML overlay: per-module "Find suppliers" buttons */}
-        <div className="absolute inset-0 pointer-events-none" style={{ overflow: "hidden" }}>
-          {layout.modules.map((lm) => {
-            const mod = modules.find((m) => m.id === lm.id)
-            if (!mod) return null
-            const hasMatches = supplierMatches.has(lm.id)
-            const isLoading = loadingModules.has(lm.id)
-            if (hasMatches || isLoading) {
-              if (isLoading) {
-                return (
-                  <div
-                    key={`btn-${lm.id}`}
-                    className="absolute pointer-events-auto"
-                    style={{
-                      left: (lm.x + 230) * svgScale,
-                      top: (lm.y + lm.h / 2 - 6) * svgScale,
-                      transform: `scale(${Math.min(svgScale, 1)})`,
-                      transformOrigin: "left top",
-                    }}
-                  >
-                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                  </div>
-                )
-              }
-              return null
-            }
-            return (
-              <button
-                key={`btn-${lm.id}`}
-                className="absolute pointer-events-auto flex items-center gap-1 text-[10px] text-international-orange hover:text-international-orange/80 transition-colors"
-                style={{
-                  left: (lm.x + SANKEY.LABEL_OFFSET_RIGHT) * svgScale,
-                  top: (lm.y + Math.min(lm.h / 2, 14) + 18) * svgScale,
-                  transform: `scale(${Math.min(svgScale, 1)})`,
-                  transformOrigin: "left top",
-                }}
-                onClick={() => onMatchModule(mod)}
-              >
-                <Search className="h-2.5 w-2.5" />
-                Find suppliers
-              </button>
-            )
-          })}
-        </div>
       </div>
     </div>
   )

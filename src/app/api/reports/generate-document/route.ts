@@ -154,7 +154,7 @@ export async function POST(request: Request): Promise<Response> {
         ].join("")
 
         // Step 3: Call Claude Opus 4.6 with streaming
-        emit({ type: "progress", message: "Generating document with Claude…", percent: 30 })
+        emit({ type: "progress", message: "Generating document…", percent: 30 })
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
         const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })

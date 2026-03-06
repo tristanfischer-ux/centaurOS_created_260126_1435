@@ -27,6 +27,7 @@ import {
   ImageIcon,
   RotateCcw,
   AlertTriangle,
+  Info,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -69,6 +70,14 @@ export default function CadLabResearchPage(): React.ReactNode {
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)
   useEffect(() => { setHeroImgError(false) }, [systemIllustrationUrl])
+
+  // INTENT: Elapsed timer for illustration generation — prevents "frozen" UX on 30-60s Gemini calls.
+  const [illustrationElapsed, setIllustrationElapsed] = useState(0)
+  useEffect(() => {
+    if (systemIllustrationStatus !== "generating") { setIllustrationElapsed(0); return }
+    const t = setInterval(() => setIllustrationElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [systemIllustrationStatus])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
@@ -234,7 +243,16 @@ export default function CadLabResearchPage(): React.ReactNode {
           {/* ═══ Research tab ═══ */}
           {activeTab === "research" && (
             <motion.div key="research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-              {/* System overview illustration — visible as soon as research completes */}
+              {/* Product overview — always first so it stays visible above the illustration */}
+              {(productOverview || modules.length > 0 || isDecomposing) && (
+                <ProductOverviewCard
+                  overview={productOverview}
+                  onSave={setProductOverview}
+                  modelAudit={modelAudit}
+                />
+              )}
+
+              {/* System overview illustration — below product overview */}
               {hasResearch && (
                 <>
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
@@ -267,9 +285,12 @@ export default function CadLabResearchPage(): React.ReactNode {
                   {systemIllustrationStatus === "generating" && (
                     <Card className="overflow-hidden border-international-orange/20">
                       <div className="aspect-[16/9] w-full bg-muted animate-pulse" />
-                      <CardContent className="py-3 flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                        <span className="text-sm font-medium text-foreground">Generating concept illustration...</span>
+                      <CardContent className="py-3 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                          <span className="text-sm font-medium text-foreground">Generating concept illustration...</span>
+                        </div>
+                        <span className="text-xs tabular-nums text-muted-foreground">{illustrationElapsed}s</span>
                       </CardContent>
                     </Card>
                   )}
@@ -297,6 +318,20 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
 
+                  {/* Decomposing placeholder — spinner while waiting for illustration to start */}
+                  {systemIllustrationStatus === "idle" && isDecomposing && (
+                    <Card className="overflow-hidden border-dashed border-muted-foreground/20">
+                      <div className="aspect-[16/9] w-full bg-muted/30 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-3 text-center px-6">
+                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/40" />
+                          <span className="text-xs text-muted-foreground">
+                            Concept illustration will generate after module breakdown...
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
                   {/* Idle placeholder — only when NOT decomposing */}
                   {systemIllustrationStatus === "idle" && !decompositionError && !isDecomposing && (
                     <Card className="overflow-hidden border-dashed border-muted-foreground/20">
@@ -311,15 +346,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
                 </>
-              )}
-
-              {/* Product overview — visible after research OR when modules exist (loaded project). Editable. */}
-              {(productOverview || modules.length > 0) && (
-                <ProductOverviewCard
-                  overview={productOverview}
-                  onSave={setProductOverview}
-                  modelAudit={modelAudit}
-                />
               )}
 
               {/* During decomposition — rich progress below overview */}
@@ -383,6 +409,24 @@ export default function CadLabResearchPage(): React.ReactNode {
                     <p className="text-xs text-muted-foreground">
                       Generating engineering illustrations — {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} ready. Each illustration coordinates manufacturing constraints, interfaces, and dimensional specs.
                     </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Recovery card — loaded project has research but no modules */}
+              {hasResearch && modules.length === 0 && !isDecomposing && !decompositionError && activeProjectId && (
+                <Card className="border-info/30 bg-info/5">
+                  <CardContent className="pt-6 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Info className="h-5 w-5 text-info shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">This project has research but no module breakdown yet.</p>
+                        <p className="text-sm text-muted-foreground">Generate modules to continue with decomposition and engineering illustrations.</p>
+                      </div>
+                    </div>
+                    <Button onClick={handleDecompose} variant="secondary" size="sm">
+                      Generate Modules
+                    </Button>
                   </CardContent>
                 </Card>
               )}

@@ -37,6 +37,7 @@ export type AIFeature =
   | 'specialist_stt'
   | 'specialist_voice'    // Tier 2: Real-time voice session
   | 'specialist_avatar'   // Tier 3/4: Avatar video session
+  | 'cad_lab_buy_search'
   | 'other'
 
 /** Conversation modes that can be tracked alongside features */

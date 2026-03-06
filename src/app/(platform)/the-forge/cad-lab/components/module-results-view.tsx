@@ -10,7 +10,6 @@ import {
   Check,
   Maximize2,
   Download,
-  Printer,
   Info,
   XCircle,
 } from "lucide-react"
@@ -29,33 +28,6 @@ import { checkPythonSyntax } from "@/lib/cad-lab/code-validators"
 // ─── View Tab Type ───────────────────────────────────────────────────
 
 export type ViewTab = "3d" | "iso" | "exploded" | "front" | "back" | "left" | "right" | "top"
-
-// ─── DFM Issue Explanations ──────────────────────────────────────────
-
-const DFM_EXPLANATIONS: Record<string, string> = {
-  overhang: "Overhangs above 45° require support material, which increases print time, material usage, and may leave surface marks where supports attach. Consider reorienting the part or adding fillets.",
-  "thin wall": "Thin walls risk warping during cooling and may not survive post-processing. Increase wall thickness to at least 1.2mm for FDM or 0.8mm for SLA.",
-  "small feature": "Very small features may not resolve at the chosen layer height, or may break during removal from the build plate. Consider scaling up or using a higher-resolution process.",
-  bridge: "Unsupported horizontal spans (bridges) can sag during printing. Keep bridges under 10mm for reliable results, or add support structure.",
-  tolerance: "The specified tolerance may not be achievable with this manufacturing process without post-machining. Discuss with your factory which features are truly critical.",
-  "build volume": "The part exceeds the build volume of common printers. You'll need a larger-format printer or may need to split the part into sections.",
-  support: "High support volume means significant material waste and post-processing time. Reorienting the part could reduce support requirements.",
-  geometry: "Complex geometry may cause slicing errors or unpredictable print quality. Simplify where possible, especially internal features.",
-}
-
-function getDfmExplanation(category: string, severity: string): string | null {
-  // Try exact match first
-  const lower = category.toLowerCase()
-  if (DFM_EXPLANATIONS[lower]) return DFM_EXPLANATIONS[lower]
-  // Try keyword match
-  for (const [key, explanation] of Object.entries(DFM_EXPLANATIONS)) {
-    if (lower.includes(key) || key.includes(lower)) return explanation
-  }
-  // Generic fallback for critical/warning
-  if (severity === "critical") return "This is a critical manufacturing issue. Resolve it before sending files to your factory — it will likely cause the part to fail or be unreproducible."
-  if (severity === "warning") return "This may affect part quality or increase cost. Discuss with your factory to determine if it needs to be addressed for your application."
-  return null
-}
 
 // ─── Module Results Viewer ───────────────────────────────────────────
 
@@ -77,7 +49,6 @@ export function ModuleResultsView({
   moduleId,
   onDownload,
   svgUrls,
-  mfgProcess,
   onExecuteCode,
   onRefineCode,
 }: {
@@ -95,8 +66,6 @@ export function ModuleResultsView({
   onDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
   /** P3: Persisted SVG URLs from Supabase storage — preferred over data URIs */
   svgUrls?: Record<string, string>
-  /** Diagnostic manufacturing process — when non-3D-printing, FDM metrics are hidden */
-  mfgProcess?: string
   /** Execute edited code on Modal — returns updated result */
   onExecuteCode?: (moduleId: string, code: string) => Promise<void>
   /** Refine code with natural language instruction — returns new code */
@@ -419,7 +388,6 @@ export function ModuleResultsView({
         {result.volumeMm3 != null && <Metric label="Volume" value={result.volumeMm3 > 1000 ? `${(result.volumeMm3 / 1000).toFixed(1)} cm³` : `${result.volumeMm3.toFixed(0)} mm³`} />}
         {result.massProperties?.surfaceAreaMm2 != null && <Metric label="Surface Area" value={result.massProperties.surfaceAreaMm2 > 10000 ? `${(result.massProperties.surfaceAreaMm2 / 100).toFixed(0)} cm²` : `${result.massProperties.surfaceAreaMm2.toFixed(0)} mm²`} />}
         {result.generationTime != null && <Metric icon={<Timer className="h-3.5 w-3.5" />} label="Pipeline Time" value={`${(result.generationTime / 1000).toFixed(1)}s`} />}
-        {result.fillRatio != null && <Metric label="Fill Ratio" value={`${result.fillRatio}%`} />}
         {result.stepSize != null && <Metric label="STEP Size" value={result.stepSize > 1024 ? `${(result.stepSize / 1024).toFixed(1)} MB` : `${result.stepSize} KB`} />}
         {result.drawingPackage?.revision && <Metric label="Revision" value={result.drawingPackage.revision} />}
       </div>
@@ -434,68 +402,6 @@ export function ModuleResultsView({
           {result.validationWarnings.map((warning, i) => (
             <p key={i} className="text-xs text-foreground pl-5">{warning}</p>
           ))}
-        </div>
-      )}
-
-      {/* DFM — only show FDM-specific metrics when the module's mfg_process is a 3D printing variant */}
-      {result.dfm && (!mfgProcess || mfgProcess.startsWith("FDM") || mfgProcess.startsWith("SLA") || mfgProcess.startsWith("SLS")) && (
-        <div className="border rounded-md p-3 space-y-3">
-          <div className="flex items-center gap-2">
-            <Printer className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs font-semibold text-foreground">DFM</span>
-            <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${result.dfm.printable ? "bg-status-success-light text-status-success" : "bg-status-error-light text-destructive"}`}>
-              {result.dfm.printable ? "PRINTABLE" : "NOT PRINTABLE"}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Metric label="Printable" value={result.dfm.printable ? "Yes" : "No"} />
-            <Metric label="Est. Print Time" value={result.dfm.estimatedPrintTimeMin > 60 ? `${(result.dfm.estimatedPrintTimeMin / 60).toFixed(1)} hrs` : `${result.dfm.estimatedPrintTimeMin} min`} />
-            <Metric label="Est. Material" value={`${result.dfm.estimatedMaterialG} g`} />
-            <Metric label="Support Volume" value={`~${result.dfm.supportVolumePct}%`} />
-          </div>
-          {result.dfm.compatiblePrinters.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Compatible Printers</p>
-              <div className="flex flex-wrap gap-1.5">
-                {result.dfm.compatiblePrinters.map((printer) => (
-                  <span key={printer} className="text-xs font-mono bg-muted px-2 py-0.5 rounded">{printer}</span>
-                ))}
-              </div>
-            </div>
-          )}
-          {result.massProperties && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Center of Gravity</p>
-              <p className="text-xs font-mono text-foreground">
-                ({result.massProperties.centerOfGravity[0].toFixed(1)}, {result.massProperties.centerOfGravity[1].toFixed(1)}, {result.massProperties.centerOfGravity[2].toFixed(1)}) mm
-              </p>
-            </div>
-          )}
-          {result.dfm.issues.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Issues — what to fix before sending to factory</p>
-              {result.dfm.issues.map((issue, i) => {
-                const explanation = getDfmExplanation(issue.category, issue.severity)
-                return (
-                  <div key={i} className={`p-2.5 rounded space-y-1 ${
-                    issue.severity === "critical" ? "bg-status-error-light/50 border border-destructive/20"
-                    : issue.severity === "warning" ? "bg-status-warning-light/50 border border-status-warning/20"
-                    : "bg-muted border border-muted"
-                  }`}>
-                    <p className="text-xs font-mono">
-                      <span className={`font-semibold uppercase ${issue.severity === "critical" ? "text-destructive" : issue.severity === "warning" ? "text-status-warning-dark" : "text-muted-foreground"}`}>
-                        {issue.severity}:
-                      </span>{" "}
-                      <span className="text-foreground">{issue.message}</span>
-                    </p>
-                    {explanation && (
-                      <p className="text-xs text-muted-foreground leading-relaxed">{explanation}</p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </div>
       )}
 

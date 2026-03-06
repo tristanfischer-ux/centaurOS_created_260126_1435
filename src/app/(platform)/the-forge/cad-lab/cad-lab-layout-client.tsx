@@ -68,7 +68,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     projects, isLoadingProjects,
     handleLoadProject, handleDeleteProject, handleReset,
     // Progress
-    progressLines, isResearching, isDecomposing, isBatchRunning, generatingModuleIds,
+    progressLines, isResearching, isDecomposing, isBatchRunning, generatingModuleIds, isGeneratingUnified,
     // Milestone
     milestone, setMilestone,
     // Post-research idle detection
@@ -94,7 +94,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     }
   }, [projectParam, handleLoadProject])
 
-  const isAnyActive = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0
+  const isAnyActive = isResearching || isDecomposing || isBatchRunning || generatingModuleIds.size > 0 || isGeneratingUnified
 
   // Auto-dismiss the research milestone banner after 8s (other milestones stay until dismissed)
   useEffect(() => {
@@ -243,8 +243,8 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
         {children}
       </PageTransition>
 
-      {/* ── Live progress (below page content so input stays at top; hidden in post-research idle and during decomposition — concept page renders decomposition progress inline) ── */}
-      {!(hasResearch && modules.length === 0 && !isAnyActive) && !isDecomposing && (
+      {/* ── Live progress (below page content so input stays at top; hidden in post-research idle, during decomposition, and on CAD page which has its own progress) ── */}
+      {!(hasResearch && modules.length === 0 && !isAnyActive) && !isDecomposing && !pathname.includes("/cad-lab/cad") && (
         <CadLabProgress
           lines={progressLines}
           isActive={isAnyActive}

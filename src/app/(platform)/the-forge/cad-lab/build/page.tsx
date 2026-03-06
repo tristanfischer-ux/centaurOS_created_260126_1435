@@ -1453,7 +1453,6 @@ export default function CadLabBuildPage(): React.ReactNode {
                           moduleId={mod.id}
                           onDownload={handleDownload}
                           svgUrls={mod.svgUrls}
-                          mfgProcess={diagnosticAnswers?.[mod.id]?.mfg_process}
                         />
                       )}
 
