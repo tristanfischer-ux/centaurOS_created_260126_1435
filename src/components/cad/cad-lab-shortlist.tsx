@@ -97,6 +97,8 @@ interface CadLabShortlistProps {
   buyPartResults?: BuyPartSearchResult[]
   /** Whether buy search is loading */
   buySearchLoading?: boolean
+  /** Callback to re-trigger buy part price search */
+  onRefreshBuyParts?: () => void
 }
 
 type DocType = "rfq" | "sow" | "nda"
@@ -150,6 +152,7 @@ export function CadLabShortlist({
   onMatchAll,
   buyPartResults,
   buySearchLoading,
+  onRefreshBuyParts,
 }: CadLabShortlistProps): React.ReactNode {
   // ── Shared buyer details ──
   const [buyerName, setBuyerName] = useState("")
@@ -468,6 +471,7 @@ export function CadLabShortlist({
             onSupplierClick={handleOpenSupplierDetail}
             buyPartResults={buyPartResults}
             buySearchLoading={buySearchLoading}
+            onRefreshBuyParts={onRefreshBuyParts}
           />
         )}
 

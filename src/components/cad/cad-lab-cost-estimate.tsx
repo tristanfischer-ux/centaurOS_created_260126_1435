@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { formatCurrency } from "@/lib/format"
 import type { CadLabModule, EarlyCostEstimate, AiCostEstimate } from "@/lib/cad-lab-types"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
+import { normalizeForMatch } from "@/lib/part-match"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { CategorySupplierEntry } from "@/lib/sankey-utils"
@@ -196,48 +197,71 @@ export function CadLabCostEstimate({
     return map
   }, [sortedCategories, partCostMap])
 
-  // ── Build buy supplier entries per category (for costs page) ──
-  const buildBuyCostEntries = useCallback((cat: CategoryNode): Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number }> => {
-    if (!buyPartResults || buyPartResults.length === 0) return []
-    const catPartNames = new Set(cat.parts.map((p) => p.name.toLowerCase()))
+  // ── Build per-part buy entries for cost page ──
+  const buildBuyCostEntries = useCallback((cat: CategoryNode): Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number; buyUrl?: string; _buySource?: string; _isEstimate?: boolean }> => {
+    // INTENT: Per-part lookup for O(1) matching (normalized for fuzzy name matching)
+    const resultsByPart = new Map<string, BuyPartSearchResult>()
+    if (buyPartResults) {
+      for (const r of buyPartResults) resultsByPart.set(normalizeForMatch(r.partName), r)
+    }
 
-    const sourceAgg = new Map<string, { totalCost: number; partCount: number; url: string }>()
-    for (const result of buyPartResults) {
-      if (!catPartNames.has(result.partName.toLowerCase())) continue
-      for (const product of result.products) {
-        const price = product.numericPrice ?? 0
-        const existing = sourceAgg.get(product.source)
-        if (existing) {
-          existing.totalCost += price
-          existing.partCount += 1
-        } else {
-          sourceAgg.set(product.source, { totalCost: price, partCount: 1, url: product.url ?? "" })
-        }
+    const entries: Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number; buyUrl?: string; _buySource?: string; _isEstimate?: boolean }> = []
+
+    // INTENT: Iterate in BOM order so bars match user's mental model
+    for (let pi = 0; pi < cat.parts.length; pi++) {
+      const part = cat.parts[pi]
+      const result = resultsByPart.get(normalizeForMatch(part.name))
+
+      if (result && result.products.length > 0) {
+        // Pick cheapest product with URL + price > 0, fallback to first
+        const withPrice = result.products.filter((p) => p.url && (p.numericPrice ?? 0) > 0)
+        const best = withPrice.length > 0
+          ? withPrice.reduce((a, b) => ((a.numericPrice ?? 0) <= (b.numericPrice ?? 0) ? a : b))
+          : result.products[0]
+
+        entries.push({
+          supplierId: `buy-part-${pi}-${part.name}`,
+          name: part.name,
+          isVerified: false,
+          aggregateScore: 0,
+          rank: entries.length + 1,
+          allocatedCost: best.numericPrice ?? 0,
+          buyTotalCost: best.numericPrice,
+          buyUrl: best.url,
+          _buySource: best.source,
+          _isEstimate: false,
+          originalMatch: null as unknown as CategorySupplierEntry["originalMatch"],
+          contributingModuleIds: [],
+        })
+      } else {
+        // FALLBACK: No search result — use AI cost estimate
+        const aiCost = partCostMap.get(part.name) ?? 0
+        entries.push({
+          supplierId: `buy-part-${pi}-${part.name}`,
+          name: part.name,
+          isVerified: false,
+          aggregateScore: 0,
+          rank: entries.length + 1,
+          allocatedCost: aiCost,
+          buyTotalCost: aiCost > 0 ? aiCost : undefined,
+          buyUrl: `https://uk.rs-online.com/web/c/?searchTerm=${encodeURIComponent(part.name)}`,
+          _buySource: "RS Components",
+          _isEstimate: true,
+          originalMatch: null as unknown as CategorySupplierEntry["originalMatch"],
+          contributingModuleIds: [],
+        })
       }
     }
 
-    return [...sourceAgg.entries()]
-      .sort(([, a], [, b]) => a.totalCost - b.totalCost)
-      .map(([source, data], i) => ({
-        supplierId: `buy-${source}`,
-        name: source,
-        isVerified: false,
-        aggregateScore: data.totalCost,
-        rank: i + 1,
-        // INTENT: 1st choice (cheapest) gets cost allocation
-        allocatedCost: i === 0 ? data.totalCost : 0,
-        buyTotalCost: data.totalCost,
-        originalMatch: null as unknown as CategorySupplierEntry["originalMatch"],
-        contributingModuleIds: [],
-      }))
-  }, [buyPartResults])
+    return entries
+  }, [buyPartResults, partCostMap])
 
   // ── Compute layout ──
   const layout = useMemo(() => {
     const layoutCats: Array<CategoryNode & { x: number; y: number; h: number; barColor: string }> = []
     const rankGroups: Array<{
       catId: string; catType: "make" | "buy"; x: number; y: number
-      entries: Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number }>
+      entries: Array<CategorySupplierEntry & { rank: number; allocatedCost: number; buyTotalCost?: number; buyUrl?: string; _buySource?: string; _isEstimate?: boolean }>
       moreCount: number
     }> = []
     const flows: Array<{
@@ -254,12 +278,10 @@ export function CadLabCostEstimate({
       const catPartsH = CATEGORY_NAME_H + cat.parts.length * PART_ROW_H + 4
 
       if (cat.type === "buy") {
-        // INTENT: Buy categories use same horizontal bar layout as make categories.
+        // INTENT: Buy parts render as aligned text rows (source + price) matching left-side parts.
         const buyEntries = buildBuyCostEntries(cat)
-        const visibleEntries = buyEntries.slice(0, SUPPLIER_BAR.MAX_VISIBLE)
 
-        const rankH = CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H + 8
-        const h = Math.max(catPartsH, rankH, SANKEY.BAR_MIN_H)
+        const h = Math.max(catPartsH, SANKEY.BAR_MIN_H)
         layoutCats.push({ ...cat, x: COL_CATS_X, y: cy, h, barColor })
 
         rankGroups.push({
@@ -267,14 +289,14 @@ export function CadLabCostEstimate({
           catType: "buy",
           x: COL_SUPS_X,
           y: cy,
-          entries: visibleEntries,
-          moreCount: Math.max(buyEntries.length - SUPPLIER_BAR.MAX_VISIBLE, 0),
+          entries: buyEntries,
+          moreCount: 0,
         })
 
-        if (visibleEntries.length > 0) {
+        if (buyEntries.length > 0) {
           const flowH = Math.min(h * 0.6, 24)
           const catMidY = cy + h / 2
-          const supMidY = cy + CATEGORY_NAME_H + SUPPLIER_BAR.BAR_H / 2
+          const supMidY = cy + CATEGORY_NAME_H + (buyEntries.length * PART_ROW_H) / 2
           flows.push({
             catId: cat.id,
             x1: COL_CATS_X + SANKEY.BAR_W, y1t: catMidY - flowH / 2, y1b: catMidY + flowH / 2,
@@ -509,7 +531,7 @@ export function CadLabCostEstimate({
                             fontWeight={600}
                             fill="#1e293b"
                           >
-                            {truncate(c.label, 45)}
+                            {truncate(c.label, 65)}
                             {catCost > 0 && (
                               <tspan fill="#64748b" fontWeight={500} fontFamily="monospace" fontSize={9}>
                                 {" "}{formatCurrency(catCost)}
@@ -546,7 +568,7 @@ export function CadLabCostEstimate({
                                   fontSize={9}
                                   fill="#475569"
                                 >
-                                  {truncate(part.name, 40)}
+                                  {truncate(part.name, 70)}
                                 </text>
                                 {cost != null && cost > 0 && (
                                   <text
@@ -585,12 +607,60 @@ export function CadLabCostEstimate({
                             fontWeight={600}
                             fill="#64748b"
                           >
-                            {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 40)}
+                            {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 55)}
                           </text>
 
-                          {/* Horizontal supplier bars */}
-                          {group.entries.map((entry, ei) => {
-                            const isFirst = ei === 0 && (isBuy || rankedIds[0] === entry.supplierId)
+                          {/* Buy: text rows aligned 1:1 with left-side parts (source + price) */}
+                          {isBuy && group.entries.map((entry, ei) => {
+                            const rowY = group.y + CATEGORY_NAME_H + ei * PART_ROW_H + 4
+                            const priceText = entry.buyTotalCost != null && entry.buyTotalCost > 0
+                              ? `${formatCurrency(entry.buyTotalCost)}${entry._isEstimate ? " (est.)" : ""}`
+                              : ""
+
+                            return (
+                              <g
+                                key={entry.supplierId}
+                                style={{ cursor: entry.buyUrl ? "pointer" : undefined }}
+                                onClick={entry.buyUrl ? () => window.open(entry.buyUrl, "_blank", "noopener,noreferrer") : undefined}
+                              >
+                                <rect
+                                  x={group.x}
+                                  y={rowY - 5}
+                                  width={SUPPLIER_BAR.FIRST_W}
+                                  height={PART_ROW_H}
+                                  fill="transparent"
+                                  rx={2}
+                                  className="hover:fill-[#f1f5f9]"
+                                />
+                                {/* Source name */}
+                                <text
+                                  x={group.x}
+                                  y={rowY + 3}
+                                  fontSize={9}
+                                  fill="#475569"
+                                >
+                                  {truncate(entry._buySource ?? "—", 20)}
+                                  <title>{entry.name}{entry._buySource ? ` — ${entry._buySource}` : ""}{entry.buyTotalCost != null ? ` — ${formatCurrency(entry.buyTotalCost)}${entry._isEstimate ? " (estimated)" : ""}` : ""}</title>
+                                </text>
+                                {/* Price — right-aligned */}
+                                <text
+                                  x={group.x + SUPPLIER_BAR.FIRST_W}
+                                  y={rowY + 3}
+                                  fontSize={9}
+                                  fontFamily="monospace"
+                                  fontWeight={500}
+                                  fill={entry._isEstimate ? "#94a3b8" : "#334155"}
+                                  textAnchor="end"
+                                >
+                                  {priceText}
+                                </text>
+                              </g>
+                            )
+                          })}
+
+                          {/* Make: horizontal ranked supplier bars with costs */}
+                          {!isBuy && group.entries.map((entry, ei) => {
+                            const isFirst = ei === 0 && rankedIds[0] === entry.supplierId
                             const barW = isFirst ? SUPPLIER_BAR.FIRST_W : SUPPLIER_BAR.BACKUP_W
                             const barX = group.x + (ei === 0
                               ? 0
@@ -599,18 +669,15 @@ export function CadLabCostEstimate({
                             const cat = sortedCategories.find((c) => c.id === group.catId)
                             const partCount = cat?.partCount ?? 0
 
-                            // Buy: show price. Make: show allocated cost or score.
-                            const costLabel = isBuy && entry.buyTotalCost != null
-                              ? `${formatCurrency(entry.buyTotalCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.buyTotalCost / partCount))}/pt` : ""}`
-                              : isFirst && entry.allocatedCost > 0
-                                ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.allocatedCost / partCount))}/pt` : ""} (est.)`
-                                : `${Math.round(entry.aggregateScore)}%`
+                            const costLabel = isFirst && entry.allocatedCost > 0
+                              ? `${formatCurrency(entry.allocatedCost)}${partCount > 1 ? ` · ~${formatCurrency(Math.round(entry.allocatedCost / partCount))}/pt` : ""} (est.)`
+                              : `${Math.round(entry.aggregateScore)}%`
 
                             return (
                               <g
                                 key={entry.supplierId}
-                                style={{ cursor: isBuy ? undefined : onPromoteSupplier ? "pointer" : undefined }}
-                                onClick={!isBuy && onPromoteSupplier ? () => onPromoteSupplier(group.catId, entry.supplierId) : undefined}
+                                style={{ cursor: onPromoteSupplier ? "pointer" : undefined }}
+                                onClick={onPromoteSupplier ? () => onPromoteSupplier(group.catId, entry.supplierId) : undefined}
                               >
                                 <rect
                                   x={barX}
@@ -622,7 +689,6 @@ export function CadLabCostEstimate({
                                   strokeWidth={isFirst ? 0 : 1}
                                   rx={SUPPLIER_BAR.BAR_R}
                                 />
-                                {/* Supplier name */}
                                 <text
                                   x={barX + 6}
                                   y={barY + 11}
@@ -631,9 +697,8 @@ export function CadLabCostEstimate({
                                   fill={isFirst ? "#ffffff" : "#334155"}
                                 >
                                   {truncate(entry.name, isFirst ? 18 : 12)}
-                                  <title>{entry.name} — {isBuy && entry.buyTotalCost != null ? formatCurrency(entry.buyTotalCost) : `${Math.round(entry.aggregateScore)}% match`}</title>
+                                  <title>{entry.name} — {Math.round(entry.aggregateScore)}% match</title>
                                 </text>
-                                {/* Cost (for 1st choice) or score (for backups) */}
                                 <text
                                   x={barX + barW - (onSupplierClick ? 18 : 6)}
                                   y={barY + 11}
@@ -645,7 +710,6 @@ export function CadLabCostEstimate({
                                 >
                                   {costLabel}
                                 </text>
-                                {/* Info icon — opens supplier detail dialog */}
                                 {onSupplierClick && (
                                   <g
                                     style={{ cursor: "pointer" }}
@@ -682,8 +746,8 @@ export function CadLabCostEstimate({
                             )
                           })}
 
-                          {/* "+N more" chip */}
-                          {group.moreCount > 0 && (
+                          {/* "+N more" chip — make categories only */}
+                          {!isBuy && group.moreCount > 0 && (
                             (() => {
                               const chipX = group.x
                                 + SUPPLIER_BAR.FIRST_W + SUPPLIER_BAR.BAR_GAP

@@ -397,7 +397,13 @@ If you cannot find a product for a part, include it with an empty products array
 
       if (!text) {
         console.warn(`[BUY-SEARCH] No text blocks in response. Block types: [${blockTypes.join(",")}]`)
+        // INTENT: If Sonnet only returned tool_use/web_search blocks but no text, the search
+        // completed but Sonnet never produced a final JSON summary. Push empty results.
+        allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
+        continue
       }
+
+      console.log(`[BUY-SEARCH] Response text length: ${text.length} chars, first 200: ${text.slice(0, 200)}`)
 
       // Build normalized→original name map for this batch
       const normalizedToOriginal = new Map<string, string>()
@@ -407,15 +413,23 @@ If you cannot find a product for a part, include it with an empty products array
 
       // Parse JSON from response
       try {
-        // Try to extract JSON from the text (handles markdown fences)
-        const jsonMatch = text.match(/\[[\s\S]*\]/)
+        // INTENT: Strip markdown fences before extraction — Sonnet often wraps JSON in ```json ... ```
+        const stripped = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1")
+        // INTENT: Try targeted regex first (array starting with [{ and ending with }])
+        // then fall back to greedy match. Greedy \[[\s\S]*\] fails when response
+        // contains unrelated brackets like "I found [these items]..."
+        const jsonMatch = stripped.match(/\[\s*\{[\s\S]*\}\s*\]/) ?? stripped.match(/\[[\s\S]*\]/)
+
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]) as BuyPartSearchResult[]
           // INTENT: Map Sonnet's returned names back to original BOM names.
           // Uses normalized matching (strips hyphens, special chars, parens) + positional fallback.
           for (let ri = 0; ri < parsed.length; ri++) {
             const result = parsed[ri]
+            // DECISION: Also try normalizing WITHOUT cleanPartName so "stainless" etc. in the
+            // returned name can match the full BOM name's normalized form.
             const matched = normalizedToOriginal.get(normalizeForMatch(result.partName))
+              ?? normalizedToOriginal.get(normalizeForMatch(cleanPartName(result.partName)))
             if (matched) {
               result.partName = matched
             } else if (ri < batch.length) {
@@ -428,11 +442,11 @@ If you cannot find a product for a part, include it with an empty products array
           console.log(`[BUY-SEARCH] Batch results: ${withProducts}/${parsed.length} parts have products`)
           allResults.push(...parsed)
         } else {
-          console.warn("[BUY-SEARCH] No JSON found in response")
+          console.warn(`[BUY-SEARCH] No JSON found in response. Raw text (first 500 chars): ${text.slice(0, 500)}`)
           allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
         }
       } catch (parseErr) {
-        console.error("[BUY-SEARCH] Failed to parse JSON response:", parseErr)
+        console.error(`[BUY-SEARCH] Failed to parse JSON response:`, parseErr, `\nRaw text (first 500 chars): ${text.slice(0, 500)}`)
         allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
       }
     } catch (err) {

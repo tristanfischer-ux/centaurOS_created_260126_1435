@@ -195,8 +195,8 @@ export default function SourcePage(): React.ReactNode {
   }, [categoryRankingsKey])
 
   // ── Buy part search state (persisted to localStorage per project) ──
-  // DECISION: v3 cache key invalidates old results after verification pipeline rewrite (JSON-LD + meta + quality-gated Haiku)
-  const buySearchKey = activeProjectId ? `forge-buy-search-v3-${activeProjectId}` : null
+  // DECISION: v4 cache key invalidates stale results so the fixed v2 verification pipeline actually executes
+  const buySearchKey = activeProjectId ? `forge-buy-search-v4-${activeProjectId}` : null
 
   const [buyPartResults, setBuyPartResultsRaw] = useState<BuyPartSearchResult[]>(() => {
     if (!buySearchKey) return []
@@ -624,6 +624,7 @@ export default function SourcePage(): React.ReactNode {
               onMatchAll={handleMatchAll}
               buyPartResults={buyPartResults}
               buySearchLoading={buySearchLoading}
+              onRefreshBuyParts={() => handleSearchBuyParts(buyPartNames)}
             />
           </motion.div>
         )}
