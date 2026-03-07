@@ -2,18 +2,19 @@
  * @file cad-lab-supplier-match.ts — Multi-factor supplier matching for CadLab modules.
  *
  * @description Server action that matches CadLab modules to marketplace listings
- * using a 5-factor scoring system (100pts total):
+ * using a 6-factor scoring system (100pts total):
  *
  * | Factor            | Max | Source                                      |
  * |-------------------|-----|---------------------------------------------|
- * | Semantic relevance| 40  | match_marketplace_listings RPC (cosine sim)  |
- * | Process match     | 20  | attributes JSONB + subcategory               |
- * | Material match    | 15  | attributes JSONB                             |
- * | Quality & trust   | 15  | is_verified flag                             |
+ * | Semantic relevance| 30  | match_marketplace_listings RPC (cosine sim)  |
+ * | Capability match  | 25  | process_capabilities JSONB (Nightshift data) |
+ * | Process match     | 15  | attributes JSONB + subcategory               |
+ * | Material match    | 10  | attributes JSONB                             |
+ * | Quality & trust   | 10  | is_verified flag                             |
  * | Keyword relevance | 10  | text matching on title/description/categories |
  *
- * When process or material is unspecified, their points redistribute to
- * semantic + keyword so the total always sums to 100.
+ * When process, material, or capabilities are unavailable, their points
+ * redistribute to semantic + keyword so the total always sums to 100.
  *
  * Falls back to keyword-only scoring when embedding is unavailable.
  *
@@ -38,6 +39,8 @@ export interface CadLabModuleInput {
   description?: string
   process?: string | null
   material?: string | null
+  toleranceMm?: number | null
+  batchSize?: string | null
 }
 
 export interface ScoreBreakdown {
@@ -46,6 +49,7 @@ export interface ScoreBreakdown {
   material: number
   quality: number
   keyword: number
+  capability: number
   total: number
 }
 
@@ -121,11 +125,12 @@ function normalizeToCategories(
 
 /** Base weights (when both process and material are specified) */
 const BASE_WEIGHTS = {
-  semantic: 40,
-  process: 20,
-  material: 15,
-  quality: 15,
+  semantic: 30,
+  process: 15,
+  material: 10,
+  quality: 10,
   keyword: 10,
+  capability: 25,
 } as const
 
 const MIN_SCORE_THRESHOLD = 15
@@ -149,6 +154,7 @@ function computeWeights(
     material: hasMaterial ? BASE_WEIGHTS.material : 0,
     quality: BASE_WEIGHTS.quality,
     keyword: BASE_WEIGHTS.keyword + Math.round(redistributable * 0.4),
+    capability: BASE_WEIGHTS.capability,
   }
 }
 
@@ -268,6 +274,80 @@ function scoreKeywords(
   return { score, matchedTerms: matched }
 }
 
+// ─── Capability Scoring ──────────────────────────────────────────────
+
+interface ProcessCapability {
+  process_category?: string
+  materials_worked?: string[]
+  tolerance_value_mm?: number
+  batch_size_range?: string
+}
+
+/**
+ * Scores a listing's process_capabilities JSONB against module diagnostics.
+ * Returns 0-1 normalized score across 4 sub-factors:
+ * - Process category match (10pts)
+ * - Material match (7pts)
+ * - Tolerance met (5pts)
+ * - Batch size match (3pts)
+ */
+function scoreCapabilityMatch(
+  capabilities: ProcessCapability[],
+  inputProcessKeys: Set<string>,
+  inputMaterial: string | null | undefined,
+  inputToleranceMm: number | null | undefined,
+  inputBatchSize: string | null | undefined,
+): number {
+  if (!capabilities || capabilities.length === 0) return 0
+  const maxPts = 25
+  let bestScore = 0
+
+  for (const cap of capabilities) {
+    let pts = 0
+
+    // Process category match (10pts)
+    if (cap.process_category && inputProcessKeys.has(cap.process_category)) {
+      pts += 10
+    }
+
+    // Material match (7pts) — check if any of the supplier's materials match input
+    if (inputMaterial && cap.materials_worked && cap.materials_worked.length > 0) {
+      const inputMatLower = inputMaterial.toLowerCase()
+      const hasMatch = cap.materials_worked.some((m) => {
+        const matLower = m.toLowerCase()
+        return matLower.includes(inputMatLower) || inputMatLower.includes(matLower.split(" ")[0])
+      })
+      if (hasMatch) pts += 7
+    }
+
+    // Tolerance met (5pts) — supplier can achieve the required tolerance
+    if (inputToleranceMm != null && cap.tolerance_value_mm != null) {
+      if (cap.tolerance_value_mm <= inputToleranceMm) {
+        pts += 5
+      }
+    }
+
+    // Batch size match (3pts) — simple range containment check
+    if (inputBatchSize && cap.batch_size_range) {
+      const rangeLower = cap.batch_size_range.toLowerCase()
+      const batchLower = inputBatchSize.toLowerCase()
+      // Check for keyword overlap (prototype, low, production, etc.)
+      if (
+        rangeLower.includes(batchLower) ||
+        batchLower.includes("prototype") && rangeLower.includes("1") ||
+        batchLower.includes("low") && (rangeLower.includes("10") || rangeLower.includes("100")) ||
+        batchLower.includes("production") && (rangeLower.includes("1000") || rangeLower.includes("10000"))
+      ) {
+        pts += 3
+      }
+    }
+
+    bestScore = Math.max(bestScore, pts)
+  }
+
+  return bestScore / maxPts
+}
+
 // ─── Main Action ────────────────────────────────────────────────────
 
 /**
@@ -363,10 +443,10 @@ export async function matchCadLabModuleSuppliers(
     }
   }
 
-  // Fetch full data for all candidates
+  // Fetch full data for all candidates (includes process_capabilities for capability scoring)
   const { data: listings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities")
     .in("id", [...candidateIds])
 
   const matches: CadLabSupplierMatch[] = []
@@ -399,23 +479,43 @@ export async function matchCadLabModuleSuppliers(
       // Factor 5: Keyword (with keyParts for higher-value term matching)
       let { score: keywordRaw } = scoreKeywords(searchTerms, listingText, input.keyParts)
 
+      // Factor 6: Capability (from process_capabilities JSONB)
+      const caps = (listing.process_capabilities ?? []) as ProcessCapability[]
+      const capabilityRaw = scoreCapabilityMatch(
+        caps,
+        inputProcessKeys,
+        input.material,
+        input.toleranceMm,
+        input.batchSize,
+      )
+
       // Relevance gate (same logic as suppliers above)
-      const hasRelevance = semanticRaw >= 0.3 || processScore >= 1.0 || materialScore >= 1.0
+      const hasRelevance = semanticRaw >= 0.3 || processScore >= 1.0 || materialScore >= 1.0 || capabilityRaw > 0
       if (!hasRelevance) {
         qualityRaw = 0
         keywordRaw = 0
       }
 
+      // INTENT: When a listing has no process_capabilities, redistribute its
+      // capability points to semantic (60%) + keyword (40%) — same pattern as
+      // missing process/material.
+      const hasCapabilities = caps.length > 0
+      const effectiveCapWeight = hasCapabilities ? weights.capability : 0
+      const capRedist = hasCapabilities ? 0 : weights.capability
+      const effectiveSemanticWeight = weights.semantic + Math.round(capRedist * 0.6)
+      const effectiveKeywordWeight = weights.keyword + Math.round(capRedist * 0.4)
+
       const breakdown: ScoreBreakdown = {
-        semantic: Math.round(semanticRaw * weights.semantic * 10) / 10,
+        semantic: Math.round(semanticRaw * effectiveSemanticWeight * 10) / 10,
         process: Math.round(processScore * weights.process * 10) / 10,
         material: Math.round(materialScore * weights.material * 10) / 10,
         quality: Math.round(qualityRaw * weights.quality * 10) / 10,
-        keyword: Math.round(keywordRaw * weights.keyword * 10) / 10,
+        keyword: Math.round(keywordRaw * effectiveKeywordWeight * 10) / 10,
+        capability: Math.round(capabilityRaw * effectiveCapWeight * 10) / 10,
         total: 0,
       }
       breakdown.total = Math.round(
-        (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality + breakdown.keyword) * 10,
+        (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality + breakdown.keyword + breakdown.capability) * 10,
       ) / 10
 
       if (breakdown.total >= MIN_SCORE_THRESHOLD) {
@@ -423,6 +523,7 @@ export async function matchCadLabModuleSuppliers(
         if (breakdown.semantic >= weights.semantic * 0.5) reasons.push("Semantic match")
         if (processScore >= 1.0 && input.process) reasons.push(`Process: ${input.process}`)
         if (materialScore >= 1.0 && input.material) reasons.push(`Material: ${input.material}`)
+        if (capabilityRaw >= 0.4) reasons.push("Verified capabilities")
         if (listing.subcategory) reasons.push(listing.subcategory)
 
         matches.push({

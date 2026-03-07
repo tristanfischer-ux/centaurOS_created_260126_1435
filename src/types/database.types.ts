@@ -8471,6 +8471,7 @@ export type Database = {
           real_world_surface_finishes: Json | null
           real_world_tolerances: Json | null
           source: string | null
+          source_company_ids: Json | null
           supplier_count: number | null
           technique_slug: string
           tips_and_insights: Json | null
@@ -8487,6 +8488,7 @@ export type Database = {
           real_world_surface_finishes?: Json | null
           real_world_tolerances?: Json | null
           source?: string | null
+          source_company_ids?: Json | null
           supplier_count?: number | null
           technique_slug: string
           tips_and_insights?: Json | null
@@ -8503,6 +8505,7 @@ export type Database = {
           real_world_surface_finishes?: Json | null
           real_world_tolerances?: Json | null
           source?: string | null
+          source_company_ids?: Json | null
           supplier_count?: number | null
           technique_slug?: string
           tips_and_insights?: Json | null
@@ -8558,6 +8561,7 @@ export type Database = {
           outreach_notes: string | null
           outreach_status: string | null
           price: number | null
+          process_capabilities: Json | null
           production_capacity: string | null
           products: Json | null
           quality_systems: string | null
@@ -8616,6 +8620,7 @@ export type Database = {
           outreach_notes?: string | null
           outreach_status?: string | null
           price?: number | null
+          process_capabilities?: Json | null
           production_capacity?: string | null
           products?: Json | null
           quality_systems?: string | null
@@ -8674,6 +8679,7 @@ export type Database = {
           outreach_notes?: string | null
           outreach_status?: string | null
           price?: number | null
+          process_capabilities?: Json | null
           production_capacity?: string | null
           products?: Json | null
           quality_systems?: string | null

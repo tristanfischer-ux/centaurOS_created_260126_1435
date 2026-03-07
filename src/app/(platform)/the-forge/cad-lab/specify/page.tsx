@@ -37,6 +37,7 @@ import {
   PlayCircle,
   XCircle,
   ClipboardCheck,
+  Grid3x3,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -77,6 +78,12 @@ import { DesignRevisionBanner } from "@/components/cad/design-revision-banner"
 import { recommendSpecialist } from "@/lib/cad-lab/recommend-specialist"
 import { RedlineDiff } from "../components/redline-diff"
 import { buildRevisionItems } from "../components/checkpoint-revision-diffs"
+import { PartsMap } from "@/components/cad/parts-map"
+import { DfmInsightPanel } from "@/components/cad/dfm-insight-panel"
+import { getTechniqueInsightsByProcess, getProcessRecommendations } from "@/actions/manufacturing-techniques"
+import type { ProcessInsights } from "@/actions/manufacturing-techniques"
+import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
+import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -178,6 +185,53 @@ export default function SpecifyPage(): React.ReactNode {
 
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
+  const [showPartsMap, setShowPartsMap] = useState(false)
+
+  // ── DFM Insights — fetched per process from Nightshift technique knowledge ──
+  const [processInsights, setProcessInsights] = useState<Record<string, ProcessInsights>>({})
+  const fetchedProcessesRef = useRef<Set<string>>(new Set())
+
+  // INTENT: Fetch insights when a module's mfg_process is set. Cache by process name
+  // to avoid re-fetching when switching between modules with the same process.
+  useEffect(() => {
+    const processNames = new Set<string>()
+    for (const mod of modules) {
+      const process = diagnosticAnswers[mod.id]?.mfg_process?.trim()
+      if (process && !fetchedProcessesRef.current.has(process)) {
+        processNames.add(process)
+      }
+    }
+    if (processNames.size === 0) return
+
+    for (const process of processNames) {
+      fetchedProcessesRef.current.add(process)
+      getTechniqueInsightsByProcess(process).then((result) => {
+        if (result) {
+          setProcessInsights((prev) => ({ ...prev, [process]: result }))
+        }
+      })
+    }
+  }, [modules, diagnosticAnswers])
+
+  // ── Technique Recommendations — fetched when material + tolerance are set ──
+  const [techniqueRecs, setTechniqueRecs] = useState<Record<string, TechniqueRecommendation[]>>({})
+  const recFingerprintRef = useRef<Record<string, string>>({})
+
+  useEffect(() => {
+    for (const mod of modules) {
+      const diag = diagnosticAnswers[mod.id]
+      if (!diag?.material || !diag?.tolerance) continue
+      const toleranceMm = getToleranceMm(diag.tolerance)
+      const fp = `${diag.material}|${diag.tolerance}|${diag.batch_size ?? ""}`
+      if (recFingerprintRef.current[mod.id] === fp) continue
+      recFingerprintRef.current[mod.id] = fp
+      getProcessRecommendations(diag.material, toleranceMm, diag.batch_size ?? null).then((recs) => {
+        if (recs.length > 0) {
+          setTechniqueRecs((prev) => ({ ...prev, [mod.id]: recs }))
+        }
+      })
+    }
+  }, [modules, diagnosticAnswers])
 
   // ── Diagnostic handlers ──
 
@@ -456,7 +510,13 @@ export default function SpecifyPage(): React.ReactNode {
 
             {/* Module summary cards */}
             <div>
-              <h2 className="text-sm font-semibold text-foreground mb-3">Modules ({modules.length})</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-foreground">Modules ({modules.length})</h2>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setShowPartsMap(true)}>
+                  <Grid3x3 className="h-3.5 w-3.5" />
+                  Parts Map
+                </Button>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {modules.map((mod) => {
                   const status = moduleStatuses[mod.id]
@@ -887,6 +947,40 @@ export default function SpecifyPage(): React.ReactNode {
                                         )
                                       })}
                                     </div>
+
+                                    {/* DFM Insight Panel — shown below mfg_process after selection */}
+                                    {q.id === "mfg_process" && currentAnswer && processInsights[currentAnswer] && (
+                                      <DfmInsightPanel
+                                        insights={processInsights[currentAnswer]}
+                                        selectedTolerance={modDiag.tolerance}
+                                        selectedMaterial={modDiag.material}
+                                      />
+                                    )}
+
+                                    {/* Technique recommendations — shown below material when recs differ from selected process */}
+                                    {q.id === "material" && techniqueRecs[mod.id]?.length > 0 && modDiag.mfg_process && (() => {
+                                      const recs = techniqueRecs[mod.id]
+                                      const selectedProcess = modDiag.mfg_process.toLowerCase()
+                                      // Only show if top recommendation is different from current process
+                                      const topRec = recs[0]
+                                      const isAlternative = !topRec.name.toLowerCase().includes(selectedProcess) &&
+                                        !selectedProcess.includes(topRec.slug.split("-")[0])
+                                      if (!isAlternative) return null
+                                      return (
+                                        <div className="rounded-lg border border-info/20 bg-info/[0.02] p-2.5 space-y-1">
+                                          <p className="text-[11px] font-medium text-info flex items-center gap-1">
+                                            <Lightbulb className="h-3 w-3" />
+                                            Consider alternative process
+                                          </p>
+                                          <p className="text-[11px] text-muted-foreground">
+                                            <span className="font-medium text-foreground">{topRec.name}</span>
+                                            {" "}scores higher for your requirements
+                                            {topRec.supplierCount > 0 && ` (${topRec.supplierCount} suppliers)`}
+                                            {topRec.reasons[0] && ` — ${topRec.reasons[0].toLowerCase()}`}
+                                          </p>
+                                        </div>
+                                      )
+                                    })()}
                                   </div>
                                 )
                               })}
@@ -1194,6 +1288,21 @@ export default function SpecifyPage(): React.ReactNode {
 
 
       </AnimatePresence>
+
+      {/* ── Parts Map overlay ── */}
+      <PartsMap
+        modules={modules}
+        diagnosticAnswers={diagnosticAnswers}
+        aiCostEstimates={aiCostEstimates}
+        subject={subject}
+        open={showPartsMap}
+        onClose={() => setShowPartsMap(false)}
+        onModuleClick={(moduleId) => {
+          setShowPartsMap(false)
+          setActiveTab("specs")
+          setExpandedModuleId(moduleId)
+        }}
+      />
     </div>
   )
 }

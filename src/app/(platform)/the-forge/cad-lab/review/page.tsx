@@ -55,6 +55,7 @@ import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
+import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { useCadLab } from "../cad-lab-context"
@@ -215,6 +216,8 @@ export default function CadLabReviewPage(): React.ReactNode {
         description: mod.description,
         process: diag.mfg_process || null,
         material: diag.material || null,
+        toleranceMm: getToleranceMm(diag.tolerance),
+        batchSize: diag.batch_size || null,
       })
       setSupplierMatches((prev) => new Map(prev).set(mod.id, results))
     } catch (err) {

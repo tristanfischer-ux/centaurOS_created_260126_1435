@@ -11,6 +11,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
 import type { CadLabModuleInput } from "@/actions/cad-lab-supplier-match"
+import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import type {
   SupplyFlowNode,
   SupplyFlowEdge,
@@ -108,6 +109,8 @@ export async function getSupplyFlowData(
         description: mod.description,
         process: diag.mfg_process || null,
         material: diag.material || null,
+        toleranceMm: getToleranceMm(diag.tolerance),
+        batchSize: diag.batch_size || null,
       }
 
       const matches = await matchCadLabModuleSuppliers(input)

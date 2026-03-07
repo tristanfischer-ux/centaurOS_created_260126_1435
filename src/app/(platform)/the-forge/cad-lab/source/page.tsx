@@ -33,6 +33,7 @@ import { CadLabShortlist } from "@/components/cad/cad-lab-shortlist"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchCadLabModuleSuppliers } from "@/actions/cad-lab-supplier-match"
+import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { searchBuyPartProducts } from "@/actions/buy-part-search"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import { toast } from "sonner"
@@ -194,7 +195,8 @@ export default function SourcePage(): React.ReactNode {
   }, [categoryRankingsKey])
 
   // ── Buy part search state (persisted to localStorage per project) ──
-  const buySearchKey = activeProjectId ? `forge-buy-search-${activeProjectId}` : null
+  // DECISION: v3 cache key invalidates old results after verification pipeline rewrite (JSON-LD + meta + quality-gated Haiku)
+  const buySearchKey = activeProjectId ? `forge-buy-search-v3-${activeProjectId}` : null
 
   const [buyPartResults, setBuyPartResultsRaw] = useState<BuyPartSearchResult[]>(() => {
     if (!buySearchKey) return []
@@ -224,7 +226,7 @@ export default function SourcePage(): React.ReactNode {
       if (withProducts > 0) {
         toast.success(`Found products for ${withProducts} of ${results.length} buy parts`)
       } else {
-        toast.info("No supplier products found — showing search links instead")
+        toast.info("No supplier products found — try again later or check supplier websites directly")
       }
     } catch (err) {
       console.error("[SOURCE] Buy part search failed:", err)
@@ -371,6 +373,8 @@ export default function SourcePage(): React.ReactNode {
         description: mod.description,
         process: diag.mfg_process ?? null,
         material: diag.material ?? null,
+        toleranceMm: getToleranceMm(diag.tolerance),
+        batchSize: diag.batch_size ?? null,
       })
       setSupplierMatches((prev) => new Map(prev).set(mod.id, matches))
     } catch (err) {

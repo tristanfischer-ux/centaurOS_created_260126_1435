@@ -42,6 +42,7 @@ import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
 import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
 import { estimateModuleCostsAi } from "@/actions/cad-lab-cost"
+import { getTechniqueInsightsByProcess } from "@/actions/manufacturing-techniques"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { ReferenceModel } from "@/actions/reference-models"
@@ -726,7 +727,29 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     const pid = activeProjectIdRef.current
     setIsEstimatingCosts(true)
     setCostEstimationError(null)
-    estimateModuleCostsAi(modules, diagnosticAnswers, editableReport.slice(0, 2000), productOverview || undefined)
+
+    // INTENT: Fetch technique insights per unique process to ground cost estimates.
+    // Runs in parallel per process, then passes merged map to Haiku.
+    const uniqueProcesses = [...new Set(
+      modules.map((m) => diagnosticAnswers[m.id]?.mfg_process).filter(Boolean) as string[]
+    )]
+    const insightsPromises = uniqueProcesses.map(async (proc) => {
+      const insights = await getTechniqueInsightsByProcess(proc)
+      return [proc, insights] as const
+    })
+
+    Promise.all(insightsPromises)
+      .then((entries) => {
+        const techniqueInsights: Record<string, import("@/actions/manufacturing-techniques").ProcessInsights> = {}
+        for (const [proc, ins] of entries) {
+          if (ins) techniqueInsights[proc] = ins
+        }
+        return estimateModuleCostsAi(
+          modules, diagnosticAnswers, editableReport.slice(0, 2000),
+          productOverview || undefined,
+          Object.keys(techniqueInsights).length > 0 ? techniqueInsights : undefined,
+        )
+      })
       .then((res) => {
         if (res.success) {
           setAiCostEstimates(res.estimates)

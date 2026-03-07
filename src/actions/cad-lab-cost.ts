@@ -18,6 +18,7 @@
 
 import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ interface EstimateError {
  * @param diagnosticAnswers - Per-module diagnostic answers (6 dimensions)
  * @param researchExcerpt - First 2000 chars of research report for product context
  * @param productOverview - Optional user-edited product overview
+ * @param techniqueInsights - Optional real-world insights keyed by process name
  * @returns Record of AiCostEstimate keyed by moduleId, or error
  */
 export async function estimateModuleCostsAi(
@@ -52,6 +54,7 @@ export async function estimateModuleCostsAi(
   diagnosticAnswers: DiagnosticAnswers,
   researchExcerpt: string,
   productOverview?: string,
+  techniqueInsights?: Record<string, ProcessInsights>,
 ): Promise<EstimateResult | EstimateError> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
@@ -66,18 +69,34 @@ export async function estimateModuleCostsAi(
   // Full descriptions caused 90s+ responses and token-limit truncation with 9 modules.
   const moduleSummaries = modules.map((mod) => {
     const answers = diagnosticAnswers[mod.id] || {}
+    const process = answers.mfg_process || "Not specified"
+
+    // INTENT: Inject compact real-world context (~100 tokens) when technique insights
+    // are available. Grounds Haiku's estimates using actual supplier data.
+    const insights = techniqueInsights?.[process]
+    const realWorldContext = insights
+      ? {
+          supplierCount: insights.totalSupplierCount,
+          typicalTolerance_mm: insights.tolerances.typical_mm,
+          topMaterials: insights.materials.slice(0, 3).map((m) => m.material),
+          batchSizes: insights.batchSizes,
+          equipment: insights.equipment.slice(0, 3).map((e) => e.brand_model),
+        }
+      : undefined
+
     return {
       id: mod.id,
       name: mod.name,
       keyParts: mod.keyParts,
       diagnostics: {
-        mfg_process: answers.mfg_process || "Not specified",
+        mfg_process: process,
         material: answers.material || "Not specified",
         tolerance: answers.tolerance || "Not specified",
         finish: answers.finish || "Not specified",
         environment: answers.environment || "Not specified",
         batch_size: answers.batch_size || "Not specified",
       },
+      ...(realWorldContext && { realWorldContext }),
     }
   })
 
@@ -92,6 +111,7 @@ RULES:
 - Reference: mild steel ~£1.50/kg, aluminium 6061 ~£8/kg, stainless 304 ~£6/kg
 - Confidence: "high" only when parts are standard/well-understood
 - Keep ALL reasoning BRIEF — under 15 words each
+- When realWorldContext is provided, ground estimates using: supplierCount as market depth, equipment to determine cost tier, topMaterials for realistic material grades
 
 CRITICAL: Return ONLY valid JSON, no markdown fences.
 {
