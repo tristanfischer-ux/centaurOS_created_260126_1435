@@ -68,7 +68,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY })
+const anthropic = new Anthropic({
+  apiKey: ANTHROPIC_API_KEY,
+  timeout: 5 * 60 * 1000, // 5 minutes — web_search with many searches takes a while
+})
 
 const CH_BASE = "https://api.company-information.service.gov.uk"
 const CH_AUTH = Buffer.from(`${COMPANIES_HOUSE_API_KEY}:`).toString("base64")
@@ -198,94 +201,53 @@ async function discoverAssemblyCompanies(
 ): Promise<DiscoveredCompany[]> {
   console.log(`\n[Step 1] Sonnet AI discovery — finding ${limit} UK assembly companies...`)
 
-  const systemPrompt = `You are a UK manufacturing industry researcher. Find real, currently operating UK contract assembly and system integration companies. These must be companies that explicitly offer assembly services — building complete products or sub-assemblies from components supplied by customers.
+  // TRIED: web_search_20260209 tool causes consistent API timeouts (>5min per call).
+  // DECISION: Use Sonnet's training data for company names, then verify via Companies House.
+  // Companies House validation is more reliable than web_search anyway.
 
-Focus on:
-- Contract electronics assembly (PCBA, box build)
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 8192,
+    messages: [
+      {
+        role: "user",
+        content: `List ${limit} real, currently operating UK companies that offer contract assembly services. Include a diverse mix:
+
+- Contract electronics assembly (PCBA, box build, SMT) — e.g. NOTE, Jaltek, Nemco, AWS Electronics
 - Mechanical assembly and system integration
 - Electromechanical assembly
 - Cable and harness assembly
-- Product assembly and fulfilment
+- Product assembly, kitting, and fulfilment
 
-Do NOT include:
-- Companies that only do CNC machining, sheet metal, or other single-process manufacturing
-- Holding companies or dormant entities
-- Companies outside the UK
+These must be real UK-registered companies (not global multinationals unless they have a UK subsidiary). Provide their exact registered company name as it would appear on Companies House.
 
-Return ONLY valid JSON with no markdown fences. The JSON must be an array of objects:
+Return ONLY valid JSON with no markdown fences:
 [
   {
-    "name": "Exact registered company name",
+    "name": "Exact UK registered company name (as on Companies House)",
     "website": "https://...",
     "location": "City, County",
     "assemblyServices": "Brief description of what they assemble",
     "certifications": ["ISO 9001", "AS9100", ...]
   }
-]
-
-Find exactly ${limit} companies. Use web search to verify each one is real and active.`
-
-  let response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250514",
-    max_tokens: 8192,
-    system: systemPrompt,
-    tools: [
-      { type: "web_search_20260209" as any, name: "web_search", max_uses: 15 },
-    ],
-    messages: [
-      {
-        role: "user",
-        content: `Find ${limit} real UK contract assembly and system integration companies. Search for companies that offer assembly services as their primary business. Include a mix of electronics assembly, mechanical assembly, and electromechanical assembly companies from different regions of the UK.`,
+]`,
       },
     ],
   })
-
-  // Handle pause_turn continuation loop
-  let turns = 0
-  while (response.stop_reason === "pause_turn" && turns < 12) {
-    turns++
-    console.log(`  pause_turn #${turns}, continuing search...`)
-    response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250514",
-      max_tokens: 8192,
-      system: systemPrompt,
-      tools: [
-        {
-          type: "web_search_20260209" as any,
-          name: "web_search",
-          max_uses: 15,
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `Find ${limit} real UK contract assembly and system integration companies.`,
-        },
-        { role: "assistant", content: response.content },
-        {
-          role: "user",
-          content:
-            "Continue searching and provide the complete JSON results for all companies.",
-        },
-      ],
-    })
-  }
 
   const cost =
     ((response.usage?.input_tokens ?? 0) * 3.0 +
       (response.usage?.output_tokens ?? 0) * 15.0) /
     1_000_000
   console.log(
-    `  Sonnet usage: ${response.usage?.input_tokens ?? 0} in / ${response.usage?.output_tokens ?? 0} out ~ $${cost.toFixed(4)}`,
+    `  Sonnet: ${response.usage?.input_tokens ?? 0} in / ${response.usage?.output_tokens ?? 0} out ~ $${cost.toFixed(4)}`,
   )
 
-  // Extract text content
   const textBlocks = response.content.filter(
     (block): block is Anthropic.TextBlock => block.type === "text",
   )
   const text = textBlocks.map((b) => b.text).join("")
 
-  // Parse JSON
   const jsonMatch = text.match(/\[[\s\S]*\]/)
   if (!jsonMatch) {
     console.error("  ERROR: No JSON array found in Sonnet response")
@@ -519,46 +481,18 @@ Return ONLY valid JSON with no markdown fences:
 
 For specialties, use these slugs where applicable: contract_assembly, system_integration, pcba_assembly, box_build, cable_harness, electromechanical, mechanical_assembly, product_assembly, test_and_inspection, fulfilment`
 
-  let response = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250514",
+  // TRIED: web_search causes API timeouts. Using Sonnet's training data instead.
+  const response = await anthropic.messages.create({
+    model: "claude-sonnet-4-6",
     max_tokens: 4096,
     system: systemPrompt,
-    tools: [
-      { type: "web_search_20260209" as any, name: "web_search", max_uses: 5 },
-    ],
     messages: [
       {
         role: "user",
-        content: `Research this UK assembly company and extract structured data:\n\nCompany: ${company.name}\nWebsite: ${company.website}\nLocation: ${company.location}\nKnown services: ${company.assemblyServices}`,
+        content: `Research this UK assembly company and extract structured data. Use your knowledge of the company:\n\nCompany: ${company.name}\nWebsite: ${company.website}\nLocation: ${company.location}\nKnown services: ${company.assemblyServices}\nKnown certifications: ${company.certifications.join(", ") || "unknown"}`,
       },
     ],
   })
-
-  // Handle pause_turn
-  let turns = 0
-  while (response.stop_reason === "pause_turn" && turns < 6) {
-    turns++
-    response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250514",
-      max_tokens: 4096,
-      system: systemPrompt,
-      tools: [
-        {
-          type: "web_search_20260209" as any,
-          name: "web_search",
-          max_uses: 5,
-        },
-      ],
-      messages: [
-        {
-          role: "user",
-          content: `Research ${company.name} (${company.website})`,
-        },
-        { role: "assistant", content: response.content },
-        { role: "user", content: "Provide the complete JSON result." },
-      ],
-    })
-  }
 
   const textBlocks = response.content.filter(
     (block): block is Anthropic.TextBlock => block.type === "text",
