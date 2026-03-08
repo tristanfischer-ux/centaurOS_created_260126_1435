@@ -88,6 +88,7 @@ export function TeamMap({
       verification_tier: p.isVerified ? 'claimed' : 'unverified',
       is_demo: false,
       created_by_provider_id: null,
+      process_capabilities: null,
     }
   }, [])
 

@@ -165,6 +165,23 @@ export async function getSavedResources() {
 
 export type VerificationTier = 'unverified' | 'claimed' | 'verified'
 
+/** Structured process capability from Nightshift deep enrichment pipeline. */
+export interface ProcessCapability {
+    process_category?: string
+    process_name?: string
+    materials_worked?: string[]
+    tolerance_claimed?: string
+    tolerance_value_mm?: number
+    surface_finish_claimed?: string
+    surface_finish_ra_um?: number
+    max_part_dimensions?: string
+    batch_size_range?: string
+    equipment_mentioned?: string[]
+    surface_treatments?: string[]
+    confidence?: number
+    source_excerpt?: string
+}
+
 export interface MarketplaceListing {
     id: string
     category: 'People' | 'Products' | 'Services' | 'AI'
@@ -181,6 +198,8 @@ export interface MarketplaceListing {
     is_demo: boolean
     /** Provider profile ID linking to the real user who created this listing */
     created_by_provider_id: string | null
+    /** Structured process capabilities from Nightshift deep enrichment. */
+    process_capabilities: ProcessCapability[] | null
 }
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'

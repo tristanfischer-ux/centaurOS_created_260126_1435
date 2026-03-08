@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { MarketplaceListing } from '@/actions/marketplace'
+import { MarketplaceListing, type ProcessCapability } from '@/actions/marketplace'
 import { contactExpert } from '@/actions/messaging'
 import { toast } from 'sonner'
 import {
@@ -36,6 +36,8 @@ import {
     Store,
     ArrowRight,
     ThumbsUp,
+    Factory,
+    ChevronRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -269,6 +271,9 @@ export function MarketplaceListingDialog({
 
                     {/* DETAILS TAB */}
                     <TabsContent value="details" className="mt-4 space-y-4">
+                        {/* Process capabilities from Nightshift deep enrichment */}
+                        <ProcessCapabilitiesSection capabilities={listing.process_capabilities} />
+
                         {/* Category-specific sections */}
                         {category === 'People' && <PeopleDetails attrs={attrs} />}
                         {category === 'Products' && <ProductsDetails attrs={attrs} />}
@@ -699,6 +704,160 @@ function ServicesDetails({ attrs }: { attrs: Record<string, unknown> }) {
     )
 }
 
+// Format category slug to readable name (e.g. cnc_machining → CNC Machining)
+function formatCategoryName(slug: string): string {
+    return slug
+        .split('_')
+        .map((w) => {
+            const upper = w.toUpperCase()
+            // Keep known acronyms uppercase
+            if (['cnc', 'edm', '3d', 'pcb'].includes(w.toLowerCase())) return upper
+            return w.charAt(0).toUpperCase() + w.slice(1)
+        })
+        .join(' ')
+}
+
+// Process Capabilities section — mirrors TechniqueDetailDialog's Real-World Insights pattern
+function ProcessCapabilitiesSection({ capabilities }: { capabilities: ProcessCapability[] | null }) {
+    if (!capabilities || capabilities.length === 0) return null
+
+    // Filter out low-confidence entries
+    const filtered = capabilities.filter((c) => (c.confidence ?? 1) >= 0.3)
+    if (filtered.length === 0) return null
+
+    // Compute summary stats
+    const bestTolerance = Math.min(
+        ...filtered.map((c) => c.tolerance_value_mm).filter((v): v is number => v != null && v > 0)
+    )
+    const allMaterials = new Set(filtered.flatMap((c) => c.materials_worked ?? []))
+    const processCount = filtered.length
+
+    // Group by process_category
+    const grouped = new Map<string, ProcessCapability[]>()
+    for (const cap of filtered) {
+        const key = cap.process_category ?? 'other'
+        const list = grouped.get(key) ?? []
+        list.push(cap)
+        grouped.set(key, list)
+    }
+    const categories = Array.from(grouped.entries())
+    const showCollapsed = categories.length > 3
+
+    return (
+        <div className="rounded-xl border border-international-orange/20 bg-international-orange/[0.02] p-5 space-y-4">
+            {/* Header */}
+            <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center rounded-lg h-9 w-9 shrink-0 bg-international-orange/10 text-international-orange">
+                    <Factory className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-foreground">Process Capabilities</h3>
+                    <p className="text-xs text-muted-foreground">Verified from company website</p>
+                </div>
+            </div>
+
+            {/* Summary stat grid */}
+            <div className="grid grid-cols-3 gap-3">
+                <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Best Tolerance</p>
+                    <p className="text-sm font-semibold text-foreground">
+                        {isFinite(bestTolerance) ? `±${bestTolerance}mm` : '—'}
+                    </p>
+                </div>
+                <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Processes</p>
+                    <p className="text-sm font-semibold text-foreground">{processCount}</p>
+                </div>
+                <div className="rounded-lg border bg-card p-3 text-center">
+                    <p className="text-xs text-muted-foreground">Materials</p>
+                    <p className="text-sm font-semibold text-foreground">{allMaterials.size}</p>
+                </div>
+            </div>
+
+            {/* Per-category process cards */}
+            <div className="space-y-3">
+                {categories.slice(0, showCollapsed ? 3 : categories.length).map(([cat, caps]) => (
+                    <ProcessCategoryGroup key={cat} category={cat} capabilities={caps} />
+                ))}
+            </div>
+
+            {/* Collapsible overflow */}
+            {showCollapsed && (
+                <details className="group">
+                    <summary className="cursor-pointer text-xs font-medium text-international-orange hover:underline list-none flex items-center gap-1">
+                        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+                        {categories.length - 3} more process {categories.length - 3 === 1 ? 'category' : 'categories'}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                        {categories.slice(3).map(([cat, caps]) => (
+                            <ProcessCategoryGroup key={cat} category={cat} capabilities={caps} />
+                        ))}
+                    </div>
+                </details>
+            )}
+        </div>
+    )
+}
+
+// Single process category group card
+function ProcessCategoryGroup({ category, capabilities }: { category: string; capabilities: ProcessCapability[] }) {
+    return (
+        <div className="rounded-lg border bg-card p-3 space-y-2">
+            <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                {formatCategoryName(category)}
+            </h4>
+            {capabilities.map((cap, i) => (
+                <div key={i} className="text-sm space-y-1.5 border-t pt-2 first:border-0 first:pt-0">
+                    {cap.process_name && (
+                        <p className="font-medium text-foreground">{cap.process_name}</p>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {cap.tolerance_claimed && (
+                            <span>Tolerance: <span className="font-medium text-foreground">{cap.tolerance_claimed}</span></span>
+                        )}
+                        {cap.surface_finish_claimed && (
+                            <span>Finish: <span className="font-medium text-foreground">{cap.surface_finish_claimed}</span></span>
+                        )}
+                        {cap.max_part_dimensions && (
+                            <span>Max dims: <span className="font-medium text-foreground">{cap.max_part_dimensions}</span></span>
+                        )}
+                        {cap.batch_size_range && (
+                            <span>Batch: <span className="font-medium text-foreground">{cap.batch_size_range}</span></span>
+                        )}
+                    </div>
+                    {(cap.materials_worked?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {cap.materials_worked!.map((mat, j) => (
+                                <Badge key={j} variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    {mat}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+                    {(cap.equipment_mentioned?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {cap.equipment_mentioned!.map((eq, j) => (
+                                <Badge key={j} variant="outline" className="text-[10px] px-1.5 py-0">
+                                    {eq}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+                    {(cap.surface_treatments?.length ?? 0) > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                            {cap.surface_treatments!.map((t, j) => (
+                                <Badge key={j} variant="outline" className="text-[10px] px-1.5 py-0 text-international-orange border-international-orange/30">
+                                    {t}
+                                </Badge>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+    )
+}
+
 // Additional Attributes section
 function AdditionalAttributes({ attrs, category }: { attrs: Record<string, unknown>; category: string }) {
     // Keys already shown in category-specific sections
@@ -710,7 +869,7 @@ function AdditionalAttributes({ attrs, category }: { attrs: Record<string, unkno
         'accuracy', 'latency', 'throughput',
         'certifications', 'capabilities', 'lead_time', 'moq',
         'specialty', 'focus_areas', 'turnaround', 'capacity',
-        'location', 'availability', 'provider_id'
+        'location', 'availability', 'provider_id', 'process_capabilities'
     ])
 
     const remainingAttrs = Object.entries(attrs).filter(([key]) => !shownKeys.has(key))
