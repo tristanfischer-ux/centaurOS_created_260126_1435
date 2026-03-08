@@ -690,14 +690,54 @@ function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
         )
     }
 
-    // Render objects
+    // Render objects as structured key-value rows
     if (typeof value === 'object') {
+        const entries = Object.entries(value as Record<string, unknown>).filter(
+            ([, v]) => v !== null && v !== undefined && v !== ''
+        )
+        if (entries.length === 0) return null
+
+        const formatKey = (key: string) =>
+            key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+        const renderValue = (k: string, v: unknown) => {
+            if (typeof v === 'boolean') {
+                return (
+                    <Badge variant={v ? 'success' : 'secondary'} className="text-xs">
+                        {v ? 'Yes' : 'No'}
+                    </Badge>
+                )
+            }
+            if (k === 'health' && typeof v === 'string') {
+                const variant = v === 'good' ? 'success' : v === 'caution' ? 'warning' : v === 'risk' ? 'destructive' : 'secondary'
+                return (
+                    <Badge variant={variant} className="text-xs capitalize">
+                        {v}
+                    </Badge>
+                )
+            }
+            if (k === 'company_status' && typeof v === 'string') {
+                const variant = v === 'active' ? 'success' : v === 'dissolved' ? 'destructive' : 'secondary'
+                return (
+                    <Badge variant={variant} className="text-xs capitalize">
+                        {v}
+                    </Badge>
+                )
+            }
+            return <span className="text-sm font-medium text-foreground">{String(v)}</span>
+        }
+
         return (
             <div>
                 <p className="text-sm text-muted-foreground mb-2">{label}</p>
-                <pre className="bg-muted p-3 rounded text-xs text-muted-foreground overflow-x-auto">
-                    {JSON.stringify(value, null, 2)}
-                </pre>
+                <div className="bg-muted/50 rounded-lg p-3 space-y-0">
+                    {entries.map(([k, v]) => (
+                        <div key={k} className="flex items-center justify-between py-1.5 border-b border-border last:border-0">
+                            <span className="text-sm text-muted-foreground">{formatKey(k)}</span>
+                            {renderValue(k, v)}
+                        </div>
+                    ))}
+                </div>
             </div>
         )
     }
