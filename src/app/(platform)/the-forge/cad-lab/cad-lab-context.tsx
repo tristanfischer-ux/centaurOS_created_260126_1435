@@ -311,6 +311,9 @@ export interface CadLabContextValue {
   isRegeneratingImages: boolean
   handleRegenerateDrawingsAfterRevision: () => Promise<void>
 
+  // Cost fingerprint reset (allows Source page to force re-estimation)
+  resetCostFingerprint: () => void
+
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
   initializeCadLab: () => void
@@ -531,6 +534,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isEstimatingCosts, setIsEstimatingCosts] = useState(false)
   const [costEstimationError, setCostEstimationError] = useState<string | null>(null)
   const aiCostFingerprintRef = useRef<string>("")
+  const resetCostFingerprint = useCallback(() => { aiCostFingerprintRef.current = "" }, [])
 
   // Decomposition connections (AI-declared inter-module topology)
   const [decompositionConnections, setDecompositionConnections] = useState<ModuleConnection[]>([])
@@ -1282,6 +1286,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         failureModes: [],
         unknowns: [],
         status: "pending" as const,
+        ...(sm.mirrorOf ? { mirrorOf: sm.mirrorOf } : {}),
       }))
 
       setModules(skeletonAsCadModules)
@@ -1359,6 +1364,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             whyItMatters: expRes.expansion.whyItMatters,
             failureModes: expRes.expansion.failureModes,
             unknowns: expRes.expansion.unknowns,
+            ...(expRes.expansion.estimatedMassKg ? { estimatedMassKg: expRes.expansion.estimatedMassKg } : {}),
           }
 
           addProgressLine(`  ${skeleton.name} expanded — ${expRes.expansion.keyParts.length} components`)
@@ -1367,7 +1373,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             const exp = expandedModules[i]
             setModules((prev) => prev.map((m) =>
               m.id === exp.id
-                ? { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns }
+                ? { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns, ...(exp.estimatedMassKg ? { estimatedMassKg: exp.estimatedMassKg } : {}) }
                 : m
             ))
           }
@@ -3327,6 +3333,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     imagesStale,
     isRegeneratingImages,
     handleRegenerateDrawingsAfterRevision,
+    resetCostFingerprint,
     initialized,
     initializeCadLab,
     handleDownload,

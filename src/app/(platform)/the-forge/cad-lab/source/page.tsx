@@ -21,6 +21,7 @@ import {
   ArrowRight,
   Package,
   AlertCircle,
+  RefreshCw,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -85,6 +86,7 @@ export default function SourcePage(): React.ReactNode {
     setModules,
     aiCostEstimates,
     isEstimatingCosts,
+    resetCostFingerprint,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -398,6 +400,34 @@ export default function SourcePage(): React.ReactNode {
     }
   }, [eligibleModules, handleMatchModule])
 
+  // ── Refresh active tab ──
+  const isRefreshing = activeTab === "costs"
+    ? buySearchLoading || isEstimatingCosts
+    : matchAllLoading
+
+  const handleRefreshActiveTab = useCallback(() => {
+    if (activeTab === "suppliers") {
+      setSupplierMatchesRaw(new Map())
+      handleMatchAll()
+      toast.info("Refreshing supplier matches…")
+    } else if (activeTab === "shortlist") {
+      setSupplierMatchesRaw(new Map())
+      setShortlistedSuppliersRaw(new Map())
+      setCategoryRankingsRaw(new Map())
+      autoSelectKeyRef.current = ""
+      handleMatchAll()
+      toast.info("Refreshing shortlist…")
+    } else if (activeTab === "costs") {
+      setBuyPartResultsRaw([])
+      buySearchTriggeredRef.current = false
+      resetCostFingerprint()
+      if (buyPartNames.length > 0) {
+        handleSearchBuyParts(buyPartNames)
+      }
+      toast.info("Refreshing cost data…")
+    }
+  }, [activeTab, handleMatchAll, handleSearchBuyParts, buyPartNames, resetCostFingerprint])
+
   // ── Auto-select top 3 suppliers after matching ──
   const autoSelectKeyRef = useRef<string>("")
 
@@ -546,6 +576,14 @@ export default function SourcePage(): React.ReactNode {
               {tab.label}
             </button>
           ))}
+          <button
+            onClick={handleRefreshActiveTab}
+            disabled={isRefreshing}
+            title="Refresh current tab"
+            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+          </button>
         </div>
       </nav>
 
