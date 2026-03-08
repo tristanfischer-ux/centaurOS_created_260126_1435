@@ -195,8 +195,8 @@ export default function SourcePage(): React.ReactNode {
   }, [categoryRankingsKey])
 
   // ── Buy part search state (persisted to localStorage per project) ──
-  // DECISION: v4 cache key invalidates stale results so the fixed v2 verification pipeline actually executes
-  const buySearchKey = activeProjectId ? `forge-buy-search-v4-${activeProjectId}` : null
+  // DECISION: v7 cache key invalidates stale results after adding relevance scoring + unsourceable filter
+  const buySearchKey = activeProjectId ? `forge-buy-search-v7-${activeProjectId}` : null
 
   const [buyPartResults, setBuyPartResultsRaw] = useState<BuyPartSearchResult[]>(() => {
     if (!buySearchKey) return []

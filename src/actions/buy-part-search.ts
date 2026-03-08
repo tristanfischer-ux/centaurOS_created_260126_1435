@@ -1,15 +1,15 @@
 "use server"
 
 /**
- * @file buy-part-search.ts — Server action: find purchase URLs for buy parts via Claude Sonnet + web_search.
+ * @file buy-part-search.ts — Server action: find purchase URLs for buy parts via direct RS scraping.
  *
- * @description Batches buy parts into groups of ~5, asks Sonnet to find product URLs
- * from RS Components, McMaster-Carr, Misumi, Farnell, etc.
- * Then verifies prices via a 3-tier pipeline: JSON-LD → meta tags → quality-gated Haiku.
+ * @description For each buy part, constructs an RS Components search URL, fetches the
+ * search results page, and extracts product data from RS's embedded __NEXT_DATA__ JSON
+ * payload (which contains prices, titles, and URLs). Falls back to Haiku on stripped
+ * text if JSON extraction fails.
  */
 
 import Anthropic from "@anthropic-ai/sdk"
-import { normalizeForMatch } from "@/lib/part-match"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -29,23 +29,60 @@ export interface BuyPartSearchResult {
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const BATCH_SIZE = 5
-const VERIFY_CONCURRENCY = 3
-const VERIFY_BATCH_DELAY_MS = 500
-const MAX_HTML_BYTES = 200_000
+const SCRAPE_CONCURRENCY = 3
+// GOTCHA: RS search pages are ~400-500KB with __NEXT_DATA__ near the end.
+// 200KB truncated before the JSON payload. 600KB captures it reliably.
+const MAX_HTML_BYTES = 600_000
 const MIN_TEXT_LENGTH = 200
 const FETCH_TIMEOUT_MS = 8_000
+const RS_BASE = "https://uk.rs-online.com"
 
 /**
- * Strip quantity markers (×12, x4, etc.) and parenthesized spec suffixes
- * to produce cleaner search queries. Keeps core part identity.
- * E.g. "M5 socket-head cap screws (×12, 304 SS)" → "M5 socket-head cap screws"
+ * Strip quantity markers, parenthesized suffixes, BOM status metadata,
+ * and em-dashes to produce cleaner RS search queries.
+ * E.g. "M4 tapped inserts (×8 top) – brass, bought" → "M4 tapped inserts brass"
  */
 function cleanPartName(name: string): string {
   return name
-    .replace(/\s*\(.*\)\s*/g, "")     // remove parenthesized suffixes
-    .replace(/\s*[×x]\s*\d+/gi, "")   // remove ×12, x4 etc.
+    .replace(/\s*\(.*\)\s*/g, "")                          // remove parenthesized suffixes
+    .replace(/\s*[×x]\s*\d+/gi, "")                        // remove ×12, x4 etc.
+    .replace(/,\s*(bought|outsourced|custom|fabricated)\b/gi, "")  // strip BOM status metadata
+    .replace(/[–—]/g, " ")                                  // em-dashes → spaces
+    .replace(/\s+/g, " ")                                   // collapse whitespace
     .trim()
+}
+
+// ─── Unsourceable Part Filter ────────────────────────────────────────
+
+/**
+ * Conservative filter: skip RS fetch for parts that RS can't supply.
+ * These consistently produce bad matches (e.g. fibre optic dome cover for a custom spun dome).
+ * Returns true if the part should be skipped.
+ */
+const UNSOURCEABLE_PATTERNS = [
+  // Custom fabrication
+  /\bspun\s+alumini?um\b/i,
+  /\bvacuum[- ]?formed\b/i,
+  // Services (not purchasable components)
+  /\bpowder\s*coat/i,
+  /\bpaint\s+finish/i,
+  /\bgraphics?\b/i,
+  /\banodis[ei]d\b/i,
+  /\bplating\b/i,
+  // Custom assemblies
+  /\bwiring\s+harness/i,
+  /\bcable\s+assembly/i,
+  // Custom shapes
+  /\bhemispherical\s+dome\b/i,
+  /\bdome\s+shell\b/i,
+  // Other
+  /\bsub[- ]?assembly\b/i,
+  /\bweldment\b/i,
+  /\bfabrication\b/i,
+]
+
+function isUnsourceableFromRS(partName: string): boolean {
+  return UNSOURCEABLE_PATTERNS.some((pattern) => pattern.test(partName))
 }
 
 // ─── Lightweight Page Fetcher ───────────────────────────────────────
@@ -295,6 +332,285 @@ ${strippedText.slice(0, 4000)}`,
   return null
 }
 
+// ─── RS Embedded JSON Extraction ────────────────────────────────────
+
+interface RSProduct {
+  title: string
+  url: string
+  price: number
+}
+
+/**
+ * Extract product data from RS Components' embedded __NEXT_DATA__ JSON payload.
+ *
+ * RS search pages are a Next.js SPA — product links are NOT in anchor tags.
+ * Instead, product data lives in a <script id="__NEXT_DATA__"> tag at:
+ *   props.pageProps.discoverData.records[].article[0].discoverArticleAttributes
+ *
+ * @param html - Raw RS search results HTML
+ * @returns Array of products with title, url, and price (max 10)
+ */
+function extractRSProducts(html: string): RSProduct[] {
+  // INTENT: RS embeds all search result data in __NEXT_DATA__ as a Next.js app
+  const scriptRegex = /<script[^>]*id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/i
+  const nextDataMatch = html.match(scriptRegex)
+
+  if (!nextDataMatch) {
+    console.log("[BUY-SEARCH] No __NEXT_DATA__ script tag found in RS HTML")
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(nextDataMatch[1])
+
+    // INTENT: Navigate the Next.js data structure to find product records
+    const records = parsed?.props?.pageProps?.discoverData?.records
+    if (!Array.isArray(records) || records.length === 0) {
+      console.log("[BUY-SEARCH] No records found in discoverData")
+      return []
+    }
+
+    const products: RSProduct[] = []
+
+    for (const record of records) {
+      if (!Array.isArray(record.article) || record.article.length === 0) continue
+
+      const article = record.article[0]
+      const attrs = article?.discoverArticleAttributes
+      if (!attrs) continue
+
+      const priceStr = attrs.price ?? attrs.displayPrice
+      if (!priceStr) continue
+
+      // INTENT: Parse price — strip currency symbols and commas
+      const priceNum = parseFloat(String(priceStr).replace(/[^0-9.]/g, ""))
+      if (isNaN(priceNum) || priceNum <= 0) continue
+
+      const title = article.title || ""
+      const url = attrs.productURL || ""
+
+      if (title && url) {
+        products.push({ title, url, price: priceNum })
+      }
+
+      if (products.length >= 10) break
+    }
+
+    console.log(`[BUY-SEARCH] Extracted ${products.length} products from RS __NEXT_DATA__`)
+    return products
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.log(`[BUY-SEARCH] Failed to parse __NEXT_DATA__ JSON: ${message}`)
+    return []
+  }
+}
+
+// ─── Relevance Scoring ──────────────────────────────────────────────
+
+const BULK_INDICATORS = ["kit", "set", "assortment", "piece", "pcs", "selection", "collection", "variety"]
+
+/**
+ * Score all extracted RS products against the cleaned query and pick the best match.
+ * Avoids blindly picking rsProducts[0] which may be a bulk kit instead of the specific part.
+ *
+ * Scoring: +1 per query word found in title (substring), -3 per bulk indicator in title.
+ * Returns null if best score < 2 (too weak a match → fall through to Haiku).
+ */
+function pickBestProduct(products: RSProduct[], cleanedQuery: string): RSProduct | null {
+  if (products.length === 0) return null
+
+  // INTENT: Normalize plurals so "inserts" matches "insert" in titles (and vice versa)
+  const queryWords = cleanedQuery.toLowerCase().split(/\s+/).filter((w) => w.length >= 2)
+  const queryVariants = queryWords.map((w) => w.endsWith("s") && w.length > 3 ? [w, w.slice(0, -1)] : [w])
+  let bestProduct: RSProduct | null = null
+  let bestScore = -Infinity
+
+  for (const product of products) {
+    const titleLower = product.title.toLowerCase()
+    let score = 0
+
+    // INTENT: +1 per query word found in product title (substring match — "M3" matches "M3x10")
+    // Also checks singular form for plural query words ("inserts" → also tries "insert")
+    for (const variants of queryVariants) {
+      if (variants.some((v) => titleLower.includes(v))) score += 1
+    }
+
+    // INTENT: -3 penalty per bulk indicator to push kits/assortments down
+    for (const bulk of BULK_INDICATORS) {
+      if (titleLower.includes(bulk)) score -= 3
+    }
+
+    if (score > bestScore) {
+      bestScore = score
+      bestProduct = product
+    }
+  }
+
+  // DECISION: Score < 2 means too few query words matched — weak match, let Haiku handle it
+  if (bestScore < 2) {
+    console.log(`[BUY-SEARCH] pickBestProduct: best score=${bestScore} too low, skipping`)
+    return null
+  }
+
+  console.log(`[BUY-SEARCH] pickBestProduct: score=${bestScore} — "${bestProduct!.title}"`)
+  return bestProduct
+}
+
+// ─── Per-Part RS Scraper ────────────────────────────────────────────
+
+/**
+ * Scrape RS Components for a single buy part.
+ * 1. Search RS for the cleaned part name
+ * 2. Extract product data from embedded __NEXT_DATA__ JSON
+ * 3. If products found → return first match (price already in JSON, no verification needed)
+ * 4. If extraction fails → use Haiku on stripped text as fallback
+ *
+ * @param partName - Original BOM part name
+ * @param apiKey - Anthropic API key for Haiku fallback
+ * @returns Search result with products array
+ */
+async function scrapePartFromRS(
+  partName: string,
+  apiKey: string,
+): Promise<BuyPartSearchResult> {
+  // INTENT: Skip parts RS can't supply — avoids wildly wrong matches (e.g. fibre optic dome for custom shell)
+  if (isUnsourceableFromRS(partName)) {
+    console.log(`[BUY-SEARCH] SKIP "${partName}": unsourceable from RS`)
+    return { partName, products: [] }
+  }
+
+  const cleaned = cleanPartName(partName)
+  const searchUrl = `${RS_BASE}/web/c/?searchTerm=${encodeURIComponent(cleaned)}`
+
+  console.log(`[BUY-SEARCH] Scraping RS for "${partName}" → ${searchUrl}`)
+
+  const searchPage = await fetchPageRaw(searchUrl)
+  if (!searchPage) {
+    console.log(`[BUY-SEARCH] SKIP "${partName}": RS search page fetch failed`)
+    return { partName, products: [] }
+  }
+
+  // INTENT: Extract product data directly from RS's embedded JSON payload
+  // Price, title, and URL are all available — no second fetch or verification needed
+  const rsProducts = extractRSProducts(searchPage.html)
+
+  if (rsProducts.length > 0) {
+    // DECISION: Score all candidates instead of blindly picking rsProducts[0]
+    // Avoids bulk kits (£73.46) being chosen over specific parts (£6.25)
+    const best = pickBestProduct(rsProducts, cleaned)
+    if (best) {
+      console.log(`[BUY-SEARCH] RS JSON hit for "${partName}": £${best.price.toFixed(2)} — "${best.title}"`)
+      return {
+        partName,
+        products: [
+          {
+            title: best.title,
+            url: best.url,
+            source: "RS Components",
+            estimatedPrice: `£${best.price.toFixed(2)}`,
+            numericPrice: best.price,
+          },
+        ],
+      }
+    }
+    console.log(`[BUY-SEARCH] No strong RS match for "${partName}" (${rsProducts.length} candidates scored too low)`)
+  }
+
+  // INTENT: JSON extraction failed (structure changed, blocked, etc.) — Haiku fallback on stripped text
+  console.log(`[BUY-SEARCH] No RS JSON products for "${partName}", trying Haiku fallback on search page`)
+
+  const strippedText = searchPage.html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()
+  if (strippedText.length < MIN_TEXT_LENGTH) {
+    console.log(`[BUY-SEARCH] SKIP "${partName}": search page too sparse (${strippedText.length} chars)`)
+    return { partName, products: [] }
+  }
+
+  try {
+    const client = new Anthropic({ apiKey })
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 256,
+      messages: [
+        {
+          role: "user",
+          content: `This is an RS Components (uk.rs-online.com) search results page for "${cleaned}".
+Find the best matching product and extract its details.
+
+Return ONLY valid JSON, no markdown:
+{"title": "Product name", "price": 12.34, "url": "https://uk.rs-online.com/web/p/..."}
+
+If you cannot find a matching product, return: {"title": "", "price": 0, "url": ""}
+
+Page content (first 4000 chars):
+${strippedText.slice(0, 4000)}`,
+        },
+      ],
+    })
+
+    const text = response.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      if (parsed.price && parsed.price > 0) {
+        console.log(`[BUY-SEARCH] Haiku search page hit for "${partName}": £${parsed.price.toFixed(2)} — "${parsed.title || ""}"`)
+        return {
+          partName,
+          products: [
+            {
+              title: parsed.title || cleaned,
+              url: parsed.url || searchUrl,
+              source: "RS Components",
+              estimatedPrice: `£${parsed.price.toFixed(2)}`,
+              numericPrice: parsed.price,
+            },
+          ],
+        }
+      }
+    }
+
+    console.log(`[BUY-SEARCH] Haiku search page miss for "${partName}"`)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.log(`[BUY-SEARCH] Haiku fallback error for "${partName}": ${message}`)
+  }
+
+  return { partName, products: [] }
+}
+
+// ─── Concurrency Limiter ────────────────────────────────────────────
+
+/**
+ * Simple semaphore-style concurrency limiter.
+ * Processes tasks with at most `limit` running concurrently.
+ */
+async function withConcurrencyLimit<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const index = nextIndex++
+      try {
+        results[index] = { status: "fulfilled", value: await tasks[index]() }
+      } catch (reason) {
+        results[index] = { status: "rejected", reason }
+      }
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker())
+  await Promise.all(workers)
+
+  return results
+}
+
 // ─── Server Action ──────────────────────────────────────────────────
 
 export async function searchBuyPartProducts(
@@ -308,160 +624,18 @@ export async function searchBuyPartProducts(
     return partNames.map((name) => ({ partName: name, products: [] }))
   }
 
-  const client = new Anthropic({ apiKey })
-  const allResults: BuyPartSearchResult[] = []
+  console.log(`[BUY-SEARCH] Starting direct RS scrape for ${partNames.length} parts (concurrency=${SCRAPE_CONCURRENCY})`)
 
-  // Batch parts into groups of BATCH_SIZE
-  const batches: string[][] = []
-  for (let i = 0; i < partNames.length; i += BATCH_SIZE) {
-    batches.push(partNames.slice(i, i + BATCH_SIZE))
-  }
+  const tasks = partNames.map((name) => () => scrapePartFromRS(name, apiKey))
+  const settled = await withConcurrencyLimit(tasks, SCRAPE_CONCURRENCY)
 
-  let totalInputTokens = 0
-  let totalOutputTokens = 0
+  const allResults: BuyPartSearchResult[] = settled.map((s, i) => {
+    if (s.status === "fulfilled") return s.value
+    console.error(`[BUY-SEARCH] Part "${partNames[i]}" scrape rejected:`, s.reason)
+    return { partName: partNames[i], products: [] }
+  })
 
-  for (const batch of batches) {
-    try {
-      const partList = batch.map((name, i) => `${i + 1}. ${cleanPartName(name)}`).join("\n")
-      console.log(`[BUY-SEARCH] Searching batch of ${batch.length} parts:`, batch.map((n) => `"${n}" → "${cleanPartName(n)}"`).join(", "))
-
-      const systemPrompt = `You are a procurement assistant. Search for purchase URLs for engineering/manufacturing parts from UK industrial suppliers: RS Components (uk.rs-online.com), Farnell (uk.farnell.com), Misumi (uk.misumi-ec.com), McMaster-Carr (mcmaster.com), or any relevant supplier.
-
-For each part:
-1. Search for the exact part by name/specification
-2. Open the product page on the supplier website
-3. Read the ACTUAL listed price from the product page (not a guess — the real GBP price shown on the page)
-4. Copy the direct product URL (not a search results page)
-
-You MUST visit the actual product page to get the real price. Do not estimate or guess prices.
-
-Return your results as a JSON array. IMPORTANT: Return ONLY valid JSON, no markdown code fences, no explanation.
-[
-  {
-    "partName": "exact part name from the list",
-    "products": [
-      { "title": "Product listing title", "url": "https://uk.rs-online.com/web/p/...", "source": "RS Components", "estimatedPrice": "£0.12" }
-    ]
-  }
-]
-
-For estimatedPrice: use the exact price shown on the product page in GBP. If the page shows a quantity-based price, use the unit price for qty 1.
-If you cannot find a product for a part, include it with an empty products array.`
-
-      let response = await client.messages.create({
-        model: "claude-sonnet-4-5-20250514",
-        max_tokens: 8192,
-        system: systemPrompt,
-        tools: [{ type: "web_search_20260209" as any, name: "web_search", max_uses: 20 }],
-        messages: [
-          {
-            role: "user",
-            content: `Find purchase URLs and exact listed prices for these parts. Visit each product page to read the real price.\n\n${partList}`,
-          },
-        ],
-      })
-
-      // Handle pause_turn responses (web search continuation)
-      let turns = 0
-      while (response.stop_reason === "pause_turn" && turns < 12) {
-        turns++
-        console.log(`[BUY-SEARCH] pause_turn #${turns}, continuing…`)
-        response = await client.messages.create({
-          model: "claude-sonnet-4-5-20250514",
-          max_tokens: 8192,
-          system: systemPrompt,
-          tools: [{ type: "web_search_20260209" as any, name: "web_search", max_uses: 20 }],
-          messages: [
-            {
-              role: "user",
-              content: `Find purchase URLs for these parts:\n\n${partList}`,
-            },
-            { role: "assistant", content: response.content },
-            { role: "user", content: "Continue searching and provide the final JSON results." },
-          ],
-        })
-      }
-
-      totalInputTokens += response.usage?.input_tokens ?? 0
-      totalOutputTokens += response.usage?.output_tokens ?? 0
-
-      // Diagnostic logging
-      const blockTypes = response.content.map((b) => b.type)
-      console.log(`[BUY-SEARCH] stop_reason=${response.stop_reason}, blocks=[${blockTypes.join(",")}], turns=${turns}`)
-
-      // Extract text content from response
-      const textBlocks = response.content.filter(
-        (block): block is Anthropic.TextBlock => block.type === "text",
-      )
-      const text = textBlocks.map((b) => b.text).join("")
-
-      if (!text) {
-        console.warn(`[BUY-SEARCH] No text blocks in response. Block types: [${blockTypes.join(",")}]`)
-        // INTENT: If Sonnet only returned tool_use/web_search blocks but no text, the search
-        // completed but Sonnet never produced a final JSON summary. Push empty results.
-        allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
-        continue
-      }
-
-      console.log(`[BUY-SEARCH] Response text length: ${text.length} chars, first 200: ${text.slice(0, 200)}`)
-
-      // Build normalized→original name map for this batch
-      const normalizedToOriginal = new Map<string, string>()
-      for (const name of batch) {
-        normalizedToOriginal.set(normalizeForMatch(cleanPartName(name)), name)
-      }
-
-      // Parse JSON from response
-      try {
-        // INTENT: Strip markdown fences before extraction — Sonnet often wraps JSON in ```json ... ```
-        const stripped = text.replace(/```(?:json)?\s*([\s\S]*?)```/g, "$1")
-        // INTENT: Try targeted regex first (array starting with [{ and ending with }])
-        // then fall back to greedy match. Greedy \[[\s\S]*\] fails when response
-        // contains unrelated brackets like "I found [these items]..."
-        const jsonMatch = stripped.match(/\[\s*\{[\s\S]*\}\s*\]/) ?? stripped.match(/\[[\s\S]*\]/)
-
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]) as BuyPartSearchResult[]
-          // INTENT: Map Sonnet's returned names back to original BOM names.
-          // Uses normalized matching (strips hyphens, special chars, parens) + positional fallback.
-          for (let ri = 0; ri < parsed.length; ri++) {
-            const result = parsed[ri]
-            // DECISION: Also try normalizing WITHOUT cleanPartName so "stainless" etc. in the
-            // returned name can match the full BOM name's normalized form.
-            const matched = normalizedToOriginal.get(normalizeForMatch(result.partName))
-              ?? normalizedToOriginal.get(normalizeForMatch(cleanPartName(result.partName)))
-            if (matched) {
-              result.partName = matched
-            } else if (ri < batch.length) {
-              // Positional fallback — Sonnet usually returns results in input order
-              console.log(`[BUY-SEARCH] Name mismatch: "${result.partName}" → positional fallback to "${batch[ri]}"`)
-              result.partName = batch[ri]
-            }
-          }
-          const withProducts = parsed.filter((r) => r.products.length > 0).length
-          console.log(`[BUY-SEARCH] Batch results: ${withProducts}/${parsed.length} parts have products`)
-          allResults.push(...parsed)
-        } else {
-          console.warn(`[BUY-SEARCH] No JSON found in response. Raw text (first 500 chars): ${text.slice(0, 500)}`)
-          allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
-        }
-      } catch (parseErr) {
-        console.error(`[BUY-SEARCH] Failed to parse JSON response:`, parseErr, `\nRaw text (first 500 chars): ${text.slice(0, 500)}`)
-        allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
-      }
-    } catch (err) {
-      console.error("[BUY-SEARCH] Batch search failed:", err)
-      allResults.push(...batch.map((name) => ({ partName: name, products: [] })))
-    }
-  }
-
-  // INTENT: Log usage for cost monitoring (no server-side tracking without auth context)
-  if (totalInputTokens > 0 || totalOutputTokens > 0) {
-    const cost = (totalInputTokens * 3.00 + totalOutputTokens * 15.00) / 1_000_000
-    console.log(`[BUY-SEARCH] Sonnet usage: ${totalInputTokens} in / ${totalOutputTokens} out ≈ $${cost.toFixed(4)}`)
-  }
-
-  // Post-process: parse numeric prices from estimatedPrice strings
+  // Post-process: parse numeric prices from estimatedPrice strings (for any missing)
   for (const result of allResults) {
     for (const product of result.products) {
       if (product.estimatedPrice && product.numericPrice == null) {
@@ -472,64 +646,6 @@ If you cannot find a product for a part, include it with an empty products array
         }
       }
     }
-  }
-
-  // ── Step 2: Price verification — 3-tier pipeline (JSON-LD → meta → Haiku) ──
-  // DECISION: Verify ALL URLs, not just non-search ones. The old searchTerm= filter excluded everything.
-  const verificationsToRun: Array<{ resultIndex: number; productIndex: number; url: string; partName: string }> = []
-  for (let ri = 0; ri < allResults.length; ri++) {
-    const result = allResults[ri]
-    if (result.products.length > 0) {
-      verificationsToRun.push({
-        resultIndex: ri,
-        productIndex: 0,
-        url: result.products[0].url,
-        partName: result.partName,
-      })
-    }
-  }
-
-  if (verificationsToRun.length > 0 && apiKey) {
-    console.log(`[BUY-VERIFY] Starting verification for ${verificationsToRun.length} products (batches of ${VERIFY_CONCURRENCY}, ${VERIFY_BATCH_DELAY_MS}ms delay)`)
-
-    let verifiedCount = 0
-
-    // Process in batches of VERIFY_CONCURRENCY with delay between batches
-    for (let i = 0; i < verificationsToRun.length; i += VERIFY_CONCURRENCY) {
-      const batch = verificationsToRun.slice(i, i + VERIFY_CONCURRENCY)
-
-      const settled = await Promise.allSettled(
-        batch.map(async (v) => {
-          const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 15_000))
-          const verified = await Promise.race([verifyProductPrice(v.url, apiKey, v.partName), timeout])
-          return { ...v, verified }
-        }),
-      )
-
-      for (const s of settled) {
-        if (s.status === "fulfilled" && s.value.verified) {
-          const { resultIndex, productIndex, verified, partName } = s.value
-          const product = allResults[resultIndex].products[productIndex]
-          console.log(`[BUY-VERIFY] VERIFIED "${partName}": £${verified.price.toFixed(2)} (was "${product.estimatedPrice || "none"}")`)
-          product.estimatedPrice = `£${verified.price.toFixed(2)}`
-          product.numericPrice = verified.price
-          if (verified.url && verified.url !== product.url) product.url = verified.url
-          if (verified.title) product.title = verified.title
-          verifiedCount++
-        } else if (s.status === "fulfilled") {
-          console.log(`[BUY-VERIFY] MISS "${s.value.partName}": no price extracted from ${s.value.url}`)
-        } else {
-          console.log(`[BUY-VERIFY] ERROR: verification rejected — ${s.reason}`)
-        }
-      }
-
-      // Delay between batches to avoid overwhelming suppliers
-      if (i + VERIFY_CONCURRENCY < verificationsToRun.length) {
-        await new Promise((resolve) => setTimeout(resolve, VERIFY_BATCH_DELAY_MS))
-      }
-    }
-
-    console.log(`[BUY-VERIFY] Done: ${verifiedCount}/${verificationsToRun.length} products verified with real prices`)
   }
 
   const totalWithProducts = allResults.filter((r) => r.products.length > 0).length
