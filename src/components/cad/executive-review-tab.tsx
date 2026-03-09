@@ -23,12 +23,14 @@ interface ExecutiveReviewTabProps {
   modules: CadLabModule[]
   diagnosticAnswers: DiagnosticAnswers
   context: "design" | "sourcing"
+  useCase?: string
 }
 
 export function ExecutiveReviewTab({
   modules,
   diagnosticAnswers,
   context,
+  useCase,
 }: ExecutiveReviewTabProps) {
   const [experts, setExperts] = useState<MatchedExpert[]>([])
   const [loading, setLoading] = useState(false)
@@ -49,8 +51,8 @@ export function ExecutiveReviewTab({
     }
   }, [modules, diagnosticAnswers])
 
-  // INTENT: Fingerprint changes when processes, materials, or context change → triggers re-fetch.
-  const fingerprint = `${projectNeeds.processes.join(",")}|${projectNeeds.materials.join(",")}|${context}`
+  // INTENT: Fingerprint changes when processes, materials, context, or useCase change → triggers re-fetch.
+  const fingerprint = `${projectNeeds.processes.join(",")}|${projectNeeds.materials.join(",")}|${context}|${useCase ?? ""}`
 
   const fetchExperts = useCallback(async () => {
     if (projectNeeds.processes.length === 0 && projectNeeds.materials.length === 0) return
@@ -60,6 +62,7 @@ export function ExecutiveReviewTab({
         processes: projectNeeds.processes,
         materials: projectNeeds.materials,
         context,
+        useCase,
       })
       setExperts(result.experts)
     } catch (error) {
@@ -67,7 +70,7 @@ export function ExecutiveReviewTab({
     } finally {
       setLoading(false)
     }
-  }, [projectNeeds.processes, projectNeeds.materials, context])
+  }, [projectNeeds.processes, projectNeeds.materials, context, useCase])
 
   // INTENT: Auto-fetch when the fingerprint changes (new processes/materials/context).
   // Skips if no diagnostic data, or if already fetched with the same fingerprint.
@@ -163,14 +166,17 @@ export function ExecutiveReviewTab({
             {experts.length} executive{experts.length !== 1 ? "s" : ""} matched for {contextLabel}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {experts.map(({ expert, matchScore, matchReasons }) => (
+            {experts.map(({ expert, matchScore, matchReasons, sourceLabel }) => (
               <div key={expert.id} className="space-y-2">
                 <ExpertCard expert={expert} />
                 <div className="px-1 flex flex-wrap items-center gap-1.5">
                   <Badge variant="info" className="text-[10px]">
                     {matchScore}pt match
                   </Badge>
-                  {matchReasons.slice(0, 2).map((reason) => (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {sourceLabel}
+                  </Badge>
+                  {matchReasons.slice(0, 4).map((reason) => (
                     <span key={reason} className="text-[10px] text-muted-foreground">
                       {reason}
                     </span>

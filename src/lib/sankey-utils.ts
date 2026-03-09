@@ -7,7 +7,8 @@
  */
 
 import { getChartColor } from "@/lib/chart-colors"
-import type { CadLabModule, AiCostEstimate } from "@/lib/cad-lab-types"
+import { classifyPart } from "@/lib/part-classification"
+import type { CadLabModule, AiCostEstimate, PartCategoryOverride } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 
@@ -188,68 +189,13 @@ export function buildUniqueSuppliers(
   return [...map.values()].sort((a, b) => b.bestScore - a.bestScore)
 }
 
-// ─── Part classification ─────────────────────────────────────────────
-
-// INTENT: Deterministic two-pass classification for keyParts and AI estimate parts.
-// Make indicators take PRIORITY over buy keywords to prevent false positives
-// on compound names like "motor mount bracket" or "sensor housing".
-
-const MAKE_INDICATORS = /\b(machined|cnc.machined|milled|turned|welded|fabricated|cast|moulded|molded|printed|forged|bent|formed|stamped|extruded|laser.cut|anodized|anodised|powder.coated|bracket|housing|frame|plate|enclosure|chassis|baseplate|panel|structure|duct|manifold|fixture|shell|body|cavity|guard|tray|channel|spar|strut|rib|bulkhead|tank|rudder|blade|nozzle|impeller|exhaust|piping|keel|hull|mast|boom|foil|fin|canopy|fairing|cowl|shroud|baffle|pedestal|mount|flange|collar|sleeve|weldment|tube|pipe)s?\b/i
-
-const BUY_KEYWORDS = /\b(motor|servo|stepper|sensor|switch|batter(?:y|ies)|power suppl(?:y|ies)|microcontroller|pcb|arduino|raspberry|cable|connector|bearing|linear rail|lead screw|belt|pulley|gear|fastener|bolt|screw|nut|washer|seal|o-ring|spring|fan|pump|valve|display|led|camera|encoder|driver|esc|fuse|relay|capacitor|resistor|transistor|diode|regulator|thermostat|gauge|meter|indicator|antenna|transponder|gps|transducer|solenoid|actuator|contactor|breaker|terminal|epirb|vhf|radar|anemometer|compass|standoff|isolator|bushing|grommet|hose|fitting|rivet|pin|dowel|circlip|shim|gasket|filter)s?\b/i
-
-const PROCESS_PATTERNS: [RegExp, string][] = [
-  [/\b(cnc.machin\w*|milled|turned|lathe)\b/i, "CNC Machining"],
-  [/\b(weld\w*|tig.weld\w*|mig.weld\w*)\b/i, "Welding"],
-  [/\b(sheet.metal|laser.cut\w*|bent|fold\w*|punch\w*|stamp\w*)\b/i, "Sheet Metal"],
-  [/\b(injection.mould\w*|injection.mold\w*)\b/i, "Injection Moulding"],
-  [/\b(3d.print\w*|fdm|sla|sls)\b/i, "3D Printing"],
-  [/\b(cast(?:ing)?|die.cast\w*)\b/i, "Casting"],
-  [/\b(composite|carbon.fib\w*|fibre.glass|fiber.glass|layup)\b/i, "Composites"],
-  [/\b(extrud\w*|extrusion)\b/i, "Extrusion"],
-]
-
-const MATERIAL_PATTERNS: [RegExp, string][] = [
-  [/\b(6061|alumini?um alloy)\b/i, "Aluminum 6061"],
-  [/\b(mild steel|carbon steel)\b/i, "Mild Steel"],
-  [/\b(stainless|304|316)\b/i, "Stainless Steel"],
-  [/\b(abs)\b/i, "ABS"],
-  [/\b(nylon|pa6|pa66)\b/i, "Nylon"],
-  [/\b(tpu|rubber)\b/i, "TPU/Rubber"],
-  [/\b(brass)\b/i, "Brass"],
-  [/\b(titanium)\b/i, "Titanium"],
-  [/\b(polycarbonate|pc)\b/i, "Polycarbonate"],
-]
-
-function classifyPart(
-  name: string,
-  fallbackProcess: string,
-  fallbackMaterial: string,
-): { type: "buy" | "make"; process: string; material: string; explicit: boolean } {
-  // Make indicators take priority — prevents false positives
-  const isMake = MAKE_INDICATORS.test(name)
-  if (!isMake && BUY_KEYWORDS.test(name)) {
-    return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true }
-  }
-  // Detect actual process from text (instead of blindly using module diagnostic)
-  let process = fallbackProcess
-  for (const [re, label] of PROCESS_PATTERNS) {
-    if (re.test(name)) { process = label; break }
-  }
-  // Detect actual material from text
-  let material = fallbackMaterial
-  for (const [re, label] of MATERIAL_PATTERNS) {
-    if (re.test(name)) { material = label; break }
-  }
-  return { type: "make", process, material, explicit: isMake }
-}
-
 // ─── Build Sankey data ───────────────────────────────────────────────
 
 export function buildSankeyData(
   modules: CadLabModule[],
   diagnosticAnswers: DiagnosticAnswers | undefined,
   aiCostEstimates: Record<string, AiCostEstimate> | undefined,
+  partCategoryOverrides?: Record<string, PartCategoryOverride>,
 ): { moduleNodes: ModuleNode[]; categories: CategoryNode[]; totalParts: number } {
   const moduleNodes: ModuleNode[] = []
   const catMap = new Map<string, CategoryNode>()
@@ -275,9 +221,16 @@ export function buildSankeyData(
       for (const part of costEstimate.parts!) {
         // Safety net: explicit keyword detection overrides AI classification in BOTH directions
         const cls = classifyPart(part.name, diag?.mfg_process || "Unknown Process", diag?.material || "Unknown Material")
-        const effectiveType = cls.explicit ? cls.type : part.type
-        const process = effectiveType === "buy" ? "Buy" : (part.process || cls.process)
-        const material = effectiveType === "buy" ? "Off-the-shelf" : (part.material || cls.material)
+        // DECISION: Override priority chain: user override → text-detected → AI → fallback
+        const partKey = `${mod.id}::${part.name}`
+        const override = partCategoryOverrides?.[partKey]
+        const effectiveType = override?.type ?? (cls.explicit ? cls.type : part.type)
+        // DECISION: Text-detected values override AI — prevents Haiku's wrong "Aluminum"
+        // from beating classifier's text-detected "Stainless Steel" or "Copper".
+        const process = effectiveType === "buy" ? "Buy"
+          : (override?.process ?? (cls.processDetected ? cls.process : (part.process || cls.process)))
+        const material = effectiveType === "buy" ? "Off-the-shelf"
+          : (override?.material ?? (cls.materialDetected ? cls.material : (part.material || cls.material)))
         const catKey = `${process}-${material}-${effectiveType}`.toLowerCase().replace(/\s+/g, "_")
 
         node.partNames.push(part.name)

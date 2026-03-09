@@ -342,6 +342,8 @@ export interface CadLabModule {
   leadWeeks: number
   /** AI-estimated mass in kg from decomposition (product-scale-aware) */
   estimatedMassKg?: number
+  /** ID of the primary module this mirrors (e.g. right_leg mirrors left_leg) */
+  mirrorOf?: string
   /** Technical description (1-2 paragraphs) */
   description: string
   /** Why this module is critical to the system */
@@ -458,6 +460,8 @@ export interface SkeletonModule {
   inputs: string[]
   /** Output streams/signals */
   outputs: string[]
+  /** ID of the primary module this mirrors (e.g. right_leg mirrors left_leg) */
+  mirrorOf?: string
 }
 
 /** Result from the fast skeleton decomposition (Phase 1). */
@@ -487,6 +491,7 @@ export interface ModuleExpansionResult {
   expansion?: {
     keyParts: string[]
     leadWeeks: number
+    estimatedMassKg?: number
     description: string
     whyItMatters: string
     failureModes: string[]
@@ -795,6 +800,10 @@ export interface PartCostEstimate {
   cost: number
   /** Plain English reasoning for this part's cost */
   reasoning: string
+  /** Inferred manufacturing process for make parts (e.g. "CNC Machining", "Sheet Metal") */
+  process?: string
+  /** Inferred material for make parts (e.g. "Aluminum 6061", "Stainless 304") */
+  material?: string
 }
 
 /** Structured per-module cost estimate produced by AI (Claude Haiku).
@@ -832,6 +841,16 @@ export interface AiCostEstimate {
   finishMultiplier?: number
   environmentMultiplier?: number
   adjustmentReasoning?: string
+}
+
+// ─── Part Classification Override Types ───────────────────────────────
+
+/** User override for a part's classification (type, process, material).
+ *  Keyed by `${moduleId}::${partName}` in the overrides map. */
+export interface PartCategoryOverride {
+  type?: "buy" | "make"
+  process?: string
+  material?: string
 }
 
 /** Pipeline stage for the 4-stage product development flow */

@@ -11,7 +11,7 @@
  * Gate: redirects to Source if no research or no specified modules.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react"
+import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -26,19 +26,15 @@ import {
   ShieldCheck,
   CircleDot,
   Circle,
+  ExternalLink,
+  Check,
+  Info,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
 import { useCadLab } from "../cad-lab-context"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { matchAssemblyCompanies } from "@/actions/assembly-match"
@@ -48,10 +44,14 @@ import { AssemblyBrandingSpec } from "@/components/cad/assembly-branding-spec"
 import { AssemblyShipping } from "@/components/cad/assembly-shipping"
 import { AssemblyCostRollup } from "@/components/cad/assembly-cost-rollup"
 import { AssemblyLeadTime } from "@/components/cad/assembly-lead-time"
+import { SupplierDetailDialog } from "@/components/cad/supplier-detail-dialog"
+import { AssemblerCompareDialog } from "@/components/cad/assembler-compare-dialog"
+import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
 import { toast } from "sonner"
 import {
   DEFAULT_BRANDING,
   DEFAULT_SHIPPING,
+  recommendAssemblerConfig,
 } from "@/lib/assembly-utils"
 import type {
   AssemblyCompanyMatch,
@@ -59,6 +59,8 @@ import type {
   BrandingSpec,
   ShippingConfig,
 } from "@/lib/assembly-utils"
+import { inferRequiredSpecialties } from "@/lib/cad-lab/assembly-capability-map"
+import type { CategoryInput } from "@/lib/cad-lab/assembly-capability-map"
 import type { OrderTrackingStep } from "@/lib/assembly-utils"
 import type { OrderLineSummary } from "@/actions/assembly"
 import type { ShortlistedSupplier } from "../source/page"
@@ -128,7 +130,14 @@ export default function AssemblePage(): React.ReactNode {
   const matchesKey = pid ? `forge-assembly-matches-${pid}` : null
 
   const [assemblerMatches, setAssemblerMatchesRaw] = useState<AssemblyCompanyMatch[]>(
-    () => loadJson<AssemblyCompanyMatch[]>(matchesKey, []),
+    () => loadJson<AssemblyCompanyMatch[]>(matchesKey, []).map((m) => ({
+      ...m,
+      // GOTCHA: Stale localStorage from before specialty-aware scoring has no specialty fields.
+      // Without defaults, .length / .map() on undefined crashes the page.
+      specialties: m.specialties ?? [],
+      matchedSpecialties: m.matchedSpecialties ?? [],
+      missingSpecialties: m.missingSpecialties ?? [],
+    })),
   )
   const setAssemblerMatches = useCallback((matches: AssemblyCompanyMatch[]) => {
     setAssemblerMatchesRaw(matches)
@@ -194,11 +203,36 @@ export default function AssemblePage(): React.ReactNode {
       .catch(() => { /* non-blocking */ })
   }, [pid])
 
+  // ── Required specialties (persisted so badges survive page reload) ──
+  const reqSpecsKey = pid ? `forge-assembly-req-specs-${pid}` : null
+
+  const [requiredSpecialties, setRequiredSpecialtiesRaw] = useState<string[]>(
+    () => loadJson<string[]>(reqSpecsKey, []),
+  )
+  const setRequiredSpecialties = useCallback((specs: string[]) => {
+    setRequiredSpecialtiesRaw(specs)
+    saveJson(reqSpecsKey, specs)
+  }, [reqSpecsKey])
+
   // ── Match assemblers action ──
   const handleMatchAssemblers = useCallback(async () => {
     if (eligibleModules.length === 0) return
     setIsMatching(true)
     try {
+      // INTENT: Build categories BEFORE calling server action so we can pass them for specialty scoring
+      const { categories } = await import("@/lib/sankey-utils").then((mod) =>
+        mod.buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates),
+      )
+      const categoryInputs: CategoryInput[] = categories.map((c) => ({
+        id: c.id,
+        process: c.process,
+        material: c.material,
+        type: c.type as "buy" | "make",
+        parts: c.parts,
+      }))
+      const reqSpecs = inferRequiredSpecialties(categoryInputs)
+      setRequiredSpecialties(reqSpecs)
+
       const processTypes = new Set<string>()
       const materialTypes = new Set<string>()
       for (const mod of eligibleModules) {
@@ -212,32 +246,33 @@ export default function AssemblePage(): React.ReactNode {
         productDescription: eligibleModules.map((m) => `${m.name}: ${m.purpose}`).join(". "),
         processTypes: [...processTypes],
         materialTypes: [...materialTypes],
+        categories: categoryInputs,
       })
 
       setAssemblerMatches(matches)
 
-      // INTENT: Auto-assign top match as Tier 2 (final assembly) with all categories
+      // INTENT: Use specialty-aware recommendation instead of naive top-match auto-assign
       if (matches.length > 0) {
-        const { categories } = await import("@/lib/sankey-utils").then((mod) =>
-          mod.buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates),
-        )
-        const top = matches[0]
-        setTierConfig([[top.id, {
-          assemblerId: top.id,
-          assemblerName: top.name,
-          tierLevel: 2,
-          assignedCategories: categories.map((c) => c.id),
-        }]])
-      }
+        const recommended = recommendAssemblerConfig(matches, categoryInputs)
+        const newTierConfig: [string, AssemblyTierNode][] = recommended.map((node) => [node.assemblerId, node])
+        setTierConfig(newTierConfig)
 
-      toast.success(`Found ${matches.length} assembly companies`)
+        const tier1Count = recommended.filter((n) => n.tierLevel === 1).length
+        if (tier1Count > 0) {
+          toast.success(`Found ${matches.length} assemblers — multi-assembler config (${tier1Count} sub + 1 final)`)
+        } else {
+          toast.success(`Found ${matches.length} assembly companies`)
+        }
+      } else {
+        toast.success("No assembly companies matched")
+      }
     } catch (err) {
       console.error("[ASSEMBLE] Match failed:", err)
       toast.error("Failed to match assembly companies")
     } finally {
       setIsMatching(false)
     }
-  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, subject, setAssemblerMatches, setTierConfig])
+  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, subject, setAssemblerMatches, setTierConfig, setRequiredSpecialties])
 
   // ── Assign category to assembler ──
   const handleAssignCategory = useCallback((categoryId: string, assemblerId: string) => {
@@ -267,17 +302,37 @@ export default function AssemblePage(): React.ReactNode {
   }, [tierKey])
 
   // ── Select a different assembler as Tier 2 (final assembly) ──
+  // INTENT: When Tier 1 sub-assemblers exist, preserve them and only replace the Tier 2 node
   const handleSelectAssembler = useCallback(async (match: AssemblyCompanyMatch) => {
     const { buildSankeyData } = await import("@/lib/sankey-utils")
     const { categories } = buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates)
-    setTierConfig([[match.id, {
-      assemblerId: match.id,
-      assemblerName: match.name,
-      tierLevel: 2,
-      assignedCategories: categories.map((c) => c.id),
-    }]])
+
+    const tier1Entries = tierConfig.filter(([, node]) => node.tierLevel === 1)
+
+    if (tier1Entries.length > 0) {
+      // Preserve Tier 1 sub-assemblers, replace only Tier 2
+      const tier1CatIds = new Set(tier1Entries.flatMap(([, node]) => node.assignedCategories))
+      const remainingCatIds = categories.map((c) => c.id).filter((id) => !tier1CatIds.has(id))
+      setTierConfig([
+        ...tier1Entries,
+        [match.id, {
+          assemblerId: match.id,
+          assemblerName: match.name,
+          tierLevel: 2,
+          assignedCategories: remainingCatIds,
+        }],
+      ])
+    } else {
+      // No Tier 1 nodes — assign all categories (existing behavior)
+      setTierConfig([[match.id, {
+        assemblerId: match.id,
+        assemblerName: match.name,
+        tierLevel: 2,
+        assignedCategories: categories.map((c) => c.id),
+      }]])
+    }
     toast.success(`${match.name} set as assembler`)
-  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, setTierConfig])
+  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, tierConfig, setTierConfig])
 
   // ── Active assembler ID (the Tier 2 entry) ──
   const activeAssemblerId = useMemo(() => {
@@ -336,6 +391,24 @@ export default function AssemblePage(): React.ReactNode {
 
   const [activeTab, setActiveTab] = useState("flow")
   const [selectedAssembler, setSelectedAssembler] = useState<AssemblyCompanyMatch | null>(null)
+  const assemblerDetailCache = useRef(new Map<string, SupplierDetail>())
+
+  // ── Compare selection ──
+  const [compareIds, setCompareIds] = useState<Set<string>>(new Set())
+  const [showCompare, setShowCompare] = useState(false)
+
+  const toggleCompare = useCallback((id: string) => {
+    setCompareIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) { next.delete(id) } else { next.add(id) }
+      return next
+    })
+  }, [])
+
+  const compareAssemblers = useMemo(
+    () => assemblerMatches.filter((m) => compareIds.has(m.id)),
+    [assemblerMatches, compareIds],
+  )
 
   // INTENT: Read tab from URL after hydration — avoids React #418.
   useEffect(() => {
@@ -465,11 +538,33 @@ export default function AssemblePage(): React.ReactNode {
                     Matched Assembly Companies
                   </p>
 
+                  {/* ── Required specialties badges ── */}
+                  {requiredSpecialties.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mb-3">
+                      <span className="text-[10px] text-muted-foreground font-medium mr-1">Required:</span>
+                      {requiredSpecialties.map((s) => (
+                        <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {s.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ── Multi-assembler banner ── */}
+                  {tierConfig.some(([, node]) => node.tierLevel === 1) && (
+                    <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-info/10 border border-info/20">
+                      <Info className="h-3.5 w-3.5 text-info shrink-0" />
+                      <p className="text-xs text-info">
+                        Multi-assembler configuration — sub-assemblers handle specialist work before final assembly.
+                      </p>
+                    </div>
+                  )}
+
                   {/* ── Scoring legend ── */}
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 px-1 py-2 rounded-lg bg-muted/50">
                     {[
                       { label: "S", full: "Semantic", max: 30 },
-                      { label: "C", full: "Capability", max: 25 },
+                      { label: "C", full: "Specialty Coverage", max: 25 },
                       { label: "F", full: "Capacity", max: 15 },
                       { label: "Q", full: "Quality", max: 15 },
                       { label: "K", full: "Keyword", max: 15 },
@@ -490,7 +585,7 @@ export default function AssemblePage(): React.ReactNode {
                       const isActive = match.id === activeAssemblerId
                       const scoreItems = [
                         { label: "S", full: "Semantic", value: match.scoreBreakdown.semantic, max: 30 },
-                        { label: "C", full: "Capability", value: match.scoreBreakdown.capability, max: 25 },
+                        { label: "C", full: "Specialty Coverage", value: match.scoreBreakdown.capability, max: 25 },
                         { label: "F", full: "Capacity", value: match.scoreBreakdown.capacity, max: 15 },
                         { label: "Q", full: "Quality", value: match.scoreBreakdown.quality, max: 15 },
                         { label: "K", full: "Keyword", value: match.scoreBreakdown.keyword, max: 15 },
@@ -504,9 +599,26 @@ export default function AssemblePage(): React.ReactNode {
                             isActive
                               ? "border-international-orange ring-1 ring-international-orange/30"
                               : "border-border",
+                            compareIds.has(match.id) && "ring-1 ring-info/30",
                           )}
                         >
                           <div className="flex items-start justify-between gap-4">
+                            {/* Compare checkbox */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleCompare(match.id)
+                              }}
+                              className={cn(
+                                "shrink-0 mt-0.5 h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                                compareIds.has(match.id)
+                                  ? "bg-international-orange border-international-orange"
+                                  : "border-border hover:border-international-orange/50",
+                              )}
+                              aria-label={`${compareIds.has(match.id) ? "Deselect" : "Select"} ${match.name} for comparison`}
+                            >
+                              {compareIds.has(match.id) && <Check className="h-3 w-3 text-primary-foreground" />}
+                            </button>
                             {/* Left: radio dot + name, meta, reasons */}
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2">
@@ -554,6 +666,34 @@ export default function AssemblePage(): React.ReactNode {
                                   </span>
                                 ))}
                               </div>
+                              {/* Specialty coverage badges */}
+                              {(match.matchedSpecialties.length > 0 || match.missingSpecialties.length > 0) && (
+                                <div className="flex items-center gap-1 mt-1.5 ml-6 flex-wrap">
+                                  {match.matchedSpecialties.map((s) => (
+                                    <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-success/10 text-success">
+                                      {s.replace(/_/g, " ")}
+                                    </span>
+                                  ))}
+                                  {match.missingSpecialties.map((s) => (
+                                    <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground line-through">
+                                      {s.replace(/_/g, " ")}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Website URL */}
+                              {match.websiteUrl && (
+                                <a
+                                  href={match.websiteUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-xs text-info hover:text-info/80 transition-colors ml-6 mt-1"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  {match.websiteUrl.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                                </a>
+                              )}
                               {/* Certifications */}
                               {match.certifications.length > 0 && (
                                 <div className="flex items-center gap-1.5 mt-1.5 ml-6">
@@ -608,151 +748,16 @@ export default function AssemblePage(): React.ReactNode {
               </Card>
             )}
 
-            {/* ── Assembler detail Dialog ── */}
-            <Dialog open={!!selectedAssembler} onOpenChange={(open) => { if (!open) setSelectedAssembler(null) }}>
-              <DialogContent size="md">
-                {selectedAssembler && (
-                  <>
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        {selectedAssembler.name}
-                        {selectedAssembler.isVerified && (
-                          <ShieldCheck className="h-4 w-4 text-success" />
-                        )}
-                      </DialogTitle>
-                      <DialogDescription>
-                        Assembly company details and match breakdown
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 mt-2">
-                      {/* Quick facts */}
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                        {selectedAssembler.locationCountry && (
-                          <span className="flex items-center gap-1">
-                            <MapPin className="h-3.5 w-3.5" />
-                            {selectedAssembler.locationCountry}
-                          </span>
-                        )}
-                        {selectedAssembler.typicalLeadDays && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {selectedAssembler.typicalLeadDays} days lead time
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Capabilities */}
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Capabilities</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedAssembler.capabilities.map((c) => (
-                            <span key={c} className="text-xs text-foreground bg-muted px-2 py-1 rounded-md">
-                              {c.replace(/_/g, " ")}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Score breakdown */}
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Score Breakdown</p>
-                        <div className="space-y-1.5">
-                          {[
-                            { label: "S", full: "Semantic match", value: selectedAssembler.scoreBreakdown.semantic, max: 30 },
-                            { label: "C", full: "Capability match", value: selectedAssembler.scoreBreakdown.capability, max: 25 },
-                            { label: "F", full: "Capacity/availability", value: selectedAssembler.scoreBreakdown.capacity, max: 15 },
-                            { label: "Q", full: "Quality signals", value: selectedAssembler.scoreBreakdown.quality, max: 15 },
-                            { label: "K", full: "Keyword match", value: selectedAssembler.scoreBreakdown.keyword, max: 15 },
-                          ].map(({ label, full, value, max }) => (
-                            <div key={label} className="flex items-center gap-2">
-                              <div
-                                className="h-5 w-5 rounded text-[8px] font-bold flex items-center justify-center shrink-0"
-                                style={{
-                                  backgroundColor: value > max * 0.5 ? "#05966920" : value > 0 ? "#d9770620" : "#f1f5f9",
-                                  color: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
-                                }}
-                              >
-                                {label}
-                              </div>
-                              <span className="text-sm text-foreground w-40">{full}</span>
-                              <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{
-                                    width: `${(value / max) * 100}%`,
-                                    backgroundColor: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
-                                  }}
-                                />
-                              </div>
-                              <span className="text-xs text-muted-foreground font-mono w-12 text-right">{value}/{max}</span>
-                            </div>
-                          ))}
-                          <div className="flex items-center gap-2 pt-1 border-t border-border">
-                            <span className="text-sm font-semibold text-foreground ml-7 w-40">Total</span>
-                            <div className="flex-1" />
-                            <span className={`text-sm font-bold font-mono px-2 py-0.5 rounded-full ${
-                              selectedAssembler.matchScore >= 50
-                                ? "bg-success/10 text-success"
-                                : selectedAssembler.matchScore >= 30
-                                  ? "bg-warning/10 text-warning"
-                                  : "bg-muted text-muted-foreground"
-                            }`}>
-                              {Math.round(selectedAssembler.matchScore)}/100
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Match reasons */}
-                      {selectedAssembler.matchReasons.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Why this match</p>
-                          <ul className="space-y-1">
-                            {selectedAssembler.matchReasons.map((reason, i) => (
-                              <li key={i} className="text-sm text-muted-foreground flex items-start gap-1.5">
-                                <span className="text-international-orange mt-0.5">&#x2022;</span>
-                                {reason}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Certifications */}
-                      {selectedAssembler.certifications.length > 0 && (
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Certifications</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {selectedAssembler.certifications.map((cert) => (
-                              <span key={cert} className="text-xs text-foreground bg-success/10 text-success px-2 py-1 rounded-md">
-                                {cert}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Use as Assembler action */}
-                      {selectedAssembler.id !== activeAssemblerId && (
-                        <div className="pt-2 border-t border-border">
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              handleSelectAssembler(selectedAssembler)
-                              setSelectedAssembler(null)
-                            }}
-                            className="w-full"
-                          >
-                            Use as Assembler
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </DialogContent>
-            </Dialog>
+            {/* ── Assembler detail Dialog (standard formatting) ── */}
+            <SupplierDetailDialog
+              open={!!selectedAssembler}
+              onOpenChange={(open) => { if (!open) setSelectedAssembler(null) }}
+              supplierId={selectedAssembler?.id ?? null}
+              supplierName={selectedAssembler?.name}
+              matchScore={selectedAssembler?.matchScore}
+              matchReasons={selectedAssembler?.matchReasons}
+              cache={assemblerDetailCache}
+            />
           </motion.div>
         )}
 
@@ -792,6 +797,46 @@ export default function AssemblePage(): React.ReactNode {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ── Floating Compare bar ── */}
+      <AnimatePresence>
+        {compareIds.size >= 2 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 300 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-full bg-card border border-border shadow-lg px-5 py-2.5"
+          >
+            <Button size="sm" onClick={() => setShowCompare(true)}>
+              Compare ({compareIds.size})
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setCompareIds(new Set())}
+            >
+              Clear
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Assembler compare dialog ── */}
+      <AssemblerCompareDialog
+        open={showCompare}
+        onOpenChange={setShowCompare}
+        assemblers={compareAssemblers}
+        onRemove={(id) => {
+          setCompareIds((prev) => {
+            const next = new Set(prev)
+            next.delete(id)
+            return next
+          })
+          // Close dialog if fewer than 2 remain
+          if (compareIds.size <= 2) setShowCompare(false)
+        }}
+      />
     </div>
   )
 }

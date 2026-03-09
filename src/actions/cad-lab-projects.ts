@@ -28,6 +28,7 @@ import type {
   ModuleConnection,
   SpecialistReview,
   AiCostEstimate,
+  PartCategoryOverride,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 
@@ -118,6 +119,9 @@ export interface CadLabProjectData {
 
   /** AI-powered cost estimates per module (keyed by moduleId) */
   aiCostEstimates: Record<string, AiCostEstimate> | null
+
+  /** User overrides for part classification (keyed by "${moduleId}::${partName}") */
+  partCategoryOverrides: Record<string, PartCategoryOverride> | null
 
   /** Project-level design version (v1 = initial, v2+ = post-review revision) */
   designRevision: number
@@ -240,6 +244,7 @@ export async function loadCadLabProject(
         unifiedCode: project.unified_code ?? null,
         reviews: (project.reviews as Record<string, SpecialistReview[]> | null) ?? null,
         aiCostEstimates: (project.ai_cost_estimates as Record<string, AiCostEstimate> | null) ?? null,
+        partCategoryOverrides: (project.part_category_overrides as Record<string, PartCategoryOverride> | null) ?? null,
         designRevision: (project.design_revision as number) ?? 1,
         imagesGeneratedAtRevision: (project.images_generated_at_revision as number) ?? 1,
         reviewSkipped: (project.review_skipped as boolean) ?? false,
@@ -1140,6 +1145,36 @@ export async function saveCadLabAiCostEstimates(
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save AI cost estimates:", error.message)
       return { error: `Failed to save AI cost estimates: ${sanitizeErrorMessage(error)}` }
+    }
+
+    return { success: true as const }
+  })
+}
+
+// ─── Save Part Category Overrides ────────────────────────────────────
+
+/**
+ * Persists user overrides for part classification (type/process/material).
+ *
+ * @param projectId - The project to update
+ * @param overrides - Overrides keyed by "${moduleId}::${partName}"
+ * @returns Success or error
+ */
+export async function saveCadLabPartCategoryOverrides(
+  projectId: string,
+  overrides: Record<string, PartCategoryOverride>,
+): Promise<{ success: true } | { error: string }> {
+  return withAuth(async ({ supabase }) => {
+    if (!projectId) return { error: "Project ID required" }
+
+    const { error } = await supabase
+      .from("cad_lab_projects")
+      .update({ part_category_overrides: overrides as unknown as Json })
+      .eq("id", projectId)
+
+    if (error) {
+      console.error("[THE-FORGE-PROJECTS] Failed to save part category overrides:", error.message)
+      return { error: `Failed to save part category overrides: ${sanitizeErrorMessage(error)}` }
     }
 
     return { success: true as const }

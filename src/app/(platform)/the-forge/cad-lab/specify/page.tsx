@@ -1354,6 +1354,7 @@ export default function SpecifyPage(): React.ReactNode {
               modules={modules}
               diagnosticAnswers={diagnosticAnswers}
               context="design"
+              useCase={designBrief.useCase}
             />
           </motion.div>
         )}

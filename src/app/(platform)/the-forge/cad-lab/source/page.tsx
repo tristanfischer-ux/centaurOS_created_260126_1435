@@ -672,6 +672,24 @@ export default function SourcePage(): React.ReactNode {
               buySearchLoading={buySearchLoading}
               onRefreshBuyParts={() => handleSearchBuyParts(buyPartNames)}
             />
+            {/* INTENT: Show re-search button when all buy parts returned empty (stale cache from RS blocking) */}
+            {buyPartResults.length > 0 &&
+              buyPartResults.every((r) => r.products.length === 0) &&
+              !buySearchLoading && (
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setBuyPartResults([])
+                    buySearchTriggeredRef.current = false
+                    handleSearchBuyParts(buyPartNames)
+                  }}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Re-search suppliers
+                </Button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -696,6 +714,24 @@ export default function SourcePage(): React.ReactNode {
                 ))
               }}
             />
+            {/* INTENT: Show re-search button when all buy parts returned empty (stale cache from RS blocking) */}
+            {buyPartResults.length > 0 &&
+              buyPartResults.every((r) => r.products.length === 0) &&
+              !buySearchLoading && (
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setBuyPartResults([])
+                    buySearchTriggeredRef.current = false
+                    handleSearchBuyParts(buyPartNames)
+                  }}
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" /> Re-search suppliers
+                </Button>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -717,6 +753,7 @@ export default function SourcePage(): React.ReactNode {
               modules={eligibleModules}
               diagnosticAnswers={diagnosticAnswers}
               context="sourcing"
+              useCase={designBrief?.useCase}
             />
           </motion.div>
         )}

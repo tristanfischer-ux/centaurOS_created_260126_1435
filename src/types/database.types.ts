@@ -3871,6 +3871,7 @@ export type Database = {
           model_id: string
           modules: Json | null
           name: string
+          part_category_overrides: Json | null
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
           product_overview: string | null
           quality_ratings: Json | null
@@ -3911,6 +3912,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
           quality_ratings?: Json | null
@@ -3951,6 +3953,7 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
           quality_ratings?: Json | null

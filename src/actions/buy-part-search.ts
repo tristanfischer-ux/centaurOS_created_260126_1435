@@ -44,8 +44,9 @@ const RS_BASE = "https://uk.rs-online.com"
  */
 function cleanPartName(name: string): string {
   return name
-    .replace(/\s*\(.*\)\s*/g, "")                          // remove parenthesized suffixes
-    .replace(/\s*[×x]\s*\d+/gi, "")                        // remove ×12, x4 etc.
+    .replace(/\s*\(.*\)\s*/g, "")                          // remove parenthesized suffixes (handles "×8 top" inside parens)
+    // DECISION: Removed [×x]\s*\d+ — was stripping dimensions ("M4 × 12" → "M4").
+    // Quantity markers like "×8" are inside parens and already handled above.
     .replace(/,\s*(bought|outsourced|custom|fabricated)\b/gi, "")  // strip BOM status metadata
     .replace(/[–—]/g, " ")                                  // em-dashes → spaces
     .replace(/\s+/g, " ")                                   // collapse whitespace
@@ -446,8 +447,10 @@ function pickBestProduct(products: RSProduct[], cleanedQuery: string): RSProduct
     }
   }
 
-  // DECISION: Score < 2 means too few query words matched — weak match, let Haiku handle it
-  if (bestScore < 2) {
+  // DECISION: Score < 1 means no query words matched at all — truly irrelevant.
+  // Was < 2 but that rejected short part names with only 1 matching word (e.g. "encoder").
+  // The bulk indicator penalty (-3) still protects against kits.
+  if (bestScore < 1) {
     console.log(`[BUY-SEARCH] pickBestProduct: best score=${bestScore} too low, skipping`)
     return null
   }
@@ -611,6 +614,119 @@ async function withConcurrencyLimit<T>(
   return results
 }
 
+// ─── Web Search Fallback (pre-v7 Sonnet approach) ───────────────────
+
+/**
+ * Fallback: use Sonnet + web_search tool to find buy part products.
+ * Restores the pre-v7 approach for when RS direct scraping fails (IP blocking on Vercel).
+ * Anthropic handles the web fetching, so no IP blocking issues.
+ *
+ * @param partNames - Array of original BOM part names to search
+ * @param apiKey - Anthropic API key
+ * @returns Search results for each part
+ */
+async function searchViaWebSearch(
+  partNames: string[],
+  apiKey: string,
+): Promise<BuyPartSearchResult[]> {
+  const client = new Anthropic({ apiKey })
+  const allResults: BuyPartSearchResult[] = []
+
+  // INTENT: Batch parts into groups of 5 to balance cost vs quality
+  const batchSize = 5
+  for (let i = 0; i < partNames.length; i += batchSize) {
+    const batch = partNames.slice(i, i + batchSize)
+    const cleanedBatch = batch.map((n) => ({ original: n, cleaned: cleanPartName(n) }))
+
+    const partList = cleanedBatch.map((p, idx) => `${idx + 1}. "${p.cleaned}"`).join("\n")
+
+    try {
+      let messages: Anthropic.MessageParam[] = [
+        {
+          role: "user",
+          content: `Find UK supplier products (with prices in GBP) for these parts. Search RS Components, Farnell, DigiKey, or McMaster-Carr.\n\n${partList}\n\nFor each part, return the best matching product with title, URL, price (GBP), and source.\nReturn a JSON array:\n[{"partName": "original name", "title": "Product Title", "url": "https://...", "price": 12.34, "source": "RS Components"}]\n\nIf you cannot find a product for a part, omit it from the array.`,
+        },
+      ]
+
+      let finalText = ""
+      const maxTurns = 8
+
+      for (let turn = 0; turn < maxTurns; turn++) {
+        const response = await client.messages.create({
+          model: "claude-sonnet-4-5-20250514",
+          max_tokens: 4096,
+          system: "You are a procurement assistant. Find real products from UK electronic/mechanical component suppliers. Always search for actual products with real prices. Return only valid JSON.",
+          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
+          messages,
+        })
+
+        // INTENT: Collect text blocks from the response
+        for (const block of response.content) {
+          if (block.type === "text") finalText += block.text
+        }
+
+        // INTENT: Handle pause_turn — model needs more tool calls to finish
+        if (response.stop_reason === "pause_turn") {
+          messages = [
+            ...messages,
+            { role: "assistant", content: response.content },
+            { role: "user", content: "Continue searching for the remaining parts." },
+          ]
+          continue
+        }
+
+        break // end_turn or max_tokens — done
+      }
+
+      // INTENT: Parse JSON array from response text
+      const jsonMatch = finalText.match(/\[[\s\S]*\]/)
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]) as Array<{
+          partName?: string
+          title?: string
+          url?: string
+          price?: number
+          source?: string
+        }>
+
+        for (const item of parsed) {
+          if (!item.title || !item.price || item.price <= 0) continue
+          if (isUnsourceableFromRS(item.partName || "")) continue
+
+          // INTENT: Map cleaned name back to original BOM name
+          const matchedPart = cleanedBatch.find(
+            (p) =>
+              p.cleaned.toLowerCase() === (item.partName || "").toLowerCase() ||
+              p.original.toLowerCase() === (item.partName || "").toLowerCase(),
+          )
+          const originalName = matchedPart?.original || item.partName || ""
+          if (!originalName) continue
+
+          allResults.push({
+            partName: originalName,
+            products: [
+              {
+                title: item.title,
+                url: item.url || "",
+                source: item.source || "Web Search",
+                estimatedPrice: `£${item.price.toFixed(2)}`,
+                numericPrice: item.price,
+              },
+            ],
+          })
+        }
+      }
+
+      console.log(`[BUY-SEARCH] Web search batch ${Math.floor(i / batchSize) + 1}: found ${allResults.length} products so far`)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      console.error(`[BUY-SEARCH] Web search batch failed: ${message}`)
+    }
+  }
+
+  return allResults
+}
+
 // ─── Server Action ──────────────────────────────────────────────────
 
 export async function searchBuyPartProducts(
@@ -645,6 +761,21 @@ export async function searchBuyPartProducts(
           if (!isNaN(num)) product.numericPrice = num
         }
       }
+    }
+  }
+
+  // INTENT: If RS blocked (>60% failure), fall back to web_search for failed parts only.
+  // RS blocks Vercel IPs intermittently — Sonnet web_search bypasses this since Anthropic handles fetching.
+  const failedParts = allResults.filter((r) => r.products.length === 0).map((r) => r.partName)
+  const failRate = allResults.length > 0 ? failedParts.length / allResults.length : 0
+
+  if (failRate > 0.6 && failedParts.length > 0) {
+    console.log(`[BUY-SEARCH] RS fail rate ${Math.round(failRate * 100)}% — falling back to web_search for ${failedParts.length} parts`)
+    const webResults = await searchViaWebSearch(failedParts, apiKey)
+    // INTENT: Merge — replace empty RS results with web_search results
+    for (const wr of webResults) {
+      const idx = allResults.findIndex((r) => r.partName === wr.partName)
+      if (idx >= 0 && wr.products.length > 0) allResults[idx] = wr
     }
   }
 

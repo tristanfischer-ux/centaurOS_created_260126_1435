@@ -19,6 +19,7 @@
 import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
+import { classifyPart } from "@/lib/part-classification"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -218,22 +219,19 @@ Return ONLY valid JSON.`
           if (typeof part.material !== "string" || !part.material) delete part.material
         }
       }
-      // INTENT: Two-pass reclassification — make indicators take PRIORITY over buy
-      // keywords to prevent false positives on compound names like "motor mount bracket".
-      const MAKE_INDICATORS = /\b(machined|cnc.machined|milled|turned|welded|fabricated|cast|moulded|molded|printed|forged|bent|formed|stamped|extruded|laser.cut|bracket|housing|frame|plate|enclosure|chassis|baseplate|panel|structure|duct|manifold|fixture|shell|body|cavity|guard|tray|channel|spar|strut|rib|bulkhead|tank|rudder|blade|nozzle|impeller|exhaust|piping|keel|hull|mast|boom|foil|fin|canopy|fairing|cowl|shroud|baffle|pedestal|mount|flange|collar|sleeve|weldment|tube|pipe)s?\b/i
-      const BUY_KEYWORDS = /\b(motor|servo|stepper|sensor|switch|batter(?:y|ies)|power suppl(?:y|ies)|microcontroller|pcb|arduino|raspberry|cable|connector|bearing|linear rail|lead screw|belt|pulley|gear|fastener|bolt|screw|nut|washer|seal|o-ring|spring|fan|pump|valve|display|led|camera|encoder|driver|esc|fuse|relay|capacitor|resistor|transistor|diode|regulator|thermostat|gauge|meter|indicator|antenna|transponder|gps|transducer|solenoid|actuator|contactor|breaker|terminal|epirb|vhf|radar|anemometer|compass|standoff|isolator|bushing|grommet|hose|fitting|rivet|pin|dowel|circlip|shim|gasket|filter)s?\b/i
+      // INTENT: Safety net — shared classifyPart() overrides AI when explicit keyword match found.
+      // DECISION: "make wins" on dual-match (consistent with Sankey). See part-classification.ts.
       const diag = diagnosticAnswers[mod.id]
       for (const part of est.parts) {
-        if (part.type === "make" && !MAKE_INDICATORS.test(part.name) && BUY_KEYWORDS.test(part.name)) {
-          part.type = "buy"
-          delete part.process
-          delete part.material
-        }
-        // INTENT: Reverse override — buy→make when make indicators match but buy keywords don't
-        if (part.type === "buy" && MAKE_INDICATORS.test(part.name) && !BUY_KEYWORDS.test(part.name)) {
-          part.type = "make"
-          part.process = part.process || diag?.mfg_process || "Manual/Assembly"
-          part.material = part.material || diag?.material || "Other"
+        const cls = classifyPart(part.name, diag?.mfg_process || "Manual/Assembly", diag?.material || "Other")
+        if (cls.explicit) {
+          if (cls.type === "buy") { part.type = "buy"; delete part.process; delete part.material }
+          else {
+            part.type = "make"
+            // DECISION: Text-detected values override AI (same logic as sankey-utils.ts)
+            part.process = cls.processDetected ? cls.process : (part.process || cls.process)
+            part.material = cls.materialDetected ? cls.material : (part.material || cls.material)
+          }
         }
       }
 

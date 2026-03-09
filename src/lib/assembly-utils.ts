@@ -27,6 +27,10 @@ export interface AssemblyCompanyMatch {
   typicalLeadDays: number | null
   locationCountry: string | null
   certifications: string[]
+  websiteUrl: string | null
+  specialties: string[]            // raw specialties from DB
+  matchedSpecialties: string[]     // which required specialties this company covers
+  missingSpecialties: string[]     // which required specialties this company is missing
 }
 
 // ─── Assembly Tier Config ───────────────────────────────────────────
@@ -146,3 +150,99 @@ export const ORDER_TRACKING_STEPS = [
 ] as const
 
 export type OrderTrackingStep = typeof ORDER_TRACKING_STEPS[number]
+
+// ─── Multi-assembler recommendation ─────────────────────────────────
+
+/** Maps a category process name to its dominant required specialty */
+function categoryToSpecialty(process: string): string | null {
+  const p = process.toLowerCase()
+  if (/pcb|circuit|electronic|pcba/.test(p)) return "pcba_assembly"
+  if (/cable|harness|wiring/.test(p)) return "cable_harness"
+  if (/cnc|machining|sheet_metal|casting|grinding|welding|3d_print|extrusion|manual/.test(p)) return "mechanical_assembly"
+  return null
+}
+
+/**
+ * Recommends a single or multi-assembler tier config based on specialty coverage.
+ *
+ * @param matches - Scored assembly companies (sorted by score desc)
+ * @param categories - Sankey categories with process/id
+ * @param requiredSpecialties - From inferRequiredSpecialties()
+ * @returns AssemblyTierNode[] — Tier 2 = final assembler, Tier 1 = sub-assemblers
+ */
+export function recommendAssemblerConfig(
+  matches: AssemblyCompanyMatch[],
+  categories: { id: string; process: string }[],
+): AssemblyTierNode[] {
+  if (matches.length === 0 || categories.length === 0) return []
+
+  const top = matches[0]
+
+  // INTENT: Simple products or fully-covered → single Tier 2 (existing behavior)
+  // GOTCHA: Defensive ?? [] guards against stale localStorage objects missing these fields
+  if ((top.missingSpecialties ?? []).length === 0 || categories.length <= 2) {
+    return [{
+      assemblerId: top.id,
+      assemblerName: top.name,
+      tierLevel: 2,
+      assignedCategories: categories.map((c) => c.id),
+    }]
+  }
+
+  // Pick best "final assembler": highest score among companies with system_integration or box_build
+  const finalAssembler = matches.find((m) =>
+    (m.matchedSpecialties ?? []).includes("system_integration") || (m.matchedSpecialties ?? []).includes("box_build"),
+  ) ?? top
+
+  const finalSpecSet = new Set(finalAssembler.matchedSpecialties ?? [])
+  const uncoveredCategories: { id: string; specialty: string }[] = []
+  const finalCategories: string[] = []
+
+  for (const cat of categories) {
+    const specialty = categoryToSpecialty(cat.process)
+    if (!specialty || finalSpecSet.has(specialty)) {
+      finalCategories.push(cat.id)
+    } else {
+      uncoveredCategories.push({ id: cat.id, specialty })
+    }
+  }
+
+  const nodes: AssemblyTierNode[] = []
+
+  // Greedily assign sub-assemblers for uncovered category specialties
+  const subAssigned = new Map<string, string[]>() // assemblerId → categoryIds
+  for (const { id: catId, specialty } of uncoveredCategories) {
+    const sub = matches.find((m) =>
+      m.id !== finalAssembler.id && (m.matchedSpecialties ?? []).includes(specialty),
+    )
+    if (sub) {
+      const existing = subAssigned.get(sub.id) ?? []
+      existing.push(catId)
+      subAssigned.set(sub.id, existing)
+    } else {
+      // No sub-assembler covers this — assign to final assembler
+      finalCategories.push(catId)
+    }
+  }
+
+  // Build Tier 1 nodes (sub-assemblers)
+  for (const [subId, catIds] of subAssigned) {
+    const subMatch = matches.find((m) => m.id === subId)!
+    nodes.push({
+      assemblerId: subId,
+      assemblerName: subMatch.name,
+      tierLevel: 1,
+      assignedCategories: catIds,
+    })
+  }
+
+  // Final assembler as Tier 2
+  nodes.push({
+    assemblerId: finalAssembler.id,
+    assemblerName: finalAssembler.name,
+    tierLevel: 2,
+    assignedCategories: finalCategories,
+  })
+
+  return nodes
+}

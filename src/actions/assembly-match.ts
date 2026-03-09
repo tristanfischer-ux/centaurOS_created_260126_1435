@@ -27,6 +27,8 @@
 import { createClient } from "@/lib/supabase/server"
 import { ASSEMBLY_KEYWORDS } from "@/lib/assembly-utils"
 import type { AssemblyCompanyMatch, AssemblyScoreBreakdown } from "@/lib/assembly-utils"
+import { inferRequiredSpecialties, specialtyCoverageScore } from "@/lib/cad-lab/assembly-capability-map"
+import type { CategoryInput } from "@/lib/cad-lab/assembly-capability-map"
 
 // ─── Input ──────────────────────────────────────────────────────────
 
@@ -35,6 +37,7 @@ interface AssemblyMatchInput {
   productDescription: string
   processTypes: string[]
   materialTypes: string[]
+  categories?: CategoryInput[]   // Optional: enables specialty-weighted scoring
 }
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -78,6 +81,11 @@ export async function matchAssemblyCompanies(
 ): Promise<AssemblyCompanyMatch[]> {
   const supabase = await createClient()
 
+  // INTENT: If categories provided, infer required specialties for weighted scoring
+  const requiredSpecialties = input.categories
+    ? inferRequiredSpecialties(input.categories)
+    : []
+
   // ── Step 1: Query fulfillment_capabilities for assemblers (primary) ──
 
   const { data: assemblerCaps } = await supabase
@@ -107,7 +115,7 @@ export async function matchAssemblyCompanies(
 
   const { data: verifiedListings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, is_verified, subcategory, category, specialties, certifications, attributes, lead_time, company_size, city, country")
+    .select("id, title, description, is_verified, subcategory, category, specialties, certifications, attributes, lead_time, company_size, city, country, website_url")
     .or("specialties.cs.[\"contract_assembly\"],attributes->>assembly_verified.eq.true")
     .eq("approval_status", "approved")
     .limit(40)
@@ -131,8 +139,11 @@ export async function matchAssemblyCompanies(
       const id = profile.id
       const name = profile.company_name ?? `Assembler ${id.slice(0, 8)}`
 
-      // Capability score: assemblers get full 25pts
+      // INTENT: Fulfillment capabilities don't have specialties — flat 25pts (backwards compat)
       const capabilityScore = 25
+      const companySpecialties: string[] = []
+      const matchedSpecs: string[] = []
+      const missingSpecs: string[] = [...requiredSpecialties]
 
       // Capacity score (15pts max): concurrent jobs (5pts), lead days <=30 (5pts), certifications (5pts)
       let capacityScore = 0
@@ -149,8 +160,6 @@ export async function matchAssemblyCompanies(
       const { score: kwRaw, matchedTerms } = scoreKeywords(name)
       const keywordScore = Math.round(kwRaw * 15 * 10) / 10
 
-      // Semantic: if we have a listing match for this provider, use it
-      // (cross-reference would need listing_id, so use 0 for direct capability matches)
       const semanticScore = 0
 
       const breakdown: AssemblyScoreBreakdown = {
@@ -185,6 +194,10 @@ export async function matchAssemblyCompanies(
             typicalLeadDays: cap.typical_lead_days,
             locationCountry: cap.location_country,
             certifications: cap.certifications ?? [],
+            websiteUrl: null,
+            specialties: companySpecialties,
+            matchedSpecialties: matchedSpecs,
+            missingSpecialties: missingSpecs,
           })
         }
       }
@@ -197,8 +210,26 @@ export async function matchAssemblyCompanies(
   for (const listing of listings) {
     const listingText = `${listing.title} ${listing.description ?? ""} ${listing.subcategory ?? ""}`.toLowerCase()
 
-    // Capability: verified assembly companies get full 25pts
-    const capabilityScore = 25
+    // INTENT: Read specialties from DB (JSONB array) for coverage scoring
+    const companySpecialties = Array.isArray(listing.specialties)
+      ? (listing.specialties as string[])
+      : []
+
+    // Capability: weighted by specialty coverage if categories provided, else flat 25pts
+    let capabilityScore: number
+    let matchedSpecs: string[]
+    let missingSpecs: string[]
+
+    if (requiredSpecialties.length > 0) {
+      const coverage = specialtyCoverageScore(companySpecialties, requiredSpecialties)
+      capabilityScore = Math.round(coverage.score * 25 * 10) / 10
+      matchedSpecs = coverage.matched
+      missingSpecs = coverage.missing
+    } else {
+      capabilityScore = 25
+      matchedSpecs = []
+      missingSpecs = []
+    }
 
     // Capacity: extract from promoted columns if available
     let capacityScore = 0
@@ -216,7 +247,6 @@ export async function matchAssemblyCompanies(
     const { score: kwRaw, matchedTerms } = scoreKeywords(listingText)
     const keywordScore = Math.round(kwRaw * 15 * 10) / 10
 
-    // Semantic: 0 (no embedding lookup for targeted query)
     const semanticScore = 0
 
     const breakdown: AssemblyScoreBreakdown = {
@@ -233,8 +263,11 @@ export async function matchAssemblyCompanies(
     if (total >= MIN_SCORE_THRESHOLD) {
       const reasons: string[] = ["Verified assembly company"]
       if (listing.subcategory) reasons.push(listing.subcategory)
-      if (listingCerts.length > 0) reasons.push(`Certs: ${listingCerts.slice(0, 2).join(", ")}`)
-      if (matchedTerms.length > 0 && reasons.length < 3) reasons.push(`Keywords: ${matchedTerms.slice(0, 2).join(", ")}`)
+      if (matchedSpecs.length > 0) {
+        reasons.push(`Covers: ${matchedSpecs.slice(0, 3).map((s) => s.replace(/_/g, " ")).join(", ")}`)
+      }
+      if (listingCerts.length > 0 && reasons.length < 4) reasons.push(`Certs: ${listingCerts.slice(0, 2).join(", ")}`)
+      if (matchedTerms.length > 0 && reasons.length < 4) reasons.push(`Keywords: ${matchedTerms.slice(0, 2).join(", ")}`)
 
       const existing = matchMap.get(listing.id)
       if (!existing || total > existing.matchScore) {
@@ -249,6 +282,10 @@ export async function matchAssemblyCompanies(
           typicalLeadDays: listing.lead_time ? parseInt(listing.lead_time.match(/\d+/)?.[0] ?? "0", 10) || null : null,
           locationCountry: listing.country ?? null,
           certifications: listingCerts,
+          websiteUrl: listing.website_url ?? null,
+          specialties: companySpecialties,
+          matchedSpecialties: matchedSpecs,
+          missingSpecialties: missingSpecs,
         })
       }
     }
@@ -261,7 +298,27 @@ export async function matchAssemblyCompanies(
     const key = m.name.toLowerCase()
     const existing = deduped.get(key)
     if (!existing || m.matchScore > existing.matchScore) {
-      deduped.set(key, m)
+      // GOTCHA: When fulfillment_capabilities entry (flat 25pts, empty specialties) wins
+      // over marketplace listing (weighted, real specialties), merge specialty data from
+      // the losing entry so the UI still shows accurate specialty badges.
+      if (existing && existing.specialties.length > 0 && m.specialties.length === 0) {
+        deduped.set(key, {
+          ...m,
+          specialties: existing.specialties,
+          matchedSpecialties: existing.matchedSpecialties,
+          missingSpecialties: existing.missingSpecialties,
+        })
+      } else {
+        deduped.set(key, m)
+      }
+    } else if (existing && existing.specialties.length === 0 && m.specialties.length > 0) {
+      // Existing entry won on score but has no specialty data — take it from the loser
+      deduped.set(key, {
+        ...existing,
+        specialties: m.specialties,
+        matchedSpecialties: m.matchedSpecialties,
+        missingSpecialties: m.missingSpecialties,
+      })
     }
   }
 

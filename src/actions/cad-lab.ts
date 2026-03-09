@@ -2409,20 +2409,30 @@ export async function skeletonDecompose(
       }
     }
 
-    // Validate skeleton modules (lightweight — just id, name, purpose, inputs, outputs)
+    // Validate skeleton modules (lightweight — just id, name, purpose, inputs, outputs, mirrorOf)
     const modules: SkeletonModule[] = rawModules.map((raw) => {
       const m = raw as Record<string, unknown>
+      const mirrorOfRaw = m.mirrorOf
       return {
         id: String(m.id || "unknown").toLowerCase().replace(/\s+/g, "_"),
         name: String(m.name || "Unnamed Module"),
         purpose: String(m.purpose || ""),
         inputs: Array.isArray(m.inputs) ? m.inputs.map(String) : ["Input"],
         outputs: Array.isArray(m.outputs) ? m.outputs.map(String) : ["Output"],
+        ...(typeof mirrorOfRaw === "string" && mirrorOfRaw.trim() ? { mirrorOf: mirrorOfRaw.trim().toLowerCase().replace(/\s+/g, "_") } : {}),
       }
     })
 
-    // Validate connections against skeleton modules
+    // Validate mirrorOf references — must point to a real module ID
     const moduleIds = new Set(modules.map(m => m.id))
+    for (const mod of modules) {
+      if (mod.mirrorOf && !moduleIds.has(mod.mirrorOf)) {
+        console.warn(`[THE-FORGE] Dropped invalid mirrorOf: ${mod.id} → ${mod.mirrorOf}`)
+        delete mod.mirrorOf
+      }
+    }
+
+    // Validate connections against skeleton modules
     const modulePortLookup = new Map(modules.map(m => [m.id, { inputs: m.inputs, outputs: m.outputs }]))
     let connections: ModuleConnection[] | undefined
 
@@ -2555,6 +2565,8 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
       expansion: {
         keyParts: Array.isArray(parsed.keyParts) ? parsed.keyParts.map(String) : [],
         leadWeeks: typeof parsed.leadWeeks === "number" ? parsed.leadWeeks : 4,
+        estimatedMassKg: typeof parsed.estimatedMassKg === "number" && parsed.estimatedMassKg > 0
+          ? parsed.estimatedMassKg : undefined,
         description: String(parsed.description || ""),
         whyItMatters: String(parsed.whyItMatters || ""),
         failureModes: Array.isArray(parsed.failureModes) ? parsed.failureModes.map(String) : [],
@@ -2828,6 +2840,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     // Validate and clean each module
     const modules: CadLabModule[] = rawModules.map((raw) => {
       const m = raw as Record<string, unknown>
+      const mirrorOfRaw = m.mirrorOf
       return {
         id: String(m.id || "unknown").toLowerCase().replace(/\s+/g, "_"),
         name: String(m.name || "Unnamed Module"),
@@ -2838,6 +2851,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : 4,
         estimatedMassKg: typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0
           ? m.estimatedMassKg : undefined,
+        ...(typeof mirrorOfRaw === "string" && mirrorOfRaw.trim() ? { mirrorOf: mirrorOfRaw.trim().toLowerCase().replace(/\s+/g, "_") } : {}),
         description: String(m.description || ""),
         whyItMatters: String(m.whyItMatters || ""),
         failureModes: Array.isArray(m.failureModes) ? m.failureModes.map(String) : [],
@@ -2846,8 +2860,14 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     })
 
-    // Validate connections against parsed modules
+    // Validate mirrorOf references — must point to a real module ID
     const moduleIds = new Set(modules.map(m => m.id))
+    for (const mod of modules) {
+      if (mod.mirrorOf && !moduleIds.has(mod.mirrorOf)) {
+        console.warn(`[THE-FORGE] Dropped invalid mirrorOf: ${mod.id} → ${mod.mirrorOf}`)
+        delete mod.mirrorOf
+      }
+    }
     const modulePortLookup = new Map(modules.map(m => [m.id, { inputs: m.inputs, outputs: m.outputs }]))
     let connections: ModuleConnection[] | undefined
 
