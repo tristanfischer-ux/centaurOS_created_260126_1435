@@ -497,7 +497,7 @@ export function ShortlistCoverageFlow({
                     opacity={getOpacity(catId)}
                     className="transition-opacity duration-200"
                   >
-                    {truncate(c.label, 65)}
+                    {truncate(c.label, 90)}
                     <title>{c.label} — {c.partCount} part{c.partCount !== 1 ? "s" : ""}</title>
                   </text>
                   {/* Inline parts with colored dots */}
@@ -518,7 +518,7 @@ export function ShortlistCoverageFlow({
                           fontSize={9}
                           fill="#475569"
                         >
-                          {truncate(part.name, 70)}
+                          {truncate(part.name, 110)}
                         </text>
                       </g>
                     )
@@ -561,7 +561,7 @@ export function ShortlistCoverageFlow({
                     opacity={getOpacity(rankId)}
                     className="transition-opacity duration-200"
                   >
-                    {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 55)}
+                    {truncate(sortedCategories.find((c) => c.id === group.catId)?.label ?? "", 70)}
                   </text>
 
                   {/* Buy: text rows aligned 1:1 with left-side parts (source + price) */}
