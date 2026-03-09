@@ -188,6 +188,62 @@ export function buildUniqueSuppliers(
   return [...map.values()].sort((a, b) => b.bestScore - a.bestScore)
 }
 
+// ─── Part classification ─────────────────────────────────────────────
+
+// INTENT: Deterministic two-pass classification for keyParts and AI estimate parts.
+// Make indicators take PRIORITY over buy keywords to prevent false positives
+// on compound names like "motor mount bracket" or "sensor housing".
+
+const MAKE_INDICATORS = /\b(machined|cnc.machined|milled|turned|welded|fabricated|cast|moulded|molded|printed|forged|bent|formed|stamped|extruded|laser.cut|anodized|anodised|powder.coated|bracket|housing|frame|plate|enclosure|chassis|baseplate|panel|structure|duct|manifold|fixture|shell|body|cavity|guard|tray|channel|spar|strut|rib|bulkhead|tank|rudder|blade|nozzle|impeller|exhaust|piping|keel|hull|mast|boom|foil|fin|canopy|fairing|cowl|shroud|baffle|pedestal|mount|flange|collar|sleeve|weldment|tube|pipe)s?\b/i
+
+const BUY_KEYWORDS = /\b(motor|servo|stepper|sensor|switch|batter(?:y|ies)|power suppl(?:y|ies)|microcontroller|pcb|arduino|raspberry|cable|connector|bearing|linear rail|lead screw|belt|pulley|gear|fastener|bolt|screw|nut|washer|seal|o-ring|spring|fan|pump|valve|display|led|camera|encoder|driver|esc|fuse|relay|capacitor|resistor|transistor|diode|regulator|thermostat|gauge|meter|indicator|antenna|transponder|gps|transducer|solenoid|actuator|contactor|breaker|terminal|epirb|vhf|radar|anemometer|compass|standoff|isolator|bushing|grommet|hose|fitting|rivet|pin|dowel|circlip|shim|gasket|filter)s?\b/i
+
+const PROCESS_PATTERNS: [RegExp, string][] = [
+  [/\b(cnc.machin\w*|milled|turned|lathe)\b/i, "CNC Machining"],
+  [/\b(weld\w*|tig.weld\w*|mig.weld\w*)\b/i, "Welding"],
+  [/\b(sheet.metal|laser.cut\w*|bent|fold\w*|punch\w*|stamp\w*)\b/i, "Sheet Metal"],
+  [/\b(injection.mould\w*|injection.mold\w*)\b/i, "Injection Moulding"],
+  [/\b(3d.print\w*|fdm|sla|sls)\b/i, "3D Printing"],
+  [/\b(cast(?:ing)?|die.cast\w*)\b/i, "Casting"],
+  [/\b(composite|carbon.fib\w*|fibre.glass|fiber.glass|layup)\b/i, "Composites"],
+  [/\b(extrud\w*|extrusion)\b/i, "Extrusion"],
+]
+
+const MATERIAL_PATTERNS: [RegExp, string][] = [
+  [/\b(6061|alumini?um alloy)\b/i, "Aluminum 6061"],
+  [/\b(mild steel|carbon steel)\b/i, "Mild Steel"],
+  [/\b(stainless|304|316)\b/i, "Stainless Steel"],
+  [/\b(abs)\b/i, "ABS"],
+  [/\b(nylon|pa6|pa66)\b/i, "Nylon"],
+  [/\b(tpu|rubber)\b/i, "TPU/Rubber"],
+  [/\b(brass)\b/i, "Brass"],
+  [/\b(titanium)\b/i, "Titanium"],
+  [/\b(polycarbonate|pc)\b/i, "Polycarbonate"],
+]
+
+function classifyPart(
+  name: string,
+  fallbackProcess: string,
+  fallbackMaterial: string,
+): { type: "buy" | "make"; process: string; material: string; explicit: boolean } {
+  // Make indicators take priority — prevents false positives
+  const isMake = MAKE_INDICATORS.test(name)
+  if (!isMake && BUY_KEYWORDS.test(name)) {
+    return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true }
+  }
+  // Detect actual process from text (instead of blindly using module diagnostic)
+  let process = fallbackProcess
+  for (const [re, label] of PROCESS_PATTERNS) {
+    if (re.test(name)) { process = label; break }
+  }
+  // Detect actual material from text
+  let material = fallbackMaterial
+  for (const [re, label] of MATERIAL_PATTERNS) {
+    if (re.test(name)) { material = label; break }
+  }
+  return { type: "make", process, material, explicit: isMake }
+}
+
 // ─── Build Sankey data ───────────────────────────────────────────────
 
 export function buildSankeyData(
@@ -217,9 +273,12 @@ export function buildSankeyData(
 
     if (hasParts) {
       for (const part of costEstimate.parts!) {
-        const process = part.type === "buy" ? "Buy" : (diag?.mfg_process ?? "Unknown Process")
-        const material = part.type === "buy" ? "Off-the-shelf" : (diag?.material ?? "Unknown Material")
-        const catKey = `${process}-${material}-${part.type}`.toLowerCase().replace(/\s+/g, "_")
+        // Safety net: explicit keyword detection overrides AI classification in BOTH directions
+        const cls = classifyPart(part.name, diag?.mfg_process || "Unknown Process", diag?.material || "Unknown Material")
+        const effectiveType = cls.explicit ? cls.type : part.type
+        const process = effectiveType === "buy" ? "Buy" : (part.process || cls.process)
+        const material = effectiveType === "buy" ? "Off-the-shelf" : (part.material || cls.material)
+        const catKey = `${process}-${material}-${effectiveType}`.toLowerCase().replace(/\s+/g, "_")
 
         node.partNames.push(part.name)
         node.partsWithCategories.push({ name: part.name, categoryKey: catKey })
@@ -227,10 +286,10 @@ export function buildSankeyData(
 
         let cat = catMap.get(catKey)
         if (!cat) {
-          const label = part.type === "buy"
+          const label = effectiveType === "buy"
             ? "Buy \u00b7 Off-the-shelf"
             : `${process} \u00b7 ${material}`
-          cat = { id: catKey, label, process, material, type: part.type, partCount: 0, parts: [], moduleContributions: new Map() }
+          cat = { id: catKey, label, process, material, type: effectiveType, partCount: 0, parts: [], moduleContributions: new Map() }
           catMap.set(catKey, cat)
         }
         cat.parts.push({ name: part.name, moduleId: mod.id })
@@ -239,29 +298,31 @@ export function buildSankeyData(
       }
       node.partCount = costEstimate.parts!.length
     } else {
-      // Fallback: each keyPart as a "make" part
-      const process = diag?.mfg_process ?? "Unknown Process"
-      const material = diag?.material ?? "Unknown Material"
-      const catKey = `${process}-${material}-make`.toLowerCase().replace(/\s+/g, "_")
+      // Fallback: classify each keyPart individually via deterministic keywords
+      const fallbackProcess = diag?.mfg_process ?? "Unknown Process"
+      const fallbackMaterial = diag?.material ?? "Unknown Material"
 
       for (const kp of mod.keyParts) {
+        const cls = classifyPart(kp, fallbackProcess, fallbackMaterial)
+        const catKey = `${cls.process}-${cls.material}-${cls.type}`.toLowerCase().replace(/\s+/g, "_")
+
         node.partNames.push(kp)
         node.partsWithCategories.push({ name: kp, categoryKey: catKey })
         catKeysSet.add(catKey)
+
+        let cat = catMap.get(catKey)
+        if (!cat) {
+          const label = cls.type === "buy"
+            ? "Buy \u00b7 Off-the-shelf"
+            : `${cls.process} \u00b7 ${cls.material}`
+          cat = { id: catKey, label, process: cls.process, material: cls.material, type: cls.type, partCount: 0, parts: [], moduleContributions: new Map() }
+          catMap.set(catKey, cat)
+        }
+        cat.parts.push({ name: kp, moduleId: mod.id })
+        cat.partCount++
+        cat.moduleContributions.set(mod.id, (cat.moduleContributions.get(mod.id) ?? 0) + 1)
       }
       node.partCount = mod.keyParts.length
-
-      let cat = catMap.get(catKey)
-      if (!cat) {
-        const label = `${process} \u00b7 ${material}`
-        cat = { id: catKey, label, process, material, type: "make", partCount: 0, parts: [], moduleContributions: new Map() }
-        catMap.set(catKey, cat)
-      }
-      for (const kp of mod.keyParts) {
-        cat.parts.push({ name: kp, moduleId: mod.id })
-      }
-      cat.partCount += mod.keyParts.length
-      cat.moduleContributions.set(mod.id, (cat.moduleContributions.get(mod.id) ?? 0) + mod.keyParts.length)
     }
 
     node.categoryKeys = [...catKeysSet]

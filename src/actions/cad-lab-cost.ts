@@ -104,6 +104,22 @@ export async function estimateModuleCostsAi(
 
 For each module: list parts as "buy" or "make" with cost and SHORT reasoning (under 15 words per part). Add labour at £40/hr.
 
+IMPORTANT: The module-level "mfg_process" tells you the PRIMARY manufacturing method for custom parts in that module. It does NOT mean every part is "make" — many parts in every module are standard buy items. Classify EACH part individually.
+
+Example — a module with mfg_process "Sheet Metal" might produce:
+  sheet metal enclosure (make, Sheet Metal, Mild Steel)
+  M6 cap screws ×12 (buy)
+  proximity sensor (buy)
+  waterproof cable gland (buy)
+  stainless shaft (make, CNC Machining, Stainless 304)
+
+A module with mfg_process "Manual/Assembly" still has make parts — classify by their ACTUAL process:
+  welded frame (make, Welding, Mild Steel)
+  machined pivot block (make, CNC Machining, Aluminum 6061)
+  toggle switches ×4 (buy)
+
+EVERY module should have BOTH buy and make parts. If you find yourself classifying all parts in a module as "make" with the same process, you are probably wrong.
+
 RULES:
 - Buy parts: UK 2026 market price (RS Components, Farnell)
 - Make parts: process + material + complexity from diagnostics
@@ -113,12 +129,18 @@ RULES:
 - Keep ALL reasoning BRIEF — under 15 words each
 - When realWorldContext is provided, ground estimates using: supplierCount as market depth, equipment to determine cost tier, topMaterials for realistic material grades
 
+BUY vs MAKE classification:
+- "buy" = any COTS/off-the-shelf part: motors, stepper motors, servos, sensors, switches, batteries, power supplies, microcontrollers, PCBs, Arduino/Raspberry Pi, cables, connectors, bearings, linear rails, lead screws, belts, pulleys, gears, fasteners (bolts, screws, nuts, washers), seals, O-rings, springs, fans, pumps, valves, displays, LEDs, cameras, encoders, drivers, ESCs
+- "make" = custom manufactured: machined housings, welded frames, sheet metal brackets, cast parts, moulded plastics, custom PCBs, fabricated enclosures
+
+For each "make" part, specify process (e.g. "CNC Machining", "Sheet Metal", "Injection Moulding", "Welding", "3D Printing", "Casting") and material (e.g. "Aluminum 6061", "Mild Steel", "Stainless 304", "ABS", "Nylon"). Each make part should have its OWN process/material — do not assume all parts in a module share the same process.
+
 CRITICAL: Return ONLY valid JSON, no markdown fences.
 {
   "estimates": {
     "<moduleId>": {
       "moduleId": "<moduleId>",
-      "parts": [{ "name": "<part>", "type": "buy"|"make", "cost": <number>, "reasoning": "<brief>" }],
+      "parts": [{ "name": "<part>", "type": "buy"|"make", "cost": <number>, "reasoning": "<brief>", "process": "<make only>", "material": "<make only>" }],
       "labourCost": <number>,
       "labourReasoning": "<brief>",
       "totalPerUnit": <number>,
@@ -187,7 +209,34 @@ Return ONLY valid JSON.`
       )
       for (const part of est.parts) {
         if (part.type !== "buy" && part.type !== "make") part.type = "make"
+        // Preserve per-part process/material for make parts, strip from buy parts
+        if (part.type === "buy") {
+          delete part.process
+          delete part.material
+        } else {
+          if (typeof part.process !== "string" || !part.process) delete part.process
+          if (typeof part.material !== "string" || !part.material) delete part.material
+        }
       }
+      // INTENT: Two-pass reclassification — make indicators take PRIORITY over buy
+      // keywords to prevent false positives on compound names like "motor mount bracket".
+      const MAKE_INDICATORS = /\b(machined|cnc.machined|milled|turned|welded|fabricated|cast|moulded|molded|printed|forged|bent|formed|stamped|extruded|laser.cut|bracket|housing|frame|plate|enclosure|chassis|baseplate|panel|structure|duct|manifold|fixture|shell|body|cavity|guard|tray|channel|spar|strut|rib|bulkhead|tank|rudder|blade|nozzle|impeller|exhaust|piping|keel|hull|mast|boom|foil|fin|canopy|fairing|cowl|shroud|baffle|pedestal|mount|flange|collar|sleeve|weldment|tube|pipe)s?\b/i
+      const BUY_KEYWORDS = /\b(motor|servo|stepper|sensor|switch|batter(?:y|ies)|power suppl(?:y|ies)|microcontroller|pcb|arduino|raspberry|cable|connector|bearing|linear rail|lead screw|belt|pulley|gear|fastener|bolt|screw|nut|washer|seal|o-ring|spring|fan|pump|valve|display|led|camera|encoder|driver|esc|fuse|relay|capacitor|resistor|transistor|diode|regulator|thermostat|gauge|meter|indicator|antenna|transponder|gps|transducer|solenoid|actuator|contactor|breaker|terminal|epirb|vhf|radar|anemometer|compass|standoff|isolator|bushing|grommet|hose|fitting|rivet|pin|dowel|circlip|shim|gasket|filter)s?\b/i
+      const diag = diagnosticAnswers[mod.id]
+      for (const part of est.parts) {
+        if (part.type === "make" && !MAKE_INDICATORS.test(part.name) && BUY_KEYWORDS.test(part.name)) {
+          part.type = "buy"
+          delete part.process
+          delete part.material
+        }
+        // INTENT: Reverse override — buy→make when make indicators match but buy keywords don't
+        if (part.type === "buy" && MAKE_INDICATORS.test(part.name) && !BUY_KEYWORDS.test(part.name)) {
+          part.type = "make"
+          part.process = part.process || diag?.mfg_process || "Manual/Assembly"
+          part.material = part.material || diag?.material || "Other"
+        }
+      }
+
       if (typeof est.labourCost !== "number") est.labourCost = 0
       if (typeof est.labourReasoning !== "string") est.labourReasoning = ""
       if (typeof est.totalPerUnit !== "number" || est.totalPerUnit <= 0) {
@@ -198,6 +247,14 @@ Return ONLY valid JSON.`
 
     console.info("[CAD-LAB-COST] AI estimates produced for", Object.keys(estimates).length, "modules",
       `(${response.usage?.input_tokens ?? 0} in / ${response.usage?.output_tokens ?? 0} out)`)
+
+    // Log category distribution for debugging
+    const allParts = Object.values(estimates).flatMap(e => e.parts ?? [])
+    const buyCount = allParts.filter(p => p.type === "buy").length
+    const makeCount = allParts.filter(p => p.type === "make").length
+    const processes = new Set(allParts.filter(p => p.type === "make").map(p => p.process).filter(Boolean))
+    console.info(`[CAD-LAB-COST] Distribution: ${buyCount} buy, ${makeCount} make, ${processes.size} unique processes: ${[...processes].join(", ")}`)
+    if (buyCount === 0) console.warn("[CAD-LAB-COST] WARNING: Zero buy parts detected — prompt may need strengthening")
 
     return { success: true, estimates }
   } catch (err) {
