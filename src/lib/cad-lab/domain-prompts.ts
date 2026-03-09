@@ -303,7 +303,8 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
       "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
       "whyItMatters": "Why this module is critical to the overall system.",
       "failureModes": ["Failure mode 1", "Failure mode 2"],
-      "unknowns": ["Open question 1", "Open question 2"]
+      "unknowns": ["Open question 1", "Open question 2"],
+      "mirrorOf": null
     }
   ],
   "connections": [
@@ -322,7 +323,8 @@ RULES:
 - Modules should cover the ENTIRE product — no gaps
 - Use dimensions from the research report — do not invent new ones
 - If the research report mentions sub-components, those are good module candidates
-- Output ONLY the JSON object — no markdown, no explanation`
+- Output ONLY the JSON object — no markdown, no explanation
+- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.`
 
 const MODULE_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -352,7 +354,8 @@ Output STRICTLY as a JSON object with two keys — "modules" and "connections":
       "name": "Human Readable Name",
       "purpose": "One sentence: what this module does",
       "inputs": ["Input stream or signal 1", "Input 2"],
-      "outputs": ["Output stream or signal 1"]
+      "outputs": ["Output stream or signal 1"],
+      "mirrorOf": null
     }
   ],
   "connections": [
@@ -367,7 +370,8 @@ RULES:
 - IMPORTANT: Only list inter-module interfaces — NOT external/environmental interfaces. If a module interfaces with the outside world, describe that in its purpose — not in inputs/outputs.
 - Modules should cover the ENTIRE product — no gaps
 - Output ONLY the JSON object — no markdown, no explanation
-- Keep it lightweight — purpose should be ONE sentence`
+- Keep it lightweight — purpose should be ONE sentence
+- SYMMETRY (CRITICAL): If a module is the mirrored counterpart of another (e.g. "Right Leg" mirrors "Left Leg", "Right Drive Module" mirrors "Left Drive Module"), you MUST set mirrorOf to the ID of the primary module. Only ONE module in a symmetric pair sets mirrorOf — the other is the primary (mirrorOf: null). Modules that happen to be similar but aren't geometric mirrors should NOT use mirrorOf. Downstream image generation depends on mirrorOf to produce visually consistent illustrations — if you omit it, mirror pairs will look completely different.`
 
 const SKELETON_DECOMPOSITION_ROLE: Record<CadLabDomain, string> = {
   electronics:
@@ -395,6 +399,7 @@ For the target module, provide detailed engineering information. Output STRICTLY
 {
   "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
   "leadWeeks": 6,
+  "estimatedMassKg": 0.5,
   "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
   "whyItMatters": "Why this module is critical to the overall system.",
   "failureModes": ["Failure mode 1", "Failure mode 2"],
@@ -404,6 +409,7 @@ For the target module, provide detailed engineering information. Output STRICTLY
 RULES:
 - At least 3 keyParts with specific part names and specifications
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
+- estimatedMassKg: best estimate of this module's mass in kg, calibrated to the overall product size. A vacuum cleaner motor ≈ 0.3 kg, a phone screen ≈ 0.05 kg, an industrial pump casing ≈ 15 kg. Be specific to this product.
 - description should cover physical characteristics, operating principle, and material choices
 - failureModes: 2-4 realistic engineering failure modes
 - unknowns: 1-3 open questions that need resolution
@@ -591,6 +597,7 @@ RULES:
 - perModuleImagePrompts should describe zoomed-in detail views that match the hero composition
 - Use consistent color coding, material language, and perspective across ALL prompts
 - Reference spatial relationships between modules (connected modules are physically adjacent)
+- MIRROR PAIR SYMMETRY: For modules that are mirror pairs (one has mirrorOf pointing to the other, or they follow a Left/Right naming pattern like "Left Drive Module" / "Right Drive Module"), generate ONE shared per-module image prompt and assign the IDENTICAL prompt text to BOTH module IDs in perModuleImagePrompts. The prompt should describe the geometry from a neutral perspective — avoid left/right directives since the overlay label already distinguishes them. This guarantees visually identical illustrations for symmetric pairs.
 - DIMENSIONAL DATA: Use ONLY dimensions from source data. NEVER invent dimensions. Include proportional relationships.`
 
 /**

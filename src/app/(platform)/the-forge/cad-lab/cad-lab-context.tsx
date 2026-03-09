@@ -40,7 +40,7 @@ import {
 } from "@/actions/cad-lab"
 import { buildCheckpointPromptSection } from "@/lib/cad-lab/checkpoint-prompt"
 import { matchReferenceModel } from "@/actions/reference-models"
-import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
+import { saveCadLabIntegratedAssembly, saveCadLabSystemIllustration, saveCadLabVisualStyle, saveCadLabInterfaceContracts, saveCadLabDiagnosticAnswers, saveCadLabDiagnosticEnrichment, saveCadLabDecompositionConnections, saveCadLabUnifiedResult, saveCadLabDesignRevision, saveCadLabAiCostEstimates, saveCadLabReviewSkipped, saveCadLabPartCategoryOverrides, pollUnifiedResultAction } from "@/actions/cad-lab-projects"
 import { estimateModuleCostsAi } from "@/actions/cad-lab-cost"
 import { getTechniqueInsightsByProcess } from "@/actions/manufacturing-techniques"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
@@ -76,6 +76,7 @@ import type {
   ModuleConnection,
   SpecialistReview,
   AiCostEstimate,
+  PartCategoryOverride,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints, reviseModulesFromReviews } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -262,6 +263,11 @@ export interface CadLabContextValue {
   aiCostEstimates: Record<string, AiCostEstimate>
   isEstimatingCosts: boolean
   costEstimationError: string | null
+
+  // Part classification overrides (keyed by "${moduleId}::${partName}")
+  partCategoryOverrides: Record<string, PartCategoryOverride>
+  setPartCategoryOverride: (partKey: string, override: PartCategoryOverride) => void
+  clearPartCategoryOverride: (partKey: string) => void
 
   // Decomposition connections (highest-fidelity edge source)
   decompositionConnections: ModuleConnection[]
@@ -539,6 +545,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [costEstimationError, setCostEstimationError] = useState<string | null>(null)
   const aiCostFingerprintRef = useRef<string>("")
 
+  // Part classification overrides (keyed by "${moduleId}::${partName}")
+  const [partCategoryOverrides, setPartCategoryOverrides] = useState<Record<string, PartCategoryOverride>>({})
+
   // Decomposition connections (AI-declared inter-module topology)
   const [decompositionConnections, setDecompositionConnections] = useState<ModuleConnection[]>([])
 
@@ -759,6 +768,26 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
       .finally(() => setIsEstimatingCosts(false))
   }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview])
+
+  // ── Part classification override handlers ──
+  const setPartCategoryOverride = useCallback((partKey: string, override: PartCategoryOverride) => {
+    setPartCategoryOverrides((prev) => {
+      const next = { ...prev, [partKey]: override }
+      const pid = activeProjectIdRef.current
+      if (pid) saveCadLabPartCategoryOverrides(pid, next).catch(console.error)
+      return next
+    })
+  }, [])
+
+  const clearPartCategoryOverride = useCallback((partKey: string) => {
+    setPartCategoryOverrides((prev) => {
+      const next = { ...prev }
+      delete next[partKey]
+      const pid = activeProjectIdRef.current
+      if (pid) saveCadLabPartCategoryOverrides(pid, next).catch(console.error)
+      return next
+    })
+  }, [])
 
   // ── AI cost estimation auto-trigger ──
   // INTENT: Only estimate costs after reviews are done — costings tab requires it.
@@ -1852,13 +1881,85 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     }
 
+    // INTENT: Detect mirror pairs so we can reuse the primary module's image for
+    // the mirror module — guarantees pixel-identical drawings and saves an API call.
+    // Detection: (1) explicit mirrorOf field, (2) Left/Right name pattern fallback.
+    const mirrorMap = new Map<string, string>() // mirrorId → primaryId
+    const processModuleIds = new Set(modulesToProcess.map(m => m.id))
+    for (const mod of modulesToProcess) {
+      if (mod.mirrorOf && processModuleIds.has(mod.mirrorOf)) {
+        mirrorMap.set(mod.id, mod.mirrorOf)
+      }
+    }
+    // Fallback: detect implicit mirror pairs via Left/Right naming pattern
+    if (mirrorMap.size === 0) {
+      const byBaseName = new Map<string, CadLabModule[]>()
+      for (const mod of modulesToProcess) {
+        const match = mod.name.match(/^(Left|Right)\s+(.+)$/i)
+        if (match) {
+          const baseName = match[2]
+          const group = byBaseName.get(baseName) ?? []
+          group.push(mod)
+          byBaseName.set(baseName, group)
+        }
+      }
+      for (const [, group] of byBaseName) {
+        if (group.length === 2) {
+          // Convention: "Left" variant is primary, "Right" is mirror
+          const left = group.find(m => m.name.match(/^Left\s/i))
+          const right = group.find(m => m.name.match(/^Right\s/i))
+          if (left && right) mirrorMap.set(right.id, left.id)
+        }
+      }
+    }
+
+    // Reorder: primaries first, then mirrors (so image is available to clone)
+    const primaryIds = new Set(mirrorMap.values())
+    const mirrorIds = new Set(mirrorMap.keys())
+    const orderedModules = [
+      ...modulesToProcess.filter(m => !mirrorIds.has(m.id)), // primaries + non-mirror modules
+      ...modulesToProcess.filter(m => mirrorIds.has(m.id)),  // mirrors last
+    ]
+
+    if (mirrorMap.size > 0) {
+      console.log(`[CAD-LAB] Mirror pairs detected: ${[...mirrorMap.entries()].map(([m, p]) => `${m} → ${p}`).join(", ")}`)
+    }
+
+    // Track primary module image URLs for mirror reuse
+    const primaryImageUrls = new Map<string, { url: string; model?: string }>()
+
     // INTENT: Process one at a time — concurrent large base64 payloads trigger
     // React Flight's "Maximum array nesting exceeded" serialization limit.
     // Retry (single module, no base64) always worked; this aligns bulk gen to match.
-    for (let i = 0; i < modulesToProcess.length; i++) {
-      await generateOne(modulesToProcess[i])
+    for (let i = 0; i < orderedModules.length; i++) {
+      const mod = orderedModules[i]
+      const primaryId = mirrorMap.get(mod.id)
+      const primaryImage = primaryId ? primaryImageUrls.get(primaryId) : undefined
+
+      // INTENT: If this module is a mirror and its primary succeeded, reuse the same image
+      // instead of making another API call. Saves cost and guarantees visual consistency.
+      if (primaryImage) {
+        console.log(`[CAD-LAB] Reusing image from primary ${primaryId} for mirror ${mod.id}`)
+        setModules((prev) =>
+          prev.map((m) => (m.id === mod.id ? { ...m, imageUrl: primaryImage.url, imageStatus: "complete" as const, imageModelUsed: primaryImage.model } : m)),
+        )
+        completedCount++
+        setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
+        revealModule(mod.id)
+      } else {
+        await generateOne(mod)
+        // If this is a primary, capture its URL for mirror reuse
+        if (primaryIds.has(mod.id)) {
+          let snap: CadLabModule[] = []
+          setModules((current) => { snap = current; return current })
+          const generated = snap.find(m => m.id === mod.id)
+          if (generated?.imageStatus === "complete" && generated.imageUrl) {
+            primaryImageUrls.set(mod.id, { url: generated.imageUrl, model: generated.imageModelUsed })
+          }
+        }
+      }
       // Small delay between calls to let React Flight serialization settle
-      if (i < modulesToProcess.length - 1) {
+      if (i < orderedModules.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
@@ -2822,6 +2923,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setAiCostEstimates({})
       }
 
+      // Restore part classification overrides
+      setPartCategoryOverrides(
+        (p.partCategoryOverrides && Object.keys(p.partCategoryOverrides).length > 0)
+          ? p.partCategoryOverrides
+          : {}
+      )
+
       // Restore unified CAD result from database
       setUnifiedResult((p.unifiedResult as CadLabResult | null) ?? null)
       setUnifiedCode(p.unifiedCode ?? null)
@@ -3396,6 +3504,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     aiCostEstimates,
     isEstimatingCosts,
     costEstimationError,
+    partCategoryOverrides,
+    setPartCategoryOverride,
+    clearPartCategoryOverride,
     decompositionConnections,
     interfaceContracts,
     isExtractingContracts,
