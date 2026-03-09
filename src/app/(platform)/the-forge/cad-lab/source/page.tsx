@@ -420,7 +420,9 @@ export default function SourcePage(): React.ReactNode {
       toast.info("Refreshing shortlist…")
     } else if (activeTab === "costs") {
       setBuyPartResultsRaw([])
-      buySearchTriggeredRef.current = false
+      // GOTCHA: Do NOT reset buySearchTriggeredRef — we call handleSearchBuyParts
+      // directly below. Resetting the ref would let the auto-trigger effect fire
+      // a duplicate search when the first one returns zero results.
       reEstimateCosts()
       if (buyPartNames.length > 0) {
         handleSearchBuyParts(buyPartNames)
