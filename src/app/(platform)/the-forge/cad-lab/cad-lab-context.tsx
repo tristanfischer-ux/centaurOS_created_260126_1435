@@ -90,6 +90,10 @@ const CAD_LAB_DRAFT_SUBJECT_KEY = "forgeos:cad-lab:draft-subject"
 /** Maximum number of concurrent module generation requests */
 const MAX_CONCURRENCY = 2
 
+// INTENT: Bump this whenever the cost estimation prompt changes materially.
+// The fingerprint includes this version so stale DB-cached estimates auto-invalidate.
+const COST_PROMPT_VERSION = 3
+
 // ─── Extract executive summary from research report markdown ─────────
 
 function extractExecutiveSummary(report: string): string | null {
@@ -311,8 +315,8 @@ export interface CadLabContextValue {
   isRegeneratingImages: boolean
   handleRegenerateDrawingsAfterRevision: () => Promise<void>
 
-  // Cost fingerprint reset (allows Source page to force re-estimation)
-  resetCostFingerprint: () => void
+  /** Directly trigger cost re-estimation (bypasses effect system to avoid cascading re-renders) */
+  reEstimateCosts: () => void
 
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
@@ -534,7 +538,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [isEstimatingCosts, setIsEstimatingCosts] = useState(false)
   const [costEstimationError, setCostEstimationError] = useState<string | null>(null)
   const aiCostFingerprintRef = useRef<string>("")
-  const resetCostFingerprint = useCallback(() => { aiCostFingerprintRef.current = "" }, [])
 
   // Decomposition connections (AI-declared inter-module topology)
   const [decompositionConnections, setDecompositionConnections] = useState<ModuleConnection[]>([])
@@ -707,6 +710,56 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Product overview (editable executive summary) ──
   const [productOverview, setProductOverview] = useState("")
 
+  // INTENT: Direct re-estimation callable from Source page refresh — bypasses the effect
+  // system to avoid cascading re-renders that trigger the Specify redirect gate.
+  const reEstimateCosts = useCallback(() => {
+    const pid = activeProjectIdRef.current
+    if (!pid || modules.length === 0) { console.warn("[CAD-LAB] reEstimateCosts: no project or modules"); return }
+    if (isEstimatingCosts) { console.warn("[CAD-LAB] reEstimateCosts: already running"); return }
+    aiCostFingerprintRef.current = ""
+    setIsEstimatingCosts(true)
+    setCostEstimationError(null)
+
+    const uniqueProcesses = [...new Set(
+      modules.map((m) => diagnosticAnswers[m.id]?.mfg_process).filter(Boolean) as string[]
+    )]
+    Promise.all(uniqueProcesses.map(async (proc) => {
+      const insights = await getTechniqueInsightsByProcess(proc)
+      return [proc, insights] as const
+    }))
+      .then((entries) => {
+        const techniqueInsights: Record<string, import("@/actions/manufacturing-techniques").ProcessInsights> = {}
+        for (const [proc, ins] of entries) {
+          if (ins) techniqueInsights[proc] = ins
+        }
+        return estimateModuleCostsAi(
+          modules, diagnosticAnswers, editableReport.slice(0, 2000),
+          productOverview || undefined,
+          Object.keys(techniqueInsights).length > 0 ? techniqueInsights : undefined,
+        )
+      })
+      .then((res) => {
+        if (res.success) {
+          setAiCostEstimates(res.estimates)
+          setCostEstimationError(null)
+          if (pid) saveCadLabAiCostEstimates(pid, { ...res.estimates, _promptVersion: COST_PROMPT_VERSION } as unknown as Record<string, AiCostEstimate>).catch(console.error)
+          // Update fingerprint so auto-trigger doesn't re-fire
+          aiCostFingerprintRef.current = `v${COST_PROMPT_VERSION}:` + modules.map((m) => {
+            const a = diagnosticAnswers[m.id] || {}
+            return `${m.id}:${m.purpose?.slice(0, 50)}|${m.description?.slice(0, 50)}|${m.keyParts?.length}|${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
+          }).join(";")
+        } else {
+          console.warn("[CAD-LAB] AI cost re-estimation failed:", res.error)
+          setCostEstimationError(res.error)
+        }
+      })
+      .catch((err) => {
+        console.error("[CAD-LAB] AI cost re-estimation exception:", err)
+        setCostEstimationError(err instanceof Error ? err.message : "Unknown error")
+      })
+      .finally(() => setIsEstimatingCosts(false))
+  }, [modules, diagnosticAnswers, isEstimatingCosts, editableReport, productOverview])
+
   // ── AI cost estimation auto-trigger ──
   // INTENT: Only estimate costs after reviews are done — costings tab requires it.
   // The fingerprint includes module content, so post-revision changes auto-trigger re-estimation.
@@ -722,7 +775,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // INTENT: Include module content (purpose, description, keyParts) in fingerprint
     // so that when handleApplyReviewRevisions rewrites modules, the fingerprint changes
     // and AI cost estimation re-fires automatically.
-    const fp = modules.map((m) => {
+    const fp = `v${COST_PROMPT_VERSION}:` + modules.map((m) => {
       const a = diagnosticAnswers[m.id] || {}
       return `${m.id}:${m.purpose?.slice(0, 50)}|${m.description?.slice(0, 50)}|${m.keyParts?.length}|${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
     }).join(";")
@@ -758,7 +811,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         if (res.success) {
           setAiCostEstimates(res.estimates)
           setCostEstimationError(null)
-          if (pid) saveCadLabAiCostEstimates(pid, res.estimates).catch(console.error)
+          if (pid) saveCadLabAiCostEstimates(pid, { ...res.estimates, _promptVersion: COST_PROMPT_VERSION } as unknown as Record<string, AiCostEstimate>).catch(console.error)
         } else {
           console.warn("[CAD-LAB] AI cost estimation failed:", res.error)
           setCostEstimationError(res.error)
@@ -2716,13 +2769,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
 
       // Restore AI cost estimates from database
+      // INTENT: Version-aware restore — if the saved prompt version doesn't match the
+      // current COST_PROMPT_VERSION, leave the fingerprint empty so the auto-trigger
+      // re-fires with the updated prompt.
       if (p.aiCostEstimates && Object.keys(p.aiCostEstimates).length > 0) {
-        setAiCostEstimates(p.aiCostEstimates)
-        if (p.diagnosticAnswers && p.modules) {
-          aiCostFingerprintRef.current = p.modules.map((m) => {
+        const savedVersion = (p.aiCostEstimates as Record<string, unknown>)._promptVersion as number | undefined ?? 1
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { _promptVersion, ...estimates } = p.aiCostEstimates as Record<string, unknown>
+        setAiCostEstimates(estimates as Record<string, AiCostEstimate>)
+        if (savedVersion === COST_PROMPT_VERSION && p.diagnosticAnswers && p.modules) {
+          // Version matches — set fingerprint so auto-trigger skips
+          aiCostFingerprintRef.current = `v${COST_PROMPT_VERSION}:` + p.modules.map((m) => {
             const a = p.diagnosticAnswers?.[m.id] || {}
             return `${m.id}:${m.purpose?.slice(0, 50)}|${m.description?.slice(0, 50)}|${m.keyParts?.length}|${a.mfg_process}|${a.material}|${a.tolerance}|${a.finish}|${a.environment}|${a.batch_size}`
           }).join(";")
+        } else {
+          // Version mismatch — leave fingerprint empty so auto-trigger fires
+          console.log(`[CAD-LAB] Cost prompt version mismatch (saved=${savedVersion}, current=${COST_PROMPT_VERSION}) — will re-estimate`)
+          aiCostFingerprintRef.current = ""
         }
       } else {
         setAiCostEstimates({})
@@ -3333,7 +3397,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     imagesStale,
     isRegeneratingImages,
     handleRegenerateDrawingsAfterRevision,
-    resetCostFingerprint,
+    reEstimateCosts,
     initialized,
     initializeCadLab,
     handleDownload,

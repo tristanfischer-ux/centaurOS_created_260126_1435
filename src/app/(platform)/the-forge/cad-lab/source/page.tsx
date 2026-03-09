@@ -86,7 +86,7 @@ export default function SourcePage(): React.ReactNode {
     setModules,
     aiCostEstimates,
     isEstimatingCosts,
-    resetCostFingerprint,
+    reEstimateCosts,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -401,9 +401,10 @@ export default function SourcePage(): React.ReactNode {
   }, [eligibleModules, handleMatchModule])
 
   // ── Refresh active tab ──
-  const isRefreshing = activeTab === "costs"
-    ? buySearchLoading || isEstimatingCosts
-    : matchAllLoading
+  const isRefreshing =
+    activeTab === "costs"
+      ? buySearchLoading || isEstimatingCosts
+      : matchAllLoading
 
   const handleRefreshActiveTab = useCallback(() => {
     if (activeTab === "suppliers") {
@@ -420,13 +421,13 @@ export default function SourcePage(): React.ReactNode {
     } else if (activeTab === "costs") {
       setBuyPartResultsRaw([])
       buySearchTriggeredRef.current = false
-      resetCostFingerprint()
+      reEstimateCosts()
       if (buyPartNames.length > 0) {
         handleSearchBuyParts(buyPartNames)
       }
       toast.info("Refreshing cost data…")
     }
-  }, [activeTab, handleMatchAll, handleSearchBuyParts, buyPartNames, resetCostFingerprint])
+  }, [activeTab, handleMatchAll, handleSearchBuyParts, buyPartNames, reEstimateCosts])
 
   // ── Auto-select top 3 suppliers after matching ──
   const autoSelectKeyRef = useRef<string>("")
