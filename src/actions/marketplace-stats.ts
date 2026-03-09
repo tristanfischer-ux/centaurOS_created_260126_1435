@@ -1,6 +1,7 @@
 "use server"
 
-import { createClient } from "@/lib/supabase/server"
+import { unstable_cache } from "next/cache"
+import { createAdminClient } from "@/lib/supabase/admin"
 import {
   extractPostcode,
   deriveRegionFromPostcode,
@@ -11,7 +12,13 @@ import {
  * @file marketplace-stats.ts
  * @description Server action to compute aggregate marketplace statistics
  * for the analytics dashboard. Reads from marketplace_listings and computes
- * counts by company type, company size, and UK region.
+ * counts by company type, company size, UK region, subcategory, industry,
+ * and certification distributions.
+ *
+ * DECISION: Wrapped in unstable_cache with 5-min TTL to avoid 6+ sequential
+ * Supabase calls on every page load. Uses createAdminClient() (service role)
+ * because cookies() cannot be called inside unstable_cache — same pattern as
+ * getInvestorStats in investors.ts.
  *
  * FLOW: Region/postcode helpers live in @/lib/postcode-utils (shared with recruits-stats).
  */
@@ -27,39 +34,39 @@ export interface MarketplaceStats {
   companySizeCounts: { name: string; count: number }[]
   regionCounts: { name: string; count: number }[]
   avgCompanyAge: number | null
+  subcategoryCounts: { name: string; count: number }[]
+  industryCounts: { name: string; count: number }[]
+  certificationCounts: { name: string; count: number }[]
+  withCapabilitiesCount: number
+  withCertificationsCount: number
 }
 
-// ─── Main Stats Function ────────────────────────────────────────────────────
+// ─── Fetch + Aggregate (runs inside cache) ──────────────────────────────────
 
-/**
- * Compute aggregate marketplace statistics for the analytics dashboard.
- *
- * @description Fetches all visible (verified) marketplace listings and computes:
- * - Total and verified counts
- * - Company type distribution (top 15)
- * - Company size breakdown (for donut chart)
- * - UK regional coverage
- * - Average company age from incorporation dates
- *
- * @returns MarketplaceStats or null on error
- */
-export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
-  const supabase = await createClient()
+const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
+  const supabase = createAdminClient()
 
-  // Fetch all Products & Services listings with attributes
+  // Fetch all Products & Services listings with attributes + new columns
   // INTENT: We only count Products and Services for the marketplace stats
   // (Finance listings are separate). Paginate to handle large datasets.
   // GOTCHA: Supabase returns `Json` type for JSONB columns, which is a union
   // of string | number | boolean | null | Json[] | { [key: string]: Json }.
   // We cast to our expected shape after fetching.
-  const allRows: { is_verified: boolean | null; attributes: unknown }[] = []
+  const allRows: {
+    is_verified: boolean | null
+    attributes: unknown
+    subcategory: string | null
+    industries: unknown
+    certifications: unknown
+    process_capabilities: unknown
+  }[] = []
   let offset = 0
   const pageSize = 1000
 
   while (true) {
     const { data, error } = await supabase
       .from("marketplace_listings")
-      .select("is_verified, attributes")
+      .select("is_verified, attributes, subcategory, industries, certifications, process_capabilities")
       .in("category", ["Products", "Services"])
       .range(offset, offset + pageSize - 1)
 
@@ -69,7 +76,7 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
     }
 
     if (!data || data.length === 0) break
-    allRows.push(...data)
+    allRows.push(...(data as typeof allRows))
     if (data.length < pageSize) break
     offset += pageSize
   }
@@ -84,6 +91,11 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
       companySizeCounts: [],
       regionCounts: [],
       avgCompanyAge: null,
+      subcategoryCounts: [],
+      industryCounts: [],
+      certificationCounts: [],
+      withCapabilitiesCount: 0,
+      withCertificationsCount: 0,
     }
   }
 
@@ -94,15 +106,54 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
   let verifiedCount = 0
   let totalAge = 0
   let ageCount = 0
+  let withCapabilitiesCount = 0
+  let withCertificationsCount = 0
   const typeCounts = new Map<string, number>()
   const sizeCounts = new Map<string, number>()
   const regionMap = new Map<string, number>()
+  const subcategoryMap = new Map<string, number>()
+  const industryMap = new Map<string, number>()
+  const certificationMap = new Map<string, number>()
 
   for (const row of allRows) {
     const attrs = row.attributes as Record<string, unknown> | null
 
     // Verified count
     if (row.is_verified === true) verifiedCount++
+
+    // Subcategory (top-level column, not inside attributes)
+    if (row.subcategory) {
+      subcategoryMap.set(row.subcategory, (subcategoryMap.get(row.subcategory) ?? 0) + 1)
+    }
+
+    // Industries — top-level JSONB array column + attributes.industries fallback
+    const industriesRaw = row.industries ?? (attrs as Record<string, unknown> | null)?.industries
+    if (Array.isArray(industriesRaw)) {
+      for (const ind of industriesRaw) {
+        if (typeof ind === "string" && ind.trim()) {
+          const name = ind.trim()
+          industryMap.set(name, (industryMap.get(name) ?? 0) + 1)
+        }
+      }
+    }
+
+    // Certifications — top-level JSONB array column + attributes.certifications fallback
+    const certsRaw = row.certifications ?? (attrs as Record<string, unknown> | null)?.certifications
+    if (Array.isArray(certsRaw) && certsRaw.length > 0) {
+      withCertificationsCount++
+      for (const cert of certsRaw) {
+        if (typeof cert === "string" && cert.trim()) {
+          const name = cert.trim()
+          certificationMap.set(name, (certificationMap.get(name) ?? 0) + 1)
+        }
+      }
+    }
+
+    // Process capabilities (count companies that have data)
+    const caps = row.process_capabilities
+    if (Array.isArray(caps) && caps.length > 0) {
+      withCapabilitiesCount++
+    }
 
     if (!attrs) continue
 
@@ -155,10 +206,11 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
     }
 
     // Company age
-    const incDate =
-      (attrs.ch_incorporation_date as string) ??
-      (attrs.incorporation_date as string) ??
-      (attrs.founded_year as string)
+    const incDateRaw =
+      attrs.ch_incorporation_date ??
+      attrs.incorporation_date ??
+      attrs.founded_year
+    const incDate = incDateRaw != null ? String(incDateRaw) : undefined
     if (incDate) {
       const year = parseInt(incDate.slice(0, 4), 10)
       if (!isNaN(year) && year > 1800 && year <= currentYear) {
@@ -183,6 +235,21 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
     .sort((a, b) => b[1] - a[1])
     .map(([name, count]) => ({ name, count }))
 
+  const subcategoryCounts = [...subcategoryMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([name, count]) => ({ name, count }))
+
+  const industryCounts = [...industryMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([name, count]) => ({ name, count }))
+
+  const certificationCounts = [...certificationMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([name, count]) => ({ name, count }))
+
   const regionCount = regionMap.size
   const avgCompanyAge = ageCount > 0 ? Math.round(totalAge / ageCount) : null
 
@@ -195,5 +262,27 @@ export async function getMarketplaceStats(): Promise<MarketplaceStats | null> {
     companySizeCounts,
     regionCounts,
     avgCompanyAge,
+    subcategoryCounts,
+    industryCounts,
+    certificationCounts,
+    withCapabilitiesCount,
+    withCertificationsCount,
   }
 }
+
+// ─── Cached Export ──────────────────────────────────────────────────────────
+
+/**
+ * Compute aggregate marketplace statistics for the analytics dashboard.
+ *
+ * @description Cached with 5-minute TTL. Uses admin client (service role)
+ * because unstable_cache can revalidate during a different user's request
+ * and cookies() inside unstable_cache() causes a Next.js error.
+ *
+ * @returns MarketplaceStats or null on error
+ */
+export const getMarketplaceStats = unstable_cache(
+  fetchMarketplaceStats,
+  ["marketplace-stats"],
+  { revalidate: 300 }
+)
