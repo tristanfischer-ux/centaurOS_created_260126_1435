@@ -53,6 +53,10 @@ interface MarketplaceFilterPanelProps {
     advancedFilters: AdvancedFilters
     /** Update a single advanced filter value */
     onAdvancedFilterChange: <K extends keyof AdvancedFilters>(key: K, value: AdvancedFilters[K]) => void
+    /** Available industries from stats (for multiselect). */
+    availableIndustries?: string[]
+    /** Available certifications from stats (for multiselect). */
+    availableCertifications?: string[]
 }
 
 /**
@@ -70,6 +74,8 @@ export function MarketplaceFilterPanel({
     activeCategory,
     advancedFilters,
     onAdvancedFilterChange,
+    availableIndustries = [],
+    availableCertifications = [],
 }: MarketplaceFilterPanelProps) {
     const categoryKey = activeCategory === 'All' ? '' : (activeCategory ?? '')
     const contextFilters = categoryKey ? getFiltersForCategory(categoryKey) : getFiltersForCategory('')
@@ -282,6 +288,96 @@ export function MarketplaceFilterPanel({
                                     default:
                                         return null
                                 }
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Industry filter — shown for Products/Services/All */}
+            {availableIndustries.length > 0 && (activeCategory === 'Products' || activeCategory === 'Services' || activeCategory === 'All' || !activeCategory) && (
+                <>
+                    <div className="border-t border-border" />
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium text-foreground">Industry / Sector</h3>
+                            {(advancedFilters.industries?.length ?? 0) > 0 && (
+                                <Button variant="ghost" size="sm" onClick={() => onAdvancedFilterChange('industries', undefined)} className="h-7 text-xs">
+                                    <X className="h-3 w-3 mr-1" /> Clear
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {availableIndustries.map((industry) => {
+                                const selected = (advancedFilters.industries ?? []).includes(industry)
+                                return (
+                                    <button
+                                        key={industry}
+                                        onClick={() => {
+                                            const current = advancedFilters.industries ?? []
+                                            const next = selected
+                                                ? current.filter((i) => i !== industry)
+                                                : [...current, industry]
+                                            onAdvancedFilterChange('industries', next.length > 0 ? next : undefined)
+                                        }}
+                                        className={cn(
+                                            'px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150',
+                                            'min-h-[32px]',
+                                            selected
+                                                ? 'bg-foreground text-background'
+                                                : 'bg-background text-muted-foreground border hover:bg-secondary hover:text-foreground'
+                                        )}
+                                        aria-pressed={selected}
+                                    >
+                                        {industry}
+                                        {selected && <X className="inline-block ml-1 h-3 w-3" />}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Certification filter — shown for Products/Services/All */}
+            {availableCertifications.length > 0 && (activeCategory === 'Products' || activeCategory === 'Services' || activeCategory === 'All' || !activeCategory) && (
+                <>
+                    <div className="border-t border-border" />
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-medium text-foreground">Certifications</h3>
+                            {(advancedFilters.certifications?.length ?? 0) > 0 && (
+                                <Button variant="ghost" size="sm" onClick={() => onAdvancedFilterChange('certifications', undefined)} className="h-7 text-xs">
+                                    <X className="h-3 w-3 mr-1" /> Clear
+                                </Button>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {availableCertifications.map((cert) => {
+                                const selected = (advancedFilters.certifications ?? []).includes(cert)
+                                return (
+                                    <button
+                                        key={cert}
+                                        onClick={() => {
+                                            const current = advancedFilters.certifications ?? []
+                                            const next = selected
+                                                ? current.filter((c) => c !== cert)
+                                                : [...current, cert]
+                                            onAdvancedFilterChange('certifications', next.length > 0 ? next : undefined)
+                                        }}
+                                        className={cn(
+                                            'px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-150',
+                                            'min-h-[32px]',
+                                            selected
+                                                ? 'bg-foreground text-background'
+                                                : 'bg-background text-muted-foreground border hover:bg-secondary hover:text-foreground'
+                                        )}
+                                        aria-pressed={selected}
+                                    >
+                                        {cert}
+                                        {selected && <X className="inline-block ml-1 h-3 w-3" />}
+                                    </button>
+                                )
                             })}
                         </div>
                     </div>

@@ -144,6 +144,10 @@ export function useMarketplaceState({
         if (ct) initial.companyTypes = ct.split(',').filter(Boolean)
         const cs = searchParams?.get('cs')
         if (cs) initial.companySizes = cs.split(',').filter(Boolean)
+        const ind = searchParams?.get('ind')
+        if (ind) initial.industries = ind.split(',').filter(Boolean)
+        const cert = searchParams?.get('cert')
+        if (cert) initial.certifications = cert.split(',').filter(Boolean)
         return initial
     })
 
@@ -224,6 +228,8 @@ export function useMarketplaceState({
         if (f.maxRate != null) p.set('rmax', String(f.maxRate))
         if (f.companyTypes && f.companyTypes.length > 0) p.set('ct', f.companyTypes.join(','))
         if (f.companySizes && f.companySizes.length > 0) p.set('cs', f.companySizes.join(','))
+        if (f.industries && f.industries.length > 0) p.set('ind', f.industries.join(','))
+        if (f.certifications && f.certifications.length > 0) p.set('cert', f.certifications.join(','))
         const newURL = p.toString() ? `${pathname}?${p.toString()}` : pathname
         window.history.replaceState(null, '', newURL)
     }, [pathname, advancedFilters])

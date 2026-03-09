@@ -228,6 +228,10 @@ export interface AdvancedFilters {
     skills?: string[]
     companyTypes?: string[]
     companySizes?: string[]
+    /** Filter by industries (JSONB array in-memory post-filter). */
+    industries?: string[]
+    /** Filter by certifications (JSONB array in-memory post-filter). */
+    certifications?: string[]
 }
 
 export interface SearchMarketplaceListingsParams {
@@ -448,6 +452,35 @@ export async function searchMarketplaceListings(
             if (af.minRate != null && numeric < af.minRate) return false
             if (af.maxRate != null && numeric > af.maxRate) return false
             return true
+        })
+    }
+
+    // INTENT: In-memory post-filter for industries and certifications JSONB arrays.
+    // PostgREST doesn't support JSONB array containment without RPC, so we filter
+    // client-side (same approach as investor stage/sector filtering).
+    if (af && af.industries && af.industries.length > 0) {
+        const wanted = new Set(af.industries.map(i => i.toLowerCase()))
+        listings = listings.filter((l) => {
+            const attrs = l.attributes as Record<string, unknown> | null
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const industries = (l as any).industries ?? attrs?.industries
+            if (!Array.isArray(industries)) return false
+            return industries.some((ind: unknown) =>
+                typeof ind === 'string' && wanted.has(ind.toLowerCase())
+            )
+        })
+    }
+
+    if (af && af.certifications && af.certifications.length > 0) {
+        const wanted = new Set(af.certifications.map(c => c.toLowerCase()))
+        listings = listings.filter((l) => {
+            const attrs = l.attributes as Record<string, unknown> | null
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const certs = (l as any).certifications ?? attrs?.certifications
+            if (!Array.isArray(certs)) return false
+            return certs.some((cert: unknown) =>
+                typeof cert === 'string' && wanted.has(cert.toLowerCase())
+            )
         })
     }
 

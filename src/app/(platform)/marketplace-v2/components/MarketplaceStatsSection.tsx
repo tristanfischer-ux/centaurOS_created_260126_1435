@@ -3,8 +3,9 @@
 /**
  * @file MarketplaceStatsSection.tsx
  * @description Collapsible analytics section for the marketplace page.
- * Shows KPI cards and three charts: manufacturing type distribution (bar),
- * company size breakdown (donut), and regional coverage (bar).
+ * Shows 6 KPI cards and two rows of charts:
+ *   Row 1: Subcategory Distribution (bar), Company Size (donut), Regional Coverage (bar)
+ *   Row 2: Industry/Sector Breakdown (bar), Certification Distribution (bar), Company Type (bar)
  *
  * FLOW: Stats are computed server-side in getMarketplaceStats() and passed
  * as props from the marketplace page.tsx.
@@ -25,6 +26,7 @@ import {
   Users,
   Briefcase,
   Filter,
+  Award,
 } from 'lucide-react'
 import {
   BarChart,
@@ -75,9 +77,15 @@ interface MarketplaceStatsSectionProps {
   selectedCompanyTypes?: string[]
   selectedCompanySizes?: string[]
   selectedSubRegions?: string[]
+  selectedIndustries?: string[]
+  selectedCertifications?: string[]
+  selectedSubcategories?: string[]
   onCompanyTypeClick?: (type: string) => void
   onCompanySizeClick?: (size: string) => void
   onRegionClick?: (region: string) => void
+  onIndustryClick?: (industry: string) => void
+  onCertificationClick?: (certification: string) => void
+  onSubcategoryChartClick?: (subcategory: string) => void
   hasActiveFilters?: boolean
   onClearFilters?: () => void
 }
@@ -151,6 +159,88 @@ function KPICard({ icon: Icon, value, label }: {
   )
 }
 
+// ─── Horizontal Bar Chart (reusable) ────────────────────────────────────────
+
+function HorizontalBarChart({
+  data,
+  title,
+  selectedItems = [],
+  onItemClick,
+  colorIndex = 0,
+  noun = 'suppliers',
+  labelWidth = 120,
+}: {
+  data: { name: string; count: number }[]
+  title: string
+  selectedItems?: string[]
+  onItemClick?: (name: string) => void
+  colorIndex?: number
+  noun?: string
+  labelWidth?: number
+}) {
+  if (data.length === 0) return null
+
+  return (
+    <Card className="rounded-xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs font-medium text-muted-foreground">
+          {title}
+          {onItemClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pb-4">
+        <div className="h-[200px] sm:h-[240px] md:h-[280px]" role="img" aria-label={`${title} bar chart`}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={data}
+              layout="vertical"
+              margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
+            >
+              <XAxis type="number" hide />
+              <YAxis
+                type="category"
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10 }}
+                width={labelWidth}
+              />
+              <Tooltip
+                content={<BarTooltip noun={noun} />}
+                cursor={{ fill: 'hsl(var(--muted))' }}
+              />
+              <Bar
+                dataKey="count"
+                radius={[0, 4, 4, 0]}
+                barSize={16}
+                cursor={onItemClick ? 'pointer' : undefined}
+                onClick={onItemClick ? (barData) => {
+                  const name = barData?.payload?.name as string | undefined
+                  if (name) onItemClick(name)
+                } : undefined}
+              >
+                {data.map((entry, index) => {
+                  const isSelected = selectedItems.includes(entry.name)
+                  const hasSelection = selectedItems.length > 0
+                  return (
+                    <Cell
+                      key={`bar-${index}`}
+                      fill={getChartColor(index + colorIndex, true)}
+                      fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
+                      stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
+                      strokeWidth={isSelected ? 1.5 : 0}
+                    />
+                  )
+                })}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export function MarketplaceStatsSection({
@@ -159,9 +249,15 @@ export function MarketplaceStatsSection({
   selectedCompanyTypes = [],
   selectedCompanySizes = [],
   selectedSubRegions = [],
+  selectedIndustries = [],
+  selectedCertifications = [],
+  selectedSubcategories = [],
   onCompanyTypeClick,
   onCompanySizeClick,
   onRegionClick,
+  onIndustryClick,
+  onCertificationClick,
+  onSubcategoryChartClick,
   hasActiveFilters,
   onClearFilters,
 }: MarketplaceStatsSectionProps) {
@@ -176,6 +272,10 @@ export function MarketplaceStatsSection({
     companySizeCounts,
     regionCounts,
     avgCompanyAge,
+    subcategoryCounts,
+    industryCounts,
+    certificationCounts,
+    withCertificationsCount,
   } = stats
 
   // Destructure labels with marketplace defaults
@@ -185,7 +285,6 @@ export function MarketplaceStatsSection({
     kpi1Icon: kpi1IconName,
     kpi3Label = 'Mfg Types',
     kpi3Icon: kpi3IconName,
-    chart1Title = 'Manufacturing Type Distribution',
     chart2Title = 'Company Size',
     chart3Title = 'Regional Coverage',
     barTooltipNoun = 'suppliers',
@@ -195,8 +294,9 @@ export function MarketplaceStatsSection({
   const KPI1Icon = (kpi1IconName && ICON_MAP[kpi1IconName]) || Factory
   const KPI3Icon = (kpi3IconName && ICON_MAP[kpi3IconName]) || Wrench
 
-  // Fix 6: avoid re-slicing on every render
-  const typeData: { name: string; count: number }[] = useMemo(() => companyTypeCounts.slice(0, 12), [companyTypeCounts])
+  // Avoid re-slicing on every render
+  const typeData = useMemo(() => companyTypeCounts.slice(0, 12), [companyTypeCounts])
+  const subcategoryData = useMemo(() => subcategoryCounts?.slice(0, 12) ?? [], [subcategoryCounts])
 
   // Don't render if no data
   if (totalListings === 0) return null
@@ -232,18 +332,19 @@ export function MarketplaceStatsSection({
 
       {isExpanded && (
         <CardContent className="space-y-6 pb-6">
-          {/* KPI Cards */}
-          <div className={`grid grid-cols-2 gap-3 ${avgCompanyAge !== null ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
+          {/* KPI Cards — 6 cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <KPICard icon={KPI1Icon} value={totalListings} label={kpi1Label} />
             <KPICard icon={ShieldCheck} value={verifiedCount} label="Verified" />
             <KPICard icon={KPI3Icon} value={manufacturingTypes} label={kpi3Label} />
             <KPICard icon={MapPin} value={regionCount} label="Regions" />
+            <KPICard icon={Award} value={withCertificationsCount} label="Certified" />
             {avgCompanyAge !== null && (
               <KPICard icon={Calendar} value={`${avgCompanyAge} yrs`} label="Avg. Age" />
             )}
           </div>
 
-          {/* Filter indicator (Fix 5) */}
+          {/* Filter indicator */}
           {hasActiveFilters && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-lg px-3 py-1.5">
               <Filter className="h-3 w-3" />
@@ -256,68 +357,17 @@ export function MarketplaceStatsSection({
             </div>
           )}
 
-          {/* Charts */}
+          {/* Row 1: Subcategory, Company Size, Regional Coverage */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Manufacturing Type Distribution — Horizontal Bar */}
-            {companyTypeCounts.length > 0 && (
-              <Card className="rounded-xl border shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">
-                    {chart1Title}
-                    {onCompanyTypeClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pb-4">
-                  <div className="h-[200px] sm:h-[240px] md:h-[280px]" role="img" aria-label="Manufacturing type distribution bar chart showing top 12 types">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={typeData}
-                        layout="vertical"
-                        margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 10 }}
-                          width={120}
-                        />
-                        <Tooltip
-                          content={<BarTooltip noun={barTooltipNoun} />}
-                          cursor={{ fill: 'hsl(var(--muted))' }}
-                        />
-                        <Bar
-                          dataKey="count"
-                          radius={[0, 4, 4, 0]}
-                          barSize={16}
-                          cursor={onCompanyTypeClick ? 'pointer' : undefined}
-                          onClick={onCompanyTypeClick ? (data) => {
-                            const name = data?.payload?.name as string | undefined
-                            if (name) onCompanyTypeClick(name)
-                          } : undefined}
-                        >
-                          {typeData.map((entry, index) => {
-                            const isSelected = selectedCompanyTypes.includes(entry.name)
-                            const hasSelection = selectedCompanyTypes.length > 0
-                            return (
-                              <Cell
-                                key={`type-${index}`}
-                                fill={getChartColor(index, true)}
-                                fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
-                                stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
-                                strokeWidth={isSelected ? 1.5 : 0}
-                              />
-                            )
-                          })}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Subcategory Distribution — lead chart */}
+            <HorizontalBarChart
+              data={subcategoryData}
+              title="Subcategory Distribution"
+              selectedItems={selectedSubcategories}
+              onItemClick={onSubcategoryChartClick}
+              colorIndex={0}
+              noun={barTooltipNoun}
+            />
 
             {/* Company Size — Donut Chart */}
             {companySizeCounts.length > 0 && (
@@ -406,65 +456,48 @@ export function MarketplaceStatsSection({
             )}
 
             {/* Regional Coverage — Horizontal Bar */}
-            {regionCounts.length > 0 && (
-              <Card className="rounded-xl border shadow-sm">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-medium text-muted-foreground">
-                    {chart3Title}
-                    {onRegionClick && <span className="text-[10px] text-muted-foreground/60 ml-2">Click to filter</span>}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pb-4">
-                  <div className="h-[200px] sm:h-[240px] md:h-[280px]" role="img" aria-label="Regional coverage bar chart showing UK regions">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={regionCounts}
-                        layout="vertical"
-                        margin={{ top: 0, right: 10, left: 0, bottom: 0 }}
-                      >
-                        <XAxis type="number" hide />
-                        <YAxis
-                          type="category"
-                          dataKey="name"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 10 }}
-                          width={100}
-                        />
-                        <Tooltip
-                          content={<BarTooltip noun={barTooltipNoun} />}
-                          cursor={{ fill: 'hsl(var(--muted))' }}
-                        />
-                        <Bar
-                          dataKey="count"
-                          radius={[0, 4, 4, 0]}
-                          barSize={16}
-                          cursor={onRegionClick ? 'pointer' : undefined}
-                          onClick={onRegionClick ? (data) => {
-                            const name = data?.payload?.name as string | undefined
-                            if (name) onRegionClick(name)
-                          } : undefined}
-                        >
-                          {regionCounts.map((entry, index) => {
-                            const isSelected = selectedSubRegions.includes(entry.name)
-                            const hasSelection = selectedSubRegions.length > 0
-                            return (
-                              <Cell
-                                key={`region-${index}`}
-                                fill={chartColors[1]}
-                                fillOpacity={hasSelection ? (isSelected ? 1 : 0.3) : 1}
-                                stroke={isSelected ? 'hsl(var(--foreground))' : 'none'}
-                                strokeWidth={isSelected ? 1.5 : 0}
-                              />
-                            )
-                          })}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <HorizontalBarChart
+              data={regionCounts}
+              title={chart3Title}
+              selectedItems={selectedSubRegions}
+              onItemClick={onRegionClick}
+              colorIndex={2}
+              noun={barTooltipNoun}
+              labelWidth={100}
+            />
+          </div>
+
+          {/* Row 2: Industry, Certification, Company Type */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Industry/Sector Breakdown */}
+            <HorizontalBarChart
+              data={industryCounts ?? []}
+              title="Industry / Sector Breakdown"
+              selectedItems={selectedIndustries}
+              onItemClick={onIndustryClick}
+              colorIndex={4}
+              noun={barTooltipNoun}
+            />
+
+            {/* Certification Distribution */}
+            <HorizontalBarChart
+              data={certificationCounts ?? []}
+              title="Certification Distribution"
+              selectedItems={selectedCertifications}
+              onItemClick={onCertificationClick}
+              colorIndex={6}
+              noun={barTooltipNoun}
+            />
+
+            {/* Company Type Distribution — moved from row 1 */}
+            <HorizontalBarChart
+              data={typeData}
+              title="Company Type Distribution"
+              selectedItems={selectedCompanyTypes}
+              onItemClick={onCompanyTypeClick}
+              colorIndex={0}
+              noun={barTooltipNoun}
+            />
           </div>
         </CardContent>
       )}

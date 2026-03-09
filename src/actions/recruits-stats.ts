@@ -91,6 +91,11 @@ const fetchRecruitsStats = async (): Promise<MarketplaceStats | null> => {
       companySizeCounts: [],
       regionCounts: [],
       avgCompanyAge: null,
+      subcategoryCounts: [],
+      industryCounts: [],
+      certificationCounts: [],
+      withCapabilitiesCount: 0,
+      withCertificationsCount: 0,
     }
   }
 
@@ -182,6 +187,11 @@ const fetchRecruitsStats = async (): Promise<MarketplaceStats | null> => {
     companySizeCounts,
     regionCounts,
     avgCompanyAge: null,
+    subcategoryCounts: [],
+    industryCounts: [],
+    certificationCounts: [],
+    withCapabilitiesCount: 0,
+    withCertificationsCount: 0,
   }
 }
 

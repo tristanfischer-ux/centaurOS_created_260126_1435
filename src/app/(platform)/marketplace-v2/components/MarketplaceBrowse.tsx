@@ -21,6 +21,7 @@ import {
     Factory,
     X,
     ArrowRight,
+    BarChart3,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -242,6 +243,26 @@ export function MarketplaceBrowse({
         toggleSubRegion(region)
     }, [toggleSubRegion])
 
+    // New chart click handlers for Phase 2 charts
+    const selectedIndustries = state.advancedFilters.industries
+    const selectedCertifications = state.advancedFilters.certifications
+
+    const handleIndustryClick = useCallback((industry: string) => {
+        const current = selectedIndustries ?? []
+        const next = current.includes(industry) ? current.filter(i => i !== industry) : [...current, industry]
+        updateAdvancedFilter('industries', next.length > 0 ? next : undefined)
+    }, [selectedIndustries, updateAdvancedFilter])
+
+    const handleCertificationClick = useCallback((certification: string) => {
+        const current = selectedCertifications ?? []
+        const next = current.includes(certification) ? current.filter(c => c !== certification) : [...current, certification]
+        updateAdvancedFilter('certifications', next.length > 0 ? next : undefined)
+    }, [selectedCertifications, updateAdvancedFilter])
+
+    const handleSubcategoryChartClick = useCallback((subcategory: string) => {
+        state.toggleSubcategory(subcategory)
+    }, [state])
+
     return (
         <div className="space-y-6">
             {/* Page header */}
@@ -309,23 +330,41 @@ export function MarketplaceBrowse({
             {activeTab === 'browse' && (
                 <>
                     {/* Analytics section */}
-                    {stats && (
+                    {stats ? (
                         <MarketplaceStatsSection
                             stats={stats}
                             labels={statsLabels}
                             selectedCompanyTypes={state.advancedFilters.companyTypes}
                             selectedCompanySizes={state.advancedFilters.companySizes}
                             selectedSubRegions={state.selectedSubRegions}
+                            selectedIndustries={state.advancedFilters.industries}
+                            selectedCertifications={state.advancedFilters.certifications}
+                            selectedSubcategories={Array.from(state.selectedSubcategories)}
                             onCompanyTypeClick={handleCompanyTypeClick}
                             onCompanySizeClick={handleCompanySizeClick}
                             onRegionClick={handleRegionClick}
+                            onIndustryClick={handleIndustryClick}
+                            onCertificationClick={handleCertificationClick}
+                            onSubcategoryChartClick={handleSubcategoryChartClick}
                             hasActiveFilters={
                               (state.advancedFilters.companyTypes?.length ?? 0) > 0 ||
                               (state.advancedFilters.companySizes?.length ?? 0) > 0 ||
-                              state.selectedSubRegions.length > 0
+                              (state.advancedFilters.industries?.length ?? 0) > 0 ||
+                              (state.advancedFilters.certifications?.length ?? 0) > 0 ||
+                              state.selectedSubRegions.length > 0 ||
+                              state.selectedSubcategories.size > 0
                             }
                             onClearFilters={state.clearFilters}
                         />
+                    ) : (
+                        <Card className="rounded-xl border shadow-sm">
+                            <CardContent className="py-6">
+                                <div className="flex items-center gap-3 text-muted-foreground">
+                                    <BarChart3 className="h-5 w-5" />
+                                    <p className="text-sm">Marketplace insights are temporarily unavailable. Browse listings below.</p>
+                                </div>
+                            </CardContent>
+                        </Card>
                     )}
 
                     {/* AI + Gap Recommendations (compact, dismissible) */}
@@ -432,6 +471,8 @@ export function MarketplaceBrowse({
                             }}
                             advancedFilters={state.advancedFilters}
                             onAdvancedFilterChange={state.updateAdvancedFilter}
+                            availableIndustries={stats?.industryCounts?.map(i => i.name) ?? []}
+                            availableCertifications={stats?.certificationCounts?.map(c => c.name) ?? []}
                         />
                     )}
 
