@@ -47,7 +47,7 @@ export default async function StrategyPage() {
   })
 
   if (foundryError) {
-    console.error('[Strategy] Failed to fetch foundry:', { foundryId, error: foundryError.message })
+    console.error(`[Strategy] Failed to fetch foundry: foundryId=${foundryId} error=${foundryError.message}`)
   }
 
   // Fetch strategic goals, objectives, and tasks in parallel

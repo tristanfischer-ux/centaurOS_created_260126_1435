@@ -53,7 +53,7 @@ export async function fetchDailyPulseData(
         })
     
     if (error) {
-        console.error('Failed to fetch daily pulse:', error)
+        console.error(`[DailyPulse] Failed to fetch daily pulse: ${error.message} (code: ${error.code}, details: ${error.details})`)
         return null
     }
     

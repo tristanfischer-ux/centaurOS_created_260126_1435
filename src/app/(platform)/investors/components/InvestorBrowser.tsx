@@ -130,10 +130,6 @@ export function InvestorBrowser({
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // INTENT: Skip the initial refetch when SSR data is already fresh (no URL filters).
-  // Flip to false after first render so subsequent filter changes always refetch.
-  const isFirstRender = useRef(!hasUrlFilters)
-
   // ---------------------------------------------------------------------------
   // Debounce search query
   // ---------------------------------------------------------------------------
@@ -166,23 +162,28 @@ export function InvestorBrowser({
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    // Skip first render when SSR data is already correct for the no-filter case
-    if (isFirstRender.current) {
-      isFirstRender.current = false
+    // INTENT: Skip redundant refetch when at default filters and SSR data is loaded.
+    // Value-based check — immune to React Strict Mode double-effect execution
+    // (refs get mutated on the first run, then the guard is stale on the second).
+    if (activeFirmType === 'All' && !activeOnly && !debouncedQuery && firms.length > 0) {
       return
     }
     startTransition(async () => {
-      const result = await searchInvestors({
-        firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
-        activeOnly,
-        query: debouncedQuery || undefined,
-        page: 1,
-        pageSize: PAGE_SIZE,
-      })
-      setFirms(result.firms)
-      setTotal(result.total)
-      setHasMore(result.hasMore)
-      setPage(1)
+      try {
+        const result = await searchInvestors({
+          firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
+          activeOnly,
+          query: debouncedQuery || undefined,
+          page: 1,
+          pageSize: PAGE_SIZE,
+        })
+        setFirms(result.firms)
+        setTotal(result.total)
+        setHasMore(result.hasMore)
+        setPage(1)
+      } catch (err) {
+        console.error('[InvestorBrowser] Filter search failed:', err)
+      }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFirmType, activeOnly, debouncedQuery])
@@ -205,6 +206,8 @@ export function InvestorBrowser({
       setFirms(prev => [...prev, ...result.firms])
       setHasMore(result.hasMore)
       setPage(nextPage)
+    } catch (err) {
+      console.error('[InvestorBrowser] Load more failed:', err)
     } finally {
       setIsLoadingMore(false)
     }
@@ -305,13 +308,16 @@ export function InvestorBrowser({
       </div>
 
       {/* Grid / states */}
-      {isPending ? (
+      {isPending && firms.length === 0 ? (
         <InvestorGridSkeleton />
-      ) : firms.length === 0 ? (
+      ) : firms.length === 0 && !isPending ? (
         <EmptyState onClear={handleClearFilters} />
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className={cn(
+            "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+            isPending && "opacity-60 pointer-events-none transition-opacity"
+          )}>
             {firms.map(firm => (
               <InvestorCard key={firm.id} firm={firm} />
             ))}
@@ -324,7 +330,7 @@ export function InvestorBrowser({
                 variant="secondary"
                 size="lg"
                 onClick={handleLoadMore}
-                disabled={isLoadingMore}
+                disabled={isLoadingMore || isPending}
                 className="min-w-[200px]"
               >
                 {isLoadingMore ? (

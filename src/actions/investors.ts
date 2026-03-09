@@ -18,6 +18,7 @@
 
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -291,7 +292,11 @@ const INVESTOR_FIRM_TYPES = new Set([
  */
 export const getInvestorStats = unstable_cache(
   async (): Promise<InvestorStats> => {
-    const supabase = await createClient()
+    // DECISION: Using admin client (service role) instead of cookie-based client
+    // because unstable_cache can revalidate during a different user's request.
+    // cookies() inside unstable_cache() causes a Next.js error. Safe here because
+    // investor data is read-only and public within the platform.
+    const supabase = createAdminClient()
 
     const { data, error } = await supabase
       .from('marketplace_listings')
