@@ -1396,6 +1396,36 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const skeleton = skeletonRes.modules[i]
         if (!activeProjectIdRef.current) break // Stale closure guard
 
+        // INTENT: Mirror modules copy their primary's expansion — same keyParts, description,
+        // failureModes. Saves an LLM call and ensures content consistency.
+        if (skeleton.mirrorOf) {
+          const primaryIdx = skeletonRes.modules.findIndex(m => m.id === skeleton.mirrorOf)
+          if (primaryIdx !== -1 && expandedModules[primaryIdx].keyParts.length > 0) {
+            const primary = expandedModules[primaryIdx]
+            expandedModules[i] = {
+              ...expandedModules[i],
+              keyParts: [...primary.keyParts],
+              leadWeeks: primary.leadWeeks,
+              estimatedMassKg: primary.estimatedMassKg,
+              description: primary.description,
+              whyItMatters: primary.whyItMatters,
+              failureModes: [...primary.failureModes],
+              unknowns: [...primary.unknowns],
+            }
+            addProgressLine(`  ${skeleton.name} mirrored from ${skeletonRes.modules[primaryIdx].name}`)
+            if (activeProjectIdRef.current) {
+              const exp = expandedModules[i]
+              setModules((prev) => prev.map((m) =>
+                m.id === exp.id
+                  ? { ...m, keyParts: exp.keyParts, leadWeeks: exp.leadWeeks, description: exp.description, whyItMatters: exp.whyItMatters, failureModes: exp.failureModes, unknowns: exp.unknowns, ...(exp.estimatedMassKg ? { estimatedMassKg: exp.estimatedMassKg } : {}) }
+                  : m
+              ))
+            }
+            continue
+          }
+          // Fallback: primary not yet expanded (ordering edge case) — expand normally
+        }
+
         addProgressLine(`Expanding ${skeleton.name} (${i + 1}/${skeletonRes.modules.length})...`)
 
         const expRes = await expandModuleDetail(

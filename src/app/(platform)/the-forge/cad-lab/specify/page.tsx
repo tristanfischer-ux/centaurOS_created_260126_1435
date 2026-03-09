@@ -38,6 +38,7 @@ import {
   XCircle,
   ClipboardCheck,
   Grid3x3,
+  FlipHorizontal2,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -236,20 +237,47 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Diagnostic handlers ──
 
   const handleAnswer = useCallback((moduleId: string, questionId: string, value: string) => {
-    setDiagnosticAnswers((prev: DiagnosticAnswers) => ({
-      ...prev,
-      [moduleId]: { ...(prev[moduleId] || {}), [questionId]: value },
-    }))
-  }, [setDiagnosticAnswers])
+    setDiagnosticAnswers((prev: DiagnosticAnswers) => {
+      const updated: DiagnosticAnswers = {
+        ...prev,
+        [moduleId]: { ...(prev[moduleId] || {}), [questionId]: value },
+      }
+
+      // INTENT: Auto-sync diagnostics from primary → mirror modules.
+      // Primary always wins — mirrors inherit every change. This matches the UI label
+      // "Synced from {primary}" and avoids stale-comparison race conditions.
+      const isPrimary = !modules.find((m) => m.id === moduleId)?.mirrorOf
+      if (isPrimary) {
+        for (const mod of modules) {
+          if (mod.mirrorOf === moduleId) {
+            updated[mod.id] = { ...(updated[mod.id] || {}), [questionId]: value }
+          }
+        }
+      }
+
+      return updated
+    })
+  }, [setDiagnosticAnswers, modules])
 
   const handleUseRecommended = useCallback((moduleId: string) => {
     const mod = modules.find((m) => m.id === moduleId)
     if (!mod) return
     const recommended = inferRecommendations(mod, designBrief)
-    setDiagnosticAnswers((prev: DiagnosticAnswers) => ({
-      ...prev,
-      [moduleId]: { ...(prev[moduleId] || {}), ...recommended },
-    }))
+    setDiagnosticAnswers((prev: DiagnosticAnswers) => {
+      const updated = {
+        ...prev,
+        [moduleId]: { ...(prev[moduleId] || {}), ...recommended },
+      }
+      // INTENT: Sync to mirrors if this is a primary module
+      if (!mod.mirrorOf) {
+        for (const m of modules) {
+          if (m.mirrorOf === moduleId) {
+            updated[m.id] = { ...(updated[m.id] || {}), ...recommended }
+          }
+        }
+      }
+      return updated
+    })
   }, [modules, designBrief, setDiagnosticAnswers])
 
   const handleAutoSelectAll = useCallback(() => {
@@ -258,6 +286,14 @@ export default function SpecifyPage(): React.ReactNode {
       for (const mod of modules) {
         const recommended = inferRecommendations(mod, designBrief)
         updated[mod.id] = { ...(updated[mod.id] || {}), ...recommended }
+      }
+      // INTENT: Ensure mirrors get their primary's recommendations, not independently inferred ones.
+      // Mirror modules may have divergent descriptions, so inferRecommendations() could produce
+      // different values. Force consistency by copying primary → mirror.
+      for (const mod of modules) {
+        if (mod.mirrorOf && updated[mod.mirrorOf]) {
+          updated[mod.id] = { ...updated[mod.mirrorOf] }
+        }
       }
       return updated
     })
@@ -739,6 +775,15 @@ export default function SpecifyPage(): React.ReactNode {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{mod.purpose}</p>
+                        {mod.mirrorOf && (() => {
+                          const primary = modules.find((m) => m.id === mod.mirrorOf)
+                          return primary ? (
+                            <p className="text-[10px] text-info flex items-center gap-1 mt-0.5">
+                              <FlipHorizontal2 className="h-3 w-3 inline" />
+                              Synced from {primary.name}
+                            </p>
+                          ) : null
+                        })()}
                       </div>
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
