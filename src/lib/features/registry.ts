@@ -38,10 +38,11 @@ export type FeatureCategory =
     | 'buyer'          // Buyer-specific features
     | 'strategic'      // Strategic planning features
 
-export type FeatureStatus = 
+export type FeatureStatus =
     | 'stable'         // Production-ready, fully tested
     | 'beta'           // Available but still being refined
     | 'alpha'          // Early access, may have issues
+    | 'demo'           // Demonstration / showcase stage
     | 'hidden'         // Coded but intentionally hidden from UI
     | 'deprecated'     // Being phased out
 
@@ -303,7 +304,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/apprenticeship',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'beta',
+        status: 'demo',
         isVisibleInNav: true,
         changelog: 'Launched the Apprenticeship program for tracking on-the-job training. Manage apprentice progress, competencies, and milestones.'
     },
@@ -461,7 +462,7 @@ export const FEATURE_REGISTRY: Feature[] = [
         route: '/guild',
         releasedAt: new Date('2026-01-15'),
         category: 'core',
-        status: 'beta',
+        status: 'demo',
         isVisibleInNav: true,
         changelog: 'The Guild connects executives with apprentices. Browse the apprentice pool, assign apprentices to projects, and attend networking events.'
     },
@@ -530,6 +531,14 @@ export function isRouteBeta(route: string): boolean {
 export function isRouteAlpha(route: string): boolean {
     const feature = FEATURE_REGISTRY.find(f => f.route === route)
     return feature?.status === 'alpha'
+}
+
+/**
+ * Check if a route's feature is in demo status
+ */
+export function isRouteDemo(route: string): boolean {
+    const feature = FEATURE_REGISTRY.find(f => f.route === route)
+    return feature?.status === 'demo'
 }
 
 /**

@@ -76,7 +76,7 @@ import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
-import { isRouteAlpha, isRouteBeta } from "@/lib/features/registry"
+import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
@@ -243,6 +243,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
         const isActive = isRouteActive(pathname, item.href)
         const isAlpha = isRouteAlpha(item.href)
         const isBeta = isRouteBeta(item.href)
+        const isDemo = isRouteDemo(item.href)
 
         const navLink = (
             <Link
@@ -274,6 +275,11 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {isBeta && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
                         Beta
+                    </span>
+                )}
+                {isDemo && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                        Demo
                     </span>
                 )}
             </Link>
