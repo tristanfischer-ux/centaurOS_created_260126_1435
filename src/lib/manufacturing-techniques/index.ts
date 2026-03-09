@@ -27,6 +27,11 @@ const TECHNIQUE_MAP = new Map<string, ManufacturingTechnique>(
   ALL_TECHNIQUES.map(t => [t.id, t]),
 )
 
+/** Map of technique slug → technique for O(1) lookups. */
+const TECHNIQUE_SLUG_MAP = new Map<string, ManufacturingTechnique>(
+  ALL_TECHNIQUES.map(t => [t.slug, t]),
+)
+
 /**
  * Retrieve a single technique by its unique ID.
  *
@@ -35,6 +40,16 @@ const TECHNIQUE_MAP = new Map<string, ManufacturingTechnique>(
  */
 export function getTechniqueById(id: string): ManufacturingTechnique | undefined {
   return TECHNIQUE_MAP.get(id)
+}
+
+/**
+ * Retrieve a single technique by its URL-friendly slug.
+ *
+ * @param slug - The technique slug (e.g. "fdm", "sla", "cnc-milling")
+ * @returns The matching technique or undefined
+ */
+export function getTechniqueBySlug(slug: string): ManufacturingTechnique | undefined {
+  return TECHNIQUE_SLUG_MAP.get(slug)
 }
 
 /**

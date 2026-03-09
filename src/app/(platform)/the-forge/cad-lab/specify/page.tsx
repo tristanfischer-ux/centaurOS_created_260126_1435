@@ -81,6 +81,8 @@ import { RedlineDiff } from "../components/redline-diff"
 import { buildRevisionItems } from "../components/checkpoint-revision-diffs"
 import { PartsMap } from "@/components/cad/parts-map"
 import { DfmInsightPanel } from "@/components/cad/dfm-insight-panel"
+import { ManufacturingIntelligenceTab } from "@/components/cad/manufacturing-intelligence-tab"
+import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
 import { getTechniqueInsightsByProcess, getProcessRecommendations } from "@/actions/manufacturing-techniques"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
@@ -428,6 +430,8 @@ export default function SpecifyPage(): React.ReactNode {
     { id: "overview", label: "Overview" },
     { id: "specs", label: "Module Specs" },
     { id: "review", label: "Specialist Review" },
+    { id: "mfg_intelligence", label: "Manufacturing Intelligence" },
+    { id: "executive_review", label: "Executive Review" },
   ]
 
   const [activeTab, setActiveTab] = useState("overview")
@@ -1331,6 +1335,28 @@ export default function SpecifyPage(): React.ReactNode {
           </motion.div>
         )}
 
+        {/* ═══ Manufacturing Intelligence tab ═══ */}
+        {activeTab === "mfg_intelligence" && (
+          <motion.div key="mfg_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <ManufacturingIntelligenceTab
+              modules={modules}
+              diagnosticAnswers={diagnosticAnswers}
+              processInsights={processInsights}
+              techniqueRecs={techniqueRecs}
+            />
+          </motion.div>
+        )}
+
+        {/* ═══ Executive Review tab ═══ */}
+        {activeTab === "executive_review" && (
+          <motion.div key="executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <ExecutiveReviewTab
+              modules={modules}
+              diagnosticAnswers={diagnosticAnswers}
+              context="design"
+            />
+          </motion.div>
+        )}
 
       </AnimatePresence>
 

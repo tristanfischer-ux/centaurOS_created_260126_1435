@@ -61,6 +61,12 @@ export interface CadLabSupplierMatch {
   matchReasons: string[]
   isVerified: boolean
   supplierType: string
+  processCapabilities?: Array<{
+    process_category?: string
+    materials_worked?: string[]
+    tolerance_value_mm?: number
+    batch_size_range?: string
+  }>
 }
 
 // ─── Category Normalization Maps ────────────────────────────────────
@@ -534,6 +540,7 @@ export async function matchCadLabModuleSuppliers(
           matchReasons: [...new Set(reasons)].slice(0, 3),
           isVerified: listing.is_verified ?? false,
           supplierType: listing.category === "Products" ? "manufacturer" : "service",
+          processCapabilities: caps.length > 0 ? caps : undefined,
         })
       }
     }

@@ -39,20 +39,11 @@ import { searchBuyPartProducts } from "@/actions/buy-part-search"
 import type { BuyPartSearchResult } from "@/actions/buy-part-search"
 import { toast } from "sonner"
 import { buildUniqueSuppliers, buildSankeyData, buildPerCategorySuppliers } from "@/lib/sankey-utils"
+import { ClassificationReviewPanel } from "@/components/cad/classification-review-panel"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch, ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
-
-// ─── Supplier match type (mirrors action return) ────────────────────
-
-interface SupplierMatch {
-  id: string
-  name: string
-  matchScore: number
-  scoreBreakdown: ScoreBreakdown
-  matchReasons: string[]
-  isVerified: boolean
-  supplierType: string
-}
+import { SupplierIntelligenceTab } from "@/components/cad/supplier-intelligence-tab"
+import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -87,6 +78,9 @@ export default function SourcePage(): React.ReactNode {
     aiCostEstimates,
     isEstimatingCosts,
     reEstimateCosts,
+    partCategoryOverrides,
+    setPartCategoryOverride,
+    clearPartCategoryOverride,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -99,16 +93,16 @@ export default function SourcePage(): React.ReactNode {
   // ── Supplier matching state (persisted to localStorage per project) ──
   const storageKey = activeProjectId ? `forge-supplier-matches-${activeProjectId}` : null
 
-  const [supplierMatches, setSupplierMatchesRaw] = useState<Map<string, SupplierMatch[]>>(() => {
+  const [supplierMatches, setSupplierMatchesRaw] = useState<Map<string, CadLabSupplierMatch[]>>(() => {
     if (!storageKey) return new Map()
     try {
       const stored = localStorage.getItem(storageKey)
-      if (stored) return new Map(JSON.parse(stored) as [string, SupplierMatch[]][])
+      if (stored) return new Map(JSON.parse(stored) as [string, CadLabSupplierMatch[]][])
     } catch { /* ignore corrupt data */ }
     return new Map()
   })
 
-  const setSupplierMatches = useCallback((updater: (prev: Map<string, SupplierMatch[]>) => Map<string, SupplierMatch[]>) => {
+  const setSupplierMatches = useCallback((updater: (prev: Map<string, CadLabSupplierMatch[]>) => Map<string, CadLabSupplierMatch[]>) => {
     setSupplierMatchesRaw((prev) => {
       const next = updater(prev)
       if (storageKey) {
@@ -240,9 +234,8 @@ export default function SourcePage(): React.ReactNode {
 
   // Build per-category supplier entries
   const { categories: sankeyCategories } = useMemo(
-    () => buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [eligibleModules, diagnosticAnswers, aiCostEstimates],
+    () => buildSankeyData(eligibleModules, diagnosticAnswers, aiCostEstimates, partCategoryOverrides),
+    [eligibleModules, diagnosticAnswers, aiCostEstimates, partCategoryOverrides],
   )
 
   const categorySupplierEntries = useMemo(
@@ -489,6 +482,8 @@ export default function SourcePage(): React.ReactNode {
       { id: "suppliers", label: "Suppliers" },
       { id: "shortlist", label: "Shortlist" },
       { id: "costs", label: "Costs" },
+      { id: "supplier_intelligence", label: "Supplier Intelligence" },
+      { id: "executive_review", label: "Executive Review" },
     ],
     [],
   )
@@ -561,6 +556,16 @@ export default function SourcePage(): React.ReactNode {
           </Button>
         </div>
       </div>
+
+      {/* ── Classification review panel ── */}
+      <ClassificationReviewPanel
+        modules={eligibleModules}
+        diagnosticAnswers={diagnosticAnswers}
+        aiCostEstimates={aiCostEstimates}
+        partCategoryOverrides={partCategoryOverrides}
+        onOverride={setPartCategoryOverride}
+        onClearOverride={clearPartCategoryOverride}
+      />
 
       {/* ── Tab navigation ── */}
       <nav className="sticky top-0 z-40 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3 bg-background border-b border-border overflow-x-auto">
@@ -690,6 +695,28 @@ export default function SourcePage(): React.ReactNode {
                   m.id === moduleId ? { ...m, costOverrides: overrides } : m
                 ))
               }}
+            />
+          </motion.div>
+        )}
+
+        {/* ═══ Supplier Intelligence tab ═══ */}
+        {activeTab === "supplier_intelligence" && (
+          <motion.div key="supplier_intelligence" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <SupplierIntelligenceTab
+              modules={eligibleModules}
+              diagnosticAnswers={diagnosticAnswers}
+              supplierMatches={supplierMatches}
+            />
+          </motion.div>
+        )}
+
+        {/* ═══ Executive Review tab ═══ */}
+        {activeTab === "executive_review" && (
+          <motion.div key="executive_review" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <ExecutiveReviewTab
+              modules={eligibleModules}
+              diagnosticAnswers={diagnosticAnswers}
+              context="sourcing"
             />
           </motion.div>
         )}
