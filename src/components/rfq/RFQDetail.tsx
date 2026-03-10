@@ -153,53 +153,58 @@ export function RFQDetail({
   }
 
   const handleDownloadPDF = async () => {
-    const specs = rfq.specifications || {}
-    const sections: string[] = []
+    try {
+      const specs = rfq.specifications || {}
+      const sections: string[] = []
 
-    sections.push(`# ${rfq.title}`)
-    sections.push('')
-    sections.push(`**Type:** ${typeLabels[rfq.rfq_type]}`)
-    sections.push(`**Status:** ${statusMap[rfq.status].label}`)
-    sections.push(`**Category:** ${rfq.category || 'Not specified'}`)
-    sections.push(`**Created:** ${format(new Date(rfq.created_at), 'MMM d, yyyy')}`)
-
-    if (rfq.deadline) {
-      sections.push(`**Deadline:** ${format(new Date(rfq.deadline), 'MMM d, yyyy')}`)
-    }
-
-    if (rfq.budget_min || rfq.budget_max) {
-      sections.push(`**Budget:** ${formatBudget()}`)
-    }
-
-    sections.push('')
-    sections.push('## Specifications')
-    sections.push('')
-
-    if (specs.description) {
-      sections.push(specs.description as string)
-    }
-
-    // Include module data from custom_fields
-    const customFields = specs.custom_fields as Record<string, unknown> | undefined
-    if (customFields?.modules && Array.isArray(customFields.modules)) {
+      sections.push(`# ${rfq.title}`)
       sections.push('')
-      sections.push('### Modules')
-      for (const mod of customFields.modules as Array<Record<string, unknown>>) {
-        sections.push(`- **${mod.name || 'Module'}**: ${mod.process || ''} / ${mod.material || ''} / ${mod.finish || ''}`)
+      sections.push(`**Type:** ${typeLabels[rfq.rfq_type]}`)
+      sections.push(`**Status:** ${statusMap[rfq.status].label}`)
+      sections.push(`**Category:** ${rfq.category || 'Not specified'}`)
+      sections.push(`**Created:** ${format(new Date(rfq.created_at), 'MMM d, yyyy')}`)
+
+      if (rfq.deadline) {
+        sections.push(`**Deadline:** ${format(new Date(rfq.deadline), 'MMM d, yyyy')}`)
       }
-    }
 
-    if (Array.isArray(specs.attachments) && specs.attachments.length > 0) {
+      if (rfq.budget_min != null || rfq.budget_max != null) {
+        sections.push(`**Budget:** ${formatBudget()}`)
+      }
+
       sections.push('')
-      sections.push('### Attachments')
-      for (const url of specs.attachments) {
-        if (typeof url === 'string') {
-          sections.push(`- ${url}`)
+      sections.push('## Specifications')
+      sections.push('')
+
+      if (specs.description) {
+        sections.push(specs.description as string)
+      }
+
+      // Include module data from custom_fields
+      const customFields = specs.custom_fields as Record<string, unknown> | undefined
+      if (customFields?.modules && Array.isArray(customFields.modules)) {
+        sections.push('')
+        sections.push('### Modules')
+        for (const mod of customFields.modules as Array<Record<string, unknown>>) {
+          sections.push(`- **${mod.name || 'Module'}**: ${mod.process || ''} / ${mod.material || ''} / ${mod.finish || ''}`)
         }
       }
-    }
 
-    await exportAsPDF(sections.join('\n'), `RFQ-${rfq.title.replace(/[^a-z0-9]/gi, '-')}.pdf`)
+      if (Array.isArray(specs.attachments) && specs.attachments.length > 0) {
+        sections.push('')
+        sections.push('### Attachments')
+        for (const url of specs.attachments) {
+          if (typeof url === 'string') {
+            sections.push(`- ${url}`)
+          }
+        }
+      }
+
+      await exportAsPDF(sections.join('\n'), `RFQ-${rfq.title.replace(/[^a-z0-9]/gi, '-')}.pdf`)
+    } catch (err) {
+      console.error('Failed to generate PDF:', err)
+      setError('Failed to generate PDF')
+    }
   }
 
   const toggleThread = (responseId: string) => {
@@ -215,13 +220,13 @@ export function RFQDetail({
   }
 
   const formatBudget = () => {
-    if (rfq.budget_min && rfq.budget_max) {
+    if (rfq.budget_min != null && rfq.budget_max != null) {
       return `£${rfq.budget_min.toLocaleString()} - £${rfq.budget_max.toLocaleString()}`
     }
-    if (rfq.budget_min) {
+    if (rfq.budget_min != null) {
       return `From £${rfq.budget_min.toLocaleString()}`
     }
-    if (rfq.budget_max) {
+    if (rfq.budget_max != null) {
       return `Up to £${rfq.budget_max.toLocaleString()}`
     }
     return 'Not specified'

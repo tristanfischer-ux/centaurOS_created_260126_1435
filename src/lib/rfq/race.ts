@@ -623,7 +623,7 @@ export async function checkRaceStatus(
         .eq('rfq_id', rfqId)
         .eq('provider_id', rfq.awarded_to!)
         .single()
-      winnerQuotedPrice = winningResponse?.quoted_price || null
+      winnerQuotedPrice = winningResponse?.quoted_price ?? null
     }
 
     // Determine status
@@ -718,7 +718,7 @@ export async function awardRFQ(
       return { success: false, error: 'Provider has not accepted this RFQ' }
     }
 
-    if (!response.quoted_price) {
+    if (response.quoted_price == null) {
       return { success: false, error: 'Response does not have a quoted price' }
     }
 

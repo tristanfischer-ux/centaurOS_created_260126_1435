@@ -121,7 +121,8 @@ export function RFQResponseForm({
       // Add proposal details for accept (Feature 13)
       if (responseType === 'accept') {
         if (scopeOfWork) payload.scope_of_work = scopeOfWork
-        if (timelineWeeks) payload.timeline_weeks = parseInt(timelineWeeks)
+        const parsedWeeks = parseInt(timelineWeeks, 10)
+        if (!isNaN(parsedWeeks)) payload.timeline_weeks = parsedWeeks
         if (validUntil) payload.valid_until = validUntil
         if (pricingTotal > 0) {
           payload.pricing_breakdown = {

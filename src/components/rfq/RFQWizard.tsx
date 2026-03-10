@@ -229,6 +229,11 @@ export function RFQWizard({
       return
     }
 
+    if (budgetMin && budgetMax && parseFloat(budgetMin) > parseFloat(budgetMax)) {
+      setError('Budget minimum cannot exceed maximum')
+      return
+    }
+
     startTransition(async () => {
       const attachmentPaths = files.filter((f) => f.path && !f.error).map((f) => f.path)
 
@@ -247,7 +252,8 @@ export function RFQWizard({
       // Add category-specific fields
       const categoryGroup = getCategoryGroup(category)
       if (categoryGroup === 'physical_products') {
-        if (categoryFields.quantity) specs.quantity = parseInt(categoryFields.quantity)
+        const parsedQty = parseInt(categoryFields.quantity, 10)
+        if (!isNaN(parsedQty)) specs.quantity = parsedQty
         if (categoryFields.quantityUnit) specs.unit = categoryFields.quantityUnit
         if (categoryFields.material && categoryFields.material !== 'Other (specify)') {
           specs.materials = [categoryFields.material]
@@ -263,7 +269,8 @@ export function RFQWizard({
           }
         }
       } else if (categoryGroup === 'materials_supplies') {
-        if (categoryFields.quantity) specs.quantity = parseInt(categoryFields.quantity)
+        const parsedQty = parseInt(categoryFields.quantity, 10)
+        if (!isNaN(parsedQty)) specs.quantity = parsedQty
         if (categoryFields.quantityUnit) specs.unit = categoryFields.quantityUnit
         if (categoryFields.deliverySchedule) specs.deliverySchedule = categoryFields.deliverySchedule
       } else if (categoryGroup === 'services') {

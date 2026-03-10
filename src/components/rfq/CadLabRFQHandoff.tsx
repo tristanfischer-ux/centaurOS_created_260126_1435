@@ -136,7 +136,7 @@ export function CadLabRFQHandoff({
           <Badge
             variant={readinessScore >= 80 ? 'default' : 'secondary'}
             className={cn(
-              readinessScore >= 80 && 'bg-status-success text-status-success-foreground'
+              readinessScore >= 80 && 'bg-status-success-light text-status-success'
             )}
           >
             {readinessScore}% ready
