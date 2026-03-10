@@ -110,16 +110,18 @@ export function EditEventDialog({ open, onOpenChange, onUpdated, event }: EditEv
         try {
             const dateISO = new Date(`${eventDate}T${eventTime}:00`).toISOString()
 
+            // INTENT: Always send field values so users can clear optional fields.
+            // The server action converts empty strings to null.
             const result = await updateGuildEvent(event.id, {
                 title: title.trim(),
-                description: description.trim() || undefined,
+                description: description.trim(),
                 eventType,
                 eventFormat,
                 eventDate: dateISO,
-                eventUrl: eventUrl.trim() || undefined,
-                locationGeo: locationGeo.trim() || undefined,
-                locationAddress: locationAddress.trim() || undefined,
-                maxAttendees: maxAttendees ? parseInt(maxAttendees, 10) : undefined,
+                eventUrl: eventUrl.trim(),
+                locationGeo: locationGeo.trim(),
+                locationAddress: locationAddress.trim(),
+                maxAttendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
                 isExecutiveOnly,
             })
 

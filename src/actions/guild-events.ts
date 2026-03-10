@@ -280,7 +280,7 @@ export async function updateGuildEvent(
         locationGeo?: string
         locationAddress?: string
         isExecutiveOnly?: boolean
-        maxAttendees?: number
+        maxAttendees?: number | null
     }
 ): Promise<{ success: boolean; error: string | null }> {
     try {
@@ -325,7 +325,7 @@ export async function updateGuildEvent(
                 ...(data.locationGeo !== undefined && { location_geo: data.locationGeo || null }),
                 ...(data.locationAddress !== undefined && { location_address: data.locationAddress || null }),
                 ...(data.isExecutiveOnly !== undefined && { is_executive_only: data.isExecutiveOnly }),
-                ...(data.maxAttendees !== undefined && { max_attendees: data.maxAttendees || null }),
+                ...(data.maxAttendees !== undefined && { max_attendees: data.maxAttendees }),
                 updated_at: new Date().toISOString()
             })
             .eq('id', eventId)

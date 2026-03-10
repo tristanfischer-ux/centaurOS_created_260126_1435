@@ -38,8 +38,16 @@ import {
     Pencil,
     Share2,
     MessageCircle,
+    ChevronDown,
+    CircleDot,
 } from "lucide-react"
-import { toggleRSVP, deleteGuildEvent } from "@/actions/guild-events"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { setRSVPStatus, deleteGuildEvent } from "@/actions/guild-events"
 import { startDirectMessage } from "@/actions/messaging"
 import { EditEventDialog } from "@/components/guild/edit-event-dialog"
 
@@ -132,7 +140,7 @@ export function EventDetailContent({
     currentUserId,
 }: EventDetailContentProps) {
     const router = useRouter()
-    const [attending, setAttending] = useState(initialIsAttending)
+    const [rsvpStatus, setRsvpStatus] = useState<'going' | 'maybe' | null>(initialIsAttending ? 'going' : null)
     const [count, setCount] = useState(attendeeCount)
     const [loadingRsvp, setLoadingRsvp] = useState(false)
     const [deleting, setDeleting] = useState(false)
@@ -143,18 +151,24 @@ export function EventDetailContent({
     const isPast = eventDate < new Date()
     const typeConfig = EVENT_TYPE_LABELS[event.event_type || 'meetup']
     const TypeIcon = typeConfig?.icon || Calendar
+    const isFull = event.max_attendees != null && count >= event.max_attendees
 
-    const handleRSVP = useCallback(async () => {
+    const handleSetStatus = useCallback(async (status: 'going' | 'maybe' | 'cancelled') => {
         setLoadingRsvp(true)
         try {
-            const result = await toggleRSVP(event.id)
+            const result = await setRSVPStatus(event.id, status)
             if (result.error) {
                 toast.error(result.error)
                 return
             }
-            setAttending(result.attending)
-            setCount(result.attendeeCount)
-            toast.success(result.attending ? "You're going!" : "RSVP cancelled")
+            setRsvpStatus(result.status === 'cancelled' ? null : result.status)
+            setCount(result.goingCount)
+            const messages: Record<string, string> = {
+                going: "You're going!",
+                maybe: "Marked as maybe",
+                cancelled: "RSVP cancelled",
+            }
+            toast.success(messages[status])
         } catch {
             toast.error('Failed to update RSVP')
         } finally {
@@ -381,29 +395,55 @@ export function EventDetailContent({
                     <Card className="border-2">
                         <CardContent className="p-6 space-y-4">
                             {!isPast ? (
-                                <Button
-                                    className="w-full"
-                                    size="lg"
-                                    variant={attending ? "outline" : "default"}
-                                    onClick={handleRSVP}
-                                    disabled={loadingRsvp}
-                                >
-                                    {loadingRsvp ? (
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : attending ? (
-                                        <CheckCircle2 className="mr-2 h-4 w-4 text-status-success" />
-                                    ) : null}
-                                    {attending ? "You're Going!" : "RSVP Now"}
-                                </Button>
+                                <div className="flex gap-1">
+                                    <Button
+                                        className="flex-1"
+                                        size="lg"
+                                        variant={rsvpStatus === 'going' ? 'outline' : rsvpStatus === 'maybe' ? 'secondary' : 'default'}
+                                        onClick={() => handleSetStatus(rsvpStatus ? 'cancelled' : 'going')}
+                                        disabled={loadingRsvp || (isFull && !rsvpStatus)}
+                                    >
+                                        {loadingRsvp ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        ) : rsvpStatus === 'going' ? (
+                                            <CheckCircle2 className="mr-2 h-4 w-4 text-status-success" />
+                                        ) : rsvpStatus === 'maybe' ? (
+                                            <CircleDot className="mr-2 h-4 w-4 text-status-warning" />
+                                        ) : null}
+                                        {rsvpStatus === 'going' ? "Going" : rsvpStatus === 'maybe' ? "Maybe" : isFull ? "Event Full" : "RSVP"}
+                                    </Button>
+                                    {!loadingRsvp && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline" size="lg" className="px-2" aria-label="RSVP options">
+                                                    <ChevronDown className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    onClick={() => handleSetStatus('going')}
+                                                    disabled={isFull && rsvpStatus !== 'going'}
+                                                >
+                                                    <CheckCircle2 className="mr-2 h-4 w-4 text-status-success" />
+                                                    Going
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => handleSetStatus('maybe')}>
+                                                    <CircleDot className="mr-2 h-4 w-4 text-status-warning" />
+                                                    Maybe
+                                                </DropdownMenuItem>
+                                                {rsvpStatus && (
+                                                    <DropdownMenuItem onClick={() => handleSetStatus('cancelled')}>
+                                                        <span className="mr-2 h-4 w-4" />
+                                                        Cancel RSVP
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
+                                </div>
                             ) : (
                                 <p className="text-sm text-muted-foreground text-center">
                                     This event has ended.
-                                </p>
-                            )}
-
-                            {attending && !isPast && (
-                                <p className="text-xs text-muted-foreground text-center">
-                                    Click again to cancel your RSVP
                                 </p>
                             )}
                         </CardContent>
