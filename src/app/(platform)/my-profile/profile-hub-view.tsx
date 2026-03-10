@@ -68,7 +68,7 @@ interface ProfileHubViewProps {
  * <ProfileHubView data={profileHubData} foundries={foundries} telegramLink={null} botUsername="ForgeOSBot" />
  */
 export function ProfileHubView({ data, foundries, foundriesError, telegramLink, botUsername, enrichment }: ProfileHubViewProps) {
-  const { profile, providerProfile, listing, strength, isProvider, foundryName, stats } = data
+  const { profile, providerProfile, listing, strength, isProvider, stats } = data
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
   const router = useRouter()
@@ -166,18 +166,14 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         {/* Overview Tab */}
         <TabsContent value="overview" className="mt-6">
           <OverviewTab
-            fullName={profile?.full_name ?? null}
-            email={profile?.email ?? ''}
-            role={profile?.role ?? 'Member'}
-            foundryName={resolvedFoundryName}
             bio={profile?.bio ?? null}
             phoneNumber={profile?.phone_number ?? null}
             linkedinUrl={linkedinUrl}
-            professionalBackground={profile?.professional_background as {
+            professionalBackground={(profile?.professional_background as {
               summary?: string | null
               previous_companies?: string | null
               education?: string | null
-            } | null ?? null}
+            } | null) ?? null}
             stats={stats}
             enrichment={enrichment}
           />

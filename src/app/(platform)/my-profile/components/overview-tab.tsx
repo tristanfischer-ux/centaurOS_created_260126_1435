@@ -22,14 +22,6 @@ import type { ProfileEnrichment } from '../profile-hub-view'
  */
 
 interface OverviewTabProps {
-  /** User's full name */
-  fullName: string | null
-  /** User's email */
-  email: string
-  /** User's role */
-  role: string
-  /** Foundry name */
-  foundryName: string | null
   /** User's bio */
   bio: string | null
   /** User's phone number */
@@ -54,10 +46,6 @@ interface OverviewTabProps {
 }
 
 export function OverviewTab({
-  fullName,
-  email,
-  role,
-  foundryName,
   bio,
   phoneNumber,
   linkedinUrl,
@@ -65,6 +53,8 @@ export function OverviewTab({
   stats,
   enrichment,
 }: OverviewTabProps) {
+  const hasBackground = !!(professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education))
+
   // Compute milestones from stats
   const milestones = computeMilestones(stats)
 
@@ -94,7 +84,7 @@ export function OverviewTab({
           )}
 
           {/* Background section */}
-          {professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education) && (
+          {hasBackground && professionalBackground && (
             <div className={cn(bio ? 'pt-2 border-t border-muted' : '')}>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
                 Background
@@ -130,7 +120,7 @@ export function OverviewTab({
 
           {/* Supplementary contact info */}
           {(phoneNumber || linkedinUrl) && (
-            <div className={cn((bio || (professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education))) ? 'pt-2 border-t border-muted' : '')}>
+            <div className={cn((bio || hasBackground) ? 'pt-2 border-t border-muted' : '')}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {phoneNumber && (
                   <DetailRow icon={Phone} label="Phone" value={phoneNumber} />
@@ -143,7 +133,7 @@ export function OverviewTab({
           )}
 
           {/* Empty state when nothing populated */}
-          {!bio && !(professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education)) && !phoneNumber && !linkedinUrl && (
+          {!bio && !hasBackground && !phoneNumber && !linkedinUrl && (
             <p className="text-sm text-muted-foreground italic">
               Your profile is looking a bit empty — click Edit in the hero card above to tell people about yourself.
             </p>

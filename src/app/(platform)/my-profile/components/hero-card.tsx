@@ -146,8 +146,14 @@ export function HeroCard({
               aria-hidden="true"
             />
             {/* Avatar upload hint when no photo */}
-            {!avatarUrl && (
-              <p className="text-xs text-muted-foreground text-center mt-1">Add photo</p>
+            {!avatarUrl && !isUploading && (
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                className="text-xs text-muted-foreground text-center mt-1 w-full hover:text-foreground transition-colors cursor-pointer"
+              >
+                Add photo
+              </button>
             )}
           </div>
 
