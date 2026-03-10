@@ -2,25 +2,19 @@
  * @file ai-narrative.ts
  *
  * @description Server-side module that generates executive narratives for
- * reports using the Gemini API. Two exported functions: one for the full
+ * reports using the Claude Opus API. Two exported functions: one for the full
  * executive summary and one for lightweight section intros. Falls back to
  * template-based prose when the API key is missing or the call fails.
  *
  * @related
  * - src/lib/reports/report-document-types.ts — Type definitions consumed here
  * - src/actions/report-generator.ts — Calls these functions during report build
- * - src/actions/progress-report.ts — Similar Gemini pattern for weekly digests
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
-
-// DECISION: Instantiate at module level so the SDK reuses its internal HTTP
-// client across calls within the same server lifetime, matching the pattern in
-// progress-report.ts and nudges.ts.
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
-
-const MODEL_ID = 'gemini-3.1-flash-lite-preview'
-const API_TIMEOUT_MS = 10_000
+// DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
+// module-scope side effects. The Anthropic SDK handles connection pooling internally.
+const MODEL_ID = 'claude-opus-4-6'
+const API_TIMEOUT_MS = 45_000
 
 // ─── Public Types ─────────────────────────────────────────────────
 
@@ -109,7 +103,7 @@ const SECTION_TONE_TEMPERATURE: Record<NarrativeOptions['tone'], number> = {
 /**
  * Generate a full executive narrative for a report.
  *
- * @description Sends the report metrics to Gemini and returns polished prose
+ * @description Sends the report metrics to Claude Opus and returns polished prose
  * suitable for the executive-summary section. Falls back to a deterministic
  * template when the API is unavailable.
  *
@@ -121,8 +115,8 @@ export async function generateExecutiveNarrative(
   context: NarrativeContext,
   options: NarrativeOptions,
 ): Promise<NarrativeResult> {
-  if (!process.env.GOOGLE_AI_API_KEY) {
-    console.warn('[ReportNarrative] GOOGLE_AI_API_KEY not set — using template fallback')
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('[ReportNarrative] ANTHROPIC_API_KEY not set — using template fallback')
     return buildFallbackNarrative(context, options)
   }
 
@@ -130,23 +124,23 @@ export async function generateExecutiveNarrative(
     const systemPrompt = buildExecutiveSystemPrompt(options)
     const userPrompt = buildExecutiveUserPrompt(context)
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_ID,
-      generationConfig: { temperature: TONE_TEMPERATURE[options.tone], maxOutputTokens: 1024 },
-    })
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     try {
-      const result = await Promise.race([
-        model.generateContent({
-          contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] },
-          ],
+      const response = await Promise.race([
+        client.messages.create({
+          model: MODEL_ID,
+          max_tokens: 1024,
+          temperature: TONE_TEMPERATURE[options.tone],
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
         }),
         t.promise,
       ])
 
-      const text = result.response.text()
+      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
       return parseNarrativeResponse(text, context, options)
     } finally {
       t.clear()
@@ -176,37 +170,40 @@ export async function generateSectionNarrative(
   sectionData: Record<string, unknown>,
   options: NarrativeOptions,
 ): Promise<string> {
-  if (!process.env.GOOGLE_AI_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY) {
     return buildSectionFallback(sectionType)
   }
 
   try {
-    const prompt =
+    const systemPrompt =
       `You are a report writer. Write exactly 1-2 sentences introducing the ` +
       `"${sectionType}" section of an executive report.\n\n` +
       `Tone: ${TONE_INSTRUCTIONS[options.tone]}\n\n` +
-      `Section data:\n${JSON.stringify(sectionData, null, 2)}\n\n` +
       `Rules:\n` +
       `- Never use the word "AI"\n` +
       `- Reference specific numbers from the data when possible\n` +
       `- Keep it to 1-2 sentences maximum\n` +
       `- Return ONLY the sentences, no extra formatting`
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_ID,
-      generationConfig: { temperature: SECTION_TONE_TEMPERATURE[options.tone], maxOutputTokens: 256 },
-    })
+    const userPrompt = `Section data:\n${JSON.stringify(sectionData, null, 2)}`
+
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     try {
-      const result = await Promise.race([
-        model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      const response = await Promise.race([
+        client.messages.create({
+          model: MODEL_ID,
+          max_tokens: 256,
+          temperature: SECTION_TONE_TEMPERATURE[options.tone],
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
         }),
         t.promise,
       ])
 
-      const text = result.response.text().trim()
+      const text = response.content[0]?.type === 'text' ? response.content[0].text.trim() : ''
       return text || buildSectionFallback(sectionType)
     } finally {
       t.clear()
@@ -297,7 +294,7 @@ function buildExecutiveUserPrompt(ctx: NarrativeContext): string {
 // ─── Response Parser ──────────────────────────────────────────────
 
 // DECISION: We attempt JSON.parse first, then fall back to treating the raw
-// text as the narrative. Gemini occasionally wraps its response in markdown
+// text as the narrative. The model occasionally wraps its response in markdown
 // fences or adds preamble, so we strip those before parsing.
 function parseNarrativeResponse(
   raw: string,
@@ -321,9 +318,8 @@ function parseNarrativeResponse(
     // JSON parse failed — fall through to raw text handling
   }
 
-  // GOTCHA: If Gemini returns plain text instead of JSON (happens with
-  // certain prompt lengths), we still produce a valid result rather than
-  // dropping the entire response.
+  // GOTCHA: If the model returns plain text instead of JSON, we still produce
+  // a valid result rather than dropping the entire response.
   console.warn('[ReportNarrative] Could not parse JSON — using raw text as narrative')
   return {
     narrative: cleaned,
@@ -405,6 +401,10 @@ const SECTION_FALLBACKS: Record<string, string> = {
   'sales-pipeline': 'Outreach, RFQ, and discovery call activity across the sales pipeline this period.',
   'engineering-activity': 'CAD Lab project activity and engineering throughput for this period.',
   'knowledge-learning': 'Knowledge vault contributions and apprenticeship programme progress.',
+  'workshop-design': 'An overview of CAD Lab projects, module generation, and design activity for this period.',
+  'workshop-specify': 'Specialist review outcomes, diagnostic breakdowns, and cost estimation health.',
+  'workshop-source': 'RFQ pipeline status, supplier response activity, and manufacturing order progression.',
+  'workshop-assemble': 'Manufacturing order tracking, delivery status, and items flagged as at risk.',
   'cover': '',
   'executive-summary': '',
 }
@@ -415,10 +415,8 @@ function buildSectionFallback(sectionType: string): string {
 
 // ─── Utilities ────────────────────────────────────────────────────
 
-// DECISION: Using Promise.race with a rejecting timeout rather than
-// AbortSignal because the @google/generative-ai SDK doesn't expose an
-// abort option on generateContent. This guarantees we never wait longer
-// than API_TIMEOUT_MS regardless of network conditions.
+// DECISION: Using Promise.race with a rejecting timeout to guarantee we never
+// wait longer than API_TIMEOUT_MS regardless of network conditions.
 // Returns a clearable handle so the timer doesn't dangle after the race resolves.
 function timeoutWithCleanup(ms: number) {
   let timer: ReturnType<typeof setTimeout>

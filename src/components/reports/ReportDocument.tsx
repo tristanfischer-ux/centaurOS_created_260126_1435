@@ -29,6 +29,10 @@ import {
   SalesPipelineSection,
   EngineeringActivitySection,
   KnowledgeLearningSection,
+  WorkshopDesignSection,
+  WorkshopSpecifySection,
+  WorkshopSourceSection,
+  WorkshopAssembleSection,
 } from '@/components/reports/sections'
 
 import type {
@@ -52,6 +56,10 @@ const SECTION_RENDERERS: Record<string, React.ComponentType<any>> = {
   'sales-pipeline': SalesPipelineSection,
   'engineering-activity': EngineeringActivitySection,
   'knowledge-learning': KnowledgeLearningSection,
+  'workshop-design': WorkshopDesignSection,
+  'workshop-specify': WorkshopSpecifySection,
+  'workshop-source': WorkshopSourceSection,
+  'workshop-assemble': WorkshopAssembleSection,
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

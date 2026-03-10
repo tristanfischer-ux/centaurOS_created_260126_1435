@@ -60,6 +60,11 @@ import {
   Megaphone,
   Cog,
   BookOpen,
+  Pencil,
+  ClipboardCheck,
+  ShoppingCart,
+  Package,
+  Hammer,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -124,6 +129,11 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Megaphone,
   Cog,
   BookOpen,
+  Pencil,
+  ClipboardCheck,
+  ShoppingCart,
+  Package,
+  Hammer,
 }
 
 const TEMPLATE_ICONS: Record<ReportTemplateId, React.ComponentType<{ className?: string }>> = {
@@ -132,6 +142,7 @@ const TEMPLATE_ICONS: Record<ReportTemplateId, React.ComponentType<{ className?:
   'board-pack': Briefcase,
   'custom': Sliders,
   'skill-document': FileEdit,
+  'workshop-report': Hammer,
 }
 
 const TONE_OPTIONS: { value: ReportTone; label: string; description: string }[] = [
@@ -221,7 +232,7 @@ const PAGE_TABS: { value: PageMode; label: string; icon: React.ComponentType<{ c
 ]
 
 // Report-only templates (excludes strategic-briefing and skill-document)
-const REPORT_TEMPLATE_IDS: ReportTemplateId[] = ['weekly-update', 'board-pack', 'custom']
+const REPORT_TEMPLATE_IDS: ReportTemplateId[] = ['weekly-update', 'board-pack', 'workshop-report', 'custom']
 
 // ========================
 // Component
@@ -785,7 +796,7 @@ export default function ReportsPage(): React.JSX.Element {
           {/* Change 4: Template Selector with section preview */}
           <section className="space-y-4">
             <h2 className={typography.h3}>Choose a Template</h2>
-            <div role="radiogroup" aria-label="Report template" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div role="radiogroup" aria-label="Report template" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {REPORT_TEMPLATES.filter(t => REPORT_TEMPLATE_IDS.includes(t.id)).map(template => {
                 const isSelected = selectedTemplate === template.id
                 const TemplateIcon = TEMPLATE_ICONS[template.id]

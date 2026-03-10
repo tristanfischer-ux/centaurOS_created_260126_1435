@@ -28,6 +28,12 @@ import { fetchFinancialSnapshotData } from '@/actions/report-sections/financial'
 import { fetchSalesPipelineData } from '@/actions/report-sections/sales-pipeline'
 import { fetchEngineeringActivityData } from '@/actions/report-sections/engineering'
 import { fetchKnowledgeLearningData } from '@/actions/report-sections/knowledge-learning'
+import {
+  fetchWorkshopDesignData,
+  fetchWorkshopSpecifyData,
+  fetchWorkshopSourceData,
+  fetchWorkshopAssembleData,
+} from '@/actions/report-sections/workshop'
 import type { NarrativeContext, NarrativeOptions } from '@/lib/reports/ai-narrative'
 import type { Json } from '@/types/database.types'
 import type {
@@ -53,6 +59,10 @@ import type {
   SalesPipelineSectionData,
   EngineeringActivitySectionData,
   KnowledgeLearningSectionData,
+  WorkshopDesignSectionData,
+  WorkshopSpecifySectionData,
+  WorkshopSourceSectionData,
+  WorkshopAssembleSectionData,
   ReportSectionType,
 } from '@/lib/reports/report-document-types'
 
@@ -182,6 +192,38 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       )
     }
 
+    if (requestedSections.includes('workshop-design')) {
+      fetchPromises.push(
+        fetchWorkshopDesignData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('workshop-design', { type: 'workshop-design', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('workshop-specify')) {
+      fetchPromises.push(
+        fetchWorkshopSpecifyData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('workshop-specify', { type: 'workshop-specify', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('workshop-source')) {
+      fetchPromises.push(
+        fetchWorkshopSourceData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('workshop-source', { type: 'workshop-source', data })
+        })
+      )
+    }
+
+    if (requestedSections.includes('workshop-assemble')) {
+      fetchPromises.push(
+        fetchWorkshopAssembleData(supabase, foundryId, dateRange).then(data => {
+          sectionDataMap.set('workshop-assemble', { type: 'workshop-assemble', data })
+        })
+      )
+    }
+
     await Promise.all(fetchPromises)
 
     // INTENT: After all data is fetched, enhance the executive summary with
@@ -195,7 +237,9 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
     if (requestedSections.includes('executive-summary')) {
       const narrativeContext = buildNarrativeContext(
         foundryName,
-        templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update',
+        templateId === 'board-pack' ? 'Board Pack'
+          : templateId === 'workshop-report' ? 'Workshop Report'
+          : 'Weekly Update',
         dateRange,
         sectionDataMap,
       )
@@ -221,6 +265,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       'key-metrics', 'objectives-progress', 'team-activity',
       'blockers-risks', 'completion-trend', 'week-ahead',
       'financial-snapshot', 'sales-pipeline', 'engineering-activity', 'knowledge-learning',
+      'workshop-design', 'workshop-specify', 'workshop-source', 'workshop-assemble',
     ]
 
     await Promise.all(
@@ -339,7 +384,9 @@ function buildCoverData(
   templateId: string,
   dateRange: { start: string; end: string }
 ): CoverSectionData {
-  const reportTitle = templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update'
+  const reportTitle = templateId === 'board-pack' ? 'Board Pack'
+    : templateId === 'workshop-report' ? 'Workshop Report'
+    : 'Weekly Update'
   const startDate = new Date(dateRange.start)
   const endDate = new Date(dateRange.end)
 
@@ -849,7 +896,9 @@ function buildDynamicTitle(
   templateId: string,
   sectionDataMap: Map<ReportSectionType, SectionData>,
 ): string {
-  const baseTitle = templateId === 'board-pack' ? 'Board Pack' : 'Weekly Update'
+  const baseTitle = templateId === 'board-pack' ? 'Board Pack'
+    : templateId === 'workshop-report' ? 'Workshop Report'
+    : 'Weekly Update'
 
   const metricsSection = sectionDataMap.get('key-metrics')
   const metrics = metricsSection?.type === 'key-metrics'

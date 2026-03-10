@@ -2,20 +2,18 @@
  * @file ai-slide-generator.ts
  *
  * @description Server-side module that generates a complete strategic briefing
- * slide deck using the Gemini API. Unlike ai-narrative.ts which generates a
+ * slide deck using the Claude Opus API. Unlike ai-narrative.ts which generates a
  * single summary, this module produces the ENTIRE document structure -- every
  * slide, headline, body paragraph, and data point -- from source context.
  *
- * INTENT: Replicates the quality of Google NotebookLM presentations by having
- * Gemini generate 100% of the content structure, not just an executive summary.
+ * INTENT: Produce high-quality executive presentations by having Claude generate
+ * 100% of the content structure, not just an executive summary.
  *
  * @related
  * - src/lib/reports/slide-deck-types.ts — Type definitions
  * - src/lib/reports/ai-narrative.ts — Simpler narrative generation (same SDK pattern)
  * - src/components/reports/SlideDeckRenderer.tsx — Renders the generated slides
  */
-
-import { GoogleGenerativeAI } from '@google/generative-ai'
 
 import type {
   SlideContent,
@@ -25,11 +23,10 @@ import type {
 } from './slide-deck-types'
 import { generateSlideBackgroundImage } from './report-image-generator'
 
-// DECISION: Reuse the same module-level SDK instantiation pattern as ai-narrative.ts
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
-
-const MODEL_ID = 'gemini-3.1-flash-lite-preview'
-// DECISION: 60s timeout (not 30s) because structured JSON generation with
+// DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
+// module-scope side effects. The Anthropic SDK handles connection pooling internally.
+const MODEL_ID = 'claude-opus-4-6'
+// DECISION: 60s timeout because structured JSON generation with
 // 12-18 slides takes significantly longer than a short narrative summary.
 const API_TIMEOUT_MS = 60_000
 
@@ -67,7 +64,7 @@ Available slide types (use a variety for visual interest):
 /**
  * Generate a complete strategic briefing slide deck from source context.
  *
- * @description Sends source material to Gemini and receives a fully structured
+ * @description Sends source material to Claude Opus and receives a fully structured
  * presentation with 12-18 slides. Each slide has a specific visual type and
  * all content needed for rendering.
  *
@@ -77,8 +74,8 @@ Available slide types (use a variety for visual interest):
 export async function generateStrategicBriefing(
   request: GenerateBriefingRequest,
 ): Promise<GenerateBriefingResponse> {
-  if (!process.env.GOOGLE_AI_API_KEY) {
-    console.warn('[SlideGenerator] GOOGLE_AI_API_KEY not set — using fallback')
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('[SlideGenerator] ANTHROPIC_API_KEY not set — using fallback')
     return {
       success: true,
       briefing: buildFallbackBriefing(request),
@@ -86,28 +83,32 @@ export async function generateStrategicBriefing(
   }
 
   try {
-    const prompt = buildPrompt(request)
-    console.info('[SlideGenerator] Prompt length:', prompt.length, 'chars')
+    const { systemPrompt, userPrompt } = buildPrompts(request)
+    console.info('[SlideGenerator] Prompt length:', (systemPrompt.length + userPrompt.length), 'chars')
     const genStart = Date.now()
 
-    const model = genAI.getGenerativeModel({
-      model: MODEL_ID,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 8192,
-        responseMimeType: 'application/json',
-      },
-    })
+    const Anthropic = (await import('@anthropic-ai/sdk')).default
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-    const result = await Promise.race([
-      model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      }),
-      timeout(API_TIMEOUT_MS),
-    ])
+    const t = timeoutWithCleanup(API_TIMEOUT_MS)
+    let result: Awaited<ReturnType<InstanceType<typeof Anthropic>['messages']['create']>>
+    try {
+      result = await Promise.race([
+        client.messages.create({
+          model: MODEL_ID,
+          max_tokens: 8192,
+          temperature: 0.7,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        t.promise,
+      ])
+    } finally {
+      t.clear()
+    }
 
-    console.info('[SlideGenerator] Gemini responded in', Date.now() - genStart, 'ms')
-    const text = result.response.text()
+    console.info('[SlideGenerator] Claude responded in', Date.now() - genStart, 'ms')
+    const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
     console.info('[SlideGenerator] Response length:', text.length, 'chars')
     const slides = parseSlideResponse(text)
 
@@ -184,8 +185,10 @@ export async function generateStrategicBriefing(
 
 // ─── Prompt Builder ──────────────────────────────────────────────
 
-function buildPrompt(request: GenerateBriefingRequest): string {
-  return [
+// DECISION: Split into system + user prompts to leverage Anthropic's first-class
+// system prompt support. System encodes role/instructions, user carries the data.
+function buildPrompts(request: GenerateBriefingRequest): { systemPrompt: string; userPrompt: string } {
+  const systemPrompt = [
     'You are an expert presentation designer and executive communication specialist.',
     'Your job is to transform raw source material into a polished, professional slide deck.',
     '',
@@ -218,19 +221,24 @@ function buildPrompt(request: GenerateBriefingRequest): string {
     '',
     'Each slide MUST have a "slideType" field set to one of: title, hero-insight, section-divider, argument, comparison, data-callout, evidence, summary.',
     '',
+    'Return ONLY the JSON object. No markdown fences, no preamble, no explanation.',
+  ].join('\n')
+
+  const userPrompt = [
     `## Company Name: ${request.companyName}`,
     '',
     '## Source Material',
     '',
     request.sourceContext,
   ].join('\n')
+
+  return { systemPrompt, userPrompt }
 }
 
 // ─── Response Parser ─────────────────────────────────────────────
 
-// DECISION: Using responseMimeType: 'application/json' in the Gemini config
-// so the model returns structured JSON. We still wrap in try-catch because
-// the model can occasionally produce malformed output.
+// DECISION: We still strip markdown fences and handle edge cases because
+// the model can occasionally produce wrapped output.
 function parseSlideResponse(raw: string): SlideContent[] | null {
   const cleaned = raw
     .replace(/^```(?:json)?\s*/i, '')
@@ -240,7 +248,7 @@ function parseSlideResponse(raw: string): SlideContent[] | null {
   try {
     const parsed: unknown = JSON.parse(cleaned)
 
-    // GOTCHA: Gemini sometimes wraps the response in an array [{ ... }]
+    // GOTCHA: The model sometimes wraps the response in an array [{ ... }]
     // instead of returning a plain object { ... }.
     let obj: { title?: string; subtitle?: string; slides?: unknown[] }
     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -333,11 +341,11 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
       },
       {
         slideType: 'argument',
-        headline: 'Narrative generation requires the Gemini API',
-        body: 'The strategic briefing system uses Google Gemini to synthesize source material into a structured presentation.',
+        headline: 'Narrative generation requires the Claude API',
+        body: 'The strategic briefing system uses Claude Opus to synthesize source material into a structured presentation.',
         supportingPoints: [
-          'Set GOOGLE_AI_API_KEY in your environment variables',
-          'The system uses the gemini-3.1-flash-lite-preview model for fast generation',
+          'Set ANTHROPIC_API_KEY in your environment variables',
+          'The system uses Claude Opus 4.6 for high-quality generation',
           'Fallback content is shown when the API is unavailable',
         ],
       },
@@ -345,11 +353,11 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
         slideType: 'summary',
         headline: 'Next Steps',
         takeaways: [
-          'Configure the GOOGLE_AI_API_KEY environment variable',
+          'Configure the ANTHROPIC_API_KEY environment variable',
           'Provide detailed source material for richer presentations',
           'Choose the right tone for your audience',
         ],
-        closingLine: 'Once configured, Gemini will generate the full presentation from your source material.',
+        closingLine: 'Once configured, Claude will generate the full presentation from your source material.',
       },
     ],
   }
@@ -357,8 +365,13 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
 
 // ─── Utilities ────────────────────────────────────────────────────
 
-function timeout(ms: number): Promise<never> {
-  return new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms),
-  )
+// DECISION: Using Promise.race with a rejecting timeout to guarantee we never
+// wait longer than API_TIMEOUT_MS regardless of network conditions.
+// Returns a clearable handle so the timer doesn't dangle after the race resolves.
+function timeoutWithCleanup(ms: number) {
+  let timer: ReturnType<typeof setTimeout>
+  const promise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  })
+  return { promise, clear: () => clearTimeout(timer!) }
 }

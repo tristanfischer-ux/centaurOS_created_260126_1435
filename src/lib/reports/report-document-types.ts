@@ -28,6 +28,10 @@ export type ReportSectionType =
   | 'sales-pipeline'
   | 'engineering-activity'
   | 'knowledge-learning'
+  | 'workshop-design'
+  | 'workshop-specify'
+  | 'workshop-source'
+  | 'workshop-assemble'
 
 export interface ReportSectionConfig {
   type: ReportSectionType
@@ -295,6 +299,126 @@ export interface KnowledgeLearningSectionData {
   sectionNarrative?: string
 }
 
+// ========================
+// Workshop: Design
+// ========================
+
+export interface WorkshopDesignProject {
+  id: string
+  name: string
+  stage: string
+  status: string
+  moduleCount: number
+  createdAt: string
+  researchSummary?: string
+}
+
+export interface GenerationMetricsSummary {
+  totalGenerations: number
+  successRate: number
+  averageTimeMs: number
+  topModels: { model: string; count: number }[]
+}
+
+export interface WorkshopDesignSectionData {
+  totalProjects: number
+  activeProjects: number
+  projects: WorkshopDesignProject[]
+  generationMetrics?: GenerationMetricsSummary
+  sectionNarrative?: string
+}
+
+// ========================
+// Workshop: Specify
+// ========================
+
+export interface SpecifyReviewHealth {
+  pass: number
+  warn: number
+  fail: number
+  pending: number
+  skipped: number
+}
+
+export interface SpecifyCostOverview {
+  totalEstimatedCost: number
+  projectsCosted: number
+  averageConfidence: number
+}
+
+export interface SpecifyDiagnosticRow {
+  question: string
+  topAnswers: { answer: string; count: number }[]
+}
+
+export interface WorkshopSpecifySectionData {
+  reviewHealth: SpecifyReviewHealth
+  costOverview?: SpecifyCostOverview
+  processBreakdown: { process: string; count: number }[]
+  materialBreakdown: { material: string; count: number }[]
+  diagnosticTable: SpecifyDiagnosticRow[]
+  sectionNarrative?: string
+}
+
+// ========================
+// Workshop: Source
+// ========================
+
+export interface RFQPipelineSummary {
+  total: number
+  open: number
+  bidding: number
+  awarded: number
+  closed: number
+}
+
+export interface RFQResponseStats {
+  totalResponses: number
+  averagePerRFQ: number
+}
+
+export interface SourceOrderSummary {
+  total: number
+  byStatus: { status: string; count: number }[]
+  totalEstimatedValue: number
+}
+
+export interface WorkshopSourceSectionData {
+  rfqPipeline: RFQPipelineSummary
+  rfqResponseStats: RFQResponseStats
+  orderSummary: SourceOrderSummary
+  sectionNarrative?: string
+}
+
+// ========================
+// Workshop: Assemble
+// ========================
+
+export interface AssemblyOrder {
+  id: string
+  orderNumber: string
+  title: string
+  status: string
+  projectName: string | null
+  requiredBy: string | null
+  estimatedCost: number | null
+}
+
+export interface AssemblyStatusCounts {
+  inProduction: number
+  assembling: number
+  shipping: number
+  delivered: number
+  atRisk: number
+}
+
+export interface WorkshopAssembleSectionData {
+  orders: AssemblyOrder[]
+  statusCounts: AssemblyStatusCounts
+  totalOrders: number
+  sectionNarrative?: string
+}
+
 export type SectionData =
   | { type: 'cover'; data: CoverSectionData }
   | { type: 'executive-summary'; data: ExecutiveSummarySectionData }
@@ -308,6 +432,10 @@ export type SectionData =
   | { type: 'sales-pipeline'; data: SalesPipelineSectionData }
   | { type: 'engineering-activity'; data: EngineeringActivitySectionData }
   | { type: 'knowledge-learning'; data: KnowledgeLearningSectionData }
+  | { type: 'workshop-design'; data: WorkshopDesignSectionData }
+  | { type: 'workshop-specify'; data: WorkshopSpecifySectionData }
+  | { type: 'workshop-source'; data: WorkshopSourceSectionData }
+  | { type: 'workshop-assemble'; data: WorkshopAssembleSectionData }
 
 // ========================
 // Report Document
@@ -335,7 +463,7 @@ export interface ReportDocument {
 // Template Types
 // ========================
 
-export type ReportTemplateId = 'weekly-update' | 'board-pack' | 'custom' | 'strategic-briefing' | 'skill-document'
+export type ReportTemplateId = 'weekly-update' | 'board-pack' | 'custom' | 'strategic-briefing' | 'skill-document' | 'workshop-report'
 
 export interface ReportTemplate {
   id: ReportTemplateId

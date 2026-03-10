@@ -75,6 +75,26 @@ export const SECTION_META: Record<ReportSectionType, { label: string; descriptio
     description: 'Knowledge vault contributions and apprenticeship progress',
     icon: 'BookOpen',
   },
+  'workshop-design': {
+    label: 'Workshop: Design',
+    description: 'CAD Lab projects, modules, research summaries, and generation metrics',
+    icon: 'Pencil',
+  },
+  'workshop-specify': {
+    label: 'Workshop: Specify',
+    description: 'Diagnostics, specialist reviews, and cost estimates',
+    icon: 'ClipboardCheck',
+  },
+  'workshop-source': {
+    label: 'Workshop: Source',
+    description: 'RFQs, supplier quotes, and manufacturing orders',
+    icon: 'ShoppingCart',
+  },
+  'workshop-assemble': {
+    label: 'Workshop: Assemble',
+    description: 'Order tracking, delivery status, and at-risk orders',
+    icon: 'Package',
+  },
 }
 
 export const REPORT_TEMPLATES: ReportTemplate[] = [
@@ -158,6 +178,22 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
     defaultDateRange: 'this-month',
     defaultSections: [
       { type: 'cover', enabled: true, order: 0 },
+    ],
+  },
+  {
+    id: 'workshop-report',
+    name: 'Workshop Report',
+    description: 'Deep reports across the 4 CAD Lab phases — Design, Specify, Source, and Assemble.',
+    icon: 'Hammer',
+    defaultDateRange: 'this-month',
+    defaultSections: [
+      { type: 'cover', enabled: true, order: 0 },
+      { type: 'executive-summary', enabled: true, order: 1 },
+      { type: 'workshop-design', enabled: true, order: 2 },
+      { type: 'workshop-specify', enabled: true, order: 3 },
+      { type: 'workshop-source', enabled: true, order: 4 },
+      { type: 'workshop-assemble', enabled: true, order: 5 },
+      { type: 'engineering-activity', enabled: false, order: 6 },
     ],
   },
 ]
