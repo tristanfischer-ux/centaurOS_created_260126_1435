@@ -62,7 +62,7 @@ export function RFQResponseCompareDialog({
   const bestPriceId = findBestPrice(responses)
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setAwardingId(null) }}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>

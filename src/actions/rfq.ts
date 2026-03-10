@@ -258,6 +258,38 @@ export async function updateMyRFQ(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Not authenticated" }
 
+  // VALIDATION: Title
+  if (updates.title !== undefined) {
+    if (!updates.title?.trim()) {
+      return { success: false, error: "Title is required" }
+    }
+    if (updates.title.trim().length > 500) {
+      return { success: false, error: "Title must be 500 characters or fewer" }
+    }
+    updates.title = updates.title.trim()
+  }
+  // VALIDATION: Specifications size
+  if (updates.specifications) {
+    const specSize = JSON.stringify(updates.specifications).length
+    if (specSize > 100_000) {
+      return { success: false, error: "Specifications too large (max 100KB)" }
+    }
+  }
+  // VALIDATION: Deadline must be a valid future date
+  if (updates.deadline !== undefined && updates.deadline != null) {
+    const deadlineDate = new Date(updates.deadline)
+    if (isNaN(deadlineDate.getTime())) {
+      return { success: false, error: "Invalid deadline date" }
+    }
+    if (deadlineDate < new Date()) {
+      return { success: false, error: "Deadline must be in the future" }
+    }
+  }
+  // VALIDATION: Urgency enum
+  if (updates.urgency !== undefined && !['urgent', 'standard'].includes(updates.urgency as string)) {
+    return { success: false, error: "Invalid urgency value" }
+  }
+  // VALIDATION: Budgets
   if (updates.budget_min != null && (!Number.isFinite(updates.budget_min) || updates.budget_min < 0)) {
     return { success: false, error: "Budget minimum must be a finite non-negative number" }
   }
@@ -290,6 +322,10 @@ export async function cancelMyRFQ(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Not authenticated" }
+
+  if (reason != null && reason.length > 2_000) {
+    return { success: false, error: "Cancellation reason too long (max 2,000 characters)" }
+  }
 
   const { success, error } = await cancelRFQService(supabase, rfqId, user.id, reason)
 
@@ -1036,6 +1072,8 @@ export async function publishClarification(
   const trimmedAnswer = answer.trim()
   if (!trimmedQuestion) return { success: false, error: "Question is required" }
   if (!trimmedAnswer) return { success: false, error: "Answer is required" }
+  if (trimmedQuestion.length > 5_000) return { success: false, error: "Question too long (max 5,000 characters)" }
+  if (trimmedAnswer.length > 10_000) return { success: false, error: "Answer too long (max 10,000 characters)" }
 
   const { error: insertError } = await supabase
     .from("rfq_clarifications")

@@ -110,6 +110,33 @@ export async function submitRFQResponse(
   if (params.indicative_max != null && (!Number.isFinite(params.indicative_max) || params.indicative_max < 0)) {
     return { data: null, error: "Indicative maximum must be a finite non-negative number" }
   }
+  // VALIDATION: timeline_weeks
+  if (params.timeline_weeks != null && (!Number.isFinite(params.timeline_weeks) || params.timeline_weeks < 0)) {
+    return { data: null, error: "Timeline weeks must be a finite non-negative number" }
+  }
+  // VALIDATION: scope_of_work size
+  if (params.scope_of_work != null && params.scope_of_work.length > 50_000) {
+    return { data: null, error: "Scope of work too large (max 50KB)" }
+  }
+  // VALIDATION: message length
+  if (params.message != null && params.message.length > 10_000) {
+    return { data: null, error: "Message too long (max 10,000 characters)" }
+  }
+  // VALIDATION: pricing_breakdown
+  if (params.pricing_breakdown != null) {
+    const keys = Object.keys(params.pricing_breakdown)
+    if (keys.length > 20) return { data: null, error: "Too many pricing breakdown items (max 20)" }
+    for (const [k, v] of Object.entries(params.pricing_breakdown)) {
+      if (k.length > 100) return { data: null, error: "Pricing breakdown key too long" }
+      if (v != null && (!Number.isFinite(v) || v < 0)) return { data: null, error: "Pricing breakdown values must be finite non-negative numbers" }
+    }
+  }
+  // VALIDATION: valid_until must be a valid future date
+  if (params.valid_until != null) {
+    const validDate = new Date(params.valid_until)
+    if (isNaN(validDate.getTime())) return { data: null, error: "Invalid validity date" }
+    if (validDate < new Date()) return { data: null, error: "Validity date must be in the future" }
+  }
 
   // Create the response
   const { data: response, error: insertError } = await supabase
@@ -232,7 +259,12 @@ export async function updateRFQResponse(
   // Update the response
   const updatePayload: Record<string, unknown> = {}
   if (data.quoted_price !== undefined) updatePayload.quoted_price = data.quoted_price
-  if (data.message !== undefined) updatePayload.message = data.message?.trim() || null
+  if (data.message !== undefined) {
+    if (data.message != null && data.message.length > 10_000) {
+      return { success: false, error: "Message too long (max 10,000 characters)" }
+    }
+    updatePayload.message = data.message?.trim() || null
+  }
   if (data.scope_of_work !== undefined) {
     if (data.scope_of_work != null && data.scope_of_work.length > 50_000) {
       return { success: false, error: "Scope of work too large (max 50KB)" }

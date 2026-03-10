@@ -10,7 +10,7 @@ import {
   MessageSquare,
 } from 'lucide-react'
 import { startConversation, sendNewMessage, getConversationMessages } from '@/actions/messaging'
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 
 interface Message {
   id: string
@@ -38,35 +38,34 @@ export function RFQInfoRequestThread({
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  // Initialize or load conversation
-  const initConversation = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const result = await startConversation({
-        sellerId,
-        rfqId,
-        initialMessage: undefined, // Don't re-send the original question
-      })
-
-      if (result && 'data' in result && result.data?.id) {
-        setConversationId(result.data.id)
-
-        // Load existing messages
-        const msgResult = await getConversationMessages(result.data.id)
-        if (msgResult && 'data' in msgResult && Array.isArray(msgResult.data)) {
-          setMessages(msgResult.data as Message[])
-        }
-      }
-    } catch (error) {
-      console.error('Failed to init conversation:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [rfqId, sellerId])
-
   useEffect(() => {
-    initConversation()
-  }, [initConversation])
+    let cancelled = false
+    async function init() {
+      setIsLoading(true)
+      try {
+        const result = await startConversation({
+          sellerId,
+          rfqId,
+          initialMessage: undefined,
+        })
+        if (cancelled) return
+        if (result && 'data' in result && result.data?.id) {
+          setConversationId(result.data.id)
+          const msgResult = await getConversationMessages(result.data.id)
+          if (cancelled) return
+          if (msgResult && 'data' in msgResult && Array.isArray(msgResult.data)) {
+            setMessages(msgResult.data as Message[])
+          }
+        }
+      } catch (error) {
+        if (!cancelled) console.error('Failed to init conversation:', error)
+      } finally {
+        if (!cancelled) setIsLoading(false)
+      }
+    }
+    init()
+    return () => { cancelled = true }
+  }, [rfqId, sellerId])
 
   const handleSendReply = () => {
     if (!reply.trim() || !conversationId) return

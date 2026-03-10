@@ -182,7 +182,7 @@ export function CadLabRFQHandoff({
                         type="number"
                         className="h-8 text-xs"
                         value={override.quantity ?? mod.quantity ?? ''}
-                        onChange={(e) => updateModuleOverride(idx, 'quantity', parseInt(e.target.value) || 0)}
+                        onChange={(e) => { const val = parseInt(e.target.value); updateModuleOverride(idx, 'quantity', val > 0 ? val : 1) }}
                         min={1}
                         disabled={isPending}
                       />

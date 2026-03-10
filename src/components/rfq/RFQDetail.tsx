@@ -437,7 +437,7 @@ export function RFQDetail({
                   {rfq.specifications.attachments.map((url, index) => {
                     const href = typeof url === 'string' ? url : ''
                     // SECURITY: Block javascript:, data:, vbscript: and other dangerous schemes
-                    if (!href || (!(/^https?:\/\//i).test(href) && !href.startsWith('/'))) return null
+                    if (!href || (!(/^https?:\/\//i).test(href) && !(href.startsWith('/') && !href.startsWith('//')))) return null
                     const lower = href.toLowerCase()
                     const isStep = lower.endsWith('.step') || lower.includes('.step?')
                     const isStl = lower.endsWith('.stl') || lower.includes('.stl?')

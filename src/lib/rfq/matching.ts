@@ -193,7 +193,7 @@ export async function matchSuppliersToRFQ(
     // Get RFQ details
     const { data: rfq, error: rfqError } = await supabase
       .from('rfqs')
-      .select('category, budget_min, budget_max, urgency, specifications')
+      .select('category, budget_min, budget_max, urgency, specifications, buyer_id')
       .eq('id', rfqId)
       .single()
 
@@ -220,6 +220,7 @@ export async function matchSuppliersToRFQ(
         )
       `)
       .eq('is_active', true)
+      .neq('user_id', rfq.buyer_id) // SECURITY: Exclude buyer's own provider profile (self-dealing)
 
     if (providersError || !allProviders) {
       return { matches: [], error: 'Failed to fetch providers' }

@@ -232,6 +232,14 @@ export function RFQWizard({
       return
     }
 
+    if (budgetMin && parseFloat(budgetMin) < 0) {
+      setError('Budget minimum cannot be negative')
+      return
+    }
+    if (budgetMax && parseFloat(budgetMax) < 0) {
+      setError('Budget maximum cannot be negative')
+      return
+    }
     if (budgetMin && budgetMax && parseFloat(budgetMin) > parseFloat(budgetMax)) {
       setError('Budget minimum cannot exceed maximum')
       return

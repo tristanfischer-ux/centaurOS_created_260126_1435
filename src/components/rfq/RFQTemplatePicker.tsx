@@ -58,20 +58,21 @@ export function RFQTemplatePicker({
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
-    loadTemplates()
-  }, [sector, manufacturingOnly])
+    let cancelled = false
+    async function load() {
+      setIsLoading(true)
+      const result = manufacturingOnly
+        ? await getManufacturingRFQTemplates()
+        : await getRFQTemplates(sector)
 
-  const loadTemplates = async () => {
-    setIsLoading(true)
-    const result = manufacturingOnly
-      ? await getManufacturingRFQTemplates()
-      : await getRFQTemplates(sector)
-
-    if (!result.error) {
-      setTemplates(result.data)
+      if (!cancelled && !result.error) {
+        setTemplates(result.data)
+      }
+      if (!cancelled) setIsLoading(false)
     }
-    setIsLoading(false)
-  }
+    load()
+    return () => { cancelled = true }
+  }, [sector, manufacturingOnly])
 
   const filteredTemplates = searchQuery
     ? templates.filter(

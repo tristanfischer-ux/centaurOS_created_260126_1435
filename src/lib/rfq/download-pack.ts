@@ -114,7 +114,9 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
         const urlPath = new URL(url).pathname
         const segments = urlPath.split('/')
         const rawName = segments[segments.length - 1] || `attachment-${i + 1}`
-        const fileName = decodeURIComponent(rawName)
+        // SECURITY: Sanitize filename to prevent Zip Slip (path traversal)
+        const fileName = decodeURIComponent(rawName).replace(/\.\./g, '_').replace(/[/\\]/g, '_')
+        if (!fileName || fileName === '.' || fileName === '..') continue
 
         zip.file(`attachments/${fileName}`, blob)
       } catch {
