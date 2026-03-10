@@ -253,10 +253,16 @@ export function ScenarioPanel({
 
         {/* Save button */}
         {(() => {
-          const isDirty = revenueDelay !== activeScenario.revenueDelayWeeks
-            || costDelay !== activeScenario.costDelayWeeks
-            || revenueGrowth !== activeScenario.revenueGrowthPct
-            || Math.round(parseFloat(openingBalancePounds || '0') * 100) !== activeScenario.openingBalance
+          // INTENT: Compare against persisted scenario from scenarios array, NOT activeScenario.
+          // activeScenario is updated live via propagateChanges for chart preview, so comparing
+          // against it would always yield false (values match immediately after slider change).
+          const persisted = scenarios.find(s => s.id === activeScenario.id)
+          const isDirty = persisted ? (
+            revenueDelay !== persisted.revenueDelayWeeks
+            || costDelay !== persisted.costDelayWeeks
+            || revenueGrowth !== persisted.revenueGrowthPct
+            || Math.round(parseFloat(openingBalancePounds || '0') * 100) !== persisted.openingBalance
+          ) : false
           return (
             <>
               <Button onClick={handleSave} disabled={isSaving} className="w-full">

@@ -213,6 +213,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
             cashInItems={cashIn}
             openingBalance={openingBalance}
             weeks={WEEKS}
+            controlledWeekIndex={balanceSheetWeek}
           />
 
           {/* Disclaimer */}

@@ -15,6 +15,8 @@ interface BalanceSheetTableProps {
   cashInItems: CashInItem[]
   openingBalance: number
   weeks?: number
+  /** When provided, the table uses this week index (controlled mode) and hides its own slider */
+  controlledWeekIndex?: number
 }
 
 // ============================================================
@@ -62,8 +64,13 @@ export function BalanceSheetTable({
   cashInItems,
   openingBalance,
   weeks = 52,
+  controlledWeekIndex,
 }: BalanceSheetTableProps) {
-  const [weekIndex, setWeekIndex] = useState(0)
+  const [internalWeekIndex, setInternalWeekIndex] = useState(0)
+  // INTENT: When controlledWeekIndex is provided (from parent slider), use it.
+  // Otherwise fall back to internal state with own slider.
+  const weekIndex = controlledWeekIndex ?? internalWeekIndex
+  const isControlled = controlledWeekIndex !== undefined
 
   const asOfDate = useMemo(() => {
     const now = new Date()
@@ -88,28 +95,30 @@ export function BalanceSheetTable({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Week selector */}
-        <div className="space-y-1.5">
-          <label htmlFor="bs-week-slider" className="text-sm font-medium text-foreground">
-            As of: <span className="text-international-orange">{weekLabel}</span>
-          </label>
-          <input
-            id="bs-week-slider"
-            type="range"
-            aria-label="Balance sheet week selector"
-            min={0}
-            max={weeks - 1}
-            step={1}
-            value={weekIndex}
-            onChange={(e) => setWeekIndex(Number(e.target.value))}
-            className="w-full accent-international-orange"
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Today</span>
-            <span>Week {Math.floor(weeks / 2)}</span>
-            <span>Week {weeks - 1}</span>
+        {/* Week selector — hidden when parent controls the week index */}
+        {!isControlled && (
+          <div className="space-y-1.5">
+            <label htmlFor="bs-week-slider" className="text-sm font-medium text-foreground">
+              As of: <span className="text-international-orange">{weekLabel}</span>
+            </label>
+            <input
+              id="bs-week-slider"
+              type="range"
+              aria-label="Balance sheet week selector"
+              min={0}
+              max={weeks - 1}
+              step={1}
+              value={weekIndex}
+              onChange={(e) => setInternalWeekIndex(Number(e.target.value))}
+              className="w-full accent-international-orange"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Today</span>
+              <span>Week {Math.floor(weeks / 2)}</span>
+              <span>Week {weeks - 1}</span>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Balance sheet table */}
         <div className="overflow-x-auto">
