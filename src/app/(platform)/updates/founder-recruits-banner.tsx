@@ -20,7 +20,7 @@ export function FounderRecruitsBanner(): React.ReactElement | null {
   if (isDismissed) return null
 
   return (
-    <Card className="border-international-orange/20 bg-orange-50/50">
+    <Card className="border-international-orange/20 bg-international-orange/5">
       <CardContent className="pt-4 pb-4">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-full bg-international-orange/10 flex items-center justify-center shrink-0">

@@ -158,9 +158,9 @@ function FileAttachment({
           href={safeUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block rounded-lg overflow-hidden border-2 border-white/20 hover:border-white/40 transition-colors"
+          className="block rounded-lg overflow-hidden border-2 border-primary-foreground/20 hover:border-primary-foreground/40 transition-colors"
         >
-          <div className="relative w-full max-w-sm h-48 bg-black/10">
+          <div className="relative w-full max-w-sm h-48 bg-foreground/10">
             <Image
               src={safeUrl}
               alt={fileName}
@@ -177,7 +177,7 @@ function FileAttachment({
           rel="noopener noreferrer"
           className={cn(
             'flex items-center gap-2 text-xs hover:underline',
-            isOwn ? 'text-white/90' : 'text-muted-foreground'
+            isOwn ? 'text-primary-foreground/90' : 'text-muted-foreground'
           )}
         >
           <Download className="w-3 h-3" />
@@ -195,28 +195,28 @@ function FileAttachment({
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'flex items-center gap-3 p-3 rounded-lg border-2 hover:bg-white/5 transition-colors',
-        isOwn ? 'border-white/20 hover:border-white/30' : 'border-border'
+        'flex items-center gap-3 p-3 rounded-lg border-2 hover:bg-primary-foreground/5 transition-colors',
+        isOwn ? 'border-primary-foreground/20 hover:border-primary-foreground/30' : 'border-border'
       )}
     >
       <div className="text-2xl flex-shrink-0">{fileIcon}</div>
       <div className="flex-1 min-w-0">
         <p className={cn(
           'text-sm font-medium truncate',
-          isOwn ? 'text-white' : 'text-foreground'
+          isOwn ? 'text-primary-foreground' : 'text-foreground'
         )}>
           {fileName}
         </p>
         <p className={cn(
           'text-xs',
-          isOwn ? 'text-white/70' : 'text-muted-foreground'
+          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
         )}>
           Click to download
         </p>
       </div>
       <Download className={cn(
         'w-4 h-4 flex-shrink-0',
-        isOwn ? 'text-white/70' : 'text-muted-foreground'
+        isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
       )} />
     </a>
   )
@@ -346,7 +346,7 @@ export function MessageBubble({
             className={cn(
               'px-4 py-2 rounded-2xl max-w-full break-words relative',
               isOwn 
-                ? 'bg-international-orange text-white rounded-br-md' 
+                ? 'bg-international-orange text-primary-foreground rounded-br-md' 
                 : 'bg-muted text-foreground rounded-bl-md'
             )}
           >

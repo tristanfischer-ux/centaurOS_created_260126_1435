@@ -227,7 +227,7 @@ export function UpdatesFeed({
             {timeGroups.map((group) => (
               <div key={group.label}>
                 {/* Time group header */}
-                <div className="sticky top-0 z-10 px-4 py-2 bg-muted/50 backdrop-blur-sm border-b border-muted">
+                <div className="sticky top-0 z-10 px-4 py-2 bg-muted border-b border-muted">
                   <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     {group.label}
                   </span>

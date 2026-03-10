@@ -22,6 +22,8 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { EmptyState } from '@/components/ui/empty-state'
 import { ArrowLeft, Activity, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
 import { getActivityFeed, markMultipleActivityRead } from '@/actions/activity'
@@ -222,42 +224,28 @@ export function UpdatesLayout({
 
   // ── Tab bar ─────────────────────────────────────────────────────────────
   const TabBar = (
-    <div className="flex items-center gap-1 px-4 sm:px-6 lg:px-8 py-2 border-b border-muted bg-background">
-      <button
-        onClick={() => setActiveView('activity')}
-        className={cn(
-          'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-          activeView === 'activity'
-            ? 'bg-muted text-foreground'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-        )}
-      >
-        <Activity className="h-3.5 w-3.5" />
-        Activity
-        {unreadCount > 0 && (
-          <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-semibold rounded-full bg-international-orange text-white">
-            {unreadCount}
-          </span>
-        )}
-      </button>
-      <button
-        onClick={() => setActiveView('conversations')}
-        className={cn(
-          'flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-          activeView === 'conversations'
-            ? 'bg-muted text-foreground'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-        )}
-      >
-        <MessageSquare className="h-3.5 w-3.5" />
-        Conversations
-        {totalUnread > 0 && (
-          <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-semibold rounded-full bg-electric-blue text-white">
-            {totalUnread}
-          </span>
-        )}
-      </button>
-    </div>
+    <Tabs value={activeView} onValueChange={(v) => setActiveView(v as CommsView)}>
+      <TabsList className="mx-4 sm:mx-6 lg:mx-8 my-2">
+        <TabsTrigger value="activity" className="gap-2 text-sm">
+          <Activity className="h-3.5 w-3.5" />
+          Activity
+          {unreadCount > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-semibold rounded-full bg-international-orange text-primary-foreground">
+              {unreadCount}
+            </span>
+          )}
+        </TabsTrigger>
+        <TabsTrigger value="conversations" className="gap-2 text-sm">
+          <MessageSquare className="h-3.5 w-3.5" />
+          Conversations
+          {totalUnread > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-[16px] px-1 text-[10px] font-semibold rounded-full bg-electric-blue text-primary-foreground">
+              {totalUnread}
+            </span>
+          )}
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
   )
 
   // ── Left panel content ──────────────────────────────────────────────────
@@ -313,7 +301,7 @@ export function UpdatesLayout({
   if (screenSize === 'large') {
     return (
       <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
-        <div className="p-4 sm:p-6 lg:p-8 pb-4 border-b border-slate-100">
+        <div className="p-4 sm:p-6 lg:p-8 pb-4 border-b border-border">
           <UpdatesHeader
             unreadCount={unreadCount}
             tasksWithUpdates={tasksWithUpdates}
@@ -355,7 +343,7 @@ export function UpdatesLayout({
   if (screenSize === 'medium') {
     return (
       <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
-        <div className="p-4 sm:p-6 pb-4 border-b border-slate-100">
+        <div className="p-4 sm:p-6 pb-4 border-b border-border">
           <UpdatesHeader
             unreadCount={unreadCount}
             tasksWithUpdates={tasksWithUpdates}
@@ -427,7 +415,7 @@ export function UpdatesLayout({
         </div>
       ) : (
         <div className="flex flex-col h-full">
-          <div className="p-4 pb-3 border-b border-slate-100">
+          <div className="p-4 pb-3 border-b border-border">
             <UpdatesHeader
               unreadCount={unreadCount}
               tasksWithUpdates={tasksWithUpdates}
@@ -464,12 +452,11 @@ export function UpdatesLayout({
 
 function ConversationEmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center px-6">
-      <MessageSquare className="h-12 w-12 text-muted-foreground/30 mb-4" />
-      <h3 className="text-lg font-semibold text-foreground mb-1">Select a conversation</h3>
-      <p className="text-sm text-muted-foreground max-w-sm">
-        Pick a conversation from the list to view messages, or start a new one.
-      </p>
-    </div>
+    <EmptyState
+      icon={<MessageSquare className="h-10 w-10" />}
+      title="Select a conversation"
+      description="Pick a conversation from the list to view messages, or start a new one."
+      className="h-full"
+    />
   )
 }

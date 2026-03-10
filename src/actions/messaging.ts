@@ -124,8 +124,8 @@ export async function sendNewMessage(
         .eq('id', user.id)
         .single()
 
-      revalidatePath('/messages')
-      
+      revalidatePath('/updates')
+
       const messageWithSender: MessageWithSender = {
         ...message,
         sender: {
@@ -181,8 +181,8 @@ export async function startConversation(
       // Get full conversation with participants
       const fullConversation = await getConversation(supabase, conversation.id)
 
-      revalidatePath('/messages')
-      
+      revalidatePath('/updates')
+
       return { success: true as const, data: fullConversation || undefined }
     } catch (error) {
       console.error('Failed to start conversation:', error)
@@ -232,8 +232,8 @@ export async function archiveConversation(
 
       await archiveConv(supabase, conversationId)
       
-      revalidatePath('/messages')
-      
+      revalidatePath('/updates')
+
       return { success: true as const }
     } catch (error) {
       console.error('Failed to archive conversation:', error)
@@ -263,8 +263,8 @@ export async function unarchiveConversation(
 
       await unarchiveConv(supabase, conversationId)
       
-      revalidatePath('/messages')
-      
+      revalidatePath('/updates')
+
       return { success: true as const }
     } catch (error) {
       console.error('Failed to unarchive conversation:', error)
@@ -356,8 +356,7 @@ export async function startDirectMessage(
       const fullConversation = await getConversation(supabase, conversation.id)
 
       revalidatePath('/updates')
-      revalidatePath('/messages')
-      
+
       return { success: true as const, data: fullConversation || undefined }
     } catch (error) {
       console.error('Failed to start direct message:', error)

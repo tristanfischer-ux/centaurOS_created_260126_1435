@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Send, Loader2, MessageSquare } from 'lucide-react'
 import {
   Dialog,
@@ -13,6 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { format } from 'date-fns'
 import { getThreadReplies, sendThreadReply, getThreadParent, type ThreadReply, type ThreadMessage } from '@/actions/threads'
+import { createClient } from '@/lib/supabase/client'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface ThreadPanelProps {
   /** The parent message ID to show thread for */

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
   getConversationMessages, 
@@ -45,7 +45,7 @@ export function useConversation(
   const [lastReadAt, setLastReadAt] = useState<string | null>(null)
   
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const currentUserRef = useRef<string | null>(null)
 
   // Fetch initial messages
@@ -280,7 +280,7 @@ export function useConversationList(userId?: string) {
   const [isConnected, setIsConnected] = useState(false)
   
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const fetchConversations = useCallback(async (status?: 'active' | 'archived') => {
     setIsLoading(true)
