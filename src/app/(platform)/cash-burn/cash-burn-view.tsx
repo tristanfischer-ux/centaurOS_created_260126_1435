@@ -22,7 +22,7 @@ import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
-import { generateCashOutGrid, generateCashInGrid } from '@/lib/cash-burn/weekly-projection'
+import { generateCashOutGrid, generateCashInGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
 import {
@@ -30,6 +30,7 @@ import {
   updateScenario,
   deleteScenario,
 } from '@/actions/cash-burn-scenarios'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import type {
   BurnScenario,
   CashOutItem,
@@ -51,6 +52,7 @@ const WEEKS = 52
 export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const [scenarios, setScenarios] = useState<BurnScenario[]>(initialData?.scenarios ?? [])
   const [error, setError] = useState<string | null>(null)
+  const [startDate] = useState(() => new Date())
   const [activeScenario, setActiveScenario] = useState<BurnScenario>(
     () => scenarios.find(s => s.isDefault) ?? scenarios[0] ?? {
       id: '', name: 'Base Case', openingBalance: 0,
@@ -64,12 +66,12 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
 
   // Pre-compute the weekly grids (these don't change with scenario)
   const cashOutGrid = useMemo(
-    () => generateCashOutGrid(cashOut, WEEKS, new Date()),
-    [cashOut]
+    () => generateCashOutGrid(cashOut, WEEKS, startDate),
+    [cashOut, startDate]
   )
   const cashInGrid = useMemo(
-    () => generateCashInGrid(cashIn, WEEKS, new Date()),
-    [cashIn]
+    () => generateCashInGrid(cashIn, WEEKS, startDate),
+    [cashIn, startDate]
   )
 
   // Recompute projection whenever scenario changes
@@ -97,7 +99,9 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     const byCategory: Record<string, number> = {}
     for (const item of cashOut) {
       const cat = item.category.replace(/_/g, ' ')
-      byCategory[cat] = (byCategory[cat] ?? 0) + item.weeklyAmount
+      // INTENT: Normalise all frequencies to weekly for fair comparison in donut
+      const weeklyNorm = normaliseToWeeklyPence(item.amount, item.frequency)
+      byCategory[cat] = (byCategory[cat] ?? 0) + weeklyNorm
     }
     return Object.entries(byCategory)
       .map(([name, value], i) => ({ name, value, color: chartColors[i % chartColors.length] }))
@@ -301,26 +305,28 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main area */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Primary burn chart */}
-          <BurnAreaChart data={projection.weeks} />
+          <ErrorBoundary>
+            {/* Primary burn chart */}
+            <BurnAreaChart data={projection.weeks} />
 
-          {/* Secondary charts row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <StackedBarChart
-              title="Weekly Cash Flow"
-              data={stackedBarData}
-              bars={[
-                { dataKey: 'Cash In', name: 'Cash In', color: chartColors[2] },
-                { dataKey: 'Cash Out', name: 'Cash Out', color: chartColors[0] },
-              ]}
-              height={250}
-            />
-            <DonutChart
-              title="Expense Breakdown"
-              data={expenseBreakdown}
-              height={250}
-            />
-          </div>
+            {/* Secondary charts row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <StackedBarChart
+                title="Weekly Cash Flow"
+                data={stackedBarData}
+                bars={[
+                  { dataKey: 'Cash In', name: 'Cash In', color: chartColors[2] },
+                  { dataKey: 'Cash Out', name: 'Cash Out', color: chartColors[0] },
+                ]}
+                height={250}
+              />
+              <DonutChart
+                title="Expense Breakdown"
+                data={expenseBreakdown}
+                height={250}
+              />
+            </div>
+          </ErrorBoundary>
         </div>
 
         {/* Sidebar — scenario panel */}

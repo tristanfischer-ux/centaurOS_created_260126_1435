@@ -44,6 +44,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [editingItem, setEditingItem] = useState<CashOutItem | null>(null)
   const [defaultCostType, setDefaultCostType] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
+  const [startDate] = useState(() => new Date())
 
   const fixedItems = useMemo(() => items.filter(i => i.costType === 'fixed'), [items])
   const variableItems = useMemo(() => items.filter(i => i.costType === 'variable'), [items])
@@ -61,7 +62,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   ], [weeklyFixedTotal, weeklyVariableTotal])
 
   // 52-week stacked area chart data
-  const cashOutGrid = useMemo(() => generateCashOutGrid(items, 52, new Date()), [items])
+  const cashOutGrid = useMemo(() => generateCashOutGrid(items, 52, startDate), [items, startDate])
   const stackedData = useMemo(() => cashOutGrid.map((row, i) => ({
     label: i % 4 === 0 ? row.weekLabel : `W${i + 1}`,
     'Fixed': row.fixedCosts,
@@ -206,7 +207,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           items={fixedItems.map(i => ({
             id: i.id,
             name: i.name,
-            label: i.category.replace(/_/g, ' '),
+            category: i.category.replace(/_/g, ' '),
             weeklyAmount: i.weeklyAmount,
             frequency: i.frequency,
             amount: i.amount,
@@ -222,7 +223,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           items={variableItems.map(i => ({
             id: i.id,
             name: i.name,
-            label: i.category.replace(/_/g, ' '),
+            category: i.category.replace(/_/g, ' '),
             weeklyAmount: i.weeklyAmount,
             frequency: i.frequency,
             amount: i.amount,

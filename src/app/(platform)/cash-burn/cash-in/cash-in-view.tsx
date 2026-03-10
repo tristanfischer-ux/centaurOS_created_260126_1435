@@ -55,6 +55,8 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [balanceError, setBalanceError] = useState<string | null>(null)
+  const [startDate] = useState(() => new Date())
 
   // Starting balance state
   const [openingBalancePounds, setOpeningBalancePounds] = useState<string>(
@@ -97,7 +99,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   }, [groupedItems])
 
   // 52-week cash in grid and bar chart data
-  const cashInGrid = useMemo(() => generateCashInGrid(items, 52, new Date()), [items])
+  const cashInGrid = useMemo(() => generateCashInGrid(items, 52, startDate), [items, startDate])
   const barChartData = useMemo(() => cashInGrid.map((row, i) => ({
     label: i % 4 === 0 ? row.weekLabel : `W${i + 1}`,
     Revenue: row.revenue,
@@ -128,7 +130,12 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
     const parsed = parseFloat(openingBalancePounds)
-    if (isNaN(parsed) || parsed < 0) return
+    if (isNaN(parsed)) return
+    if (parsed < 0) {
+      setBalanceError('Balance cannot be negative')
+      return
+    }
+    setBalanceError(null)
     const pence = Math.round(parsed * 100)
     setBalanceSaving(true)
     const result = await updateOpeningBalance(scenarioId, pence)
@@ -283,6 +290,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                     // Strip commas and non-numeric chars (allow digits and decimal point)
                     const raw = e.target.value.replace(/[^0-9.]/g, '')
                     setOpeningBalancePounds(raw)
+                    setBalanceError(null)
                   }}
                   onFocus={() => setBalanceFocused(true)}
                   onBlur={() => {
@@ -294,6 +302,9 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                 />
               </div>
             </div>
+            {balanceError && (
+              <p className="text-destructive text-xs mt-2 px-4 pb-2">{balanceError}</p>
+            )}
           </CardContent>
         </Card>
       )}
@@ -349,7 +360,6 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                     items={sectionItems.map(i => ({
                       id: i.id,
                       name: i.name,
-                      label: `${i.probabilityPct}%`,
                       weeklyAmount: i.weeklyAmount,
                       frequency: i.frequency,
                       amount: i.amount,

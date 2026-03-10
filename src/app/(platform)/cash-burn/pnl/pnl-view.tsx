@@ -8,10 +8,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { BarChart3 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import Link from 'next/link'
+import { BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { IncomeStatementTable } from '@/components/cash-burn/income-statement-table'
 import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
@@ -32,6 +34,7 @@ const WEEKS = 52
 
 export function PnlView({ initialData, hasError }: PnlViewProps) {
   const [periodType, setPeriodType] = useState<'weekly' | 'monthly'>('monthly')
+  const [balanceSheetWeek, setBalanceSheetWeek] = useState(0)
 
   const cashOut = initialData?.cashOut ?? []
   const cashIn = initialData?.cashIn ?? []
@@ -59,10 +62,16 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
     )
   }, [incomeStatementRows])
 
-  // Balance sheet at current date
+  // Balance sheet at selected week
+  const balanceSheetDate = useMemo(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + balanceSheetWeek * 7)
+    return d
+  }, [balanceSheetWeek])
+
   const balanceSheet = useMemo(
-    () => buildBalanceSheet(cashOut, cashIn, openingBalance, new Date()),
-    [cashOut, cashIn, openingBalance]
+    () => buildBalanceSheet(cashOut, cashIn, openingBalance, balanceSheetDate),
+    [cashOut, cashIn, openingBalance, balanceSheetDate]
   )
 
   if (hasError || !initialData) {
@@ -103,6 +112,35 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         </div>
       </div>
 
+      {cashOut.length === 0 && cashIn.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center space-y-4">
+            <div className="flex justify-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                <TrendingDown className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">No costs or revenue entered yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Set up your costs and revenue to see projected P&L statements.
+              </p>
+            </div>
+            <div className="flex justify-center gap-3">
+              <Button asChild variant="default" size="sm">
+                <Link href="/cash-burn/cash-out">Set up costs</Link>
+              </Button>
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/cash-burn/cash-in">Add revenue</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="income-statement">
         <TabsList>
           <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
@@ -129,8 +167,10 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
             </Button>
           </div>
 
-          {/* Waterfall Chart */}
-          <WaterfallChart data={totals} />
+          <ErrorBoundary>
+            {/* Waterfall Chart */}
+            <WaterfallChart data={totals} />
+          </ErrorBoundary>
 
           {/* Income Statement Table */}
           <IncomeStatementTable rows={incomeStatementRows} periodType={periodType} />
@@ -142,8 +182,30 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         </TabsContent>
 
         <TabsContent value="balance-sheet" className="space-y-6 mt-6">
-          {/* Balance Sheet Chart */}
-          <HorizontalBar data={balanceSheet} />
+          {/* Balance Sheet week selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-foreground">
+                Balance Sheet as of: <span className="text-international-orange">
+                  {balanceSheetDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              </label>
+              <span className="text-xs text-muted-foreground">Week {balanceSheetWeek}</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={52}
+              value={balanceSheetWeek}
+              onChange={(e) => setBalanceSheetWeek(Number(e.target.value))}
+              className="w-full accent-international-orange"
+            />
+          </div>
+
+          <ErrorBoundary>
+            {/* Balance Sheet Chart */}
+            <HorizontalBar data={balanceSheet} />
+          </ErrorBoundary>
 
           {/* Balance Sheet Table with slider */}
           <BalanceSheetTable

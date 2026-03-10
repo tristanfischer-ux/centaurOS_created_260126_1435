@@ -198,5 +198,7 @@ function formatUrl(url: string): string {
 
 /** Sanitize a phone number for tel: href — keep leading + and digits only. */
 function sanitizePhone(phone: string): string {
-  return phone.replace(/(?!^\+)[^\d]/g, '')
+  const trimmed = phone.trim()
+  const digits = trimmed.replace(/\D/g, '')
+  return trimmed.startsWith('+') ? `+${digits}` : digits
 }

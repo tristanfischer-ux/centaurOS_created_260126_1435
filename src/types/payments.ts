@@ -271,6 +271,18 @@ export function calculateFeeBreakdown(
 }
 
 /**
+ * Format currency in compact form for chart axes (values in pence)
+ */
+export function formatCompactCurrency(pence: number): string {
+  const pounds = pence / 100
+  const abs = Math.abs(pounds)
+  const sign = pounds < 0 ? '-' : ''
+  if (abs >= 1_000_000) return `${sign}£${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${sign}£${(abs / 1_000).toFixed(0)}k`
+  return `${sign}£${abs.toFixed(0)}`
+}
+
+/**
  * Format currency amount for display
  */
 export function formatCurrency(amount: number, currency: string = 'GBP', decimals: number = 2): string {

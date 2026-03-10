@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
-import { formatCurrency } from '@/types/payments'
+import { formatCurrency, formatCompactCurrency } from '@/types/payments'
 import type { BurnWeekRow } from '@/types/cash-burn'
 
 // ============================================================
@@ -90,7 +90,7 @@ export function BurnAreaChart({ data, comparisonData }: BurnAreaChartProps) {
               tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => formatCurrency(v)}
+              tickFormatter={(v: number) => formatCompactCurrency(v)}
             />
             <Tooltip
               contentStyle={{

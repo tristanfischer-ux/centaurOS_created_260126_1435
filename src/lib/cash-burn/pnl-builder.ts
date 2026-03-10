@@ -206,7 +206,11 @@ export function buildBalanceSheet(
   // Cash = opening + operating income + equity + loans - costs
   // RetainedEarnings = operating income - (costs excluding capex)
   const cash = openingBalance + totalOperatingIncome + totalEquityInvested + totalLoans - totalCosts
-  const equipment = totalCapex // Simplified: no depreciation
+  // INTENT: Straight-line depreciation over 3 years for P&L presentation
+  // Cash flow still shows full outflow when it occurs
+  const DEPRECIATION_WEEKS = 156
+  const depreciatedEquipment = Math.max(0, totalCapex - Math.round(totalCapex * Math.min(weeksBetween, DEPRECIATION_WEEKS) / DEPRECIATION_WEEKS))
+  const equipment = depreciatedEquipment
   const totalAssets = cash + equipment
   const totalLiabilities = totalLoans
   const retainedEarnings = totalOperatingIncome - (totalCosts - totalCapex)

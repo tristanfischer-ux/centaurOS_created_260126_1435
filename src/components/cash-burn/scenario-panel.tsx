@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Trash2, Save } from 'lucide-react'
+import { Plus, Trash2, Save, AlertTriangle } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import type { BurnScenario, CreateScenarioInput } from '@/types/cash-burn'
@@ -242,11 +242,33 @@ export function ScenarioPanel({
           </div>
         </div>
 
+        {/* Extreme scenario warning */}
+        {(revenueGrowth > 100 || revenueGrowth < -30
+          || revenueDelay > 12 || costDelay > 12) && (
+          <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 px-3 py-2 rounded-md">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            Extreme scenario — projections may be unrealistic
+          </div>
+        )}
+
         {/* Save button */}
-        <Button onClick={handleSave} disabled={isSaving} className="w-full">
-          <Save className="h-4 w-4" />
-          {isSaving ? 'Saving...' : 'Save Scenario'}
-        </Button>
+        {(() => {
+          const isDirty = revenueDelay !== activeScenario.revenueDelayWeeks
+            || costDelay !== activeScenario.costDelayWeeks
+            || revenueGrowth !== activeScenario.revenueGrowthPct
+            || Math.round(parseFloat(openingBalancePounds || '0') * 100) !== activeScenario.openingBalance
+          return (
+            <>
+              <Button onClick={handleSave} disabled={isSaving} className="w-full">
+                <Save className="h-4 w-4" />
+                {isSaving ? 'Saving...' : isDirty ? 'Save Changes' : 'Save Scenario'}
+              </Button>
+              {isDirty && (
+                <p className="text-xs text-warning text-center">You have unsaved changes</p>
+              )}
+            </>
+          )
+        })()}
       </CardContent>
     </Card>
   )

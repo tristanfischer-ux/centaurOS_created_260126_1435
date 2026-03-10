@@ -58,8 +58,12 @@ function stripCommas(value: string): string {
 // Employer's NI calculation (UK 2025/26)
 // ============================================================
 
+// INTENT: UK Employer NI rates for tax year 2025/26
+// Rate: 15% above secondary threshold (£5,000/year from April 2025)
+// Source: https://www.gov.uk/employer-national-insurance-rates
+// GOTCHA: These rates change annually — update at start of each tax year
 const EMPLOYER_NI_RATE = 0.15
-const EMPLOYER_NI_SECONDARY_THRESHOLD = 5000 // £5,000/year
+const EMPLOYER_NI_SECONDARY_THRESHOLD = 5000
 
 function annualiseAmount(amountPounds: string, frequency: Frequency): number {
   const parsed = parseFloat(amountPounds)

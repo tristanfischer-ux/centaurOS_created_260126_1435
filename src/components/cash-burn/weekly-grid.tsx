@@ -111,7 +111,7 @@ export function WeeklyGrid({ columns, rows, formatValue = formatCurrency, title 
                   Previous
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Q{page + 1} of {totalPages}
+                  Weeks {start + 1}–{Math.min(end, rows.length)} of {rows.length}
                 </span>
                 <Button
                   variant="ghost"

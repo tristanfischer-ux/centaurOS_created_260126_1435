@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
-import { formatCurrency } from '@/types/payments'
+import { formatCurrency, formatCompactCurrency } from '@/types/payments'
 import type { IncomeStatementRow } from '@/types/cash-burn'
 
 // Semantic colors from centralised palette
@@ -23,16 +23,6 @@ const COLOR_DESTRUCTIVE = moneyMapColors.loss // Red
 // ============================================================
 // Helpers
 // ============================================================
-
-/** Compact currency for Y-axis labels (values arrive in pence) */
-function formatCompactCurrency(pence: number): string {
-  const pounds = pence / 100
-  const abs = Math.abs(pounds)
-  const sign = pounds < 0 ? '-' : ''
-  if (abs >= 1_000_000) return `${sign}£${(abs / 1_000_000).toFixed(1)}M`
-  if (abs >= 1_000) return `${sign}£${(abs / 1_000).toFixed(0)}k`
-  return `${sign}£${abs.toFixed(0)}`
-}
 
 // ============================================================
 // Types
