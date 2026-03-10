@@ -486,7 +486,7 @@ export default function ReportsPage(): React.JSX.Element {
     } finally {
       setIsGeneratingBriefing(false)
     }
-  }, [isGenerating, briefingContext, tone, includeCompanyData])
+  }, [isGeneratingBriefing, briefingContext, tone, includeCompanyData])
 
   const handleExportBriefingPPTX = useCallback(async () => {
     if (!briefingResult) return

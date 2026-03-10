@@ -1,10 +1,11 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   CheckSquare, Target, Users, BarChart3,
-  Phone, Linkedin, TrendingUp, TrendingDown, Minus,
-  Award, Zap, Star, Trophy, Briefcase, GraduationCap,
+  TrendingUp, TrendingDown, Minus,
+  Award, Zap, Star, Trophy, Briefcase, GraduationCap, UserCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -15,10 +16,10 @@ import type { ProfileEnrichment } from '../profile-hub-view'
  * OverviewTab - Bio, professional background, contact info, activity stats, and milestones.
  *
  * @description Shows the user's bio, professional background (summary, previous
- * companies, education), supplementary contact info (phone, LinkedIn), enhanced
- * platform stats with trend indicators, a 30-day activity sparkline, and
- * computed achievement milestones. Name/email/role/company are shown in the
- * HeroCard instead.
+ * companies, education), enhanced platform stats with trend indicators, a
+ * 30-day activity sparkline, and computed achievement milestones.
+ * Name/email/role/company are shown in the HeroCard instead.
+ * Contact info (phone, LinkedIn) lives in the LinksTab.
  *
  * @component
  */
@@ -26,10 +27,6 @@ import type { ProfileEnrichment } from '../profile-hub-view'
 interface OverviewTabProps {
   /** User's bio */
   bio: string | null
-  /** User's phone number */
-  phoneNumber: string | null
-  /** User's LinkedIn URL */
-  linkedinUrl: string | null
   /** Professional background data */
   professionalBackground: {
     summary?: string | null
@@ -49,8 +46,6 @@ interface OverviewTabProps {
 
 export function OverviewTab({
   bio,
-  phoneNumber,
-  linkedinUrl,
   professionalBackground,
   stats,
   enrichment,
@@ -120,25 +115,13 @@ export function OverviewTab({
             </div>
           )}
 
-          {/* Supplementary contact info */}
-          {(phoneNumber || linkedinUrl) && (
-            <div className={cn((bio || hasBackground) ? 'pt-2 border-t border-muted' : '')}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {phoneNumber && (
-                  <DetailRow icon={Phone} label="Phone" value={phoneNumber} />
-                )}
-                {linkedinUrl && (
-                  <DetailRow icon={Linkedin} label="LinkedIn" value={formatUrl(linkedinUrl)} />
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Empty state when nothing populated */}
-          {!bio && !hasBackground && !phoneNumber && !linkedinUrl && (
-            <p className="text-sm text-muted-foreground italic">
-              Your profile is looking a bit empty — click Edit in the hero card above to tell people about yourself.
-            </p>
+          {!bio && !hasBackground && (
+            <EmptyState
+              icon={<UserCircle className="h-10 w-10" />}
+              title="Tell people about yourself"
+              description="Add your bio and professional background so your team and collaborators know who you are."
+            />
           )}
         </CardContent>
       </Card>
@@ -385,30 +368,3 @@ function StatCard({
   )
 }
 
-/** Detail row in the about card. */
-function DetailRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: LucideIcon
-  label: string
-  value: string
-}) {
-  return (
-    <div className="space-y-1">
-      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-        <Icon className="h-3 w-3" />
-        {label}
-      </span>
-      <p className="text-sm text-foreground">
-        {value}
-      </p>
-    </div>
-  )
-}
-
-/** Format a URL for display by removing protocol and trailing slash. */
-function formatUrl(url: string): string {
-  return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
-}
