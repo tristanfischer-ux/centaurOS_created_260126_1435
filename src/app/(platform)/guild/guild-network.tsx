@@ -1,15 +1,34 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 import { EmptyState } from "@/components/ui/empty-state"
 import { UserAvatar } from "@/components/ui/user-avatar"
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog"
+import {
     Users,
     Search,
+    MessageCircle,
+    Award,
+    ChevronDown,
+    ChevronUp,
+    Loader2,
 } from "lucide-react"
+import { startDirectMessage } from "@/actions/messaging"
+import { createEndorsement } from "@/actions/endorsements"
+import { toast } from "sonner"
 
 // ==========================================
 // TYPES
@@ -21,23 +40,24 @@ interface Member {
     role: string | null
     email: string | null
     foundry_name?: string
+    bio?: string | null
+    skills?: string[]
+    endorsement_count?: number
 }
 
 interface GuildNetworkProps {
     /** Guild community members */
     members: Member[]
+    /** Current user's ID (to hide actions on self) */
+    currentUserId?: string
+    /** Whether current user is Executive/Founder (can endorse) */
+    isExecutive?: boolean
 }
 
 // ==========================================
 // HELPERS
 // ==========================================
 
-/**
- * Returns semantic badge classes based on user role.
- *
- * @param role - The user's Guild role
- * @returns Tailwind class string for the Badge component
- */
 function getRoleBadgeClass(role: string | null): string {
     switch (role) {
         case 'Founder':
@@ -53,32 +73,76 @@ function getRoleBadgeClass(role: string | null): string {
     }
 }
 
+const ROLE_FILTERS = ['All', 'Founder', 'Executive', 'Apprentice'] as const
+
 // ==========================================
 // COMPONENT
 // ==========================================
 
 /**
- * Guild Network member directory with search and filtering.
- *
- * @description Displays Guild members in a responsive grid with search
- * by name, role, or foundry. Each member card shows their avatar,
- * name, role badge, and foundry affiliation.
- *
- * @component
- *
- * @example
- * <GuildNetwork members={members} />
+ * Guild Network member directory with search, role filters,
+ * message/endorse actions, and expandable cards.
  */
-export function GuildNetwork({ members }: GuildNetworkProps) {
+export function GuildNetwork({ members, currentUserId, isExecutive }: GuildNetworkProps) {
+    const router = useRouter()
     const [searchQuery, setSearchQuery] = useState("")
+    const [roleFilter, setRoleFilter] = useState<string>("All")
+    const [expandedId, setExpandedId] = useState<string | null>(null)
+    const [endorseTarget, setEndorseTarget] = useState<Member | null>(null)
+    const [endorseText, setEndorseText] = useState("")
+    const [endorseRelationship, setEndorseRelationship] = useState("")
+    const [isPending, startTransition] = useTransition()
+    const [messagingId, setMessagingId] = useState<string | null>(null)
 
-    const filteredMembers = searchQuery.trim()
-        ? members.filter(m =>
-            m.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.role?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            m.foundry_name?.toLowerCase().includes(searchQuery.toLowerCase())
-        )
-        : members
+    const filteredMembers = members.filter(m => {
+        // Role filter
+        if (roleFilter !== 'All' && m.role !== roleFilter) return false
+        // Search filter
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            return (
+                m.full_name?.toLowerCase().includes(q) ||
+                m.role?.toLowerCase().includes(q) ||
+                m.foundry_name?.toLowerCase().includes(q)
+            )
+        }
+        return true
+    })
+
+    const handleMessage = async (memberId: string) => {
+        setMessagingId(memberId)
+        try {
+            const result = await startDirectMessage(memberId)
+            if ('error' in result) {
+                toast.error(result.error)
+                return
+            }
+            router.push('/updates')
+        } catch {
+            toast.error('Failed to start conversation')
+        } finally {
+            setMessagingId(null)
+        }
+    }
+
+    const handleEndorse = () => {
+        if (!endorseTarget || !endorseText.trim()) return
+        startTransition(async () => {
+            const result = await createEndorsement(
+                endorseTarget.id,
+                endorseText.trim(),
+                endorseRelationship.trim() || undefined
+            )
+            if (result.success) {
+                toast.success(`Endorsement sent to ${endorseTarget.full_name}`)
+                setEndorseTarget(null)
+                setEndorseText("")
+                setEndorseRelationship("")
+            } else {
+                toast.error(result.error || 'Failed to endorse')
+            }
+        })
+    }
 
     return (
         <div className="space-y-4">
@@ -99,6 +163,21 @@ export function GuildNetwork({ members }: GuildNetworkProps) {
                 </div>
             </div>
 
+            {/* Role Filter Pills */}
+            <div className="flex flex-wrap gap-2">
+                {ROLE_FILTERS.map(role => (
+                    <Button
+                        key={role}
+                        variant={roleFilter === role ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setRoleFilter(role)}
+                        className="text-xs"
+                    >
+                        {role === 'All' ? 'All Roles' : `${role}s`}
+                    </Button>
+                ))}
+            </div>
+
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {filteredMembers.length === 0 ? (
                     <div className="col-span-full">
@@ -113,37 +192,145 @@ export function GuildNetwork({ members }: GuildNetworkProps) {
                         />
                     </div>
                 ) : (
-                    filteredMembers.map(member => (
-                        <Card key={member.id} className="p-4 bg-card hover:shadow-md transition-shadow">
-                            <div className="flex items-start gap-3">
-                                <UserAvatar
-                                    name={member.full_name}
-                                    role={member.role}
-                                    size="lg"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-foreground truncate">
-                                        {member.full_name || "Unknown"}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <Badge
-                                            variant="secondary"
-                                            className={`text-xs ${getRoleBadgeClass(member.role)}`}
-                                        >
-                                            {member.role || "Member"}
-                                        </Badge>
+                    filteredMembers.map(member => {
+                        const isExpanded = expandedId === member.id
+                        const isSelf = member.id === currentUserId
+
+                        return (
+                            <Card
+                                key={member.id}
+                                className="p-4 bg-card hover:shadow-md transition-shadow cursor-pointer"
+                                onClick={() => setExpandedId(isExpanded ? null : member.id)}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <UserAvatar
+                                        name={member.full_name}
+                                        role={member.role}
+                                        size="lg"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <p className="font-medium text-foreground truncate">
+                                                {member.full_name || "Unknown"}
+                                            </p>
+                                            {isExpanded ? (
+                                                <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            ) : (
+                                                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Badge
+                                                variant="secondary"
+                                                className={`text-xs ${getRoleBadgeClass(member.role)}`}
+                                            >
+                                                {member.role || "Member"}
+                                            </Badge>
+                                        </div>
+                                        {member.foundry_name && (
+                                            <p className="text-xs text-muted-foreground mt-1 truncate">
+                                                {member.foundry_name}
+                                            </p>
+                                        )}
                                     </div>
-                                    {member.foundry_name && (
-                                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                                            {member.foundry_name}
-                                        </p>
-                                    )}
                                 </div>
-                            </div>
-                        </Card>
-                    ))
+
+                                {/* Expanded Content */}
+                                {isExpanded && (
+                                    <div className="mt-4 pt-4 border-t border-muted space-y-3" onClick={e => e.stopPropagation()}>
+                                        {member.bio && (
+                                            <p className="text-sm text-muted-foreground">{member.bio}</p>
+                                        )}
+                                        {member.skills && member.skills.length > 0 && (
+                                            <div className="flex flex-wrap gap-1">
+                                                {member.skills.map((skill, idx) => (
+                                                    <Badge key={idx} variant="secondary" className="text-xs bg-muted">
+                                                        {skill}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {!isSelf && (
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleMessage(member.id)}
+                                                    disabled={messagingId === member.id}
+                                                    className="gap-1.5"
+                                                >
+                                                    {messagingId === member.id ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <MessageCircle className="h-3.5 w-3.5" />
+                                                    )}
+                                                    Message
+                                                </Button>
+                                                {isExecutive && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() => setEndorseTarget(member)}
+                                                        className="gap-1.5"
+                                                    >
+                                                        <Award className="h-3.5 w-3.5" /> Endorse
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </Card>
+                        )
+                    })
                 )}
             </div>
+
+            {/* Endorse Dialog */}
+            <Dialog open={!!endorseTarget} onOpenChange={(open) => !open && setEndorseTarget(null)}>
+                <DialogContent size="sm">
+                    <DialogHeader>
+                        <DialogTitle>Endorse {endorseTarget?.full_name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="endorse-text">
+                                Testimonial <span className="text-destructive" aria-label="required">*</span>
+                            </Label>
+                            <Textarea
+                                id="endorse-text"
+                                placeholder="What makes this person stand out?"
+                                value={endorseText}
+                                onChange={e => setEndorseText(e.target.value)}
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="endorse-relationship">
+                                Relationship <span className="text-muted-foreground text-xs">(optional)</span>
+                            </Label>
+                            <Input
+                                id="endorse-relationship"
+                                placeholder="e.g., Mentor, Project Lead, Colleague"
+                                value={endorseRelationship}
+                                onChange={e => setEndorseRelationship(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="secondary" onClick={() => setEndorseTarget(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleEndorse}
+                            disabled={!endorseText.trim() || isPending}
+                        >
+                            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Send Endorsement
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }

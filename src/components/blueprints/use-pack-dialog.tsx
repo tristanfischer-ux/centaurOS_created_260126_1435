@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createObjective } from '@/actions/objectives'
-import type { ObjectivePack, PackItem } from '@/actions/packs'
+import type { ObjectivePack } from '@/actions/packs'
 import { toast } from 'sonner'
 import {
   Loader2,

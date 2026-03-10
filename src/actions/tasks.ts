@@ -527,6 +527,7 @@ export async function acceptTask(taskId: string) {
 export async function rejectTask(taskId: string, reason: string) {
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!reason) return { error: 'Reason required for rejection' }
+        if (reason.length > 5_000) return { error: 'Reason too long (max 5,000 characters)' }
 
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -721,6 +722,7 @@ export async function amendTask(taskId: string, updates: {
 }) {
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!updates.amendment_notes) return { error: 'Amendment notes required' }
+        if (updates.amendment_notes.length > 5_000) return { error: 'Amendment notes too long (max 5,000 characters)' }
 
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
@@ -1169,6 +1171,7 @@ export async function getPendingApprovals() {
 export async function batchApproveTasks(taskIds: string[]) {
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
+        if (taskIds.length > 100) return { error: 'Cannot batch approve more than 100 tasks at once' }
 
         // Check if user is Executive or Founder
         const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -1228,7 +1231,9 @@ export async function batchApproveTasks(taskIds: string[]) {
 export async function batchRejectTasks(taskIds: string[], reason: string) {
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!taskIds || taskIds.length === 0) return { error: 'No tasks provided' }
+        if (taskIds.length > 100) return { error: 'Cannot batch reject more than 100 tasks at once' }
         if (!reason?.trim()) return { error: 'Rejection reason is required' }
+        if (reason.length > 5_000) return { error: 'Reason too long (max 5,000 characters)' }
 
         // Check if user is Executive or Founder
         const { data: approver } = await supabase.from('profiles').select('role').eq('id', user.id).single()
@@ -1679,6 +1684,15 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
     return withAuth(async ({ supabase, user, foundryId }) => {
         if (!updates.title && updates.description === undefined) return { success: true } // Nothing to update
 
+        // SECURITY: Length validation to prevent oversized payloads
+        if (updates.title !== undefined) {
+            if (!updates.title.trim()) return { error: 'Title cannot be empty' }
+            if (updates.title.length > 500) return { error: 'Title too long (max 500 characters)' }
+        }
+        if (updates.description !== undefined && updates.description.length > 50_000) {
+            return { error: 'Description too long (max 50,000 characters)' }
+        }
+
         // Security: Verify user has permission to modify this task
         const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
         if (!authCheck.allowed) {
@@ -1754,9 +1768,11 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
         const primaryAssigneeId = assigneeIds[0]
 
         // Update primary assignee on task table
+        // SECURITY: Include foundry_id for defense-in-depth
         const { error: taskError } = await supabase.from('tasks')
             .update({ assignee_id: primaryAssigneeId })
             .eq('id', taskId)
+            .eq('foundry_id', foundryId)
 
         if (taskError) return { error: sanitizeErrorMessage(taskError) }
 
@@ -2068,20 +2084,33 @@ export async function deleteTaskAttachment(fileId: string, filePath: string, tas
             return { error: authCheck.error || 'Unauthorized' }
         }
 
-        // Delete from Storage
+        // SECURITY: Verify the file record belongs to the specified task before
+        // deleting. Use the DB-stored path, not the user-supplied filePath, to
+        // prevent cross-foundry file deletion via path traversal.
+        const { data: fileRecord, error: lookupError } = await supabase
+            .from('task_files')
+            .select('file_path')
+            .eq('id', fileId)
+            .eq('task_id', taskId)
+            .single()
+        if (lookupError || !fileRecord) {
+            return { error: 'File not found' }
+        }
+
+        // Delete from Storage using the verified DB path
         const { error: storageError } = await supabase.storage
             .from('task-files')
-            .remove([filePath])
+            .remove([fileRecord.file_path])
 
         if (storageError) {
             console.warn("Storage delete failed", storageError)
-            // Proceed to delete record anyway - best to clean up record even if storage file is gone or erroring.
         }
 
-        // Delete from DB
+        // Delete from DB (scoped to task for defense-in-depth)
         const { error: dbError } = await supabase.from('task_files')
             .delete()
             .eq('id', fileId)
+            .eq('task_id', taskId)
 
         if (dbError) return { error: sanitizeErrorMessage(dbError) }
 

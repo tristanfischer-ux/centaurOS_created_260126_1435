@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -71,22 +71,19 @@ interface EventSummary {
 /**
  * Main Guild page content with events-first layout.
  *
- * @description Redesigned to put events front and center:
- * 1. Featured Event Hero (next upcoming event, full-width)
- * 2. Stats Bar (community health at a glance)
- * 3. Events Grid (remaining events in 2-column layout)
- * 4. Management Tabs (Pool, Assignments, Network pushed below)
- *
- * Both Manager and Apprentice views share the same events-first layout,
- * with role-specific tabs below.
+ * @description Redesigned to put events front and center with smart empty states,
+ * animated stats, capacity bars, and role-specific CTAs.
  */
 export function GuildPageContent({ isManager, isApprentice, isExecutive, currentUserId, members }: GuildPageContentProps) {
     const [myAssignments, setMyAssignments] = useState<MyAssignment[]>([])
     const [events, setEvents] = useState<GuildEvent[]>([])
-    const [rsvpStatuses, setRsvpStatuses] = useState<Record<string, { attending: boolean; count: number }>>({})
+    const [lastPastEvent, setLastPastEvent] = useState<GuildEvent | null>(null)
+    const [rsvpStatuses, setRsvpStatuses] = useState<Record<string, { attending: boolean; count: number; status: 'going' | 'maybe' | null; goingCount: number; maybeCount: number }>>({})
     const [summary, setSummary] = useState<EventSummary>({ upcomingCount: 0, totalThisMonth: 0 })
     const [loading, setLoading] = useState(true)
     const [createEventOpen, setCreateEventOpen] = useState(false)
+    const [activeTab, setActiveTab] = useState<string>(isManager ? "pool" : "assignments")
+    const tabsRef = useRef<HTMLDivElement>(null)
 
     const loadData = async (): Promise<void> => {
         setLoading(true)
@@ -97,10 +94,10 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
             if (eventsResult.error) {
                 toast.error('Failed to load events')
             }
+            let filteredEvents: GuildEvent[] = []
             if (eventsResult.data) {
                 // SECURITY: Filter executive-only events for non-executives client-side
-                // (server-side filtering is primary, this is a defense-in-depth measure)
-                const filteredEvents = isExecutive
+                filteredEvents = isExecutive
                     ? eventsResult.data
                     : eventsResult.data.filter(e => !e.is_executive_only)
                 setEvents(filteredEvents)
@@ -112,6 +109,14 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                     if (rsvpResult.data) {
                         setRsvpStatuses(rsvpResult.data)
                     }
+                }
+            }
+
+            // If no upcoming events, fetch the most recent past event
+            if (filteredEvents.length === 0) {
+                const pastResult = await getGuildEvents({ past: true, limit: 1 })
+                if (pastResult.data && pastResult.data.length > 0) {
+                    setLastPastEvent(pastResult.data[0])
                 }
             }
 
@@ -153,8 +158,25 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
     }
 
     // Sync RSVP changes across Hero and EventsSection
-    const handleRSVPChange = useCallback((eventId: string, status: { attending: boolean; count: number }) => {
+    const handleRSVPChange = useCallback((eventId: string, status: { attending: boolean; count: number; status: 'going' | 'maybe' | null; goingCount: number; maybeCount: number }) => {
         setRsvpStatuses(prev => ({ ...prev, [eventId]: status }))
+    }, [])
+
+    // Handle stat card clicks
+    const handleStatClick = useCallback((action: string) => {
+        if (action === 'network') {
+            setActiveTab('network')
+            tabsRef.current?.scrollIntoView({ behavior: 'smooth' })
+        } else if (action === 'events') {
+            // Scroll to top where events are
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+        }
+    }, [])
+
+    // Handle tab switching from hero CTA
+    const handleTabSwitch = useCallback((tab: string) => {
+        setActiveTab(tab)
+        tabsRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [])
 
     // Split events: first goes to Hero, rest to EventsSection
@@ -172,6 +194,10 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 event={featuredEvent}
                 rsvpStatus={featuredEvent ? rsvpStatuses[featuredEvent.id] : undefined}
                 onRSVPChange={handleRSVPChange}
+                lastPastEvent={lastPastEvent}
+                onCreateEvent={isExecutive ? () => setCreateEventOpen(true) : undefined}
+                userRole={isManager ? 'manager' : isApprentice ? 'apprentice' : undefined}
+                onTabSwitch={handleTabSwitch}
             />
 
             {/* 2. Stats Bar */}
@@ -180,6 +206,7 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 totalMembers={members.length}
                 totalAttending={totalAttending}
                 eventsThisMonth={summary.totalThisMonth}
+                onStatClick={handleStatClick}
             />
 
             {/* 3. Events Grid */}
@@ -229,34 +256,40 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 )}
 
                 {/* Management Tabs */}
-                <Tabs defaultValue="pool" className="space-y-6">
-                    <TabsList className="bg-muted">
-                        <TabsTrigger value="pool" className="flex items-center gap-2">
-                            <GraduationCap className="h-4 w-4" />
-                            Apprentice Pool
-                        </TabsTrigger>
-                        <TabsTrigger value="assignments" className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4" />
-                            Assignments
-                        </TabsTrigger>
-                        <TabsTrigger value="network" className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Network
-                        </TabsTrigger>
-                    </TabsList>
+                <div ref={tabsRef}>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        <TabsList className="bg-muted">
+                            <TabsTrigger value="pool" className="flex items-center gap-2">
+                                <GraduationCap className="h-4 w-4" />
+                                Apprentice Pool
+                            </TabsTrigger>
+                            <TabsTrigger value="assignments" className="flex items-center gap-2">
+                                <Briefcase className="h-4 w-4" />
+                                Assignments
+                            </TabsTrigger>
+                            <TabsTrigger value="network" className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Network
+                            </TabsTrigger>
+                        </TabsList>
 
-                    <TabsContent value="pool">
-                        <ApprenticePoolBrowser />
-                    </TabsContent>
+                        <TabsContent value="pool">
+                            <ApprenticePoolBrowser />
+                        </TabsContent>
 
-                    <TabsContent value="assignments">
-                        <ProjectAssignmentsList />
-                    </TabsContent>
+                        <TabsContent value="assignments">
+                            <ProjectAssignmentsList />
+                        </TabsContent>
 
-                    <TabsContent value="network">
-                        <GuildNetwork members={members} />
-                    </TabsContent>
-                </Tabs>
+                        <TabsContent value="network">
+                            <GuildNetwork
+                                members={members}
+                                currentUserId={currentUserId}
+                                isExecutive={isExecutive}
+                            />
+                        </TabsContent>
+                    </Tabs>
+                </div>
 
                 <CreateEventDialog
                     open={createEventOpen}
@@ -300,127 +333,133 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 )}
 
                 {/* Apprentice Tabs: Assignments + Network */}
-                <Tabs defaultValue="assignments" className="space-y-6">
-                    <TabsList className="bg-muted">
-                        <TabsTrigger value="assignments" className="flex items-center gap-2">
-                            <Briefcase className="h-4 w-4" />
-                            My Assignments
-                        </TabsTrigger>
-                        <TabsTrigger value="network" className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Network
-                        </TabsTrigger>
-                    </TabsList>
+                <div ref={tabsRef}>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                        <TabsList className="bg-muted">
+                            <TabsTrigger value="assignments" className="flex items-center gap-2">
+                                <Briefcase className="h-4 w-4" />
+                                My Assignments
+                            </TabsTrigger>
+                            <TabsTrigger value="network" className="flex items-center gap-2">
+                                <Users className="h-4 w-4" />
+                                Network
+                            </TabsTrigger>
+                        </TabsList>
 
-                    <TabsContent value="assignments">
-                        {loading ? (
-                            <Card className="border">
-                                <CardContent className="p-8 text-center">
-                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
-                                    <p className="text-muted-foreground">Loading your assignments...</p>
-                                </CardContent>
-                            </Card>
-                        ) : myAssignments.length === 0 ? (
-                            <Card className="border">
-                                <CardContent className="p-8 text-center">
-                                    <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                                    <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
-                                    <p className="text-muted-foreground">
-                                        You haven&apos;t been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
-                                    </p>
-                                </CardContent>
-                            </Card>
-                        ) : (
-                            <div className="space-y-6">
-                                {/* Active Assignments */}
-                                {activeAssignments.length > 0 && (
-                                    <Card className="border">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2 text-lg">
-                                                <Briefcase className="h-5 w-5 text-status-success" />
-                                                Active Assignments
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            {activeAssignments.map((assignment) => (
-                                                <div
-                                                    key={assignment.id}
-                                                    className="p-4 border border-status-success-light rounded-lg bg-status-success-light"
-                                                >
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <h4 className="font-semibold text-foreground">{assignment.projectName}</h4>
-                                                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                                                <Building2 className="h-4 w-4" />
-                                                                <span>{assignment.foundryName}</span>
+                        <TabsContent value="assignments">
+                            {loading ? (
+                                <Card className="border">
+                                    <CardContent className="p-8 text-center">
+                                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-4" />
+                                        <p className="text-muted-foreground">Loading your assignments...</p>
+                                    </CardContent>
+                                </Card>
+                            ) : myAssignments.length === 0 ? (
+                                <Card className="border">
+                                    <CardContent className="p-8 text-center">
+                                        <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                                        <h3 className="text-lg font-semibold text-foreground mb-2">No Assignments Yet</h3>
+                                        <p className="text-muted-foreground">
+                                            You haven&apos;t been assigned to any projects yet. Companies can find you in the Guild pool and assign you to their projects.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Active Assignments */}
+                                    {activeAssignments.length > 0 && (
+                                        <Card className="border">
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center gap-2 text-lg">
+                                                    <Briefcase className="h-5 w-5 text-status-success" />
+                                                    Active Assignments
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                                {activeAssignments.map((assignment) => (
+                                                    <div
+                                                        key={assignment.id}
+                                                        className="p-4 border border-status-success-light rounded-lg bg-status-success-light"
+                                                    >
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <h4 className="font-semibold text-foreground">{assignment.projectName}</h4>
+                                                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                                                                    <Building2 className="h-4 w-4" />
+                                                                    <span>{assignment.foundryName}</span>
+                                                                </div>
+                                                                {assignment.projectDescription && (
+                                                                    <p className="text-sm text-muted-foreground mt-2">
+                                                                        {assignment.projectDescription}
+                                                                    </p>
+                                                                )}
+                                                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    <span>Started {formatDistanceToNow(new Date(assignment.startedAt), { addSuffix: true })}</span>
+                                                                    <span className="text-muted-foreground">|</span>
+                                                                    <span>Assigned by {assignment.assignedByName}</span>
+                                                                </div>
                                                             </div>
-                                                            {assignment.projectDescription && (
-                                                                <p className="text-sm text-muted-foreground mt-2">
-                                                                    {assignment.projectDescription}
-                                                                </p>
-                                                            )}
-                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-3">
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>Started {formatDistanceToNow(new Date(assignment.startedAt), { addSuffix: true })}</span>
-                                                                <span className="text-muted-foreground">|</span>
-                                                                <span>Assigned by {assignment.assignedByName}</span>
-                                                            </div>
+                                                            <Badge className="bg-status-success text-status-success-foreground">Active</Badge>
                                                         </div>
-                                                        <Badge className="bg-status-success text-status-success-foreground">Active</Badge>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </CardContent>
-                                    </Card>
-                                )}
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+                                    )}
 
-                                {/* Past Assignments */}
-                                {pastAssignments.length > 0 && (
-                                    <Card className="border">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2 text-lg text-muted-foreground">
-                                                <Clock className="h-5 w-5" />
-                                                Past Assignments
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            {pastAssignments.map((assignment) => (
-                                                <div
-                                                    key={assignment.id}
-                                                    className="p-4 border border-muted rounded-lg opacity-70"
-                                                >
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <h4 className="font-medium text-foreground">{assignment.projectName}</h4>
-                                                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                                                <Building2 className="h-4 w-4" />
-                                                                <span>{assignment.foundryName}</span>
+                                    {/* Past Assignments */}
+                                    {pastAssignments.length > 0 && (
+                                        <Card className="border">
+                                            <CardHeader>
+                                                <CardTitle className="flex items-center gap-2 text-lg text-muted-foreground">
+                                                    <Clock className="h-5 w-5" />
+                                                    Past Assignments
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {pastAssignments.map((assignment) => (
+                                                    <div
+                                                        key={assignment.id}
+                                                        className="p-4 border border-muted rounded-lg opacity-70"
+                                                    >
+                                                        <div className="flex items-start justify-between">
+                                                            <div>
+                                                                <h4 className="font-medium text-foreground">{assignment.projectName}</h4>
+                                                                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                                                                    <Building2 className="h-4 w-4" />
+                                                                    <span>{assignment.foundryName}</span>
+                                                                </div>
                                                             </div>
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={
+                                                                    assignment.status === 'completed'
+                                                                        ? 'border text-status-info'
+                                                                        : 'border-destructive text-destructive'
+                                                                }
+                                                            >
+                                                                {assignment.status}
+                                                            </Badge>
                                                         </div>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                assignment.status === 'completed'
-                                                                    ? 'border text-status-info'
-                                                                    : 'border-destructive text-destructive'
-                                                            }
-                                                        >
-                                                            {assignment.status}
-                                                        </Badge>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
-                        )}
-                    </TabsContent>
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
+                            )}
+                        </TabsContent>
 
-                    <TabsContent value="network">
-                        <GuildNetwork members={members} />
-                    </TabsContent>
-                </Tabs>
+                        <TabsContent value="network">
+                            <GuildNetwork
+                                members={members}
+                                currentUserId={currentUserId}
+                                isExecutive={false}
+                            />
+                        </TabsContent>
+                    </Tabs>
+                </div>
             </div>
         )
     }

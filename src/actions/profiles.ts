@@ -125,6 +125,17 @@ export async function updateProfileDetails(
     if (updates.role && !['Founder', 'Executive', 'Apprentice', 'AI_Agent'].includes(updates.role)) {
         return { success: false, error: 'Invalid role. Must be Founder, Executive, Apprentice, or AI_Agent' }
     }
+
+    // SECURITY: Only Founders can change roles, and cannot change their own role.
+    // Without this check, any user could self-escalate to Founder via their own profile.
+    if (updates.role !== undefined) {
+        if (currentProfile.role !== 'Founder') {
+            return { success: false, error: 'Only Founders can change roles' }
+        }
+        if (isOwnProfile) {
+            return { success: false, error: 'Cannot change your own role' }
+        }
+    }
     
     // Build update object (only include provided fields)
     const updateData: Record<string, unknown> = {}

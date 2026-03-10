@@ -114,7 +114,11 @@ export async function approveWaitlistEntry(entryId: string): Promise<{ error?: s
   if (!user?.email) {
     return { error: "You must be signed in to approve." };
   }
-  if (ADMIN_EMAIL && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  // SECURITY: Fail-closed — if ADMIN_EMAIL is not configured, deny all approvals
+  if (!ADMIN_EMAIL) {
+    return { error: "Admin functionality is not configured." };
+  }
+  if (user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return { error: "Only the platform admin can approve waitlist entries." };
   }
 
@@ -169,7 +173,11 @@ export async function rejectWaitlistEntry(entryId: string): Promise<{ error?: st
   if (!user?.email) {
     return { error: "You must be signed in to reject." };
   }
-  if (ADMIN_EMAIL && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  // SECURITY: Fail-closed — if ADMIN_EMAIL is not configured, deny all rejections
+  if (!ADMIN_EMAIL) {
+    return { error: "Admin functionality is not configured." };
+  }
+  if (user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return { error: "Only the platform admin can reject waitlist entries." };
   }
 
@@ -200,7 +208,11 @@ export async function getWaitlistEntries(): Promise<{
   if (!user?.email) {
     return { entries: [], error: "You must be signed in." };
   }
-  if (ADMIN_EMAIL && user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  // SECURITY: Fail-closed — if ADMIN_EMAIL is not configured, deny access
+  if (!ADMIN_EMAIL) {
+    return { entries: [], error: "Admin functionality is not configured." };
+  }
+  if (user.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
     return { entries: [], error: "Only the platform admin can view the waitlist." };
   }
 

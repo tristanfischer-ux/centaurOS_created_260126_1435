@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { createBulkNotifications } from '@/actions/notifications'
 
 // ==========================================
 // TYPES
@@ -129,6 +130,34 @@ export async function createGuildEvent(data: {
             return { data: null, error: sanitizeErrorMessage(error) }
         }
 
+        // Notify guild members about the new event
+        try {
+            if (!foundryId) throw new Error('No foundry ID')
+            // SECURITY: Don't notify Apprentices about executive-only events
+            const notifyRoles = data.isExecutiveOnly
+                ? ['Founder', 'Executive'] as const
+                : ['Founder', 'Executive', 'Apprentice'] as const
+            const { data: guildMembers } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('foundry_id', foundryId)
+                .in('role', notifyRoles)
+                .neq('id', user.id)
+
+            if (guildMembers && guildMembers.length > 0) {
+                await createBulkNotifications({
+                    userIds: guildMembers.map(m => m.id),
+                    type: 'event_reminder',
+                    title: `New Guild Event: ${data.title.trim()}`,
+                    message: `A new ${data.eventType || 'meetup'} has been scheduled.`,
+                    link: `/guild/events/${(event as GuildEvent).id}`,
+                })
+            }
+        } catch (notifErr) {
+            // Non-blocking: event was created, notification failure shouldn't fail the whole operation
+            console.error('[GuildEvents] Failed to send event notifications:', notifErr)
+        }
+
         revalidatePath('/guild')
         return { data: event as GuildEvent, error: null }
     } catch (err) {
@@ -152,13 +181,15 @@ export async function getGuildEvents(options?: {
     try {
         const supabase = await createClient()
 
+        // Past events should be ordered newest-first so limit gets the most recent
+        const ascending = !options?.past
         let query = supabase
             .from('guild_events')
             .select(`
                 *,
                 creator:profiles!guild_events_created_by_fkey(id, full_name, role)
             `)
-            .order('event_date', { ascending: true })
+            .order('event_date', { ascending })
 
         const now = new Date().toISOString()
 
@@ -485,6 +516,144 @@ export async function toggleRSVP(eventId: string): Promise<{
 }
 
 /**
+ * Set explicit RSVP status for an event (going, maybe, or cancelled).
+ *
+ * @description Unlike toggleRSVP which toggles going/cancelled, this sets an explicit
+ * status including 'maybe'. Checks capacity for 'going' status.
+ *
+ * @param eventId - The event to RSVP to
+ * @param status - The desired RSVP status
+ * @returns Updated status and counts
+ */
+export async function setRSVPStatus(
+    eventId: string,
+    status: 'going' | 'maybe' | 'cancelled'
+): Promise<{
+    status: 'going' | 'maybe' | 'cancelled'
+    goingCount: number
+    maybeCount: number
+    error: string | null
+}> {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { status: 'cancelled', goingCount: 0, maybeCount: 0, error: 'Not authenticated' }
+
+        // Check existing RSVP
+        const { data: existing } = await supabase
+            .from('event_attendees')
+            .select('id, status')
+            .eq('event_id', eventId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+        if (status === 'cancelled') {
+            // Remove RSVP
+            if (existing) {
+                await supabase.from('event_attendees').delete().eq('id', existing.id)
+            }
+        } else if (existing) {
+            // Update existing RSVP
+            if (status === 'going' && existing.status !== 'going') {
+                // Check capacity before switching to going
+                const { data: event } = await supabase
+                    .from('guild_events')
+                    .select('max_attendees')
+                    .eq('id', eventId)
+                    .single()
+
+                if (event?.max_attendees) {
+                    const { count } = await supabase
+                        .from('event_attendees')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('event_id', eventId)
+                        .eq('status', 'going')
+
+                    if (count !== null && count >= event.max_attendees) {
+                        return { status: existing.status as 'going' | 'maybe' | 'cancelled', goingCount: count, maybeCount: 0, error: 'Event is at capacity' }
+                    }
+                }
+            }
+            await supabase
+                .from('event_attendees')
+                .update({ status, updated_at: new Date().toISOString() })
+                .eq('id', existing.id)
+        } else {
+            // New RSVP
+            if (status === 'going') {
+                const { data: event } = await supabase
+                    .from('guild_events')
+                    .select('max_attendees')
+                    .eq('id', eventId)
+                    .single()
+
+                if (event?.max_attendees) {
+                    const { count } = await supabase
+                        .from('event_attendees')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('event_id', eventId)
+                        .eq('status', 'going')
+
+                    if (count !== null && count >= event.max_attendees) {
+                        return { status: 'cancelled', goingCount: count, maybeCount: 0, error: 'Event is at capacity' }
+                    }
+                }
+            }
+
+            const { error: insertError } = await supabase
+                .from('event_attendees')
+                .insert({ event_id: eventId, user_id: user.id, status })
+
+            if (insertError) {
+                console.error('[GuildEvents] setRSVPStatus insert failed:', insertError)
+                return { status: 'cancelled', goingCount: 0, maybeCount: 0, error: sanitizeErrorMessage(insertError) }
+            }
+
+            // SECURITY: Post-insert capacity re-check to mitigate race conditions
+            if (status === 'going') {
+                const { data: eventCheck } = await supabase
+                    .from('guild_events')
+                    .select('max_attendees')
+                    .eq('id', eventId)
+                    .single()
+
+                if (eventCheck?.max_attendees) {
+                    const { count: postInsertCount } = await supabase
+                        .from('event_attendees')
+                        .select('*', { count: 'exact', head: true })
+                        .eq('event_id', eventId)
+                        .eq('status', 'going')
+
+                    if (postInsertCount !== null && postInsertCount > eventCheck.max_attendees) {
+                        await supabase.from('event_attendees').delete().eq('event_id', eventId).eq('user_id', user.id)
+                        return { status: 'cancelled', goingCount: eventCheck.max_attendees, maybeCount: 0, error: 'Event is at capacity' }
+                    }
+                }
+            }
+        }
+
+        // Get updated counts
+        const { count: goingCount } = await supabase
+            .from('event_attendees')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .eq('status', 'going')
+
+        const { count: maybeCount } = await supabase
+            .from('event_attendees')
+            .select('*', { count: 'exact', head: true })
+            .eq('event_id', eventId)
+            .eq('status', 'maybe')
+
+        revalidatePath('/guild')
+        return { status, goingCount: goingCount || 0, maybeCount: maybeCount || 0, error: null }
+    } catch (err) {
+        console.error('[GuildEvents] setRSVPStatus exception:', err)
+        return { status: 'cancelled', goingCount: 0, maybeCount: 0, error: 'Failed to update RSVP' }
+    }
+}
+
+/**
  * Get attendees for an event.
  *
  * @description Returns the list of users who RSVP'd "going" to an event.
@@ -563,7 +732,7 @@ export async function isAttending(eventId: string): Promise<boolean> {
  * @returns Map of event ID to RSVP status
  */
 export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
-    data: Record<string, { attending: boolean; count: number }>
+    data: Record<string, { attending: boolean; count: number; status: 'going' | 'maybe' | null; goingCount: number; maybeCount: number }>
     error: string | null
 }> {
     try {
@@ -572,12 +741,12 @@ export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
 
-        // Get all attendees for these events in one query
+        // Get all attendees for these events in one query (going + maybe)
         const { data: attendees, error } = await supabase
             .from('event_attendees')
-            .select('event_id, user_id')
+            .select('event_id, user_id, status')
             .in('event_id', eventIds)
-            .eq('status', 'going')
+            .in('status', ['going', 'maybe'])
 
         if (error) {
             console.error('[GuildEvents] getEventRSVPStatuses failed:', error)
@@ -585,12 +754,18 @@ export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
         }
 
         // Build the result map
-        const result: Record<string, { attending: boolean; count: number }> = {}
+        const result: Record<string, { attending: boolean; count: number; status: 'going' | 'maybe' | null; goingCount: number; maybeCount: number }> = {}
         for (const eventId of eventIds) {
             const eventAttendees = (attendees || []).filter(a => a.event_id === eventId)
+            const goingAttendees = eventAttendees.filter(a => a.status === 'going')
+            const maybeAttendees = eventAttendees.filter(a => a.status === 'maybe')
+            const userAttendee = user ? eventAttendees.find(a => a.user_id === user.id) : null
             result[eventId] = {
-                attending: user ? eventAttendees.some(a => a.user_id === user.id) : false,
-                count: eventAttendees.length,
+                attending: userAttendee?.status === 'going',
+                count: goingAttendees.length,
+                status: userAttendee ? (userAttendee.status as 'going' | 'maybe') : null,
+                goingCount: goingAttendees.length,
+                maybeCount: maybeAttendees.length,
             }
         }
 

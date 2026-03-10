@@ -331,6 +331,7 @@ export async function searchMarketplaceListings(
 
     // SECURITY: Sanitize values for use in PostgREST filter expressions.
     const sanitize = (v: string) => v.replace(/[,()\."*]/g, '')
+    const escapeLike = (v: string) => v.replace(/%/g, '\\%').replace(/_/g, '\\_')
 
     // Apply advanced filters
     const af = params.advancedFilters
@@ -345,10 +346,10 @@ export async function searchMarketplaceListings(
             query = query.gte('attributes->>years_experience', af.minExperience)
         }
         if (af.location) {
-            query = query.ilike('attributes->>location', `%${af.location}%`)
+            query = query.ilike('attributes->>location', `%${escapeLike(af.location)}%`)
         }
         if (af.availability) {
-            query = query.ilike('attributes->>availability', `%${af.availability}%`)
+            query = query.ilike('attributes->>availability', `%${escapeLike(af.availability)}%`)
         }
         if (af.skills && af.skills.length > 0) {
             // INTENT: Filter by overlap with attributes.expertise array using JSONB containment.
@@ -448,8 +449,8 @@ export async function searchMarketplaceListings(
                 if (af.verifiedOnly) semQuery = semQuery.eq('is_verified', true)
                 if (af.minRating != null) semQuery = semQuery.gte('attributes->>rating_average', af.minRating)
                 if (af.minExperience != null) semQuery = semQuery.gte('attributes->>years_experience', af.minExperience)
-                if (af.location) semQuery = semQuery.ilike('attributes->>location', `%${af.location}%`)
-                if (af.availability) semQuery = semQuery.ilike('attributes->>availability', `%${af.availability}%`)
+                if (af.location) semQuery = semQuery.ilike('attributes->>location', `%${escapeLike(af.location)}%`)
+                if (af.availability) semQuery = semQuery.ilike('attributes->>availability', `%${escapeLike(af.availability)}%`)
                 if (af.companyTypes && af.companyTypes.length > 0) {
                     const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${sanitize(t)}%`).join(',')
                     semQuery = semQuery.or(typeFilters)
@@ -536,8 +537,8 @@ export async function searchMarketplaceListings(
             if (af.verifiedOnly) cq = cq.eq('is_verified', true)
             if (af.minRating != null) cq = cq.gte('attributes->>rating_average', af.minRating)
             if (af.minExperience != null) cq = cq.gte('attributes->>years_experience', af.minExperience)
-            if (af.location) cq = cq.ilike('attributes->>location', `%${af.location}%`)
-            if (af.availability) cq = cq.ilike('attributes->>availability', `%${af.availability}%`)
+            if (af.location) cq = cq.ilike('attributes->>location', `%${escapeLike(af.location)}%`)
+            if (af.availability) cq = cq.ilike('attributes->>availability', `%${escapeLike(af.availability)}%`)
             if (af.companyTypes && af.companyTypes.length > 0) {
                 const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${sanitize(t)}%`).join(',')
                 cq = cq.or(typeFilters)
@@ -745,6 +746,11 @@ export async function createManualRecommendation(data: {
 }) {
     return withAuth(async ({ supabase, foundryId }) => {
         try {
+            // SECURITY: Validate input bounds
+            if (data.searchTerm.length > 500) return { success: false, error: 'Search term too long (max 500)' }
+            if (data.reasoning && data.reasoning.length > 2000) return { success: false, error: 'Reasoning too long (max 2000)' }
+            const safePriority = Math.min(Math.max(data.priority || 50, 0), 100)
+
             const { error } = await supabase
                 .from('marketplace_recommendations')
                 .insert({
@@ -754,7 +760,7 @@ export async function createManualRecommendation(data: {
                     subcategory: data.subcategory || null,
                     search_term: data.searchTerm,
                     reasoning: data.reasoning || null,
-                    priority: data.priority || 50
+                    priority: safePriority
                 })
 
             if (error) {
@@ -912,6 +918,8 @@ export async function getSavedMarketplaceListings() {
  */
 export async function getSavedListingIds(listingIds: string[]) {
     if (listingIds.length === 0) return new Set<string>()
+    // SECURITY: Cap array size to prevent oversized IN clause
+    if (listingIds.length > 500) return new Set<string>()
 
     return withUser(async ({ supabase, user }) => {
         try {

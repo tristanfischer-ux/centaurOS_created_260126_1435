@@ -130,8 +130,13 @@ export function PlaybooksPage({
   useEffect(() => {
     async function fetchPack(): Promise<void> {
       if (selectedSubsystem) {
-        const pack = await getSubsystemObjectivePack(selectedSubsystem.id)
-        setSelectedSubsystemPack(pack)
+        try {
+          const pack = await getSubsystemObjectivePack(selectedSubsystem.id)
+          setSelectedSubsystemPack(pack)
+        } catch (err) {
+          console.error('[PlaybooksPage] Failed to fetch subsystem pack:', err)
+          setSelectedSubsystemPack(null)
+        }
       } else {
         setSelectedSubsystemPack(null)
       }

@@ -4,6 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { createNotification } from '@/actions/notifications'
 
 /**
  * Get all available apprentices from the Guild pool
@@ -324,6 +325,14 @@ export async function updateAssignmentStatus(
     return { success: false, error: 'Only Founders and Executives can update assignments' }
   }
   
+  // Get assignment details before update (for notification)
+  const { data: assignment } = await supabase
+    .from('project_assignments')
+    .select('apprentice_id, project_name')
+    .eq('id', assignmentId)
+    .eq('foundry_id', foundryId)
+    .single()
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await supabase
     .from('project_assignments')
@@ -333,14 +342,39 @@ export async function updateAssignmentStatus(
     })
     .eq('id', assignmentId)
     .eq('foundry_id', foundryId)
-  
+
   if (error) {
     console.error('Failed to update assignment:', error)
     return { success: false, error: 'Failed to update assignment' }
   }
-  
+
+  // Notify the apprentice about the status change
+  if (assignment) {
+    try {
+      if (status === 'completed') {
+        await createNotification({
+          userId: assignment.apprentice_id,
+          type: 'assignment_update',
+          title: 'Assignment completed',
+          message: `Your assignment for ${assignment.project_name} has been marked complete. Great work!`,
+          link: '/guild',
+        })
+      } else if (status === 'cancelled') {
+        await createNotification({
+          userId: assignment.apprentice_id,
+          type: 'assignment_update',
+          title: 'Assignment cancelled',
+          message: `Your assignment for ${assignment.project_name} has been cancelled.`,
+          link: '/guild',
+        })
+      }
+    } catch (notifErr) {
+      console.error('[ProjectAssignments] Failed to send notification:', notifErr)
+    }
+  }
+
   revalidatePath('/team')
   revalidatePath('/guild')
-  
+
   return { success: true }
 }

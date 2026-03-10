@@ -73,7 +73,8 @@ export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members 
         toast.success(next ? 'Saved to favorites' : 'Removed from favorites')
         onSaveToggle?.(pack.id, next)
       }
-    } catch {
+    } catch (err) {
+      console.error('[PackCard] Save toggle failed:', err)
       setLocalSaved(!next)
       toast.error('Failed to update')
     } finally {

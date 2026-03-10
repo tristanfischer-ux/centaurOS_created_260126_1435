@@ -6,6 +6,13 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/ui/empty-state"
+import { Progress } from "@/components/ui/progress"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
     Calendar,
     MapPin,
@@ -15,9 +22,11 @@ import {
     Loader2,
     Video,
     ArrowRight,
+    ChevronDown,
+    CircleDot,
 } from "lucide-react"
 import { toast } from "sonner"
-import { toggleRSVP } from "@/actions/guild-events"
+import { setRSVPStatus } from "@/actions/guild-events"
 import { EVENT_TYPE_CONFIG } from "./guild-constants"
 import type { GuildEvent } from "@/actions/guild-events"
 
@@ -28,6 +37,9 @@ import type { GuildEvent } from "@/actions/guild-events"
 interface RSVPStatus {
     attending: boolean
     count: number
+    status: 'going' | 'maybe' | null
+    goingCount: number
+    maybeCount: number
 }
 
 interface EventsSectionProps {
@@ -46,38 +58,32 @@ interface EventsSectionProps {
 /**
  * Top-level events grid for the Guild page.
  *
- * @description Displays upcoming events in a responsive 2-column grid with
- * RSVP buttons, event type/format badges, and links to detail pages.
- * Extracted from the nested GuildTabs component to be a first-class
- * section on the Guild page.
- *
- * @component
- *
- * @example
- * <EventsSection
- *   events={remainingEvents}
- *   rsvpStatuses={rsvpStatuses}
- *   onRSVPChange={handleRSVPChange}
- * />
+ * @description Displays upcoming events with RSVP split buttons,
+ * capacity bars, and event type badges.
  */
 export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSectionProps) {
     const [localRsvp, setLocalRsvp] = useState<Record<string, RSVPStatus>>(rsvpStatuses)
     const [loadingRsvp, setLoadingRsvp] = useState<string | null>(null)
 
-    // Sync local state when parent RSVP statuses change (e.g. after RSVP from hero component)
     useEffect(() => { setLocalRsvp(rsvpStatuses) }, [rsvpStatuses])
 
-    const handleRSVP = useCallback(async (eventId: string) => {
+    const handleSetStatus = useCallback(async (eventId: string, newStatus: 'going' | 'maybe' | 'cancelled') => {
         setLoadingRsvp(eventId)
         try {
-            const result = await toggleRSVP(eventId)
+            const result = await setRSVPStatus(eventId, newStatus)
             if (result.error) {
                 toast.error(result.error)
                 return
             }
-            const newStatus = { attending: result.attending, count: result.attendeeCount }
-            setLocalRsvp(prev => ({ ...prev, [eventId]: newStatus }))
-            onRSVPChange?.(eventId, newStatus)
+            const updated: RSVPStatus = {
+                attending: result.status === 'going',
+                count: result.goingCount,
+                status: result.status === 'cancelled' ? null : result.status,
+                goingCount: result.goingCount,
+                maybeCount: result.maybeCount,
+            }
+            setLocalRsvp(prev => ({ ...prev, [eventId]: updated }))
+            onRSVPChange?.(eventId, updated)
         } catch (err) {
             console.error('[EventsSection] RSVP failed:', err instanceof Error ? err.message : 'Unknown error')
             toast.error('Failed to update RSVP. Please try again.')
@@ -110,11 +116,13 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {events.map(event => {
-                    const eventRsvp = localRsvp[event.id] || { attending: false, count: 0 }
+                    const eventRsvp = localRsvp[event.id] || { attending: false, count: 0, status: null, goingCount: 0, maybeCount: 0 }
                     const isLoading = loadingRsvp === event.id
                     const typeConfig = EVENT_TYPE_CONFIG[event.event_type || 'meetup']
                     const TypeIcon = typeConfig?.icon || Calendar
                     const eventDate = new Date(event.event_date)
+                    const isFull = event.max_attendees != null && eventRsvp.goingCount >= event.max_attendees
+                    const capacityPercent = event.max_attendees ? Math.min((eventRsvp.goingCount / event.max_attendees) * 100, 100) : null
 
                     return (
                         <Card
@@ -140,6 +148,9 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
                                         hour12: true,
                                     })}
                                 </span>
+                                {isFull && (
+                                    <Badge variant="destructive" className="ml-auto text-[10px]">Full</Badge>
+                                )}
                             </div>
 
                             {/* Event Content */}
@@ -188,27 +199,90 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
                                     </p>
                                 )}
 
+                                {/* Capacity Bar */}
+                                {event.max_attendees != null && capacityPercent !== null && (
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                            <span>{eventRsvp.goingCount} / {event.max_attendees} spots</span>
+                                        </div>
+                                        <Progress
+                                            value={capacityPercent}
+                                            className={`h-1.5 ${capacityPercent >= 100 ? "[&>div]:bg-destructive" : capacityPercent >= 80 ? "[&>div]:bg-status-warning" : ""}`}
+                                        />
+                                    </div>
+                                )}
+
                                 {/* Actions */}
                                 <div className="flex items-center gap-3 pt-1">
-                                    <Button
-                                        size="sm"
-                                        variant={eventRsvp.attending ? "outline" : "default"}
-                                        onClick={() => handleRSVP(event.id)}
-                                        disabled={isLoading}
-                                        className={eventRsvp.attending ? "border-status-success text-status-success hover:bg-status-success-light" : ""}
-                                    >
-                                        {isLoading ? (
-                                            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-                                        ) : eventRsvp.attending ? (
-                                            <CheckCircle2 className="mr-1 h-4 w-4" />
-                                        ) : null}
-                                        {eventRsvp.attending ? "Going" : "RSVP"}
-                                    </Button>
+                                    <div className="flex items-center">
+                                        <Button
+                                            size="sm"
+                                            variant={eventRsvp.status ? "outline" : "default"}
+                                            onClick={() => {
+                                                if (!eventRsvp.status) handleSetStatus(event.id, 'going')
+                                                else handleSetStatus(event.id, 'cancelled')
+                                            }}
+                                            disabled={isLoading || (isFull && !eventRsvp.status)}
+                                            className={`rounded-r-none ${
+                                                eventRsvp.status === 'going' ? "border-status-success text-status-success hover:bg-status-success-light" :
+                                                eventRsvp.status === 'maybe' ? "border-status-warning text-status-warning-dark hover:bg-status-warning-light" : ""
+                                            }`}
+                                        >
+                                            {isLoading ? (
+                                                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                                            ) : eventRsvp.status === 'going' ? (
+                                                <CheckCircle2 className="mr-1 h-4 w-4" />
+                                            ) : eventRsvp.status === 'maybe' ? (
+                                                <CircleDot className="mr-1 h-4 w-4" />
+                                            ) : null}
+                                            {eventRsvp.status === 'going' ? "Going" : eventRsvp.status === 'maybe' ? "Maybe" : "RSVP"}
+                                        </Button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    size="sm"
+                                                    variant={eventRsvp.status ? "outline" : "default"}
+                                                    disabled={isLoading}
+                                                    className={`rounded-l-none border-l-0 px-1.5 ${
+                                                        eventRsvp.status === 'going' ? "border-status-success text-status-success" :
+                                                        eventRsvp.status === 'maybe' ? "border-status-warning text-status-warning-dark" : ""
+                                                    }`}
+                                                >
+                                                    <ChevronDown className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem
+                                                    onClick={() => handleSetStatus(event.id, 'going')}
+                                                    disabled={isFull && eventRsvp.status !== 'going'}
+                                                    className="text-status-success"
+                                                >
+                                                    <CheckCircle2 className="h-4 w-4 mr-2" /> Going
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                    onClick={() => handleSetStatus(event.id, 'maybe')}
+                                                    className="text-status-warning-dark"
+                                                >
+                                                    <CircleDot className="h-4 w-4 mr-2" /> Maybe
+                                                </DropdownMenuItem>
+                                                {eventRsvp.status && (
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleSetStatus(event.id, 'cancelled')}
+                                                        className="text-destructive"
+                                                    >
+                                                        Cancel RSVP
+                                                    </DropdownMenuItem>
+                                                )}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
 
-                                    {eventRsvp.count > 0 && (
+                                    {(eventRsvp.goingCount > 0 || eventRsvp.maybeCount > 0) && (
                                         <span className="text-xs text-muted-foreground flex items-center gap-1">
                                             <Users className="h-3.5 w-3.5" />
-                                            {eventRsvp.count}
+                                            {eventRsvp.goingCount > 0 && `${eventRsvp.goingCount} going`}
+                                            {eventRsvp.goingCount > 0 && eventRsvp.maybeCount > 0 && ", "}
+                                            {eventRsvp.maybeCount > 0 && `${eventRsvp.maybeCount} maybe`}
                                         </span>
                                     )}
 

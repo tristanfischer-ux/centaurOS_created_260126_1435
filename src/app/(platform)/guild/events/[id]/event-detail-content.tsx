@@ -35,8 +35,13 @@ import {
     GraduationCap,
     Handshake,
     ExternalLink,
+    Pencil,
+    Share2,
+    MessageCircle,
 } from "lucide-react"
 import { toggleRSVP, deleteGuildEvent } from "@/actions/guild-events"
+import { startDirectMessage } from "@/actions/messaging"
+import { EditEventDialog } from "@/components/guild/edit-event-dialog"
 
 // ==========================================
 // TYPES
@@ -70,9 +75,7 @@ interface GuildEventDetail {
     title: string
     description: string | null
     event_date: string
-    /** Comes from Supabase as string; matches EventType values at runtime */
     event_type: string
-    /** Comes from Supabase as string; matches EventFormat values at runtime */
     event_format: string
     event_url: string | null
     location_geo: string | null
@@ -85,17 +88,11 @@ interface GuildEventDetail {
 }
 
 interface EventDetailContentProps {
-    /** The event data to display */
     event: GuildEventDetail
-    /** List of attendees with profile info */
     attendees: EventAttendee[]
-    /** Total number of confirmed attendees */
     attendeeCount: number
-    /** Whether the current user is attending */
     isAttending: boolean
-    /** Whether the current user can edit/delete this event */
     canEdit: boolean
-    /** Current user's ID */
     currentUserId: string
 }
 
@@ -124,9 +121,7 @@ const FORMAT_LABELS: Record<string, string> = {
 /**
  * Client-side content for the Guild event detail page.
  *
- * @description Displays full event information including description, attendees,
- * RSVP button, date/time, location, and organiser. Supports delete for event
- * creators and Founders.
+ * @description Full event info with RSVP, edit, delete, attendee messaging, and share.
  */
 export function EventDetailContent({
     event,
@@ -134,12 +129,15 @@ export function EventDetailContent({
     attendeeCount,
     isAttending: initialIsAttending,
     canEdit,
+    currentUserId,
 }: EventDetailContentProps) {
     const router = useRouter()
     const [attending, setAttending] = useState(initialIsAttending)
     const [count, setCount] = useState(attendeeCount)
     const [loadingRsvp, setLoadingRsvp] = useState(false)
     const [deleting, setDeleting] = useState(false)
+    const [editOpen, setEditOpen] = useState(false)
+    const [messagingId, setMessagingId] = useState<string | null>(null)
 
     const eventDate = new Date(event.event_date)
     const isPast = eventDate < new Date()
@@ -179,6 +177,35 @@ export function EventDetailContent({
         } finally {
             setDeleting(false)
         }
+    }
+
+    const handleShare = () => {
+        const url = `${window.location.origin}/guild/events/${event.id}`
+        navigator.clipboard.writeText(url).then(() => {
+            toast.success('Link copied')
+        }).catch(() => {
+            toast.error('Failed to copy link')
+        })
+    }
+
+    const handleMessageAttendee = async (userId: string) => {
+        setMessagingId(userId)
+        try {
+            const result = await startDirectMessage(userId)
+            if ('error' in result) {
+                toast.error(result.error)
+                return
+            }
+            router.push('/updates')
+        } catch {
+            toast.error('Failed to start conversation')
+        } finally {
+            setMessagingId(null)
+        }
+    }
+
+    const handleEditSuccess = () => {
+        router.refresh()
     }
 
     return (
@@ -225,36 +252,54 @@ export function EventDetailContent({
                     </div>
 
                     {/* Action Buttons */}
-                    {canEdit && (
-                        <div className="flex items-center gap-2 shrink-0">
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" aria-label="Delete event">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Delete this event?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            This will permanently delete &ldquo;{event.title}&rdquo; and remove all RSVPs. This action cannot be undone.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={handleDelete}
-                                            disabled={deleting}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        >
-                                            {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                            Delete Event
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        </div>
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleShare}
+                            aria-label="Share event"
+                        >
+                            <Share2 className="h-4 w-4" />
+                        </Button>
+                        {canEdit && (
+                            <>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditOpen(true)}
+                                    aria-label="Edit event"
+                                >
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" aria-label="Delete event">
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete this event?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                This will permanently delete &ldquo;{event.title}&rdquo; and remove all RSVPs. This action cannot be undone.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                                onClick={handleDelete}
+                                                disabled={deleting}
+                                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                            >
+                                                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                                Delete Event
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -298,7 +343,7 @@ export function EventDetailContent({
                                                 role={attendee.profile?.role}
                                                 size="md"
                                             />
-                                            <div className="min-w-0">
+                                            <div className="min-w-0 flex-1">
                                                 <p className="font-medium text-foreground text-sm truncate">
                                                     {attendee.profile?.full_name || 'Unknown'}
                                                 </p>
@@ -306,6 +351,22 @@ export function EventDetailContent({
                                                     {attendee.profile?.role || 'Member'}
                                                 </p>
                                             </div>
+                                            {attendee.user_id !== currentUserId && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 shrink-0"
+                                                    onClick={() => handleMessageAttendee(attendee.user_id)}
+                                                    disabled={messagingId === attendee.user_id}
+                                                    aria-label={`Message ${attendee.profile?.full_name || 'attendee'}`}
+                                                >
+                                                    {messagingId === attendee.user_id ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                        <MessageCircle className="h-4 w-4" />
+                                                    )}
+                                                </Button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -441,6 +502,16 @@ export function EventDetailContent({
                     </Card>
                 </div>
             </div>
+
+            {/* Edit Event Dialog */}
+            {canEdit && (
+                <EditEventDialog
+                    open={editOpen}
+                    onOpenChange={setEditOpen}
+                    onUpdated={handleEditSuccess}
+                    event={event}
+                />
+            )}
         </div>
     )
 }

@@ -53,6 +53,16 @@ export async function createNotification(data: {
     try {
         const supabase = await createClient()
 
+        // SECURITY: Verify caller is authenticated to prevent notification spoofing
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+            return { id: null, error: 'Not authenticated' }
+        }
+
+        // SECURITY: Validate title/message length to prevent DoS via oversized payloads
+        if (data.title.length > 500) return { id: null, error: 'Title too long' }
+        if (data.message && data.message.length > 5000) return { id: null, error: 'Message too long' }
+
         const { data: notificationId, error } = await supabase.rpc('create_notification', {
             p_user_id: data.userId,
             p_type: data.type,

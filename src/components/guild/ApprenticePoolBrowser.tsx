@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useTransition } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { UserAvatar } from "@/components/ui/user-avatar"
+import { StatusBadge } from "@/components/ui/status-badge"
 import {
     Dialog,
     DialogContent,
@@ -16,17 +18,28 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import { 
-    Users, 
-    Search, 
-    Briefcase, 
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import {
+    Users,
+    Search,
+    Briefcase,
     UserPlus,
     Loader2,
     GraduationCap,
     Mail,
-    CheckCircle2
+    CheckCircle2,
+    MessageCircle,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react"
 import { getGuildApprentices, assignApprenticeToProject } from "@/actions/project-assignments"
+import { startDirectMessage } from "@/actions/messaging"
 import { toast } from "sonner"
 
 interface Apprentice {
@@ -39,15 +52,27 @@ interface Apprentice {
     activeAssignments: number
 }
 
+type SortMode = 'availability' | 'name'
+
+function getAvailabilityStatus(count: number): { label: string; status: 'success' | 'warning' | 'error' } {
+    if (count === 0) return { label: 'Available', status: 'success' }
+    if (count <= 2) return { label: 'Busy', status: 'warning' }
+    return { label: 'At capacity', status: 'error' }
+}
+
 export function ApprenticePoolBrowser() {
+    const router = useRouter()
     const [apprentices, setApprentices] = useState<Apprentice[]>([])
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState("")
+    const [sortMode, setSortMode] = useState<SortMode>("availability")
+    const [expandedId, setExpandedId] = useState<string | null>(null)
     const [selectedApprentice, setSelectedApprentice] = useState<Apprentice | null>(null)
     const [projectName, setProjectName] = useState("")
     const [projectDescription, setProjectDescription] = useState("")
     const [isPending, startTransition] = useTransition()
     const [success, setSuccess] = useState(false)
+    const [messagingId, setMessagingId] = useState<string | null>(null)
 
     useEffect(() => {
         loadApprentices()
@@ -84,7 +109,7 @@ export function ApprenticePoolBrowser() {
             if (result.success) {
                 setSuccess(true)
                 toast.success(`${selectedApprentice.fullName} assigned to ${projectName}`)
-                loadApprentices() // Refresh to update assignment counts
+                loadApprentices()
             } else {
                 toast.error(result.error || "Failed to assign apprentice")
             }
@@ -98,11 +123,32 @@ export function ApprenticePoolBrowser() {
         setSuccess(false)
     }
 
-    const filteredApprentices = apprentices.filter(a => 
-        a.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
-    )
+    const handleMessage = async (apprentice: Apprentice) => {
+        setMessagingId(apprentice.id)
+        try {
+            const result = await startDirectMessage(apprentice.id)
+            if ('error' in result) {
+                toast.error(result.error)
+                return
+            }
+            router.push('/updates')
+        } catch {
+            toast.error('Failed to start conversation')
+        } finally {
+            setMessagingId(null)
+        }
+    }
+
+    const filteredApprentices = apprentices
+        .filter(a =>
+            a.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            a.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            a.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+        )
+        .sort((a, b) => {
+            if (sortMode === 'availability') return a.activeAssignments - b.activeAssignments
+            return a.fullName.localeCompare(b.fullName)
+        })
 
     if (loading) {
         return (
@@ -148,73 +194,125 @@ export function ApprenticePoolBrowser() {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {/* Search */}
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            id="search-apprentices"
-                            placeholder="Search by name, email, or skills..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9"
-                            aria-label="Search apprentices by name, email, or skills"
-                        />
+                    {/* Search + Sort */}
+                    <div className="flex gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="search-apprentices"
+                                placeholder="Search by name, email, or skills..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9"
+                                aria-label="Search apprentices by name, email, or skills"
+                            />
+                        </div>
+                        <Select value={sortMode} onValueChange={(v: SortMode) => setSortMode(v)}>
+                            <SelectTrigger className="w-[160px]">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="availability">Availability</SelectItem>
+                                <SelectItem value="name">Name</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     {/* Apprentice List */}
                     <div className="divide-y divide-muted border rounded-lg overflow-hidden">
-                        {filteredApprentices.map((apprentice) => (
-                            <div
-                                key={apprentice.id}
-                                className="flex items-center justify-between p-4 hover:bg-muted transition-colors"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <UserAvatar
-                                        name={apprentice.fullName}
-                                        role="Apprentice"
-                                        avatarUrl={apprentice.avatarUrl}
-                                        size="xl"
-                                    />
-                                    <div>
-                                        <h4 className="font-medium text-foreground">{apprentice.fullName}</h4>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Mail className="h-3 w-3" />
-                                            <span>{apprentice.email}</span>
-                                        </div>
-                                        {apprentice.skills.length > 0 && (
-                                            <div className="flex gap-1 mt-1 flex-wrap">
-                                                {apprentice.skills.slice(0, 3).map((skill, idx) => (
-                                                    <Badge key={idx} variant="secondary" className="text-xs bg-muted">
-                                                        {skill}
-                                                    </Badge>
-                                                ))}
-                                                {apprentice.skills.length > 3 && (
-                                                    <Badge variant="secondary" className="text-xs bg-muted">
-                                                        +{apprentice.skills.length - 3}
-                                                    </Badge>
+                        {filteredApprentices.map((apprentice) => {
+                            const avail = getAvailabilityStatus(apprentice.activeAssignments)
+                            const isExpanded = expandedId === apprentice.id
+
+                            return (
+                                <div key={apprentice.id}>
+                                    <div
+                                        className="flex items-center justify-between p-4 hover:bg-muted transition-colors cursor-pointer"
+                                        onClick={() => setExpandedId(isExpanded ? null : apprentice.id)}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <UserAvatar
+                                                name={apprentice.fullName}
+                                                role="Apprentice"
+                                                avatarUrl={apprentice.avatarUrl}
+                                                size="xl"
+                                            />
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-medium text-foreground">{apprentice.fullName}</h4>
+                                                    <StatusBadge status={avail.status} size="sm" dot animated={avail.status === 'success'}>
+                                                        {avail.label}
+                                                    </StatusBadge>
+                                                </div>
+                                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                    <Mail className="h-3 w-3" />
+                                                    <span>{apprentice.email}</span>
+                                                </div>
+                                                {apprentice.skills.length > 0 && (
+                                                    <div className="flex gap-1 mt-1 flex-wrap">
+                                                        {apprentice.skills.slice(0, isExpanded ? undefined : 3).map((skill, idx) => (
+                                                            <Badge key={idx} variant="secondary" className="text-xs bg-muted">
+                                                                {skill}
+                                                            </Badge>
+                                                        ))}
+                                                        {!isExpanded && apprentice.skills.length > 3 && (
+                                                            <Badge variant="secondary" className="text-xs bg-muted">
+                                                                +{apprentice.skills.length - 3}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
-                                        )}
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            {apprentice.activeAssignments > 0 && (
+                                                <Badge variant="outline" className="text-xs">
+                                                    <Briefcase className="h-3 w-3 mr-1" />
+                                                    {apprentice.activeAssignments} project{apprentice.activeAssignments !== 1 ? 's' : ''}
+                                                </Badge>
+                                            )}
+                                            {isExpanded ? (
+                                                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                                            ) : (
+                                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    {apprentice.activeAssignments > 0 && (
-                                        <Badge variant="outline" className="text-xs">
-                                            <Briefcase className="h-3 w-3 mr-1" />
-                                            {apprentice.activeAssignments} project{apprentice.activeAssignments !== 1 ? 's' : ''}
-                                        </Badge>
+
+                                    {/* Expanded Content */}
+                                    {isExpanded && (
+                                        <div className="px-4 pb-4 pl-[76px] space-y-3" onClick={e => e.stopPropagation()}>
+                                            {apprentice.bio && (
+                                                <p className="text-sm text-muted-foreground">{apprentice.bio}</p>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => setSelectedApprentice(apprentice)}
+                                                    className="bg-electric-blue hover:bg-electric-blue-hover gap-1.5"
+                                                >
+                                                    <UserPlus className="h-4 w-4" /> Assign
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleMessage(apprentice)}
+                                                    disabled={messagingId === apprentice.id}
+                                                    className="gap-1.5"
+                                                >
+                                                    {messagingId === apprentice.id ? (
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                    ) : (
+                                                        <MessageCircle className="h-3.5 w-3.5" />
+                                                    )}
+                                                    Message
+                                                </Button>
+                                            </div>
+                                        </div>
                                     )}
-                                    <Button
-                                        size="sm"
-                                        onClick={() => setSelectedApprentice(apprentice)}
-                                        className="bg-electric-blue hover:bg-electric-blue-hover"
-                                    >
-                                        <UserPlus className="h-4 w-4 mr-1" />
-                                        Assign
-                                    </Button>
                                 </div>
-                            </div>
-                        ))}
+                            )
+                        })}
 
                         {filteredApprentices.length === 0 && (
                             <div className="p-8 text-center">
@@ -229,7 +327,6 @@ export function ApprenticePoolBrowser() {
             <Dialog open={!!selectedApprentice} onOpenChange={(open) => !open && handleCloseDialog()}>
                 <DialogContent size="sm">
                     {success ? (
-                        // Success state
                         <>
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
@@ -259,7 +356,6 @@ export function ApprenticePoolBrowser() {
                             </DialogFooter>
                         </>
                     ) : (
-                        // Form state
                         <>
                             <DialogHeader>
                                 <DialogTitle>Assign to Project</DialogTitle>
@@ -267,7 +363,7 @@ export function ApprenticePoolBrowser() {
                                     Assign {selectedApprentice?.fullName} to work on a project for your company.
                                 </DialogDescription>
                             </DialogHeader>
-                            
+
                             {selectedApprentice && (
                                 <div className="flex items-center gap-4 p-4 bg-muted rounded-lg my-4">
                                     <UserAvatar
@@ -314,7 +410,7 @@ export function ApprenticePoolBrowser() {
                                 <Button variant="secondary" onClick={handleCloseDialog}>
                                     Cancel
                                 </Button>
-                                <Button 
+                                <Button
                                     onClick={handleAssign}
                                     disabled={!projectName.trim() || isPending}
                                     className="bg-electric-blue hover:bg-electric-blue-hover"
