@@ -32,7 +32,7 @@
 ### Week 4 (24-30 Mar)
 - **Blog**: "The 5 most expensive mistakes in hardware product development"
   - *Angle*: Evergreen SEO content. Each mistake maps to a specialist.
-- **LinkedIn**: Thread: "Things I learned building an AI OS for hardware founders"
+- **LinkedIn**: Thread: "Things I learned building an operating system for hardware founders"
 - **LinkedIn**: Share a customer/user win (even if it's internal testing)
 
 ---

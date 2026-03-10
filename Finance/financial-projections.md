@@ -50,7 +50,7 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 *\*Active Free = cumulative signups minus cumulative paid conversions.*
 
 **Year 1 Totals**:
-- Total registered users: ~1,500
+- Total registered users: ~2,000
 - Total paid subscribers: ~122
 - Annual Subscription Revenue: ~£69,252
 - Annual Marketplace Fees: ~£9,570
@@ -147,7 +147,7 @@ Profitable on a monthly basis by Month 10-12 (with lean team).
 | Metric | Target | How to Measure |
 |--------|--------|---------------|
 | MRR | Growth month-over-month | Stripe dashboard |
-| CAC | <£100 | Marketing spend / new paid customers |
+| CAC | <£80 | Marketing spend / new paid customers |
 | LTV | >3x CAC | ARPU / monthly churn rate |
 | Gross margin | >70% | (Revenue - COGS) / Revenue |
 | AI cost per user | <30% ARPU | Total AI spend / active users |

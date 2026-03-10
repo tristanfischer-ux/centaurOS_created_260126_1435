@@ -1,7 +1,7 @@
 # ForgeOS — Business Plan (Working Draft)
 
 **Fractional Forge Limited**
-**Date**: 3 March 2026
+**Date**: 3 March 2026 | **Last Updated**: 10 March 2026
 **Status**: Draft — to be developed with financial projections
 
 ---
@@ -83,7 +83,7 @@ Tasks (Kanban/Gantt/OKR), finance (budgeting, cash burn, invoicing), messaging, 
 | Explorer | Free | Free | Solo founders testing |
 | Startup Team | £49 | £39.20 | Early-stage, small team |
 | Professional | £149 | £119.20 | Growing team, power users |
-| Enterprise | £499 | £399 | Large teams, custom needs |
+| Enterprise | £499 | £399.20 | Large teams, custom needs |
 
 ### 4.3 Unit Economics (To Be Validated)
 
@@ -134,13 +134,13 @@ ForgeOS creates a new category: "AI Operating System for Hardware Startups." No 
 - Hardware accelerator partnerships (HAX, Highway1, Bolt)
 - Case studies from early customers
 - Referral programme for providers and customers
-- Target: 500 registered, 50 paid
+- Target: ~560 registered, ~36 paid
 
 ### Phase 3: Growth (Months 7-12)
 - Product Hunt or similar high-visibility launch
 - Paid acquisition (targeted LinkedIn, hardware communities)
 - Enterprise sales motion
-- Target: ~1,500 registered, ~122 paid (conservative projections; stretch target: 2,000/200)
+- Target: ~2,000 registered, ~122 paid (conservative projections; stretch target: 2,500/200)
 
 ### Phase 4: Scale (Year 2+)
 - International expansion
@@ -179,7 +179,7 @@ Key assumptions to model:
 ## 9. Funding Strategy
 
 ### Current: Bootstrapped
-Self-funded with AI-assisted development significantly reducing costs.
+Self-funded with lean development practices keeping costs low.
 
 ### Future Options
 - **SEIS/EIS**: SEIS: 50% income tax relief (company can raise up to £250K per year). EIS: 30% income tax relief (up to £5M per year).

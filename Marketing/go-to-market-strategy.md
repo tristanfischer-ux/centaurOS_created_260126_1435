@@ -92,7 +92,7 @@ Acquire the first 122 paid subscribers (conservative), stretch target 200 within
 
 | Metric | Month 1 | Month 3 | Month 6 | Month 12 |
 |--------|---------|---------|---------|----------|
-| Registered users | 50 | 178 | ~490 | 1,500 |
+| Registered users | 50 | 190 | ~560 | ~2,000 |
 | Paid subscribers | 4 | 13 | 36 | 122 |
 | Monthly Revenue | £464 | £1,508 | £4,676 | ~£16,350 |
 | Marketplace providers | 20 | 50 | 100 | 250 |
