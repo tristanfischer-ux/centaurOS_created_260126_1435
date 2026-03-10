@@ -51,8 +51,6 @@ interface OverviewTabProps {
   }
   /** Optional enrichment data (sparkline + trends) */
   enrichment?: ProfileEnrichment
-  /** Callback to open the edit profile dialog */
-  onEditClick: () => void
 }
 
 export function OverviewTab({
@@ -66,7 +64,6 @@ export function OverviewTab({
   professionalBackground,
   stats,
   enrichment,
-  onEditClick,
 }: OverviewTabProps) {
   // Compute milestones from stats
   const milestones = computeMilestones(stats)

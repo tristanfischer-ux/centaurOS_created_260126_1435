@@ -180,7 +180,6 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
             } | null ?? null}
             stats={stats}
             enrichment={enrichment}
-            onEditClick={() => setIsEditProfileOpen(true)}
           />
         </TabsContent>
 
