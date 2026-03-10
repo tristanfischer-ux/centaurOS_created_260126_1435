@@ -47,6 +47,7 @@ import {
   Gauge,
   Presentation,
   Image as ImageIcon,
+  Sparkles,
   Clock,
   Eye,
   FileSpreadsheet,
@@ -425,6 +426,32 @@ export default function ReportsPage(): React.JSX.Element {
       toast.success('Infographic image downloaded')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Image export failed'
+      toast.error(message)
+    }
+  }, [reportDocument])
+
+  const handleAIInfographic = useCallback(async () => {
+    if (!reportDocument) return
+    try {
+      toast.info('Generating AI infographic…')
+      const { generateAIInfographic } = await import('@/lib/reports/generate-infographic-image')
+      const result = await generateAIInfographic(reportDocument)
+      if (result.success && result.imageUrl) {
+        // Download the image
+        const response = await fetch(result.imageUrl)
+        const blob = await response.blob()
+        const url = URL.createObjectURL(blob)
+        const a = window.document.createElement('a')
+        a.href = url
+        a.download = `${reportDocument.foundryName.replace(/\s+/g, '-')}-ai-infographic-${reportDocument.dateRange.start}.png`
+        a.click()
+        URL.revokeObjectURL(url)
+        toast.success('AI infographic downloaded')
+      } else {
+        toast.error(result.error ?? 'Failed to generate AI infographic')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI infographic failed'
       toast.error(message)
     }
   }, [reportDocument])
@@ -833,6 +860,19 @@ export default function ReportsPage(): React.JSX.Element {
             </Card>
           </section>
 
+          {/* Generation progress bar */}
+          {isGenerating && (
+            <div className="space-y-2">
+              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-international-orange transition-all duration-500"
+                  style={{ width: `${((generationStep + 1) / GENERATION_STEPS.length) * 100}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">{GENERATION_STEPS[generationStep]}</p>
+            </div>
+          )}
+
           {/* Generate Button */}
           <Button
             className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
@@ -923,6 +963,10 @@ export default function ReportsPage(): React.JSX.Element {
                       Save Image
                     </Button>
                   )}
+                  <Button variant="secondary" size="sm" onClick={handleAIInfographic}>
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    AI Infographic
+                  </Button>
                   <div className="h-4 w-px bg-border" />
                   <Button
                     variant="secondary"

@@ -8,7 +8,9 @@
  * magazine-style layout.
  */
 
+import { useId } from 'react'
 import { Users, Trophy } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,6 +18,11 @@ import { cn } from '@/lib/utils'
 import { ReportSectionHeader, SectionNarrativeIntro } from '@/components/reports/report-visuals'
 
 import type { TeamActivitySectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
+
+const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+const GRID_COLOR = '#e2e8f0'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
 
 interface TeamActivitySectionProps extends TeamActivitySectionData {
   templateId?: ReportTemplateId
@@ -36,6 +43,7 @@ export function TeamActivitySection({
   templateId,
   sectionNumber,
 }: TeamActivitySectionProps): React.JSX.Element {
+  const uid = useId()
   const sorted = [...members].sort((a, b) => b.tasksCompleted - a.tasksCompleted)
   const maxTasks = sorted[0]?.tasksCompleted || 1
   const uniqueContributors = members.filter((m) => m.tasksCompleted > 0).length
@@ -71,6 +79,61 @@ export function TeamActivitySection({
           </div>
         )}
       </div>
+
+      {/* Team bar chart */}
+      {sorted.length > 0 && sorted[0].tasksCompleted > 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={sorted.filter(m => m.tasksCompleted > 0).slice(0, 8)}
+                  layout="vertical"
+                  margin={{ top: 8, right: 24, bottom: 8, left: 8 }}
+                >
+                  <defs>
+                    <linearGradient id={`${uid}-teamBarGradient`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={1} />
+                      <stop offset="100%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={0.6} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+                  <XAxis
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    dataKey="name"
+                    type="category"
+                    tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={100}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: `1px solid ${TOOLTIP_BORDER}`,
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                      fontSize: '13px',
+                    }}
+                  />
+                  <Bar
+                    dataKey="tasksCompleted"
+                    name="Tasks Completed"
+                    fill={`url(#${uid}-teamBarGradient)`}
+                    radius={[0, 4, 4, 0]}
+                    maxBarSize={24}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Top 3 contributors — highlighted cards */}
       {topThree.length > 0 && (

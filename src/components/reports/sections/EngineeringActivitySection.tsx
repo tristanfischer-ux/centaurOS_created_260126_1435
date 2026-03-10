@@ -7,8 +7,10 @@
  * module generation stats, and a recent projects list.
  */
 
+import { useId } from 'react'
 import { Cog, Box, Layers } from 'lucide-react'
 import { format } from 'date-fns'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,9 +23,17 @@ import {
 
 import type { EngineeringActivitySectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. Must stay in sync with design tokens.
+const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+const GRID_COLOR = '#e2e8f0'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
+
 interface EngineeringActivitySectionProps extends EngineeringActivitySectionData {
   templateId?: ReportTemplateId
   sectionNumber?: number
+  chartImageUrl?: string
 }
 
 const STAGE_COLORS: Record<string, string> = {
@@ -43,9 +53,11 @@ export function EngineeringActivitySection({
   totalModulesGenerated,
   recentProjects,
   sectionNarrative,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: EngineeringActivitySectionProps): React.JSX.Element {
+  const uid = useId()
   const isEmpty = totalActive === 0 && createdThisPeriod === 0
 
   return (
@@ -58,6 +70,13 @@ export function EngineeringActivitySection({
       />
 
       <SectionNarrativeIntro narrative={sectionNarrative} />
+
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
 
       {isEmpty ? (
         <div className="text-center py-12">
@@ -110,7 +129,58 @@ export function EngineeringActivitySection({
             </Card>
           </div>
 
-          {/* By Stage */}
+          {/* Projects by Stage chart */}
+          {byStage.length > 0 && (
+            <Card>
+              <CardContent className="p-6">
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={byStage} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
+                      <defs>
+                        <linearGradient id={`${uid}-engBarGradient`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={1} />
+                          <stop offset="100%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={0.6} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+                      <XAxis
+                        type="number"
+                        allowDecimals={false}
+                        tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        dataKey="stage"
+                        type="category"
+                        tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                        axisLine={false}
+                        tickLine={false}
+                        width={90}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: '8px',
+                          border: `1px solid ${TOOLTIP_BORDER}`,
+                          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                          fontSize: '13px',
+                        }}
+                      />
+                      <Bar
+                        dataKey="count"
+                        name="Projects"
+                        fill={`url(#${uid}-engBarGradient)`}
+                        radius={[0, 4, 4, 0]}
+                        maxBarSize={24}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* By Stage legend */}
           {byStage.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">

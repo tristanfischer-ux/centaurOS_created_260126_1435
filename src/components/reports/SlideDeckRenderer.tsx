@@ -193,7 +193,9 @@ export function SlideDeckRenderer({
         aria-label={`Slide ${currentSlide + 1} of ${totalSlides}`}
         aria-roledescription="slide"
       >
-        {renderSlide(briefing.slides[currentSlide])}
+        <div key={currentSlide} className="animate-fade-in h-full" style={{ animationDuration: '0.3s' }}>
+          {renderSlide(briefing.slides[currentSlide])}
+        </div>
 
         {/* Click zones for navigation */}
         <button

@@ -7,7 +7,9 @@
  * progress. Two sub-panels: knowledge stats and apprenticeship metrics.
  */
 
+import { useId } from 'react'
 import { BookOpen, GraduationCap, FileCheck, Clock } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +23,11 @@ import {
 
 import type { KnowledgeLearningSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
+const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+const GRID_COLOR = '#e2e8f0'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
+
 interface KnowledgeLearningSectionProps extends KnowledgeLearningSectionData {
   templateId?: ReportTemplateId
   sectionNumber?: number
@@ -33,6 +40,7 @@ export function KnowledgeLearningSection({
   templateId,
   sectionNumber,
 }: KnowledgeLearningSectionProps): React.JSX.Element {
+  const uid = useId()
   const isEmpty = knowledge.totalNotes === 0 && apprenticeships.activeEnrollments === 0
 
   return (
@@ -84,20 +92,55 @@ export function KnowledgeLearningSection({
                 </div>
               </div>
 
-              {/* Top domains */}
+              {/* Top domains chart */}
               {knowledge.topDomains.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                     Top Domains
                   </p>
-                  {knowledge.topDomains.map(({ name, count }) => (
-                    <div key={name} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground truncate">{name}</span>
-                      <Badge variant="secondary" className="text-[10px] ml-2">
-                        {count}
-                      </Badge>
-                    </div>
-                  ))}
+                  <div className="h-36">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={knowledge.topDomains} layout="vertical" margin={{ top: 4, right: 16, bottom: 4, left: 4 }}>
+                        <defs>
+                          <linearGradient id={`${uid}-domainBarGradient`} x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={1} />
+                            <stop offset="100%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={0.6} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+                        <XAxis
+                          type="number"
+                          allowDecimals={false}
+                          tick={{ fontSize: 11, fill: AXIS_TICK_COLOR }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          dataKey="name"
+                          type="category"
+                          tick={{ fontSize: 11, fill: AXIS_TICK_COLOR }}
+                          axisLine={false}
+                          tickLine={false}
+                          width={80}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: '8px',
+                            border: `1px solid ${TOOLTIP_BORDER}`,
+                            boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                            fontSize: '13px',
+                          }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          name="Notes"
+                          fill={`url(#${uid}-domainBarGradient)`}
+                          radius={[0, 4, 4, 0]}
+                          maxBarSize={20}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               )}
 

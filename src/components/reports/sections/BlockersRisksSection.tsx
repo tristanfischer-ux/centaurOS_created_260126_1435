@@ -8,6 +8,7 @@
  */
 
 import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,6 +16,18 @@ import { cn } from '@/lib/utils'
 import { ReportSectionHeader, SectionNarrativeIntro, ProgressBar } from '@/components/reports/report-visuals'
 
 import type { BlockersRisksSectionData, BlockerRow, AtRiskObjective, ReportTemplateId } from '@/lib/reports/report-document-types'
+
+const SEVERITY_CHART_COLOR: Record<string, string> = {
+  critical: 'hsl(0, 84%, 60%)',
+  high: 'hsl(38, 92%, 50%)',
+  medium: 'hsl(215, 16%, 47%)',
+  low: 'hsl(142, 72%, 29%)',
+  other: 'hsl(215, 20%, 65%)',
+}
+
+// INTENT: Ordered severity keys for stacked bar — determines left-to-right render order
+const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'other'] as const
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
 
 interface BlockersRisksSectionProps extends BlockersRisksSectionData {
   templateId?: ReportTemplateId
@@ -139,8 +152,23 @@ export function BlockersRisksSection({
   const severityCounts = {
     critical: blockers.filter(b => b.severity === 'critical').length,
     high: blockers.filter(b => b.severity === 'high').length,
-    other: blockers.filter(b => b.severity !== 'critical' && b.severity !== 'high').length,
+    medium: blockers.filter(b => b.severity === 'medium').length,
+    low: blockers.filter(b => b.severity === 'low').length,
+    other: blockers.filter(b => !b.severity || !['critical', 'high', 'medium', 'low'].includes(b.severity)).length,
   }
+
+  // INTENT: Stacked bar data — single row with severity segments
+  const severityBarData = blockers.length > 0 ? [{
+    name: 'Severity',
+    critical: severityCounts.critical,
+    high: severityCounts.high,
+    medium: severityCounts.medium,
+    low: severityCounts.low,
+    other: severityCounts.other,
+  }] : []
+
+  // INTENT: Dynamically compute which segments are visible for correct bar radius
+  const visibleSeverities = SEVERITY_ORDER.filter(key => severityCounts[key] > 0)
 
   return (
     <section className="space-y-8">
@@ -173,12 +201,64 @@ export function BlockersRisksSection({
               {severityCounts.high} high
             </span>
           )}
-          {severityCounts.other > 0 && (
+          {(severityCounts.other + severityCounts.medium + severityCounts.low) > 0 && (
             <span className="text-xs font-medium bg-muted text-muted-foreground rounded-full px-3 py-1.5">
-              {severityCounts.other} other
+              {severityCounts.medium + severityCounts.low + severityCounts.other} other
             </span>
           )}
         </div>
+      )}
+
+      {/* Severity stacked bar */}
+      {severityBarData.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="h-12">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={severityBarData} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" hide />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: `1px solid ${TOOLTIP_BORDER}`,
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                      fontSize: '13px',
+                    }}
+                  />
+                  {visibleSeverities.map((key, idx) => {
+                    const isFirst = idx === 0
+                    const isLast = idx === visibleSeverities.length - 1
+                    const isOnly = isFirst && isLast
+                    const radius: [number, number, number, number] = isOnly
+                      ? [4, 4, 4, 4]
+                      : isFirst ? [4, 0, 0, 4]
+                      : isLast ? [0, 4, 4, 0]
+                      : [0, 0, 0, 0]
+                    return (
+                      <Bar
+                        key={key}
+                        dataKey={key}
+                        name={key.charAt(0).toUpperCase() + key.slice(1)}
+                        stackId="severity"
+                        fill={SEVERITY_CHART_COLOR[key]}
+                        radius={radius}
+                      />
+                    )
+                  })}
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex flex-wrap gap-3 mt-2">
+              {visibleSeverities.map(key => (
+                <div key={key} className="flex items-center gap-1.5">
+                  <span className="inline-block h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: SEVERITY_CHART_COLOR[key] }} />
+                  <span className="text-xs text-muted-foreground capitalize">{key}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* Blocker cards */}

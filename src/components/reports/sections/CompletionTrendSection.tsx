@@ -7,6 +7,7 @@
  * summary stats, and consistent section header with icon.
  */
 
+import { useId } from 'react'
 import {
   BarChart,
   Bar,
@@ -27,6 +28,7 @@ import type { CompletionTrendSectionData, ReportTemplateId } from '@/lib/reports
 interface CompletionTrendSectionProps extends CompletionTrendSectionData {
   templateId?: ReportTemplateId
   sectionNumber?: number
+  chartImageUrl?: string
 }
 
 // DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
@@ -55,9 +57,11 @@ export function CompletionTrendSection({
   dataPoints,
   periodLabel,
   sectionNarrative,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: CompletionTrendSectionProps): React.JSX.Element {
+  const uid = useId()
   const chartData = dataPoints.map((dp) => ({
     ...dp,
     label: formatXAxisDate(dp.date),
@@ -76,6 +80,13 @@ export function CompletionTrendSection({
         sectionNumber={sectionNumber}
       />
       <SectionNarrativeIntro narrative={sectionNarrative} />
+
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
 
       {/* Summary stat pills */}
       <div className="flex flex-wrap gap-3">
@@ -103,6 +114,16 @@ export function CompletionTrendSection({
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+                <defs>
+                  <linearGradient id={`${uid}-completedGradient`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={1} />
+                    <stop offset="100%" stopColor={INTERNATIONAL_ORANGE} stopOpacity={0.6} />
+                  </linearGradient>
+                  <linearGradient id={`${uid}-createdGradient`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={ELECTRIC_BLUE} stopOpacity={1} />
+                    <stop offset="100%" stopColor={ELECTRIC_BLUE} stopOpacity={0.6} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
                 <XAxis
                   dataKey="label"
@@ -136,14 +157,14 @@ export function CompletionTrendSection({
                 <Bar
                   dataKey="completed"
                   name="Completed"
-                  fill={INTERNATIONAL_ORANGE}
+                  fill={`url(#${uid}-completedGradient)`}
                   radius={[4, 4, 0, 0]}
                   maxBarSize={32}
                 />
                 <Bar
                   dataKey="created"
                   name="Created"
-                  fill={ELECTRIC_BLUE}
+                  fill={`url(#${uid}-createdGradient)`}
                   radius={[4, 4, 0, 0]}
                   maxBarSize={32}
                 />

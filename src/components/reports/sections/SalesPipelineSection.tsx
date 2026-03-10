@@ -7,7 +7,9 @@
  * discovery call metrics. Three sub-panels show the full buyer journey.
  */
 
+import { useId } from 'react'
 import { Megaphone, Mail, FileText, Phone } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +21,25 @@ import {
 } from '@/components/reports/report-visuals'
 
 import type { SalesPipelineSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
+
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. Must stay in sync with design tokens.
+const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
+const ELECTRIC_BLUE = 'hsl(217, 91%, 60%)'
+const EMERALD = 'hsl(160, 84%, 39%)'
+const AMBER = 'hsl(38, 92%, 50%)'
+const PURPLE = 'hsl(271, 91%, 65%)'
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+const GRID_COLOR = '#e2e8f0'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
+
+const FUNNEL_COLORS = [
+  INTERNATIONAL_ORANGE,
+  ELECTRIC_BLUE,
+  EMERALD,
+  AMBER,
+  PURPLE,
+]
 
 interface SalesPipelineSectionProps extends SalesPipelineSectionData {
   templateId?: ReportTemplateId
@@ -41,14 +62,26 @@ export function SalesPipelineSection({
   rfqs,
   discoveryCalls,
   sectionNarrative,
+  funnelStages,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: SalesPipelineSectionProps): React.JSX.Element {
+  const uid = useId()
   const hasOutreach = outreach.activeCampaigns > 0 || outreach.emailsSent > 0
   const hasRFQs = rfqs.sentThisPeriod > 0 || rfqs.openCount > 0
   const hasCalls = discoveryCalls.scheduled > 0
 
   const isEmpty = !hasOutreach && !hasRFQs && !hasCalls
+
+  // INTENT: Build funnel data from props or derive from outreach/rfqs data
+  const funnelData = funnelStages ?? [
+    { name: 'Contacts Reached', value: outreach.contactsReached },
+    { name: 'Emails Sent', value: outreach.emailsSent },
+    { name: 'Replies', value: outreach.repliesReceived },
+    { name: 'RFQs Sent', value: rfqs.sentThisPeriod },
+    { name: 'Awarded', value: rfqs.awarded },
+  ]
 
   return (
     <div className="space-y-8">
@@ -61,6 +94,13 @@ export function SalesPipelineSection({
 
       <SectionNarrativeIntro narrative={sectionNarrative} />
 
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
+
       {isEmpty ? (
         <div className="text-center py-12">
           <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted">
@@ -69,7 +109,72 @@ export function SalesPipelineSection({
           <p className="text-sm text-muted-foreground">No pipeline activity this period.</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-3">
+        <>
+          {/* Pipeline funnel chart */}
+          <Card>
+            <CardContent className="p-6">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={funnelData} layout="vertical" margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
+                    <defs>
+                      {FUNNEL_COLORS.map((color, i) => (
+                        <linearGradient key={i} id={`${uid}-funnelGrad${i}`} x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor={color} stopOpacity={1} />
+                          <stop offset="100%" stopColor={color} stopOpacity={0.6} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+                    <XAxis
+                      type="number"
+                      tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                      axisLine={false}
+                      tickLine={false}
+                      width={120}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '8px',
+                        border: `1px solid ${TOOLTIP_BORDER}`,
+                        boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                        fontSize: '13px',
+                      }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      radius={[0, 4, 4, 0]}
+                      maxBarSize={28}
+                    >
+                      {funnelData.map((_, i) => (
+                        <Cell key={i} fill={`url(#${uid}-funnelGrad${i % FUNNEL_COLORS.length})`} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {/* Funnel legend */}
+              <div className="flex flex-wrap gap-3 mt-3">
+                {funnelData.map((stage, i) => (
+                  <div key={stage.name} className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: FUNNEL_COLORS[i % FUNNEL_COLORS.length] }}
+                    />
+                    <span className="text-xs text-muted-foreground">{stage.name}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 md:grid-cols-3">
           {/* Outreach */}
           <Card>
             <CardContent className="p-5 space-y-3">
@@ -141,6 +246,7 @@ export function SalesPipelineSection({
             </CardContent>
           </Card>
         </div>
+        </>
       )}
     </div>
   )

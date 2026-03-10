@@ -9,6 +9,7 @@
  */
 
 import { Target } from 'lucide-react'
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -16,9 +17,34 @@ import { ReportSectionHeader, SectionNarrativeIntro, HealthDot } from '@/compone
 
 import type { ObjectivesProgressSectionData, ObjectiveRow, ReportTemplateId } from '@/lib/reports/report-document-types'
 
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. Must stay in sync with design tokens.
+const STATUS_SUCCESS = 'hsl(142, 72%, 29%)'
+const STATUS_WARNING = 'hsl(38, 92%, 50%)'
+const DESTRUCTIVE = 'hsl(0, 84%, 60%)'
+const MUTED = 'hsl(215, 16%, 47%)'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
+
+const HEALTH_CHART_COLOR: Record<string, string> = {
+  'on-track': STATUS_SUCCESS,
+  'completed': STATUS_SUCCESS,
+  'at-risk': STATUS_WARNING,
+  'off-track': DESTRUCTIVE,
+  'not-started': MUTED,
+}
+
+const HEALTH_LEGEND_ITEMS: { key: string; label: string; color: string }[] = [
+  { key: 'on-track', label: 'On Track', color: STATUS_SUCCESS },
+  { key: 'at-risk', label: 'At Risk', color: STATUS_WARNING },
+  { key: 'off-track', label: 'Off Track', color: DESTRUCTIVE },
+  { key: 'completed', label: 'Completed', color: STATUS_SUCCESS },
+  { key: 'not-started', label: 'Not Started', color: MUTED },
+]
+
 interface ObjectivesProgressSectionProps extends ObjectivesProgressSectionData {
   templateId?: ReportTemplateId
   sectionNumber?: number
+  chartImageUrl?: string
 }
 
 const HEALTH_BADGE_VARIANT: Record<ObjectiveRow['health'], 'success' | 'warning' | 'destructive' | 'secondary'> = {
@@ -57,9 +83,26 @@ export function ObjectivesProgressSection({
   totalActive,
   totalCompleted,
   sectionNarrative,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: ObjectivesProgressSectionProps): React.JSX.Element {
+  // INTENT: Build donut data by counting health statuses across all objectives
+  const healthCounts = objectives.reduce<Record<string, number>>((acc, obj) => {
+    acc[obj.health] = (acc[obj.health] ?? 0) + 1
+    return acc
+  }, {})
+
+  const donutData = Object.entries(healthCounts).map(([health, count]) => ({
+    name: health.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    value: count,
+    health,
+  }))
+
+  const averageProgress = objectives.length > 0
+    ? Math.round(objectives.reduce((sum, o) => sum + o.progress, 0) / objectives.length)
+    : 0
+
   return (
     <section className="space-y-8">
       <ReportSectionHeader
@@ -69,6 +112,13 @@ export function ObjectivesProgressSection({
         sectionNumber={sectionNumber}
       />
       <SectionNarrativeIntro narrative={sectionNarrative} />
+
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
 
       {/* Summary stat pills */}
       <div className="flex flex-wrap gap-3">
@@ -81,6 +131,71 @@ export function ObjectivesProgressSection({
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mt-0.5">Completed</p>
         </div>
       </div>
+
+      {/* Health distribution donut chart */}
+      {donutData.length > 0 && (
+        <div className="relative h-48">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={donutData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={80}
+                paddingAngle={2}
+                strokeWidth={0}
+              >
+                {donutData.map((entry) => (
+                  <Cell
+                    key={entry.health}
+                    fill={HEALTH_CHART_COLOR[entry.health] ?? MUTED}
+                  />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(value, name) => {
+                  const v = Number(value ?? 0)
+                  return [`${v} objective${v !== 1 ? 's' : ''}`, String(name ?? '')]
+                }}
+                contentStyle={{
+                  borderRadius: '8px',
+                  border: `1px solid ${TOOLTIP_BORDER}`,
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                  fontSize: '13px',
+                }}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          {/* Centered average progress label */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <p className="text-2xl font-display font-bold text-foreground">{averageProgress}%</p>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Progress</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Health distribution legend */}
+      {donutData.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-4">
+          {HEALTH_LEGEND_ITEMS
+            .filter(item => healthCounts[item.key])
+            .map(item => (
+              <div key={item.key} className="flex items-center gap-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-xs text-muted-foreground">{item.label}</span>
+                <span className="text-xs font-semibold text-foreground">{healthCounts[item.key]}</span>
+              </div>
+            ))}
+        </div>
+      )}
 
       {/* Objective cards */}
       <div className="space-y-3">

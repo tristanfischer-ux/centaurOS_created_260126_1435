@@ -37,9 +37,16 @@ function BoardPackCover({
   subtitle,
   generatedAt,
   branding,
+  coverImageUrl,
 }: CoverSectionProps): React.JSX.Element {
   return (
     <section className="relative py-20">
+      {coverImageUrl && (
+        <>
+          <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
+        </>
+      )}
       {/* Top accent band */}
       <div
         className="absolute top-0 left-0 right-0 h-2 rounded-full bg-international-orange"
@@ -106,14 +113,18 @@ function WeeklyUpdateCover({
   subtitle,
   generatedAt,
   branding,
+  coverImageUrl,
 }: CoverSectionProps): React.JSX.Element {
   return (
     <section className="relative">
       {/* Colored header band */}
       <div
-        className="rounded-xl bg-international-orange px-8 py-8 text-white"
+        className="relative overflow-hidden rounded-xl bg-international-orange px-8 py-8 text-white"
         style={branding?.primaryColor ? { backgroundColor: branding.primaryColor } : undefined}
       >
+        {coverImageUrl && (
+          <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay pointer-events-none" aria-hidden="true" />
+        )}
         <div className="flex items-center gap-2 mb-4">
           <CalendarDays className="h-4 w-4 opacity-80" />
           <span className="text-xs font-medium uppercase tracking-wider opacity-80">
@@ -151,9 +162,16 @@ function CustomCover({
   subtitle,
   generatedAt,
   branding,
+  coverImageUrl,
 }: CoverSectionProps): React.JSX.Element {
   return (
-    <section className="py-12">
+    <section className="relative py-12">
+      {coverImageUrl && (
+        <>
+          <img src={coverImageUrl} alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" aria-hidden="true" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-background/40" />
+        </>
+      )}
       <div className="flex flex-col items-center text-center space-y-6">
         {branding?.logoUrl && (
           <img

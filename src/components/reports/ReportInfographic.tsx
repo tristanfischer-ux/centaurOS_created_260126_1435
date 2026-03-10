@@ -18,9 +18,15 @@
  */
 
 import { format } from 'date-fns'
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2 } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import {
+  MiniBar,
+  ProgressBar,
+  TrendArrow,
+  HealthDot,
+  formatMetricValue,
+} from '@/components/reports/report-visuals'
 
 import type {
   ReportDocument,
@@ -32,103 +38,6 @@ import type {
   TeamActivitySectionData,
   BlockersRisksSectionData,
 } from '@/lib/reports/report-document-types'
-
-// ---------------------------------------------------------------------------
-// Internal helper components
-// ---------------------------------------------------------------------------
-
-/** Tiny vertical bar for the sparkline-style mini chart. */
-function MiniBar({
-  heightPercent,
-  color,
-}: {
-  heightPercent: number
-  color: 'orange' | 'muted'
-}): React.JSX.Element {
-  return (
-    <div
-      className={cn(
-        'w-1.5 rounded-full transition-all',
-        color === 'orange' ? 'bg-international-orange' : 'bg-muted-foreground/25',
-      )}
-      style={{ height: `${Math.max(heightPercent, 4)}%` }}
-    />
-  )
-}
-
-/** Thin progress bar with percentage fill. */
-function ProgressBar({
-  value,
-  className,
-}: {
-  value: number
-  className?: string
-}): React.JSX.Element {
-  const clamped = Math.min(100, Math.max(0, value))
-  return (
-    <div className={cn('h-1.5 w-full rounded-full bg-muted', className)}>
-      <div
-        className="h-full rounded-full bg-international-orange transition-all"
-        style={{ width: `${clamped}%` }}
-      />
-    </div>
-  )
-}
-
-/** Up / down / stable trend arrow with semantic color. */
-function TrendArrow({
-  trend,
-  changePercent,
-  className,
-}: {
-  trend: 'up' | 'down' | 'stable'
-  changePercent: number
-  className?: string
-}): React.JSX.Element {
-  const Icon = trend === 'up' ? TrendingUp : trend === 'down' ? TrendingDown : Minus
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5 text-xs font-semibold',
-        trend === 'up' && 'text-status-success',
-        trend === 'down' && 'text-destructive',
-        trend === 'stable' && 'text-muted-foreground',
-        className,
-      )}
-    >
-      <Icon className="h-3 w-3" />
-      {changePercent !== 0 && (
-        <span>{changePercent > 0 ? '+' : ''}{changePercent.toFixed(0)}%</span>
-      )}
-    </span>
-  )
-}
-
-/** Small colored dot for objective health status. */
-function HealthDot({ health }: { health: string }): React.JSX.Element {
-  return (
-    <span
-      className={cn(
-        'inline-block h-2 w-2 rounded-full shrink-0',
-        health === 'on-track' && 'bg-status-success',
-        health === 'completed' && 'bg-status-success',
-        health === 'at-risk' && 'bg-status-warning',
-        health === 'off-track' && 'bg-destructive',
-        health === 'not-started' && 'bg-muted-foreground/40',
-      )}
-    />
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-function formatMetricValue(metric: KPIMetric): string {
-  if (metric.format === 'percentage') return `${metric.value}%`
-  if (metric.format === 'decimal') return metric.value.toFixed(1)
-  return metric.value.toLocaleString()
-}
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -188,13 +97,26 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
           HEADER BAND
           ================================================================ */}
       <div className="bg-international-orange px-6 py-5 text-white shrink-0">
-        <p className="text-[10px] uppercase tracking-widest opacity-80 mb-1">
-          {coverData?.companyName ?? document.foundryName}
-        </p>
-        <h1 className="text-xl font-display font-bold leading-tight">
-          {coverData?.reportTitle ?? document.title}
-        </h1>
-        <p className="text-[10px] mt-1 opacity-70">{dateRangeLabel}</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest opacity-80 mb-1">
+              {coverData?.companyName ?? document.foundryName}
+            </p>
+            <h1 className="text-xl font-display font-bold leading-tight">
+              {coverData?.reportTitle ?? document.title}
+            </h1>
+            <p className="text-[10px] mt-1 opacity-70">{dateRangeLabel}</p>
+          </div>
+          {document.branding?.logoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={document.branding.logoUrl}
+              alt=""
+              className="h-8 w-auto object-contain opacity-80"
+              aria-hidden="true"
+            />
+          )}
+        </div>
       </div>
 
       {/* Scrollable interior — flex-1 fills the A4 frame */}
@@ -209,7 +131,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
             </p>
             <div className="flex items-center justify-center gap-3">
               <span className="text-5xl font-bold text-foreground leading-none font-display">
-                {formatMetricValue(heroMetric)}
+                {formatMetricValue(heroMetric.value, heroMetric.format)}
               </span>
               <TrendArrow
                 trend={heroMetric.trend}
@@ -231,7 +153,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
                 className="bg-muted/50 rounded-lg px-3 py-2.5 text-center"
               >
                 <p className="text-xl font-bold text-foreground leading-none">
-                  {formatMetricValue(metric)}
+                  {formatMetricValue(metric.value, metric.format)}
                 </p>
                 <p className="text-[9px] uppercase tracking-wide text-muted-foreground mt-1 truncate">
                   {metric.label}
@@ -251,7 +173,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
             ============================================================== */}
         <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
           {/* --- Mini Completion Trend (sparkline) --- */}
-          <div className="flex flex-col">
+          <div className="flex flex-col bg-muted/20 rounded-lg p-3 -m-1">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-medium">
               {trendData?.periodLabel ?? 'Completion Trend'}
             </p>
