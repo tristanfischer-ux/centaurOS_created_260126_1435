@@ -13331,6 +13331,58 @@ export type Database = {
           },
         ]
       }
+      rfq_clarifications: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          created_at: string | null
+          id: string
+          question: string
+          rfq_id: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          created_at?: string | null
+          id?: string
+          question: string
+          rfq_id: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          created_at?: string | null
+          id?: string
+          question?: string
+          rfq_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfq_clarifications_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "rfq_clarifications_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rfq_clarifications_rfq_id_fkey"
+            columns: ["rfq_id"]
+            isOneToOne: false
+            referencedRelation: "rfqs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rfq_responses: {
         Row: {
           attachments: Json | null
@@ -13338,6 +13390,8 @@ export type Database = {
           buyer_viewed_at: string | null
           deliverables: Json | null
           id: string
+          indicative_max: number | null
+          indicative_min: number | null
           message: string | null
           milestones: Json | null
           pricing_breakdown: Json | null
@@ -13360,6 +13414,8 @@ export type Database = {
           buyer_viewed_at?: string | null
           deliverables?: Json | null
           id?: string
+          indicative_max?: number | null
+          indicative_min?: number | null
           message?: string | null
           milestones?: Json | null
           pricing_breakdown?: Json | null
@@ -13382,6 +13438,8 @@ export type Database = {
           buyer_viewed_at?: string | null
           deliverables?: Json | null
           id?: string
+          indicative_max?: number | null
+          indicative_min?: number | null
           message?: string | null
           milestones?: Json | null
           pricing_breakdown?: Json | null

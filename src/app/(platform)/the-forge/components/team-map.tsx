@@ -89,6 +89,13 @@ export function TeamMap({
       is_demo: false,
       created_by_provider_id: null,
       process_capabilities: null,
+      industries: null,
+      certifications: null,
+      materials: null,
+      key_equipment: null,
+      financial_health: null,
+      enrichment_quality: null,
+      security_clearances: null,
     }
   }, [])
 

@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { unstable_cache } from "next/cache"
 import { withAuth, withUser, type ActionError } from '@/lib/server-action-utils'
 import { embedText } from '@/lib/search/semantic-search'
 
@@ -200,7 +201,35 @@ export interface MarketplaceListing {
     created_by_provider_id: string | null
     /** Structured process capabilities from Nightshift deep enrichment. */
     process_capabilities: ProcessCapability[] | null
+    /** Industries served (Nightshift enrichment). */
+    industries: string[] | null
+    /** Certifications held (Nightshift enrichment). */
+    certifications: string[] | null
+    /** Materials worked with (Nightshift enrichment). */
+    materials: string[] | null
+    /** Key equipment available (Nightshift enrichment). */
+    key_equipment: string[] | null
+    /** Financial health summary (Nightshift enrichment). */
+    financial_health: string | null
+    /** Enrichment quality score from Nightshift. */
+    enrichment_quality: string | null
+    /** Security clearances held (Nightshift enrichment). */
+    security_clearances: string[] | null
 }
+
+/**
+ * Explicit column list for marketplace_listings queries.
+ * Excludes `embedding` (1536-float vector) and `search_vector` (tsvector)
+ * to avoid shipping ~12KB per row to the client.
+ */
+const LISTING_COLUMNS = [
+    'id', 'category', 'subcategory', 'title', 'description', 'attributes',
+    'image_url', 'is_verified', 'verification_tier', 'is_demo',
+    'created_by_provider_id', 'process_capabilities', 'industries',
+    'certifications', 'materials', 'key_equipment', 'financial_health',
+    'enrichment_quality', 'security_clearances', 'created_at',
+    'data_quality_score',
+].join(', ')
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
@@ -278,7 +307,7 @@ export async function searchMarketplaceListings(
     const from = (page - 1) * pageSize
     const to = from + pageSize - 1
 
-    let query = supabase.from('marketplace_listings').select('*', { count: 'exact' })
+    let query = supabase.from('marketplace_listings').select(LISTING_COLUMNS, { count: 'exact' })
 
     const queryTrimmed = params.query?.trim()
     if (queryTrimmed) {
@@ -385,7 +414,7 @@ export async function searchMarketplaceListings(
     }
 
     let totalCount = count ?? 0
-    let listings = (data || []) as MarketplaceListing[]
+    let listings = (data || []) as unknown as MarketplaceListing[]
     let hasMore = from + listings.length < totalCount
 
     // Merge semantic results (deduplicated) when embedding was generated
@@ -398,7 +427,7 @@ export async function searchMarketplaceListings(
         const semanticRows = (semanticData ?? []) as { id: string }[]
         const semanticIds = semanticRows.map((r) => r.id)
         if (semanticIds.length > 0) {
-            let semQuery = supabase.from('marketplace_listings').select('*').in('id', semanticIds)
+            let semQuery = supabase.from('marketplace_listings').select(LISTING_COLUMNS).in('id', semanticIds)
             if (params.categories?.length) {
                 semQuery = semQuery.in('category', params.categories as ("People" | "Products" | "Services")[])
             } else if (params.category) {
@@ -430,7 +459,7 @@ export async function searchMarketplaceListings(
                 }
             }
             const { data: semanticListings } = await semQuery
-            const fullSemantic = (semanticListings ?? []) as MarketplaceListing[]
+            const fullSemantic = (semanticListings ?? []) as unknown as MarketplaceListing[]
             const idToIndex = new Map(semanticIds.map((id, i) => [id, i]))
             fullSemantic.sort((a, b) => (idToIndex.get(a.id) ?? 999) - (idToIndex.get(b.id) ?? 999))
             const ftIds = new Set(listings.map((l) => l.id))
@@ -544,7 +573,7 @@ export async function getMarketplaceListings(category?: string) {
 
     let query = supabase
         .from('marketplace_listings')
-        .select('*')
+        .select(LISTING_COLUMNS)
         .order('is_verified', { ascending: false })
         .limit(200)
 
@@ -560,7 +589,7 @@ export async function getMarketplaceListings(category?: string) {
         return []
     }
 
-    return (data || []) as MarketplaceListing[]
+    return (data || []) as unknown as MarketplaceListing[]
 }
 
 // ==========================================
@@ -853,7 +882,7 @@ export async function getSavedMarketplaceListings() {
             const listingIds = savedListings.map(s => s.listing_id)
             const { data: listings, error: listingsError } = await supabase
                 .from('marketplace_listings')
-                .select('*')
+                .select(LISTING_COLUMNS)
                 .in('id', listingIds)
 
             if (listingsError) {
@@ -861,7 +890,7 @@ export async function getSavedMarketplaceListings() {
                 return { data: [] as MarketplaceListing[], error: 'Failed to fetch listing details' }
             }
 
-            return { data: (listings || []) as MarketplaceListing[], error: null }
+            return { data: (listings || []) as unknown as MarketplaceListing[], error: null }
         } catch (err) {
             console.error('[getSavedMarketplaceListings] Exception:', err)
             return { data: [] as MarketplaceListing[], error: 'Failed to fetch saved listings' }
@@ -899,4 +928,77 @@ export async function getSavedListingIds(listingIds: string[]) {
             return new Set<string>()
         }
     })
+}
+
+// ==========================================
+// SIMILAR LISTINGS (Semantic)
+// ==========================================
+
+/**
+ * Fetches semantically similar marketplace listings using vector embeddings.
+ *
+ * @description Reads the listing's embedding, calls match_marketplace_listings RPC
+ * to find similar listings, excludes the source listing, and returns top N results.
+ * Results are cached for 10 minutes per listing ID to avoid repeated RPC calls.
+ *
+ * @param {string} listingId - The listing ID to find similar listings for
+ * @param {number} [limit=4] - Maximum number of similar listings to return
+ * @returns {Promise<MarketplaceListing[]>} Array of similar marketplace listings
+ */
+export async function getSimilarListings(listingId: string, limit: number = 4): Promise<MarketplaceListing[]> {
+    const cached = unstable_cache(
+        async (id: string, lim: number) => {
+            const supabase = await createClient()
+
+            // Fetch only the embedding column for the source listing
+            const { data: source, error: sourceError } = await supabase
+                .from('marketplace_listings')
+                .select('embedding')
+                .eq('id', id)
+                .single()
+
+            if (sourceError || !source?.embedding) {
+                return []
+            }
+
+            // Call RPC for semantic matches
+            const { data: matches, error: matchError } = await supabase.rpc('match_marketplace_listings', {
+                query_embedding: JSON.stringify(source.embedding),
+                match_threshold: 0.5,
+                match_count: lim + 1, // +1 to account for self-match
+            })
+
+            if (matchError || !matches || matches.length === 0) {
+                return []
+            }
+
+            // Get matched IDs excluding self
+            const matchedIds = (matches as { id: string }[])
+                .map((m) => m.id)
+                .filter((mid) => mid !== id)
+                .slice(0, lim)
+
+            if (matchedIds.length === 0) return []
+
+            // Hydrate full listing data (exclude embedding to avoid shipping vectors to client)
+            const { data: listings, error: listingsError } = await supabase
+                .from('marketplace_listings')
+                .select(LISTING_COLUMNS)
+                .in('id', matchedIds)
+
+            if (listingsError || !listings) return []
+
+            // Preserve RPC ranking order
+            const idOrder = new Map(matchedIds.map((mid, i) => [mid, i]))
+            const sorted = (listings as unknown as MarketplaceListing[]).sort(
+                (a, b) => (idOrder.get(a.id) ?? 999) - (idOrder.get(b.id) ?? 999)
+            )
+
+            return sorted
+        },
+        [`similar-listings-${listingId}`],
+        { revalidate: 600 } // 10-minute TTL
+    )
+
+    return cached(listingId, limit)
 }

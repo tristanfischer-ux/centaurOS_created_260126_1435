@@ -267,6 +267,12 @@ export function MarketplaceToolbar({
                             </Button>
                         )}
                     </div>
+                    {isAISearchLoading && !aiInterpretation && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-in fade-in duration-200">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Understanding your query...</span>
+                        </div>
+                    )}
                     {aiInterpretation && onClearAIInterpretation && (
                         <div className="flex items-start gap-2 text-xs">
                             <Badge variant="secondary" className="gap-1.5 py-1 px-2 font-normal text-muted-foreground shrink-0">

@@ -24,6 +24,9 @@ import {
     MapPin,
     Users,
     Scale,
+    Award,
+    Factory,
+    Wrench,
 } from 'lucide-react'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
 import { toast } from 'sonner'
@@ -91,6 +94,28 @@ function getResponseTime(attrs: Record<string, unknown>): string | null {
     return `~${Math.ceil(hours / 24)}d`
 }
 
+/** Pick up to 3 capability signals from enrichment data. */
+function getCapabilitySignals(listing: MarketplaceListing): { icon: React.ComponentType<{ className?: string }>; label: string }[] {
+    const signals: { icon: React.ComponentType<{ className?: string }>; label: string }[] = []
+    if (listing.certifications && listing.certifications.length > 0) {
+        signals.push({
+            icon: Award,
+            label: listing.certifications.length === 1
+                ? listing.certifications[0]
+                : `${listing.certifications.length} certifications`,
+        })
+    }
+    if (listing.industries && listing.industries.length > 0) {
+        signals.push({ icon: Factory, label: listing.industries[0] })
+    }
+    if (listing.materials && listing.materials.length > 0) {
+        signals.push({ icon: Wrench, label: listing.materials[0] })
+    } else if (listing.key_equipment && listing.key_equipment.length > 0) {
+        signals.push({ icon: Wrench, label: listing.key_equipment[0] })
+    }
+    return signals.slice(0, 3)
+}
+
 /** Extract availability info */
 function getAvailability(attrs: Record<string, unknown>): string | null {
     const available = attrs.available_slots as number | undefined
@@ -129,6 +154,7 @@ export const MarketCardV2 = memo(function MarketCardV2({
     const location = attrs.location as string | undefined
     const headline = attrs.headline as string | undefined
     const hiredCount = attrs.total_bookings as number | undefined
+    const capabilitySignals = getCapabilitySignals(listing)
 
     const handleSave = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -252,6 +278,24 @@ export const MarketCardV2 = memo(function MarketCardV2({
                                 {tag}
                             </Badge>
                         ))}
+                    </div>
+                )}
+
+                {/* Capability signals from enrichment */}
+                {capabilitySignals.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                        {capabilitySignals.map((signal) => {
+                            const Icon = signal.icon
+                            return (
+                                <span
+                                    key={signal.label}
+                                    className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground"
+                                >
+                                    <Icon className="w-3 h-3 shrink-0" aria-hidden="true" />
+                                    <span className="truncate max-w-[120px]">{signal.label}</span>
+                                </span>
+                            )
+                        })}
                     </div>
                 )}
 
