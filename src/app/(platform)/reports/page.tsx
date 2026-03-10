@@ -283,12 +283,14 @@ export default function ReportsPage(): React.JSX.Element {
   const totalCount = allSectionTypes.length
 
   // Config summary for collapsed state
+  // GOTCHA: new Date('YYYY-MM-DD') parses as UTC midnight — toLocaleDateString in UTC-
+  // timezones shifts to the previous day. Appending T12:00:00 avoids the off-by-one.
   const configSummary = useMemo(() => {
     const toneLabel = TONE_OPTIONS.find(t => t.value === tone)?.label ?? tone
     const detailLabel = DETAIL_OPTIONS.find(d => d.value === detailLevel)?.label ?? detailLevel
-    const start = new Date(dateRange.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-    const end = new Date(dateRange.end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-    return `${toneLabel} tone · ${detailLabel} · ${start}–${end} · ${enabledCount} sections`
+    const start = new Date(dateRange.start + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    const end = new Date(dateRange.end + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    return `${toneLabel} tone · ${detailLabel} · ${start}–${end} · ${enabledCount} ${enabledCount === 1 ? 'section' : 'sections'}`
   }, [tone, detailLevel, dateRange, enabledCount])
 
   const handleTemplateSelect = useCallback((templateId: ReportTemplateId) => {
@@ -770,7 +772,7 @@ export default function ReportsPage(): React.JSX.Element {
                         )}
                       </div>
                       <p className="mt-1.5 text-[11px] text-muted-foreground">
-                        {sectionCount} sections · {defaultRange} · {defaultToneLabel} tone
+                        {sectionCount} {sectionCount === 1 ? 'section' : 'sections'} · {defaultRange} · {defaultToneLabel} tone
                       </p>
                     </CardContent>
                   </Card>
@@ -1038,7 +1040,7 @@ export default function ReportsPage(): React.JSX.Element {
           {!isGenerating && (
             <Button
               className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
-              disabled={isGenerating || enabledSections.size === 0}
+              disabled={enabledSections.size === 0}
               onClick={handleGenerate}
             >
               Generate Report

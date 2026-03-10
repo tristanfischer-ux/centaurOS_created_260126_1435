@@ -150,7 +150,7 @@ export function HeroCard({
               <button
                 type="button"
                 onClick={handleAvatarClick}
-                className="text-xs text-muted-foreground text-center mt-1 w-full hover:text-foreground transition-colors cursor-pointer"
+                className="text-xs text-muted-foreground text-center mt-1 w-full hover:text-foreground transition-colors"
               >
                 Add photo
               </button>

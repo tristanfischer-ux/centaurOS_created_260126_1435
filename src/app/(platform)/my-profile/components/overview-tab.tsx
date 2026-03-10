@@ -12,11 +12,13 @@ import { cn } from '@/lib/utils'
 import type { ProfileEnrichment } from '../profile-hub-view'
 
 /**
- * OverviewTab - Personal info, enriched activity stats, sparkline, and milestones.
+ * OverviewTab - Bio, professional background, contact info, activity stats, and milestones.
  *
- * @description Shows editable personal details (name, email, role, company, bio,
- * phone, LinkedIn), enhanced platform stats with trend indicators, a 30-day
- * activity sparkline, and computed achievement milestones.
+ * @description Shows the user's bio, professional background (summary, previous
+ * companies, education), supplementary contact info (phone, LinkedIn), enhanced
+ * platform stats with trend indicators, a 30-day activity sparkline, and
+ * computed achievement milestones. Name/email/role/company are shown in the
+ * HeroCard instead.
  *
  * @component
  */
