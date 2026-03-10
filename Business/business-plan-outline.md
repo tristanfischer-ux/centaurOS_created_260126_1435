@@ -128,7 +128,7 @@ ForgeOS creates a new category: "AI Operating System for Hardware Startups." No 
 - Seed marketplace with 20-50 providers
 - Content marketing: blog, LinkedIn, hardware forums
 - Free tier drives organic signups
-- Target: ~178 registered, ~13 paid
+- Target: ~190 registered, ~13 paid
 
 ### Phase 2: Traction (Months 4-6)
 - Hardware accelerator partnerships (HAX, Highway1, Bolt)
