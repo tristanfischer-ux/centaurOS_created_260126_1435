@@ -107,6 +107,7 @@ export const PersonCard = memo(function PersonCard({
     const initials = getInitials(listing.title)
     const gradient = getAvatarGradient('People' as MarketplaceCategory, listing.title)
     const role = attrs.role as string | undefined
+    const headline = attrs.headline as string | undefined
     const location = attrs.location as string | undefined
     const rawRateValue = attrs.rate || attrs.day_rate
     const rawRate = rawRateValue ? String(rawRateValue) : undefined
@@ -117,7 +118,9 @@ export const PersonCard = memo(function PersonCard({
     const skills = safeStringArray(attrs.skills || attrs.expertise).slice(0, 4)
     const previousCompanies = safeStringArray(attrs.previous_companies).slice(0, 3)
     const availability = getAvailabilityStatus(attrs)
-    const responseTime = getResponseTimeLabel(trust.responseTimeHours)
+    // INTENT: trust.responseTimeHours is always null (provider_ratings doesn't have the column yet),
+    // so fall back to attrs.response_time_hours which may be populated from listing attributes.
+    const responseTime = getResponseTimeLabel(trust.responseTimeHours ?? (attrs.response_time_hours as number | null))
 
     const handleSave = useCallback(async (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -153,7 +156,16 @@ export const PersonCard = memo(function PersonCard({
                 'transition-all duration-200 ease-out',
                 isSelectedForCompare && 'ring-2 ring-international-orange/50 border-international-orange/30'
             )}
+            role="button"
+            tabIndex={0}
             onClick={() => onViewDetail(listing)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    onViewDetail(listing)
+                }
+            }}
+            aria-label={`View profile for ${listing.title}`}
         >
             {/* Action buttons - top right */}
             <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
@@ -167,7 +179,7 @@ export const PersonCard = memo(function PersonCard({
                             'min-w-[44px] min-h-[44px] w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
                             isSelectedForCompare
                                 ? 'bg-international-orange text-white shadow-md'
-                                : 'bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                                : 'bg-background/90 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 shadow-sm border'
                         )}
                         aria-label={isSelectedForCompare ? 'Remove from comparison' : 'Add to comparison'}
                     >
@@ -181,7 +193,7 @@ export const PersonCard = memo(function PersonCard({
                         'min-w-[44px] min-h-[44px] w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200',
                         localSaved
                             ? 'bg-destructive text-destructive-foreground shadow-md'
-                            : 'bg-background/90 text-muted-foreground opacity-0 group-hover:opacity-100 shadow-sm border'
+                            : 'bg-background/90 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 shadow-sm border'
                     )}
                     aria-label={localSaved ? 'Remove from saved' : 'Save for later'}
                 >
@@ -232,6 +244,13 @@ export const PersonCard = memo(function PersonCard({
                         {/* Role */}
                         {role && (
                             <p className="text-sm text-muted-foreground line-clamp-1">{role}</p>
+                        )}
+                        {/* Headline */}
+                        {headline && (
+                            <p className={cn(
+                                'text-muted-foreground line-clamp-1',
+                                role ? 'text-xs' : 'text-sm'
+                            )}>{headline}</p>
                         )}
                     </div>
                 </div>
@@ -298,7 +317,7 @@ export const PersonCard = memo(function PersonCard({
                             <span>Responds {responseTime}</span>
                         </div>
                     )}
-                    {yearsExp && (
+                    {yearsExp != null && (
                         <div className="flex items-center gap-1">
                             <Award className="w-3.5 h-3.5" aria-hidden="true" />
                             <span>{yearsExp}y exp</span>

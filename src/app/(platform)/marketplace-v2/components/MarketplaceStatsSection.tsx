@@ -67,6 +67,12 @@ export interface StatsLabels {
   chart1Title?: string
   chart2Title?: string
   chart3Title?: string
+  /** Row 2 chart 1 title (default: "Industry / Sector Breakdown") */
+  chart4Title?: string
+  /** Row 2 chart 2 title (default: "Certification Distribution") */
+  chart5Title?: string
+  /** Row 2 chart 3 title (default: "Company Type Distribution") */
+  chart6Title?: string
   barTooltipNoun?: string
   donutTooltipNoun?: string
 }
@@ -74,6 +80,8 @@ export interface StatsLabels {
 interface MarketplaceStatsSectionProps {
   stats: MarketplaceStats
   labels?: StatsLabels
+  /** Whether the stats section starts expanded. Defaults to true. */
+  defaultExpanded?: boolean
   selectedCompanyTypes?: string[]
   selectedCompanySizes?: string[]
   selectedSubRegions?: string[]
@@ -246,6 +254,7 @@ function HorizontalBarChart({
 export function MarketplaceStatsSection({
   stats,
   labels,
+  defaultExpanded,
   selectedCompanyTypes = [],
   selectedCompanySizes = [],
   selectedSubRegions = [],
@@ -261,7 +270,7 @@ export function MarketplaceStatsSection({
   hasActiveFilters,
   onClearFilters,
 }: MarketplaceStatsSectionProps) {
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded ?? true)
 
   const {
     totalListings,
@@ -287,6 +296,9 @@ export function MarketplaceStatsSection({
     kpi3Icon: kpi3IconName,
     chart2Title = 'Company Size',
     chart3Title = 'Regional Coverage',
+    chart4Title = 'Industry / Sector Breakdown',
+    chart5Title = 'Certification Distribution',
+    chart6Title = 'Company Type Distribution',
     barTooltipNoun = 'suppliers',
     donutTooltipNoun = 'companies',
   } = labels ?? {}
@@ -472,7 +484,7 @@ export function MarketplaceStatsSection({
             {/* Industry/Sector Breakdown */}
             <HorizontalBarChart
               data={industryCounts ?? []}
-              title="Industry / Sector Breakdown"
+              title={chart4Title}
               selectedItems={selectedIndustries}
               onItemClick={onIndustryClick}
               colorIndex={4}
@@ -482,7 +494,7 @@ export function MarketplaceStatsSection({
             {/* Certification Distribution */}
             <HorizontalBarChart
               data={certificationCounts ?? []}
-              title="Certification Distribution"
+              title={chart5Title}
               selectedItems={selectedCertifications}
               onItemClick={onCertificationClick}
               colorIndex={6}
@@ -492,7 +504,7 @@ export function MarketplaceStatsSection({
             {/* Company Type Distribution — moved from row 1 */}
             <HorizontalBarChart
               data={typeData}
-              title="Company Type Distribution"
+              title={chart6Title}
               selectedItems={selectedCompanyTypes}
               onItemClick={onCompanyTypeClick}
               colorIndex={0}

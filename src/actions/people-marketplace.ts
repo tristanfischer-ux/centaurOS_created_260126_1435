@@ -166,6 +166,94 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
 }
 
 /**
+ * Enriches plain MarketplaceListing[] with PersonTrustData for People listings.
+ *
+ * @description Used by infinite scroll to enrich page 2+ listings that arrive
+ * from searchMarketplaceListings (which doesn't include trust data). Only enriches
+ * listings with category === 'People'; non-People listings pass through unchanged.
+ *
+ * @param listings - Plain marketplace listings to enrich
+ * @returns Same listings with trustData attached to People entries
+ */
+export async function enrichPeopleListingsBatch(
+    listings: MarketplaceListing[]
+): Promise<MarketplaceListing[]> {
+    const peopleListings = listings.filter(l => l.category === 'People')
+    if (peopleListings.length === 0) return listings
+
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return listings
+
+    const listingIds = peopleListings.map(l => l.id)
+
+    const [ratingsResult, badgesResult, portfolioResult, stackResult] = await Promise.allSettled([
+        supabase.from('provider_ratings')
+            .select('provider_id, average_rating, total_reviews, total_transactions')
+            .in('provider_id', listingIds),
+        supabase.from('provider_badges')
+            .select('provider_id, badge_type')
+            .in('provider_id', listingIds),
+        supabase.from('provider_portfolio')
+            .select('provider_id, image_urls')
+            .in('provider_id', listingIds)
+            .eq('is_featured', true)
+            .limit(100),
+        supabase.from('foundry_stack')
+            .select('provider_id')
+            .in('provider_id', listingIds),
+    ])
+
+    // Build lookup maps (same logic as getEnrichedPeopleListings)
+    const ratingsMap = new Map<string, { average_rating: number | null; total_reviews: number | null; total_transactions: number | null }>()
+    if (ratingsResult.status === 'fulfilled' && ratingsResult.value.data) {
+        for (const r of ratingsResult.value.data) ratingsMap.set(r.provider_id, r)
+    }
+    const badgesMap = new Map<string, string[]>()
+    if (badgesResult.status === 'fulfilled' && badgesResult.value.data) {
+        for (const b of badgesResult.value.data) {
+            const existing = badgesMap.get(b.provider_id) || []
+            existing.push(b.badge_type)
+            badgesMap.set(b.provider_id, existing)
+        }
+    }
+    const portfolioMap = new Map<string, string[]>()
+    if (portfolioResult.status === 'fulfilled' && portfolioResult.value.data) {
+        for (const p of portfolioResult.value.data) {
+            const existing = portfolioMap.get(p.provider_id) || []
+            const urls = (p.image_urls as string[] | null) || []
+            for (const url of urls) {
+                if (existing.length < 3 && url) existing.push(url)
+            }
+            portfolioMap.set(p.provider_id, existing)
+        }
+    }
+    const stackCountMap = new Map<string, number>()
+    if (stackResult.status === 'fulfilled' && stackResult.value.data) {
+        for (const s of stackResult.value.data) {
+            if (s.provider_id) stackCountMap.set(s.provider_id, (stackCountMap.get(s.provider_id) || 0) + 1)
+        }
+    }
+
+    const peopleIds = new Set(listingIds)
+    return listings.map(listing => {
+        if (!peopleIds.has(listing.id)) return listing
+        const ratings = ratingsMap.get(listing.id)
+        const trustData: PersonTrustData = {
+            averageRating: ratings?.average_rating ?? null,
+            totalReviews: ratings?.total_reviews ?? 0,
+            totalTransactions: ratings?.total_transactions ?? 0,
+            badges: badgesMap.get(listing.id) || [],
+            portfolioThumbnails: portfolioMap.get(listing.id) || [],
+            trustedByCount: stackCountMap.get(listing.id) || 0,
+            responseTimeHours: null,
+            endorsementCount: 0,
+        }
+        return { ...listing, trustData } as EnrichedPersonListing
+    })
+}
+
+/**
  * AI-powered talent matching with scored results.
  *
  * @description Takes a natural language query, uses AI to extract requirements,

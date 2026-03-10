@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { MarketplaceToolbar } from './MarketplaceToolbar'
 import { MarketplaceFilterPanel } from './MarketplaceFilterPanel'
@@ -54,6 +54,10 @@ interface MarketplaceBrowseProps {
     stats?: MarketplaceStats
     /** Custom labels/icons for the stats section. */
     statsLabels?: StatsLabels
+    /** Whether the stats section starts expanded. Defaults to true. */
+    statsDefaultExpanded?: boolean
+    /** Optional transform applied to listings after each server fetch (e.g. People trust enrichment). */
+    postFetchTransform?: (listings: MarketplaceListing[]) => Promise<MarketplaceListing[]>
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -83,6 +87,8 @@ export function MarketplaceBrowse({
     pageSubtitle = 'Find expert talent, products, and services to grow your business',
     stats,
     statsLabels,
+    statsDefaultExpanded,
+    postFetchTransform,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -91,6 +97,7 @@ export function MarketplaceBrowse({
         initialCategoryCounts,
         initialSavedIds,
         allowedCategories,
+        postFetchTransform,
     })
     const [activeTab, setActiveTab] = useState<MarketplaceTab>('browse')
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
@@ -149,8 +156,14 @@ export function MarketplaceBrowse({
     }, [state])
 
     const [isAISearchLoading, setIsAISearchLoading] = useState(false)
-    const handleAISearchClick = useCallback(async () => {
-        const query = state.searchQuery.trim()
+
+    // Store state methods in refs so callbacks don't depend on the `state` object
+    // (which is recreated every render, causing unnecessary effect re-runs).
+    const applyAIFiltersRef = useRef(state.applyAIFilters)
+    applyAIFiltersRef.current = state.applyAIFilters
+
+    /** Fire an AI search for the given query string. Callable from button or auto-trigger. */
+    const executeAISearch = useCallback(async (query: string) => {
         if (!query) return
         setIsAISearchLoading(true)
         try {
@@ -167,7 +180,7 @@ export function MarketplaceBrowse({
             if (data.success && data.filters) {
                 const { category, subcategory } = data.filters
                 const explanation = typeof data.explanation === 'string' ? data.explanation : undefined
-                state.applyAIFilters({
+                applyAIFiltersRef.current({
                     category: category ?? undefined,
                     subcategory: subcategory ?? undefined,
                     explanation,
@@ -180,7 +193,40 @@ export function MarketplaceBrowse({
         } finally {
             setIsAISearchLoading(false)
         }
-    }, [state])
+    }, []) // stable — no dependencies
+
+    /** Manual AI search button handler — reads live searchQuery. */
+    const handleAISearchClick = useCallback(() => {
+        executeAISearch(state.searchQuery.trim())
+    }, [state.searchQuery, executeAISearch])
+
+    // Auto-detect natural language queries and trigger AI search.
+    // Uses refs for loading/interpretation checks to keep dependency list stable.
+    const lastAutoTriggeredRef = useRef<string>('')
+    const lastAutoTriggeredTimeRef = useRef<number>(0)
+    const isAISearchLoadingRef = useRef(isAISearchLoading)
+    isAISearchLoadingRef.current = isAISearchLoading
+
+    useEffect(() => {
+        const query = state.debouncedQuery.trim()
+        if (!query || isAISearchLoadingRef.current || state.aiInterpretation) return
+        if (query === lastAutoTriggeredRef.current) return
+
+        // M2 fix: 5-second cooldown between auto-triggers to prevent cost amplification
+        const now = Date.now()
+        if (now - lastAutoTriggeredTimeRef.current < 5000) return
+
+        // Heuristic: 4+ words OR starts with multi-word intent phrases
+        const INTENT_PHRASES = /^(i need|find me|looking for|who can|show me|get me|search for|help me)/i
+        const wordCount = query.split(/\s+/).length
+        const isNaturalLanguage = wordCount >= 4 || INTENT_PHRASES.test(query)
+
+        if (isNaturalLanguage) {
+            lastAutoTriggeredRef.current = query
+            lastAutoTriggeredTimeRef.current = now
+            executeAISearch(query) // H3 fix: uses debouncedQuery directly, not state.searchQuery
+        }
+    }, [state.debouncedQuery, state.aiInterpretation, executeAISearch]) // stable deps
 
     // Enter compare mode from browse (reads from shared selection state)
     const handleCompareFromBrowse = useCallback(() => {
@@ -334,6 +380,7 @@ export function MarketplaceBrowse({
                         <MarketplaceStatsSection
                             stats={stats}
                             labels={statsLabels}
+                            defaultExpanded={statsDefaultExpanded}
                             selectedCompanyTypes={state.advancedFilters.companyTypes}
                             selectedCompanySizes={state.advancedFilters.companySizes}
                             selectedSubRegions={state.selectedSubRegions}
@@ -522,6 +569,7 @@ export function MarketplaceBrowse({
                 isSelectedForCompare={state.selectedListing ? selectedForCompare.has(state.selectedListing.id) : false}
                 onToggleCompare={toggleCompareSelection}
                 compareCount={selectedForCompare.size}
+                onViewDetail={state.setSelectedListing}
             />
         </div>
     )

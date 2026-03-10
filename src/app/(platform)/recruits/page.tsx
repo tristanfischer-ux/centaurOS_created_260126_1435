@@ -13,7 +13,7 @@
  */
 
 import { getSavedMarketplaceListings } from '@/actions/marketplace'
-import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
+import { getEnrichedPeopleListings, enrichPeopleListingsBatch } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
@@ -32,6 +32,9 @@ const RECRUITS_STATS_LABELS: StatsLabels = {
     chart1Title: 'Specialization Distribution',
     chart2Title: 'Availability Breakdown',
     chart3Title: 'Regional Coverage',
+    chart4Title: 'Domain Expertise',
+    chart5Title: 'Certification Distribution',
+    chart6Title: 'Specialization Breakdown',
     barTooltipNoun: 'people',
     donutTooltipNoun: 'people',
 }
@@ -133,6 +136,8 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
                 pageSubtitle="Find expert talent to grow your team"
                 stats={recruitsStats ?? undefined}
                 statsLabels={RECRUITS_STATS_LABELS}
+                statsDefaultExpanded={false}
+                postFetchTransform={enrichPeopleListingsBatch}
             />
         </div>
     )

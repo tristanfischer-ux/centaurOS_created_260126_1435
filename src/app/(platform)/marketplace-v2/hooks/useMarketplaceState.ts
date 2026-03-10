@@ -68,6 +68,11 @@ interface UseMarketplaceStateProps {
      * When 2+ categories are provided, an "All" pill is prepended.
      */
     allowedCategories?: ContentCategory[]
+    /**
+     * Optional transform applied to listings after each server fetch.
+     * Used by Recruits to enrich People listings with trustData on page 2+.
+     */
+    postFetchTransform?: (listings: MarketplaceListing[]) => Promise<MarketplaceListing[]>
 }
 
 export function useMarketplaceState({
@@ -77,6 +82,7 @@ export function useMarketplaceState({
     initialCategoryCounts,
     initialSavedIds = [],
     allowedCategories,
+    postFetchTransform,
 }: UseMarketplaceStateProps) {
     const pathname = usePathname()
     const searchParams = useSearchParams()
@@ -272,6 +278,10 @@ export function useMarketplaceState({
         ]
     )
 
+    // Ref to keep fetchPage dependency array stable while allowing transform updates
+    const postFetchTransformRef = useRef(postFetchTransform)
+    postFetchTransformRef.current = postFetchTransform
+
     const fetchPage = useCallback(
         async (page: number, append: boolean) => {
             if (fetchAbortRef.current) {
@@ -286,10 +296,14 @@ export function useMarketplaceState({
             }
             try {
                 const result = await searchMarketplaceListings(params)
+                // Apply optional transform (e.g. People trust data enrichment)
+                const data = postFetchTransformRef.current
+                    ? await postFetchTransformRef.current(result.data)
+                    : result.data
                 if (append) {
-                    setListings(prev => [...prev, ...result.data])
+                    setListings(prev => [...prev, ...data])
                 } else {
-                    setListings(result.data)
+                    setListings(data)
                 }
                 setTotalCount(result.totalCount)
                 setHasMore(result.hasMore)

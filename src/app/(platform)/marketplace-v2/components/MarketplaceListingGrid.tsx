@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { MarketCardV2 } from './MarketCardV2'
+import { PersonCard } from '@/components/marketplace/person-card'
+import type { EnrichedPersonListing } from '@/actions/people-marketplace'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -110,16 +112,22 @@ function ListRow({
 }) {
     const attrs = safeParseAttributes(listing.attributes)
     const isAI = listing.category === 'AI'
+    const isPeopleEnriched = listing.category === 'People' && 'trustData' in listing
+    const trust = isPeopleEnriched ? (listing as EnrichedPersonListing).trustData : null
     const AIIcon = isAI ? getAIIcon(listing.subcategory) : null
     const initials = getInitials(listing.title)
     const gradient = getAvatarGradient(listing.category as MarketplaceCategory, listing.title)
     const price = getDisplayPrice(attrs)
-    const rating = getRating(attrs)
+    // Prefer trust data ratings over attrs for enriched People listings
+    const rating = trust?.averageRating && trust.averageRating > 0
+        ? { average: trust.averageRating, count: trust.totalReviews }
+        : getRating(attrs)
     const responseTime = getResponseTime(attrs)
     const location = attrs.location as string | undefined
     const headline = attrs.headline as string | undefined
     const hiredCount = attrs.total_bookings as number | undefined
     const tags = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications).slice(0, 2)
+    const availability = isPeopleEnriched ? (attrs.availability as string | undefined) : undefined
 
     const handleSave = async (e: React.MouseEvent) => {
         e.stopPropagation()
@@ -164,11 +172,27 @@ function ListRow({
             </button>
 
             {/* Avatar */}
-            <div className={cn(
-                'w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs shrink-0',
-                gradient
-            )}>
-                {isAI && AIIcon ? <AIIcon className="w-5 h-5" /> : initials}
+            <div className="relative shrink-0">
+                <div className={cn(
+                    'w-10 h-10 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-semibold text-xs',
+                    gradient
+                )}>
+                    {isAI && AIIcon ? <AIIcon className="w-5 h-5" /> : initials}
+                </div>
+                {/* Availability dot for enriched People */}
+                {availability && (
+                    <div
+                        className={cn(
+                            'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background',
+                            availability.toLowerCase().includes('full-time') || availability.toLowerCase().includes('available')
+                                ? 'bg-status-success'
+                                : availability.toLowerCase().includes('part') || availability.toLowerCase().includes('day')
+                                    ? 'bg-amber-400'
+                                    : 'bg-muted-foreground'
+                        )}
+                        title={availability}
+                    />
+                )}
             </div>
 
             {/* Main info */}
@@ -206,7 +230,13 @@ function ListRow({
                             <span className="text-muted-foreground">({rating.count})</span>
                         </span>
                     )}
-                    {hiredCount && hiredCount > 0 && (
+                    {trust && trust.trustedByCount > 0 && (
+                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                            <Users className="w-3 h-3" aria-hidden="true" />
+                            Trusted by {trust.trustedByCount}
+                        </span>
+                    )}
+                    {!trust && hiredCount && hiredCount > 0 && (
                         <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                             <Users className="w-3 h-3" />
                             {hiredCount}x
@@ -281,6 +311,57 @@ export function MarketplaceListingGrid({
     onLoadMore,
 }: MarketplaceListingGridProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('cards')
+    const sentinelRef = useRef<HTMLDivElement>(null)
+
+    // Infinite scroll via IntersectionObserver
+    const onLoadMoreRef = useRef(onLoadMore)
+    onLoadMoreRef.current = onLoadMore
+    const isLoadingMoreRef = useRef(isLoadingMore)
+    isLoadingMoreRef.current = isLoadingMore
+    const hasMoreRef = useRef(hasMore)
+    hasMoreRef.current = hasMore
+
+    // Track whether listings are present so the observer re-creates when
+    // the component transitions from empty→populated (sentinel mounts).
+    const hasListings = listings.length > 0
+
+    useEffect(() => {
+        const sentinel = sentinelRef.current
+        if (!sentinel) return
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMoreRef.current && !isLoadingMoreRef.current && onLoadMoreRef.current) {
+                    onLoadMoreRef.current()
+                }
+            },
+            { rootMargin: '400px' }
+        )
+        observer.observe(sentinel)
+        return () => observer.disconnect()
+    }, [hasListings]) // Re-run when listings appear/disappear so observer attaches to new sentinel
+
+    // M1 fix: After a batch finishes loading, the sentinel may still be in
+    // viewport but the observer won't re-fire (no intersection state change).
+    // Disconnect and re-observe to force a fresh intersection check.
+    const prevLoadingMore = useRef(isLoadingMore)
+    useEffect(() => {
+        if (prevLoadingMore.current && !isLoadingMore && hasMore) {
+            // Batch just finished — re-observe sentinel to catch "still in viewport"
+            const sentinel = sentinelRef.current
+            if (!sentinel) { prevLoadingMore.current = isLoadingMore; return }
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    if (entries[0].isIntersecting && hasMoreRef.current && !isLoadingMoreRef.current && onLoadMoreRef.current) {
+                        onLoadMoreRef.current()
+                    }
+                    observer.disconnect()
+                },
+                { rootMargin: '400px' }
+            )
+            observer.observe(sentinel)
+        }
+        prevLoadingMore.current = isLoadingMore
+    }, [isLoadingMore, hasMore])
 
     if (listings.length === 0) {
         return (
@@ -347,17 +428,33 @@ export function MarketplaceListingGrid({
             {/* Card view */}
             {viewMode === 'cards' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {listings.map((listing) => (
-                        <MarketCardV2
-                            key={listing.id}
-                            listing={listing}
-                            isSaved={savedIds.has(listing.id)}
-                            isSelectedForCompare={selectedForCompare.has(listing.id)}
-                            onSaveToggle={onSaveToggle}
-                            onViewDetail={onViewDetail}
-                            onToggleCompare={onToggleCompare}
-                        />
-                    ))}
+                    {listings.map((listing) => {
+                        // Use the purpose-built PersonCard for enriched People listings
+                        if (listing.category === 'People' && 'trustData' in listing) {
+                            return (
+                                <PersonCard
+                                    key={listing.id}
+                                    listing={listing as EnrichedPersonListing}
+                                    isSaved={savedIds.has(listing.id)}
+                                    isSelectedForCompare={selectedForCompare.has(listing.id)}
+                                    onSaveToggle={onSaveToggle}
+                                    onViewDetail={onViewDetail}
+                                    onToggleCompare={onToggleCompare}
+                                />
+                            )
+                        }
+                        return (
+                            <MarketCardV2
+                                key={listing.id}
+                                listing={listing}
+                                isSaved={savedIds.has(listing.id)}
+                                isSelectedForCompare={selectedForCompare.has(listing.id)}
+                                onSaveToggle={onSaveToggle}
+                                onViewDetail={onViewDetail}
+                                onToggleCompare={onToggleCompare}
+                            />
+                        )
+                    })}
                 </div>
             )}
 
@@ -378,36 +475,32 @@ export function MarketplaceListingGrid({
                 </div>
             )}
 
-            {/* Load more + loading skeleton */}
-            {hasMore && onLoadMore && (
+            {/* Infinite scroll sentinel + loading skeletons */}
+            {hasMore && (
                 <div className="flex flex-col items-center gap-4 pt-4">
-                    {isLoadingMore ? (
-                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Loading more…
-                        </div>
-                    ) : (
-                        <Button
-                            variant="secondary"
-                            onClick={onLoadMore}
-                            className="min-h-[44px]"
-                        >
-                            Load more
-                        </Button>
-                    )}
-                    {isLoadingMore && viewMode === 'cards' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
-                            {[1, 2, 3].map((i) => (
-                                <Skeleton key={i} className="h-72 w-full rounded-xl" />
-                            ))}
-                        </div>
-                    )}
-                    {isLoadingMore && viewMode === 'list' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full">
-                            {[1, 2, 3, 4].map((i) => (
-                                <Skeleton key={i} className="h-24 w-full rounded-lg" />
-                            ))}
-                        </div>
+                    {/* Invisible sentinel observed by IntersectionObserver */}
+                    <div ref={sentinelRef} className="h-px w-full" aria-hidden="true" />
+                    {isLoadingMore && (
+                        <>
+                            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Loading more…
+                            </div>
+                            {viewMode === 'cards' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 w-full">
+                                    {[1, 2, 3].map((i) => (
+                                        <Skeleton key={i} className="h-72 w-full rounded-xl" />
+                                    ))}
+                                </div>
+                            )}
+                            {viewMode === 'list' && (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 w-full">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <Skeleton key={i} className="h-24 w-full rounded-lg" />
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             )}
