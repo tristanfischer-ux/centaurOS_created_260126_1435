@@ -501,7 +501,8 @@ export default function ReportsPage(): React.JSX.Element {
     }
 
     setIsGeneratingBriefing(true)
-    setBriefingResult(null)
+    // INTENT: Don't clear the previous briefing until we have a new one.
+    // This preserves the old briefing if generation fails (same pattern as reports).
 
     try {
       const result = await generateBriefingAction({
@@ -1395,7 +1396,7 @@ export default function ReportsPage(): React.JSX.Element {
 
           {/* Strategic Briefing Preview */}
           {briefingResult && (
-            <section ref={briefingRef} className="space-y-4">
+            <section ref={briefingRef} className="space-y-4 scroll-mt-28">
               <div className="sticky top-0 z-40 -mx-1 px-1 py-3 bg-background">
                 <Card>
                   <CardContent className="flex flex-col gap-3 p-4">
@@ -1655,7 +1656,8 @@ export default function ReportsPage(): React.JSX.Element {
               onClick={() => {
                 toast.success(
                   scheduleEnabled
-                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(',').map(s => s.trim()).filter(Boolean).length} recipient(s)`
+                    // GOTCHA: Match the same split pattern as handleSendEmail — users may use semicolons.
+                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(/[,;]+/).map(s => s.trim()).filter(Boolean).length} recipient(s)`
                     : 'Scheduling disabled'
                 )
                 setIsScheduleDialogOpen(false)
