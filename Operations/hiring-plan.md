@@ -1,6 +1,6 @@
 # Fractional Forge — Hiring Plan
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 **Status**: Draft — pre-hire planning
 
 ---

@@ -82,7 +82,7 @@ Tasks (Kanban/Gantt/OKR), finance (budgeting, cash burn, invoicing), messaging, 
 |------|---------|-----------------|----------------|
 | Explorer | Free | Free | Solo founders testing |
 | Startup Team | £49 | £39.20 | Early-stage, small team |
-| Professional | £149 | £119 | Growing team, power users |
+| Professional | £149 | £119.20 | Growing team, power users |
 | Enterprise | £499 | £399 | Large teams, custom needs |
 
 ### 4.3 Unit Economics (To Be Validated)
@@ -182,7 +182,7 @@ Key assumptions to model:
 Self-funded with AI-assisted development significantly reducing costs.
 
 ### Future Options
-- **SEIS/EIS**: SEIS: 50% income tax relief (up to £250K). EIS: 30% income tax relief (up to £5M per year).
+- **SEIS/EIS**: SEIS: 50% income tax relief (company can raise up to £250K per year). EIS: 30% income tax relief (up to £5M per year).
 - **Angel round**: £150-300K at seed stage if traction warrants
 - **Grants**: Innovate UK, hardware-specific grants
 - **Revenue-funded**: If unit economics work, continue bootstrapping

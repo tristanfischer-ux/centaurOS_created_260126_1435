@@ -1,6 +1,6 @@
 # Fractional Forge — Standard Operating Procedures
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 **Status**: Initial framework
 
 ---
@@ -30,7 +30,7 @@ ForgeOS deploys to Vercel on push to `main`.
 1. Create migration: `npx supabase migration new [name]`
 2. Write SQL in `supabase/migrations/`
 3. Test locally: `npx supabase db push` (against linked project)
-4. Regenerate types: `npx supabase gen types typescript --linked > src/types/database.types.ts`
+4. Regenerate types: `npx supabase gen types typescript --linked 2>/dev/null > src/types/database.types.ts`
 5. Verify: `npx tsc --noEmit`
 6. Deploy: migrations run automatically on `db push`
 

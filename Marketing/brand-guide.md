@@ -1,6 +1,6 @@
 # Fractional Forge — Brand Guide
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 
 ---
 

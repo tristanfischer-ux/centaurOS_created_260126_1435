@@ -1,6 +1,6 @@
 # ForgeOS — Outreach Templates
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 
 ---
 
@@ -50,7 +50,7 @@ Tristan Fischer | Fractional Forge
 
 Hi [First Name],
 
-I'm building ForgeOS — a platform used by hardware startup founders for AI-assisted product development. One of our core features is a B2B marketplace where founders find and engage vetted experts like you.
+I'm building ForgeOS — a platform for hardware startup founders that combines expert advisory, a CAD-to-RFQ workspace, and a vetted expert marketplace. One of our core features is a B2B marketplace where founders find and engage vetted experts like you.
 
 Our marketplace includes escrow payment protection (you always get paid), discovery call booking, portfolio showcasing, and matching that connects your skills with founders who need them.
 

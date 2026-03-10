@@ -1,5 +1,7 @@
 # Fractional Forge Limited — Company Overview
 
+**Last Updated**: 10 March 2026
+
 ## Company Details
 
 | Field | Value |
@@ -26,9 +28,9 @@ ForgeOS is a multi-tenant SaaS platform that provides:
 
 1. **13 AI Specialist Advisors** — Domain experts in strategy, engineering, finance, legal, manufacturing, supply chain, sales, marketing, HR, and product. Each is a fully characterised persona with persistent memory and contextual awareness.
 
-2. **The Forge (CAD Lab)** — A concept-to-RFQ manufacturing workspace. Describe a product, get AI-generated 3D models, run analysis, and broadcast RFQs to suppliers.
+2. **The Forge (CAD Lab)** — A concept-to-RFQ manufacturing workspace. Describe a product, get 3D models, run analysis, and broadcast RFQs to suppliers.
 
-3. **B2B Marketplace** — Connect with vetted service providers (manufacturers, consultants, engineers) with AI-powered matching, escrow payments, and dispute resolution.
+3. **B2B Marketplace** — Connect with vetted service providers (manufacturers, consultants, engineers) with contextual matching, escrow payments, and dispute resolution.
 
 4. **Operational Tools** — Task management (Kanban, Gantt, OKRs), finance tools (budgeting, cash burn modelling, invoicing), messaging, and Google Calendar integration.
 

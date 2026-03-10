@@ -1,6 +1,6 @@
 # ForgeOS — Unit Economics
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 **Status**: Framework — needs real data to validate
 
 ---
@@ -81,7 +81,7 @@ Target: <12 months payback. Both scenarios well under.
 
 **Key insight**: Free users cost ~£3/month to serve. At 7% conversion, every 100 free users produce 7 paid users generating ~£812/mo vs. £300/mo cost for all 100. Net positive.
 
-Note: This excludes the ~£15-20/mo serving cost for the 7 paid users, bringing true net contribution to ~£672-707/mo — still strongly positive.
+Note: This excludes the ~£15-20/mo serving cost for the 7 paid users, bringing true net contribution to ~£372-407/mo — still strongly positive.
 
 ---
 

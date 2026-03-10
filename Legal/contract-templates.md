@@ -1,6 +1,6 @@
 # Fractional Forge — Contract Templates Index
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 **Status**: Template outlines — to be reviewed by solicitor before use
 
 ---

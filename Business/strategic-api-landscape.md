@@ -126,7 +126,7 @@ This pipeline turns The Forge from a CAD generation tool into a full concept-to-
 | Zoo.dev | ~$1.00/generation | 3-8 CAD models | $3.00-8.00 |
 | Dashnode/CoLab | TBD (likely $0.50-2.00/check) | 3-8 DFM checks | $1.50-16.00 |
 | Xometry | Free for quoting | 5-15 quotes | $0.00 |
-| Thangs | TBD | 2-5 searches | TBD |
+| Thangs | TBD (pricing not yet published) | 2-5 searches | TBD (pricing not yet published) |
 | **Total incremental API cost** | | | **~$5-30/user/month** |
 
 At the Professional tier (£149/mo ≈ $190/mo), this represents 3-16% of revenue — well within the target gross margin of >70%. The Startup tier (£49/mo ≈ $62/mo) is tighter at 8-48%, suggesting API-intensive features should be gated to Professional+ or metered.

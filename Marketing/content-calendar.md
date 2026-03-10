@@ -1,5 +1,6 @@
 # ForgeOS — 90-Day Content Calendar
 
+**Last Updated**: 10 March 2026
 **Start Date**: March 2026
 **Cadence**: 1 blog post + 2-3 LinkedIn posts per week
 
@@ -9,12 +10,12 @@
 
 ## Month 1: Foundation & Launch (March)
 
-### Week 1 (3-9 Mar)
-- **Blog**: "The knowledge crisis killing hardware startups (and what to do about it)"
+### Week 1 (3-9 Mar) (Deferred)
+- **Blog**: "The knowledge crisis killing hardware startups (and what to do about it)" (Deferred)
   - *Angle*: Problem-aware content. Paint the pain. No product pitch yet.
   - *Distribution*: LinkedIn, Hacker News, r/hwstartups
-- **LinkedIn**: Share a specific story about a regulatory surprise that cost a startup 4 months
-- **LinkedIn**: "What's the one domain gap that caught you off guard?" (engagement post)
+- **LinkedIn**: Share a specific story about a regulatory surprise that cost a startup 4 months (Deferred)
+- **LinkedIn**: "What's the one domain gap that caught you off guard?" (engagement post) (Deferred)
 
 ### Week 2 (10-16 Mar)
 - **Blog**: "Why hardware founders need 13 types of expertise (and how to get them)"
@@ -101,7 +102,7 @@
 
 ### Primary (high intent)
 - "hardware startup tools"
-- "AI for product development"
+- "AI for product development" (SEO keyword — brand exception for search targeting)
 - "concept to prototype platform"
 - "RFQ generator for hardware"
 - "manufacturing marketplace"

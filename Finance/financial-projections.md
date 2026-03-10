@@ -1,6 +1,6 @@
 # ForgeOS — 12-Month Financial Projections
 
-**Last Updated**: 3 March 2026
+**Last Updated**: 10 March 2026
 **Status**: Framework — requires actual cost data to populate
 
 ---
@@ -32,7 +32,7 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 
 ## 2. 12-Month Revenue Projection
 
-| Month | New Signups | Total Free | New Paid | Total Paid | Churn | Sub Revenue | Mktplace GMV | Mktplace Fee | Total Revenue |
+| Month | New Signups | Active Free* | New Paid | Total Paid | Churn | Sub Revenue | Mktplace GMV | Mktplace Fee | Total Revenue |
 |-------|-------------|-----------|----------|-----------|-------|-------------|-------------|-------------|---------------|
 | 1 | 50 | 50 | 4 | 4 | 0 | £464 | £200 | £20 | £484 |
 | 2 | 60 | 106 | 4 | 8 | 0 | £928 | £600 | £60 | £988 |
@@ -46,6 +46,8 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 | 10 | 250 | 1,125 | 18 | 87 | 3 | £10,092 | £15,000 | £1,500 | £11,592 |
 | 11 | 280 | 1,318 | 20 | 104 | 3 | £12,064 | £18,000 | £1,800 | £13,864 |
 | 12 | 300 | 1,514 | 21 | 122 | 4 | £14,152 | £22,000 | £2,200 | £16,352 |
+
+*\*Active Free = cumulative signups minus cumulative paid conversions.*
 
 **Year 1 Totals**:
 - Total registered users: ~1,500
