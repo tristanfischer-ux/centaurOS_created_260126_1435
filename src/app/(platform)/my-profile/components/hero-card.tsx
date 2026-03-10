@@ -145,6 +145,10 @@ export function HeroCard({
               className="hidden"
               aria-hidden="true"
             />
+            {/* Avatar upload hint when no photo */}
+            {!avatarUrl && (
+              <p className="text-xs text-muted-foreground text-center mt-1">Add photo</p>
+            )}
           </div>
 
           {/* Info */}

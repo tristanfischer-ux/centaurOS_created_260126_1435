@@ -129,7 +129,7 @@ export function CompanySwitcher({
                   'relative cursor-pointer transition-all duration-200 rounded-xl border shadow-sm',
                   'hover:shadow-lg hover:-translate-y-0.5',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  foundry.isActive && 'ring-2 ring-international-orange',
+                  foundry.isActive && 'ring-1 ring-international-orange/60',
                   isCurrentlySwitching && 'opacity-70 pointer-events-none'
                 )}
                 onClick={() => onCompanyClick(foundry.foundryId)}

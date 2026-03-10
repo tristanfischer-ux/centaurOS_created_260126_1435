@@ -1,11 +1,10 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import {
-  CheckSquare, Target, Users, Mail, Shield, Building2,
-  Pencil, Phone, Linkedin, TrendingUp, TrendingDown, Minus,
-  Award, Zap, Star, Trophy,
+  CheckSquare, Target, Users, BarChart3,
+  Phone, Linkedin, TrendingUp, TrendingDown, Minus,
+  Award, Zap, Star, Trophy, Briefcase, GraduationCap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -37,6 +36,12 @@ interface OverviewTabProps {
   phoneNumber: string | null
   /** User's LinkedIn URL */
   linkedinUrl: string | null
+  /** Professional background data */
+  professionalBackground: {
+    summary?: string | null
+    previous_companies?: string | null
+    education?: string | null
+  } | null
   /** Platform stats */
   stats: {
     totalTasks: number
@@ -58,6 +63,7 @@ export function OverviewTab({
   bio,
   phoneNumber,
   linkedinUrl,
+  professionalBackground,
   stats,
   enrichment,
   onEditClick,
@@ -75,30 +81,12 @@ export function OverviewTab({
       {/* About You */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">About You</CardTitle>
-            <Button size="sm" variant="outline" onClick={onEditClick}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit Profile
-            </Button>
-          </div>
+          <CardTitle className="text-base">About You</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <DetailRow icon={Mail} label="Email" value={email} />
-            <DetailRow icon={Shield} label="Role" value={role} />
-            <DetailRow icon={Building2} label="Company" value={foundryName || 'No company'} />
-            {phoneNumber && (
-              <DetailRow icon={Phone} label="Phone" value={phoneNumber} />
-            )}
-            {linkedinUrl && (
-              <DetailRow icon={Linkedin} label="LinkedIn" value={formatUrl(linkedinUrl)} />
-            )}
-          </div>
-
           {/* Bio section */}
-          {bio ? (
-            <div className="pt-2 border-t border-muted">
+          {bio && (
+            <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                 Bio
               </p>
@@ -106,12 +94,62 @@ export function OverviewTab({
                 {bio}
               </p>
             </div>
-          ) : (
-            <div className="pt-2 border-t border-muted">
-              <p className="text-sm text-muted-foreground italic">
-                No bio yet — click Edit Profile to tell people about yourself.
+          )}
+
+          {/* Background section */}
+          {professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education) && (
+            <div className={cn(bio ? 'pt-2 border-t border-muted' : '')}>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                Background
               </p>
+              <div className="space-y-3">
+                {professionalBackground.summary && (
+                  <div className="flex items-start gap-2">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <p className="text-sm text-foreground">{professionalBackground.summary}</p>
+                  </div>
+                )}
+                {professionalBackground.previous_companies && (
+                  <div className="flex items-start gap-2">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Previous Companies</span>
+                      <p className="text-sm text-foreground">{professionalBackground.previous_companies}</p>
+                    </div>
+                  </div>
+                )}
+                {professionalBackground.education && (
+                  <div className="flex items-start gap-2">
+                    <GraduationCap className="h-3.5 w-3.5 text-muted-foreground mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-xs font-medium text-muted-foreground">Education</span>
+                      <p className="text-sm text-foreground">{professionalBackground.education}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+          )}
+
+          {/* Supplementary contact info */}
+          {(phoneNumber || linkedinUrl) && (
+            <div className={cn((bio || (professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education))) ? 'pt-2 border-t border-muted' : '')}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {phoneNumber && (
+                  <DetailRow icon={Phone} label="Phone" value={phoneNumber} />
+                )}
+                {linkedinUrl && (
+                  <DetailRow icon={Linkedin} label="LinkedIn" value={formatUrl(linkedinUrl)} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state when nothing populated */}
+          {!bio && !(professionalBackground && (professionalBackground.summary || professionalBackground.previous_companies || professionalBackground.education)) && !phoneNumber && !linkedinUrl && (
+            <p className="text-sm text-muted-foreground italic">
+              Your profile is looking a bit empty — click Edit in the hero card above to tell people about yourself.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -161,7 +199,7 @@ export function OverviewTab({
           value={stats.teamSize}
         />
         <StatCard
-          icon={CheckSquare}
+          icon={BarChart3}
           label="Completion Rate"
           value={stats.totalTasks > 0
             ? `${Math.round((stats.completedTasks / stats.totalTasks) * 100)}%`
@@ -374,7 +412,7 @@ function DetailRow({
         <Icon className="h-3 w-3" />
         {label}
       </span>
-      <p className="text-sm font-medium text-foreground px-3 py-2 bg-muted rounded-lg">
+      <p className="text-sm text-foreground">
         {value}
       </p>
     </div>

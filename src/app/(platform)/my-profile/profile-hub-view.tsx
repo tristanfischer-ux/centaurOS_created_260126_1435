@@ -173,6 +173,11 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
             bio={profile?.bio ?? null}
             phoneNumber={profile?.phone_number ?? null}
             linkedinUrl={linkedinUrl}
+            professionalBackground={profile?.professional_background as {
+              summary?: string | null
+              previous_companies?: string | null
+              education?: string | null
+            } | null ?? null}
             stats={stats}
             enrichment={enrichment}
             onEditClick={() => setIsEditProfileOpen(true)}
