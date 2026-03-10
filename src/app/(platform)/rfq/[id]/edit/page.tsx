@@ -36,8 +36,8 @@ export default async function RFQEditPage({ params }: RFQEditPageProps) {
     notFound()
   }
 
-  // Cannot edit awarded, closed, or cancelled RFQs
-  if (rfq.status === 'Awarded' || rfq.status === 'Closed' || rfq.status === 'cancelled') {
+  // Only allow editing Open RFQs (matches server-side guard in updateRFQ)
+  if (rfq.status !== 'Open') {
     notFound()
   }
 

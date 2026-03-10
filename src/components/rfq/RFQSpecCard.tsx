@@ -109,7 +109,7 @@ export function RFQSpecCard({
                 {mod.dimensions && (
                   <Badge variant="outline" className="text-xs text-muted-foreground">
                     {[mod.dimensions.length, mod.dimensions.width, mod.dimensions.height]
-                      .filter(Boolean)
+                      .filter(v => v != null)
                       .join(' x ')}
                     {mod.dimensions.unit ? ` ${mod.dimensions.unit}` : ' mm'}
                   </Badge>

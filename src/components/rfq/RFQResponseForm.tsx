@@ -102,6 +102,13 @@ export function RFQResponseForm({
       return
     }
 
+    if (responseType === 'interest' && indicativeMin && indicativeMax) {
+      if (parseFloat(indicativeMin) > parseFloat(indicativeMax)) {
+        setError('Minimum estimate cannot exceed maximum estimate')
+        return
+      }
+    }
+
     // Build decline message from checkboxes (Feature 15)
     let finalMessage = message
     if (responseType === 'decline' && declineReasons.size > 0) {
@@ -114,7 +121,7 @@ export function RFQResponseForm({
     startTransition(async () => {
       const payload: Parameters<typeof respondToRFQ>[1] = {
         type: responseType,
-        quoted_price: quotedPrice ? parseFloat(quotedPrice) : undefined,
+        quoted_price: quotedPrice !== '' ? parseFloat(quotedPrice) : undefined,
         message: finalMessage?.trim() || undefined,
       }
 
@@ -137,8 +144,8 @@ export function RFQResponseForm({
 
       // Add indicative pricing for interest (Feature 17)
       if (responseType === 'interest') {
-        if (indicativeMin) payload.indicative_min = parseFloat(indicativeMin)
-        if (indicativeMax) payload.indicative_max = parseFloat(indicativeMax)
+        if (indicativeMin !== '') payload.indicative_min = parseFloat(indicativeMin)
+        if (indicativeMax !== '') payload.indicative_max = parseFloat(indicativeMax)
       }
 
       const result = await respondToRFQ(rfq.id, payload)
@@ -158,6 +165,12 @@ export function RFQResponseForm({
 
   const handleSuccessClose = () => {
     onSuccess?.()
+  }
+
+  const switchMode = (newMode: ResponseMode) => {
+    setMode(newMode)
+    setMessage('')
+    setError(null)
   }
 
   const getTypeMessage = (type: RFQType) => {
@@ -197,7 +210,7 @@ export function RFQResponseForm({
           {/* Mobile: horizontal scroll, Desktop: vertical stack */}
           <div className="flex gap-3 overflow-x-auto snap-x sm:flex-col sm:overflow-visible pb-2 sm:pb-0">
             <button
-              onClick={() => setMode('accept')}
+              onClick={() => switchMode('accept')}
               className={cn(
                 'min-w-[200px] sm:min-w-0 sm:w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors',
                 'hover:border-status-success hover:bg-status-success-light snap-start'
@@ -216,7 +229,7 @@ export function RFQResponseForm({
             </button>
 
             <button
-              onClick={() => setMode('interest')}
+              onClick={() => switchMode('interest')}
               className={cn(
                 'min-w-[200px] sm:min-w-0 sm:w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors',
                 'hover:border-status-warning hover:bg-status-warning-light snap-start'
@@ -235,7 +248,7 @@ export function RFQResponseForm({
             </button>
 
             <button
-              onClick={() => setMode('info_request')}
+              onClick={() => switchMode('info_request')}
               className={cn(
                 'min-w-[200px] sm:min-w-0 sm:w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors',
                 'hover:border-status-info hover:bg-status-info-light snap-start'
@@ -254,7 +267,7 @@ export function RFQResponseForm({
             </button>
 
             <button
-              onClick={() => setMode('decline')}
+              onClick={() => switchMode('decline')}
               className={cn(
                 'min-w-[200px] sm:min-w-0 sm:w-full flex items-center gap-4 p-4 rounded-lg border-2 transition-colors',
                 'hover:border-destructive hover:bg-status-error-light snap-start'

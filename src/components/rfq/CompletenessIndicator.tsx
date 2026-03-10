@@ -27,11 +27,14 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
   const optionalPassed = optionalChecks.filter(c => c.passed).length
   
   // Required fields are worth 70%, optional 30%
-  const requiredScore = requiredChecks.length > 0 
-    ? (requiredPassed / requiredChecks.length) * 70 
+  if (checks.length === 0) {
+    return null
+  }
+  const requiredScore = requiredChecks.length > 0
+    ? (requiredPassed / requiredChecks.length) * 70
     : 70
-  const optionalScore = optionalChecks.length > 0 
-    ? (optionalPassed / optionalChecks.length) * 30 
+  const optionalScore = optionalChecks.length > 0
+    ? (optionalPassed / optionalChecks.length) * 30
     : 30
   
   const totalScore = Math.round(requiredScore + optionalScore)

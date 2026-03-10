@@ -281,6 +281,8 @@ export async function cancelRFQ(
       .from('rfqs')
       .update({
         status: 'cancelled',
+        priority_holder_id: null,
+        priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
 

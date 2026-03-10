@@ -234,6 +234,7 @@ export function RFQDetail({
 
   // Group responses by type
   const acceptResponses = rfq.responses.filter((r) => r.response_type === 'accept')
+  const interestResponses = rfq.responses.filter((r) => r.response_type === 'interest')
   const infoRequests = rfq.responses.filter((r) => r.response_type === 'info_request')
   const declines = rfq.responses.filter((r) => r.response_type === 'decline')
 
@@ -596,6 +597,24 @@ export function RFQDetail({
                       }
                       onAward={() => handleAward(response.provider_id)}
                       isPending={isPending}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Interest expressions with indicative pricing */}
+            {interestResponses.length > 0 && (
+              <div>
+                <h4 className="font-medium flex items-center gap-2 mb-3">
+                  <Zap className="w-4 h-4 text-status-info" />
+                  Interested ({interestResponses.length})
+                </h4>
+                <div className="space-y-3">
+                  {interestResponses.map((response) => (
+                    <ResponseCard
+                      key={response.id}
+                      response={response}
                     />
                   ))}
                 </div>

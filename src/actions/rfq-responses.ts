@@ -443,6 +443,7 @@ export async function getMyRFQResponse(rfqId: string): Promise<{
 
 /**
  * Get response count for an RFQ
+ * SECURITY: Only the RFQ buyer can see detailed response counts
  */
 export async function getRFQResponseCount(rfqId: string): Promise<{
   total: number
@@ -456,6 +457,17 @@ export async function getRFQResponseCount(rfqId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     return { total: 0, accepts: 0, declines: 0, info_requests: 0, error: "Not authenticated" }
+  }
+
+  // Verify user is the RFQ buyer
+  const { data: rfq } = await supabase
+    .from('rfqs')
+    .select('buyer_id')
+    .eq('id', rfqId)
+    .single()
+
+  if (!rfq || rfq.buyer_id !== user.id) {
+    return { total: 0, accepts: 0, declines: 0, info_requests: 0, error: "Not authorized" }
   }
 
   const { data: responses, error } = await supabase

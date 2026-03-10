@@ -419,6 +419,7 @@ export async function releaseRFQPriorityHold(rfqId: string): Promise<{
 
 /**
  * Get race status for an RFQ
+ * SECURITY: Only the RFQ buyer can see full race details
  */
 export async function getRFQRaceStatus(rfqId: string): Promise<{
   data: RaceStatus | null
@@ -429,11 +430,41 @@ export async function getRFQRaceStatus(rfqId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: "Not authenticated" }
 
+  // Verify user is the buyer or a broadcast recipient
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("buyer_id")
+    .eq("id", rfqId)
+    .single()
+
+  if (!rfq) return { data: null, error: "RFQ not found" }
+
+  if (rfq.buyer_id !== user.id) {
+    // Check if supplier was broadcast to
+    const { data: providerProfile } = await supabase
+      .from("provider_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!providerProfile) return { data: null, error: "Not authorized" }
+
+    const { data: broadcast } = await supabase
+      .from("rfq_broadcasts")
+      .select("id")
+      .eq("rfq_id", rfqId)
+      .eq("provider_id", providerProfile.id)
+      .single()
+
+    if (!broadcast) return { data: null, error: "Not authorized" }
+  }
+
   return checkRaceStatus(supabase, rfqId)
 }
 
 /**
  * Get matched suppliers for an RFQ (uses same smart matching as broadcast).
+ * SECURITY: Only the RFQ buyer can see matched suppliers
  */
 export async function getMatchedSuppliers(rfqId: string): Promise<{
   data: SupplierMatch[]
@@ -443,6 +474,17 @@ export async function getMatchedSuppliers(rfqId: string): Promise<{
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: [], error: "Not authenticated" }
+
+  // Verify user is the buyer
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("buyer_id")
+    .eq("id", rfqId)
+    .single()
+
+  if (!rfq || rfq.buyer_id !== user.id) {
+    return { data: [], error: "Not authorized" }
+  }
 
   const { matches, error } = await matchSuppliersToRFQ(supabase, rfqId)
   if (error) return { data: [], error }

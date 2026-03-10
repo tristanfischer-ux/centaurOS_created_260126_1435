@@ -282,7 +282,7 @@ export async function matchSuppliersToRFQ(
           matchScore: matchResult.score,
           matchReasons: matchResult.reasons,
           tier: provider.tier as SupplierMatch['tier'],
-          isAvailable: provider.current_order_count < provider.max_concurrent_orders,
+          isAvailable: (provider.current_order_count ?? 0) < (provider.max_concurrent_orders ?? 999),
         }
       })
       .filter(match => match.matchScore >= 30) // Only include reasonable matches

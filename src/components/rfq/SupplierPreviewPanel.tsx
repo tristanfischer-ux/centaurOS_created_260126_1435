@@ -102,8 +102,6 @@ export function SupplierPreviewPanel({
 
   const typeInfo = typeLabels[formData.rfqType] || typeLabels.commodity
 
-  const hasContent = formData.title || formData.description || formData.category
-
   return (
     <div className={cn('flex flex-col h-full', className)}>
       {/* Header */}
