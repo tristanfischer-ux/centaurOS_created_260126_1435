@@ -307,7 +307,10 @@ export async function acceptRFQ(
       .eq('id', providerId)
       .single()
 
-    const tier = provider?.tier as SupplierTier || 'approved'
+    if (!provider) {
+      return { success: false, awarded: false, priority_hold: false, error: 'Provider profile not found' }
+    }
+    const tier = (provider.tier as SupplierTier) || 'pending'
     const rfqType = rfq.rfq_type as RFQType
 
     // Check if broadcast has been delivered to this provider
@@ -702,8 +705,10 @@ export async function awardRFQ(
       return { success: false, error: 'RFQ already awarded' }
     }
 
-    if (rfq.status === 'cancelled' || rfq.status === 'Closed') {
-      return { success: false, error: `Cannot award ${rfq.status} RFQ` }
+    // INTENT: Closed RFQs can still be awarded (buyer closes to stop new responses,
+    // then awards from existing ones). Only cancelled RFQs are truly unawrdable.
+    if (rfq.status === 'cancelled') {
+      return { success: false, error: 'Cannot award cancelled RFQ' }
     }
 
     // Verify the provider has accepted

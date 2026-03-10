@@ -257,9 +257,11 @@ export async function sendSystemMessage(
   content: string
 ): Promise<Message> {
   // Get the conversation to find a participant to use as system sender
+  // INTENT: Fetch buyer_id with creator_id fallback. Task/objective conversations
+  // don't have buyer_id, so we fall back to creator_id to avoid NOT NULL violation.
   const { data: conversation, error: convError } = await supabase
     .from('conversations')
-    .select('buyer_id')
+    .select('buyer_id, creator_id')
     .eq('id', conversationId)
     .single()
 
@@ -267,11 +269,16 @@ export async function sendSystemMessage(
     throw new Error('Conversation not found')
   }
 
+  const senderId = conversation.buyer_id ?? conversation.creator_id
+  if (!senderId) {
+    throw new Error('Cannot determine sender for system message')
+  }
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
       conversation_id: conversationId,
-      sender_id: conversation.buyer_id, // System messages attributed to buyer for RLS
+      sender_id: senderId,
       content,
       message_type: 'system',
       is_read: false

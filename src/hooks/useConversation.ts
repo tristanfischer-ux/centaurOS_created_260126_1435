@@ -162,16 +162,9 @@ export function useConversation(
     }
   }, [conversationId])
 
-  // Get current user
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      currentUserRef.current = user?.id || null
-    }
-    getUser()
-  }, [supabase])
-
   // Initial fetch and realtime subscription
+  // INTENT: User fetch is inside init() to guarantee currentUserRef is set
+  // before fetchMessages reads it for lastReadAt.
   useEffect(() => {
     if (!conversationId) {
       setMessages([])
@@ -183,6 +176,10 @@ export function useConversation(
     let mounted = true
 
     const init = async () => {
+      // Fetch current user first so fetchMessages can read currentUserRef
+      const { data: { user } } = await supabase.auth.getUser()
+      currentUserRef.current = user?.id || null
+
       await fetchMessages()
 
       // Subscribe to new messages

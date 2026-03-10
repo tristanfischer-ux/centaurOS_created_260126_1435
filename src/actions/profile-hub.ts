@@ -373,10 +373,10 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
         user_id: user.id,
         headline: headline || null,
         bio: bio || null,
-        day_rate: dayRate || null,
+        day_rate: dayRate ?? null,
         currency: currency || 'GBP',
         location: location || null,
-        years_experience: yearsExperience || null,
+        years_experience: yearsExperience ?? null,
         linkedin_url: linkedinUrl || null,
         website_url: websiteUrl || null,
         timezone: timezone || 'Europe/London',
@@ -449,7 +449,7 @@ export async function updateBasicProfile(data: {
   if (data.linkedinUrl) {
     try {
       const url = new URL(data.linkedinUrl)
-      if (!url.hostname.endsWith('linkedin.com')) {
+      if (url.hostname !== 'linkedin.com' && !url.hostname.endsWith('.linkedin.com')) {
         return { success: false, error: 'LinkedIn URL must be a linkedin.com link' }
       }
     } catch {

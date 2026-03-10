@@ -874,7 +874,7 @@ function ResponseCard({
       )}
 
       <div className="mt-2 text-xs text-muted-foreground">
-        {format(new Date(response.responded_at), 'MMM d, yyyy HH:mm')}
+        {response.responded_at ? format(new Date(response.responded_at), 'MMM d, yyyy HH:mm') : 'Pending'}
       </div>
     </div>
   )

@@ -394,6 +394,7 @@ export default function ReportsPage(): React.JSX.Element {
   // DECISION: We compute parameters directly from getTemplate() rather than relying
   // on state, because React batches state updates and they won't be committed yet.
   const handleQuickStart = useCallback((templateId: ReportTemplateId) => {
+    if (isGenerating) return
     handleTemplateSelect(templateId)
     // For "custom", just expand config — don't auto-generate
     if (templateId === 'custom') return
@@ -441,7 +442,7 @@ export default function ReportsPage(): React.JSX.Element {
         clearInterval(stepInterval)
         setIsGenerating(false)
       })
-  }, [handleTemplateSelect])
+  }, [handleTemplateSelect, isGenerating])
 
   const handleGenerateBriefing = useCallback(async () => {
     if (!briefingContext.trim()) {
@@ -508,15 +509,19 @@ export default function ReportsPage(): React.JSX.Element {
 
   const handlePrint = useCallback(() => {
     // INTENT: Use briefingRef when in presentations tab, reportRef for report tab.
-    const printEl = pageMode === 'presentations' ? briefingRef.current : reportRef.current
-    if (!printEl || !reportDocument) return
+    const isPresentations = pageMode === 'presentations'
+    const printEl = isPresentations ? briefingRef.current : reportRef.current
+    if (!printEl || (isPresentations ? !briefingResult : !reportDocument)) return
+    const title = isPresentations
+      ? (briefingResult?.title ?? 'Strategic Briefing')
+      : `${reportDocument?.foundryName} — ${reportDocument?.title}`
     try {
-      printReport(printEl, `${reportDocument.foundryName} — ${reportDocument.title}`)
+      printReport(printEl, title)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Print failed'
       toast.error(message)
     }
-  }, [reportDocument, pageMode])
+  }, [reportDocument, briefingResult, pageMode])
 
   const handleExportDOCX = useCallback(async () => {
     if (!reportDocument) return
@@ -1537,7 +1542,7 @@ export default function ReportsPage(): React.JSX.Element {
               onClick={() => {
                 toast.success(
                   scheduleEnabled
-                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(',').length} recipient(s)`
+                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(',').map(s => s.trim()).filter(Boolean).length} recipient(s)`
                     : 'Scheduling disabled'
                 )
                 setIsScheduleDialogOpen(false)

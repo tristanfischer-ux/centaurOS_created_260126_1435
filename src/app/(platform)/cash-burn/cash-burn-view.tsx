@@ -82,7 +82,14 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const cashZeroDate = useMemo(() => {
     if (projection.runwayWeeks === null) return null
     const cliffWeek = projection.weeks.find(w => w.cumulativeBalance < 0)
-    return cliffWeek?.weekStart ?? null
+    if (cliffWeek) return cliffWeek.weekStart
+    // INTENT: Runway exceeds 52-week window — extrapolate approximate date
+    if (projection.runwayWeeks > 0) {
+      const d = new Date()
+      d.setDate(d.getDate() + projection.runwayWeeks * 7)
+      return d.toISOString().split('T')[0]
+    }
+    return null
   }, [projection])
 
   // Expense breakdown for donut chart

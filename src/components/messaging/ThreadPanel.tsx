@@ -115,10 +115,15 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
               .single()
 
             if (newReply) {
+              // INTENT: Dedup check + count increment must be outside the
+              // setReplies updater to avoid side effects in a pure function.
               setReplies(prev => {
                 if (prev.some(r => r.id === newReply.id)) return prev
-                setParentMessage(p =>
-                  p ? { ...p, reply_count: p.reply_count + 1 } : p
+                // Schedule parent count increment only when reply is new
+                queueMicrotask(() =>
+                  setParentMessage(p =>
+                    p ? { ...p, reply_count: p.reply_count + 1 } : p
+                  )
                 )
                 return [...prev, newReply as unknown as ThreadReply]
               })
@@ -165,9 +170,13 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
         return
       }
 
-      // Add reply to list
+      // Add reply to list (with dedup — realtime event may have arrived first)
       if (result.data) {
-        setReplies(prev => [...prev, result.data!])
+        const newReply = result.data
+        setReplies(prev => {
+          if (prev.some(r => r.id === newReply.id)) return prev
+          return [...prev, newReply]
+        })
         setReplyContent('')
 
         // Update parent message reply count (functional updater to avoid stale closure)

@@ -30,6 +30,24 @@ import {
   type ConversationType
 } from '@/lib/messaging/service'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { createClient } from '@/lib/supabase/server'
+
+// INTENT: Auth check via conversation_participants covers all conversation types
+// (direct, task, objective, expert) — unlike buyer_id/seller_id which are null
+// for task and objective conversations.
+async function isParticipant(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  conversationId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('conversation_participants')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('profile_id', userId)
+    .maybeSingle()
+  return !!data
+}
 
 export interface StartConversationParams {
   sellerId: string
@@ -71,14 +89,14 @@ export async function getConversationMessages(
         getConversation(supabase, conversationId)
       ])
 
-      // AUTH: Verify user is part of this conversation
-      if (conversation && conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      // AUTH: Verify user is a participant (covers task/objective convos where buyer_id is null)
+      if (conversation && !(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
       }
 
-      return { 
-        success: true as const, 
-        data: { messages, conversation } 
+      return {
+        success: true as const,
+        data: { messages, conversation }
       }
     } catch (error) {
       console.error('Failed to get conversation messages:', error)
@@ -104,7 +122,7 @@ export async function sendNewMessage(
       if (!conversation) {
         return { error: 'Conversation not found' }
       }
-      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
       }
 
@@ -221,12 +239,8 @@ export async function archiveConversation(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      // AUTH: Verify user is part of this conversation
-      const conversation = await getConversation(supabase, conversationId)
-      if (!conversation) {
-        return { error: 'Conversation not found' }
-      }
-      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      // AUTH: Verify user is a participant
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
       }
 
@@ -252,12 +266,8 @@ export async function unarchiveConversation(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      // SECURITY: Verify user is part of this conversation
-      const conversation = await getConversation(supabase, conversationId)
-      if (!conversation) {
-        return { error: 'Conversation not found' }
-      }
-      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      // SECURITY: Verify user is a participant
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
       }
 
@@ -284,12 +294,8 @@ export async function createSystemMessage(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      // SECURITY: Verify user is part of this conversation
-      const conversation = await getConversation(supabase, conversationId)
-      if (!conversation) {
-        return { error: 'Conversation not found' }
-      }
-      if (conversation.buyer_id !== user.id && conversation.seller_id !== user.id) {
+      // SECURITY: Verify user is a participant
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
       }
 
