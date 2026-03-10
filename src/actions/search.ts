@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { parseSearchQuery, operatorsToFilters, type SearchFilters } from '@/lib/search/operators'
 
+// SECURITY: Escape LIKE/ILIKE wildcards in user input
+const escapeIlike = (v: string) => v.replace(/[%_\\]/g, '\\$&')
+
 export interface SearchResult {
   id: string
   content: string
@@ -129,7 +132,7 @@ export async function searchMessages(
         let userMatchQuery = supabase
           .from('profiles')
           .select('id')
-          .ilike('full_name', `%${username}%`)
+          .ilike('full_name', `%${escapeIlike(username)}%`)
         if (foundryId) userMatchQuery = userMatchQuery.eq('foundry_id', foundryId)
         const { data: userMatch } = await userMatchQuery
           .limit(1)
@@ -152,7 +155,7 @@ export async function searchMessages(
         const { data: convoMatch } = await supabase
           .from('conversations')
           .select('id')
-          .ilike('title', `%${channelName}%`)
+          .ilike('title', `%${escapeIlike(channelName)}%`)
           .in('id', userConversationIds)
           .limit(1)
           .single()
@@ -236,7 +239,7 @@ export async function getSearchSuggestions(
       let usersQuery = supabase
         .from('profiles')
         .select('id, full_name')
-        .ilike('full_name', `%${query}%`)
+        .ilike('full_name', `%${escapeIlike(query)}%`)
       if (foundryId) usersQuery = usersQuery.eq('foundry_id', foundryId)
       const { data: users, error } = await usersQuery
         .limit(10)
@@ -266,7 +269,7 @@ export async function getSearchSuggestions(
         .from('conversations')
         .select('id, title')
         .in('id', conversationIds)
-        .ilike('title', `%${query}%`)
+        .ilike('title', `%${escapeIlike(query)}%`)
         .limit(10)
       
       if (error) {
@@ -539,14 +542,14 @@ export async function getAutocomplete(
     const { data: popular } = await supabase
       .from('popular_searches')
       .select('query, category')
-      .ilike('query', `%${query}%`)
+      .ilike('query', `%${escapeIlike(query)}%`)
       .limit(3)
 
     // 2. Search in listings titles
     let listingsQuery = supabase
       .from('marketplace_listings')
       .select('id, title, category, subcategory')
-      .ilike('title', `%${query}%`)
+      .ilike('title', `%${escapeIlike(query)}%`)
       .limit(5)
 
     if (category) {

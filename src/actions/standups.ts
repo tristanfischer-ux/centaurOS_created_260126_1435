@@ -92,6 +92,12 @@ export async function submitStandup(formData: {
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { data: null, error: 'No foundry context' }
 
+        // SECURITY: Input length validation
+        if (formData.completed && formData.completed.length > 5000) return { data: null, error: 'Text too long (max 5000 chars)' }
+        if (formData.planned && formData.planned.length > 5000) return { data: null, error: 'Text too long (max 5000 chars)' }
+        if (formData.blockers && formData.blockers.length > 5000) return { data: null, error: 'Text too long (max 5000 chars)' }
+        if (formData.blockerTags && formData.blockerTags.length > 20) return { data: null, error: 'Too many blocker tags (max 20)' }
+
         const today = new Date().toISOString().split('T')[0]
 
         const { data, error } = await supabase
@@ -138,6 +144,8 @@ export async function submitStandup(formData: {
 export async function getTodayTeamStandups(): Promise<{ data: Standup[]; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], error: 'Not authenticated' }
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { data: [], error: 'No foundry context' }
 
@@ -176,6 +184,8 @@ export async function getTodayTeamStandups(): Promise<{ data: Standup[]; error: 
 export async function getStandupsWithBlockers(): Promise<{ data: Standup[]; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], error: 'Not authenticated' }
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { data: [], error: 'No foundry context' }
 
@@ -224,6 +234,8 @@ export async function getStandupStats(): Promise<{
 }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Not authenticated' }
         const foundryId = await getFoundryIdCached()
         if (!foundryId) return { data: null, error: 'No foundry context' }
 

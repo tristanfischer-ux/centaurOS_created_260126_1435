@@ -235,7 +235,10 @@ export async function getBatchMessageReactions(
     if (messageIds.length === 0) {
       return { success: true, data: {} }
     }
-    
+    if (messageIds.length > 100) {
+      return { success: false, error: 'Too many message IDs (max 100)' }
+    }
+
     const supabase = await createClient()
     
     const { data: { user }, error: authError } = await supabase.auth.getUser()

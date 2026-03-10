@@ -122,7 +122,7 @@ export async function createGuildEvent(data: {
                 location_geo: data.locationGeo || null,
                 location_address: data.locationAddress || null,
                 is_executive_only: data.isExecutiveOnly || false,
-                max_attendees: data.maxAttendees || null,
+                max_attendees: data.maxAttendees ?? null,
                 created_by: user.id
             })
             .select(`
@@ -189,6 +189,15 @@ export async function getGuildEvents(options?: {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: [], error: 'Not authenticated' }
 
+        // SECURITY: Check caller role to filter executive-only events server-side
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        const isExecutive = profile?.role && ['Founder', 'Executive'].includes(profile.role)
+
         // Past events should be ordered newest-first so limit gets the most recent
         const ascending = !options?.past
         let query = supabase
@@ -198,6 +207,11 @@ export async function getGuildEvents(options?: {
                 creator:profiles!guild_events_created_by_fkey(id, full_name, role)
             `)
             .order('event_date', { ascending })
+
+        // SECURITY: Non-executives cannot see executive-only events
+        if (!isExecutive) {
+            query = query.eq('is_executive_only', false)
+        }
 
         const now = new Date().toISOString()
 
@@ -246,6 +260,10 @@ export async function getUpcomingGuildEvents(limit: number = 3): Promise<{ data:
 export async function getGuildEvent(eventId: string): Promise<{ data: GuildEvent | null; error: string | null }> {
     try {
         const supabase = await createClient()
+
+        // AUTH: Require authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Not authenticated' }
 
         const { data, error } = await supabase
             .from('guild_events')
@@ -313,7 +331,7 @@ export async function updateGuildEvent(
                 .eq('id', user.id)
                 .single()
 
-            const isFoundryAdmin = profile?.foundry_id === event.foundry_id && 
+            const isFoundryAdmin = profile?.foundry_id === event.foundry_id &&
                 profile?.role && ['Founder', 'Executive'].includes(profile.role)
 
             if (!isFoundryAdmin) {
@@ -321,10 +339,16 @@ export async function updateGuildEvent(
             }
         }
 
+        // SECURITY: Input length validation (mirrors createGuildEvent)
+        if (data.title && data.title.length > 200) return { success: false, error: 'Title too long (max 200 chars)' }
+        if (data.description && data.description.length > 5000) return { success: false, error: 'Description too long (max 5000 chars)' }
+        if (data.eventUrl && data.eventUrl.length > 2000) return { success: false, error: 'URL too long (max 2000 chars)' }
+        if (data.locationAddress && data.locationAddress.length > 500) return { success: false, error: 'Location too long (max 500 chars)' }
+
         const { error } = await supabase
             .from('guild_events')
             .update({
-                ...(data.title && { title: data.title.trim() }),
+                ...(data.title?.trim() && { title: data.title.trim() }),
                 ...(data.description !== undefined && { description: data.description?.trim() || null }),
                 ...(data.eventDate && { event_date: data.eventDate }),
                 ...(data.eventType && { event_type: data.eventType }),
@@ -748,6 +772,7 @@ export async function getEventRSVPStatuses(eventIds: string[]): Promise<{
 
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: {}, error: 'Not authenticated' }
 
         // Get all attendees for these events in one query (going + maybe)
         const { data: attendees, error } = await supabase
@@ -804,9 +829,14 @@ export async function getGuildEventsSummary(): Promise<{
     try {
         const supabase = await createClient()
 
+        // AUTH: Require authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: null, error: 'Not authenticated' }
+
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString()
+        // INTENT: First day of next month for exclusive upper bound (avoids off-by-one on last day)
+        const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
         // Get upcoming events count
         const { count: upcomingCount } = await supabase
@@ -830,7 +860,7 @@ export async function getGuildEventsSummary(): Promise<{
             .from('guild_events')
             .select('*', { count: 'exact', head: true })
             .gte('event_date', startOfMonth)
-            .lte('event_date', endOfMonth)
+            .lt('event_date', startOfNextMonth)
 
         return {
             data: {

@@ -209,7 +209,7 @@ function JoinPageInner() {
 
   const [selectedPath, setSelectedPath] = useState<UserPath | null>(initialPath);
   const [joiningRole, setJoiningRole] = useState<JoiningRole>(initialJoiningRole);
-  const [demoData, setDemoData] = useState<DemoAccountData | null>(null);
+  const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
 
   // useActionState: errors returned inline, form data preserved on failure.
   // On success the server action calls redirect() so this state is never updated.
@@ -515,7 +515,7 @@ function JoinPageInner() {
                       name="password"
                       type="password"
                       placeholder="Create a strong password"
-                      defaultValue={demoData?.password || ""}
+                      defaultValue=""
                       className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       required
                       aria-required="true"

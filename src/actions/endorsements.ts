@@ -193,6 +193,8 @@ export async function getEndorsementSummary(
     endorsedUserId: string
 ): Promise<EndorsementSummary> {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { generalCount: 0, skillCount: 0, topSkills: [], recentEndorsements: [] }
 
     // Fetch endorsements + endorser profiles in parallel
     const [endorsementsResult, skillsResult] = await Promise.allSettled([

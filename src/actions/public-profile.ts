@@ -104,7 +104,6 @@ export async function getPublicProfile(slug: string): Promise<{ profile: PublicP
             profiles!provider_profiles_user_id_fkey (
                 id,
                 full_name,
-                email,
                 avatar_url
             ),
             provider_ratings (
@@ -214,7 +213,7 @@ async function buildProfileResponse(supabase: Awaited<ReturnType<typeof createCl
         trial_rate_discount: (provider.trial_rate_discount as number) || 0,
         minimum_engagement_hours: (provider.minimum_engagement_hours as number) || 10,
         user_name: profiles?.full_name || null,
-        user_email: profiles?.email || null,
+        user_email: null, // SECURITY: Never expose email on public profiles
         user_avatar: profiles?.avatar_url || null,
         average_rating: ratings?.average_rating || null,
         total_reviews: ratings?.total_reviews || 0,

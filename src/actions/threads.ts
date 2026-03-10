@@ -106,7 +106,10 @@ export async function sendThreadReply(
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
-    
+    if (content.length > 10000) {
+      return { success: false, error: 'Content too long (max 10000 chars)' }
+    }
+
     // Get parent message and conversation
     const { data: parentMessage, error: parentError } = await supabase
       .from('messages')

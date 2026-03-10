@@ -120,7 +120,8 @@ export async function POST(request: Request) {
 
                 if (!response.ok || !response.body) {
                     const errText = await response.text()
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `API error: ${errText.slice(0, 200)}` })}\n\n`))
+                    console.error("[Outreach SSE] API error:", { status: response.status, body: errText.slice(0, 500) })
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Email generation failed. Please try again." })}\n\n`))
                     controller.close()
                     clearInterval(heartbeatInterval)
                     return

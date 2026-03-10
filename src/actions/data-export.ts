@@ -193,29 +193,25 @@ async function fetchTableData(
                 .eq('foundry_id', foundryId)
             break
             
-        case 'orders':
-            // Orders might not have foundry_id directly
-            try {
-                query = supabase
-                    .from('orders')
-                    .select(`
-                        id,
-                        order_number,
-                        status,
-                        total_amount,
-                        currency,
-                        created_at,
-                        completed_at
-                    `)
-                    .limit(1000)
-            } catch (error) {
-                console.error('[DataExport] Failed to query orders table:', {
-                    error: error instanceof Error ? error.message : 'Unknown error',
-                    foundryId,
-                })
-                return []
-            }
+        case 'orders': {
+            // SECURITY: Scope orders to the authenticated user (as buyer)
+            const { data: { user: orderUser } } = await supabase.auth.getUser()
+            if (!orderUser) return []
+            query = supabase
+                .from('orders')
+                .select(`
+                    id,
+                    order_number,
+                    status,
+                    total_amount,
+                    currency,
+                    created_at,
+                    completed_at
+                `)
+                .eq('buyer_id', orderUser.id)
+                .limit(1000)
             break
+        }
             
         default:
             return []
