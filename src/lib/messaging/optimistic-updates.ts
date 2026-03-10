@@ -141,22 +141,29 @@ export async function retryFailedMessage(
   onError?: (error: Error) => void
 ): Promise<boolean> {
   if (!message.localId) return false
-  
+
   const supabase = createClient()
-  
+
+  // SECURITY: Re-derive senderId from auth session, never trust stored value
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    onError?.(new Error('Not authenticated'))
+    return false
+  }
+
   // Update status to sending
   const retryingMessage: OptimisticMessage = {
     ...message,
     status: 'sending'
   }
   onOptimisticUpdate?.(retryingMessage)
-  
+
   try {
     const { data, error } = await supabase
       .from('messages')
       .insert({
         conversation_id: message.conversation_id,
-        sender_id: message.sender_id,
+        sender_id: user.id,
         content: message.content,
         message_type: message.message_type || 'text'
       })
@@ -255,14 +262,18 @@ export async function processQueuedMessages(
   if (queue.length === 0) return
   
   const supabase = createClient()
-  
+
+  // SECURITY: Derive senderId from auth session, never trust localStorage
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
   for (const queued of queue) {
     try {
       const { data, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: queued.conversationId,
-          sender_id: queued.senderId,
+          sender_id: user.id,
           content: queued.content,
           message_type: 'text'
         })

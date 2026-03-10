@@ -207,7 +207,7 @@ export function useConversation(
               .eq('id', payload.new.id)
               .single()
 
-            if (newMessage) {
+            if (newMessage && !(newMessage as unknown as { is_deleted?: boolean }).is_deleted) {
               setMessages(prev => {
                 // Check if message already exists
                 if (prev.some(m => m.id === newMessage.id)) {

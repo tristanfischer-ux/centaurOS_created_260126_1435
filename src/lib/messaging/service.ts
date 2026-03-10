@@ -874,6 +874,7 @@ export async function getEnhancedConversationsForUser(
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', conv.id)
           .neq('sender_id', userId)
+          .eq('is_deleted', false)
           .gt('created_at', lastReadAt)
 
         unreadCount = count || 0
@@ -884,6 +885,7 @@ export async function getEnhancedConversationsForUser(
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', conv.id)
           .neq('sender_id', userId)
+          .eq('is_deleted', false)
 
         unreadCount = count || 0
       }
@@ -1012,7 +1014,7 @@ export async function searchConversations(
     `)
     .eq('conversations.conversation_participants.profile_id', userId)
     .eq('conversations.status', 'active')
-    .neq('is_deleted', true)
+    .eq('is_deleted', false)
     .ilike('content', searchPattern)
     .limit(limit)
 
@@ -1265,6 +1267,7 @@ export async function getTaskThread(
       sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
     `)
     .eq('task_id', taskId)
+    .eq('is_deleted', false)
     .order('created_at', { ascending: true })
 
   if (messagesError) {

@@ -142,15 +142,15 @@ export function CreateSubsystemObjectiveDialog({
   const [objectiveDescription, setObjectiveDescription] = useState(objectivePack?.summary || '')
   const [dueDate, setDueDate] = useState('')
 
-  // Reset editable fields when objectivePack changes
+  // Reset editable fields when objectivePack changes or dialog opens
   useEffect(() => {
-    if (objectivePack) {
+    if (open && objectivePack) {
       setObjectiveTitle(objectivePack.title)
       setObjectiveDescription(objectivePack.summary || '')
       setSelectedTasks(new Set(objectivePack.tasks.map((_, i) => i)))
       setDueDate('')
     }
-  }, [objectivePack])
+  }, [objectivePack, open])
 
   if (!subsystem || !objectivePack) return null
   

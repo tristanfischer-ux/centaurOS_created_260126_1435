@@ -350,6 +350,10 @@ export async function markActivityRead(
 export async function markMultipleActivityRead(
   items: Array<{ type: 'task_comment' | 'objective_comment'; commentId: string }>
 ): Promise<{ success: boolean; error?: string }> {
+  if (items.length > 500) {
+    return { success: false, error: 'Too many items (max 500)' }
+  }
+
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -523,6 +527,7 @@ export async function getActivityUnreadCount(): Promise<{
           .select('*', { count: 'exact', head: true })
           .eq('conversation_id', convId as string)
           .neq('sender_id', user.id)
+          .eq('is_deleted', false)
 
         if (lastReadAt) {
           countQuery = countQuery.gt('created_at', lastReadAt)

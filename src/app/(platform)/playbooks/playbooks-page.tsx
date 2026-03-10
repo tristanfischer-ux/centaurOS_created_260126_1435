@@ -482,7 +482,7 @@ export function PlaybooksPage({
                   <span
                     className={cn(
                       'text-xs tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center',
-                      isActive ? 'bg-white/60' : 'bg-muted',
+                      isActive ? 'bg-card/60' : 'bg-muted',
                     )}
                   >
                     {tab.count}

@@ -85,6 +85,24 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
   )
   const [bulkAssigneeKey, setBulkAssigneeKey] = useState(0)
 
+  // Reset state when dialog opens to avoid stale values after cancel-reopen
+  const resetState = () => {
+    setObjectiveTitle(pack.title)
+    setObjectiveDescription(pack.description || '')
+    setDueDate('')
+    setSelectedTaskIds(pack.items?.map(item => item.id) || [])
+    setTaskAssignees(
+      pack.items?.reduce((acc, item) => ({ ...acc, [item.id]: 'unassigned' }), {} as Record<string, string>) || {}
+    )
+    setBulkAssigneeKey(prev => prev + 1)
+    setExpandedTaskId(null)
+  }
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (nextOpen) resetState()
+    setOpen(nextOpen)
+  }
+
   const handleCreate = async () => {
     if (!objectiveTitle.trim()) {
       toast.error('Please enter an objective title')
@@ -150,7 +168,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger !== undefined ? (
         <DialogTrigger asChild>
           {trigger}

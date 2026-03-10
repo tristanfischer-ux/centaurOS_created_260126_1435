@@ -276,6 +276,9 @@ export default function ReportsPage(): React.JSX.Element {
 
   // View mode: full report or infographic
   const [viewMode, setViewMode] = useState<'document' | 'infographic'>('document')
+  // INTENT: Track the tone used when the report was generated, so the preview
+  // badge reflects the actual report content, not the current config state.
+  const [generatedTone, setGeneratedTone] = useState<ReportTone>('internal')
 
   // Change 2: Collapsible config panel
   const [isConfigExpanded, setIsConfigExpanded] = useState(false)
@@ -338,7 +341,9 @@ export default function ReportsPage(): React.JSX.Element {
     if (templateId === 'board-pack') {
       setReportTone('board')
       setDetailLevel('standard')
-    } else if (templateId === 'weekly-update') {
+    } else {
+      // INTENT: Reset tone to internal for all non-board templates so switching
+      // away from board-pack doesn't leave a stale 'board' tone.
       setReportTone('internal')
       setDetailLevel('standard')
     }
@@ -403,6 +408,7 @@ export default function ReportsPage(): React.JSX.Element {
       }
 
       setReportDocument(result.document)
+      setGeneratedTone(reportTone)
       setViewMode('document')
       toast.success('Report generated successfully')
 
@@ -471,6 +477,7 @@ export default function ReportsPage(): React.JSX.Element {
           return
         }
         setReportDocument(result.document)
+        setGeneratedTone(templateTone as ReportTone)
         // INTENT: Reset to document view so reportRef is mounted for scrolling.
         // If the user was viewing an infographic from a previous report, reportRef
         // would be null and the scroll below would silently fail.
@@ -721,6 +728,9 @@ export default function ReportsPage(): React.JSX.Element {
 
   const handleLoadHistoricReport = useCallback((document: ReportDocumentType, snapshotId: string) => {
     setReportDocument(document)
+    // INTENT: Historic reports don't store tone — default to 'internal' so badge
+    // doesn't show stale tone from a previous generation.
+    setGeneratedTone('internal')
     setLastSnapshotId(snapshotId)
     setShareUrl(null)
     setPageMode('reports')
@@ -884,7 +894,7 @@ export default function ReportsPage(): React.JSX.Element {
                 <button
                   type="button"
                   aria-expanded={isConfigExpanded}
-                  aria-controls="report-config-panel"
+                  aria-controls={isConfigExpanded ? 'report-config-panel' : undefined}
                   className="flex w-full items-center justify-between px-6 py-4 text-left"
                   onClick={() => setIsConfigExpanded(prev => !prev)}
                 >
@@ -1193,9 +1203,9 @@ export default function ReportsPage(): React.JSX.Element {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <h2 className={typography.h3}>Report Preview</h2>
-                        {reportTone !== 'internal' && (
+                        {generatedTone !== 'internal' && (
                           <Badge variant="secondary" className="text-xs">
-                            {TONE_OPTIONS.find(t => t.value === reportTone)?.label} tone
+                            {TONE_OPTIONS.find(t => t.value === generatedTone)?.label} tone
                           </Badge>
                         )}
                       </div>
