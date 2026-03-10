@@ -66,7 +66,7 @@ export function RFQTemplatePicker({
         : await getRFQTemplates(sector)
 
       if (!cancelled && !result.error) {
-        setTemplates(result.data)
+        setTemplates(result.data ?? [])
       }
       if (!cancelled) setIsLoading(false)
     }

@@ -219,10 +219,19 @@ export function RFQWizard({
   }
 
   const handleSubmit = () => {
+    if (isPending) return // Prevent double-submission
     setError(null)
 
     if (!rfqType) {
       setError('Please select an RFQ type')
+      setCurrentStep('start')
+      return
+    }
+
+    // Re-validate step 2 fields in case user navigated back and broke them
+    if (title.trim().length < 3 || !category || description.trim().length < 20) {
+      setError('Please go back and complete the required fields')
+      setCurrentStep('specs')
       return
     }
 

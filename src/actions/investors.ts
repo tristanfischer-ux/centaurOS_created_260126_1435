@@ -19,6 +19,11 @@
 import { unstable_cache } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  extractPostcode,
+  deriveRegionFromPostcode,
+  deriveRegionFromKeywords,
+} from '@/lib/postcode-utils'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -93,7 +98,7 @@ export interface InvestorStats {
   withWebsiteCount: number
   activeDeployingCount: number
   subcategoryBreakdown: { name: string; count: number }[]
-  cityBreakdown: { name: string; count: number }[]
+  regionBreakdown: { name: string; count: number }[]
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +152,22 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
  * @param filters - Optional filter parameters
  * @returns Paginated list of investor firms with total count and hasMore flag
  */
+// SECURITY: Allowlist of valid firm_type values to prevent PostgREST filter injection.
+const VALID_FIRM_TYPES = new Set([
+  'VC', 'PE', 'Growth', 'Growth Equity', 'Family Office', 'CVC',
+  'Corporate VC', 'Accelerator', 'Angel', 'Angel Network', 'Debt Fund',
+  'Impact Fund', 'EIS Fund', 'SEIS Fund', 'Advisory Services',
+  'Institutional Investor', 'Private Credit', 'Financial Institution',
+])
+
+/**
+ * SECURITY: Sanitize a string for use in PostgREST filter expressions.
+ * Strips characters that could inject additional filter conditions.
+ */
+function sanitizeFilterValue(value: string): string {
+  return value.replace(/[,()\."*]/g, '')
+}
+
 export async function searchInvestors(
   filters: InvestorFilters = {}
 ): Promise<InvestorSearchResult> {
@@ -162,6 +183,10 @@ export async function searchInvestors(
     pageSize = 24,
   } = filters
 
+  // SECURITY: Bound pagination to prevent DoS via oversized page requests
+  const safePage = Math.max(1, page)
+  const safePageSize = Math.min(Math.max(1, pageSize), 100)
+
   const supabase = await createClient()
 
   // INTENT: Build the query progressively, filtered to Finance category (VC/PE firms).
@@ -171,14 +196,22 @@ export async function searchInvestors(
     .eq('category', 'Finance')
 
   // Full-text search on title and description
+  // SECURITY: Sanitize query to prevent PostgREST filter injection via commas/dots
   if (query && query.trim().length > 0) {
-    const term = `%${query.trim()}%`
-    q = q.or(`title.ilike.${term},description.ilike.${term}`)
+    const sanitized = sanitizeFilterValue(query.trim())
+    if (sanitized) {
+      const term = `%${sanitized}%`
+      q = q.or(`title.ilike.${term},description.ilike.${term}`)
+    }
   }
 
   // JSONB scalar filter: firm_type
+  // SECURITY: Validate against allowlist to prevent filter injection
   if (firmType && firmType.length > 0) {
-    q = q.or(firmType.map((t: string) => `attributes->>firm_type.eq.${t}`).join(','))
+    const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
+    if (safeFirmTypes.length > 0) {
+      q = q.or(safeFirmTypes.map((t: string) => `attributes->>firm_type.eq.${t}`).join(','))
+    }
   }
 
   // JSONB scalar filter: is_active_deploying
@@ -187,18 +220,24 @@ export async function searchInvestors(
   }
 
   // JSONB scalar filter: hq_city
+  // SECURITY: Sanitize to prevent filter grammar injection
   if (hqCity && hqCity.trim().length > 0) {
-    q = q.filter('attributes->>hq_city', 'ilike', `%${hqCity.trim()}%`)
+    const safeCity = sanitizeFilterValue(hqCity.trim())
+    if (safeCity) {
+      q = q.filter('attributes->>hq_city', 'ilike', `%${safeCity}%`)
+    }
   }
 
   // JSONB scalar filter: outreach_priority
-  if (priority) {
+  // SECURITY: Validate against known values
+  const VALID_PRIORITIES = new Set(['A', 'B', 'C'])
+  if (priority && VALID_PRIORITIES.has(priority)) {
     q = q.filter('attributes->>outreach_priority', 'eq', priority)
   }
 
   // Pagination
-  const from = (page - 1) * pageSize
-  const to = from + pageSize - 1
+  const from = (safePage - 1) * safePageSize
+  const to = from + safePageSize - 1
   q = q.range(from, to).order('title', { ascending: true })
 
   const { data, count, error } = await q
@@ -234,7 +273,7 @@ export async function searchInvestors(
   // pages — if the DB returned a full page, there may be more to fetch.
   const rawPageSize = (data ?? []).length
   const hasMore = stage?.length || sector?.length
-    ? rawPageSize >= pageSize  // client-filtered: more pages if DB returned a full page
+    ? rawPageSize >= safePageSize  // client-filtered: more pages if DB returned a full page
     : from + rawPageSize < total  // unfiltered: exact count is reliable
 
   return { firms, total, hasMore }
@@ -312,7 +351,7 @@ export const getInvestorStats = unstable_cache(
         withWebsiteCount: 0,
         activeDeployingCount: 0,
         subcategoryBreakdown: [],
-        cityBreakdown: [],
+        regionBreakdown: [],
       }
     }
 
@@ -324,7 +363,7 @@ export const getInvestorStats = unstable_cache(
     let withWebsiteCount = 0
     let activeDeployingCount = 0
     const subcategoryCounts: Record<string, number> = {}
-    const cityCounts: Record<string, number> = {}
+    const regionCounts: Record<string, number> = {}
 
     for (const row of rows) {
       const attrs = (row.attributes as Record<string, unknown>) ?? {}
@@ -344,8 +383,21 @@ export const getInvestorStats = unstable_cache(
       const sub = (row.subcategory as string) || 'Unknown'
       subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
 
-      const city = (attrs.hq_city as string) || ''
-      if (city) cityCounts[city] = (cityCounts[city] ?? 0) + 1
+      // DECISION: Derive UK region from hq_city and location fields using the
+      // same postcode/keyword mapping as the marketplace Regional Coverage chart.
+      // Tries postcode extraction first, then city keyword fallback.
+      let region: string | null = null
+      const hqCity = (attrs.hq_city as string) || ''
+      const location = (attrs.location as string) || ''
+      const locationText = hqCity || location
+
+      if (locationText) {
+        const postcode = extractPostcode(locationText)
+        if (postcode) region = deriveRegionFromPostcode(postcode)
+        if (!region) region = deriveRegionFromKeywords(locationText)
+      }
+
+      if (region) regionCounts[region] = (regionCounts[region] ?? 0) + 1
     }
 
     const subcategoryBreakdown = Object.entries(subcategoryCounts)
@@ -353,10 +405,10 @@ export const getInvestorStats = unstable_cache(
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
-    const cityBreakdown = Object.entries(cityCounts)
+    const regionBreakdown = Object.entries(regionCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10)
+      .slice(0, 11) // UK has 11 regions max
 
     return {
       total,
@@ -365,7 +417,7 @@ export const getInvestorStats = unstable_cache(
       withWebsiteCount,
       activeDeployingCount,
       subcategoryBreakdown,
-      cityBreakdown,
+      regionBreakdown,
     }
   },
   ['investor-stats'],

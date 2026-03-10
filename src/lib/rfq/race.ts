@@ -53,11 +53,13 @@ export async function broadcastRFQ(
       if (matchError) {
         console.error('Error matching suppliers:', matchError)
       }
+      // SECURITY: Exclude buyer's own provider profile to prevent self-dealing
       const { data: fallbackProviders, error: providersError } = await supabase
         .from('provider_profiles')
         .select('id, user_id, timezone, tier')
         .eq('is_active', true)
         .not('tier', 'eq', 'suspended')
+        .neq('user_id', rfq.buyer_id)
 
       if (providersError || !fallbackProviders || fallbackProviders.length === 0) {
         return { success: false, broadcast_count: 0, error: 'Failed to fetch suppliers' }
@@ -336,16 +338,22 @@ export async function acceptRFQ(
       }
     }
 
-    // Get provider tier for delay calculation
+    // Get provider tier and user_id for delay calculation and self-dealing check
     const { data: provider } = await supabase
       .from('provider_profiles')
-      .select('tier')
+      .select('tier, user_id')
       .eq('id', providerId)
       .single()
 
     if (!provider) {
       return { success: false, awarded: false, priority_hold: false, error: 'Provider profile not found' }
     }
+
+    // SECURITY: Prevent buyer from accepting their own RFQ (self-dealing)
+    if (provider.user_id === rfq.buyer_id) {
+      return { success: false, awarded: false, priority_hold: false, error: 'Cannot accept your own RFQ' }
+    }
+
     const tier = (provider.tier as SupplierTier) || 'pending'
 
     // SECURITY: Suspended providers cannot accept RFQs
@@ -514,6 +522,11 @@ export async function requestMoreInfo(
   questions: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
+    // VALIDATION: Bound input length at the library level (defense-in-depth)
+    if (questions.length > 10_000) {
+      return { success: false, error: 'Questions too long (max 10,000 characters)' }
+    }
+
     // Check if RFQ exists and is accepting responses
     const { data: rfq, error: rfqError } = await supabase
       .from('rfqs')
@@ -586,6 +599,11 @@ export async function declineRFQ(
   reason?: string
 ): Promise<{ success: boolean; error: string | null }> {
   try {
+    // VALIDATION: Bound input length at the library level (defense-in-depth)
+    if (reason && reason.length > 10_000) {
+      return { success: false, error: 'Reason too long (max 10,000 characters)' }
+    }
+
     // Check if RFQ exists
     const { data: rfq, error: rfqError } = await supabase
       .from('rfqs')

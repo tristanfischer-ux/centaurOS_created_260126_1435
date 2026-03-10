@@ -75,13 +75,15 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem('investor-insights-collapsed') === '1')
+    try {
+      setCollapsed(localStorage.getItem('investor-insights-collapsed') === '1')
+    } catch { /* Safari private mode */ }
   }, [])
 
   const handleToggle = useCallback(() => {
     setCollapsed(prev => {
       const next = !prev
-      localStorage.setItem('investor-insights-collapsed', next ? '1' : '0')
+      try { localStorage.setItem('investor-insights-collapsed', next ? '1' : '0') } catch {}
       return next
     })
   }, [])
@@ -153,15 +155,15 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                     data={stats.subcategoryBreakdown}
                     margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
                   >
-                    <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={110}
-                      tick={{ fontSize: 10 }}
+                      width={140}
+                      tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 14)}
+                      tickFormatter={(v: string) => truncate(v, 20)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill="var(--color-international-orange)" radius={[0, 3, 3, 0]} />
@@ -214,27 +216,27 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
               </div>
             </div>
 
-            {/* Chart 3: Top Cities */}
+            {/* Chart 3: Regional Coverage */}
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Top Cities
+                Regional Coverage
               </p>
               <div className="h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     layout="vertical"
-                    data={stats.cityBreakdown}
+                    data={stats.regionBreakdown}
                     margin={{ top: 0, right: 16, bottom: 0, left: 0 }}
                   >
-                    <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis
                       type="category"
                       dataKey="name"
-                      width={80}
-                      tick={{ fontSize: 10 }}
+                      width={120}
+                      tick={{ fontSize: 11 }}
                       tickLine={false}
                       axisLine={false}
-                      tickFormatter={(v: string) => truncate(v, 11)}
+                      tickFormatter={(v: string) => truncate(v, 16)}
                     />
                     <Tooltip contentStyle={{ fontSize: 11, borderRadius: 6 }} />
                     <Bar dataKey="count" fill="var(--color-electric-blue)" radius={[0, 3, 3, 0]} />

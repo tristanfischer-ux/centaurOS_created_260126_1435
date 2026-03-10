@@ -91,10 +91,11 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
   const specSheet = buildSpecSheet(rfq)
   zip.file('spec-sheet.txt', specSheet)
 
-  // Fetch and add attachments
+  // Fetch and add attachments (cap at 50 to prevent browser overload)
   const attachments = rfq.specifications?.attachments
   if (Array.isArray(attachments)) {
-    for (let i = 0; i < attachments.length; i++) {
+    const maxAttachments = 50
+    for (let i = 0; i < Math.min(attachments.length, maxAttachments); i++) {
       const url = attachments[i]
       if (typeof url !== 'string' || !url) continue
 
@@ -114,8 +115,10 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
         const urlPath = new URL(url).pathname
         const segments = urlPath.split('/')
         const rawName = segments[segments.length - 1] || `attachment-${i + 1}`
-        // SECURITY: Sanitize filename to prevent Zip Slip (path traversal)
-        const fileName = decodeURIComponent(rawName).replace(/\.\./g, '_').replace(/[/\\]/g, '_')
+        // SECURITY: Sanitize filename — strip path traversal, control chars, reserved chars
+        const fileName = decodeURIComponent(rawName)
+          .replace(/\.\./g, '_')
+          .replace(/[/\\:*?"<>|\x00-\x1f]/g, '_')
         if (!fileName || fileName === '.' || fileName === '..') continue
 
         zip.file(`attachments/${fileName}`, blob)

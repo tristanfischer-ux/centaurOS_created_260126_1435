@@ -151,13 +151,22 @@ export const CITY_REGION_MAP: Record<string, string> = {
 }
 
 /**
+ * Sorted city entries — longest first so "stoke-on-trent" matches before "stoke",
+ * "newcastle upon tyne" before "newcastle", etc.
+ */
+const SORTED_CITY_ENTRIES = Object.entries(CITY_REGION_MAP)
+  .sort((a, b) => b[0].length - a[0].length)
+
+/**
  * Try to derive a UK region from a free-text location string using city keywords.
- * Checks if any known city name appears in the location string.
+ * Uses word-boundary matching to avoid false positives (e.g., "Bathgate" ≠ "Bath").
  */
 export function deriveRegionFromKeywords(location: string): string | null {
   const lower = location.toLowerCase()
-  for (const [city, region] of Object.entries(CITY_REGION_MAP)) {
-    if (lower.includes(city)) return region
+  for (const [city, region] of SORTED_CITY_ENTRIES) {
+    // Word-boundary check: \b handles spaces, punctuation, start/end of string
+    const pattern = new RegExp(`\\b${city.replace(/[-]/g, '[-\\s]')}\\b`)
+    if (pattern.test(lower)) return region
   }
   return null
 }

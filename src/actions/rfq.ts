@@ -112,7 +112,10 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
       budget_max: params.budget_max,
       deadline: params.deadline,
       category: params.category,
-      urgency: params.urgency || 'standard',
+      // VALIDATION: Urgency must be a known value
+      urgency: (['urgent', 'standard'] as const).includes(params.urgency as 'urgent' | 'standard')
+        ? params.urgency!
+        : 'standard',
     }
   )
 
@@ -323,8 +326,11 @@ export async function cancelMyRFQ(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Not authenticated" }
 
-  if (reason != null && reason.length > 2_000) {
-    return { success: false, error: "Cancellation reason too long (max 2,000 characters)" }
+  if (reason != null) {
+    reason = reason.trim()
+    if (reason.length > 2_000) {
+      return { success: false, error: "Cancellation reason too long (max 2,000 characters)" }
+    }
   }
 
   const { success, error } = await cancelRFQService(supabase, rfqId, user.id, reason)
