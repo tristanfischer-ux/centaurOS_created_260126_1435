@@ -62,6 +62,7 @@ export function UpdatesThreadPanel({
   const [replyContent, setReplyContent] = useState('')
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Fetch thread data
   const fetchThread = useCallback(async () => {
@@ -134,6 +135,14 @@ export function UpdatesThreadPanel({
       setIsSending(false)
     }
   }
+
+  // Auto-resize textarea
+  const handleTextareaInput = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [])
 
   // Handle Ctrl+Enter to send
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -297,9 +306,11 @@ export function UpdatesThreadPanel({
       <div className="border-t border-muted p-3 flex-shrink-0">
         <div className="flex items-end gap-2">
           <Textarea
+            ref={textareaRef}
             placeholder="Add a note..."
             value={replyContent}
             onChange={(e) => setReplyContent(e.target.value)}
+            onInput={handleTextareaInput}
             onKeyDown={handleKeyDown}
             className="min-h-[40px] max-h-[120px] resize-none text-sm"
             rows={1}

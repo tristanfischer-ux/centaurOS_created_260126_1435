@@ -11,6 +11,7 @@ import { ConversationThread } from './ConversationThread'
 import { QuickComposeDialog } from './QuickComposeDialog'
 import { useConversationList } from '@/hooks/useConversation'
 import type { ConversationWithParticipants } from '@/lib/messaging/service'
+import { getConversationDisplayName } from '@/lib/messaging/display-name'
 import {
   MessageSquare,
   Search,
@@ -25,20 +26,6 @@ interface MessagingSidebarProps {
   userId: string
   className?: string
   defaultCollapsed?: boolean
-}
-
-function getConversationDisplayName(
-  conv: ConversationWithParticipants,
-  currentUserId: string
-): string {
-  // For channels (task/objective), use the title
-  if (conv.title) {
-    return conv.title
-  }
-
-  // For direct/expert, show the other participant's name
-  const otherParticipant = conv.buyer?.id === currentUserId ? conv.seller : conv.buyer
-  return otherParticipant?.full_name || otherParticipant?.email || 'Unknown'
 }
 
 function ConversationListItem({

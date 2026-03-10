@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import type { ConversationWithParticipants, ConversationType } from '@/lib/messaging/service'
+import { getConversationDisplayName } from '@/lib/messaging/display-name'
 
 interface ConversationsPanelProps {
   conversations: ConversationWithParticipants[]
@@ -34,23 +35,6 @@ interface ConversationsPanelProps {
   selectedConversationId: string | null
   onSelectConversation: (id: string) => void
   onNewMessage: () => void
-}
-
-function getConversationDisplayName(
-  conv: ConversationWithParticipants,
-  currentUserId: string
-): string {
-  if (conv.conversation_type === 'task' && conv.task) {
-    return `#${conv.task.task_number}: ${conv.task.title}`
-  }
-  if (conv.conversation_type === 'objective' && conv.objective) {
-    return conv.objective.title
-  }
-  if (conv.title) {
-    return conv.title
-  }
-  const otherParticipant = conv.buyer?.id === currentUserId ? conv.seller : conv.buyer
-  return otherParticipant?.full_name || otherParticipant?.email || 'Unknown'
 }
 
 function getConversationIcon(type: ConversationType | undefined) {

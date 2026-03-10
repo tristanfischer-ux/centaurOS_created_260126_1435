@@ -40,35 +40,10 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
   const [error, setError] = useState<string | null>(null)
   const repliesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const supabase = useMemo(() => createClient(), [])
 
-  // Load thread data when panel opens
-  useEffect(() => {
-    if (open && parentMessageId) {
-      loadThread()
-    } else {
-      // Reset state when closed
-      setParentMessage(null)
-      setReplies([])
-      setReplyContent('')
-      setError(null)
-    }
-  }, [open, parentMessageId])
-
-  // Auto-scroll to bottom when new replies arrive
-  useEffect(() => {
-    if (replies.length > 0) {
-      repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
-  }, [replies.length])
-
-  // Focus textarea when panel opens
-  useEffect(() => {
-    if (open && !isLoading) {
-      textareaRef.current?.focus()
-    }
-  }, [open, isLoading])
-
-  async function loadThread() {
+  const loadThread = useCallback(async () => {
     if (!parentMessageId) return
 
     setIsLoading(true)
@@ -99,7 +74,79 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [parentMessageId])
+
+  // Load thread data when panel opens
+  useEffect(() => {
+    if (open && parentMessageId) {
+      loadThread()
+    } else {
+      // Reset state when closed
+      setParentMessage(null)
+      setReplies([])
+      setReplyContent('')
+      setError(null)
+    }
+  }, [open, parentMessageId, loadThread])
+
+  // Supabase Realtime subscription for new thread replies
+  useEffect(() => {
+    if (!open || !parentMessageId) return
+
+    channelRef.current = supabase
+      .channel(`thread-replies:${parentMessageId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `parent_id=eq.${parentMessageId}`
+        },
+        async (payload) => {
+          // Fetch the full reply with sender info
+          const { data: newReply } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role)
+            `)
+            .eq('id', payload.new.id)
+            .single()
+
+          if (newReply) {
+            setReplies(prev => {
+              if (prev.some(r => r.id === newReply.id)) return prev
+              return [...prev, newReply as unknown as ThreadReply]
+            })
+            setParentMessage(prev =>
+              prev ? { ...prev, reply_count: prev.reply_count + 1 } : prev
+            )
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+      }
+    }
+  }, [open, parentMessageId, supabase])
+
+  // Auto-scroll to bottom when new replies arrive
+  useEffect(() => {
+    if (replies.length > 0) {
+      repliesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [replies.length])
+
+  // Focus textarea when panel opens
+  useEffect(() => {
+    if (open && !isLoading) {
+      textareaRef.current?.focus()
+    }
+  }, [open, isLoading])
 
   async function handleSendReply() {
     if (!parentMessageId || !replyContent.trim() || isSending) return
