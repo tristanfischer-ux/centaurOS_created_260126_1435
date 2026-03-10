@@ -20,7 +20,7 @@ import { CashOutSetupWizard } from '@/components/cash-burn/cash-out-setup-wizard
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
-import { generateCashOutGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
+import { generateCashOutGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
   createCashOutItem,

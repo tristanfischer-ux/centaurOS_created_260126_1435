@@ -213,7 +213,10 @@ export function buildBalanceSheet(
   const equipment = depreciatedEquipment
   const totalAssets = cash + equipment
   const totalLiabilities = totalLoans
-  const retainedEarnings = totalOperatingIncome - (totalCosts - totalCapex)
+  // INTENT: Retained earnings must include depreciation expense so the
+  // accounting equation (Assets = Liabilities + Equity) balances.
+  // depreciatedEquipment replaces totalCapex to reflect the P&L impact.
+  const retainedEarnings = totalOperatingIncome - (totalCosts - depreciatedEquipment)
   const totalEquity = openingBalance + totalEquityInvested + retainedEarnings
 
   return {
