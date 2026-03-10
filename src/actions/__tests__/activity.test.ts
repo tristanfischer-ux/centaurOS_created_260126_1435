@@ -156,6 +156,17 @@ describe('Activity Actions', () => {
             })
           }
         }
+        if (table === 'conversation_participants') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                eq: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({ data: { profile_id: VALID_USER_ID } })
+                })
+              })
+            })
+          }
+        }
         if (table === 'messages') {
           return {
             insert: jest.fn().mockReturnValue({
