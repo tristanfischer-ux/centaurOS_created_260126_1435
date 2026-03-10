@@ -62,6 +62,10 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
     return { data: null, error: "RFQ type is required" }
   }
 
+  if (params.budget_min != null && params.budget_max != null && params.budget_min > params.budget_max) {
+    return { data: null, error: "Minimum budget cannot exceed maximum budget" }
+  }
+
   // Create the RFQ
   const { data: rfq, error: createError } = await createRFQService(
     supabase,
@@ -832,12 +836,17 @@ export async function publishClarification(
     return { success: false, error: "Not authorized" }
   }
 
+  const trimmedQuestion = question.trim()
+  const trimmedAnswer = answer.trim()
+  if (!trimmedQuestion) return { success: false, error: "Question is required" }
+  if (!trimmedAnswer) return { success: false, error: "Answer is required" }
+
   const { error: insertError } = await supabase
     .from("rfq_clarifications")
     .insert({
       rfq_id: rfqId,
-      question: question.trim(),
-      answer: answer.trim(),
+      question: trimmedQuestion,
+      answer: trimmedAnswer,
       answered_at: new Date().toISOString(),
       answered_by: user.id,
     })

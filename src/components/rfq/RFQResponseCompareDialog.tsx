@@ -41,7 +41,7 @@ function findBestPrice(responses: RFQResponseWithProvider[]): string | null {
   let bestPrice = Infinity
 
   for (const r of responses) {
-    if (r.quoted_price && r.quoted_price < bestPrice) {
+    if (r.quoted_price != null && r.quoted_price < bestPrice) {
       bestPrice = r.quoted_price
       bestId = r.provider_id
     }

@@ -108,10 +108,12 @@ export function SlideDeckRenderer({
         e.preventDefault()
         goPrev()
       } else if (e.key === 'Escape') {
-        if (isOverview) {
-          setIsOverview(false)
-        } else if (isFullscreen) {
+        // INTENT: Check fullscreen first — escaping fake fullscreen is more
+        // critical than closing overview grid, and user expects Esc to exit fullscreen.
+        if (isFullscreen) {
           setIsFullscreen(false)
+        } else if (isOverview) {
+          setIsOverview(false)
         }
       } else if (e.key === 'g') {
         setIsOverview(prev => !prev)

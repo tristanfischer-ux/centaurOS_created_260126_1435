@@ -847,9 +847,9 @@ function ResponseCard({
         </div>
 
         <div className="flex items-center gap-2">
-          {response.quoted_price && (
+          {response.quoted_price != null && (
             <span className="font-semibold text-lg">
-              £{response.quoted_price.toLocaleString()}
+              £{Number(response.quoted_price).toLocaleString()}
             </span>
           )}
           {canAward && onAward && !isAwarded && (

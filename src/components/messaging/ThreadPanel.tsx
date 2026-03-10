@@ -171,18 +171,24 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
       }
 
       // Add reply to list (with dedup — realtime event may have arrived first)
+      // INTENT: Only increment reply_count if we actually inserted (not a realtime dup).
+      // Realtime handler already increments when it inserts, so we skip here if dup.
       if (result.data) {
         const newReply = result.data
+        let wasInserted = false
         setReplies(prev => {
           if (prev.some(r => r.id === newReply.id)) return prev
+          wasInserted = true
           return [...prev, newReply]
         })
         setReplyContent('')
 
-        // Update parent message reply count (functional updater to avoid stale closure)
-        setParentMessage(prev =>
-          prev ? { ...prev, reply_count: prev.reply_count + 1 } : prev
-        )
+        // Only increment if we actually added (realtime didn't beat us)
+        if (wasInserted) {
+          setParentMessage(prev =>
+            prev ? { ...prev, reply_count: prev.reply_count + 1 } : prev
+          )
+        }
       }
     } catch (err) {
       setError('Failed to send reply')

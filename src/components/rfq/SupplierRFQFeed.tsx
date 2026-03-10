@@ -142,12 +142,12 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
             </div>
 
             {/* Category filter */}
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <Select value={categoryFilter || '__all__'} onValueChange={(v) => setCategoryFilter(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="All Categories" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Categories</SelectItem>
+                <SelectItem value="__all__">All Categories</SelectItem>
                 {RFQ_CATEGORIES.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}
@@ -157,12 +157,12 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
             </Select>
 
             {/* Urgency filter */}
-            <Select value={urgencyFilter} onValueChange={setUrgencyFilter}>
+            <Select value={urgencyFilter || '__all__'} onValueChange={(v) => setUrgencyFilter(v === '__all__' ? '' : v)}>
               <SelectTrigger className="w-full sm:w-[150px]">
                 <SelectValue placeholder="All Urgency" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All</SelectItem>
+                <SelectItem value="__all__">All</SelectItem>
                 <SelectItem value="urgent">
                   <span className="flex items-center gap-1">
                     <Zap className="w-3 h-3" />

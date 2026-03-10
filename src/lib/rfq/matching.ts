@@ -81,7 +81,7 @@ export interface SupplierMatch {
   timezone?: string | null
   matchScore: number
   matchReasons: string[]
-  tier: 'pending' | 'standard' | 'verified' | 'premium'
+  tier: 'pending' | 'approved' | 'verified_partner' | 'suspended'
   isAvailable: boolean
 }
 
@@ -169,13 +169,14 @@ export function calculateMatchScore(
     score += 10 // Neutral score for standard urgency
   }
 
-  // Tier bonus (premium/verified get slight advantage)
-  if (supplier.tier === 'premium') {
+  // Tier bonus (verified partners/approved get slight advantage)
+  // GOTCHA: DB tier values are 'verified_partner' and 'approved', not 'premium'/'verified'
+  if (supplier.tier === 'verified_partner') {
     score += 5
-    reasons.push('Premium supplier')
-  } else if (supplier.tier === 'verified') {
+    reasons.push('Verified Partner')
+  } else if (supplier.tier === 'approved') {
     score += 3
-    reasons.push('Verified supplier')
+    reasons.push('Approved supplier')
   }
 
   return { score: Math.min(100, Math.round(score)), reasons }

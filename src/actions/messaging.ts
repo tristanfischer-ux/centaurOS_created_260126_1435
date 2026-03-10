@@ -89,9 +89,9 @@ export async function getConversationMessages(
         getConversation(supabase, conversationId)
       ])
 
-      // AUTH: Verify user is a participant (covers task/objective convos where buyer_id is null)
-      if (conversation && !(await isParticipant(supabase, conversationId, user.id))) {
-        return { error: 'Access denied' }
+      // AUTH: Verify conversation exists AND user is a participant
+      if (!conversation || !(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: !conversation ? 'Conversation not found' : 'Access denied' }
       }
 
       return {
@@ -649,13 +649,18 @@ export async function markConversationAsReadEnhanced(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // AUTH: Verify user is a participant before marking read
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: 'Access denied' }
+      }
+
       await markConversationAsRead(supabase, conversationId, user.id)
-      
+
       return { success: true as const }
     } catch (error) {
       console.error('Failed to mark conversation as read:', error)
-      return { 
-        error: sanitizeErrorMessage(error) 
+      return {
+        error: sanitizeErrorMessage(error)
       }
     }
   })
@@ -713,8 +718,13 @@ export async function getParticipants(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // AUTH: Verify user is a participant before revealing other participants
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: 'Access denied' }
+      }
+
       const participants = await getConversationParticipants(supabase, conversationId)
-      
+
       const data = participants.map(p => ({
         id: p.id,
         profile_id: p.profile_id,

@@ -22,9 +22,9 @@ function buildSpecSheet(rfq: RFQWithDetails): string {
   lines.push(`Created: ${new Date(rfq.created_at).toLocaleDateString()}`)
   lines.push(``)
 
-  if (rfq.budget_min || rfq.budget_max) {
-    const min = rfq.budget_min ? `£${rfq.budget_min.toLocaleString()}` : 'N/A'
-    const max = rfq.budget_max ? `£${rfq.budget_max.toLocaleString()}` : 'N/A'
+  if (rfq.budget_min != null || rfq.budget_max != null) {
+    const min = rfq.budget_min != null ? `£${rfq.budget_min.toLocaleString()}` : 'N/A'
+    const max = rfq.budget_max != null ? `£${rfq.budget_max.toLocaleString()}` : 'N/A'
     lines.push(`Budget: ${min} – ${max}`)
   }
 

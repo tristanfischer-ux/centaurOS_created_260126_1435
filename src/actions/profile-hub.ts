@@ -328,6 +328,26 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
     return { success: false, error: 'Bio must be 2000 characters or less' }
   }
 
+  // VALIDATION: LinkedIn URL must be a valid linkedin.com URL
+  if (linkedinUrl) {
+    try {
+      const url = new URL(linkedinUrl)
+      if (url.hostname !== 'linkedin.com' && !url.hostname.endsWith('.linkedin.com')) {
+        return { success: false, error: 'LinkedIn URL must be a linkedin.com link' }
+      }
+    } catch {
+      return { success: false, error: 'LinkedIn URL must be a valid URL (e.g. https://linkedin.com/in/yourname)' }
+    }
+  }
+
+  // VALIDATION: Numeric fields — guard against NaN from non-numeric form input
+  if (dayRate !== null && isNaN(dayRate)) {
+    return { success: false, error: 'Day rate must be a valid number' }
+  }
+  if (yearsExperience !== null && isNaN(yearsExperience)) {
+    return { success: false, error: 'Years of experience must be a valid number' }
+  }
+
   // Check if provider profile exists
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: existing } = await supabase

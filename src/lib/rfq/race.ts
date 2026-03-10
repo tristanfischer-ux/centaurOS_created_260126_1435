@@ -38,6 +38,11 @@ export async function broadcastRFQ(
       return { success: false, broadcast_count: 0, error: 'RFQ not found' }
     }
 
+    // Only broadcast Open or Bidding RFQs
+    if (rfq.status !== 'Open' && rfq.status !== 'Bidding') {
+      return { success: false, broadcast_count: 0, error: `Cannot broadcast RFQ in ${rfq.status} status` }
+    }
+
     // Use smart matching to find best suppliers for this RFQ
     const { matches, error: matchError } = await matchSuppliersToRFQ(supabase, rfqId)
 
@@ -107,9 +112,9 @@ export async function broadcastRFQ(
       .eq('id', rfqId)
 
     // Send notifications to matched suppliers
-    const budgetRange = rfq.budget_min && rfq.budget_max 
+    const budgetRange = rfq.budget_min != null && rfq.budget_max != null
       ? `£${rfq.budget_min.toLocaleString()} - £${rfq.budget_max.toLocaleString()}`
-      : rfq.budget_max
+      : rfq.budget_max != null
       ? `Up to £${rfq.budget_max.toLocaleString()}`
       : 'Budget not specified'
 
@@ -321,8 +326,13 @@ export async function acceptRFQ(
       .eq('provider_id', providerId)
       .single()
 
+    // Supplier must have been invited via broadcast
+    if (!broadcast) {
+      return { success: false, awarded: false, priority_hold: false, error: 'Not invited to this RFQ' }
+    }
+
     // Apply tier delay for approved suppliers (vs verified partners)
-    if (broadcast && tier === 'approved') {
+    if (tier === 'approved') {
       const scheduledTime = new Date(broadcast.scheduled_at)
       const delayTime = new Date(scheduledTime.getTime() + RACE_CONSTANTS.TIER_DELAY_MS)
       
@@ -338,7 +348,7 @@ export async function acceptRFQ(
     }
 
     // Mark broadcast as delivered/viewed if not already
-    if (broadcast && !broadcast.delivered_at) {
+    if (!broadcast.delivered_at) {
       await supabase
         .from('rfq_broadcasts')
         .update({ 
@@ -389,7 +399,7 @@ export async function acceptRFQ(
           .eq('id', rfqId)
 
         // Automatically create an order for commodity auto-award
-        if (quotedPrice) {
+        if (quotedPrice != null) {
           const { error: orderError } = await createOrder(
             supabase,
             rfq.buyer_id,

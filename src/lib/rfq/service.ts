@@ -322,8 +322,8 @@ export async function closeRFQ(
       return { success: false, error: 'Not authorized to close this RFQ' }
     }
 
-    // Can only close Open or Bidding RFQs
-    if (existing.status !== 'Open' && existing.status !== 'Bidding') {
+    // Can only close Open, Bidding, or priority_hold RFQs
+    if (existing.status !== 'Open' && existing.status !== 'Bidding' && existing.status !== 'priority_hold') {
       return { success: false, error: `Cannot close RFQ in ${existing.status} status` }
     }
 
@@ -331,6 +331,8 @@ export async function closeRFQ(
       .from('rfqs')
       .update({
         status: 'Closed',
+        priority_holder_id: null,
+        priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
 

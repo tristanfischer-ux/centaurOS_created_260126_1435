@@ -102,10 +102,11 @@ function computeRunway(
     return { weeks: null, monthlyBurn: 0 }
   }
 
-  // Find the first week where cumulative balance goes negative
+  // Find the first week where cumulative balance hits zero or negative
+  // INTENT: Balance at exactly 0 means cash is exhausted — not "sustainable"
   let runwayWeeks: number | null = null
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i].cumulativeBalance < 0) {
+    if (rows[i].cumulativeBalance <= 0) {
       runwayWeeks = i
       break
     }

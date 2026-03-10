@@ -43,7 +43,10 @@ function RechartsSparkline({
   height?: number
   className?: string
 }): React.JSX.Element {
-  const uid = useId()
+  // GOTCHA: useId() returns IDs with colons (e.g. ":r0:") which are valid in
+  // DOM but break html2canvas/PDF export tools. Strip them for SVG gradient refs.
+  const rawUid = useId()
+  const uid = rawUid.replace(/:/g, '')
   const chartData = data.map((value, index) => ({ index, value }))
   const colors = SPARKLINE_COLORS[color]
 
@@ -189,7 +192,8 @@ export function KeyMetricsSection({
   templateId,
   sectionNumber,
 }: KeyMetricsSectionProps): React.JSX.Element {
-  const [heroMetric, ...remainingMetrics] = metrics
+  // GOTCHA: metrics may be undefined if the generator skipped this section
+  const [heroMetric, ...remainingMetrics] = metrics ?? []
 
   return (
     <section className="space-y-8">

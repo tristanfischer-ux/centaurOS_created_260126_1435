@@ -208,6 +208,12 @@ export function useRFQSubscription(
   const [isSubscribed, setIsSubscribed] = useState(false)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
 
+  // Store callbacks in refs to avoid resubscription on every render
+  const onUpdateRef = useRef(onUpdate)
+  onUpdateRef.current = onUpdate
+  const onNewResponseRef = useRef(onNewResponse)
+  onNewResponseRef.current = onNewResponse
+
   useEffect(() => {
     if (!rfqId) return
 
@@ -224,9 +230,7 @@ export function useRFQSubscription(
           filter: `id=eq.${rfqId}`,
         },
         (payload: RealtimePostgresChangesPayload<{ [key: string]: unknown }>) => {
-          if (onUpdate) {
-            onUpdate(payload.new)
-          }
+          onUpdateRef.current?.(payload.new)
         }
       )
       .on(
@@ -238,9 +242,7 @@ export function useRFQSubscription(
           filter: `rfq_id=eq.${rfqId}`,
         },
         () => {
-          if (onNewResponse) {
-            onNewResponse()
-          }
+          onNewResponseRef.current?.()
         }
       )
       .subscribe((status) => {
@@ -255,7 +257,7 @@ export function useRFQSubscription(
         channelRef.current = null
       }
     }
-  }, [rfqId, onUpdate, onNewResponse])
+  }, [rfqId])
 
   return { isSubscribed }
 }

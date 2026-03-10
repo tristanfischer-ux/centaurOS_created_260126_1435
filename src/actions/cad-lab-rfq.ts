@@ -271,7 +271,7 @@ export async function createCadLabRfqAction(
   const rfqResult = await createNewRFQ({
     title: `${input.projectName} — Manufacturing RFQ`,
     rfq_type: "custom",
-    category: "Products",
+    category: "Custom Manufacturing",
     deadline: input.deadline || null,
     specifications: {
       description: descriptionLines.join("\n"),
@@ -376,7 +376,7 @@ export async function createMashupRfqAction(
   const rfqResult = await createNewRFQ({
     title,
     rfq_type: "custom",
-    category: "Products",
+    category: "Custom Manufacturing",
     specifications: {
       description: descriptionLines.join("\n"),
       attachments,

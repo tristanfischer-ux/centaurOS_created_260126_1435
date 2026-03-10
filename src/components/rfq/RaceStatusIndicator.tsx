@@ -59,7 +59,7 @@ export const RaceStatusIndicator = memo(function RaceStatusIndicator({
           setHoldTimeLeft(formatDuration(diff))
           // Assuming 2 hour hold (7200000ms)
           const totalHoldTime = 2 * 60 * 60 * 1000
-          setHoldProgress((diff / totalHoldTime) * 100)
+          setHoldProgress(Math.min((diff / totalHoldTime) * 100, 100))
         } else {
           setHoldTimeLeft(null)
           setHoldProgress(0)

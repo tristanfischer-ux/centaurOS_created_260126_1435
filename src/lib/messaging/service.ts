@@ -367,14 +367,18 @@ export async function getConversationsForUser(
   userId: string,
   status?: ConversationStatus
 ): Promise<ConversationWithParticipants[]> {
+  // INTENT: Use conversation_participants to find conversations, not buyer_id/seller_id.
+  // Task and objective conversations have null buyer_id/seller_id, so the old
+  // .or('buyer_id.eq.X,seller_id.eq.X') filter dropped them entirely.
   let query = supabase
     .from('conversations')
     .select(`
       *,
       buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
-      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email)
+      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email),
+      conversation_participants!inner(profile_id)
     `)
-    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+    .eq('conversation_participants.profile_id', userId)
     .order('updated_at', { ascending: false })
 
   if (status) {

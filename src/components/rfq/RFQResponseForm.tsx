@@ -97,6 +97,11 @@ export function RFQResponseForm({
   const handleSubmit = (responseType: 'accept' | 'info_request' | 'decline' | 'interest') => {
     setError(null)
 
+    if (responseType === 'accept' && quotedPrice === '') {
+      setError('Please provide a quoted price')
+      return
+    }
+
     if (responseType === 'info_request' && !message.trim()) {
       setError('Please provide your questions')
       return

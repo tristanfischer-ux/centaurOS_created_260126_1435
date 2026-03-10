@@ -239,7 +239,12 @@ export default function ReportsPage(): React.JSX.Element {
   const [enabledSections, setEnabledSections] = useState<Set<ReportSectionType>>(defaultSections)
   const [tone, setTone] = useState<ReportTone>('internal')
   const [detailLevel, setDetailLevel] = useState<ReportDetailLevel>('standard')
-  const [isGenerating, setIsGenerating] = useState(false)
+  // INTENT: Separate generating state per tab to prevent cross-tab interference.
+  // Reports and presentations can't be generated simultaneously, but if one is
+  // generating, the other tab's Generate button shouldn't be blocked.
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false)
+  const isGenerating = isGeneratingReport || isGeneratingBriefing
   const [generationStep, setGenerationStep] = useState(0)
   const [reportDocument, setReportDocument] = useState<ReportDocumentType | null>(null)
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null)
@@ -344,8 +349,8 @@ export default function ReportsPage(): React.JSX.Element {
   }, [])
 
   const handleGenerate = useCallback(async () => {
-    if (isGenerating) return
-    setIsGenerating(true)
+    if (isGeneratingReport) return
+    setIsGeneratingReport(true)
     setGenerationStep(0)
     setReportDocument(null)
     setShareUrl(null)
@@ -387,15 +392,15 @@ export default function ReportsPage(): React.JSX.Element {
       toast.error(`Report generation failed: ${message}`)
     } finally {
       clearInterval(stepInterval)
-      setIsGenerating(false)
+      setIsGeneratingReport(false)
     }
-  }, [isGenerating, enabledSections, selectedTemplate, dateRange, tone, detailLevel])
+  }, [isGeneratingReport, enabledSections, selectedTemplate, dateRange, tone, detailLevel])
 
   // Quick-start: select template + immediately generate
   // DECISION: We compute parameters directly from getTemplate() rather than relying
   // on state, because React batches state updates and they won't be committed yet.
   const handleQuickStart = useCallback((templateId: ReportTemplateId) => {
-    if (isGenerating) return
+    if (isGeneratingReport) return
     handleTemplateSelect(templateId)
     // For "custom", just expand config — don't auto-generate
     if (templateId === 'custom') return
@@ -406,7 +411,7 @@ export default function ReportsPage(): React.JSX.Element {
     const templateTone = templateId === 'board-pack' ? 'board' : 'internal'
 
     // Set generating immediately to prevent double-trigger via Generate button
-    setIsGenerating(true)
+    setIsGeneratingReport(true)
     setGenerationStep(0)
 
     const stepInterval = setInterval(() => {
@@ -441,18 +446,18 @@ export default function ReportsPage(): React.JSX.Element {
       })
       .finally(() => {
         clearInterval(stepInterval)
-        setIsGenerating(false)
+        setIsGeneratingReport(false)
       })
-  }, [handleTemplateSelect, isGenerating])
+  }, [handleTemplateSelect, isGeneratingReport])
 
   const handleGenerateBriefing = useCallback(async () => {
-    if (isGenerating) return
+    if (isGeneratingBriefing) return
     if (!briefingContext.trim()) {
       toast.error('Provide source material for the briefing')
       return
     }
 
-    setIsGenerating(true)
+    setIsGeneratingBriefing(true)
     setBriefingResult(null)
 
     try {
@@ -479,7 +484,7 @@ export default function ReportsPage(): React.JSX.Element {
       const message = error instanceof Error ? error.message : 'Unexpected error'
       toast.error(`Briefing generation failed: ${message}`)
     } finally {
-      setIsGenerating(false)
+      setIsGeneratingBriefing(false)
     }
   }, [isGenerating, briefingContext, tone, includeCompanyData])
 
