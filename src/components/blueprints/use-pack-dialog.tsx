@@ -83,6 +83,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
   const [taskAssignees, setTaskAssignees] = useState<Record<string, string>>(
     pack.items?.reduce((acc, item) => ({ ...acc, [item.id]: 'unassigned' }), {} as Record<string, string>) || {}
   )
+  const [bulkAssigneeKey, setBulkAssigneeKey] = useState(0)
 
   const handleCreate = async () => {
     if (!objectiveTitle.trim()) {
@@ -363,6 +364,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
                 id="objective-due-date"
                 type="date"
                 value={dueDate}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setDueDate(e.target.value)}
               />
             </div>
@@ -371,13 +373,14 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
             <div className="space-y-2">
               <Label>Assign all tasks to</Label>
               <Select
-                value={undefined}
+                key={bulkAssigneeKey}
                 onValueChange={(value) => {
                   const updated = { ...taskAssignees }
                   for (const key of Object.keys(updated)) {
                     updated[key] = value
                   }
                   setTaskAssignees(updated)
+                  setBulkAssigneeKey(prev => prev + 1)
                 }}
               >
                 <SelectTrigger>

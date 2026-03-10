@@ -108,7 +108,7 @@ export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members 
               'w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200',
               localSaved
                 ? 'bg-international-orange/10 text-international-orange'
-                : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 bg-background/80 text-muted-foreground hover:text-international-orange border shadow-sm',
+                : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 bg-background text-muted-foreground hover:text-international-orange border shadow-sm',
             )}
             title={localSaved ? 'Remove from saved' : 'Save for later'}
           >

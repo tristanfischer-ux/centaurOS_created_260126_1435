@@ -180,6 +180,11 @@ export function CreateSubsystemObjectiveDialog({
   const marketplaceTasks = selectedTasksList.filter((t) => t.is_marketplace_task).length
   
   const handleCreate = async () => {
+    if (!objectiveTitle.trim()) {
+      toast.error('Please enter an objective title')
+      return
+    }
+
     if (selectedTasks.size === 0) {
       toast.error('Please select at least one task')
       return
@@ -258,11 +263,12 @@ export function CreateSubsystemObjectiveDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="objective-due-date">Due date</Label>
+            <Label htmlFor="objective-due-date">Due date (optional)</Label>
             <Input
               id="objective-due-date"
               type="date"
               value={dueDate}
+              min={new Date().toISOString().split('T')[0]}
               onChange={(e) => setDueDate(e.target.value)}
             />
           </div>
@@ -326,7 +332,7 @@ export function CreateSubsystemObjectiveDialog({
           </Button>
           <Button
             onClick={handleCreate}
-            disabled={isCreating || selectedTasks.size === 0}
+            disabled={isCreating || selectedTasks.size === 0 || !objectiveTitle.trim()}
           >
             {isCreating ? (
               <>

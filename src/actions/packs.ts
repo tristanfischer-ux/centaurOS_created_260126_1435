@@ -317,15 +317,11 @@ export async function unsavePack(packId: string): Promise<{
 }
 
 /**
- * Get IDs of all saved packs for the current user
- * 
- * @returns Set of saved pack IDs
- * 
- * @security RLS ensures users only see their own saved packs
- */
-/**
  * Get pack IDs that have already been used to create objectives in the current foundry.
  * Uses source_pack_id (reliable) with title-matching fallback for older objectives.
+ *
+ * @returns Set of used pack IDs
+ * @security Scoped to user's foundry via profile lookup
  */
 export async function getUsedPackIds(): Promise<{ usedIds: Set<string>, error: string | null }> {
     noStore()

@@ -225,12 +225,12 @@ export function PlaybooksPage({
         ...nc,
         packs: allFunctionalPacks.filter(p => {
           const cat = p.category?.toLowerCase() || ''
-          return cat.includes(nc.id)
+          return cat === nc.id
         }),
-        hasGap: ctx?.gapCategories.some(gc =>
-          gc.toLowerCase().replace(/[& ]/g, '').includes(nc.id) ||
-          nc.id.includes(gc.toLowerCase().replace(/[& ]/g, ''))
-        ) || false,
+        hasGap: ctx?.gapCategories.some(gc => {
+          const normalized = gc.toLowerCase().replace(/[& ]/g, '')
+          return normalized === nc.id
+        }) || false,
       }))
       .filter(g => g.packs.length > 0)
   }, [allFunctionalPacks, ctx])
@@ -381,8 +381,6 @@ export function PlaybooksPage({
   // Tab config
   // ---------------------------------------------------------------------------
 
-  const gapCount = ctx?.gapCategories?.length || 0
-
   const tabs: Tab[] = useMemo(() => [
     {
       id: 'by-need',
@@ -429,7 +427,7 @@ export function PlaybooksPage({
       activeClasses: 'bg-international-orange/10 text-international-orange border-international-orange',
       group: 'utility',
     },
-  ], [gapCount, allFunctionalPacks.length, industryCount, universalSubsystems.length, popularPacks.length, savedPackIds.size])
+  ], [allFunctionalPacks.length, industryCount, universalSubsystems.length, popularPacks.length, savedPackIds.size])
 
   // ---------------------------------------------------------------------------
   // Render
@@ -799,11 +797,15 @@ export function PlaybooksPage({
                 <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
                 <h3 className="text-base font-semibold mb-1">No packs found</h3>
                 <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
-                  Try adjusting your search or filters.
+                  {hasActiveFilters
+                    ? 'Try adjusting your search or filters.'
+                    : 'No packs available yet.'}
                 </p>
-                <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
-                  <X className="h-3.5 w-3.5" /> Clear filters
-                </Button>
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> Clear filters
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
