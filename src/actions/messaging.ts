@@ -748,13 +748,15 @@ export async function searchConversations(
   query: string,
   limit = 20
 ) {
+  // Cap limit to prevent abuse
+  const cappedLimit = Math.min(Math.max(1, limit), 50)
   return withUser(async ({ supabase, user }) => {
     try {
       if (!query.trim()) {
         return { success: true as const, data: [] as ConversationWithParticipants[] }
       }
 
-      const conversations = await searchConvs(supabase, user.id, query.trim(), limit)
+      const conversations = await searchConvs(supabase, user.id, query.trim(), cappedLimit)
       return { success: true as const, data: conversations }
     } catch (error) {
       console.error('Failed to search conversations:', error)

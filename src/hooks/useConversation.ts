@@ -248,7 +248,7 @@ export function useConversation(
                 m.id === updated.id
                   ? {
                       ...m,
-                      content: (updated.content as string) ?? m.content,
+                      content: updated.content !== undefined ? (updated.content as string | null) : m.content,
                       is_read: (updated.is_read as boolean) ?? m.is_read,
                       read_at: (updated.read_at as string | null) ?? m.read_at,
                       edited_at: (updated.edited_at as string | null) ?? m.edited_at ?? null,

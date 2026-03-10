@@ -112,9 +112,12 @@ export function UpdatesLayout({
     const thread = searchParams.get('thread')
     const id = searchParams.get('id')
 
+    // VALIDATION: Only accept UUID-shaped IDs in deep links
+    const isUUID = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+
     if (view === 'conversations') {
       setActiveView('conversations')
-      if (id) {
+      if (id && isUUID(id)) {
         setSelectedConversationId(id)
         setShowThread(true)
       }
@@ -122,7 +125,7 @@ export function UpdatesLayout({
       setActiveView('activity')
       if (thread) {
         const [type, sourceId] = thread.split(':') as [string, string]
-        if ((type === 'task' || type === 'objective' || type === 'conversation') && sourceId) {
+        if ((type === 'task' || type === 'objective' || type === 'conversation') && sourceId && isUUID(sourceId)) {
           setSelectedSource({ type, id: sourceId })
           setShowThread(true)
         }

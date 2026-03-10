@@ -1033,10 +1033,10 @@ export async function editMessage(
   userId: string,
   newContent: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Verify ownership and check if deleted
+  // Verify ownership, deletion status, and edit window
   const { data: message, error: fetchError } = await supabase
     .from('messages')
-    .select('sender_id, is_deleted')
+    .select('sender_id, is_deleted, created_at')
     .eq('id', messageId)
     .single()
 
@@ -1050,6 +1050,15 @@ export async function editMessage(
 
   if (message.is_deleted) {
     return { success: false, error: 'Cannot edit a deleted message' }
+  }
+
+  // SECURITY: Only allow editing within 15 minutes of sending
+  if (message.created_at) {
+    const ageMs = Date.now() - new Date(message.created_at).getTime()
+    const fifteenMinutes = 15 * 60 * 1000
+    if (ageMs > fifteenMinutes) {
+      return { success: false, error: 'Messages can only be edited within 15 minutes of sending' }
+    }
   }
 
   const { error } = await supabase

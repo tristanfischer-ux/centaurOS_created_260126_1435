@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -40,7 +40,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
   const awayTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastActivityRef = useRef<number>(Date.now())
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   // Update presence via RPC function (bypasses RLS for reliable updates)
   const updatePresence = useCallback(async (

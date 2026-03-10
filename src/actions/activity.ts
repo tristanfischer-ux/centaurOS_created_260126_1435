@@ -115,6 +115,17 @@ export async function replyToActivity(
 
     switch (sourceType) {
       case 'task': {
+        // SECURITY: Verify the task belongs to the user's foundry
+        const { data: task } = await supabase
+          .from('tasks')
+          .select('id, foundry_id')
+          .eq('id', sourceId)
+          .single()
+
+        if (!task || task.foundry_id !== foundryId) {
+          return { success: false, error: 'Task not found or access denied' }
+        }
+
         // Add comment to task
         const { data: inserted, error } = await supabase.from('task_comments').insert({
           task_id: sourceId,
@@ -163,6 +174,17 @@ export async function replyToActivity(
       }
 
       case 'objective': {
+        // SECURITY: Verify the objective belongs to the user's foundry
+        const { data: objective } = await (supabase as AnySupabaseClient)
+          .from('objectives')
+          .select('id, foundry_id')
+          .eq('id', sourceId)
+          .single()
+
+        if (!objective || objective.foundry_id !== foundryId) {
+          return { success: false, error: 'Objective not found or access denied' }
+        }
+
         // Add comment to objective (table created by migration)
         const { data: inserted, error } = await (supabase as AnySupabaseClient).from('objective_comments').insert({
           objective_id: sourceId,

@@ -67,9 +67,19 @@ export async function sendMessageOptimistic(
     reply_count: 0
   }
   
+  // VALIDATION: Match server-side checks
+  if (!content.trim()) {
+    onError?.(new Error('Message cannot be empty'))
+    return false
+  }
+  if (content.length > 10000) {
+    onError?.(new Error('Message is too long (max 10,000 characters)'))
+    return false
+  }
+
   // Show optimistic message immediately
   onOptimisticUpdate?.(optimisticMessage)
-  
+
   // Attempt to send
   let retries = 0
   while (retries <= MAX_RETRIES) {

@@ -89,6 +89,16 @@ describe('Activity Actions', () => {
             })
           }
         }
+        // SECURITY: Foundry ownership check added to replyToActivity
+        if (table === 'tasks') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_TASK_ID, foundry_id: VALID_FOUNDRY_ID }, error: null })
+              })
+            })
+          }
+        }
         if (table === 'task_comments') {
           return {
             insert: jest.fn().mockReturnValue({
@@ -125,6 +135,16 @@ describe('Activity Actions', () => {
             select: jest.fn().mockReturnValue({
               eq: jest.fn().mockReturnValue({
                 single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+              })
+            })
+          }
+        }
+        // SECURITY: Foundry ownership check added to replyToActivity
+        if (table === 'objectives') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_OBJECTIVE_ID, foundry_id: VALID_FOUNDRY_ID }, error: null })
               })
             })
           }
@@ -505,6 +525,16 @@ describe('Comment-to-Message Sync Integration', () => {
           select: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
               single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+            })
+          })
+        }
+      }
+      // SECURITY: Foundry ownership check added to replyToActivity
+      if (table === 'tasks') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: VALID_TASK_ID, foundry_id: VALID_FOUNDRY_ID }, error: null })
             })
           })
         }
