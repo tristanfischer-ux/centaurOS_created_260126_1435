@@ -244,7 +244,6 @@ export default function ReportsPage(): React.JSX.Element {
   // generating, the other tab's Generate button shouldn't be blocked.
   const [isGeneratingReport, setIsGeneratingReport] = useState(false)
   const [isGeneratingBriefing, setIsGeneratingBriefing] = useState(false)
-  const isGenerating = isGeneratingReport || isGeneratingBriefing
   const [generationStep, setGenerationStep] = useState(0)
   const [reportDocument, setReportDocument] = useState<ReportDocumentType | null>(null)
   const [lastSnapshotId, setLastSnapshotId] = useState<string | null>(null)
@@ -718,7 +717,7 @@ export default function ReportsPage(): React.JSX.Element {
           <ReportHistory onLoadReport={handleLoadHistoricReport} />
 
           {/* Change 1: Hero showcase when no report generated */}
-          {!reportDocument && !isGenerating && (
+          {!reportDocument && !isGeneratingReport && (
             <ReportsHeroShowcase onQuickStart={handleQuickStart} />
           )}
 
@@ -739,7 +738,7 @@ export default function ReportsPage(): React.JSX.Element {
                     className={cn(
                       'cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
                       isSelected && 'ring-2 ring-international-orange',
-                      isGenerating && 'pointer-events-none opacity-60'
+                      isGeneratingReport && 'pointer-events-none opacity-60'
                     )}
                     onClick={() => handleTemplateSelect(template.id)}
                   >
@@ -1011,7 +1010,7 @@ export default function ReportsPage(): React.JSX.Element {
           </section>
 
           {/* Change 7: Enhanced Generation Progress */}
-          {isGenerating && (
+          {isGeneratingReport && (
             <Card>
               <CardContent className="p-6 space-y-4">
                 {/* Thin accent bar at top */}
@@ -1051,7 +1050,7 @@ export default function ReportsPage(): React.JSX.Element {
           )}
 
           {/* Generate Button */}
-          {!isGenerating && (
+          {!isGeneratingReport && (
             <Button
               className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
               disabled={enabledSections.size === 0}
@@ -1062,7 +1061,7 @@ export default function ReportsPage(): React.JSX.Element {
           )}
 
           {/* Change 5: Pre-Generation Capability Strip */}
-          {!reportDocument && !isGenerating && (
+          {!reportDocument && !isGeneratingReport && (
             <div className="flex flex-wrap items-center justify-center gap-4 py-2">
               <span className="text-xs text-muted-foreground">After generating:</span>
               {CAPABILITY_ITEMS.map(item => {
@@ -1276,10 +1275,10 @@ export default function ReportsPage(): React.JSX.Element {
           {/* Generate Briefing Button */}
           <Button
             className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
-            disabled={isGenerating || !briefingContext.trim()}
+            disabled={isGeneratingBriefing || !briefingContext.trim()}
             onClick={handleGenerateBriefing}
           >
-            {isGenerating ? (
+            {isGeneratingBriefing ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Generating presentation deck…
