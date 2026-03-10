@@ -91,7 +91,7 @@ export function RFQResponseForm({
     const l = parseFloat(pricingLabour) || 0
     const t = parseFloat(pricingTooling) || 0
     const mk = parseFloat(pricingMarkup) || 0
-    return m + l + t + mk
+    return Math.round((m + l + t + mk) * 100) / 100
   }, [pricingMaterial, pricingLabour, pricingTooling, pricingMarkup])
 
   const handleSubmit = (responseType: 'accept' | 'info_request' | 'decline' | 'interest') => {

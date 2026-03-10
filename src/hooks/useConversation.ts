@@ -240,7 +240,6 @@ export function useConversation(
                       content: (updated.content as string) ?? m.content,
                       is_read: (updated.is_read as boolean) ?? m.is_read,
                       read_at: (updated.read_at as string | null) ?? m.read_at,
-                      is_starred: (updated.is_starred as boolean) ?? m.is_starred,
                     }
                   : m
               )

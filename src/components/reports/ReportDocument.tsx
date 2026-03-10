@@ -129,6 +129,9 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
         </div>
       </footer>
 
+      {/* INTENT: Always render print styles so browser Ctrl+P works correctly.
+          The forPrint-specific rules only apply when the class is present,
+          but the @media print rules must always be available. */}
       {forPrint && (
         <style>{`
           .print-document {
@@ -138,14 +141,17 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
           .print-document .print-page-break {
             page-break-before: always;
           }
-          @media print {
-            .print-document * {
-              transition: none !important;
-              animation: none !important;
-            }
-          }
         `}</style>
       )}
+      <style>{`
+        @media print {
+          .max-w-4xl * {
+            transition: none !important;
+            animation: none !important;
+            opacity: 1 !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

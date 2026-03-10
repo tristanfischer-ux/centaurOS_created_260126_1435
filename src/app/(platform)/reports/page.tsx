@@ -505,14 +505,16 @@ export default function ReportsPage(): React.JSX.Element {
   }, [reportDocument])
 
   const handlePrint = useCallback(() => {
-    if (!reportRef.current || !reportDocument) return
+    // INTENT: Use briefingRef when in presentations tab, reportRef for report tab.
+    const printEl = pageMode === 'presentations' ? briefingRef.current : reportRef.current
+    if (!printEl || !reportDocument) return
     try {
-      printReport(reportRef.current, `${reportDocument.foundryName} — ${reportDocument.title}`)
+      printReport(printEl, `${reportDocument.foundryName} — ${reportDocument.title}`)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Print failed'
       toast.error(message)
     }
-  }, [reportDocument])
+  }, [reportDocument, pageMode])
 
   const handleExportDOCX = useCallback(async () => {
     if (!reportDocument) return

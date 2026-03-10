@@ -445,9 +445,16 @@ export async function updateBasicProfile(data: {
     return { success: false, error: 'Bio must be 2000 characters or less' }
   }
 
-  // VALIDATION: LinkedIn URL format
-  if (data.linkedinUrl && !data.linkedinUrl.startsWith('http')) {
-    return { success: false, error: 'LinkedIn URL must start with https://' }
+  // VALIDATION: LinkedIn URL must be a valid linkedin.com URL
+  if (data.linkedinUrl) {
+    try {
+      const url = new URL(data.linkedinUrl)
+      if (!url.hostname.endsWith('linkedin.com')) {
+        return { success: false, error: 'LinkedIn URL must be a linkedin.com link' }
+      }
+    } catch {
+      return { success: false, error: 'LinkedIn URL must be a valid URL (e.g. https://linkedin.com/in/yourname)' }
+    }
   }
 
   // Build update payload — include professional_background only if provided

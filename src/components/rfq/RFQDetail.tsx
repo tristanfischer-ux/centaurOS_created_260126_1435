@@ -287,32 +287,34 @@ export function RFQDetail({
             </div>
 
             {/* Owner actions */}
-            {isOwner && (rfq.status === 'Open' || rfq.status === 'Bidding' || rfq.status === 'priority_hold') && (
-              <div className="flex items-center gap-2">
-                {rfq.status === 'priority_hold' && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="secondary" size="sm" disabled={isPending}>
-                        Release Hold
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Release Priority Hold?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This will allow other suppliers to compete for this RFQ.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleReleasePriorityHold}>
-                          Release
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
+            {/* Release Hold — only when priority_hold */}
+            {isOwner && rfq.status === 'priority_hold' && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="secondary" size="sm" disabled={isPending}>
+                    Release Hold
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Release Priority Hold?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will allow other suppliers to compete for this RFQ.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleReleasePriorityHold}>
+                      Release
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
 
+            {/* Close RFQ — only Open or Bidding (not priority_hold) */}
+            {isOwner && (rfq.status === 'Open' || rfq.status === 'Bidding') && (
+              <div className="flex items-center gap-2">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="secondary" size="sm" disabled={isPending}>
