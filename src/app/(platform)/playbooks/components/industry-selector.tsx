@@ -86,7 +86,8 @@ export function IndustrySelector({
           return
         }
         setPacks(result.packs)
-      } catch {
+      } catch (err) {
+        console.error('[IndustrySelector] Failed to load packs:', err)
         if (mounted) toast.error('Failed to load packs')
       } finally {
         if (mounted) setLoading(false)

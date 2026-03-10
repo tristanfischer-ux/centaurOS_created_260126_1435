@@ -480,6 +480,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleTask(item.id)}
+                            onClick={(e) => e.stopPropagation()}
                             className="mt-0.5"
                           />
                           <div className="flex-1 min-w-0 space-y-2">

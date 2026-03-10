@@ -679,6 +679,9 @@ export default function ReportsPage(): React.JSX.Element {
       const result = await createReportShareLink(lastSnapshotId)
       if (result.success && result.shareUrl) {
         setShareUrl(result.shareUrl)
+        // INTENT: Reset copied state so the button doesn't show a stale checkmark
+        // from a previous share link copy.
+        setIsCopied(false)
         setIsShareDialogOpen(true)
       } else {
         toast.error(result.error ?? 'Failed to create share link')
@@ -743,6 +746,14 @@ export default function ReportsPage(): React.JSX.Element {
     setLastSnapshotId(snapshotId)
     setShareUrl(null)
     setPageMode('reports')
+    // INTENT: Sync config state with the loaded report so the config panel
+    // accurately reflects what's displayed and Generate won't produce a surprise.
+    if (REPORT_TEMPLATE_IDS.includes(document.templateId as ReportTemplateId)) {
+      setSelectedTemplate(document.templateId as ReportTemplateId)
+      const template = getTemplate(document.templateId as ReportTemplateId)
+      setEnabledSections(new Set(template.defaultSections.filter(s => s.enabled).map(s => s.type)))
+    }
+    setDateRange(document.dateRange)
     // INTENT: Reset to document view so reportRef is mounted for scrolling.
     // Without this, if the user was in infographic view, reportRef.current is null
     // and the scroll below silently fails.
@@ -781,9 +792,11 @@ export default function ReportsPage(): React.JSX.Element {
           return (
             <button
               key={tab.value}
+              id={`tab-${tab.value}`}
               type="button"
               role="tab"
               aria-selected={isActive}
+              aria-controls={`tabpanel-${tab.value}`}
               onClick={() => setPageMode(tab.value)}
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
@@ -803,7 +816,7 @@ export default function ReportsPage(): React.JSX.Element {
       {/* REPORTS TAB                                   */}
       {/* ══════════════════════════════════════════════ */}
       {pageMode === 'reports' && (
-        <>
+        <div id="tabpanel-reports" role="tabpanel" aria-labelledby="tab-reports">
           {/* Change 8: Report History (promoted) */}
           <ReportHistory onLoadReport={handleLoadHistoricReport} />
 
@@ -1338,14 +1351,14 @@ export default function ReportsPage(): React.JSX.Element {
               )}
             </section>
           )}
-        </>
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════ */}
       {/* PRESENTATIONS TAB                             */}
       {/* ══════════════════════════════════════════════ */}
       {pageMode === 'presentations' && (
-        <>
+        <div id="tabpanel-presentations" role="tabpanel" aria-labelledby="tab-presentations">
           <section className="space-y-4">
             <h2 className={typography.h3}>Source Material</h2>
             <Card>
@@ -1465,13 +1478,17 @@ export default function ReportsPage(): React.JSX.Element {
               </div>
             </section>
           )}
-        </>
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════ */}
       {/* DOCUMENTS TAB                                 */}
       {/* ══════════════════════════════════════════════ */}
-      {pageMode === 'documents' && <SkillDocumentSection />}
+      {pageMode === 'documents' && (
+        <div id="tabpanel-documents" role="tabpanel" aria-labelledby="tab-documents">
+          <SkillDocumentSection />
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════ */}
       {/* Dialogs (shared across tabs)                  */}

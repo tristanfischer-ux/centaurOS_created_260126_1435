@@ -16,6 +16,7 @@ import * as LucideIcons from 'lucide-react'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -121,7 +122,9 @@ export function SubsystemDetailDialog({
                   <DialogTitle className="text-xl font-bold text-foreground">
                     {subsystem.name}
                   </DialogTitle>
-                  <p className="text-muted-foreground mt-1">{subsystem.tagline}</p>
+                  <DialogDescription className="text-muted-foreground mt-1">
+                    {subsystem.tagline}
+                  </DialogDescription>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge variant="secondary">{subsystem.category}</Badge>
                     {objectivePack && (
