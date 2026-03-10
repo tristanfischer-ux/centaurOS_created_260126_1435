@@ -2,18 +2,8 @@
 
 /**
  * Portfolio actions module
- * Re-exports portfolio-related functions from trust-signals.ts
- * and adds any additional portfolio-specific functionality
+ * Additional portfolio-specific server actions beyond trust-signals.ts
  */
-
-export {
-    getPortfolioItems as getPortfolio,
-    addPortfolioItem,
-    updatePortfolioItem,
-    deletePortfolioItem,
-    reorderPortfolioItems as reorderPortfolio,
-    type PortfolioItem,
-} from './trust-signals'
 
 import { updatePortfolioItem } from './trust-signals'
 import { createClient } from '@/lib/supabase/server'

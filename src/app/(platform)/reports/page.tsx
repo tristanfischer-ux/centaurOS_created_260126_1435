@@ -714,17 +714,20 @@ export default function ReportsPage(): React.JSX.Element {
       </div>
 
       {/* Change 6: Tab Separation */}
-      <div className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 p-1">
+      <div role="tablist" aria-label="Report type" className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 p-1">
         {PAGE_TABS.map(tab => {
           const Icon = tab.icon
+          const isActive = pageMode === tab.value
           return (
             <button
               key={tab.value}
               type="button"
+              role="tab"
+              aria-selected={isActive}
               onClick={() => setPageMode(tab.value)}
               className={cn(
                 'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
-                pageMode === tab.value
+                isActive
                   ? 'bg-background shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               )}
@@ -990,6 +993,9 @@ export default function ReportsPage(): React.JSX.Element {
                             <button
                               key={sectionType}
                               type="button"
+                              role="checkbox"
+                              aria-checked={isEnabled}
+                              aria-label={meta.label}
                               disabled={isCover}
                               onClick={() => {
                                 if (!isCover) handleSectionToggle(sectionType, !isEnabled)
@@ -1125,9 +1131,11 @@ export default function ReportsPage(): React.JSX.Element {
                       </div>
 
                       {/* View toggle */}
-                      <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
+                      <div role="tablist" aria-label="View mode" className="flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
                         <button
                           type="button"
+                          role="tab"
+                          aria-selected={viewMode === 'document'}
                           onClick={() => setViewMode('document')}
                           className={cn(
                             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
@@ -1141,6 +1149,8 @@ export default function ReportsPage(): React.JSX.Element {
                         </button>
                         <button
                           type="button"
+                          role="tab"
+                          aria-selected={viewMode === 'infographic'}
                           onClick={() => setViewMode('infographic')}
                           className={cn(
                             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
