@@ -46,14 +46,15 @@ export default async function RFQEditPage({ params }: RFQEditPageProps) {
   return (
     <div className="max-w-5xl h-[calc(100vh-4rem)]">
       <RFQWizard
+        editRfqId={rfq.id}
         initialTitle={rfq.title}
         initialCategory={rfq.category || ''}
         initialDescription={
           typeof specs.description === 'string' ? specs.description : ''
         }
         initialRfqType={rfq.rfq_type as RFQType}
-        initialBudgetMin={rfq.budget_min ? String(rfq.budget_min) : ''}
-        initialBudgetMax={rfq.budget_max ? String(rfq.budget_max) : ''}
+        initialBudgetMin={rfq.budget_min != null ? String(rfq.budget_min) : ''}
+        initialBudgetMax={rfq.budget_max != null ? String(rfq.budget_max) : ''}
         initialDeadline={rfq.deadline ? rfq.deadline.split('T')[0] : ''}
       />
     </div>

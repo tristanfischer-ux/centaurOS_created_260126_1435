@@ -8,6 +8,7 @@
  * sparkline trend visualization.
  */
 
+import { useId } from 'react'
 import { TrendingUp as TrendingUpIcon } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 
@@ -42,6 +43,7 @@ function RechartsSparkline({
   height?: number
   className?: string
 }): React.JSX.Element {
+  const uid = useId()
   const chartData = data.map((value, index) => ({ index, value }))
   const colors = SPARKLINE_COLORS[color]
 
@@ -50,7 +52,7 @@ function RechartsSparkline({
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
           <defs>
-            <linearGradient id={`sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={`${uid}-sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={colors.fill} stopOpacity={0.3} />
               <stop offset="95%" stopColor={colors.fill} stopOpacity={0.05} />
             </linearGradient>
@@ -59,7 +61,7 @@ function RechartsSparkline({
             type="monotone"
             dataKey="value"
             stroke={colors.stroke}
-            fill={`url(#sparkGrad-${color})`}
+            fill={`url(#${uid}-sparkGrad-${color})`}
             strokeWidth={1.5}
             dot={false}
             isAnimationActive={false}

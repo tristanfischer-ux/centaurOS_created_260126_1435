@@ -55,8 +55,8 @@ export async function createRFQ(
         rfq_type: params.rfq_type,
         title: params.title,
         specifications: (params.specifications || {}) as unknown as Json,
-        budget_min: params.budget_min || null,
-        budget_max: params.budget_max || null,
+        budget_min: params.budget_min ?? null,
+        budget_max: params.budget_max ?? null,
         deadline: params.deadline || null,
         category: params.category || null,
         urgency: params.urgency || 'standard',
@@ -484,7 +484,9 @@ export async function getRFQs(
     }
 
     if (filters.search) {
-      query = query.ilike('title', `%${filters.search}%`)
+      // Escape LIKE wildcards to prevent injection
+      const escaped = filters.search.replace(/[%_\\]/g, '\\$&')
+      query = query.ilike('title', `%${escaped}%`)
     }
 
     // Pagination

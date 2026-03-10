@@ -718,10 +718,6 @@ export async function awardRFQ(
       return { success: false, error: 'Provider has not accepted this RFQ' }
     }
 
-    if (response.quoted_price == null) {
-      return { success: false, error: 'Response does not have a quoted price' }
-    }
-
     // Award the RFQ
     const { error: updateError } = await supabase
       .from('rfqs')
@@ -738,22 +734,23 @@ export async function awardRFQ(
       return { success: false, error: 'Failed to award RFQ' }
     }
 
-    // Automatically create an order for the awarded RFQ
-    const { data: order, error: orderError } = await createOrder(
-      supabase,
-      buyerId,
-      {
-        sellerId: providerId,
-        orderType: 'product_rfq',
-        totalAmount: parseFloat(response.quoted_price.toString()),
-        currency: 'GBP',
-      }
-    )
+    // Automatically create an order if a quoted price exists
+    if (response.quoted_price != null) {
+      const { error: orderError } = await createOrder(
+        supabase,
+        buyerId,
+        {
+          sellerId: providerId,
+          orderType: 'product_rfq',
+          totalAmount: parseFloat(response.quoted_price.toString()),
+          currency: 'GBP',
+        }
+      )
 
-    if (orderError) {
-      console.error('Error creating order from RFQ:', orderError)
-      // Don't fail the award - order can be created manually
-      // But we should log this for admin attention
+      if (orderError) {
+        console.error('Error creating order from RFQ:', orderError)
+        // Don't fail the award - order can be created manually
+      }
     }
 
     return { success: true, error: null }

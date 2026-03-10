@@ -188,7 +188,7 @@ export function UpdatesFeed({
             <TabsTrigger value="unread" className="text-xs gap-1">
               Unread
               {unreadCount > 0 && (
-                <Badge className="ml-0.5 h-4 px-1 text-[10px] bg-international-orange text-white">
+                <Badge className="ml-0.5 h-4 px-1 text-[10px] bg-international-orange text-primary-foreground">
                   {unreadCount}
                 </Badge>
               )}

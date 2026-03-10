@@ -79,13 +79,13 @@ export function SupplierPreviewPanel({
     const min = formData.budgetMin ? parseFloat(formData.budgetMin) : null
     const max = formData.budgetMax ? parseFloat(formData.budgetMax) : null
 
-    if (min && max) {
+    if (min != null && max != null) {
       return `£${min.toLocaleString()} - £${max.toLocaleString()}`
     }
-    if (min) {
+    if (min != null) {
       return `From £${min.toLocaleString()}`
     }
-    if (max) {
+    if (max != null) {
       return `Up to £${max.toLocaleString()}`
     }
     return 'Not specified'

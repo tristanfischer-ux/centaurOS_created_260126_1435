@@ -154,8 +154,12 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     } else {
       setScenarios(prev => {
         const remaining = prev.filter(s => s.id !== id)
-        if (activeScenario.id === id && remaining.length > 0) {
-          setActiveScenario(remaining[0])
+        if (activeScenario.id === id) {
+          setActiveScenario(remaining[0] ?? {
+            id: '', name: 'Base Case', openingBalance: 0,
+            revenueDelayWeeks: 0, costDelayWeeks: 0, revenueGrowthPct: 0,
+            isDefault: true, sortOrder: 0,
+          })
         }
         return remaining
       })

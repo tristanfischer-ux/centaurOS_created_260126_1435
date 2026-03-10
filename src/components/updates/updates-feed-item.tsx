@@ -174,7 +174,7 @@ export function UpdatesFeedItem({
                 </Badge>
               )}
               {unreadCount > 0 && (
-                <Badge className="bg-international-orange text-white text-[10px] px-1.5 py-0">
+                <Badge className="bg-international-orange text-primary-foreground text-[10px] px-1.5 py-0">
                   {unreadCount} new
                 </Badge>
               )}

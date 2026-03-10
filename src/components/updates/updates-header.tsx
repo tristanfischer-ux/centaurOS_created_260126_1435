@@ -53,7 +53,7 @@ export function UpdatesHeader({
             <h1 className={typography.h1}>Comms</h1>
             {unreadCount > 0 && (
               <Badge
-                className="ml-2 bg-international-orange text-white"
+                className="ml-2 bg-international-orange text-primary-foreground"
                 aria-label={`${unreadCount} unread update${unreadCount !== 1 ? 's' : ''}`}
               >
                 {unreadCount} unread

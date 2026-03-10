@@ -26,7 +26,7 @@ import {
   CheckCircle2,
   Sparkles,
 } from 'lucide-react'
-import { createNewRFQ } from '@/actions/rfq'
+import { createNewRFQ, updateMyRFQ } from '@/actions/rfq'
 import { CreateRFQParams, RFQType, RFQ_CATEGORIES } from '@/types/rfq'
 import { RFQFileUpload } from './RFQFileUpload'
 import { CategoryFieldGroup, getCategoryGroup } from './CategoryFieldGroup'
@@ -82,6 +82,8 @@ const DEFAULT_CATEGORY_FIELDS: CategoryFieldState = {
 }
 
 export interface RFQWizardProps {
+  /** When set, the wizard updates an existing RFQ instead of creating a new one */
+  editRfqId?: string
   initialTitle?: string
   initialCategory?: string
   initialDescription?: string
@@ -107,6 +109,7 @@ const STEPS = [
 type StepKey = (typeof STEPS)[number]['key']
 
 export function RFQWizard({
+  editRfqId,
   initialTitle = '',
   initialCategory = '',
   initialDescription = '',
@@ -278,29 +281,57 @@ export function RFQWizard({
         if (categoryFields.deliverables) specs.deliverables = categoryFields.deliverables
       }
 
-      const params: CreateRFQParams = {
-        title: title.trim(),
-        rfq_type: rfqType as RFQType,
-        specifications: specs,
-        budget_min: budgetMin ? parseFloat(budgetMin) : null,
-        budget_max: budgetMax ? parseFloat(budgetMax) : null,
-        deadline: deadline || null,
-        category: category || null,
-        urgency,
-      }
+      const parsedBudgetMin = budgetMin ? parseFloat(budgetMin) : null
+      const parsedBudgetMax = budgetMax ? parseFloat(budgetMax) : null
 
-      const result = await createNewRFQ(params)
+      if (editRfqId) {
+        // Update existing RFQ
+        const updateResult = await updateMyRFQ(editRfqId, {
+          title: title.trim(),
+          specifications: specs,
+          budget_min: isNaN(parsedBudgetMin as number) ? null : parsedBudgetMin,
+          budget_max: isNaN(parsedBudgetMax as number) ? null : parsedBudgetMax,
+          deadline: deadline || null,
+          category: category || null,
+          urgency,
+        })
 
-      if (result.error) {
-        setError(result.error)
-        return
-      }
+        if (updateResult.error) {
+          setError(updateResult.error)
+          return
+        }
 
-      if (result.data?.id) {
         if (onSuccess) {
-          onSuccess(result.data.id)
+          onSuccess(editRfqId)
         } else {
-          router.push(`/rfq/${result.data.id}`)
+          router.push(`/rfq/${editRfqId}`)
+        }
+      } else {
+        // Create new RFQ
+        const params: CreateRFQParams = {
+          title: title.trim(),
+          rfq_type: rfqType as RFQType,
+          specifications: specs,
+          budget_min: isNaN(parsedBudgetMin as number) ? null : parsedBudgetMin,
+          budget_max: isNaN(parsedBudgetMax as number) ? null : parsedBudgetMax,
+          deadline: deadline || null,
+          category: category || null,
+          urgency,
+        }
+
+        const result = await createNewRFQ(params)
+
+        if (result.error) {
+          setError(result.error)
+          return
+        }
+
+        if (result.data?.id) {
+          if (onSuccess) {
+            onSuccess(result.data.id)
+          } else {
+            router.push(`/rfq/${result.data.id}`)
+          }
         }
       }
     })
@@ -330,7 +361,7 @@ export function RFQWizard({
         <div className="px-6 pt-6 pb-4 border-b">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Create Request for Quote</h1>
+            <h1 className={typography.h1}>{editRfqId ? 'Edit Request for Quote' : 'Create Request for Quote'}</h1>
           </div>
           <div className="flex items-center gap-2 mt-4">
             {STEPS.map((step, idx) => {
@@ -777,7 +808,7 @@ export function RFQWizard({
               >
                 {isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 <Sparkles className="w-4 h-4 mr-2" />
-                Send RFQ
+                {editRfqId ? 'Save Changes' : 'Send RFQ'}
               </Button>
             ) : (
               <Button

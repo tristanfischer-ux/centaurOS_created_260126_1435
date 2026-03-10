@@ -52,13 +52,13 @@ export const RFQCard = memo(function RFQCard({
   const TypeIcon = type.icon
 
   const formatBudget = () => {
-    if (rfq.budget_min && rfq.budget_max) {
+    if (rfq.budget_min != null && rfq.budget_max != null) {
       return `£${rfq.budget_min.toLocaleString()} - £${rfq.budget_max.toLocaleString()}`
     }
-    if (rfq.budget_min) {
+    if (rfq.budget_min != null) {
       return `From £${rfq.budget_min.toLocaleString()}`
     }
-    if (rfq.budget_max) {
+    if (rfq.budget_max != null) {
       return `Up to £${rfq.budget_max.toLocaleString()}`
     }
     return null
