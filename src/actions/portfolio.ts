@@ -22,6 +22,11 @@ export async function getProviderPortfolio(providerId: string): Promise<{
     image_urls?: string[]
 }[]> {
     const supabase = await createClient()
+
+    // AUTH: Verify user is authenticated before serving portfolio data
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
     const { data, error } = await supabase
         .from('provider_portfolio')
         .select('id, title, client_name, description, image_urls')

@@ -99,6 +99,11 @@ export function SaveSearchDialog({ open, onClose, searchQuery, filters }: SaveSe
                             id="search-name"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && name.trim() && !isSaving) {
+                                    handleSave()
+                                }
+                            }}
                             placeholder="e.g. CTO search, Quality engineers..."
                             maxLength={100}
                             aria-required
