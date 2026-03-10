@@ -93,17 +93,16 @@ export function ProjectAssignmentsList() {
     }
 
     const handleStatusUpdate = (assignmentId: string, status: 'completed' | 'cancelled') => {
+        // GOTCHA: Capture assignment BEFORE startTransition — assignments state may be stale inside the closure
+        const assignment = assignments.find(a => a.id === assignmentId)
         setActionId(assignmentId)
         startTransition(async () => {
             try {
                 const result = await updateAssignmentStatus(assignmentId, status)
                 if (result.success) {
                     // Show feedback dialog for completions
-                    if (status === 'completed') {
-                        const assignment = assignments.find(a => a.id === assignmentId)
-                        if (assignment) {
-                            setCompletedAssignment(assignment)
-                        }
+                    if (status === 'completed' && assignment) {
+                        setCompletedAssignment(assignment)
                     }
                     toast.success(`Assignment ${status}`)
                     loadAssignments()

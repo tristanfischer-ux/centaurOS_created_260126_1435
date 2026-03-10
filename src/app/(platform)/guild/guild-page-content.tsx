@@ -99,6 +99,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                 // SECURITY: Executive-only filtering now handled server-side in getGuildEvents
                 filteredEvents = eventsResult.data
                 setEvents(filteredEvents)
+                // Clear stale past event when upcoming events exist
+                if (filteredEvents.length > 0) setLastPastEvent(null)
 
                 // Load RSVP statuses for all visible events
                 const eventIds = filteredEvents.map(e => e.id)

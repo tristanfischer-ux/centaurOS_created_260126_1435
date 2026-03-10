@@ -100,7 +100,13 @@ function CostDisplay({ tier }: { tier: CostTier }) {
 // ---------------------------------------------------------------------------
 
 function renderSimpleMarkdown(md: string): string {
-  return md
+  // SECURITY: Escape HTML entities first to prevent XSS via injected tags
+  const escaped = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+  return escaped
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')

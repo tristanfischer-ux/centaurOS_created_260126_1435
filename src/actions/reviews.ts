@@ -143,6 +143,8 @@ export async function getReviewSummaries(
   entityNames: string[]
 ): Promise<{ data: Record<string, { avg: number; count: number }> } | { error: string }> {
   if (entityNames.length === 0) return { data: {} }
+  // SECURITY: Cap batch size to prevent DoS via large .in() clauses
+  if (entityNames.length > 200) return { error: 'Too many entity names (max 200)' }
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

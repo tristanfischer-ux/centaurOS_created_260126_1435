@@ -123,7 +123,7 @@ export async function uploadMessageFile(
   // Generate unique filename
   const fileExt = file.name.split('.').pop()
   const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).substring(2, 15)
+  const randomStr = crypto.randomUUID().replace(/-/g, '').substring(0, 15)
   const fileName = `${timestamp}-${randomStr}.${fileExt}`
   const filePath = `messages/${conversationId}/${fileName}`
   
@@ -170,7 +170,7 @@ export async function uploadTaskFile(
   
   const fileExt = file.name.split('.').pop()
   const timestamp = Date.now()
-  const randomStr = Math.random().toString(36).substring(2, 15)
+  const randomStr = crypto.randomUUID().replace(/-/g, '').substring(0, 15)
   const fileName = `${timestamp}-${randomStr}.${fileExt}`
   const filePath = `tasks/${taskId}/${fileName}`
   

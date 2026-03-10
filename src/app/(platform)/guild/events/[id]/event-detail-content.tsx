@@ -173,12 +173,14 @@ export function EventDetailContent({
                 cancelled: "RSVP cancelled",
             }
             toast.success(messages[status])
+            // Refresh server data to update attendee list
+            router.refresh()
         } catch {
             toast.error('Failed to update RSVP')
         } finally {
             setLoadingRsvp(false)
         }
-    }, [event.id])
+    }, [event.id, router])
 
     const handleDelete = async (): Promise<void> => {
         setDeleting(true)
@@ -199,11 +201,16 @@ export function EventDetailContent({
 
     const handleShare = () => {
         const url = `${window.location.origin}/guild/events/${event.id}`
-        navigator.clipboard.writeText(url).then(() => {
-            toast.success('Link copied')
-        }).catch(() => {
-            toast.error('Failed to copy link')
-        })
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                toast.success('Link copied')
+            }).catch(() => {
+                toast.error('Failed to copy link')
+            })
+        } else {
+            // Fallback for insecure contexts / older browsers
+            toast.error('Clipboard not available')
+        }
     }
 
     const handleMessageAttendee = async (userId: string) => {

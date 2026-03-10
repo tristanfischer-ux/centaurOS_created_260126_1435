@@ -19,6 +19,7 @@
  */
 
 import { NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 
 /**
  * Verifies the CRON_SECRET Bearer token on a cron job request.
@@ -46,8 +47,13 @@ export function verifyCronSecret(req: Request): NextResponse | null {
         )
     }
 
-    const authHeader = req.headers.get("authorization")
-    if (authHeader !== `Bearer ${cronSecret}`) {
+    // SECURITY: Timing-safe comparison to prevent secret oracle attacks
+    const authHeader = req.headers.get("authorization") || ""
+    const expected = `Bearer ${cronSecret}`
+    if (
+        authHeader.length !== expected.length ||
+        !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+    ) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

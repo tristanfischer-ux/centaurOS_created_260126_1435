@@ -107,6 +107,13 @@ export async function createGuildEvent(data: {
         if (data.eventUrl && data.eventUrl.length > 2000) return { data: null, error: 'URL too long (max 2000 chars)' }
         if (data.locationAddress && data.locationAddress.length > 500) return { data: null, error: 'Location too long (max 500 chars)' }
 
+        // VALIDATION: maxAttendees must be a positive integer if provided
+        if (data.maxAttendees !== undefined && data.maxAttendees !== null) {
+            if (!Number.isInteger(data.maxAttendees) || data.maxAttendees < 1) {
+                return { data: null, error: 'Max attendees must be a positive whole number' }
+            }
+        }
+
         const foundryId = await getFoundryIdCached()
 
         const { data: event, error } = await supabase
@@ -279,6 +286,19 @@ export async function getGuildEvent(eventId: string): Promise<{ data: GuildEvent
             return { data: null, error: sanitizeErrorMessage(error) }
         }
 
+        // SECURITY: Non-executives cannot view executive-only events
+        if (data?.is_executive_only) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+
+            if (!profile?.role || !['Founder', 'Executive'].includes(profile.role)) {
+                return { data: null, error: 'Event not found' }
+            }
+        }
+
         return { data: data as GuildEvent, error: null }
     } catch (err) {
         console.error('[GuildEvents] getGuildEvent exception:', err)
@@ -337,6 +357,11 @@ export async function updateGuildEvent(
             if (!isFoundryAdmin) {
                 return { success: false, error: 'Not authorized to update this event' }
             }
+        }
+
+        // VALIDATION: Reject empty/whitespace-only title
+        if (data.title !== undefined && !data.title.trim()) {
+            return { success: false, error: 'Title cannot be empty' }
         }
 
         // SECURITY: Input length validation (mirrors createGuildEvent)
@@ -466,16 +491,24 @@ export async function toggleRSVP(eventId: string): Promise<{
 
         if (existing && existing.status === 'going') {
             // Cancel RSVP
-            await supabase
+            const { error: delError } = await supabase
                 .from('event_attendees')
                 .delete()
                 .eq('id', existing.id)
+            if (delError) {
+                console.error('[GuildEvents] toggleRSVP delete failed:', delError)
+                return { attending: true, attendeeCount: 0, error: sanitizeErrorMessage(delError) }
+            }
         } else if (existing) {
             // Re-activate cancelled RSVP
-            await supabase
+            const { error: updError } = await supabase
                 .from('event_attendees')
                 .update({ status: 'going', updated_at: new Date().toISOString() })
                 .eq('id', existing.id)
+            if (updError) {
+                console.error('[GuildEvents] toggleRSVP update failed:', updError)
+                return { attending: false, attendeeCount: 0, error: sanitizeErrorMessage(updError) }
+            }
         } else {
             // SECURITY: Check capacity before inserting
             // NOTE: This check + insert is not fully atomic. A database constraint
@@ -582,7 +615,11 @@ export async function setRSVPStatus(
         if (status === 'cancelled') {
             // Remove RSVP
             if (existing) {
-                await supabase.from('event_attendees').delete().eq('id', existing.id)
+                const { error: delError } = await supabase.from('event_attendees').delete().eq('id', existing.id)
+                if (delError) {
+                    console.error('[GuildEvents] setRSVPStatus delete failed:', delError)
+                    return { status: existing.status as 'going' | 'maybe' | 'cancelled', goingCount: 0, maybeCount: 0, error: sanitizeErrorMessage(delError) }
+                }
             }
         } else if (existing) {
             // Update existing RSVP
@@ -606,10 +643,14 @@ export async function setRSVPStatus(
                     }
                 }
             }
-            await supabase
+            const { error: updError } = await supabase
                 .from('event_attendees')
                 .update({ status, updated_at: new Date().toISOString() })
                 .eq('id', existing.id)
+            if (updError) {
+                console.error('[GuildEvents] setRSVPStatus update failed:', updError)
+                return { status: existing.status as 'going' | 'maybe' | 'cancelled', goingCount: 0, maybeCount: 0, error: sanitizeErrorMessage(updError) }
+            }
         } else {
             // New RSVP
             if (status === 'going') {
@@ -700,6 +741,10 @@ export async function getEventAttendees(eventId: string, limit: number = 50): Pr
 }> {
     try {
         const supabase = await createClient()
+
+        // AUTH: Require authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], totalCount: 0, error: 'Not authenticated' }
 
         const { data, error, count } = await supabase
             .from('event_attendees')
@@ -833,19 +878,30 @@ export async function getGuildEventsSummary(): Promise<{
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'Not authenticated' }
 
+        // SECURITY: Check caller role to filter executive-only events
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        const isExec = profile?.role && ['Founder', 'Executive'].includes(profile.role)
+
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
         // INTENT: First day of next month for exclusive upper bound (avoids off-by-one on last day)
         const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
 
         // Get upcoming events count
-        const { count: upcomingCount } = await supabase
+        let upcomingQuery = supabase
             .from('guild_events')
             .select('*', { count: 'exact', head: true })
             .gte('event_date', now.toISOString())
+        if (!isExec) upcomingQuery = upcomingQuery.eq('is_executive_only', false)
+        const { count: upcomingCount } = await upcomingQuery
 
         // Get next event
-        const { data: nextEvents } = await supabase
+        let nextQuery = supabase
             .from('guild_events')
             .select(`
                 *,
@@ -854,13 +910,17 @@ export async function getGuildEventsSummary(): Promise<{
             .gte('event_date', now.toISOString())
             .order('event_date', { ascending: true })
             .limit(1)
+        if (!isExec) nextQuery = nextQuery.eq('is_executive_only', false)
+        const { data: nextEvents } = await nextQuery
 
         // Get this month's events count
-        const { count: totalThisMonth } = await supabase
+        let monthQuery = supabase
             .from('guild_events')
             .select('*', { count: 'exact', head: true })
             .gte('event_date', startOfMonth)
             .lt('event_date', startOfNextMonth)
+        if (!isExec) monthQuery = monthQuery.eq('is_executive_only', false)
+        const { count: totalThisMonth } = await monthQuery
 
         return {
             data: {

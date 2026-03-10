@@ -92,9 +92,13 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
         return { success: false, error: 'Not authorized to edit this listing' }
     }
     
-    // Update the listing - resets to pending approval if content changed
+    // SECURITY: Allowlist fields — prevent mass assignment of is_verified, approval_status, etc.
     const updateData: Record<string, unknown> = {
-        ...input,
+        ...(input.title !== undefined && { title: input.title }),
+        ...(input.category !== undefined && { category: input.category }),
+        ...(input.subcategory !== undefined && { subcategory: input.subcategory }),
+        ...(input.description !== undefined && { description: input.description }),
+        ...(input.attributes !== undefined && { attributes: input.attributes }),
         approval_status: 'pending' // Require re-approval after edit
     }
     const { error } = await supabase

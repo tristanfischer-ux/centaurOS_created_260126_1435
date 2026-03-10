@@ -38,30 +38,38 @@ export interface OrderContract {
 // Get all contract templates
 export async function getContractTemplates(templateType?: string) {
     const supabase = await createClient()
-    
+
+    // SECURITY: Require authentication
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { templates: [], error: 'Not authenticated' }
+
     let query = supabase
         .from('contract_templates')
         .select('*')
-    
+
     if (templateType) {
         query = query.eq('template_type', templateType)
     }
-    
+
     const { data, error } = await query.order('name', { ascending: true })
-    
+
     return { templates: (data || []) as unknown as ContractTemplate[], error: error?.message || null }
 }
 
 // Get a specific template
 export async function getContractTemplate(id: string) {
     const supabase = await createClient()
-    
+
+    // SECURITY: Require authentication
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { template: null, error: 'Not authenticated' }
+
     const { data, error } = await supabase
         .from('contract_templates')
         .select('*')
         .eq('id', id)
         .single()
-    
+
     return { template: data as unknown as ContractTemplate | null, error: error?.message || null }
 }
 
@@ -106,9 +114,10 @@ export async function generateContract(input: {
     }
     
     // Render the template with variable values
+    // SECURITY: Use replaceAll instead of new RegExp() to avoid ReDoS from user-controlled keys
     let renderedContent = template.content
     for (const [key, value] of Object.entries(input.variableValues)) {
-        renderedContent = renderedContent.replace(new RegExp(`{{${key}}}`, 'g'), value)
+        renderedContent = renderedContent.replaceAll(`{{${key}}}`, value)
     }
     
     // Check if contract already exists for this order

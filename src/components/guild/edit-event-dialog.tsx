@@ -101,7 +101,8 @@ export function EditEventDialog({ open, onOpenChange, onUpdated, event }: EditEv
         const hours = String(d.getHours()).padStart(2, "0")
         const minutes = String(d.getMinutes()).padStart(2, "0")
         setEventTime(`${hours}:${minutes}`)
-    }, [event])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [event.id])
 
     const handleSave = async () => {
         if (!title.trim() || !eventDate || !eventTime) return

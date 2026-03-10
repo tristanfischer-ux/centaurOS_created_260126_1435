@@ -98,11 +98,21 @@ export async function createBulkNotifications(data: {
 }): Promise<{ count: number; error: string | null }> {
     try {
         const supabase = await createClient()
+
+        // SECURITY: Require authentication
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { count: 0, error: 'Not authenticated' }
+
         const foundryId = await getFoundryIdCached()
-        
         if (!foundryId) {
             return { count: 0, error: 'No foundry context' }
         }
+
+        // SECURITY: Cap batch size to prevent DoS
+        if (data.userIds.length > 100) return { count: 0, error: 'Too many recipients (max 100)' }
+        // SECURITY: Validate input lengths
+        if (data.title.length > 500) return { count: 0, error: 'Title too long' }
+        if (data.message && data.message.length > 5000) return { count: 0, error: 'Message too long' }
 
         const notifications = data.userIds.map(userId => ({
             user_id: userId,

@@ -20,6 +20,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -132,6 +133,10 @@ export async function generateRfqPackAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // SECURITY: Derive foundry_id server-side — never trust client input
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { error: 'No foundry context' }
+
   // VALIDATION: Require at least one module
   if (input.modules.length === 0) return { error: 'No modules to generate RFQ for' }
 
@@ -242,7 +247,7 @@ export async function generateRfqPackAction(
       .from('forge_contracts')
       .insert({
         xray_scan_id: input.scanId,
-        foundry_id: input.foundryId,
+        foundry_id: foundryId,
         document_type: 'rfq_pack',
         rendered_content: renderedContent,
         variable_values: variableValues,
@@ -283,6 +288,10 @@ export async function generateForgeContractAction(
   // AUTH: Verify authenticated
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
+
+  // SECURITY: Derive foundry_id server-side — never trust client input
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { error: 'No foundry context' }
 
   // Load the template
   const { data: template, error: templateError } = await supabase
@@ -363,7 +372,7 @@ export async function generateForgeContractAction(
     .from('forge_contracts')
     .insert({
       xray_scan_id: input.scanId,
-      foundry_id: input.foundryId,
+      foundry_id: foundryId,
       template_id: template.id,
       document_type: documentType,
       module_id: input.moduleId ?? null,
@@ -410,10 +419,15 @@ export async function updateForgeContractStatusAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // SECURITY: Derive foundry_id server-side for tenant isolation
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { error: 'No foundry context' }
+
   const { error } = await supabase
     .from('forge_contracts')
     .update({ status })
     .eq('id', contractId)
+    .eq('foundry_id', foundryId)
 
   if (error) {
     console.error('[ForgeContracts] Failed to update status:', { contractId, status, error: error.message })
@@ -442,10 +456,15 @@ export async function deleteForgeContractAction(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // SECURITY: Derive foundry_id server-side for tenant isolation
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { error: 'No foundry context' }
+
   const { error } = await supabase
     .from('forge_contracts')
     .delete()
     .eq('id', contractId)
+    .eq('foundry_id', foundryId)
 
   if (error) {
     console.error('[ForgeContracts] Failed to delete contract:', { contractId, error: error.message })

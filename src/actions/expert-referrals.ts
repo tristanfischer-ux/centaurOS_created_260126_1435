@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { withUser } from '@/lib/server-action-utils'
 import { revalidatePath } from "next/cache"
+import { randomInt } from "crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
 /**
@@ -49,10 +50,11 @@ export interface ReferralStats {
  * Generate a unique referral code for the current user.
  */
 function generateCode(): string {
+    // SECURITY: Use crypto.randomInt for unpredictable referral codes
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
     let code = ''
     for (let i = 0; i < 8; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)]
+        code += chars[randomInt(chars.length)]
     }
     return code
 }

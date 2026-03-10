@@ -103,17 +103,22 @@ export async function assignApprenticeToProject(
     return { success: false, error: 'Unauthorized' }
   }
   
+  // VALIDATION: Input length checks
+  if (!projectName.trim()) return { success: false, error: 'Project name is required' }
+  if (projectName.length > 200) return { success: false, error: 'Project name too long (max 200 chars)' }
+  if (projectDescription && projectDescription.length > 2000) return { success: false, error: 'Description too long (max 2000 chars)' }
+
   // Verify user is a Founder or Executive
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, foundry_id')
     .eq('id', user.id)
     .single()
-  
+
   if (!profile || (profile.role !== 'Founder' && profile.role !== 'Executive')) {
     return { success: false, error: 'Only Founders and Executives can assign apprentices' }
   }
-  
+
   // Verify the apprentice is in the Guild
   const { data: apprentice } = await supabase
     .from('profiles')
@@ -325,13 +330,22 @@ export async function updateAssignmentStatus(
     return { success: false, error: 'Only Founders and Executives can update assignments' }
   }
   
-  // Get assignment details before update (for notification)
+  // Get assignment details before update (for notification + active check)
   const { data: assignment } = await supabase
     .from('project_assignments')
-    .select('apprentice_id, project_name')
+    .select('apprentice_id, project_name, status')
     .eq('id', assignmentId)
     .eq('foundry_id', foundryId)
     .single()
+
+  if (!assignment) {
+    return { success: false, error: 'Assignment not found' }
+  }
+
+  // VALIDATION: Only active assignments can be completed or cancelled
+  if (assignment.status !== 'active') {
+    return { success: false, error: `Assignment is already ${assignment.status}` }
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error } = await supabase

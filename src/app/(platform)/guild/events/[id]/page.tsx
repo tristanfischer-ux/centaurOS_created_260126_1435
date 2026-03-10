@@ -52,6 +52,11 @@ export default async function EventDetailPage({ params }: PageProps) {
         notFound()
     }
 
+    // SECURITY: Non-executives cannot access executive-only events
+    if (event.is_executive_only && profile.role !== 'Founder' && profile.role !== 'Executive') {
+        notFound()
+    }
+
     // Get attendees with profile info
     const { data: attendees } = await supabase
         .from('event_attendees')

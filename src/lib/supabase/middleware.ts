@@ -159,8 +159,12 @@ export async function updateSession(request: NextRequest) {
             }
 
             // Otherwise go to last visited page or /today
+            // SECURITY: Validate last-path to prevent open redirect via cookie manipulation
             const lastVisited = request.cookies.get('forge-last-path')?.value
-            redirectUrl.pathname = lastVisited && lastVisited !== '/' && lastVisited !== '/dashboard' ? lastVisited : '/today'
+            const safePath = (lastVisited && lastVisited.startsWith('/') && !lastVisited.startsWith('//') && lastVisited !== '/' && lastVisited !== '/dashboard')
+              ? lastVisited
+              : '/today'
+            redirectUrl.pathname = safePath
             return NextResponse.redirect(redirectUrl)
         }
 

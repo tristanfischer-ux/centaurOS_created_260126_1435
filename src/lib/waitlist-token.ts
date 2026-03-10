@@ -1,6 +1,7 @@
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 
-const WAITLIST_SECRET = process.env.WAITLIST_SECRET || "dev-waitlist-secret";
+// SECURITY: Fail closed — no hardcoded fallback
+const WAITLIST_SECRET = process.env.WAITLIST_SECRET;
 
 /**
  * Create a signed token for one-click approve/reject links in admin email.
@@ -10,6 +11,7 @@ export function createWaitlistActionToken(
   entryId: string,
   action: "approve" | "reject"
 ): string {
+  if (!WAITLIST_SECRET) throw new Error("WAITLIST_SECRET not configured");
   const exp = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
   const payload = JSON.stringify({ id: entryId, action, exp });
   const payloadB64 = Buffer.from(payload, "utf-8").toString("base64url");
@@ -26,8 +28,12 @@ export function verifyWaitlistActionToken(
   const parts = token.split(".");
   if (parts.length !== 2) return null;
   const [payloadB64, sig] = parts;
+  if (!WAITLIST_SECRET) return null; // Fail closed when not configured
   const expectedSig = createHmac("sha256", WAITLIST_SECRET).update(payloadB64).digest("base64url");
-  if (sig !== expectedSig) return null;
+  // SECURITY: Timing-safe comparison to prevent signature oracle attacks
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) return null;
   try {
     const payload = JSON.parse(Buffer.from(payloadB64, "base64url").toString("utf-8"));
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;

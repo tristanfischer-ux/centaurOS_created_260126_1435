@@ -384,7 +384,7 @@ export async function fetchWebPage(url: string): Promise<WebFetchResponse> {
           title: pageTitle,
           description,
           content: description || "Could not extract readable content from this page.",
-          htmlContent: `<p>${description || "Could not extract readable content from this page."}</p>`,
+          htmlContent: `<p>${(description || "Could not extract readable content from this page.").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`,
           siteName,
           favicon,
           byline: null,
