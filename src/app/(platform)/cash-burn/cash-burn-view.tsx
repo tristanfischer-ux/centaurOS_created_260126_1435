@@ -83,7 +83,8 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   // Cash-zero date
   const cashZeroDate = useMemo(() => {
     if (projection.runwayWeeks === null) return null
-    const cliffWeek = projection.weeks.find(w => w.cumulativeBalance < 0)
+    // INTENT: Match computeRunway which uses <= 0 (balance at exactly 0 = exhausted)
+    const cliffWeek = projection.weeks.find(w => w.cumulativeBalance <= 0)
     if (cliffWeek) return cliffWeek.weekStart
     // INTENT: Runway exceeds 52-week window — extrapolate approximate date
     if (projection.runwayWeeks > 0) {

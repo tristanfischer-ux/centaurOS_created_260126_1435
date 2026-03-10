@@ -35,8 +35,10 @@ export function projectBurn(
   const rows: BurnWeekRow[] = []
   let cumulativeBalance = scenario.openingBalance
   // INTENT: Compound annual growth over 52 weeks, not flat multiplier
-  const weeklyGrowthFactor = scenario.revenueGrowthPct !== 0
-    ? Math.pow(1 + scenario.revenueGrowthPct / 100, 1 / 52)
+  // VALIDATION: Guard against NaN when growth < -100% (e.g. -200% → negative base)
+  const growthBase = 1 + scenario.revenueGrowthPct / 100
+  const weeklyGrowthFactor = scenario.revenueGrowthPct !== 0 && growthBase > 0
+    ? Math.pow(growthBase, 1 / 52)
     : 1
 
   for (let w = 0; w < weeks; w++) {
@@ -53,9 +55,12 @@ export function projectBurn(
     // Apply compound revenue growth scaling
     if (weeklyGrowthFactor !== 1 && inWeekIdx >= 0 && inWeekIdx < cashInGrid.length) {
       // Scale only the revenue portion, not loans/equity/grants
+      // INTENT: Use inWeekIdx (source week) not w (display week) — the growth
+      // exponent should reflect how many weeks of growth the source data has,
+      // not the shifted display position.
       const revenueOnly = cashInGrid[inWeekIdx].revenue
       const nonRevenue = totalIn - revenueOnly
-      totalIn = Math.round(revenueOnly * Math.pow(weeklyGrowthFactor, w)) + nonRevenue
+      totalIn = Math.round(revenueOnly * Math.pow(weeklyGrowthFactor, inWeekIdx)) + nonRevenue
     }
 
     // Get cash out for this week (with delay applied)
