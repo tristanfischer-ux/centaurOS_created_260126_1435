@@ -10,7 +10,7 @@
  * @component
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,10 +28,12 @@ import {
   Calendar,
   Users,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Link2
 } from 'lucide-react'
 import { formatDistanceToNow, format } from 'date-fns'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { getThreadForSource, replyToActivity, markMultipleActivityRead } from '@/actions/activity'
 import type { ThreadData, ThreadItem } from '@/actions/activity'
@@ -120,6 +122,65 @@ export function UpdatesThreadPanel({
     }
   }, [threadData])
 
+  // Realtime subscription for new comments (task/objective only — conversations use useConversation)
+  const supabase = useMemo(() => createClient(), [])
+
+  useEffect(() => {
+    if (sourceType === 'conversation') return
+
+    const table = sourceType === 'task' ? 'task_comments' : 'objective_comments'
+    const filterCol = sourceType === 'task' ? 'task_id' : 'objective_id'
+
+    const channel = supabase
+      .channel(`thread-${sourceType}-${sourceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table,
+          filter: `${filterCol}=eq.${sourceId}`
+        },
+        async (payload: { new: { id: string; user_id: string; content: string; created_at: string; is_system_log: boolean } }) => {
+          const row = payload.new
+          if (row.user_id === currentUserId) return
+
+          const { data: author } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url, role')
+            .eq('id', row.user_id)
+            .single()
+
+          if (!author) return
+
+          const newItem: ThreadItem = {
+            id: row.id,
+            content: row.content,
+            created_at: row.created_at,
+            is_system_log: row.is_system_log,
+            is_unread: true,
+            author: {
+              id: author.id,
+              full_name: author.full_name,
+              avatar_url: author.avatar_url,
+              role: author.role
+            }
+          }
+
+          setThreadData(prev => {
+            if (!prev) return prev
+            if (prev.items.some(i => i.id === newItem.id)) return prev
+            return { ...prev, items: [...prev.items, newItem] }
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sourceType, sourceId, currentUserId, supabase])
+
   // Handle reply
   const handleReply = async () => {
     if (!replyContent.trim() || isSending) return
@@ -129,12 +190,17 @@ export function UpdatesThreadPanel({
       const result = await replyToActivity(sourceType as ActivitySourceType, sourceId, replyContent.trim())
       if (result.success) {
         setReplyContent('')
-        // Reset textarea height after clearing
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
         }
-        // Refresh thread to show the new reply
-        await fetchThread()
+        // Optimistically append the returned ThreadItem
+        if (result.data && threadData) {
+          setThreadData(prev => {
+            if (!prev) return prev
+            if (prev.items.some(i => i.id === result.data!.id)) return prev
+            return { ...prev, items: [...prev.items, result.data!] }
+          })
+        }
         toast.success('Reply sent')
       } else {
         toast.error(result.error || 'Failed to send reply')
@@ -145,6 +211,13 @@ export function UpdatesThreadPanel({
     } finally {
       setIsSending(false)
     }
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(
+      () => toast.success('Link copied to clipboard'),
+      () => toast.error('Failed to copy link')
+    )
   }
 
   // Auto-resize textarea
@@ -222,15 +295,24 @@ export function UpdatesThreadPanel({
             </div>
           </div>
 
-          {!isConversation && (
-            <Link
-              href={linkHref}
-              className="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-              title={`Open in ${isTask ? 'Tasks' : 'Objectives'}`}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={handleCopyLink}
+              className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+              title="Copy link"
             >
-              <ExternalLink className="h-4 w-4" />
-            </Link>
-          )}
+              <Link2 className="h-4 w-4" />
+            </button>
+            {!isConversation && (
+              <Link
+                href={linkHref}
+                className="text-muted-foreground hover:text-foreground transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                title={`Open in ${isTask ? 'Tasks' : 'Objectives'}`}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Metadata chips */}

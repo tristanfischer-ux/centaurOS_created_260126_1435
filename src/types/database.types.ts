@@ -8938,8 +8938,10 @@ export type Database = {
           content: string | null
           conversation_id: string
           created_at: string | null
+          edited_at: string | null
           file_url: string | null
           id: string
+          is_deleted: boolean
           is_read: boolean | null
           last_reply_at: string | null
           message_type: string | null
@@ -8954,8 +8956,10 @@ export type Database = {
           content?: string | null
           conversation_id: string
           created_at?: string | null
+          edited_at?: string | null
           file_url?: string | null
           id?: string
+          is_deleted?: boolean
           is_read?: boolean | null
           last_reply_at?: string | null
           message_type?: string | null
@@ -8970,8 +8974,10 @@ export type Database = {
           content?: string | null
           conversation_id?: string
           created_at?: string | null
+          edited_at?: string | null
           file_url?: string | null
           id?: string
+          is_deleted?: boolean
           is_read?: boolean | null
           last_reply_at?: string | null
           message_type?: string | null
@@ -11662,6 +11668,8 @@ export type Database = {
           status: Database["public"]["Enums"]["presence_status"]
           status_message: string | null
           timezone: string | null
+          typing_in_conversation_id: string | null
+          typing_since: string | null
           updated_at: string
           user_id: string
         }
@@ -11676,6 +11684,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["presence_status"]
           status_message?: string | null
           timezone?: string | null
+          typing_in_conversation_id?: string | null
+          typing_since?: string | null
           updated_at?: string
           user_id: string
         }
@@ -11690,6 +11700,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["presence_status"]
           status_message?: string | null
           timezone?: string | null
+          typing_in_conversation_id?: string | null
+          typing_since?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -11699,6 +11711,13 @@ export type Database = {
             columns: ["current_task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presence_typing_in_conversation_id_fkey"
+            columns: ["typing_in_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
           {
@@ -18891,6 +18910,8 @@ export type Database = {
           status: Database["public"]["Enums"]["presence_status"]
           status_message: string | null
           timezone: string | null
+          typing_in_conversation_id: string | null
+          typing_since: string | null
           updated_at: string
           user_id: string
         }

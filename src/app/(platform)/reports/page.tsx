@@ -700,6 +700,10 @@ export default function ReportsPage(): React.JSX.Element {
     setLastSnapshotId(snapshotId)
     setShareUrl(null)
     setPageMode('reports')
+    // INTENT: Reset to document view so reportRef is mounted for scrolling.
+    // Without this, if the user was in infographic view, reportRef.current is null
+    // and the scroll below silently fails.
+    setViewMode('document')
     toast.success('Report loaded from history')
     // INTENT: Wait for React to commit the DOM before scrolling. requestAnimationFrame
     // fires after paint, which is more reliable than a fixed 100ms timeout.
@@ -768,7 +772,7 @@ export default function ReportsPage(): React.JSX.Element {
           {/* Change 4: Template Selector with section preview */}
           <section className="space-y-4">
             <h2 className={typography.h3}>Choose a Template</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div role="radiogroup" aria-label="Report template" className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {REPORT_TEMPLATES.filter(t => REPORT_TEMPLATE_IDS.includes(t.id)).map(template => {
                 const isSelected = selectedTemplate === template.id
                 const TemplateIcon = TEMPLATE_ICONS[template.id]
@@ -779,12 +783,22 @@ export default function ReportsPage(): React.JSX.Element {
                 return (
                   <Card
                     key={template.id}
+                    role="radio"
+                    aria-checked={isSelected}
+                    aria-label={template.name}
+                    tabIndex={0}
                     className={cn(
                       'cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
                       isSelected && 'ring-2 ring-international-orange',
                       isGeneratingReport && 'pointer-events-none opacity-60'
                     )}
                     onClick={() => handleTemplateSelect(template.id)}
+                    onKeyDown={(e: React.KeyboardEvent) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleTemplateSelect(template.id)
+                      }
+                    }}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
@@ -845,6 +859,8 @@ export default function ReportsPage(): React.JSX.Element {
                 {/* Collapsed summary row */}
                 <button
                   type="button"
+                  aria-expanded={isConfigExpanded}
+                  aria-controls="report-config-panel"
                   className="flex w-full items-center justify-between px-6 py-4 text-left"
                   onClick={() => setIsConfigExpanded(prev => !prev)}
                 >
@@ -866,7 +882,7 @@ export default function ReportsPage(): React.JSX.Element {
 
                 {/* Expanded config */}
                 {isConfigExpanded && (
-                  <div className="border-t border-border px-6 pb-6 pt-4 space-y-6">
+                  <div id="report-config-panel" className="border-t border-border px-6 pb-6 pt-4 space-y-6">
                     {/* Tone & Detail */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-3">

@@ -64,6 +64,9 @@ export interface Message {
   // Context fields
   task_id?: string | null
   objective_id?: string | null
+  // Edit/delete support
+  edited_at: string | null
+  is_deleted: boolean
 }
 
 export interface MessageWithContext extends Message {
@@ -815,7 +818,7 @@ export async function getEnhancedConversationsForUser(
       task:tasks!conversations_task_id_fkey(id, title, task_number, status),
       objective:objectives!conversations_objective_id_fkey(id, title),
       listing:marketplace_listings!conversations_listing_id_fkey(id, title, category),
-      conversation_participants!inner(profile_id, last_read_at)
+      conversation_participants!inner(profile_id, last_read_at, is_muted)
     `)
     .eq('conversation_participants.profile_id', userId)
     .order('updated_at', { ascending: false })
@@ -980,7 +983,118 @@ export async function searchConversations(
     .eq('status', 'active')
     .limit(limit)
 
-  return (byTitle || []) as unknown as ConversationWithParticipants[]
+  // Also search message content
+  const { data: byContent } = await supabase
+    .from('messages')
+    .select(`
+      conversation_id,
+      content,
+      conversations!inner(
+        *,
+        buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
+        seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email),
+        conversation_participants!inner(profile_id)
+      )
+    `)
+    .eq('conversations.conversation_participants.profile_id', userId)
+    .eq('conversations.status', 'active')
+    .neq('is_deleted', true)
+    .ilike('content', searchPattern)
+    .limit(limit)
+
+  // Merge results, deduplicating by conversation ID
+  const seenIds = new Set((byTitle || []).map((c: { id: string }) => c.id))
+  const results = [...(byTitle || [])] as unknown as (ConversationWithParticipants & { matchingSnippet?: string })[]
+
+  for (const msg of byContent || []) {
+    const conv = (msg as unknown as { conversations: Record<string, unknown> }).conversations
+    if (conv && !seenIds.has((conv as { id: string }).id)) {
+      seenIds.add((conv as { id: string }).id)
+      results.push({
+        ...(conv as unknown as ConversationWithParticipants),
+        matchingSnippet: (msg.content || '').slice(0, 200)
+      })
+    }
+  }
+
+  return results as unknown as ConversationWithParticipants[]
+}
+
+/**
+ * Edit a message (only by the sender)
+ */
+export async function editMessage(
+  supabase: AnySupabaseClient,
+  messageId: string,
+  userId: string,
+  newContent: string
+): Promise<{ success: boolean; error?: string }> {
+  // Verify ownership
+  const { data: message, error: fetchError } = await supabase
+    .from('messages')
+    .select('sender_id')
+    .eq('id', messageId)
+    .single()
+
+  if (fetchError || !message) {
+    return { success: false, error: 'Message not found' }
+  }
+
+  if (message.sender_id !== userId) {
+    return { success: false, error: 'You can only edit your own messages' }
+  }
+
+  const { error } = await supabase
+    .from('messages')
+    .update({
+      content: newContent,
+      edited_at: new Date().toISOString()
+    })
+    .eq('id', messageId)
+
+  if (error) {
+    return { success: false, error: 'Failed to edit message' }
+  }
+
+  return { success: true }
+}
+
+/**
+ * Soft delete a message (only by the sender)
+ */
+export async function deleteMessage(
+  supabase: AnySupabaseClient,
+  messageId: string,
+  userId: string
+): Promise<{ success: boolean; error?: string }> {
+  // Verify ownership
+  const { data: message, error: fetchError } = await supabase
+    .from('messages')
+    .select('sender_id')
+    .eq('id', messageId)
+    .single()
+
+  if (fetchError || !message) {
+    return { success: false, error: 'Message not found' }
+  }
+
+  if (message.sender_id !== userId) {
+    return { success: false, error: 'You can only delete your own messages' }
+  }
+
+  const { error } = await supabase
+    .from('messages')
+    .update({
+      is_deleted: true,
+      content: null
+    })
+    .eq('id', messageId)
+
+  if (error) {
+    return { success: false, error: 'Failed to delete message' }
+  }
+
+  return { success: true }
 }
 
 // ============================================================================

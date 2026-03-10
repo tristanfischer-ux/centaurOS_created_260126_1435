@@ -20,6 +20,8 @@ export interface UserPresence {
   availability_end: string | null
   focus_until: string | null
   status_message: string | null
+  typing_in_conversation_id: string | null
+  typing_since: string | null
   updated_at: string
 }
 
@@ -106,6 +108,24 @@ export function usePresence(options: UsePresenceOptions = {}) {
   const goOffline = useCallback(() => {
     return updatePresence('offline')
   }, [updatePresence])
+
+  // Set typing status for a conversation
+  const setTyping = useCallback(async (conversationId: string | null) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      await supabase
+        .from('presence')
+        .update({
+          typing_in_conversation_id: conversationId,
+          typing_since: conversationId ? new Date().toISOString() : null
+        })
+        .eq('user_id', user.id)
+    } catch (err) {
+      console.debug('Failed to set typing status:', err instanceof Error ? err.message : String(err))
+    }
+  }, [supabase])
 
   // Set current working task
   const setWorkingOn = useCallback((taskId: string | null) => {
@@ -335,6 +355,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
     goAway,
     goFocus,
     goOffline,
+    setTyping,
     setWorkingOn,
     recordActivity,
     getPresenceForUser,

@@ -35,7 +35,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { archiveConversation, unarchiveConversation } from '@/actions/messaging'
+import { archiveConversation, unarchiveConversation, editMessage, deleteMessage } from '@/actions/messaging'
 import { getBatchReplyCounts } from '@/actions/threads'
 import { toggleStarMessage, togglePinMessage, markConversationUnread } from '@/actions/message-actions'
 import { toast } from 'sonner'
@@ -381,6 +381,19 @@ export function ConversationThread({
     }
   }
 
+  const handleEditMessage = useCallback(async (messageId: string, newContent: string) => {
+    const result = await editMessage(messageId, newContent)
+    if (result.success) { toast.success('Message edited') }
+    else { toast.error(result.error || 'Failed to edit message') }
+  }, [])
+
+  const handleDeleteMessage = useCallback(async (messageId: string) => {
+    if (!confirm('Delete this message? This cannot be undone.')) return
+    const result = await deleteMessage(messageId)
+    if (result.success) { toast.success('Message deleted') }
+    else { toast.error(result.error || 'Failed to delete message') }
+  }, [])
+
   // Handle opening thread panel
   const handleOpenThread = (messageId: string) => {
     setSelectedMessageId(messageId)
@@ -539,6 +552,8 @@ export function ConversationThread({
                         replyCount={replyCounts[message.id] || 0}
                         lastReplyAt={message.last_reply_at || null}
                         onOpenThread={handleOpenThread}
+                        onEditMessage={handleEditMessage}
+                        onDeleteMessage={handleDeleteMessage}
                       />
                     </div>
                   )

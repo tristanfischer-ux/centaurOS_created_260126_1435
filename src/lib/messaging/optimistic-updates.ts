@@ -20,6 +20,8 @@ export type OptimisticMessage = Message & {
   localId?: string
   updated_at?: string
   is_edited?: boolean
+  edited_at: null
+  is_deleted: false
 }
 
 const MAX_RETRIES = 3
@@ -53,6 +55,8 @@ export async function sendMessageOptimistic(
     task_id: null,
     objective_id: null,
     is_edited: false,
+    edited_at: null,
+    is_deleted: false,
     optimistic: true,
     status: 'sending',
     retryCount: 0,

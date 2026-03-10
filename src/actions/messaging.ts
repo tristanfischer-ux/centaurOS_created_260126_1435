@@ -129,6 +129,21 @@ export async function sendNewMessage(
         return { error: 'Message is too long (10,000 character limit)' }
       }
 
+      // VALIDATION: fileUrl must be a valid HTTPS URL
+      if (fileUrl) {
+        try {
+          const parsed = new URL(fileUrl)
+          if (parsed.protocol !== 'https:') {
+            return { error: 'File URL must use HTTPS' }
+          }
+        } catch {
+          return { error: 'Invalid file URL' }
+        }
+        if (fileUrl.length > 2048) {
+          return { error: 'File URL too long' }
+        }
+      }
+
       // AUTH: Verify user is part of this conversation
       const conversation = await getConversation(supabase, conversationId)
       if (!conversation) {
@@ -388,6 +403,11 @@ export async function startDirectMessage(
         return { error: 'Cannot message yourself' }
       }
 
+      // VALIDATION: initialMessage length bound
+      if (initialMessage && initialMessage.trim().length > 10_000) {
+        return { error: 'Initial message too long (max 10,000 characters)' }
+      }
+
       const conversation = await createDirectConversation(supabase, {
         creatorId: user.id,
         participantId
@@ -442,6 +462,11 @@ export async function startTaskDiscussion(
 
       if (taskError || !task) {
         return { error: 'Task not found' }
+      }
+
+      // VALIDATION: initialMessage length bound
+      if (initialMessage && initialMessage.trim().length > 10_000) {
+        return { error: 'Initial message too long (max 10,000 characters)' }
       }
 
       // Get all assignees from task_assignees table
@@ -512,6 +537,11 @@ export async function startObjectiveDiscussion(
 
       if (objError || !objective) {
         return { error: 'Objective not found' }
+      }
+
+      // VALIDATION: initialMessage length bound
+      if (initialMessage && initialMessage.trim().length > 10_000) {
+        return { error: 'Initial message too long (max 10,000 characters)' }
       }
 
       // Get all assignees from tasks under this objective
@@ -600,6 +630,11 @@ export async function contactExpert(
       // VALIDATION: Cannot message yourself
       if (expertUserId === user.id) {
         return { error: 'Cannot message yourself' }
+      }
+
+      // VALIDATION: initialMessage length bound
+      if (initialMessage && initialMessage.trim().length > 10_000) {
+        return { error: 'Initial message too long (max 10,000 characters)' }
       }
 
       // Get listing title if listingId provided
@@ -781,9 +816,41 @@ export async function getParticipants(
       return { success: true as const, data }
     } catch (error) {
       console.error('Failed to get participants:', error)
-      return { 
-        error: sanitizeErrorMessage(error) 
+      return {
+        error: sanitizeErrorMessage(error)
       }
     }
+  })
+}
+
+/**
+ * Edit a message (only by the sender)
+ */
+export async function editMessage(
+  messageId: string,
+  newContent: string
+): Promise<{ success: boolean; error?: string }> {
+  return withUser(async ({ supabase, user }) => {
+    if (!newContent.trim()) {
+      return { success: false, error: 'Message cannot be empty' }
+    }
+    if (newContent.length > 10000) {
+      return { success: false, error: 'Message too long (max 10,000 characters)' }
+    }
+
+    const { editMessage: edit } = await import('@/lib/messaging/service')
+    return edit(supabase, messageId, user.id, newContent.trim())
+  })
+}
+
+/**
+ * Delete a message (soft delete, only by the sender)
+ */
+export async function deleteMessage(
+  messageId: string
+): Promise<{ success: boolean; error?: string }> {
+  return withUser(async ({ supabase, user }) => {
+    const { deleteMessage: del } = await import('@/lib/messaging/service')
+    return del(supabase, messageId, user.id)
   })
 }

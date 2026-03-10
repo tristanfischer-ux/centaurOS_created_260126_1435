@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { Check, CheckCheck, AlertCircle, MessageSquare, Download } from 'lucide-react'
+import { Check, CheckCheck, AlertCircle, MessageSquare, Download, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { MessageWithSender } from '@/lib/messaging/service'
 import { sanitizeHref } from '@/lib/security/url-validation'
+import { Textarea } from '@/components/ui/textarea'
 import { ReactionDisplay } from './ReactionDisplay'
 import { QuickReactionBar } from './ReactionPicker'
 import { StarredIndicator } from './StarredIndicator'
@@ -38,6 +39,8 @@ interface MessageBubbleProps {
   // Action callbacks
   onToggleStar?: () => void
   onForwardMessage?: () => void
+  onEditMessage?: (messageId: string, newContent: string) => void
+  onDeleteMessage?: (messageId: string) => void
 }
 
 function formatTime(dateString: string): string {
@@ -237,13 +240,23 @@ export function MessageBubble({
   isStarred = false,
   isPinned = false,
   onToggleStar,
-  onForwardMessage
+  onForwardMessage,
+  onEditMessage,
+  onDeleteMessage
 }: MessageBubbleProps) {
   const [showQuickReactions, setShowQuickReactions] = useState(false)
   const [showActions, setShowActions] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(message.content ?? '')
+  const editRef = useRef<HTMLTextAreaElement>(null)
   const sender = message.sender
   const isSystem = message.message_type === 'system'
   const isFile = message.message_type === 'file'
+
+  // Access fields that may not be in type yet
+  const msgRecord = message as unknown as Record<string, unknown>
+  const isDeleted = msgRecord.is_deleted === true
+  const editedAt = msgRecord.edited_at as string | null
   
   const handleToggleReaction = (emoji: string) => {
     onToggleReaction?.(emoji)
@@ -258,6 +271,32 @@ export function MessageBubble({
     if (onOpenThread) {
       onOpenThread(message.id)
     }
+  }
+
+  const handleStartEdit = () => {
+    setEditContent(message.content ?? '')
+    setIsEditing(true)
+    requestAnimationFrame(() => editRef.current?.focus())
+  }
+
+  const handleSaveEdit = () => {
+    const trimmed = editContent.trim()
+    if (!trimmed || trimmed === message.content) {
+      setIsEditing(false)
+      return
+    }
+    onEditMessage?.(message.id, trimmed)
+    setIsEditing(false)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditContent(message.content ?? '')
+  }
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSaveEdit() }
+    if (e.key === 'Escape') { handleCancelEdit() }
   }
 
   // System messages are centered and styled differently
@@ -325,7 +364,7 @@ export function MessageBubble({
           )}
           
           {/* Message actions (appears on hover) */}
-          {showActions && !isSystem && (
+          {showActions && !isSystem && !isDeleted && (
             <div className={cn(
               'absolute top-0 z-10',
               isOwn ? 'left-0 -translate-x-full -ml-2' : 'right-0 translate-x-full ml-2'
@@ -335,6 +374,9 @@ export function MessageBubble({
                 messageContent={message.content ?? ''}
                 isOwn={isOwn}
                 isStarred={isStarred}
+                isDeleted={isDeleted}
+                onEdit={isOwn && onEditMessage ? handleStartEdit : undefined}
+                onDelete={isOwn && onDeleteMessage ? () => onDeleteMessage(message.id) : undefined}
                 onReplyInThread={onOpenThread ? handleOpenThread : undefined}
                 onToggleStar={onToggleStar}
                 onForward={onForwardMessage}
@@ -353,16 +395,23 @@ export function MessageBubble({
             {/* Starred and Pinned indicators */}
             <StarredIndicator isStarred={isStarred} />
             <PinnedIndicator isPinned={isPinned} />
-            {isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
-              <FileAttachment 
-                fileUrl={message.file_url}
-                fileName={message.content || 'Attachment'}
-                isOwn={isOwn}
-                messageId={message.id}
-                conversationId={message.conversation_id}
-              />
+            {isDeleted ? (
+              <p className="text-sm italic text-muted-foreground">This message was deleted</p>
+            ) : isEditing ? (
+              <div className="space-y-2">
+                <Textarea ref={editRef} value={editContent} onChange={(e) => setEditContent(e.target.value)} onKeyDown={handleEditKeyDown} className="min-h-[40px] text-sm bg-background text-foreground" rows={1} />
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={handleCancelEdit} className="h-6 text-xs">Cancel</Button>
+                  <Button size="sm" onClick={handleSaveEdit} className="h-6 text-xs">Save</Button>
+                </div>
+              </div>
+            ) : isFile && message.file_url && sanitizeHref(message.file_url) !== '#' ? (
+              <FileAttachment fileUrl={message.file_url} fileName={message.content || 'Attachment'} isOwn={isOwn} messageId={message.id} conversationId={message.conversation_id} />
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <>
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                {editedAt && <span className="text-[10px] text-muted-foreground/70 italic">(edited)</span>}
+              </>
             )}
           </div>
         </div>

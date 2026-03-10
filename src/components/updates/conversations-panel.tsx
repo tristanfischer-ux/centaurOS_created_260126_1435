@@ -20,8 +20,10 @@ import {
   Hash,
   User,
   Briefcase,
+  BellOff,
   CheckSquare,
   Target,
+  Loader2,
   MessageSquare
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -280,6 +282,9 @@ function ConversationRow({
             {displayName}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
+            {!!(conversation as unknown as Record<string, unknown>).is_muted && (
+              <BellOff className="h-3 w-3 text-muted-foreground" />
+            )}
             {conversation.last_message && (
               <span className="text-[10px] text-muted-foreground">
                 {formatDistanceToNow(new Date(conversation.last_message.created_at), { addSuffix: false })}

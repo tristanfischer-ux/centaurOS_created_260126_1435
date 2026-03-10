@@ -10,7 +10,7 @@
  * - Forward to another conversation
  */
 
-import { Copy, Forward, MessageSquare, Star } from 'lucide-react'
+import { Copy, Forward, MessageSquare, Pencil, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
@@ -22,6 +22,9 @@ interface MessageActionsProps {
   isStarred: boolean
   onReplyInThread?: () => void
   onToggleStar?: () => void
+  isDeleted?: boolean
+  onEdit?: () => void
+  onDelete?: () => void
   onForward?: () => void
   className?: string
 }
@@ -31,6 +34,9 @@ export function MessageActions({
   messageContent,
   isOwn,
   isStarred,
+  isDeleted,
+  onEdit,
+  onDelete,
   onReplyInThread,
   onToggleStar,
   onForward,
@@ -96,6 +102,20 @@ export function MessageActions({
         <Copy className="h-3.5 w-3.5" />
       </Button>
       
+      {/* Edit (own messages only) */}
+      {isOwn && !isDeleted && onEdit && (
+        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted" onClick={onEdit} title="Edit message" aria-label="Edit message">
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      )}
+
+      {/* Delete (own messages only) */}
+      {isOwn && !isDeleted && onDelete && (
+        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-muted text-destructive hover:text-destructive" onClick={onDelete} title="Delete message" aria-label="Delete message">
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      )}
+
       {/* Forward */}
       {onForward && (
         <Button

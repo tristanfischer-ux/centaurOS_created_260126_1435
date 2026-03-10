@@ -17,11 +17,13 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
 import {
   Search,
   MessageSquare,
   Target,
-  Filter
+  Filter,
+  Loader2
 } from 'lucide-react'
 import { isToday, isYesterday, isThisWeek } from 'date-fns'
 import { UpdatesFeedItem } from './updates-feed-item'
@@ -41,6 +43,9 @@ interface UpdatesFeedProps {
   onSelectItem: (item: ActivityItem) => void
   /** Callback when filter changes */
   onFilterChange: (filter: ActivityFilter) => void
+  onLoadMore?: () => void
+  hasMore?: boolean
+  isLoadingMore?: boolean
 }
 
 /** An activity item enriched with counts from grouping by source. */
@@ -145,7 +150,10 @@ export function UpdatesFeed({
   filter,
   isLoading,
   onSelectItem,
-  onFilterChange
+  onFilterChange,
+  onLoadMore,
+  hasMore = false,
+  isLoadingMore = false
 }: UpdatesFeedProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -246,6 +254,13 @@ export function UpdatesFeed({
                 ))}
               </div>
             ))}
+            {hasMore && onLoadMore && (
+              <div className="flex justify-center py-4">
+                <Button variant="ghost" size="sm" onClick={onLoadMore} disabled={isLoadingMore} className="text-xs gap-2">
+                  {isLoadingMore ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading...</>) : 'Load more'}
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </ScrollArea>

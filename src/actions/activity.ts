@@ -211,6 +211,18 @@ export async function replyToActivity(
       }
 
       case 'conversation': {
+        // SECURITY: Verify user is a participant in this conversation
+        const { data: participant } = await (supabase as AnySupabaseClient)
+          .from('conversation_participants')
+          .select('profile_id')
+          .eq('conversation_id', sourceId)
+          .eq('profile_id', user.id)
+          .single()
+
+        if (!participant) {
+          return { success: false, error: 'Not a participant in this conversation' }
+        }
+
         // Send message to conversation
         const { data: inserted, error } = await supabase.from('messages').insert({
           conversation_id: sourceId,
@@ -838,6 +850,10 @@ export async function getActivityFeed(options?: {
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+      if (before) {
+        objectiveCommentsQuery = objectiveCommentsQuery.lt('created_at', before)
+      }
 
       // Only filter out system logs if not explicitly including them
       if (!includeSystemLogs) {
