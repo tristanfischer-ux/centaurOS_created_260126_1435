@@ -445,6 +445,7 @@ export default function ReportsPage(): React.JSX.Element {
   }, [handleTemplateSelect, isGenerating])
 
   const handleGenerateBriefing = useCallback(async () => {
+    if (isGenerating) return
     if (!briefingContext.trim()) {
       toast.error('Provide source material for the briefing')
       return
@@ -479,7 +480,7 @@ export default function ReportsPage(): React.JSX.Element {
     } finally {
       setIsGenerating(false)
     }
-  }, [briefingContext, tone, includeCompanyData])
+  }, [isGenerating, briefingContext, tone, includeCompanyData])
 
   const handleExportBriefingPPTX = useCallback(async () => {
     if (!briefingResult) return
