@@ -164,7 +164,10 @@ const DATE_RANGE_PRESETS = [
 
 function computeDatePreset(label: string): { start: string; end: string } {
   const now = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  // GOTCHA: toISOString() converts to UTC — in UTC+ timezones after local midnight,
+  // it returns the PREVIOUS day. Use local getters instead.
+  const fmt = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const dayOfWeek = now.getDay()
 
   switch (label) {
@@ -203,6 +206,11 @@ const CAPABILITY_ITEMS = [
   { icon: Clock, label: 'Schedule' },
   { icon: ImageIcon, label: 'Infographic' },
 ]
+
+/** Strip characters that are invalid in filenames across OS platforms. */
+function sanitizeFilename(str: string): string {
+  return str.replace(/[/\\:*?"<>|]+/g, '').replace(/\s+/g, '-')
+}
 
 type PageMode = 'reports' | 'presentations' | 'documents'
 
@@ -347,9 +355,12 @@ export default function ReportsPage(): React.JSX.Element {
   }, [allSectionTypes])
 
   const handleClearAll = useCallback(() => {
-    // Keep cover, clear everything else
-    setEnabledSections(new Set(['cover'] as ReportSectionType[]))
-  }, [])
+    // Keep only 'cover' if it exists in the current template, otherwise empty
+    const coverOnly = allSectionTypes.includes('cover' as ReportSectionType)
+      ? new Set<ReportSectionType>(['cover' as ReportSectionType])
+      : new Set<ReportSectionType>()
+    setEnabledSections(coverOnly)
+  }, [allSectionTypes])
 
   const handleGenerate = useCallback(async () => {
     if (isGeneratingReportRef.current) return
@@ -519,7 +530,7 @@ export default function ReportsPage(): React.JSX.Element {
     if (!reportRef.current || !reportDocument) return
     try {
       toast.info('Generating PDF…')
-      const filename = `${reportDocument.foundryName.replace(/\s+/g, '-')}-${reportDocument.title.replace(/\s+/g, '-')}-${reportDocument.dateRange.start}.pdf`
+      const filename = `${sanitizeFilename(reportDocument.foundryName)}-${sanitizeFilename(reportDocument.title)}-${reportDocument.dateRange.start}.pdf`
       await exportReportAsPDF(reportRef.current, filename)
       toast.success('PDF downloaded')
     } catch (error) {
@@ -575,7 +586,7 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       toast.info('Exporting infographic as image…')
       const { downloadInfographicAsImage } = await import('@/lib/reports/export-infographic')
-      const filename = `${reportDocument.foundryName.replace(/\s+/g, '-')}-infographic-${reportDocument.dateRange.start}.png`
+      const filename = `${sanitizeFilename(reportDocument.foundryName)}-infographic-${reportDocument.dateRange.start}.png`
       await downloadInfographicAsImage(infographicRef.current, filename)
       toast.success('Infographic image downloaded')
     } catch (error) {
@@ -597,7 +608,7 @@ export default function ReportsPage(): React.JSX.Element {
         const url = URL.createObjectURL(blob)
         const a = window.document.createElement('a')
         a.href = url
-        a.download = `${reportDocument.foundryName.replace(/\s+/g, '-')}-ai-infographic-${reportDocument.dateRange.start}.png`
+        a.download = `${sanitizeFilename(reportDocument.foundryName)}-ai-infographic-${reportDocument.dateRange.start}.png`
         a.click()
         // INTENT: Delay revocation so the browser has time to start the download
         setTimeout(() => URL.revokeObjectURL(url), 5_000)
@@ -1143,11 +1154,11 @@ export default function ReportsPage(): React.JSX.Element {
 
                     {/* Action buttons */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <Button variant="secondary" size="sm" onClick={handlePrint}>
+                      <Button variant="secondary" size="sm" onClick={handlePrint} disabled={viewMode !== 'document'}>
                         <Printer className="mr-1.5 h-3.5 w-3.5" />
                         Print
                       </Button>
-                      <Button variant="secondary" size="sm" onClick={handleExportPDF}>
+                      <Button variant="secondary" size="sm" onClick={handleExportPDF} disabled={viewMode !== 'document'}>
                         <FileDown className="mr-1.5 h-3.5 w-3.5" />
                         PDF
                       </Button>
@@ -1378,7 +1389,7 @@ export default function ReportsPage(): React.JSX.Element {
                 </div>
                 <Button variant="secondary" size="sm" onClick={handleCopyShareLink}>
                   {isCopied ? (
-                    <CheckCheck className="h-4 w-4 text-status-success" />
+                    <CheckCheck className="h-4 w-4 text-success" />
                   ) : (
                     <Copy className="h-4 w-4" />
                   )}
