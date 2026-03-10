@@ -83,12 +83,12 @@ export function SlideDeckRenderer({
   }, [totalSlides])
 
   const goNext = useCallback(() => {
-    goToSlide(currentSlide + 1)
-  }, [currentSlide, goToSlide])
+    setCurrentSlide(prev => Math.min(totalSlides - 1, prev + 1))
+  }, [totalSlides])
 
   const goPrev = useCallback(() => {
-    goToSlide(currentSlide - 1)
-  }, [currentSlide, goToSlide])
+    setCurrentSlide(prev => Math.max(0, prev - 1))
+  }, [])
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen(prev => !prev)
@@ -97,6 +97,10 @@ export function SlideDeckRenderer({
   // Keyboard navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent): void {
+      // Don't intercept keypresses in input elements
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return
+
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault()
         goNext()
@@ -117,6 +121,16 @@ export function SlideDeckRenderer({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goNext, goPrev, isOverview, isFullscreen])
+
+  // ─── Empty Guard ────────────────────────────────────────────
+
+  if (totalSlides === 0) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-muted-foreground">
+        No slides to display.
+      </div>
+    )
+  }
 
   // ─── Print Mode: Render All Slides ───────────────────────────
 

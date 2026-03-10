@@ -23,6 +23,7 @@ import type {
   GenerateBriefingRequest,
   GenerateBriefingResponse,
 } from './slide-deck-types'
+import { generateSlideBackgroundImage } from './report-image-generator'
 
 // DECISION: Reuse the same module-level SDK instantiation pattern as ai-narrative.ts
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
@@ -128,6 +129,46 @@ export async function generateStrategicBriefing(
       tone: request.tone,
       slides,
       sourceContext: request.sourceContext,
+    }
+
+    // FLOW: Generate background images for visual slides in parallel.
+    // Individual failures are non-fatal — slides render without images.
+    try {
+      const imageableSlides = briefing.slides
+        .map((slide, idx) => ({ slide, idx }))
+        .filter(({ slide }) =>
+          slide.slideType === 'title' ||
+          slide.slideType === 'hero-insight' ||
+          slide.slideType === 'section-divider'
+        )
+
+      if (imageableSlides.length > 0) {
+        const imageResults = await Promise.allSettled(
+          imageableSlides.map(({ slide, idx }) =>
+            generateSlideBackgroundImage(
+              briefing.id,
+              slide.slideType,
+              slide.headline,
+              request.companyName,
+            ).then(url => ({ idx, url }))
+          )
+        )
+
+        for (const result of imageResults) {
+          if (result.status === 'fulfilled' && result.value.url) {
+            const slide = briefing.slides[result.value.idx]
+            if (
+              slide.slideType === 'title' ||
+              slide.slideType === 'hero-insight' ||
+              slide.slideType === 'section-divider'
+            ) {
+              ;(slide as { imageUrl?: string }).imageUrl = result.value.url
+            }
+          }
+        }
+      }
+    } catch (slideImgErr) {
+      console.warn('[SlideGenerator] Slide image generation failed (non-fatal):', slideImgErr)
     }
 
     return { success: true, briefing }

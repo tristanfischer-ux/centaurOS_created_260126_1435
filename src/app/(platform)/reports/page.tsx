@@ -275,7 +275,7 @@ export default function ReportsPage(): React.JSX.Element {
 
     // Cycle through descriptive progress messages during generation
     const stepInterval = setInterval(() => {
-      setGenerationStep(prev => (prev + 1) % GENERATION_STEPS.length)
+      setGenerationStep(prev => Math.min(prev + 1, GENERATION_STEPS.length - 1))
     }, 1500)
 
     try {

@@ -67,7 +67,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
   const remainingMetrics = allMetrics.slice(1, 5)
 
   const topObjectives = (objectivesData?.objectives ?? []).slice(0, 3)
-  const topContributors = (teamData?.members ?? [])
+  const topContributors = [...(teamData?.members ?? [])]
     .sort((a, b) => b.tasksCompleted - a.tasksCompleted)
     .slice(0, 3)
 
@@ -147,9 +147,9 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
             ============================================================== */}
         {remainingMetrics.length > 0 && (
           <div className="grid grid-cols-4 gap-2 shrink-0">
-            {remainingMetrics.map((metric) => (
+            {remainingMetrics.map((metric, idx) => (
               <div
-                key={metric.label}
+                key={`${metric.label}-${idx}`}
                 className="bg-muted/50 rounded-lg px-3 py-2.5 text-center"
               >
                 <p className="text-xl font-bold text-foreground leading-none">

@@ -141,6 +141,14 @@ function buildCoverSlide(
   const slide = pres.addSlide()
   const accentColor = templateId === 'board-pack' ? NAVY_ACCENT : ORANGE
 
+  if ((data as any).coverImageUrl) {
+    slide.addImage({
+      path: (data as any).coverImageUrl,
+      x: 0, y: 0, w: '100%', h: '100%',
+      sizing: { type: 'cover', w: 10, h: 5.63 },
+    })
+  }
+
   slide.addShape('rect', {
     x: 0,
     y: 0,
@@ -254,6 +262,13 @@ function buildKeyMetricsSlide(
   data: KeyMetricsSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
+  if ((data as any).chartImageUrl) {
+    slide.addImage({
+      path: (data as any).chartImageUrl,
+      x: 6.5, y: 0.3, w: 3, h: 1.7,
+      rounding: true,
+    })
+  }
   addSectionTitle(slide, 'Key Metrics')
 
   // DECISION: Layout as a 2×2 grid even if fewer than 4 metrics. The grid
@@ -326,6 +341,13 @@ function buildObjectivesProgressSlide(
   data: ObjectivesProgressSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
+  if ((data as any).chartImageUrl) {
+    slide.addImage({
+      path: (data as any).chartImageUrl,
+      x: 6.5, y: 0.3, w: 3, h: 1.7,
+      rounding: true,
+    })
+  }
   addSectionTitle(slide, 'Objectives Progress')
 
   const headerRow: PptxGenJS.TableRow = [
@@ -470,6 +492,13 @@ function buildCompletionTrendSlide(
   data: CompletionTrendSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
+  if ((data as any).chartImageUrl) {
+    slide.addImage({
+      path: (data as any).chartImageUrl,
+      x: 6.5, y: 0.3, w: 3, h: 1.7,
+      rounding: true,
+    })
+  }
   addSectionTitle(slide, 'Completion Trend')
 
   // DECISION: Using pptxgenjs's built-in chart support for a real line chart

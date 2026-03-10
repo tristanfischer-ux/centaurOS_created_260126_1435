@@ -79,7 +79,12 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
   const formattedTimestamp = format(new Date(document.generatedAt), 'd MMM yyyy, h:mm a')
   const templateId = (document.templateId || 'weekly-update') as ReportTemplateId
 
-  let sectionCounter = 0
+  // INTENT: Pre-compute section numbers so .map() has no side effects.
+  // Cover sections get 0; non-cover sections get a running count (1, 2, 3…).
+  const sectionNumbers = (() => {
+    let counter = 0
+    return document.sections.map(s => s.type === 'cover' ? 0 : ++counter)
+  })()
 
   return (
     <div
@@ -92,9 +97,7 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
         {document.sections.map((section, index) => {
           const isCover = section.type === 'cover'
           const isMajorSection = !isCover && index > 0
-
-          if (!isCover) sectionCounter++
-          const sectionNumber = isCover ? 0 : sectionCounter
+          const sectionNumber = sectionNumbers[index]
 
           return (
             <div
@@ -105,7 +108,7 @@ export function ReportDocument({ document, forPrint = false }: ReportDocumentPro
                 !isCover && sectionNumber % 2 === 0 && 'bg-muted/20 bg-grid-pattern print:bg-none -mx-6 px-6 py-12 rounded-2xl',
                 !forPrint && !isCover && 'opacity-0 animate-fade-in print:opacity-100 print:animate-none',
               )}
-              style={!forPrint && !isCover ? { animationDelay: `${index * 100}ms`, animationFillMode: 'forwards' } : undefined}
+              style={!forPrint && !isCover ? { animationDelay: `${index * 100}ms` } : undefined}
             >
               {renderSection(section, forPrint, document.branding, templateId, sectionNumber)}
             </div>

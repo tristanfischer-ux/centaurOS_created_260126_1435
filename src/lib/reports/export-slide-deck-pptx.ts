@@ -53,6 +53,14 @@ function buildTitleSlide(
   // Orange background
   s.background = { fill: ORANGE }
 
+  if ((slide as any).imageUrl) {
+    s.addImage({
+      path: (slide as any).imageUrl,
+      x: 0, y: 0, w: '100%', h: '100%',
+      sizing: { type: 'cover', w: 10, h: 5.63 },
+    })
+  }
+
   // Company name
   s.addText(slide.companyName.toUpperCase(), {
     x: 0.8,
@@ -134,6 +142,14 @@ function buildHeroInsightSlide(
   slide: HeroInsightSlideContent,
 ): PptxGenJS.Slide {
   const s = pres.addSlide()
+
+  if ((slide as any).imageUrl) {
+    s.addImage({
+      path: (slide as any).imageUrl,
+      x: 6, y: 0.5, w: 3.5, h: 4.5,
+      rounding: true,
+    })
+  }
 
   // Accent badge
   if (slide.accent) {
@@ -590,6 +606,14 @@ function buildSectionDividerSlide(
 ): PptxGenJS.Slide {
   const s = pres.addSlide()
   s.background = { fill: DARK_TEXT }
+
+  if ((slide as any).imageUrl) {
+    s.addImage({
+      path: (slide as any).imageUrl,
+      x: 0, y: 0, w: '100%', h: '100%',
+      sizing: { type: 'cover', w: 10, h: 5.63 },
+    })
+  }
 
   // Accent bar
   s.addShape('rect', {

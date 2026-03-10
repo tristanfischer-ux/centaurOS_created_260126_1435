@@ -9,21 +9,71 @@
  */
 
 import { TrendingUp as TrendingUpIcon } from 'lucide-react'
+import { AreaChart, Area, ResponsiveContainer } from 'recharts'
 
 import { Card, CardContent } from '@/components/ui/card'
 import {
   ReportSectionHeader,
   SectionNarrativeIntro,
   TrendArrow,
-  Sparkline,
   formatMetricValue,
 } from '@/components/reports/report-visuals'
 
 import type { KeyMetricsSectionData, KPIMetric, ReportTemplateId } from '@/lib/reports/report-document-types'
 
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. Must stay in sync with design tokens.
+const INTERNATIONAL_ORANGE = 'hsl(14, 100%, 50%)'
+const MUTED = 'hsl(215, 16%, 47%)'
+
+const SPARKLINE_COLORS: Record<'orange' | 'muted', { stroke: string; fill: string }> = {
+  orange: { stroke: INTERNATIONAL_ORANGE, fill: INTERNATIONAL_ORANGE },
+  muted: { stroke: MUTED, fill: MUTED },
+}
+
+function RechartsSparkline({
+  data,
+  color = 'orange',
+  height = 40,
+  className,
+}: {
+  data: number[]
+  color?: 'orange' | 'muted'
+  height?: number
+  className?: string
+}): React.JSX.Element {
+  const chartData = data.map((value, index) => ({ index, value }))
+  const colors = SPARKLINE_COLORS[color]
+
+  return (
+    <div className={className} style={{ height }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={chartData} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+          <defs>
+            <linearGradient id={`sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={colors.fill} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={colors.fill} stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={colors.stroke}
+            fill={`url(#sparkGrad-${color})`}
+            strokeWidth={1.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 interface KeyMetricsSectionProps extends KeyMetricsSectionData {
   templateId?: ReportTemplateId
   sectionNumber?: number
+  chartImageUrl?: string
 }
 
 function MetricCard({ metric }: { metric: KPIMetric }): React.JSX.Element {
@@ -57,7 +107,7 @@ function MetricCard({ metric }: { metric: KPIMetric }): React.JSX.Element {
 
           {/* Mini sparkline */}
           {sparklineData.length > 0 && (
-            <Sparkline
+            <RechartsSparkline
               data={sparklineData}
               color={metric.trend === 'down' ? 'muted' : 'orange'}
               height={40}
@@ -97,7 +147,7 @@ function HeroMetric({ metric }: { metric: KPIMetric }): React.JSX.Element {
           </div>
 
           {sparklineData.length > 0 && (
-            <Sparkline
+            <RechartsSparkline
               data={sparklineData}
               color={metric.trend === 'down' ? 'muted' : 'orange'}
               height={56}
@@ -133,6 +183,7 @@ function generateSyntheticSparkline(metric: KPIMetric): number[] {
 export function KeyMetricsSection({
   metrics,
   sectionNarrative,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: KeyMetricsSectionProps): React.JSX.Element {
@@ -147,6 +198,13 @@ export function KeyMetricsSection({
         sectionNumber={sectionNumber}
       />
       <SectionNarrativeIntro narrative={sectionNarrative} />
+
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
 
       {/* Hero metric — full width */}
       {heroMetric && <HeroMetric metric={heroMetric} />}

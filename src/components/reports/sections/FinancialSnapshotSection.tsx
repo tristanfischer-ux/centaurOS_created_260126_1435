@@ -7,7 +7,9 @@
  * orders — giving stakeholders immediate visibility into financial performance.
  */
 
+import { useId } from 'react'
 import { PoundSterling, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +24,14 @@ import {
 import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 
 import type { FinancialSnapshotSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
+
+// DECISION: Recharts doesn't support CSS variables for fill/stroke, so HSL
+// values are hardcoded here. Must stay in sync with design tokens.
+const STATUS_SUCCESS = 'hsl(142, 72%, 29%)'
+const DESTRUCTIVE = 'hsl(0, 84%, 60%)'
+const AXIS_TICK_COLOR = 'hsl(215, 16%, 47%)'
+const GRID_COLOR = '#e2e8f0'
+const TOOLTIP_BORDER = 'hsl(214, 32%, 91%)'
 
 interface FinancialSnapshotSectionProps extends FinancialSnapshotSectionData {
   templateId?: ReportTemplateId
@@ -40,9 +50,12 @@ export function FinancialSnapshotSection({
   budgetHealth,
   overBudgetCount,
   sectionNarrative,
+  trendData,
+  chartImageUrl,
   templateId,
   sectionNumber,
 }: FinancialSnapshotSectionProps): React.JSX.Element {
+  const uid = useId()
   const revenueChange = calculatePercentChange(periodRevenue, previousPeriodRevenue)
   const expenseChange = calculatePercentChange(periodExpenses, previousPeriodExpenses)
   const netChange = calculatePercentChange(netPosition, previousNetPosition)
@@ -57,6 +70,84 @@ export function FinancialSnapshotSection({
       />
 
       <SectionNarrativeIntro narrative={sectionNarrative} />
+
+      {chartImageUrl && (
+        <div className="rounded-xl overflow-hidden border bg-card">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chartImageUrl} alt="" className="w-full h-auto" aria-hidden="true" />
+        </div>
+      )}
+
+      {/* Revenue vs Expenses trend chart */}
+      {trendData && trendData.length > 0 && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 8, right: 8, bottom: 8, left: 0 }}>
+                  <defs>
+                    <linearGradient id={`${uid}-revenueGradient`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={STATUS_SUCCESS} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={STATUS_SUCCESS} stopOpacity={0.05} />
+                    </linearGradient>
+                    <linearGradient id={`${uid}-expensesGradient`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={DESTRUCTIVE} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={DESTRUCTIVE} stopOpacity={0.05} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: AXIS_TICK_COLOR }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={64}
+                    tickFormatter={(v: number) => `£${(v / 100).toLocaleString()}`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '8px',
+                      border: `1px solid ${TOOLTIP_BORDER}`,
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.07)',
+                      fontSize: '13px',
+                    }}
+                    formatter={(value?: number, name?: string) => [
+                      value != null ? `£${(value / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` : '£0.00',
+                      name ? name.charAt(0).toUpperCase() + name.slice(1) : '',
+                    ]}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    height={36}
+                    iconType="circle"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="revenue"
+                    name="Revenue"
+                    stroke={STATUS_SUCCESS}
+                    fill={`url(#${uid}-revenueGradient)`}
+                    strokeWidth={2}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="expenses"
+                    name="Expenses"
+                    stroke={DESTRUCTIVE}
+                    fill={`url(#${uid}-expensesGradient)`}
+                    strokeWidth={2}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary pills */}
       <div className="flex flex-wrap gap-2">

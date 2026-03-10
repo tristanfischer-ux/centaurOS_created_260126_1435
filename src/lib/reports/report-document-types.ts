@@ -45,6 +45,7 @@ export interface CoverSectionData {
   subtitle: string
   dateRange: { start: string; end: string }
   generatedAt: string
+  coverImageUrl?: string
 }
 
 export interface ExecutiveSummarySectionData {
@@ -65,6 +66,7 @@ export interface KPIMetric {
 export interface KeyMetricsSectionData {
   metrics: KPIMetric[]
   sectionNarrative?: string
+  chartImageUrl?: string
 }
 
 export interface ObjectiveRow {
@@ -84,6 +86,7 @@ export interface ObjectivesProgressSectionData {
   totalActive: number
   totalCompleted: number
   sectionNarrative?: string
+  chartImageUrl?: string
 }
 
 export interface TeamMemberRow {
@@ -135,6 +138,7 @@ export interface CompletionTrendSectionData {
   dataPoints: DailyDataPoint[]
   periodLabel: string
   sectionNarrative?: string
+  chartImageUrl?: string
 }
 
 export interface UpcomingTask {
@@ -176,6 +180,8 @@ export interface FinancialSnapshotSectionData {
   budgetHealth: BudgetHealthRow[]
   overBudgetCount: number
   sectionNarrative?: string
+  chartImageUrl?: string
+  trendData?: { date: string; revenue: number; expenses: number }[]
 }
 
 // ========================
@@ -205,6 +211,8 @@ export interface SalesPipelineSectionData {
     noShows: number
   }
   sectionNarrative?: string
+  chartImageUrl?: string
+  funnelStages?: { name: string; value: number }[]
 }
 
 // ========================
@@ -228,6 +236,7 @@ export interface EngineeringActivitySectionData {
   totalModulesGenerated: number
   recentProjects: RecentProject[]
   sectionNarrative?: string
+  chartImageUrl?: string
 }
 
 // ========================

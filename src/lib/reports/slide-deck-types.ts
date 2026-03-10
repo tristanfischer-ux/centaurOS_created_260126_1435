@@ -36,6 +36,7 @@ export interface TitleSlideContent {
   subtitle: string
   companyName: string
   date: string
+  imageUrl?: string
 }
 
 export interface HeroInsightSlideContent {
@@ -43,6 +44,7 @@ export interface HeroInsightSlideContent {
   headline: string
   body: string
   accent?: string
+  imageUrl?: string
 }
 
 export interface ArgumentSlideContent {
@@ -87,6 +89,7 @@ export interface SectionDividerSlideContent {
   slideType: 'section-divider'
   headline: string
   subtitle?: string
+  imageUrl?: string
 }
 
 export type SlideContent =

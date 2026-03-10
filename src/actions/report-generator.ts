@@ -23,6 +23,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 import { generateExecutiveNarrative, generateSectionNarrative } from '@/lib/reports/ai-narrative'
+import { generateAllReportImages } from '@/lib/reports/report-image-generator'
 import { fetchFinancialSnapshotData } from '@/actions/report-sections/financial'
 import { fetchSalesPipelineData } from '@/actions/report-sections/sales-pipeline'
 import { fetchEngineeringActivityData } from '@/actions/report-sections/engineering'
@@ -254,13 +255,64 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       } as SectionData)
     }
 
+    // FLOW: Generate AI images in parallel after narratives are done.
+    // Each image generation is independent; failures return null (graceful degradation).
+    const reportId = uuidv4()
+    const dateLabel = `${dateRange.start} — ${dateRange.end}`
+    const branding = {
+      logoUrl: foundry?.logo_url ?? null,
+      primaryColor: foundry?.report_primary_color ?? null,
+      accentColor: foundry?.report_accent_color ?? null,
+    }
+
+    try {
+      const allSections = Array.from(sectionDataMap.values())
+      const imageUrlMap = await generateAllReportImages(
+        reportId,
+        allSections,
+        foundryName,
+        templateId,
+        dateLabel,
+        branding,
+      )
+
+      // Merge image URLs into section data
+      if (imageUrlMap.size > 0) {
+        const coverUrl = imageUrlMap.get('cover')
+        if (coverUrl && sectionDataMap.has('cover')) {
+          const s = sectionDataMap.get('cover')!
+          sectionDataMap.set('cover', {
+            ...s,
+            data: { ...s.data, coverImageUrl: coverUrl },
+          } as SectionData)
+        }
+
+        const accentSections: ReportSectionType[] = [
+          'key-metrics', 'objectives-progress', 'financial-snapshot',
+          'sales-pipeline', 'completion-trend', 'engineering-activity',
+        ]
+        for (const sType of accentSections) {
+          const url = imageUrlMap.get(`section-${sType}`)
+          if (url && sectionDataMap.has(sType)) {
+            const s = sectionDataMap.get(sType)!
+            sectionDataMap.set(sType, {
+              ...s,
+              data: { ...s.data, chartImageUrl: url },
+            } as SectionData)
+          }
+        }
+      }
+    } catch (imgErr) {
+      console.warn('[ReportGenerator] Image generation failed (non-fatal):', imgErr)
+    }
+
     // Re-assemble in case cover was updated
     const finalSections: SectionData[] = requestedSections
       .filter(type => sectionDataMap.has(type))
       .map(type => sectionDataMap.get(type)!)
 
     const document: ReportDocument = {
-      id: uuidv4(),
+      id: reportId,
       templateId,
       title: dynamicTitle,
       dateRange,
@@ -268,11 +320,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
       foundryId,
       foundryName,
       sections: finalSections,
-      branding: {
-        logoUrl: foundry?.logo_url ?? null,
-        primaryColor: foundry?.report_primary_color ?? null,
-        accentColor: foundry?.report_accent_color ?? null,
-      },
+      branding,
     }
 
     return { success: true, document }

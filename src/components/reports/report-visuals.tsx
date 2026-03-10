@@ -181,7 +181,7 @@ export function ReportSectionHeader({
   const showNumber = templateId === 'board-pack' && sectionNumber != null
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 pt-4">
       <div className="h-6 w-1 rounded-full bg-international-orange" />
       {Icon && (
         <Icon className="h-5 w-5 text-international-orange" />
