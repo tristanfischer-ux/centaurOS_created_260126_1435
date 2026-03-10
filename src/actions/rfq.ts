@@ -193,6 +193,27 @@ export async function getRFQDetail(rfqId: string): Promise<{
   }
 
   const { data, error } = await getRFQService(supabase, rfqId, user.id)
+
+  // SECURITY: Suppliers must not see other suppliers' responses (bid confidentiality)
+  // or the buyer's email. Strip sensitive data for non-buyer callers.
+  if (data && rfqCheck.buyer_id !== user.id) {
+    // Get caller's provider ID to filter to only their own response
+    const { data: callerProfile } = await supabase
+      .from("provider_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single()
+
+    const callerId = callerProfile?.id
+    data.responses = data.responses.filter((r) => r.provider_id === callerId)
+    data.broadcasts = []
+    data.response_count = data.responses.length
+    // Strip buyer email
+    if (data.buyer) {
+      data.buyer = { ...data.buyer, email: undefined as unknown as string }
+    }
+  }
+
   return { data, error }
 }
 
@@ -362,6 +383,18 @@ export async function respondToRFQ(
 
       if (!interestRfq || (interestRfq.status !== 'Open' && interestRfq.status !== 'Bidding')) {
         return { success: false, error: "RFQ is no longer accepting responses" }
+      }
+
+      // SECURITY: Verify provider was invited via broadcast
+      const { data: interestBroadcast } = await supabase
+        .from('rfq_broadcasts')
+        .select('id')
+        .eq('rfq_id', rfqId)
+        .eq('provider_id', providerProfile.id)
+        .single()
+
+      if (!interestBroadcast) {
+        return { success: false, error: "Not invited to this RFQ" }
       }
 
       // Check for duplicate response

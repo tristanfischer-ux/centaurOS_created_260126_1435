@@ -176,6 +176,18 @@ export function RFQResponseForm({
     setMode(newMode)
     setMessage('')
     setError(null)
+    setQuotedPrice('')
+    setDeclineReasons(new Set())
+    setIndicativeMin('')
+    setIndicativeMax('')
+    setScopeOfWork('')
+    setTimelineWeeks('')
+    setValidUntil('')
+    setPricingMaterial('')
+    setPricingLabour('')
+    setPricingTooling('')
+    setPricingMarkup('')
+    setShowProposalDetails(false)
   }
 
   const getTypeMessage = (type: RFQType) => {

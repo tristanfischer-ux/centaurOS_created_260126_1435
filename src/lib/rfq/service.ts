@@ -95,7 +95,6 @@ export async function getRFQ(
         buyer:profiles!rfqs_buyer_id_fkey (
           id,
           full_name,
-          email,
           avatar_url
         )
       `)
@@ -277,7 +276,8 @@ export async function cancelRFQ(
       return { success: false, error: `Cannot cancel RFQ in ${existing.status} status` }
     }
 
-    const { error } = await supabase
+    // SECURITY: Optimistic concurrency — prevent overwriting a concurrent award
+    const { data: cancelResult, error } = await supabase
       .from('rfqs')
       .update({
         status: 'cancelled',
@@ -285,10 +285,17 @@ export async function cancelRFQ(
         priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
+      .neq('status', 'Awarded')
+      .neq('status', 'cancelled')
+      .select('id')
 
     if (error) {
       console.error('Error cancelling RFQ:', error)
       return { success: false, error: 'Failed to cancel RFQ' }
+    }
+
+    if (!cancelResult?.length) {
+      return { success: false, error: 'RFQ status changed — please refresh and try again' }
     }
 
     return { success: true, error: null }
@@ -327,7 +334,8 @@ export async function closeRFQ(
       return { success: false, error: `Cannot close RFQ in ${existing.status} status` }
     }
 
-    const { error } = await supabase
+    // SECURITY: Optimistic concurrency — only close if still in expected status
+    const { data: closeResult, error } = await supabase
       .from('rfqs')
       .update({
         status: 'Closed',
@@ -335,10 +343,16 @@ export async function closeRFQ(
         priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
+      .in('status', ['Open', 'Bidding', 'priority_hold'])
+      .select('id')
 
     if (error) {
       console.error('Error closing RFQ:', error)
       return { success: false, error: 'Failed to close RFQ' }
+    }
+
+    if (!closeResult?.length) {
+      return { success: false, error: 'RFQ status changed — please refresh and try again' }
     }
 
     return { success: true, error: null }

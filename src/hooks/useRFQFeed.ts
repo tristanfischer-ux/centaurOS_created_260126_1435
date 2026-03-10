@@ -48,6 +48,10 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
   // Store callbacks in refs to prevent channel reconnect storms
   const onNewRFQRef = useRef(onNewRFQ)
   onNewRFQRef.current = onNewRFQ
+  const onRFQUpdateRef = useRef(onRFQUpdate)
+  onRFQUpdateRef.current = onRFQUpdate
+  const onRaceStatusChangeRef = useRef(onRaceStatusChange)
+  onRaceStatusChangeRef.current = onRaceStatusChange
 
   const clearNewCount = useCallback(() => {
     setNewRFQCount(0)
@@ -69,11 +73,9 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
         },
         (payload: RealtimePostgresChangesPayload<{ [key: string]: unknown }>) => {
           const newData = payload.new as unknown as Partial<RFQSummary> & { id: string }
-          if (onRFQUpdate) {
-            onRFQUpdate(newData)
-          }
-          if (onRaceStatusChange && newData.status) {
-            onRaceStatusChange(rfqId, newData.status as string)
+          onRFQUpdateRef.current?.(newData)
+          if (onRaceStatusChangeRef.current && newData.status) {
+            onRaceStatusChangeRef.current(rfqId, newData.status as string)
           }
         }
       )
@@ -87,15 +89,13 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
         },
         () => {
           // New response received, might want to refresh response count
-          if (onRFQUpdate) {
-            onRFQUpdate({ id: rfqId })
-          }
+          onRFQUpdateRef.current?.({ id: rfqId })
         }
       )
       .subscribe()
 
     rfqChannelsRef.current.set(rfqId, channel)
-  }, [onRFQUpdate, onRaceStatusChange])
+  }, [])
 
   const unsubscribeFromRFQ = useCallback((rfqId: string) => {
     const channel = rfqChannelsRef.current.get(rfqId)

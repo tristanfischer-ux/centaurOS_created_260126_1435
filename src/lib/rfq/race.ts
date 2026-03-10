@@ -506,6 +506,18 @@ export async function requestMoreInfo(
       return { success: false, error: `RFQ is ${rfq.status}, cannot request info` }
     }
 
+    // SECURITY: Verify provider was invited via broadcast
+    const { data: broadcast } = await supabase
+      .from('rfq_broadcasts')
+      .select('id')
+      .eq('rfq_id', rfqId)
+      .eq('provider_id', providerId)
+      .single()
+
+    if (!broadcast) {
+      return { success: false, error: 'Not invited to this RFQ' }
+    }
+
     // Check for existing response
     const { data: existingResponse } = await supabase
       .from('rfq_responses')
@@ -564,6 +576,18 @@ export async function declineRFQ(
 
     if (rfq.status !== 'Open' && rfq.status !== 'Bidding' && rfq.status !== 'priority_hold') {
       return { success: false, error: `RFQ is ${rfq.status}, cannot decline` }
+    }
+
+    // SECURITY: Verify provider was invited via broadcast
+    const { data: declineBroadcast } = await supabase
+      .from('rfq_broadcasts')
+      .select('id')
+      .eq('rfq_id', rfqId)
+      .eq('provider_id', providerId)
+      .single()
+
+    if (!declineBroadcast) {
+      return { success: false, error: 'Not invited to this RFQ' }
     }
 
     // Check for existing response
