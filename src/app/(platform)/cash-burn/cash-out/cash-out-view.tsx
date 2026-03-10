@@ -42,6 +42,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashOutItem | null>(null)
+  const [defaultCostType, setDefaultCostType] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
 
   const fixedItems = useMemo(() => items.filter(i => i.costType === 'fixed'), [items])
@@ -77,6 +78,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
 
   const handleAdd = useCallback((costType?: string) => {
     setEditingItem(null)
+    setDefaultCostType(costType)
     setDialogOpen(true)
   }, [])
 
@@ -249,9 +251,13 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         open={dialogOpen}
         onOpenChange={(open) => {
           setDialogOpen(open)
-          if (!open) setEditingItem(null)
+          if (!open) {
+            setEditingItem(null)
+            setDefaultCostType(undefined)
+          }
         }}
         mode="cash-out"
+        defaultCostType={defaultCostType}
         initialData={editingItem ? {
           name: editingItem.name,
           category: editingItem.category,
