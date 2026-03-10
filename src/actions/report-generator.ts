@@ -59,10 +59,6 @@ import type {
   SalesPipelineSectionData,
   EngineeringActivitySectionData,
   KnowledgeLearningSectionData,
-  WorkshopDesignSectionData,
-  WorkshopSpecifySectionData,
-  WorkshopSourceSectionData,
-  WorkshopAssembleSectionData,
   ReportSectionType,
 } from '@/lib/reports/report-document-types'
 

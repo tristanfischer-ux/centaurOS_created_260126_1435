@@ -137,11 +137,6 @@ export function WorkshopDesignSection({
                 >
                   <div className="space-y-0.5 min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{p.name}</p>
-                    {p.researchSummary && (
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {p.researchSummary}
-                      </p>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 ml-3 shrink-0">
                     <Badge variant="secondary" className="text-[10px]">

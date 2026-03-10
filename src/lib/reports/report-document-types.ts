@@ -310,7 +310,6 @@ export interface WorkshopDesignProject {
   status: string
   moduleCount: number
   createdAt: string
-  researchSummary?: string
 }
 
 export interface GenerationMetricsSummary {

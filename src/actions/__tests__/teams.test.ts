@@ -175,7 +175,9 @@ describe('Team Actions - Authorization', () => {
                             })
                         }),
                         delete: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: jest.fn().mockReturnValue({
+                                eq: jest.fn().mockResolvedValue({ error: null })
+                            })
                         })
                     }
                 }
@@ -261,7 +263,9 @@ describe('Team Actions - Authorization', () => {
                             })
                         }),
                         update: jest.fn().mockReturnValue({
-                            eq: jest.fn().mockResolvedValue({ error: null })
+                            eq: jest.fn().mockReturnValue({
+                                eq: jest.fn().mockResolvedValue({ error: null })
+                            })
                         })
                     }
                 }

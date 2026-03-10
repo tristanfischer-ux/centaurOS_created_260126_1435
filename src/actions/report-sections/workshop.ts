@@ -73,33 +73,25 @@ export async function fetchWorkshopDesignData(
   foundryId: string,
   _dateRange: { start: string; end: string },
 ): Promise<WorkshopDesignSectionData> {
-  const [{ data: projects }, { data: metrics }] = await Promise.all([
-    supabase
-      .from('cad_lab_projects')
-      .select('id, name, stage, status, modules, created_at')
-      .eq('foundry_id', foundryId)
-      .not('status', 'eq', 'archived')
-      .order('created_at', { ascending: false })
-      .limit(20),
-    supabase
-      .from('cad_lab_generation_metrics')
-      .select('model_used, success, generation_time_ms, project_id')
-      .eq('project_id', foundryId) // generation_metrics has project_id, filtered below
-      .limit(500),
-  ])
+  // INTENT: Fetch projects first, then use their IDs to scope generation_metrics.
+  // generation_metrics.project_id references cad_lab_projects.id (NOT foundry_id).
+  const { data: projects } = await supabase
+    .from('cad_lab_projects')
+    .select('id, name, stage, status, modules, created_at')
+    .eq('foundry_id', foundryId)
+    .not('status', 'eq', 'archived')
+    .order('created_at', { ascending: false })
+    .limit(20)
 
   const allProjects = projects ?? []
+  const projectIds = allProjects.map(p => p.id)
 
-  // INTENT: generation_metrics references project IDs, not foundry IDs directly.
-  // We fetch all projects for the foundry, then filter metrics by those project IDs.
-  const projectIds = new Set(allProjects.map(p => p.id))
-
-  // Re-fetch generation metrics scoped by project IDs
-  const { data: genMetrics } = projectIds.size > 0
+  // Fetch generation metrics scoped by actual project IDs
+  const { data: genMetrics } = projectIds.length > 0
     ? await supabase
         .from('cad_lab_generation_metrics')
         .select('model_used, success, generation_time_ms')
-        .in('project_id', Array.from(projectIds))
+        .in('project_id', projectIds)
     : { data: [] }
 
   const mappedProjects: WorkshopDesignProject[] = allProjects.map(p => ({
@@ -112,7 +104,7 @@ export async function fetchWorkshopDesignData(
   }))
 
   let generationMetrics: GenerationMetricsSummary | undefined
-  const allMetrics = genMetrics ?? metrics ?? []
+  const allMetrics = genMetrics ?? []
   if (allMetrics.length > 0) {
     const successCount = allMetrics.filter(m => m.success).length
     const timings = allMetrics
@@ -332,7 +324,7 @@ export async function fetchWorkshopSourceData(
   const [{ data: rfqs }, { data: orders }] = await Promise.all([
     supabase
       .from('rfqs')
-      .select('id, status, awarded_to')
+      .select('id, status')
       .eq('foundry_id', foundryId),
     supabase
       .from('manufacturing_orders')
@@ -341,6 +333,15 @@ export async function fetchWorkshopSourceData(
   ])
 
   const allRfqs = rfqs ?? []
+  const rfqIds = allRfqs.map(r => r.id)
+
+  // Fetch actual rfq_responses scoped to this foundry's RFQs
+  const { data: actualResponses } = rfqIds.length > 0
+    ? await supabase
+        .from('rfq_responses')
+        .select('id, rfq_id')
+        .in('rfq_id', rfqIds)
+    : { data: [] }
 
   // RFQ pipeline
   const rfqPipeline: RFQPipelineSummary = {
@@ -351,12 +352,12 @@ export async function fetchWorkshopSourceData(
     closed: allRfqs.filter(r => r.status === 'Closed' || r.status === 'cancelled').length,
   }
 
-  // Response stats — count RFQs that have an awarded_to as a proxy for responses
-  const rfqsWithResponses = allRfqs.filter(r => r.awarded_to != null)
+  // Response stats from actual rfq_responses table
+  const allResponses = actualResponses ?? []
   const rfqResponseStats: RFQResponseStats = {
-    totalResponses: rfqsWithResponses.length,
+    totalResponses: allResponses.length,
     averagePerRFQ: allRfqs.length > 0
-      ? Math.round((rfqsWithResponses.length / allRfqs.length) * 100) / 100
+      ? Math.round((allResponses.length / allRfqs.length) * 10) / 10
       : 0,
   }
 
