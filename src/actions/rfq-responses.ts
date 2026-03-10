@@ -89,14 +89,14 @@ export async function submitRFQResponse(
       rfq_id: params.rfq_id,
       provider_id: providerProfile.id,
       response_type: params.response_type,
-      quoted_price: params.quoted_price || null,
+      quoted_price: params.quoted_price ?? null,
       message: params.message?.trim() || null,
-      ...(params.scope_of_work && { scope_of_work: params.scope_of_work }),
-      ...(params.pricing_breakdown && { pricing_breakdown: params.pricing_breakdown as { [key: string]: number | undefined } }),
-      ...(params.timeline_weeks && { timeline_weeks: params.timeline_weeks }),
-      ...(params.valid_until && { valid_until: params.valid_until }),
-      ...(params.indicative_min && { indicative_min: params.indicative_min }),
-      ...(params.indicative_max && { indicative_max: params.indicative_max }),
+      ...(params.scope_of_work != null && { scope_of_work: params.scope_of_work }),
+      ...(params.pricing_breakdown != null && { pricing_breakdown: params.pricing_breakdown as { [key: string]: number | undefined } }),
+      ...(params.timeline_weeks != null && { timeline_weeks: params.timeline_weeks }),
+      ...(params.valid_until != null && { valid_until: params.valid_until }),
+      ...(params.indicative_min != null && { indicative_min: params.indicative_min }),
+      ...(params.indicative_max != null && { indicative_max: params.indicative_max }),
     })
     .select()
     .single()

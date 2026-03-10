@@ -21,14 +21,6 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import {
   CheckCircle2,
   HelpCircle,
   XCircle,
@@ -49,7 +41,7 @@ interface RFQResponseFormProps {
   className?: string
 }
 
-type ResponseMode = 'select' | 'accept' | 'info_request' | 'decline' | 'interest'
+type ResponseMode = 'select' | 'accept' | 'info_request' | 'decline' | 'interest' | 'success'
 
 const DECLINE_REASONS = [
   'Tolerance too tight',
@@ -71,7 +63,6 @@ export function RFQResponseForm({
   const [quotedPrice, setQuotedPrice] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
   const [responseResult, setResponseResult] = useState<{
     awarded?: boolean
     priority_hold?: boolean
@@ -160,15 +151,12 @@ export function RFQResponseForm({
         awarded: result.awarded,
         priority_hold: result.priority_hold,
       })
-      setShowSuccessDialog(true)
+      setMode('success')
     })
   }
 
   const handleSuccessClose = () => {
-    setShowSuccessDialog(false)
-    if (onSuccess) {
-      onSuccess()
-    }
+    onSuccess?.()
   }
 
   const getTypeMessage = (type: RFQType) => {
@@ -737,43 +725,49 @@ export function RFQResponseForm({
     )
   }
 
-  // Success dialog
-  return (
-    <>
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {responseResult.awarded ? (
-                <>
-                  <Award className="w-5 h-5 text-primary" />
-                  Congratulations!
-                </>
-              ) : responseResult.priority_hold ? (
-                <>
-                  <Clock className="w-5 h-5 text-status-warning" />
-                  Priority Hold Granted
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5 text-status-success" />
-                  Response Submitted
-                </>
-              )}
-            </DialogTitle>
-            <DialogDescription>
-              {responseResult.awarded
-                ? 'You have been awarded this RFQ! The buyer will contact you shortly.'
-                : responseResult.priority_hold
-                ? 'You have a 2-hour priority hold. The buyer will review and confirm.'
-                : 'Your response has been submitted successfully.'}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={handleSuccessClose}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
+  // Success view
+  if (mode === 'success') {
+    return (
+      <Card className={className}>
+        <CardContent className="py-8 text-center space-y-4">
+          {responseResult.awarded ? (
+            <>
+              <Award className="w-12 h-12 text-international-orange mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold">Congratulations!</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You have been awarded this RFQ! The buyer will contact you shortly.
+                </p>
+              </div>
+            </>
+          ) : responseResult.priority_hold ? (
+            <>
+              <Clock className="w-12 h-12 text-status-warning mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold">Priority Hold Granted</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You have a 2-hour priority hold. The buyer will review and confirm.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-12 h-12 text-status-success mx-auto" />
+              <div>
+                <h3 className="text-lg font-semibold">Response Submitted</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your response has been submitted successfully.
+                </p>
+              </div>
+            </>
+          )}
+          <Button onClick={handleSuccessClose} className="min-h-[44px]">
+            Close
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return null
 }

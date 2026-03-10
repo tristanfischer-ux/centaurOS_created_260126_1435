@@ -352,12 +352,12 @@ export async function acceptRFQ(
         rfq_id: rfqId,
         provider_id: providerId,
         response_type: 'accept',
-        quoted_price: quotedPrice || null,
+        quoted_price: quotedPrice ?? null,
         message: null,
-        ...(proposalDetails?.scope_of_work && { scope_of_work: proposalDetails.scope_of_work }),
-        ...(proposalDetails?.pricing_breakdown && { pricing_breakdown: proposalDetails.pricing_breakdown as { [key: string]: number | undefined } }),
-        ...(proposalDetails?.timeline_weeks && { timeline_weeks: proposalDetails.timeline_weeks }),
-        ...(proposalDetails?.valid_until && { valid_until: proposalDetails.valid_until }),
+        ...(proposalDetails?.scope_of_work != null && { scope_of_work: proposalDetails.scope_of_work }),
+        ...(proposalDetails?.pricing_breakdown != null && { pricing_breakdown: proposalDetails.pricing_breakdown as { [key: string]: number | undefined } }),
+        ...(proposalDetails?.timeline_weeks != null && { timeline_weeks: proposalDetails.timeline_weeks }),
+        ...(proposalDetails?.valid_until != null && { valid_until: proposalDetails.valid_until }),
       })
 
     if (responseError) {

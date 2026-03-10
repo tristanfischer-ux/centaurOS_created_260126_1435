@@ -438,7 +438,7 @@ export function RFQDetail({
                           href={href}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm font-medium text-electric-blue hover:text-electric-blue-hover hover:underline"
+                          className="inline-flex items-center gap-2 text-sm font-medium text-international-orange hover:underline"
                         >
                           <FileBox className="h-4 w-4 shrink-0" />
                           <span>{label}</span>
