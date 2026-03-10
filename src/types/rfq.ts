@@ -14,7 +14,7 @@ export type RFQType = 'commodity' | 'custom' | 'service'
 export type RFQStatus = 'Open' | 'Bidding' | 'Awarded' | 'Closed' | 'priority_hold' | 'cancelled'
 
 /** RFQ response type */
-export type RFQResponseType = 'accept' | 'info_request' | 'decline'
+export type RFQResponseType = 'accept' | 'info_request' | 'decline' | 'interest'
 
 /** Supplier tier - determines race delay timing */
 export type SupplierTier = 'verified_partner' | 'approved' | 'pending' | 'suspended'
@@ -83,6 +83,12 @@ export interface RFQResponse {
   quoted_price: number | null
   message: string | null
   responded_at: string
+  scope_of_work?: string | null
+  pricing_breakdown?: PricingBreakdown | null
+  timeline_weeks?: number | null
+  valid_until?: string | null
+  indicative_min?: number | null
+  indicative_max?: number | null
 }
 
 /** RFQ Response with provider details */
@@ -120,6 +126,17 @@ export interface RFQBroadcastWithProvider extends RFQBroadcast {
     timezone: string | null
     tier: SupplierTier
   } | null
+}
+
+/** RFQ Clarification — published Q&A visible to all suppliers */
+export interface RFQClarification {
+  id: string
+  rfq_id: string
+  question: string
+  answer: string | null
+  answered_at: string | null
+  answered_by: string | null
+  created_at: string
 }
 
 // =============================================
@@ -212,18 +229,37 @@ export interface UpdateRFQParams {
   urgency?: RFQUrgency
 }
 
+/** Pricing breakdown for proposal details */
+export interface PricingBreakdown {
+  material?: number
+  labour?: number
+  tooling?: number
+  markup?: number
+  total?: number
+}
+
 /** Parameters for submitting an RFQ response */
 export interface SubmitRFQResponseParams {
   rfq_id: string
   response_type: RFQResponseType
   quoted_price?: number | null
   message?: string | null
+  scope_of_work?: string | null
+  pricing_breakdown?: PricingBreakdown | null
+  timeline_weeks?: number | null
+  valid_until?: string | null
+  indicative_min?: number | null
+  indicative_max?: number | null
 }
 
 /** Parameters for updating an RFQ response */
 export interface UpdateRFQResponseParams {
   quoted_price?: number | null
   message?: string | null
+  scope_of_work?: string | null
+  pricing_breakdown?: PricingBreakdown | null
+  timeline_weeks?: number | null
+  valid_until?: string | null
 }
 
 // =============================================

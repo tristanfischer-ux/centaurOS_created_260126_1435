@@ -1,7 +1,7 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
   MessageSquare,
   Award,
   X,
@@ -40,6 +45,10 @@ import {
   FileCheck,
   Download,
   FileBox,
+  Copy,
+  BarChart3,
+  FileDown,
+  ChevronDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import {
@@ -47,9 +56,20 @@ import {
   closeMyRFQ,
   awardRFQToSupplier,
   releaseRFQPriorityHold,
+  duplicateRFQ,
 } from '@/actions/rfq'
 import { RFQWithDetails, RFQStatus, RFQType, RFQResponseWithProvider } from '@/types/rfq'
 import { RaceStatusIndicator } from './RaceStatusIndicator'
+import { RFQBroadcastDashboard } from './RFQBroadcastDashboard'
+import { RFQResponseCompareDialog } from './RFQResponseCompareDialog'
+import { RFQInfoRequestThread } from './RFQInfoRequestThread'
+import { RFQSpecCard } from './RFQSpecCard'
+import { MatchReasoningCard } from './MatchReasoningCard'
+import { BuyerContextCard } from './BuyerContextCard'
+import { RFQClarificationsPanel } from './RFQClarificationsPanel'
+import { RaceCountdown } from './RaceStatusIndicator'
+import { exportAsPDF } from '@/lib/export-utils'
+import { downloadTechPack } from '@/lib/rfq/download-pack'
 import { format } from 'date-fns'
 
 interface RFQDetailProps {
@@ -59,12 +79,12 @@ interface RFQDetailProps {
   className?: string
 }
 
-const statusMap: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default' }> = {
+const statusMap: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'pending' | 'active' }> = {
   'Open': { label: 'Open', status: 'info' },
   'Bidding': { label: 'Bidding', status: 'success' },
   'priority_hold': { label: 'Priority Hold', status: 'warning' },
   'Awarded': { label: 'Awarded', status: 'success' },
-  'Closed': { label: 'Closed', status: 'default' },
+  'Closed': { label: 'Closed', status: 'pending' },
   'cancelled': { label: 'Cancelled', status: 'error' },
 }
 
@@ -80,8 +100,10 @@ export function RFQDetail({
   hasResponded = false,
   className,
 }: RFQDetailProps) {
+  const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
 
   const handleCancel = () => {
     startTransition(async () => {
@@ -116,6 +138,79 @@ export function RFQDetail({
       if (result.error) {
         setError(result.error)
       }
+    })
+  }
+
+  const handleDuplicate = () => {
+    startTransition(async () => {
+      const result = await duplicateRFQ(rfq.id)
+      if (result.error) {
+        setError(result.error)
+      } else if (result.data) {
+        router.push(`/rfq/${result.data.id}/edit`)
+      }
+    })
+  }
+
+  const handleDownloadPDF = async () => {
+    const specs = rfq.specifications || {}
+    const sections: string[] = []
+
+    sections.push(`# ${rfq.title}`)
+    sections.push('')
+    sections.push(`**Type:** ${typeLabels[rfq.rfq_type]}`)
+    sections.push(`**Status:** ${statusMap[rfq.status].label}`)
+    sections.push(`**Category:** ${rfq.category || 'Not specified'}`)
+    sections.push(`**Created:** ${format(new Date(rfq.created_at), 'MMM d, yyyy')}`)
+
+    if (rfq.deadline) {
+      sections.push(`**Deadline:** ${format(new Date(rfq.deadline), 'MMM d, yyyy')}`)
+    }
+
+    if (rfq.budget_min || rfq.budget_max) {
+      sections.push(`**Budget:** ${formatBudget()}`)
+    }
+
+    sections.push('')
+    sections.push('## Specifications')
+    sections.push('')
+
+    if (specs.description) {
+      sections.push(specs.description as string)
+    }
+
+    // Include module data from custom_fields
+    const customFields = specs.custom_fields as Record<string, unknown> | undefined
+    if (customFields?.modules && Array.isArray(customFields.modules)) {
+      sections.push('')
+      sections.push('### Modules')
+      for (const mod of customFields.modules as Array<Record<string, unknown>>) {
+        sections.push(`- **${mod.name || 'Module'}**: ${mod.process || ''} / ${mod.material || ''} / ${mod.finish || ''}`)
+      }
+    }
+
+    if (Array.isArray(specs.attachments) && specs.attachments.length > 0) {
+      sections.push('')
+      sections.push('### Attachments')
+      for (const url of specs.attachments) {
+        if (typeof url === 'string') {
+          sections.push(`- ${url}`)
+        }
+      }
+    }
+
+    await exportAsPDF(sections.join('\n'), `RFQ-${rfq.title.replace(/[^a-z0-9]/gi, '-')}.pdf`)
+  }
+
+  const toggleThread = (responseId: string) => {
+    setExpandedThreads((prev) => {
+      const next = new Set(prev)
+      if (next.has(responseId)) {
+        next.delete(responseId)
+      } else {
+        next.add(responseId)
+      }
+      return next
     })
   }
 
@@ -306,13 +401,21 @@ export function RFQDetail({
             </div>
           </div>
 
-          {/* Specifications */}
-          {rfq.specifications?.description && (
-            <div>
-              <h3 className="font-semibold mb-2">Specifications</h3>
-              <div className="p-4 rounded-lg bg-muted/50 whitespace-pre-wrap">
-                {rfq.specifications.description}
-              </div>
+          {/* Specifications — Structured (Feature 11) or plain text */}
+          <RFQSpecCard
+            customFields={rfq.specifications?.custom_fields as Record<string, unknown> | undefined}
+            description={rfq.specifications?.description as string | undefined}
+          />
+
+          {/* Supplier: Deadline countdown banner (Feature 18) */}
+          {!isOwner && rfq.race_opens_at && (
+            <div className="p-3 rounded-lg bg-status-info-light border border-status-info/20">
+              <RaceCountdown raceOpensAt={rfq.race_opens_at} />
+              {rfq.deadline && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Response deadline: {format(new Date(rfq.deadline), 'MMM d, yyyy')}
+                </p>
+              )}
             </div>
           )}
 
@@ -345,40 +448,126 @@ export function RFQDetail({
                     )
                   })}
                 </ul>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => downloadTechPack(rfq)}
+                >
+                  <Download className="w-4 h-4 mr-1" />
+                  Download Tech Pack
+                </Button>
               </div>
             )}
 
-          {/* Buyer info */}
-          {rfq.buyer && (
-            <div className="flex items-center gap-3 pt-4 border-t">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                {rfq.buyer.avatar_url ? (
-                  <img
-                    src={rfq.buyer.avatar_url}
-                    alt={rfq.buyer.full_name || 'User'}
-                    className="w-10 h-10 rounded-full"
-                  />
-                ) : (
-                  <User className="w-5 h-5 text-muted-foreground" />
-                )}
-              </div>
-              <div>
-                <div className="font-medium">{rfq.buyer.full_name || 'Unknown'}</div>
-                <div className="text-sm text-muted-foreground">Buyer</div>
-              </div>
+          {/* Clarifications panel (Feature 16) */}
+          <RFQClarificationsPanel
+            rfqId={rfq.id}
+            isOwner={isOwner}
+            infoRequests={
+              isOwner
+                ? rfq.responses
+                    .filter((r) => r.response_type === 'info_request')
+                    .map((r) => ({
+                      id: r.id,
+                      message: r.message,
+                      provider_profile: r.provider_profile,
+                    }))
+                : []
+            }
+          />
+
+          {/* Owner action buttons: PDF, Duplicate */}
+          {isOwner && (
+            <div className="flex items-center gap-2 pt-4 border-t">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleDownloadPDF}
+              >
+                <FileDown className="w-4 h-4 mr-1" />
+                Download PDF
+              </Button>
+
+              {(rfq.status === 'Awarded' || rfq.status === 'Closed' || rfq.status === 'cancelled') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDuplicate}
+                  disabled={isPending}
+                >
+                  {isPending ? (
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                  ) : (
+                    <Copy className="w-4 h-4 mr-1" />
+                  )}
+                  Duplicate
+                </Button>
+              )}
             </div>
+          )}
+
+          {/* Buyer info — enhanced with context for suppliers (Feature 19) */}
+          {rfq.buyer && (
+            !isOwner ? (
+              <BuyerContextCard
+                buyerId={rfq.buyer_id}
+                buyerName={rfq.buyer.full_name}
+                buyerAvatarUrl={rfq.buyer.avatar_url}
+              />
+            ) : (
+              <div className="flex items-center gap-3 pt-4 border-t">
+                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                  {rfq.buyer.avatar_url ? (
+                    <img
+                      src={rfq.buyer.avatar_url}
+                      alt={rfq.buyer.full_name || 'User'}
+                      className="w-10 h-10 rounded-full"
+                    />
+                  ) : (
+                    <User className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <div className="font-medium">{rfq.buyer.full_name || 'Unknown'}</div>
+                  <div className="text-sm text-muted-foreground">Buyer</div>
+                </div>
+              </div>
+            )
           )}
         </CardContent>
       </Card>
+
+      {/* Broadcast Dashboard (Feature 6) — owner only */}
+      {isOwner && rfq.broadcasts && rfq.broadcasts.length > 0 && (
+        <RFQBroadcastDashboard broadcasts={rfq.broadcasts} />
+      )}
 
       {/* Responses Section (Buyer View) */}
       {isOwner && rfq.responses.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5" />
-              Responses ({rfq.responses.length})
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                Responses ({rfq.responses.length})
+              </CardTitle>
+
+              {/* Compare button (Feature 8) */}
+              {acceptResponses.length >= 2 && (
+                <RFQResponseCompareDialog
+                  responses={acceptResponses}
+                  onAward={(providerId) => handleAward(providerId)}
+                  isPending={isPending}
+                  awardedTo={rfq.awarded_to}
+                >
+                  <Button variant="secondary" size="sm">
+                    <BarChart3 className="w-4 h-4 mr-1" />
+                    Compare
+                  </Button>
+                </RFQResponseCompareDialog>
+              )}
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Accept responses */}
@@ -406,7 +595,7 @@ export function RFQDetail({
               </div>
             )}
 
-            {/* Info requests */}
+            {/* Info requests with inline thread (Feature 9) */}
             {infoRequests.length > 0 && (
               <div>
                 <h4 className="font-medium flex items-center gap-2 mb-3">
@@ -415,10 +604,37 @@ export function RFQDetail({
                 </h4>
                 <div className="space-y-3">
                   {infoRequests.map((response) => (
-                    <ResponseCard
-                      key={response.id}
-                      response={response}
-                    />
+                    <div key={response.id}>
+                      <ResponseCard response={response} />
+                      {response.provider?.user_id && (
+                        <Collapsible
+                          open={expandedThreads.has(response.id)}
+                          onOpenChange={() => toggleThread(response.id)}
+                        >
+                          <CollapsibleTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-1 ml-4 text-xs"
+                            >
+                              <MessageSquare className="w-3 h-3 mr-1" />
+                              {expandedThreads.has(response.id) ? 'Hide Thread' : 'Reply'}
+                              <ChevronDown className={cn(
+                                'w-3 h-3 ml-1 transition-transform',
+                                expandedThreads.has(response.id) && 'rotate-180'
+                              )} />
+                            </Button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="ml-4">
+                            <RFQInfoRequestThread
+                              rfqId={rfq.id}
+                              sellerId={response.provider.user_id}
+                              initialQuestion={response.message || ''}
+                            />
+                          </CollapsibleContent>
+                        </Collapsible>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -443,6 +659,11 @@ export function RFQDetail({
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Match Reasoning (Feature 14) — supplier only */}
+      {!isOwner && (
+        <MatchReasoningCard rfqId={rfq.id} />
       )}
 
       {/* Supplier View: Already Responded */}

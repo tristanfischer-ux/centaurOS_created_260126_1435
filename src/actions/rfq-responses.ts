@@ -73,7 +73,7 @@ export async function submitRFQResponse(
   }
 
   // Validate response type
-  if (!['accept', 'decline', 'info_request'].includes(params.response_type)) {
+  if (!['accept', 'decline', 'info_request', 'interest'].includes(params.response_type)) {
     return { data: null, error: "Invalid response type" }
   }
 
@@ -91,6 +91,12 @@ export async function submitRFQResponse(
       response_type: params.response_type,
       quoted_price: params.quoted_price || null,
       message: params.message?.trim() || null,
+      ...(params.scope_of_work && { scope_of_work: params.scope_of_work }),
+      ...(params.pricing_breakdown && { pricing_breakdown: params.pricing_breakdown as { [key: string]: number | undefined } }),
+      ...(params.timeline_weeks && { timeline_weeks: params.timeline_weeks }),
+      ...(params.valid_until && { valid_until: params.valid_until }),
+      ...(params.indicative_min && { indicative_min: params.indicative_min }),
+      ...(params.indicative_max && { indicative_max: params.indicative_max }),
     })
     .select()
     .single()
@@ -216,12 +222,17 @@ export async function updateRFQResponse(
   }
 
   // Update the response
+  const updatePayload: Record<string, unknown> = {}
+  if (data.quoted_price !== undefined) updatePayload.quoted_price = data.quoted_price
+  if (data.message !== undefined) updatePayload.message = data.message?.trim() || null
+  if (data.scope_of_work !== undefined) updatePayload.scope_of_work = data.scope_of_work
+  if (data.pricing_breakdown !== undefined) updatePayload.pricing_breakdown = data.pricing_breakdown
+  if (data.timeline_weeks !== undefined) updatePayload.timeline_weeks = data.timeline_weeks
+  if (data.valid_until !== undefined) updatePayload.valid_until = data.valid_until
+
   const { error: updateError } = await supabase
     .from('rfq_responses')
-    .update({
-      quoted_price: data.quoted_price,
-      message: data.message?.trim() || null,
-    })
+    .update(updatePayload)
     .eq('id', responseId)
 
   if (updateError) {

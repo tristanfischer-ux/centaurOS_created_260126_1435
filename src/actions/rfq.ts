@@ -29,6 +29,7 @@ import {
   RFQRole,
   RFQSummary,
   RFQWithDetails,
+  RFQClarification,
   RaceStatus,
   SupplierMatch,
 } from "@/types/rfq"
@@ -236,9 +237,15 @@ export async function closeMyRFQ(rfqId: string): Promise<{
 export async function respondToRFQ(
   rfqId: string,
   response: {
-    type: 'accept' | 'decline' | 'info_request'
+    type: 'accept' | 'decline' | 'info_request' | 'interest'
     quoted_price?: number
     message?: string
+    scope_of_work?: string
+    pricing_breakdown?: Record<string, number>
+    timeline_weeks?: number
+    valid_until?: string
+    indicative_min?: number
+    indicative_max?: number
   }
 ): Promise<{
   success: boolean
@@ -269,7 +276,13 @@ export async function respondToRFQ(
         supabase,
         rfqId,
         providerProfile.id,
-        response.quoted_price
+        response.quoted_price,
+        {
+          scope_of_work: response.scope_of_work,
+          pricing_breakdown: response.pricing_breakdown,
+          timeline_weeks: response.timeline_weeks,
+          valid_until: response.valid_until,
+        }
       )
       break
 
@@ -293,6 +306,28 @@ export async function respondToRFQ(
         response.message
       )
       return { success: result.success, error: result.error }
+
+    case 'interest': {
+      // Express interest with indicative pricing — no race state changes
+      const { error: interestError } = await supabase
+        .from('rfq_responses')
+        .insert({
+          rfq_id: rfqId,
+          provider_id: providerProfile.id,
+          response_type: 'interest',
+          message: response.message?.trim() || null,
+          indicative_min: response.indicative_min || null,
+          indicative_max: response.indicative_max || null,
+        })
+
+      if (interestError) {
+        return { success: false, error: "Failed to express interest" }
+      }
+
+      revalidatePath("/rfq")
+      revalidatePath(`/rfq/${rfqId}`)
+      return { success: true, error: null }
+    }
 
     default:
       return { success: false, error: "Invalid response type" }
@@ -396,6 +431,61 @@ export async function getMatchedSuppliers(rfqId: string): Promise<{
     match_reasons: m.matchReasons,
   }))
   return { data, error: null }
+}
+
+// =============================================
+// DUPLICATE / RE-SEND
+// =============================================
+
+/**
+ * Duplicate an existing RFQ (creates a new draft copy, no auto-broadcast)
+ */
+export async function duplicateRFQ(rfqId: string): Promise<{
+  data: { id: string } | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: "Not authenticated" }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { data: null, error: "User not in a foundry" }
+
+  // Fetch source RFQ
+  const { data: source, error: fetchError } = await supabase
+    .from('rfqs')
+    .select('*')
+    .eq('id', rfqId)
+    .single()
+
+  if (fetchError || !source) {
+    return { data: null, error: "RFQ not found" }
+  }
+
+  // Create a copy (no broadcast)
+  const { data: rfq, error: createError } = await createRFQService(
+    supabase,
+    user.id,
+    foundryId,
+    {
+      title: `[Copy] ${source.title}`,
+      rfq_type: source.rfq_type,
+      specifications: (source.specifications as CreateRFQParams['specifications']) ?? undefined,
+      budget_min: source.budget_min,
+      budget_max: source.budget_max,
+      deadline: null, // Reset deadline for the copy
+      category: source.category,
+      urgency: 'standard',
+    }
+  )
+
+  if (createError || !rfq) {
+    return { data: null, error: createError || "Failed to duplicate RFQ" }
+  }
+
+  revalidatePath("/rfq")
+  return { data: { id: rfq.id }, error: null }
 }
 
 // =============================================
@@ -508,6 +598,75 @@ export async function checkIsProvider(): Promise<{
 }
 
 /**
+ * Get buyer context stats for supplier view (Feature 19)
+ */
+export async function getBuyerContext(buyerId: string): Promise<{
+  data: {
+    totalRfqs: number
+    awardedRfqs: number
+    awardRate: number
+    avgDecisionDays: number | null
+  } | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, error: "Not authenticated" }
+
+  // Get all RFQs from this buyer
+  const { data: rfqs, error } = await supabase
+    .from('rfqs')
+    .select('id, status, created_at')
+    .eq('buyer_id', buyerId)
+
+  if (error || !rfqs) {
+    return { data: null, error: error?.message || "Failed to fetch" }
+  }
+
+  const totalRfqs = rfqs.length
+  const awardedRfqs = rfqs.filter((r) => r.status === 'Awarded').length
+  const awardRate = totalRfqs > 0 ? Math.round((awardedRfqs / totalRfqs) * 100) : 0
+
+  // Estimate avg decision time from response timestamps on awarded RFQs
+  let avgDecisionDays: number | null = null
+  if (awardedRfqs > 0) {
+    const awardedIds = rfqs.filter((r) => r.status === 'Awarded').map((r) => r.id)
+    const { data: responses } = await supabase
+      .from('rfq_responses')
+      .select('rfq_id, responded_at')
+      .in('rfq_id', awardedIds)
+      .eq('response_type', 'accept')
+      .order('responded_at', { ascending: true })
+
+    if (responses && responses.length > 0) {
+      // Use first accept response time minus creation time as proxy for decision time
+      const rfqMap = new Map(rfqs.filter((r) => r.created_at).map((r) => [r.id, r.created_at!]))
+      let totalDays = 0
+      let count = 0
+      const seen = new Set<string>()
+      for (const resp of responses) {
+        if (seen.has(resp.rfq_id)) continue
+        seen.add(resp.rfq_id)
+        const created = rfqMap.get(resp.rfq_id)
+        if (created && resp.responded_at) {
+          totalDays += (new Date(resp.responded_at).getTime() - new Date(created).getTime()) / (1000 * 60 * 60 * 24)
+          count++
+        }
+      }
+      if (count > 0) {
+        avgDecisionDays = Math.round(totalDays / count)
+      }
+    }
+  }
+
+  return {
+    data: { totalRfqs, awardedRfqs, awardRate, avgDecisionDays },
+    error: null,
+  }
+}
+
+/**
  * Get RFQ counts by status for dashboard
  */
 export async function getRFQCounts(): Promise<{
@@ -567,4 +726,80 @@ export async function getRFQCounts(): Promise<{
   }
 
   return { data: counts, error: null }
+}
+
+// =============================================
+// CLARIFICATION ACTIONS (Feature 16)
+// =============================================
+
+/**
+ * Publish a clarification Q&A for an RFQ (buyer only)
+ */
+export async function publishClarification(
+  rfqId: string,
+  question: string,
+  answer: string
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: "Not authenticated" }
+
+  // Verify user owns this RFQ
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("buyer_id")
+    .eq("id", rfqId)
+    .single()
+
+  if (!rfq || rfq.buyer_id !== user.id) {
+    return { success: false, error: "Not authorized" }
+  }
+
+  const { error: insertError } = await supabase
+    .from("rfq_clarifications")
+    .insert({
+      rfq_id: rfqId,
+      question: question.trim(),
+      answer: answer.trim(),
+      answered_at: new Date().toISOString(),
+      answered_by: user.id,
+    })
+
+  if (insertError) {
+    console.error("Error publishing clarification:", insertError)
+    return { success: false, error: "Failed to publish clarification" }
+  }
+
+  revalidatePath(`/rfq/${rfqId}`)
+  return { success: true, error: null }
+}
+
+/**
+ * Get all clarifications for an RFQ
+ */
+export async function getRFQClarifications(
+  rfqId: string
+): Promise<{ data: RFQClarification[]; error: string | null }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { data: [], error: "Not authenticated" }
+
+  const { data, error } = await supabase
+    .from("rfq_clarifications")
+    .select("*")
+    .eq("rfq_id", rfqId)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    console.error("Error fetching clarifications:", error)
+    return { data: [], error: "Failed to fetch clarifications" }
+  }
+
+  return { data: (data || []) as RFQClarification[], error: null }
 }

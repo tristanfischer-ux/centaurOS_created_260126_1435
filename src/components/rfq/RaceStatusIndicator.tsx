@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { useState, useEffect, memo } from 'react'
@@ -241,12 +240,12 @@ interface StatusBadgeProps {
 }
 
 function StatusBadge({ status, className }: StatusBadgeProps) {
-  const config: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default'; Icon: typeof Clock }> = {
+  const config: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'pending' | 'active'; Icon: typeof Clock }> = {
     'Open': { label: 'Open', status: 'info', Icon: Clock },
     'Bidding': { label: 'Bidding', status: 'success', Icon: Zap },
     'priority_hold': { label: 'Priority Hold', status: 'warning', Icon: Lock },
     'Awarded': { label: 'Awarded', status: 'success', Icon: Award },
-    'Closed': { label: 'Closed', status: 'default', Icon: CheckCircle2 },
+    'Closed': { label: 'Closed', status: 'pending', Icon: CheckCircle2 },
     'cancelled': { label: 'Cancelled', status: 'error', Icon: Ban },
   }
 

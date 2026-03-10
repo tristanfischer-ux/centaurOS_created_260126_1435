@@ -238,12 +238,18 @@ export async function acceptRFQ(
   supabase: TypedSupabaseClient,
   rfqId: string,
   providerId: string,
-  quotedPrice?: number
-): Promise<{ 
-  success: boolean; 
-  awarded: boolean; 
+  quotedPrice?: number,
+  proposalDetails?: {
+    scope_of_work?: string
+    pricing_breakdown?: Record<string, number>
+    timeline_weeks?: number
+    valid_until?: string
+  }
+): Promise<{
+  success: boolean;
+  awarded: boolean;
   priority_hold: boolean;
-  error: string | null 
+  error: string | null
 }> {
   try {
     // Get the RFQ
@@ -339,7 +345,7 @@ export async function acceptRFQ(
         .eq('id', broadcast.id)
     }
 
-    // Create the response
+    // Create the response with optional proposal details
     const { error: responseError } = await supabase
       .from('rfq_responses')
       .insert({
@@ -348,6 +354,10 @@ export async function acceptRFQ(
         response_type: 'accept',
         quoted_price: quotedPrice || null,
         message: null,
+        ...(proposalDetails?.scope_of_work && { scope_of_work: proposalDetails.scope_of_work }),
+        ...(proposalDetails?.pricing_breakdown && { pricing_breakdown: proposalDetails.pricing_breakdown as { [key: string]: number | undefined } }),
+        ...(proposalDetails?.timeline_weeks && { timeline_weeks: proposalDetails.timeline_weeks }),
+        ...(proposalDetails?.valid_until && { valid_until: proposalDetails.valid_until }),
       })
 
     if (responseError) {

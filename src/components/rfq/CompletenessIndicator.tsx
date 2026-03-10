@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { Progress } from '@/components/ui/progress'
@@ -11,6 +10,7 @@ export interface CompletenessCheck {
   passed: boolean
   required: boolean
   hint?: string
+  nudge?: string
 }
 
 interface CompletenessIndicatorProps {
@@ -89,9 +89,11 @@ export function CompletenessIndicator({ checks, className }: CompletenessIndicat
             <AlertCircle className="w-4 h-4 text-status-warning mt-0.5 shrink-0" />
             <div>
               <span className="text-status-warning">{check.label}</span>
-              {check.hint && (
+              {check.nudge ? (
+                <span className="text-muted-foreground ml-1">— {check.nudge}</span>
+              ) : check.hint ? (
                 <span className="text-muted-foreground ml-1">— {check.hint}</span>
-              )}
+              ) : null}
             </div>
           </div>
         ))}
@@ -162,6 +164,7 @@ export function generateCompletenessChecks(formData: {
       passed: !!(formData.budgetMin || formData.budgetMax),
       required: false,
       hint: 'helps suppliers prioritize',
+      nudge: 'RFQs with a budget range get 40% more responses',
     },
     {
       key: 'deadline',
@@ -169,6 +172,7 @@ export function generateCompletenessChecks(formData: {
       passed: !!formData.deadline,
       required: false,
       hint: 'faster responses',
+      nudge: 'A deadline doubles your average response speed',
     },
     {
       key: 'files',
@@ -176,6 +180,7 @@ export function generateCompletenessChecks(formData: {
       passed: formData.files.length > 0,
       required: false,
       hint: 'drawings, specs, CAD',
+      nudge: 'Attachments cut back-and-forth by half',
     },
     {
       key: 'quantity',
@@ -183,6 +188,7 @@ export function generateCompletenessChecks(formData: {
       passed: !!(formData.quantity && parseInt(formData.quantity) > 0),
       required: false,
       hint: 'for accurate quotes',
+      nudge: 'Suppliers quote 2x faster with a quantity',
     },
   ]
 }

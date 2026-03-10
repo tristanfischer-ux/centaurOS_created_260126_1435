@@ -1,4 +1,3 @@
-// @ts-nocheck
 'use client'
 
 import { memo } from 'react'
@@ -27,12 +26,12 @@ interface RFQCardProps {
   className?: string
 }
 
-const statusConfig: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'default' }> = {
+const statusConfig: Record<RFQStatus, { label: string; status: 'info' | 'success' | 'warning' | 'error' | 'pending' | 'active' }> = {
   'Open': { label: 'Open', status: 'info' },
   'Bidding': { label: 'Bidding', status: 'success' },
   'priority_hold': { label: 'Priority Hold', status: 'warning' },
   'Awarded': { label: 'Awarded', status: 'success' },
-  'Closed': { label: 'Closed', status: 'default' },
+  'Closed': { label: 'Closed', status: 'pending' },
   'cancelled': { label: 'Cancelled', status: 'error' },
 }
 
