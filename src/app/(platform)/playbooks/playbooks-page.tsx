@@ -579,6 +579,7 @@ export function PlaybooksPage({
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -679,10 +680,10 @@ export function PlaybooksPage({
       {/* ================================================================== */}
       {activeTab === 'subsystems' && (
         <div className="space-y-4">
-          <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+          <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
             <CardContent className="pt-6">
               <div className="flex items-start gap-4">
-                <div className="p-3 bg-orange-100 rounded-xl shrink-0">
+                <div className="p-3 bg-international-orange/10 rounded-xl shrink-0">
                   <Cpu className="h-6 w-6 text-international-orange" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -745,6 +746,7 @@ export function PlaybooksPage({
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
+                  aria-label="Clear search"
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 >
                   <X className="h-4 w-4" />
@@ -854,7 +856,8 @@ export function PlaybooksPage({
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <X className="h-4 w-4" />
                     </button>

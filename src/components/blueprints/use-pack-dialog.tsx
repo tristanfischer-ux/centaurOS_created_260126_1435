@@ -187,6 +187,9 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
             <Package className="h-5 w-5 text-electric-blue" />
             {pack.title}
           </DialogTitle>
+          <DialogDescription>
+            Create an objective from this pack. Review details and select tasks to include.
+          </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="mt-4">
@@ -204,7 +207,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
           {/* OVERVIEW TAB */}
           <TabsContent value="overview" className="mt-4 space-y-4">
             {/* What is this pack? */}
-            <Card className="bg-blue-50/50 border-blue-100">
+            <Card className="bg-electric-blue/5 border-electric-blue/20">
               <CardContent className="pt-6">
                 <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
                   <Package className="h-4 w-4 text-electric-blue" />
@@ -297,7 +300,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
             )}
 
             {/* What you'll accomplish */}
-            <Card className="bg-orange-50/50 border-orange-100">
+            <Card className="bg-international-orange/5 border-international-orange/20">
               <CardContent className="pt-6">
                 <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
                   <Target className="h-4 w-4 text-international-orange" />
@@ -323,7 +326,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
             </Card>
 
             {/* Marketplace upsell */}
-            <Card className="bg-gradient-to-r from-orange-50 to-background border-orange-100">
+            <Card className="bg-gradient-to-r from-international-orange/5 to-background border-international-orange/20">
               <CardContent className="pt-6">
                 <div className="flex items-start gap-3">
                   <Store className="h-5 w-5 text-international-orange shrink-0 mt-0.5" />
@@ -484,7 +487,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
                               <span className="text-sm font-medium flex-1 min-w-0">
                                 {idx + 1}. {item.title}
                               </span>
-                              <div className="flex items-center gap-1 shrink-0">
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <Select
                                   value={taskAssignees[item.id] || 'unassigned'}
                                   onValueChange={(value) => {

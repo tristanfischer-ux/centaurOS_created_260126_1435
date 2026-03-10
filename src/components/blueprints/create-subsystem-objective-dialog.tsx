@@ -105,7 +105,7 @@ function TaskPreview({
         </p>
         
         <div className="flex items-center gap-3 mt-2">
-          {task.estimated_hours && (
+          {task.estimated_hours != null && task.estimated_hours > 0 && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
               {task.estimated_hours}h
