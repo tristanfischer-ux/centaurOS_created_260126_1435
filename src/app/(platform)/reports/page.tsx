@@ -392,7 +392,15 @@ export default function ReportsPage(): React.JSX.Element {
       }
 
       setReportDocument(result.document)
+      setViewMode('document')
       toast.success('Report generated successfully')
+
+      // INTENT: Scroll to the generated report after the DOM commits.
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }, 100)
+      })
 
       saveReportSnapshot(result.document)
         .then((saveResult) => {
@@ -452,6 +460,10 @@ export default function ReportsPage(): React.JSX.Element {
           return
         }
         setReportDocument(result.document)
+        // INTENT: Reset to document view so reportRef is mounted for scrolling.
+        // If the user was viewing an infographic from a previous report, reportRef
+        // would be null and the scroll below would silently fail.
+        setViewMode('document')
         toast.success('Report generated successfully')
         // INTENT: Scroll to the generated report — quick-start fires from the hero
         // at the top of the page, so the user can't see the result without scrolling.
@@ -1131,10 +1143,15 @@ export default function ReportsPage(): React.JSX.Element {
           {!isGeneratingReport && (
             <Button
               className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
-              disabled={enabledSections.size === 0}
+              disabled={enabledSections.size === 0 || dateRange.start > dateRange.end}
               onClick={handleGenerate}
             >
               Generate Report
+              {dateRange.start > dateRange.end && (
+                <span className="ml-2 text-xs font-normal opacity-80">
+                  (start date is after end date)
+                </span>
+              )}
             </Button>
           )}
 
