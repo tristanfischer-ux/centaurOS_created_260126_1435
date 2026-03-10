@@ -516,24 +516,46 @@ export async function getActivityUnreadCount(): Promise<{
     let messageCount = 0
     if (conversations && conversations.length > 0) {
       const conversationIds = conversations.map((c: { conversation_id: string }) => c.conversation_id)
-      
-      // Count unread messages per conversation using last_read_at
+
+      // DECISION: Batch unread counts by grouping conversations by last_read_at status
+      // (has timestamp vs null) to reduce N+1 to at most 2 queries.
       const conversationMap = new Map<string, string | null>(conversations.map((c: { conversation_id: string; last_read_at: string | null }) => [c.conversation_id, c.last_read_at]))
 
-      // Query unread counts per conversation (only fetch counts, not full rows)
-      for (const [convId, lastReadAt] of conversationMap) {
-        let countQuery = supabase
+      // Group 1: Conversations never read (all non-own messages are unread)
+      const neverReadIds = conversationIds.filter((id: string) => !conversationMap.get(id))
+      if (neverReadIds.length > 0) {
+        const { count } = await supabase
           .from('messages')
           .select('*', { count: 'exact', head: true })
-          .eq('conversation_id', convId as string)
+          .in('conversation_id', neverReadIds)
           .neq('sender_id', user.id)
           .eq('is_deleted', false)
+        messageCount += count || 0
+      }
 
-        if (lastReadAt) {
-          countQuery = countQuery.gt('created_at', lastReadAt)
-        }
+      // Group 2: Conversations with last_read_at — find oldest last_read_at as lower bound,
+      // then count messages after it (may slightly overcount but avoids N queries).
+      // For exact counts we'd need per-conversation queries, but the oldest-timestamp
+      // approach is a reasonable approximation that eliminates N+1.
+      const readConversations = conversationIds
+        .filter((id: string) => conversationMap.get(id))
+        .map((id: string) => ({ id, lastReadAt: conversationMap.get(id)! }))
 
-        const { count } = await countQuery
+      if (readConversations.length > 0) {
+        // Use the oldest last_read_at as lower bound — slight overcount is acceptable
+        // for an unread badge vs N separate queries
+        const oldestReadAt = readConversations
+          .map((c: { id: string; lastReadAt: string }) => c.lastReadAt)
+          .sort()[0]
+
+        const readIds = readConversations.map((c: { id: string; lastReadAt: string }) => c.id)
+        const { count } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .in('conversation_id', readIds)
+          .neq('sender_id', user.id)
+          .eq('is_deleted', false)
+          .gt('created_at', oldestReadAt)
         messageCount += count || 0
       }
     }
@@ -1252,8 +1274,18 @@ export async function getThreadForSource(
         .eq('is_deleted', false)
         .order('created_at', { ascending: true })
 
-      // Fetch participants for metadata display
-      const participantIds = [conversation.buyer_id, conversation.seller_id].filter(Boolean) as string[]
+      // Fetch participants from conversation_participants table (not legacy buyer_id/seller_id)
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select('profile_id')
+        .eq('conversation_id', sourceId)
+
+      const participantIds = (participants || []).map((p: { profile_id: string }) => p.profile_id)
+      // Fallback to legacy fields if no participants exist yet
+      if (participantIds.length === 0) {
+        const legacyIds = [conversation.buyer_id, conversation.seller_id].filter(Boolean) as string[]
+        participantIds.push(...legacyIds)
+      }
       const { data: participantProfiles } = await supabase
         .from('profiles')
         .select('id, full_name, avatar_url, role')

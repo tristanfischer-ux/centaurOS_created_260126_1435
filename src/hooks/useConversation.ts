@@ -244,18 +244,22 @@ export function useConversation(
             // Only update scalar fields that can actually change.
             const updated = payload.new as Record<string, unknown>
             setMessages(prev =>
-              prev.map(m =>
-                m.id === updated.id
-                  ? {
-                      ...m,
-                      content: updated.content !== undefined ? (updated.content as string | null) : m.content,
-                      is_read: (updated.is_read as boolean) ?? m.is_read,
-                      read_at: (updated.read_at as string | null) ?? m.read_at,
-                      edited_at: (updated.edited_at as string | null) ?? m.edited_at ?? null,
-                      is_deleted: (updated.is_deleted as boolean) ?? m.is_deleted ?? false,
-                    }
-                  : m
-              )
+              prev
+                .map(m =>
+                  m.id === updated.id
+                    ? {
+                        ...m,
+                        content: updated.content !== undefined ? (updated.content as string | null) : m.content,
+                        is_read: (updated.is_read as boolean) ?? m.is_read,
+                        read_at: (updated.read_at as string | null) ?? m.read_at,
+                        edited_at: (updated.edited_at as string | null) ?? m.edited_at ?? null,
+                        is_deleted: (updated.is_deleted as boolean) ?? m.is_deleted ?? false,
+                      }
+                    : m
+                )
+                // DECISION: Filter out soft-deleted messages immediately on UPDATE,
+                // so they disappear in realtime instead of lingering until refresh.
+                .filter(m => !m.is_deleted)
             )
           }
         )

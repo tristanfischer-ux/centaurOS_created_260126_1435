@@ -202,9 +202,10 @@ interface QueuedMessage {
   localId: string
 }
 
+// DECISION: senderId removed — always derived from auth session at send time.
+// Kept in QueuedMessage interface for backwards compat with existing localStorage entries.
 export function queueOfflineMessage(
   conversationId: string,
-  senderId: string,
   content: string
 ): string {
   try {
@@ -214,7 +215,7 @@ export function queueOfflineMessage(
     
     queue.push({
       conversationId,
-      senderId,
+      senderId: '', // DECISION: Not used — sender derived from auth at send time
       content,
       timestamp: Date.now(),
       localId

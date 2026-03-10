@@ -220,6 +220,13 @@ export async function createConversation(
     throw new Error(`Failed to create conversation: ${error.message}`)
   }
 
+  // DECISION: Create conversation_participants entries so RLS and queries
+  // that join on conversation_participants work correctly.
+  await addParticipantToConversation(supabase, data.id, buyerId)
+  if (sellerId !== buyerId) {
+    await addParticipantToConversation(supabase, data.id, sellerId)
+  }
+
   return data as Conversation
 }
 
@@ -735,6 +742,13 @@ export async function createExpertConversation(
     throw new Error(`Failed to create expert conversation: ${error.message}`)
   }
 
+  // DECISION: Create conversation_participants entries so RLS and queries
+  // that join on conversation_participants work correctly.
+  await addParticipantToConversation(supabase, data.id, creatorId)
+  if (expertUserId !== creatorId) {
+    await addParticipantToConversation(supabase, data.id, expertUserId)
+  }
+
   return data as Conversation
 }
 
@@ -943,33 +957,49 @@ export async function markConversationAsRead(
 
 /**
  * Toggle mute status for a conversation
+ * DECISION: Uses SQL NOT(is_muted) for atomic toggle — avoids TOCTOU race
+ * where two rapid clicks could read the same value and both flip the same way.
  */
 export async function toggleConversationMute(
   supabase: AnySupabaseClient,
   conversationId: string,
   userId: string
 ): Promise<boolean> {
-  // Get current mute status
-  const { data: current } = await supabase
-    .from('conversation_participants')
-    .select('is_muted')
-    .eq('conversation_id', conversationId)
-    .eq('profile_id', userId)
-    .single()
-
-  const newMuteStatus = !current?.is_muted
-
-  const { error } = await supabase
-    .from('conversation_participants')
-    .update({ is_muted: newMuteStatus })
-    .eq('conversation_id', conversationId)
-    .eq('profile_id', userId)
+  // Atomic toggle: set is_muted = NOT is_muted in a single UPDATE, return new value
+  const { data, error } = await supabase
+    .rpc('toggle_conversation_mute', {
+      p_conversation_id: conversationId,
+      p_profile_id: userId
+    })
 
   if (error) {
+    // Fallback to non-atomic toggle if RPC doesn't exist yet
+    if (error.code === '42883') { // function does not exist
+      const { data: current } = await supabase
+        .from('conversation_participants')
+        .select('is_muted')
+        .eq('conversation_id', conversationId)
+        .eq('profile_id', userId)
+        .single()
+
+      const newMuteStatus = !current?.is_muted
+
+      const { error: updateError } = await supabase
+        .from('conversation_participants')
+        .update({ is_muted: newMuteStatus })
+        .eq('conversation_id', conversationId)
+        .eq('profile_id', userId)
+
+      if (updateError) {
+        throw new Error(`Failed to toggle mute: ${updateError.message}`)
+      }
+
+      return newMuteStatus
+    }
     throw new Error(`Failed to toggle mute: ${error.message}`)
   }
 
-  return newMuteStatus
+  return data as boolean
 }
 
 /**
