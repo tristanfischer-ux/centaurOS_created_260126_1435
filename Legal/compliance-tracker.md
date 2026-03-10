@@ -76,7 +76,7 @@
 | Dispute resolution process | Implemented | Escalation workflow exists in code |
 | Provider verification process | To document | How providers are vetted |
 | Consumer Rights Act 2015 (UK) | To assess | Applies to digital content |
-| Distance Selling Regulations | To assess | 14-day cooling-off period |
+| Consumer Contracts Regulations 2013 | To assess | 14-day cooling-off period |
 | Platform liability limitations | Needed | Documented in ToS |
 
 ---
@@ -96,7 +96,7 @@
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Security audit conducted | Done | Feb 2026 (see docs/security/) |
+| Security audit conducted | Done (Feb 2026) | See docs/security/ and ISMS documentation |
 | Row-Level Security (RLS) | Implemented | Multi-tenant isolation |
 | Authentication security | Implemented | JWT, HTTP-only cookies, CSRF protection |
 | Rate limiting | Implemented | Per-user, per-IP on AI endpoints |
@@ -104,7 +104,7 @@
 | CSP headers | Implemented | Strict Content-Security-Policy |
 | Penetration testing | Recommended | Not yet conducted |
 | SOC 2 Type II | Future | When enterprise customers require it |
-| ISO 27001 | Future | When enterprise customers require it |
+| ISO 27001 | In Progress | ISMS documentation underway (see FractionalForge-ISMS repository) |
 
 ---
 

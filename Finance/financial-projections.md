@@ -13,13 +13,13 @@
 |------------|-------|-------|
 | Free → paid conversion rate | 7% | Industry average for freemium SaaS (5-10%) |
 | Monthly churn (paid) | 4% | Early-stage SaaS typical (3-7%) |
-| Starter : Professional : Enterprise ratio | 60% : 30% : 10% | Estimate |
+| Startup Team : Professional : Enterprise ratio | 60% : 30% : 10% | Estimate |
 | Average Startup Team ARPU | £49/mo | List price |
 | Average Professional ARPU | £149/mo | List price |
 | Average Enterprise ARPU | £499/mo | List price |
 | Annual billing discount | 20% | Per pricing page |
 | Annual billing uptake | 30% | Estimate |
-| Marketplace GMV per active customer | £200/mo | Conservative estimate |
+| Marketplace GMV per active customer | £200/mo | Estimate — subject to cold-start risk in early months |
 | Marketplace take rate | 10% | Per pricing page |
 
 ### Blended ARPU Calculation
@@ -58,6 +58,10 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 
 *Note: These are estimates. Actual numbers depend heavily on marketing execution and product-market fit.*
 
+*Note: UK VAT registration threshold is £90,000. As revenue approaches this level (projected around Month 10-11), VAT registration and 20% VAT on UK SaaS sales will need to be factored in.*
+
+*Note: UK Corporation Tax applies at 19% on profits under £50K, 25% on profits over £250K, with marginal relief between.*
+
 ---
 
 ## 3. Cost Structure
@@ -70,8 +74,8 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 | Supabase | £25 | £300 | Pro plan |
 | Domain & DNS | £2 | £24 | |
 | Sentry monitoring | £26 | £312 | Team plan |
-| Email (Resend) | £20 | £240 | Starter |
-| Stripe fees | 2.9% + 20p | Variable | Per transaction |
+| Email (Resend) | £20 | £240 | Startup Team |
+| Stripe fees | ~2% + 20p (blended UK/EU rate; UK cards 1.5% + 20p) | Variable | Per transaction |
 | **Fixed total** | **~£93** | **~£1,116** | |
 
 ### Variable Costs (Scale with Usage)
@@ -80,7 +84,7 @@ With 30% on annual (20% discount): Effective blended ARPU ~ **£116/mo**
 |----------|-------------|-------------|--------------|-------|
 | Anthropic Claude | ~£0.50-2/conversation | £100 | £2,000 | Primary AI spend |
 | OpenAI GPT-4o | ~£0.20-0.50/conversation | £40 | £500 | Fallback + speculative |
-| Google Gemini | ~£0.10-0.30/call | £20 | £200 | Image generation |
+| OpenAI DALL-E | ~£0.10-0.30/call | £20 | £200 | Image generation |
 | Qwen / MiniMax | ~£0.05-0.20/conversation | £30 | £400 | High-volume tiers |
 | Modal.com (CAD) | ~£0.10-0.50/execution | £20 | £300 | CadQuery runs |
 | **Variable total** | | **~£210** | **~£3,400** | |
@@ -91,7 +95,7 @@ Target: AI cost < 30% of ARPU
 
 | Scenario | AI cost/user/mo | ARPU | AI as % of ARPU |
 |----------|----------------|------|-----------------|
-| Light user (Starter) | £5-10 | £49 | 10-20% |
+| Light user (Startup Team) | £5-10 | £49 | 10-20% |
 | Medium user (Pro) | £15-30 | £149 | 10-20% |
 | Heavy user (Pro) | £40-60 | £149 | 27-40% |
 
@@ -120,6 +124,8 @@ At blended ARPU of £116/mo and estimated costs:
 | Founder + minimal salary | £3,093 | ~£15/user | ~31 paid users |
 | Founder + 1 hire | £7,093 | ~£15/user | ~70 paid users |
 | Full team (3 people) | £13,093 | ~£15/user | ~130 paid users |
+
+*Note: The £15/user variable cost is a blended average across all months. Month 12 per-user cost is higher (~£28/user) as AI usage scales with engagement — early months are lower, pulling the average down.*
 
 ### Path to Profitability
 
@@ -158,7 +164,7 @@ Profitable on a monthly basis by Month 10-12 (with lean team).
 - Slower growth but full equity retention
 
 ### Scenario B: SEIS Angel Round (£150K)
-- SEIS investors get 30% tax relief (attractive)
+- SEIS investors get 50% tax relief (attractive)
 - Hire 2 people immediately (developer + marketer)
 - Accelerate to 200+ paid users by Month 12
 - Use for 12-18 months runway

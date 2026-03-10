@@ -41,11 +41,11 @@ The existing CAD Workbench (Monaco editor, parameter extraction, conversational 
 - Three.js viewer: Unchanged — still renders the STEP/STL output
 - Specialist layer: Max (CTO) and Fang (VP Manufacturing) provide contextual guidance on top of Zoo output
 
-**Cost**: $0.0083/second ($0.50/min). 20 free minutes included ($10 balance). At ~2 min per generation, that's ~$1/model. Professional tier usage (10-20 CAD models/month) = $10-20/user/month — ~7-13% of the £149 subscription. Acceptable.
+**Cost**: $0.0083/second ($0.50/min). 20 free minutes included ($10 balance). At ~2 min per generation, that's ~$1/model. Professional tier usage (10-20 CAD models/month) = $10-20/user/month — ~5-11% of the £149/mo subscription (at current exchange rates). Acceptable.
 
 **API endpoints to integrate**:
 - `POST /ai/text-to-cad/{output_format}` — primary generation (text prompt + desired format → STEP file)
-- `POST /ml/text-to-cad/multi-file/iteration` — refinement (existing model + follow-up prompt → updated STEP). Note: the single-file `/ml/text-to-cad/iteration` endpoint is **deprecated** — Zoo has moved to multi-file iteration, indicating assembly-level support
+- `POST /ml/text-to-cad/multi-file/iteration` — refinement (existing model + follow-up prompt → updated STEP). Note: the single-file `/ml/text-to-cad/iteration` endpoint is **deprecated** (checked March 2026 — verify current status) — Zoo has moved to multi-file iteration, indicating assembly-level support
 - `GET /ws/ml/copilot` — websocket for conversational Zookeeper agent (potential integration for advanced users)
 - `POST /ml/kcl/completions` — KCL code completions (future: if exposing KCL editor in The Forge)
 - Client libraries available in Python, TypeScript, Go, Rust

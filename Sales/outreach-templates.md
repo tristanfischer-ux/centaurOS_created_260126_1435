@@ -18,10 +18,10 @@ We built ForgeOS to solve exactly this. It gives hardware founders 13 AI special
 
 The free tier is genuinely free — no credit card, no trial expiry. Worth 5 minutes to try?
 
-[Link to signup]
+https://forgeos.app
 
 Best,
-Tristan
+Tristan Fischer | Fractional Forge
 
 ---
 
@@ -40,8 +40,7 @@ I'd love to explore offering ForgeOS to your [accelerator name] cohort. We have 
 Would you be open to a 15-minute call to see if there's a fit?
 
 Best,
-Tristan Fischer
-Fractional Forge
+Tristan Fischer | Fractional Forge
 
 ---
 
@@ -53,20 +52,20 @@ Hi [First Name],
 
 I'm building ForgeOS — a platform used by hardware startup founders for AI-assisted product development. One of our core features is a B2B marketplace where founders find and engage vetted experts like you.
 
-Our marketplace includes escrow payment protection (you always get paid), discovery call booking, portfolio showcasing, and AI-powered matching that connects your skills with founders who need them.
+Our marketplace includes escrow payment protection (you always get paid), discovery call booking, portfolio showcasing, and matching that connects your skills with founders who need them.
 
 We're currently inviting select [manufacturing consultants / regulatory experts / supply chain specialists] to join as founding providers. There's no listing fee, and you'd be among the first experts our users discover.
 
 Interested in a quick chat about how it works?
 
 Best,
-Tristan
+Tristan Fischer | Fractional Forge
 
 ---
 
 ## LinkedIn Connection Request
 
-"Hi [Name] — I see you're building hardware at [Company]. I'm working on ForgeOS, an AI-powered operating system for hardware founders (advisory, CAD, marketplace). Would love to connect and share notes on the hardware startup journey."
+"Hi [Name] — I see you're building hardware at [Company]. I'm working on ForgeOS, an operating system for hardware founders — advisory, CAD workspace, and expert marketplace. Would love to connect and share notes on the hardware startup journey."
 
 ---
 
@@ -80,12 +79,12 @@ Just floating this back up — I know things get busy.
 
 If it helps, here's a 2-minute overview: ForgeOS gives hardware founders 13 AI specialist advisors, a concept-to-RFQ CAD workspace, and a marketplace of vetted experts. Free to start.
 
-Happy to show you a quick demo if you're curious, or you can just try it: [signup link]
+Happy to show you a quick demo if you're curious, or you can just try it: https://forgeos.app
 
 No worries either way.
 
 Best,
-Tristan
+Tristan Fischer | Fractional Forge
 
 ---
 
@@ -104,4 +103,4 @@ Great chatting today. As discussed:
 Let me know if you hit any snags getting set up. Happy to hop on a quick call anytime.
 
 Best,
-Tristan
+Tristan Fischer | Fractional Forge

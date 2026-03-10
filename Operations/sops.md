@@ -15,10 +15,9 @@ ForgeOS deploys to Vercel on push to `main`.
 1. Run `npm run verify` (TypeScript + ESLint + Playwright smoke)
 2. Run `./scripts/check-design-tokens.sh` if UI changes
 3. Ensure all tests pass locally
-4. Review Vercel preview deployment (auto-created on PR)
-5. Merge to `main` — Vercel auto-deploys
-6. Monitor Sentry for new errors post-deploy (15 minutes)
-7. Spot-check key flows: login, specialist conversation, marketplace browse
+4. Push to `main` — Vercel auto-deploys (trunk-based: commits to main trigger auto-deploy). Preview deployments used for external contributor PRs only.
+5. Monitor Sentry for new errors post-deploy (15 minutes)
+6. Spot-check key flows: login, specialist conversation, marketplace browse
 
 **Rollback procedure**:
 1. Go to Vercel dashboard → Deployments
@@ -135,6 +134,7 @@ ForgeOS deploys to Vercel on push to `main`.
 | Resend | Email | ~£20 | Subscription | Monthly |
 | Sentry | Monitoring | ~£26 | Subscription | Monthly |
 | GitHub | Source control | Free | Free tier | N/A |
+| Together AI | Qwen 3.5 model hosting | Usage-based | API key | N/A |
 
 ### Vendor Review Cadence
 - Monthly: Review costs vs. budget

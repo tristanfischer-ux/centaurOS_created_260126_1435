@@ -35,7 +35,7 @@
 ## 2. Value Proposition
 
 ### One-Liner
-"ForgeOS gives hardware founders an AI-powered C-suite, a concept-to-RFQ manufacturing workspace, and a marketplace of vetted experts — all in one platform."
+"ForgeOS gives hardware founders a full specialist C-suite — 13 domain experts covering strategy, finance, legal, marketing, and more — a concept-to-RFQ manufacturing workspace, and a marketplace of vetted experts — all in one platform."
 
 ### Elevator Pitch (30 seconds)
 "Hardware founders face a knowledge crisis — they need expertise in 10+ domains but can't afford specialists in each. ForgeOS solves this with 13 AI specialist advisors that understand your company context, a CAD lab that takes you from concept to manufacturer RFQ, and a marketplace of vetted hardware experts. It's like having a full leadership team from day one, starting free."
@@ -74,7 +74,7 @@
 | "I don't have time to learn a new tool" | "The free tier takes 2 minutes to sign up. Start by asking one specialist a question you'd normally Google or ask a consultant. No commitment needed." |
 | "AI can't replace real experts" | "We agree — that's why we built the marketplace. Our AI specialists help you identify what you need and ask the right questions, then the marketplace connects you with real human experts." |
 | "My product is too niche/complex" | "Our specialists handle the domain expertise (electronics, regulatory, supply chain, etc.) and adapt to your specific context. Try briefing one on your product and see how deep they go." |
-| "I'm worried about data privacy" | "Every workspace is isolated with bank-grade security. Your data is never shared with other companies, and AI conversations are scoped to your workspace only." |
+| "I'm worried about data privacy" | "Every workspace is isolated with row-level security and encrypted data storage. Your data is never shared with other companies. AI conversations are scoped to your workspace only." |
 | "Can I export my data?" | "Yes, all your data is yours. Tasks, documents, conversations — all exportable." |
 
 ---
@@ -85,7 +85,7 @@
 "Let me show you what it's like to have a full leadership team from day one."
 
 ### Specialists (2 min)
-1. Open the agents page — show the 13 specialists with their personalities
+1. Open the specialists page — show the 13 specialists with their personalities
 2. Brief Sage (Strategy) with a quick product idea
 3. Show the streaming response with contextual advice
 4. Point out the "Next steps" and cross-specialist recommendations
@@ -96,7 +96,7 @@
 3. Show the procurement tab with auto-generated RFQ
 
 ### Marketplace (30 sec)
-1. Quick browse showing categories and AI-powered search
+1. Quick browse showing categories and search
 2. Show a provider profile with ratings and booking
 
 ### Close (30 sec)

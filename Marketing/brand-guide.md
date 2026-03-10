@@ -11,7 +11,7 @@
 | **Company Name** | Fractional Forge |
 | **Product Name** | ForgeOS |
 | **Tagline** | "We build atoms at the speed of bits" |
-| **Category** | AI Operating System for Hardware Startups |
+| **Category** | Operating System for Hardware Startups |
 
 ### Naming Rules
 - "Fractional Forge" = the company

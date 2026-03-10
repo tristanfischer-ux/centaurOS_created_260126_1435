@@ -8,7 +8,7 @@
 ## 1. GTM Overview
 
 ### Objective
-Acquire the first 200 paid subscribers within 12 months through a content-led, community-driven approach targeting hardware startup founders.
+Acquire the first 122 paid subscribers (conservative), stretch target 200 within 12 months through a content-led, community-driven approach targeting hardware startup founders.
 
 ### Positioning Statement
 "For hardware startup founders who need expertise across too many domains to hire for, ForgeOS is the AI operating system that provides 13 specialist advisors, a concept-to-RFQ manufacturing workspace, and a marketplace of vetted experts — unlike generic AI tools or fragmented SaaS stacks, ForgeOS understands hardware development workflows and grows with your company."
@@ -92,9 +92,9 @@ Acquire the first 200 paid subscribers within 12 months through a content-led, c
 
 | Metric | Month 1 | Month 3 | Month 6 | Month 12 |
 |--------|---------|---------|---------|----------|
-| Registered users | 50 | 200 | 500 | 2,000 |
-| Paid subscribers | 5 | 25 | 75 | 200 |
-| MRR | £245 | £1,225 | £5,000 | £15,000+ |
+| Registered users | 50 | 178 | 500 | 1,500 |
+| Paid subscribers | 4 | 13 | 36 | 122 |
+| MRR | £464 | £1,508 | £4,676 | ~£16,350 |
 | Marketplace providers | 20 | 50 | 100 | 250 |
 | Blog posts published | 4 | 12 | 24 | 50 |
 | Email list size | 100 | 500 | 1,500 | 5,000 |
@@ -105,9 +105,9 @@ Acquire the first 200 paid subscribers within 12 months through a content-led, c
 
 | Category | Monthly | Notes |
 |----------|---------|-------|
-| Content creation | £0-200 | AI-assisted, founder-written |
+| Content creation | £0-200 | Founder-written |
 | Email tooling | £0-50 | Free tier of Resend or Mailchimp |
 | Social media tools | £0-30 | Buffer or Hootsuite free tier |
 | Paid ads (Month 6+) | £200-500 | LinkedIn, retargeting only |
-| Design/assets | £0-100 | AI-generated, Figma |
+| Design/assets | £0-100 | Figma, in-house |
 | **Total** | **£0-880** | Lean, founder-led |

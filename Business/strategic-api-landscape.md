@@ -4,6 +4,8 @@
 **Source**: Image-to-CAD prototyping session (Claude.ai conversation, 5 March 2026)
 **Status**: Strategic intelligence — requires evaluation and prioritisation
 
+> **Note:** Priority ordering in this analysis differs from the product roadmap. See product-roadmap.md for the authoritative priority sequence.
+
 ---
 
 ## Context
@@ -58,7 +60,7 @@ ForgeOS currently handles Stage 1 (text → CadQuery → STL/STEP via Modal.com)
 - **Fictiv** — Upload CAD → interactive quote with DFM issue highlighting (wall thickness, draft angles, tolerances, material suitability).
 - **CoLab AutoReview** — AI analysis of 3D CAD models for manufacturability, geometry, design intent. Automated markups citing relevant standards.
 
-**Strategic value for ForgeOS**: This directly addresses one of the validated pain points from the PRD — "The FCC Surprise" pattern where founders discover manufacturing issues late. Automated DFM analysis after every CAD generation catches problems before they become expensive. This differentiates ForgeOS from generic CAD tools.
+**Strategic value for ForgeOS**: This directly addresses one of the validated pain points from the PRD — "The CM Rework Loop" pattern where founders discover manufacturing issues late. Automated DFM analysis after every CAD generation catches problems before they become expensive. This differentiates ForgeOS from generic CAD tools.
 
 **Integration approach**: After The Forge generates or imports a STEP file → automatically run DFM analysis → surface issues in the Analysis stage with severity ratings and fix suggestions → feed issues back to the AI specialist (Fang, VP Manufacturing) for contextual guidance.
 

@@ -9,12 +9,12 @@
 | **Jurisdiction** | United Kingdom |
 | **Type** | Private Limited Company |
 | **Founder** | Tristan Fischer |
-| **Website** | TBC |
+| **Website** | https://forgeos.app |
 | **Product URL** | Deployed on Vercel (production) |
 
 ## Mission
 
-To democratise access to world-class business expertise for hardware startup founders, replacing the need for a full C-suite with AI-powered specialist advisors, manufacturing tools, and a curated marketplace — all in one platform.
+To democratise access to world-class business expertise for hardware startup founders, replacing the need for a full C-suite with specialist advisors, manufacturing tools, and a curated marketplace — all in one platform.
 
 ## Vision
 
@@ -34,14 +34,15 @@ ForgeOS is a multi-tenant SaaS platform that provides:
 
 ## Stage
 
-- **Product Version**: 0.9.0 (approaching 1.0)
+- **Product Version**: 0.9.0 (approaching 1.0) (see package.json for current)
 - **Status**: Production-deployed, feature-complete for core flows
-- **Revenue**: Pre-revenue / early revenue
+- **Revenue**: Pre-revenue
 - **Team**: Founder + AI-assisted development
 - **Funding**: Self-funded (bootstrapped)
 
 ## Key Metrics (to track)
 
+- Registered users: 0 (pre-launch)
 - Monthly Active Users (MAU)
 - Paid subscriber count by tier
 - Marketplace transaction volume (GMV)

@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-ForgeOS is an AI-powered operating system for hardware startup founders. It replaces the need to hire a full leadership team by providing 13 AI specialist advisors, a concept-to-RFQ manufacturing workspace, and a B2B marketplace — all in one platform.
+ForgeOS is an operating system for hardware startup founders. It replaces the need to hire a full leadership team by providing 13 AI specialist advisors, a concept-to-RFQ manufacturing workspace, and a B2B marketplace — all in one platform.
 
 **The Problem**: Hardware founders face a knowledge coordination crisis. Building physical products requires expertise spanning 10+ domains, and most startups can't afford specialists in each. Founders currently cobble together 6+ SaaS tools and expensive consultants.
 
@@ -58,7 +58,7 @@ Concept → 3D Model → DFM Analysis → Peer Review → Instant Quote → RFQ 
 
 ### 3.3 B2B Marketplace
 
-Hardware-focused marketplace with AI-powered matching, Stripe escrow, milestone tracking, and dispute resolution. Categories: People, Products, Services, AI, Finance.
+Hardware-focused marketplace with matching, Stripe escrow, milestone tracking, and dispute resolution. Categories: People, Products, Services, AI, Finance.
 
 ### 3.4 Operational Tools
 
@@ -81,14 +81,14 @@ Tasks (Kanban/Gantt/OKR), finance (budgeting, cash burn, invoicing), messaging, 
 | Tier | Monthly | Annual (per mo) | Target Persona |
 |------|---------|-----------------|----------------|
 | Explorer | Free | Free | Solo founders testing |
-| Startup Team | £49 | £39.17 | Early-stage, small team |
+| Startup Team | £49 | £39.20 | Early-stage, small team |
 | Professional | £149 | £119 | Growing team, power users |
 | Enterprise | £499 | £399 | Large teams, custom needs |
 
 ### 4.3 Unit Economics (To Be Validated)
 
-- **CAC (Customer Acquisition Cost)**: TBD — target <£100 via content marketing and partnerships
-- **LTV (Lifetime Value)**: TBD — target >3x CAC
+- **CAC (Customer Acquisition Cost)**: Target <£80 blended (see Finance/unit-economics.md)
+- **LTV (Lifetime Value)**: ~£2,900 blended (see Finance/unit-economics.md)
 - **AI Cost per User**: To be measured — critical metric given multi-model approach
 - **Gross Margin Target**: >70% on subscriptions, >80% on marketplace fees
 - **Payback Period Target**: <6 months
@@ -128,7 +128,7 @@ ForgeOS creates a new category: "AI Operating System for Hardware Startups." No 
 - Seed marketplace with 20-50 providers
 - Content marketing: blog, LinkedIn, hardware forums
 - Free tier drives organic signups
-- Target: 100 registered users, 10 paid
+- Target: ~178 registered, ~13 paid
 
 ### Phase 2: Traction (Months 4-6)
 - Hardware accelerator partnerships (HAX, Highway1, Bolt)
@@ -140,7 +140,7 @@ ForgeOS creates a new category: "AI Operating System for Hardware Startups." No 
 - Product Hunt or similar high-visibility launch
 - Paid acquisition (targeted LinkedIn, hardware communities)
 - Enterprise sales motion
-- Target: 2,000 registered, 200 paid
+- Target: ~1,500 registered, ~122 paid (conservative projections; stretch target: 2,000/200)
 
 ### Phase 4: Scale (Year 2+)
 - International expansion
@@ -182,7 +182,7 @@ Key assumptions to model:
 Self-funded with AI-assisted development significantly reducing costs.
 
 ### Future Options
-- **SEIS/EIS**: UK tax relief scheme for angel investors (up to £250K SEIS, £5M EIS)
+- **SEIS/EIS**: SEIS: 50% income tax relief (up to £250K). EIS: 30% income tax relief (up to £5M per year).
 - **Angel round**: £150-300K at seed stage if traction warrants
 - **Grants**: Innovate UK, hardware-specific grants
 - **Revenue-funded**: If unit economics work, continue bootstrapping

@@ -34,12 +34,14 @@
 
 | Scenario | LTV | CAC | Ratio | Verdict |
 |----------|-----|-----|-------|---------|
-| Optimistic | £2,900 | £40 | 72:1 | Excellent |
-| Base case | £2,900 | £80 | 36:1 | Very good |
+| Optimistic | £2,900 | £40 | 72:1 | Theoretical maximum |
+| Base case | £2,900 | £80 | 36:1 | Theoretical — requires validation |
 | Conservative | £1,500 | £150 | 10:1 | Good |
 | Minimum viable | £980 | £200 | 5:1 | Acceptable (>3:1 rule) |
 
 Target: LTV:CAC > 3:1 (industry standard for healthy SaaS).
+
+*Caveat: These are mathematical outputs based on early assumptions. Real-world LTV:CAC will differ substantially until validated with actual cohort data. Industry-leading SaaS companies typically achieve 3:1 to 5:1.*
 
 ### CAC Payback Period
 
@@ -63,7 +65,7 @@ Target: <12 months payback. Both scenarios well under.
 | AI conversations (Claude) | £2 | £8 | £25 |
 | AI conversations (other models) | £1 | £3 | £10 |
 | CAD generation (Modal.com) | £0 | £2 | £8 |
-| Image generation (Gemini) | £0 | £1 | £3 |
+| Image generation (DALL-E) | £0 | £1 | £3 |
 | Supabase (storage, bandwidth) | £0.10 | £0.30 | £1 |
 | Stripe fees (marketplace) | £0 | £1 | £5 |
 | **Total cost to serve** | **£3.10** | **£15.30** | **£52** |
@@ -79,6 +81,8 @@ Target: <12 months payback. Both scenarios well under.
 
 **Key insight**: Free users cost ~£3/month to serve. At 7% conversion, every 100 free users produce 7 paid users generating ~£812/mo vs. £300/mo cost for all 100. Net positive.
 
+Note: This excludes the ~£15-20/mo serving cost for the 7 paid users, bringing true net contribution to ~£672-707/mo — still strongly positive.
+
 ---
 
 ## 3. Marketplace Unit Economics
@@ -89,9 +93,9 @@ Target: <12 months payback. Both scenarios well under.
 |--------|-------|
 | Average transaction size (target) | £500 |
 | Platform fee | 10% (£50) |
-| Stripe processing | 2.9% + 20p (£14.70) |
-| **Net revenue per transaction** | **£35.30** |
-| **Net margin on marketplace fee** | **70.6%** |
+| Stripe processing | ~2% + 20p (£10.20) |
+| **Net revenue per transaction** | **£39.80** |
+| **Net margin on marketplace fee** | **79.6%** |
 
 ### Marketplace Revenue Potential
 

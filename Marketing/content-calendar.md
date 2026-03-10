@@ -3,6 +3,8 @@
 **Start Date**: March 2026
 **Cadence**: 1 blog post + 2-3 LinkedIn posts per week
 
+> **Note:** Week 1 (3-9 Mar) content deferred — to be rescheduled. Week 2 begins 10 Mar.
+
 ---
 
 ## Month 1: Foundation & Launch (March)
@@ -61,7 +63,7 @@
 ## Month 3: Traction & Proof (May)
 
 ### Week 9
-- **Blog**: "Case study: How [Founder X] went from idea to manufacturer quote in 2 weeks"
+- **Blog**: "Case study: How a hardware founder went from idea to manufacturer quote in 2 weeks"
   - *Angle*: First real case study (or detailed hypothetical based on testing)
 - **LinkedIn**: Quote from the case study with a key metric
 
@@ -114,6 +116,6 @@
 ### Long-tail
 - "how to write an RFQ for PCB manufacturing"
 - "hardware startup regulatory checklist"
-- "AI-assisted product design tools"
+- "AI-assisted product design tools" (SEO keyword — brand exception for search targeting)
 - "finding supply chain experts for startups"
 - "cash burn management for hardware companies"
