@@ -108,7 +108,10 @@ export function useConversation(
       if (result.success && result.data?.messages) {
         const newMessages = result.data.messages
         setMessages(prev => {
-          const merged = [...newMessages, ...prev]
+          // DECISION: Deduplicate by id to handle created_at timestamp collisions
+          const existingIds = new Set(prev.map(m => m.id))
+          const uniqueNew = newMessages.filter(m => !existingIds.has(m.id))
+          const merged = [...uniqueNew, ...prev]
           messagesRef.current = merged
           return merged
         })

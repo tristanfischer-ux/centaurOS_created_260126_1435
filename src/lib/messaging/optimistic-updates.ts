@@ -47,6 +47,20 @@ export async function sendMessageOptimistic(
   }
   const senderId = user.id
 
+  // Defense-in-depth: verify participation client-side before insert
+  // (RLS policy is the primary guard, but this gives a better error message)
+  const { data: participant } = await supabase
+    .from('conversation_participants')
+    .select('id')
+    .eq('conversation_id', conversationId)
+    .eq('profile_id', senderId)
+    .maybeSingle()
+
+  if (!participant) {
+    onError?.(new Error('Not a participant in this conversation'))
+    return false
+  }
+
   // Create optimistic message
   const localId = `local-${Date.now()}-${Math.random()}`
   const optimisticMessage: OptimisticMessage = {

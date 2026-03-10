@@ -96,6 +96,15 @@ export async function getConversationMessages(
 
       // VALIDATION: Cap limit to prevent abuse
       const safeLim = Math.min(limit, 200)
+
+      // VALIDATION: before must be a valid ISO timestamp if provided
+      if (before) {
+        const ts = Date.parse(before)
+        if (isNaN(ts)) {
+          return { error: 'Invalid pagination cursor' }
+        }
+      }
+
       const messages = await getMessages(supabase, conversationId, safeLim, before)
 
       return {
@@ -294,6 +303,13 @@ export async function archiveConversation(
         return { error: 'Access denied' }
       }
 
+      // DECISION: Prevent archiving group conversations — archive is global (on
+      // conversations.status), so one user archiving would hide it for everyone.
+      const conv = await getConversation(supabase, conversationId)
+      if (conv?.is_group) {
+        return { error: 'Cannot archive group conversations' }
+      }
+
       await archiveConv(supabase, conversationId)
       
       revalidatePath('/updates')
@@ -319,6 +335,12 @@ export async function unarchiveConversation(
       // SECURITY: Verify user is a participant
       if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
+      }
+
+      // DECISION: Prevent unarchiving group conversations (same as archive)
+      const conv = await getConversation(supabase, conversationId)
+      if (conv?.is_group) {
+        return { error: 'Cannot unarchive group conversations' }
       }
 
       await unarchiveConv(supabase, conversationId)

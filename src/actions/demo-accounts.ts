@@ -93,9 +93,13 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
  * @param role - The role type (founder, executive, apprentice, etc.)
  * @returns Demo account data if available, null otherwise
  */
-export async function getDemoAccountData(role: string): Promise<DemoAccountData | null> {
+export async function getDemoAccountData(role: string): Promise<Omit<DemoAccountData, 'password'> | null> {
   const normalizedRole = role.toLowerCase()
-  return DEMO_ACCOUNTS[normalizedRole] || null
+  const account = DEMO_ACCOUNTS[normalizedRole]
+  if (!account) return null
+  // SECURITY: Never expose passwords to the client
+  const { password: _pw, ...safeData } = account
+  return safeData
 }
 
 /**

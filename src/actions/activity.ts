@@ -7,10 +7,11 @@ import { z } from 'zod'
 import { syncObjectiveCommentToMessages, syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 
 // Simple content validation schema
+// DECISION: Aligned to 10,000 char limit matching messaging system
 const contentSchema = z.object({
   content: z.string()
     .min(1, 'Comment cannot be empty')
-    .max(5000, 'Comment must be 5,000 characters or less')
+    .max(10_000, 'Comment must be 10,000 characters or less')
 })
 import type { 
   ActivityItem, 
@@ -688,6 +689,12 @@ export async function getActivityFeed(options?: {
     
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
+    }
+
+    // SECURITY: Validate UUID before .or() interpolation
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(user.id)) {
+      return { success: false, error: 'Invalid user ID' }
     }
 
     const foundryId = await getFoundryIdCached()

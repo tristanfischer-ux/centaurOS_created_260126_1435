@@ -122,10 +122,10 @@ describe('Activity Actions', () => {
     })
 
     it('should validate content length', async () => {
-      const longContent = 'a'.repeat(5001)
+      const longContent = 'a'.repeat(10_001)
       const result = await replyToActivity('task', VALID_TASK_ID, longContent)
       expect(result.success).toBe(false)
-      expect(result.error).toContain('5,000')
+      expect(result.error).toContain('10,000')
     })
 
     it('should add objective comment successfully', async () => {

@@ -543,28 +543,40 @@ export async function createDirectConversation(
     return existing as Conversation
   }
 
-  // Also check via participants table — scoped to creator's conversations to avoid unbounded query
-  const { data: existingViaParticipants } = await supabase
-    .from('conversations')
-    .select(`
-      *,
-      conversation_participants!inner(profile_id)
-    `)
-    .eq('conversation_type', 'direct')
-    .eq('status', 'active')
-    .eq('is_group', false)
-    .eq('conversation_participants.profile_id', creatorId)
+  // DECISION: Find shared conversations via participant intersection queries.
+  // Previous approach using inner join + filter was dead code (inner join only
+  // returned the filtered participant row, so length was always 1).
+  const { data: creatorConvIds } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('profile_id', creatorId)
 
-  // Filter to find conversation with exactly these two participants
-  const dmConv = existingViaParticipants?.find(conv => {
-    const participantIds = conv.conversation_participants?.map((p: { profile_id: string }) => p.profile_id) || []
-    return participantIds.length === 2 && 
-           participantIds.includes(creatorId) && 
-           participantIds.includes(participantId)
-  })
+  const { data: participantConvIds } = await supabase
+    .from('conversation_participants')
+    .select('conversation_id')
+    .eq('profile_id', participantId)
 
-  if (dmConv) {
-    return dmConv as Conversation
+  if (creatorConvIds && participantConvIds) {
+    const creatorSet = new Set(creatorConvIds.map((r: { conversation_id: string }) => r.conversation_id))
+    const sharedConvIds = participantConvIds
+      .map((r: { conversation_id: string }) => r.conversation_id)
+      .filter((id: string) => creatorSet.has(id))
+
+    if (sharedConvIds.length > 0) {
+      const { data: existingDM } = await supabase
+        .from('conversations')
+        .select('*')
+        .in('id', sharedConvIds)
+        .eq('conversation_type', 'direct')
+        .eq('status', 'active')
+        .eq('is_group', false)
+        .limit(1)
+        .maybeSingle()
+
+      if (existingDM) {
+        return existingDM as Conversation
+      }
+    }
   }
 
   // Create new DM conversation
@@ -1112,6 +1124,7 @@ export async function editMessage(
       edited_at: new Date().toISOString()
     })
     .eq('id', messageId)
+    .eq('sender_id', userId) // Re-assert ownership at UPDATE time
 
   if (error) {
     return { success: false, error: 'Failed to edit message' }
@@ -1150,6 +1163,7 @@ export async function deleteMessage(
       content: null
     })
     .eq('id', messageId)
+    .eq('sender_id', userId) // Re-assert ownership at UPDATE time
 
   if (error) {
     return { success: false, error: 'Failed to delete message' }

@@ -85,6 +85,12 @@ export async function getSupplyFlowData(
   modules: ModuleInput[],
   diagnosticAnswers: DiagnosticAnswers,
 ): Promise<SupplyFlowData> {
+  // SECURITY: Require authentication
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user) return { nodes: [], edges: [], projectName: '' }
+  if (modules.length > 50) return { nodes: [], edges: [], projectName: '' }
+
   // ── Build component nodes (left column) ──
   const componentNodes: SupplyFlowNode[] = modules.map((m) => ({
     id: `comp-${m.id}`,

@@ -101,6 +101,12 @@ export async function createGuildEvent(data: {
             return { data: null, error: 'Only Executives and Founders can create events' }
         }
 
+        // SECURITY: Input length validation
+        if (data.title.length > 200) return { data: null, error: 'Title too long (max 200 chars)' }
+        if (data.description && data.description.length > 5000) return { data: null, error: 'Description too long (max 5000 chars)' }
+        if (data.eventUrl && data.eventUrl.length > 2000) return { data: null, error: 'URL too long (max 2000 chars)' }
+        if (data.locationAddress && data.locationAddress.length > 500) return { data: null, error: 'Location too long (max 500 chars)' }
+
         const foundryId = await getFoundryIdCached()
 
         const { data: event, error } = await supabase
@@ -180,6 +186,8 @@ export async function getGuildEvents(options?: {
 }): Promise<{ data: GuildEvent[]; error: string | null }> {
     try {
         const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { data: [], error: 'Not authenticated' }
 
         // Past events should be ordered newest-first so limit gets the most recent
         const ascending = !options?.past
