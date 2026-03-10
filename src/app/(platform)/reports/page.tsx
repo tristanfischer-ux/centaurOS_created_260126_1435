@@ -908,21 +908,24 @@ export default function ReportsPage(): React.JSX.Element {
                     <div className="space-y-3">
                       <span className="text-sm font-medium text-foreground">Date Range</span>
                       <div className="flex flex-wrap gap-2">
-                        {EXTENDED_DATE_PRESETS.map(preset => (
-                          <button
-                            key={preset.label}
-                            type="button"
-                            onClick={() => setDateRange(preset.getRange())}
-                            className={cn(
-                              'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
-                              dateRange.start === preset.getRange().start && dateRange.end === preset.getRange().end
-                                ? 'border-international-orange bg-international-orange/5 text-foreground'
-                                : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                            )}
-                          >
-                            {preset.label}
-                          </button>
-                        ))}
+                        {EXTENDED_DATE_PRESETS.map(preset => {
+                          const range = preset.getRange()
+                          return (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => setDateRange(range)}
+                              className={cn(
+                                'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
+                                dateRange.start === range.start && dateRange.end === range.end
+                                  ? 'border-international-orange bg-international-orange/5 text-foreground'
+                                  : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                              )}
+                            >
+                              {preset.label}
+                            </button>
+                          )
+                        })}
                       </div>
                       <div className="flex flex-col sm:flex-row items-center gap-3">
                         <div className="w-full sm:flex-1">
@@ -1253,7 +1256,10 @@ export default function ReportsPage(): React.JSX.Element {
                   source material. The system will synthesize it into a polished
                   presentation deck with 12-18 slides.
                 </p>
+                <label htmlFor="briefing-source" className="sr-only">Source material</label>
                 <textarea
+                  id="briefing-source"
+                  aria-required="true"
                   className="w-full min-h-[200px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
                   placeholder="Paste your source material here — strategy documents, progress updates, meeting notes, investor memos, research findings…"
                   value={briefingContext}
@@ -1472,10 +1478,11 @@ export default function ReportsPage(): React.JSX.Element {
             {/* Enable toggle */}
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-foreground">Enable scheduling</p>
+                <label htmlFor="schedule-enabled" className="text-sm font-medium text-foreground block cursor-pointer">Enable scheduling</label>
                 <p className="text-xs text-muted-foreground">Reports will be delivered automatically</p>
               </div>
               <Checkbox
+                id="schedule-enabled"
                 checked={scheduleEnabled}
                 onCheckedChange={(checked) => setScheduleEnabled(checked === true)}
               />
