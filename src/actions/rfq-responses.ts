@@ -100,15 +100,15 @@ export async function submitRFQResponse(
     return { data: null, error: "Please provide your questions" }
   }
 
-  // VALIDATION: Reject negative prices
-  if (params.quoted_price != null && (isNaN(params.quoted_price) || params.quoted_price < 0)) {
-    return { data: null, error: "Quoted price must be a non-negative number" }
+  // VALIDATION: Reject negative/infinite prices
+  if (params.quoted_price != null && (!Number.isFinite(params.quoted_price) || params.quoted_price < 0)) {
+    return { data: null, error: "Quoted price must be a finite non-negative number" }
   }
-  if (params.indicative_min != null && (isNaN(params.indicative_min) || params.indicative_min < 0)) {
-    return { data: null, error: "Indicative minimum must be a non-negative number" }
+  if (params.indicative_min != null && (!Number.isFinite(params.indicative_min) || params.indicative_min < 0)) {
+    return { data: null, error: "Indicative minimum must be a finite non-negative number" }
   }
-  if (params.indicative_max != null && (isNaN(params.indicative_max) || params.indicative_max < 0)) {
-    return { data: null, error: "Indicative maximum must be a non-negative number" }
+  if (params.indicative_max != null && (!Number.isFinite(params.indicative_max) || params.indicative_max < 0)) {
+    return { data: null, error: "Indicative maximum must be a finite non-negative number" }
   }
 
   // Create the response
@@ -213,9 +213,20 @@ export async function updateRFQResponse(
     return { success: false, error: "Cannot update response after RFQ is closed" }
   }
 
-  // VALIDATION: Reject negative prices
-  if (data.quoted_price != null && (isNaN(data.quoted_price) || data.quoted_price < 0)) {
-    return { success: false, error: "Quoted price must be a non-negative number" }
+  // VALIDATION: Reject negative/infinite numeric values
+  if (data.quoted_price != null && (!Number.isFinite(data.quoted_price) || data.quoted_price < 0)) {
+    return { success: false, error: "Quoted price must be a finite non-negative number" }
+  }
+  if (data.timeline_weeks != null && (!Number.isFinite(data.timeline_weeks) || data.timeline_weeks < 0)) {
+    return { success: false, error: "Timeline weeks must be a finite non-negative number" }
+  }
+  if (data.pricing_breakdown != null) {
+    const keys = Object.keys(data.pricing_breakdown)
+    if (keys.length > 20) return { success: false, error: "Too many pricing breakdown items (max 20)" }
+    for (const [k, v] of Object.entries(data.pricing_breakdown)) {
+      if (k.length > 100) return { success: false, error: "Pricing breakdown key too long" }
+      if (v != null && !Number.isFinite(v)) return { success: false, error: "Pricing breakdown values must be finite numbers" }
+    }
   }
 
   // Update the response
@@ -301,7 +312,18 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
     return { success: false, error: "Cannot withdraw after being awarded" }
   }
 
-  // If this provider holds priority, release it
+  // Delete the response FIRST — if this fails, we haven't modified any other state
+  const { error: deleteError } = await supabase
+    .from('rfq_responses')
+    .delete()
+    .eq('id', responseId)
+
+  if (deleteError) {
+    console.error("Error withdrawing RFQ response:", deleteError)
+    return { success: false, error: "Failed to withdraw response" }
+  }
+
+  // Only release priority hold AFTER successful delete
   // SECURITY: Only release if still in priority_hold to prevent overwriting concurrent award
   if (rfq.priority_holder_id === providerProfile.id) {
     await supabase
@@ -313,17 +335,6 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
       })
       .eq('id', response.rfq_id)
       .eq('status', 'priority_hold')
-  }
-
-  // Delete the response
-  const { error: deleteError } = await supabase
-    .from('rfq_responses')
-    .delete()
-    .eq('id', responseId)
-
-  if (deleteError) {
-    console.error("Error withdrawing RFQ response:", deleteError)
-    return { success: false, error: "Failed to withdraw response" }
   }
 
   revalidatePath("/rfq")

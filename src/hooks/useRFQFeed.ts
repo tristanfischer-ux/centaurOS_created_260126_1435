@@ -111,18 +111,21 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
   useEffect(() => {
     if (!enabled) return
 
+    let cancelled = false
     const supabase = createClient()
 
     // Get user's provider profile for filtering broadcasts
     const setupChannel = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user || cancelled) return
 
       const { data: providerProfile } = await supabase
         .from('provider_profiles')
         .select('id')
         .eq('user_id', user.id)
         .single()
+
+      if (cancelled) return
 
       // Main channel for new RFQ broadcasts
       const channel = supabase
@@ -133,11 +136,12 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
             event: 'INSERT',
             schema: 'public',
             table: 'rfq_broadcasts',
-            ...(providerProfile?.id 
-              ? { filter: `provider_id=eq.${providerProfile.id}` } 
+            ...(providerProfile?.id
+              ? { filter: `provider_id=eq.${providerProfile.id}` }
               : {}),
           },
           async (payload: RealtimePostgresChangesPayload<{ [key: string]: unknown }>) => {
+            if (cancelled) return
             const broadcast = payload.new as { rfq_id: string }
             if (broadcast?.rfq_id) {
               // Fetch the RFQ details
@@ -161,7 +165,7 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
                 .eq('id', broadcast.rfq_id)
                 .single()
 
-              if (rfq && onNewRFQRef.current) {
+              if (rfq && onNewRFQRef.current && !cancelled) {
                 setNewRFQCount((prev) => prev + 1)
                 onNewRFQRef.current(rfq as unknown as RFQSummary)
               }
@@ -169,15 +173,20 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
           }
         )
         .subscribe((status) => {
-          setIsConnected(status === 'SUBSCRIBED')
+          if (!cancelled) setIsConnected(status === 'SUBSCRIBED')
         })
 
+      if (cancelled) {
+        supabase.removeChannel(channel)
+        return
+      }
       channelRef.current = channel
     }
 
     setupChannel()
 
     return () => {
+      cancelled = true
       // Read ref at cleanup time — setupChannel may have set it after the effect started
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)

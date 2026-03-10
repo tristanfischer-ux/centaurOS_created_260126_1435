@@ -30,15 +30,19 @@ export function MatchReasoningCard({
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchMatch = async () => {
       try {
         const providerResult = await checkIsProvider()
+        if (cancelled) return
         if (!providerResult.isProvider || !providerResult.providerId) {
           setIsLoading(false)
           return
         }
 
         const { data: matches } = await getMatchedSuppliers(rfqId)
+        if (cancelled) return
         if (!matches) {
           setIsLoading(false)
           return
@@ -52,11 +56,12 @@ export function MatchReasoningCard({
       } catch (error) {
         console.error('Failed to fetch match reasoning:', error)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     fetchMatch()
+    return () => { cancelled = true }
   }, [rfqId])
 
   if (isLoading) {

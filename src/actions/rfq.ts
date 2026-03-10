@@ -57,6 +57,9 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
   if (!params.title?.trim()) {
     return { data: null, error: "Title is required" }
   }
+  if (params.title.trim().length > 500) {
+    return { data: null, error: "Title must be 500 characters or fewer" }
+  }
 
   if (!params.rfq_type) {
     return { data: null, error: "RFQ type is required" }
@@ -66,12 +69,20 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
     return { data: null, error: "Invalid RFQ type" }
   }
 
-  // VALIDATION: Reject negative budgets
-  if (params.budget_min != null && params.budget_min < 0) {
-    return { data: null, error: "Budget minimum cannot be negative" }
+  // VALIDATION: Reject oversized specifications (DoS prevention)
+  if (params.specifications) {
+    const specSize = JSON.stringify(params.specifications).length
+    if (specSize > 100_000) {
+      return { data: null, error: "Specifications too large (max 100KB)" }
+    }
   }
-  if (params.budget_max != null && params.budget_max < 0) {
-    return { data: null, error: "Budget maximum cannot be negative" }
+
+  // VALIDATION: Reject negative/infinite budgets
+  if (params.budget_min != null && (!Number.isFinite(params.budget_min) || params.budget_min < 0)) {
+    return { data: null, error: "Budget minimum must be a finite non-negative number" }
+  }
+  if (params.budget_max != null && (!Number.isFinite(params.budget_max) || params.budget_max < 0)) {
+    return { data: null, error: "Budget maximum must be a finite non-negative number" }
   }
   if (params.budget_min != null && params.budget_max != null && params.budget_min > params.budget_max) {
     return { data: null, error: "Minimum budget cannot exceed maximum budget" }
@@ -236,6 +247,12 @@ export async function updateMyRFQ(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Not authenticated" }
 
+  if (updates.budget_min != null && (!Number.isFinite(updates.budget_min) || updates.budget_min < 0)) {
+    return { success: false, error: "Budget minimum must be a finite non-negative number" }
+  }
+  if (updates.budget_max != null && (!Number.isFinite(updates.budget_max) || updates.budget_max < 0)) {
+    return { success: false, error: "Budget maximum must be a finite non-negative number" }
+  }
   if (updates.budget_min != null && updates.budget_max != null && updates.budget_min > updates.budget_max) {
     return { success: false, error: "Minimum budget cannot exceed maximum budget" }
   }
@@ -337,21 +354,32 @@ export async function respondToRFQ(
     return { success: false, error: "You need a provider profile to respond to RFQs" }
   }
 
-  // VALIDATION: Numeric fields must be positive and finite
-  if (response.quoted_price != null && (isNaN(response.quoted_price) || response.quoted_price < 0)) {
-    return { success: false, error: "Quoted price must be a non-negative number" }
+  // VALIDATION: Numeric fields must be finite and non-negative (Infinity bypasses < 0)
+  if (response.quoted_price != null && (!Number.isFinite(response.quoted_price) || response.quoted_price < 0)) {
+    return { success: false, error: "Quoted price must be a finite non-negative number" }
   }
-  if (response.indicative_min != null && (isNaN(response.indicative_min) || response.indicative_min < 0)) {
-    return { success: false, error: "Indicative minimum must be a non-negative number" }
+  if (response.indicative_min != null && (!Number.isFinite(response.indicative_min) || response.indicative_min < 0)) {
+    return { success: false, error: "Indicative minimum must be a finite non-negative number" }
   }
-  if (response.indicative_max != null && (isNaN(response.indicative_max) || response.indicative_max < 0)) {
-    return { success: false, error: "Indicative maximum must be a non-negative number" }
+  if (response.indicative_max != null && (!Number.isFinite(response.indicative_max) || response.indicative_max < 0)) {
+    return { success: false, error: "Indicative maximum must be a finite non-negative number" }
   }
   if (response.indicative_min != null && response.indicative_max != null && response.indicative_min > response.indicative_max) {
     return { success: false, error: "Indicative minimum cannot exceed maximum" }
   }
-  if (response.timeline_weeks != null && (isNaN(response.timeline_weeks) || response.timeline_weeks < 0)) {
-    return { success: false, error: "Timeline weeks must be a non-negative number" }
+  if (response.timeline_weeks != null && (!Number.isFinite(response.timeline_weeks) || response.timeline_weeks < 0)) {
+    return { success: false, error: "Timeline weeks must be a finite non-negative number" }
+  }
+  // VALIDATION: Reject oversized/invalid pricing breakdown
+  if (response.pricing_breakdown != null) {
+    const keys = Object.keys(response.pricing_breakdown)
+    if (keys.length > 20) {
+      return { success: false, error: "Too many pricing breakdown items (max 20)" }
+    }
+    for (const [k, v] of Object.entries(response.pricing_breakdown)) {
+      if (k.length > 100) return { success: false, error: "Pricing breakdown key too long" }
+      if (v != null && !Number.isFinite(v)) return { success: false, error: "Pricing breakdown values must be finite numbers" }
+    }
   }
 
   let result

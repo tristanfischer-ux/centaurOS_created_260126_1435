@@ -510,7 +510,7 @@ export function RFQResponseForm({
         <CardFooter className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="secondary"
-            onClick={() => setMode('select')}
+            onClick={() => switchMode('select')}
             disabled={isPending}
             className="w-full sm:flex-1 min-h-[44px]"
           >
@@ -602,7 +602,7 @@ export function RFQResponseForm({
         <CardFooter className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="secondary"
-            onClick={() => setMode('select')}
+            onClick={() => switchMode('select')}
             disabled={isPending}
             className="w-full sm:flex-1 min-h-[44px]"
           >
@@ -663,7 +663,7 @@ export function RFQResponseForm({
         <CardFooter className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="secondary"
-            onClick={() => setMode('select')}
+            onClick={() => switchMode('select')}
             disabled={isPending}
             className="w-full sm:flex-1 min-h-[44px]"
           >
@@ -747,7 +747,7 @@ export function RFQResponseForm({
         <CardFooter className="flex flex-col sm:flex-row gap-3">
           <Button
             variant="secondary"
-            onClick={() => setMode('select')}
+            onClick={() => switchMode('select')}
             disabled={isPending}
             className="w-full sm:flex-1 min-h-[44px]"
           >

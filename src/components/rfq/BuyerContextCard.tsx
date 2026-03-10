@@ -40,20 +40,24 @@ export function BuyerContextCard({
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchContext = async () => {
       try {
         const result = await getBuyerContext(buyerId)
+        if (cancelled) return
         if (result.data) {
           setContext(result.data)
         }
       } catch (error) {
         console.error('Failed to fetch buyer context:', error)
       } finally {
-        setIsLoading(false)
+        if (!cancelled) setIsLoading(false)
       }
     }
 
     fetchContext()
+    return () => { cancelled = true }
   }, [buyerId])
 
   if (isLoading) {
