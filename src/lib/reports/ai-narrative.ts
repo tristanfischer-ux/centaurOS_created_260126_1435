@@ -48,6 +48,12 @@ export interface NarrativeContext {
   cadProjectsCompleted?: number
   knowledgeNotesAdded?: number
   overBudgetCategories?: number
+  // Engineering deep context
+  cadReviewsCompleted?: number
+  cadReviewsPending?: number
+  cadTotalEstimatedCost?: number
+  cadProjectsWithEstimates?: number
+  cadAverageConfidence?: number
 }
 
 export interface NarrativeOptions {

@@ -227,6 +227,34 @@ export interface RecentProject {
   createdAt: string
 }
 
+export interface ReviewSummary {
+  totalReviewed: number
+  totalProjects: number
+  verdicts: { approved: number; conditional: number; rejected: number; pending: number }
+  topIssues: string[]
+}
+
+export interface CostSummary {
+  totalEstimatedCost: number
+  averageCostPerUnit: number
+  averageConfidence: number
+  projectsWithEstimates: number
+  buyVsMake: { buy: number; make: number }
+}
+
+export interface ManufacturingFunnel {
+  designed: number
+  reviewed: number
+  costed: number
+  ordered: number
+}
+
+export interface DesignHealth {
+  averageRevisions: number
+  projectsWithStaleImages: number
+  totalModulesAcrossProjects: number
+}
+
 export interface EngineeringActivitySectionData {
   totalActive: number
   createdThisPeriod: number
@@ -237,6 +265,12 @@ export interface EngineeringActivitySectionData {
   recentProjects: RecentProject[]
   sectionNarrative?: string
   chartImageUrl?: string
+  reviewSummary?: ReviewSummary
+  costSummary?: CostSummary
+  manufacturingFunnel?: ManufacturingFunnel
+  designHealth?: DesignHealth
+  processBreakdown?: { process: string; count: number }[]
+  materialBreakdown?: { material: string; count: number }[]
 }
 
 // ========================

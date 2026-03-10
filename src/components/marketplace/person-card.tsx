@@ -287,6 +287,24 @@ export const PersonCard = memo(function PersonCard({
                     </div>
                 )}
 
+                {/* Portfolio thumbnails */}
+                {trust.portfolioThumbnails.length > 0 && (
+                    <div className="flex gap-1.5 mb-3">
+                        {trust.portfolioThumbnails.slice(0, 3).map((url, i) => (
+                            <div key={i} className="w-16 h-12 rounded-md overflow-hidden bg-muted shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={url}
+                                    alt=""
+                                    loading="lazy"
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 {/* Previous companies (social proof) */}
                 {previousCompanies.length > 0 && (
                     <p className="text-xs text-muted-foreground mb-3 line-clamp-1">
@@ -309,6 +327,12 @@ export const PersonCard = memo(function PersonCard({
                         <div className="flex items-center gap-1">
                             <Users className="w-3.5 h-3.5" aria-hidden="true" />
                             <span>Trusted by {trust.trustedByCount}</span>
+                        </div>
+                    )}
+                    {trust.endorsementCount > 0 && (
+                        <div className="flex items-center gap-1">
+                            <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" />
+                            <span>{trust.endorsementCount} endorsement{trust.endorsementCount !== 1 ? 's' : ''}</span>
                         </div>
                     )}
                     {responseTime && (

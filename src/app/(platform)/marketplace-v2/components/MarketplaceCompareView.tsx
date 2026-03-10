@@ -33,6 +33,7 @@ import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/mark
 import { toast } from 'sonner'
 import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing } from '@/actions/marketplace'
+import type { EnrichedPersonListing } from '@/actions/people-marketplace'
 
 interface MarketplaceCompareViewProps {
     listings: MarketplaceListing[]
@@ -64,6 +65,7 @@ function getComparisonRows(listings: MarketplaceListing[]): { key: string; label
         { key: 'experience', label: 'Experience', icon: Briefcase },
         { key: 'verified', label: 'Verified', icon: ShieldCheck },
         { key: 'availability', label: 'Availability' },
+        { key: 'endorsements', label: 'Endorsements', icon: MessageSquare },
         { key: 'skills', label: 'Skills / Expertise' },
         { key: 'specialties', label: 'Specialties' },
     ]
@@ -132,6 +134,10 @@ function getComparisonValue(listing: MarketplaceListing, key: string): React.Rea
             }
             if (attrs.availability === 'Available Now') return 'Available Now'
             return '—'
+        }
+        case 'endorsements': {
+            const count = (listing as EnrichedPersonListing).trustData?.endorsementCount ?? 0
+            return count > 0 ? `${count}` : '—'
         }
         case 'skills': {
             const skills = safeStringArray(attrs.skills || attrs.expertise || attrs.integrations || attrs.certifications)
@@ -215,6 +221,15 @@ function getBestIndex(listings: MarketplaceListing[], key: string): number | nul
             listings.forEach((l, i) => {
                 const attrs = safeParseAttributes(l.attributes)
                 const val = (attrs.total_bookings as number) || 0
+                if (val > bestVal) { bestVal = val; bestIdx = i }
+            })
+            return bestVal > 0 ? bestIdx : null
+        }
+        case 'endorsements': {
+            let bestIdx = -1
+            let bestVal = -1
+            listings.forEach((l, i) => {
+                const val = (l as EnrichedPersonListing).trustData?.endorsementCount ?? 0
                 if (val > bestVal) { bestVal = val; bestIdx = i }
             })
             return bestVal > 0 ? bestIdx : null

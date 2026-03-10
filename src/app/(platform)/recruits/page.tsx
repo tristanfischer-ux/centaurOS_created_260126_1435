@@ -15,12 +15,15 @@
 import { getSavedMarketplaceListings } from '@/actions/marketplace'
 import { getEnrichedPeopleListings, enrichPeopleListingsBatch } from '@/actions/people-marketplace'
 import { getRecruitsStats } from '@/actions/recruits-stats'
+import { getMatchAlerts } from '@/actions/match-alerts'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
+import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
+import type { MatchAlert } from '@/actions/match-alerts'
 import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
 
 const RECRUITS_STATS_LABELS: StatsLabels = {
@@ -55,18 +58,26 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     let recommendations: MarketplaceRecommendation[] = []
     let savedIds: string[] = []
     let savedListings: MarketplaceListing[] = []
+    let matchAlerts: MatchAlert[] = []
 
-    // Fetch enriched People listings, foundry context, and stats in parallel
-    // DECISION: Removed redundant getMarketplaceListings('People') — MarketplaceBrowse
-    // fetches its own listings internally. Enriched listings are the primary source.
-    const [enrichedResult, foundryContext, statsResult] = await Promise.allSettled([
+    // Fetch enriched People listings, foundry context, stats, and match alerts in parallel
+    const parallelResults = await Promise.allSettled([
         getEnrichedPeopleListings(),
         getFoundryContext(),
         getRecruitsStats(),
+        getMatchAlerts({ unreadOnly: true, limit: 8 }),
     ])
+
+    const enrichedResult = parallelResults[0]
+    const foundryContext = parallelResults[1]
+    const statsResult = parallelResults[2]
+    const alertsResult = parallelResults[3]
 
     if (enrichedResult.status === 'fulfilled') {
         listings = enrichedResult.value
+    }
+    if (alertsResult.status === 'fulfilled') {
+        matchAlerts = alertsResult.value
     }
 
     const ctx = foundryContext.status === 'fulfilled' ? foundryContext.value : null
@@ -117,12 +128,15 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
         }
     }
 
-    // DECISION: No Suspense wrapper — this server component awaits all data
-    // before rendering, so Suspense would never trigger its fallback.
     return (
         <div className="space-y-6">
             {/* AI Talent Finder - the "aha moment" */}
             <TalentFinderWrapper />
+
+            {/* Match alert banner — shows unread match notifications */}
+            {matchAlerts.length > 0 && (
+                <MatchAlertBanner alerts={matchAlerts} />
+            )}
 
             {/* Standard marketplace browse with enriched People cards */}
             <MarketplaceBrowse

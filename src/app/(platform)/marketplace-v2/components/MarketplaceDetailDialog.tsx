@@ -286,6 +286,30 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
     const [endorsementSummary, setEndorsementSummary] = useState<EndorsementSummary | null>(null)
     const [skillEndorsements, setSkillEndorsements] = useState<SkillEndorsement[]>([])
     const [isEndorsementsLoading, setIsEndorsementsLoading] = useState(false)
+    const [portfolio, setPortfolio] = useState<{ id: string; title: string; client_name?: string; description?: string; image_urls?: string[] }[]>([])
+    const [isPortfolioLoading, setIsPortfolioLoading] = useState(false)
+
+    // Fetch portfolio when dialog opens for People listings
+    useEffect(() => {
+        if (!listing || listing.category !== 'People') {
+            setPortfolio([])
+            return
+        }
+        const providerId = listing.created_by_provider_id
+        if (!providerId) return
+
+        let cancelled = false
+        setIsPortfolioLoading(true)
+        // FLOW: Uses getSimilarListings pattern — fetch via import to avoid client supabase
+        import('@/actions/portfolio').then(mod => mod.getProviderPortfolio(providerId)).then(result => {
+            if (!cancelled) setPortfolio(result)
+        }).catch(() => {
+            // Non-critical — portfolio section just won't show
+        }).finally(() => {
+            if (!cancelled) setIsPortfolioLoading(false)
+        })
+        return () => { cancelled = true }
+    }, [listing?.id, listing?.category, listing?.created_by_provider_id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Fetch endorsements when dialog opens for People listings
     useEffect(() => {
@@ -362,7 +386,10 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
     const visibleCapabilities = showAllCapabilities ? processCapabilities : processCapabilities.slice(0, 6)
 
     const handleSendEnquiry = async () => {
-        const providerId = attrs.provider_id as string
+        // DECISION: attrs.provider_id is the attributes-JSON field; fall back to
+        // listing.created_by_provider_id (DB column) which is more reliably populated
+        // for People listings pushed from Nightshift or created by users.
+        const providerId = (attrs.provider_id as string) || listing.created_by_provider_id
         if (!providerId) {
             toast.error('Unable to contact this provider')
             return
@@ -694,7 +721,47 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                             <div className="space-y-6">
                                 {/* People get a profile section; others get company details */}
                                 {isPeople ? (
-                                    <PeopleProfileSection attrs={attrs} />
+                                    <>
+                                        <PeopleProfileSection attrs={attrs} />
+                                        {/* Past Projects */}
+                                        {isPortfolioLoading ? (
+                                            <div className="flex items-center gap-2 text-muted-foreground text-sm py-4 justify-center">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                Loading projects…
+                                            </div>
+                                        ) : portfolio.length > 0 ? (
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+                                                    <Briefcase className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                                                    Past Projects
+                                                </h3>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    {portfolio.map(project => (
+                                                        <div key={project.id} className="rounded-lg border p-3 space-y-2">
+                                                            {project.image_urls?.[0] && (
+                                                                <div className="w-full h-24 rounded-md overflow-hidden bg-muted">
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img
+                                                                        src={project.image_urls[0]}
+                                                                        alt={project.title}
+                                                                        loading="lazy"
+                                                                        className="w-full h-full object-cover"
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                            <p className="text-sm font-medium text-foreground line-clamp-1">{project.title}</p>
+                                                            {project.client_name && (
+                                                                <p className="text-xs text-muted-foreground">{project.client_name}</p>
+                                                            )}
+                                                            {project.description && (
+                                                                <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ) : null}
+                                    </>
                                 ) : (
                                     <CompanyDetailsSection attrs={attrs} />
                                 )}
@@ -810,12 +877,29 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                         <InviteToCompanyButton listing={listing} />
 
                         {isPeople ? (
-                            <Button className="flex-1 gap-2" asChild>
-                                <Link href={`/marketplace/${listing.id}/book`}>
-                                    <CalendarDays className="w-4 h-4" />
-                                    Book Now
-                                </Link>
-                            </Button>
+                            <>
+                                {(attrs.provider_id || listing.created_by_provider_id) && (
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2"
+                                        onClick={handleSendEnquiry}
+                                        disabled={isSendingEnquiry}
+                                    >
+                                        {isSendingEnquiry ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <MessageSquare className="w-4 h-4" />
+                                        )}
+                                        Message
+                                    </Button>
+                                )}
+                                <Button className="flex-1 gap-2" asChild>
+                                    <Link href={`/marketplace/${listing.id}/book`}>
+                                        <CalendarDays className="w-4 h-4" />
+                                        Book Now
+                                    </Link>
+                                </Button>
+                            </>
                         ) : attrs.provider_id ? (
                             <Button
                                 className="flex-1 gap-2"

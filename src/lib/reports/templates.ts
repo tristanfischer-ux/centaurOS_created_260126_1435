@@ -67,7 +67,7 @@ export const SECTION_META: Record<ReportSectionType, { label: string; descriptio
   },
   'engineering-activity': {
     label: 'Engineering Activity',
-    description: 'CAD Lab projects, module generation, and engineering throughput',
+    description: 'CAD Lab projects, specialist reviews, cost estimates, design health, and manufacturing pipeline',
     icon: 'Cog',
   },
   'knowledge-learning': {
@@ -103,8 +103,9 @@ export const REPORT_TEMPLATES: ReportTemplate[] = [
       { type: 'objectives-progress', enabled: true, order: 5 },
       { type: 'team-activity', enabled: true, order: 6 },
       { type: 'sales-pipeline', enabled: true, order: 7 },
-      { type: 'blockers-risks', enabled: true, order: 8 },
-      { type: 'week-ahead', enabled: true, order: 9 },
+      { type: 'engineering-activity', enabled: true, order: 8 },
+      { type: 'blockers-risks', enabled: true, order: 9 },
+      { type: 'week-ahead', enabled: true, order: 10 },
     ],
   },
   {

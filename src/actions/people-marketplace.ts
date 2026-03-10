@@ -72,9 +72,10 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
 
     // Get provider IDs linked to these listings
     const listingIds = listings.map(l => l.id)
+    const providerIds = listings.map(l => l.created_by_provider_id).filter(Boolean) as string[]
 
     // Fetch trust data in parallel for performance
-    const [ratingsResult, badgesResult, portfolioResult, stackResult] = await Promise.allSettled([
+    const trustResults = await Promise.allSettled([
         // Ratings from provider_ratings (keyed by provider_id, not listing_id)
         supabase
             .from('provider_ratings')
@@ -97,7 +98,21 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
             .from('foundry_stack')
             .select('provider_id')
             .in('provider_id', listingIds),
+        // Endorsement counts per user
+        providerIds.length > 0
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ? (supabase as any)
+                .from('endorsements')
+                .select('endorsed_user_id')
+                .in('endorsed_user_id', providerIds)
+            : Promise.resolve({ data: [] as { endorsed_user_id: string }[] }),
     ])
+
+    const ratingsResult = trustResults[0]
+    const badgesResult = trustResults[1]
+    const portfolioResult = trustResults[2]
+    const stackResult = trustResults[3]
+    const endorsementsResult = trustResults[4]
 
     // Build lookup maps
     const ratingsMap = new Map<string, {
@@ -144,6 +159,14 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
         }
     }
 
+    const endorsementCountMap = new Map<string, number>()
+    if (endorsementsResult.status === 'fulfilled' && endorsementsResult.value.data) {
+        for (const e of endorsementsResult.value.data) {
+            const uid = (e as { endorsed_user_id: string }).endorsed_user_id
+            if (uid) endorsementCountMap.set(uid, (endorsementCountMap.get(uid) || 0) + 1)
+        }
+    }
+
     // Enrich listings
     return listings.map(listing => {
         const ratings = ratingsMap.get(listing.id)
@@ -155,7 +178,7 @@ export async function getEnrichedPeopleListings(): Promise<EnrichedPersonListing
             portfolioThumbnails: portfolioMap.get(listing.id) || [],
             trustedByCount: stackCountMap.get(listing.id) || 0,
             responseTimeHours: null, // provider_ratings table doesn't have this column yet
-            endorsementCount: 0, // Will be populated after endorsements table is created
+            endorsementCount: endorsementCountMap.get(listing.created_by_provider_id ?? '') || 0,
         }
 
         return {
@@ -186,8 +209,9 @@ export async function enrichPeopleListingsBatch(
     if (!user) return listings
 
     const listingIds = peopleListings.map(l => l.id)
+    const providerIds = peopleListings.map(l => l.created_by_provider_id).filter(Boolean) as string[]
 
-    const [ratingsResult, badgesResult, portfolioResult, stackResult] = await Promise.allSettled([
+    const batchResults = await Promise.allSettled([
         supabase.from('provider_ratings')
             .select('provider_id, average_rating, total_reviews, total_transactions')
             .in('provider_id', listingIds),
@@ -202,7 +226,19 @@ export async function enrichPeopleListingsBatch(
         supabase.from('foundry_stack')
             .select('provider_id')
             .in('provider_id', listingIds),
+        providerIds.length > 0
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ? (supabase as any).from('endorsements')
+                .select('endorsed_user_id')
+                .in('endorsed_user_id', providerIds)
+            : Promise.resolve({ data: [] as { endorsed_user_id: string }[] }),
     ])
+
+    const ratingsResult = batchResults[0]
+    const badgesResult = batchResults[1]
+    const portfolioResult = batchResults[2]
+    const stackResult = batchResults[3]
+    const endorsementsResult = batchResults[4]
 
     // Build lookup maps (same logic as getEnrichedPeopleListings)
     const ratingsMap = new Map<string, { average_rating: number | null; total_reviews: number | null; total_transactions: number | null }>()
@@ -234,6 +270,13 @@ export async function enrichPeopleListingsBatch(
             if (s.provider_id) stackCountMap.set(s.provider_id, (stackCountMap.get(s.provider_id) || 0) + 1)
         }
     }
+    const endorsementCountMap = new Map<string, number>()
+    if (endorsementsResult.status === 'fulfilled' && endorsementsResult.value.data) {
+        for (const e of endorsementsResult.value.data) {
+            const uid = (e as { endorsed_user_id: string }).endorsed_user_id
+            if (uid) endorsementCountMap.set(uid, (endorsementCountMap.get(uid) || 0) + 1)
+        }
+    }
 
     const peopleIds = new Set(listingIds)
     return listings.map(listing => {
@@ -247,7 +290,7 @@ export async function enrichPeopleListingsBatch(
             portfolioThumbnails: portfolioMap.get(listing.id) || [],
             trustedByCount: stackCountMap.get(listing.id) || 0,
             responseTimeHours: null,
-            endorsementCount: 0,
+            endorsementCount: endorsementCountMap.get(listing.created_by_provider_id ?? '') || 0,
         }
         return { ...listing, trustData } as EnrichedPersonListing
     })

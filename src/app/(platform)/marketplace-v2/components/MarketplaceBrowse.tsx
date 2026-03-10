@@ -10,6 +10,7 @@ import { MarketplaceRecommendations } from './MarketplaceRecommendations'
 import { MarketplaceSavedView } from './MarketplaceSavedView'
 import { MarketplaceCompareView } from './MarketplaceCompareView'
 import { MarketplaceStatsSection, type StatsLabels } from './MarketplaceStatsSection'
+import { SaveSearchDialog } from './SaveSearchDialog'
 import { useMarketplaceState, type MarketplaceCategory, type ContentCategory } from '../hooks/useMarketplaceState'
 import { dismissRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
@@ -155,6 +156,7 @@ export function MarketplaceBrowse({
         state.setSearchQuery(query)
     }, [state])
 
+    const [showSaveSearchDialog, setShowSaveSearchDialog] = useState(false)
     const [isAISearchLoading, setIsAISearchLoading] = useState(false)
 
     // Store state methods in refs so callbacks don't depend on the `state` object
@@ -452,6 +454,7 @@ export function MarketplaceBrowse({
                         advancedFilters={state.advancedFilters}
                         onRemoveAdvancedFilter={state.removeAdvancedFilter}
                         onUpdateAdvancedFilter={state.updateAdvancedFilter}
+                        onSaveSearch={() => setShowSaveSearchDialog(true)}
                     />
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}
@@ -570,6 +573,18 @@ export function MarketplaceBrowse({
                 onToggleCompare={toggleCompareSelection}
                 compareCount={selectedForCompare.size}
                 onViewDetail={state.setSelectedListing}
+            />
+
+            {/* Save Search dialog */}
+            <SaveSearchDialog
+                open={showSaveSearchDialog}
+                onClose={() => setShowSaveSearchDialog(false)}
+                searchQuery={state.searchQuery}
+                filters={{
+                    category: state.activeCategory,
+                    subcategories: Array.from(state.selectedSubcategories),
+                    ...state.advancedFilters,
+                }}
             />
         </div>
     )

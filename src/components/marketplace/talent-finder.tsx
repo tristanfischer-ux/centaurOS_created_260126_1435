@@ -24,8 +24,8 @@ import {
     Award,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { findTalentMatches } from '@/actions/people-marketplace'
-import type { TalentMatch, TalentMatchResult } from '@/actions/people-marketplace'
+import { getEnrichedPeopleListings } from '@/actions/people-marketplace'
+import type { EnrichedPersonListing, TalentMatch, TalentMatchResult } from '@/actions/people-marketplace'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
 /**
@@ -40,6 +40,48 @@ import type { MarketplaceListing } from '@/actions/marketplace'
  * @example
  * <TalentFinder onViewDetail={handleViewDetail} />
  */
+
+/** Client-side keyword matching — mirrors performKeywordMatching in people-marketplace.ts
+ *  but runs against already-fetched listings to avoid a redundant server round trip. */
+function clientKeywordMatch(query: string, listings: EnrichedPersonListing[]): TalentMatchResult {
+    const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+    if (words.length === 0) return { matches: [], explanation: 'No matching keywords found.', error: null }
+
+    const scored = listings.map(listing => {
+        const attrs = safeParseAttributes(listing.attributes)
+        const text = [
+            listing.title, listing.description, listing.subcategory,
+            ...((attrs.skills as string[]) ?? []),
+            ...((attrs.expertise as string[]) ?? []),
+            (attrs.role as string) || '',
+            (attrs.location as string) || '',
+        ].join(' ').toLowerCase()
+
+        let score = 0
+        const matched: string[] = []
+        for (const w of words) {
+            if (text.includes(w)) { score += 10; matched.push(w) }
+        }
+        if (listing.is_verified) score += 5
+        if (listing.trustData.averageRating && listing.trustData.averageRating >= 4.5) score += 5
+        if (listing.trustData.totalReviews > 0) score += 3
+        if (listing.trustData.trustedByCount > 2) score += 3
+
+        const max = words.length * 10 + 16
+        const norm = Math.min(100, Math.round((score / max) * 100))
+        const skills = ((attrs.skills as string[]) ?? (attrs.expertise as string[]) ?? [])
+        const highlighted = skills.filter((s: string) => words.some(w => s.toLowerCase().includes(w)))
+
+        return {
+            listing, matchScore: norm,
+            matchReasons: matched.length > 0 ? [`Matches keywords: ${matched.join(', ')}`] : ['General match based on profile'],
+            highlightedSkills: highlighted,
+        }
+    })
+
+    const top = scored.filter(m => m.matchScore > 0).sort((a, b) => b.matchScore - a.matchScore).slice(0, 5)
+    return { matches: top, explanation: `Found ${top.length} potential matches based on your description.`, error: null }
+}
 
 interface TalentFinderProps {
     /** Callback when user clicks to view a matched listing's detail */
@@ -120,7 +162,65 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
         setAnimationComplete(false)
 
         try {
-            const result = await findTalentMatches(query.trim())
+            // DECISION: Try AI-powered matching via API route (browser sends cookies
+            // so auth works, unlike server-action-to-API which sends empty cookies).
+            // Fall back to keyword matching if AI route fails.
+            const listings = await getEnrichedPeopleListings()
+            if (listings.length === 0) {
+                setResults({ matches: [], explanation: 'No talent listings available yet.', error: null })
+                return
+            }
+
+            let result: TalentMatchResult | null = null
+            try {
+                const res = await fetch('/api/marketplace/talent-match', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query.trim(),
+                        listings: listings.slice(0, 50).map(l => ({
+                            id: l.id,
+                            title: l.title,
+                            description: l.description,
+                            subcategory: l.subcategory,
+                            attributes: l.attributes,
+                            is_verified: l.is_verified,
+                            trustData: l.trustData,
+                        })),
+                    }),
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.success && data.matches) {
+                        // Map API response back to TalentMatch[] with full listing objects
+                        const listingMap = new Map(listings.map(l => [l.id, l]))
+                        const matches: TalentMatch[] = (data.matches as { id: string; score: number; reasons: string[]; highlightedSkills: string[] }[])
+                            .map(m => {
+                                const listing = listingMap.get(m.id)
+                                if (!listing) return null
+                                return {
+                                    listing,
+                                    matchScore: m.score,
+                                    matchReasons: m.reasons,
+                                    highlightedSkills: m.highlightedSkills,
+                                } as TalentMatch
+                            })
+                            .filter((m): m is TalentMatch => m !== null)
+                        result = { matches, explanation: data.explanation || '', error: null }
+                    }
+                }
+            } catch {
+                // AI route failed — fall back to keyword matching below
+                console.warn('[TalentFinder] AI route failed, falling back to keyword matching')
+            }
+
+            // Fallback to keyword matching using already-fetched listings.
+            // DECISION: Inline keyword matching instead of calling findTalentMatches()
+            // (which would re-fetch all listings via getEnrichedPeopleListings).
+            if (!result) {
+                result = clientKeywordMatch(query.trim(), listings)
+            }
+
             setResults(result)
         } catch (err) {
             console.error('[TalentFinder] Search failed:', err)

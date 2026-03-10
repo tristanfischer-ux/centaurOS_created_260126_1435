@@ -1006,6 +1006,12 @@ function buildNarrativeContext(
     cadProjectsCompleted: engineering?.completedThisPeriod,
     knowledgeNotesAdded: knowledge?.knowledge.addedThisPeriod,
     overBudgetCategories: financial?.overBudgetCount,
+    // Engineering deep context
+    cadReviewsCompleted: engineering?.reviewSummary?.totalReviewed,
+    cadReviewsPending: engineering?.reviewSummary?.verdicts.pending,
+    cadTotalEstimatedCost: engineering?.costSummary?.totalEstimatedCost,
+    cadProjectsWithEstimates: engineering?.costSummary?.projectsWithEstimates,
+    cadAverageConfidence: engineering?.costSummary?.averageConfidence,
   }
 }
 

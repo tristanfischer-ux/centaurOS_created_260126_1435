@@ -21,6 +21,7 @@ import {
     Wrench,
     Sparkles,
     Loader2,
+    Bookmark,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SORT_OPTIONS, type SortOption, type MarketplaceCategory } from '../hooks/useMarketplaceState'
@@ -107,6 +108,8 @@ interface MarketplaceToolbarProps {
     onRemoveAdvancedFilter?: (key: keyof AdvancedFilters) => void
     /** Update a specific advanced filter (used for removing individual values from array filters). */
     onUpdateAdvancedFilter?: <K extends keyof AdvancedFilters>(key: K, value: AdvancedFilters[K]) => void
+    /** Called when user clicks the Save Search bookmark button. */
+    onSaveSearch?: () => void
 }
 
 /**
@@ -143,6 +146,7 @@ export function MarketplaceToolbar({
     advancedFilters,
     onRemoveAdvancedFilter,
     onUpdateAdvancedFilter,
+    onSaveSearch,
 }: MarketplaceToolbarProps) {
     const [showSuggestions, setShowSuggestions] = useState(false)
     const searchRef = useRef<HTMLInputElement>(null)
@@ -340,6 +344,17 @@ export function MarketplaceToolbar({
                             ))}
                         </SelectContent>
                     </Select>
+
+                    {onSaveSearch && (searchQuery.trim() || hasActiveFilters) && (
+                        <Button
+                            variant="secondary"
+                            onClick={onSaveSearch}
+                            aria-label="Save this search"
+                        >
+                            <Bookmark className="h-4 w-4 mr-2" />
+                            Save
+                        </Button>
+                    )}
 
                     <Button
                         variant="secondary"
