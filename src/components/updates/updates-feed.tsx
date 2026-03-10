@@ -175,7 +175,7 @@ export function UpdatesFeed({
   return (
     <div className="flex flex-col h-full">
       {/* Filter tabs */}
-      <div className="p-3 border-b border-muted space-y-3">
+      <div className="p-3 border-b border-border space-y-3">
         <Tabs
           value={filter}
           onValueChange={(v) => onFilterChange(v as ActivityFilter)}
@@ -227,7 +227,7 @@ export function UpdatesFeed({
             {timeGroups.map((group) => (
               <div key={group.label}>
                 {/* Time group header */}
-                <div className="sticky top-0 z-10 px-4 py-2 bg-muted border-b border-muted">
+                <div className="sticky top-0 z-10 px-4 py-2 bg-muted border-b border-border">
                   <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                     {group.label}
                   </span>

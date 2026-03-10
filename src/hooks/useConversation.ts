@@ -45,6 +45,7 @@ export function useConversation(
   const [lastReadAt, setLastReadAt] = useState<string | null>(null)
   
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const messagesRef = useRef<MessageWithSender[]>([])
   const supabase = useMemo(() => createClient(), [])
   const currentUserRef = useRef<string | null>(null)
 
@@ -68,7 +69,9 @@ export function useConversation(
         return
       }
 
-      setMessages(result.data?.messages || [])
+      const msgs = result.data?.messages || []
+      setMessages(msgs)
+      messagesRef.current = msgs
       setConversation(result.data?.conversation || null)
       setHasMore((result.data?.messages?.length || 0) >= 50)
       
@@ -92,25 +95,29 @@ export function useConversation(
 
   // Load more messages (pagination)
   const loadMore = useCallback(async () => {
-    if (!conversationId || !hasMore || isLoading || messages.length === 0) return
+    if (!conversationId || !hasMore || isLoading || messagesRef.current.length === 0) return
 
     try {
-      const oldestMessage = messages[0]
+      const oldestMessage = messagesRef.current[0]
       const result = await getConversationMessages(
-        conversationId, 
-        50, 
+        conversationId,
+        50,
         oldestMessage.created_at
       )
-      
+
       if (result.success && result.data?.messages) {
         const newMessages = result.data.messages
-        setMessages(prev => [...newMessages, ...prev])
+        setMessages(prev => {
+          const merged = [...newMessages, ...prev]
+          messagesRef.current = merged
+          return merged
+        })
         setHasMore(newMessages.length >= 50)
       }
     } catch (err) {
       console.error('Failed to load more messages:', err)
     }
-  }, [conversationId, hasMore, isLoading, messages])
+  }, [conversationId, hasMore, isLoading])
 
   // Send a new message
   const sendMessage = useCallback(async (content: string, fileUrl?: string): Promise<boolean> => {
@@ -131,7 +138,9 @@ export function useConversation(
           if (prev.some(m => m.id === result.data!.id)) {
             return prev
           }
-          return [...prev, result.data!]
+          const next = [...prev, result.data!]
+          messagesRef.current = next
+          return next
         })
       }
 
@@ -206,7 +215,9 @@ export function useConversation(
                 if (prev.some(m => m.id === newMessage.id)) {
                   return prev
                 }
-                return [...prev, newMessage as unknown as MessageWithSender]
+                const next = [...prev, newMessage as unknown as MessageWithSender]
+                messagesRef.current = next
+                return next
               })
 
               // Auto-mark as read if from other user and option enabled

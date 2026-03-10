@@ -185,7 +185,7 @@ export function UpdatesThreadPanel({
   return (
     <div className="flex flex-col h-full">
       {/* Source metadata bar */}
-      <div className="border-b border-muted p-4 space-y-3 flex-shrink-0">
+      <div className="border-b border-border p-4 space-y-3 flex-shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             <div className={cn(
@@ -307,7 +307,7 @@ export function UpdatesThreadPanel({
       </div>
 
       {/* Inline reply */}
-      <div className="border-t border-muted p-3 flex-shrink-0">
+      <div className="border-t border-border p-3 flex-shrink-0">
         <div className="flex items-end gap-2">
           <Textarea
             ref={textareaRef}
@@ -411,7 +411,7 @@ function ThreadSkeleton() {
   return (
     <div className="flex flex-col h-full">
       {/* Metadata skeleton */}
-      <div className="border-b border-muted p-4 space-y-3">
+      <div className="border-b border-border p-4 space-y-3">
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-lg" />
           <div className="space-y-1.5">
@@ -439,7 +439,7 @@ function ThreadSkeleton() {
       </div>
 
       {/* Reply skeleton */}
-      <div className="border-t border-muted p-3">
+      <div className="border-t border-border p-3">
         <Skeleton className="h-10 w-full rounded-md" />
       </div>
     </div>

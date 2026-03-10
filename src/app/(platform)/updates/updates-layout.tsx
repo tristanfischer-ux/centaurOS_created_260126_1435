@@ -320,7 +320,7 @@ export function UpdatesLayout({
         )}
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[380px] xl:w-[420px] border-r border-muted flex flex-col overflow-hidden">
+          <div className="w-[380px] xl:w-[420px] border-r border-border flex flex-col overflow-hidden">
             {LeftPanel}
           </div>
           <div className="flex-1 flex flex-col min-w-0">
@@ -362,7 +362,7 @@ export function UpdatesLayout({
         )}
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[320px] border-r border-muted flex flex-col overflow-hidden">
+          <div className="w-[320px] border-r border-border flex flex-col overflow-hidden">
             {LeftPanel}
           </div>
           <div className="flex-1 flex flex-col min-w-0">
@@ -386,7 +386,7 @@ export function UpdatesLayout({
     <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 pb-20 sm:pb-0">
       {showThread && (activeView === 'activity' ? selectedSource : selectedConversationId) ? (
         <div className="flex flex-col h-full">
-          <div className="flex items-center gap-2 p-3 border-b border-muted">
+          <div className="flex items-center gap-2 p-3 border-b border-border">
             <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -385,7 +385,7 @@ export function ConversationThread({
   }
 
   // Group messages by date
-  const messageGroups = groupMessagesByDate(messages)
+  const messageGroups = useMemo(() => groupMessagesByDate(messages), [messages])
 
   // No conversation selected
   if (!conversationId) {

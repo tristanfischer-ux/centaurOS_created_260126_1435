@@ -404,7 +404,7 @@ export async function startTaskDiscussion(
       participantIds.add(user.id) // Current user
       if (task.creator_id) participantIds.add(task.creator_id)
       if (task.assignee_id) participantIds.add(task.assignee_id)
-      assignees?.forEach(a => participantIds.add(a.profile_id))
+      assignees?.forEach(a => { if (a?.profile_id) participantIds.add(a.profile_id) })
 
       const conversation = await createTaskConversation(supabase, {
         creatorId: user.id,

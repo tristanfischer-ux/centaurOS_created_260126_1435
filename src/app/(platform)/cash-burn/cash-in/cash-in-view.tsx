@@ -107,15 +107,9 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
     Other: row.other,
   })), [cashInGrid])
 
-  // Opening balance in pence for cumulative calculation
-  const openingBalancePence = useMemo(() => {
-    const parsed = parseFloat(openingBalancePounds)
-    return isNaN(parsed) ? 0 : Math.round(parsed * 100)
-  }, [openingBalancePounds])
-
-  // Weekly table rows with cumulative column
+  // Weekly table rows with cumulative inflows column (pure sum, excludes opening balance)
   const weeklyTableRows = useMemo(() => {
-    let cumulative = openingBalancePence
+    let cumulative = 0
     return cashInGrid.map(row => {
       cumulative += row.totalIn
       return {
@@ -129,7 +123,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         cumulative,
       }
     })
-  }, [cashInGrid, openingBalancePence])
+  }, [cashInGrid])
 
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
