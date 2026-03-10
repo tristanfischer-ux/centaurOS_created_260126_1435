@@ -306,25 +306,12 @@ export async function markAsRead(
   userId: string
 ): Promise<number> {
   const now = new Date().toISOString()
-  
-  // Mark individual messages as read
-  const { data, error } = await supabase
-    .from('messages')
-    .update({ 
-      is_read: true,
-      read_at: now
-    })
-    .eq('conversation_id', conversationId)
-    .neq('sender_id', userId)
-    .eq('is_read', false)
-    .select('id')
 
-  if (error) {
-    throw new Error(`Failed to mark messages as read: ${error.message}`)
-  }
-
-  // Also update last_read_at on the participant record
-  // This is critical for unread count calculations
+  // Update last_read_at on the participant record
+  // This is the authoritative source for unread count calculations.
+  // DECISION: Per-message is_read updates removed — RLS sender-only policy
+  // prevents non-senders from updating message rows. Read status is derived
+  // by comparing message.created_at against participant.last_read_at.
   const { error: participantError } = await supabase
     .from('conversation_participants')
     .update({ last_read_at: now })
@@ -332,10 +319,10 @@ export async function markAsRead(
     .eq('profile_id', userId)
 
   if (participantError) {
-    console.error('[markAsRead] Failed to update last_read_at:', participantError.message)
+    throw new Error(`Failed to mark as read: ${participantError.message}`)
   }
 
-  return data?.length || 0
+  return 0
 }
 
 /**

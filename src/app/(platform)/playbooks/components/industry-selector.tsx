@@ -33,6 +33,8 @@ interface IndustrySelectorProps {
   defaultIndustry?: string
   /** Team members available for task assignment */
   members?: TeamMember[]
+  /** Pack IDs that have already been used to create objectives */
+  usedPackIds?: Set<string>
 }
 
 export function IndustrySelector({
@@ -41,6 +43,7 @@ export function IndustrySelector({
   onSaveToggle,
   defaultIndustry,
   members = [],
+  usedPackIds = new Set(),
 }: IndustrySelectorProps) {
   const [selected, setSelected] = useState<BlueprintTemplate | null>(null)
   const [packs, setPacks] = useState<ObjectivePack[]>([])
@@ -158,6 +161,7 @@ export function IndustrySelector({
                 isSaved={savedPackIds.has(pack.id)}
                 onSaveToggle={onSaveToggle}
                 members={members}
+                alreadyUsed={usedPackIds.has(pack.id)}
               />
             ))}
           </div>

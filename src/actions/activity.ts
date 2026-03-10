@@ -513,20 +513,23 @@ export async function getActivityUnreadCount(): Promise<{
     if (conversations && conversations.length > 0) {
       const conversationIds = conversations.map((c: { conversation_id: string }) => c.conversation_id)
       
-      // Single batch query for all messages across all conversations
-      const { data: allMessages } = await supabase
-        .from('messages')
-        .select('id, conversation_id, sender_id, created_at')
-        .in('conversation_id', conversationIds)
-        .neq('sender_id', user.id)
-      
-      if (allMessages) {
-        // Filter messages by last_read_at in memory
-        const conversationMap = new Map(conversations.map((c: { conversation_id: string; last_read_at: string | null }) => [c.conversation_id, c.last_read_at || '1970-01-01']))
-        messageCount = allMessages.filter(msg => {
-          const lastReadAt = conversationMap.get(msg.conversation_id)
-          return lastReadAt && msg.created_at && msg.created_at > lastReadAt
-        }).length
+      // Count unread messages per conversation using last_read_at
+      const conversationMap = new Map<string, string | null>(conversations.map((c: { conversation_id: string; last_read_at: string | null }) => [c.conversation_id, c.last_read_at]))
+
+      // Query unread counts per conversation (only fetch counts, not full rows)
+      for (const [convId, lastReadAt] of conversationMap) {
+        let countQuery = supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', convId as string)
+          .neq('sender_id', user.id)
+
+        if (lastReadAt) {
+          countQuery = countQuery.gt('created_at', lastReadAt)
+        }
+
+        const { count } = await countQuery
+        messageCount += count || 0
       }
     }
 
@@ -1001,7 +1004,7 @@ export async function getActivityFeed(options?: {
     // Apply limit after merging
     const limitedItems = items.slice(0, limit)
 
-    return { success: true, data: limitedItems, hasMore: items.length >= limit }
+    return { success: true, data: limitedItems, hasMore: items.length > limit }
   } catch (error) {
     console.error('getActivityFeed error:', error)
     return { 
@@ -1209,7 +1212,7 @@ export async function getThreadForSource(
           .from('conversation_participants')
           .select('id')
           .eq('conversation_id', sourceId)
-          .eq('user_id', user.id)
+          .eq('profile_id', user.id)
           .maybeSingle()
 
         if (!participant) {
@@ -1220,14 +1223,15 @@ export async function getThreadForSource(
       // Build a display title from conversation data
       const convTitle = conversation.title || 'Direct Message'
 
-      // Fetch all messages for this conversation
+      // Fetch all non-deleted messages for this conversation
       const { data: messages } = await supabase
         .from('messages')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_deleted,
           sender:profiles!sender_id(id, full_name, avatar_url, role)
         `)
         .eq('conversation_id', sourceId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: true })
 
       // Fetch participants for metadata display

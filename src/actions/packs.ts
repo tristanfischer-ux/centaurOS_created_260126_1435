@@ -24,6 +24,9 @@ export type ObjectivePack = {
     difficulty: string | null
     estimated_duration: string | null
     icon_name: string | null
+    prerequisites?: string[] | null
+    success_criteria?: string[] | null
+    tags?: string[] | null
     items?: PackItem[]
 }
 
@@ -320,6 +323,68 @@ export async function unsavePack(packId: string): Promise<{
  * 
  * @security RLS ensures users only see their own saved packs
  */
+/**
+ * Get pack IDs that have already been used to create objectives in the current foundry.
+ * Uses source_pack_id (reliable) with title-matching fallback for older objectives.
+ */
+export async function getUsedPackIds(): Promise<{ usedIds: Set<string>, error: string | null }> {
+    noStore()
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { usedIds: new Set(), error: null }
+
+        // Get user's foundry
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('foundry_id')
+            .eq('id', user.id)
+            .single()
+
+        if (!profile?.foundry_id) return { usedIds: new Set(), error: null }
+
+        // Get objectives with source_pack_id and titles for fallback matching
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: objectives } = await (supabase as any)
+            .from('objectives')
+            .select('title, source_pack_id')
+            .eq('foundry_id', profile.foundry_id)
+
+        if (!objectives) return { usedIds: new Set(), error: null }
+
+        const usedIds = new Set<string>()
+
+        // Primary: collect source_pack_ids (reliable tracking)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const obj of objectives as any[]) {
+            if (obj.source_pack_id) {
+                usedIds.add(obj.source_pack_id)
+            }
+        }
+
+        // Fallback: title matching for older objectives without source_pack_id
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const objectiveTitles = new Set((objectives as any[]).map((o: { title: string }) => o.title?.toLowerCase()))
+
+        const { data: packs } = await supabase
+            .from('objective_packs')
+            .select('id, title')
+
+        if (packs) {
+            for (const pack of packs) {
+                if (pack.title && objectiveTitles.has(pack.title.toLowerCase())) {
+                    usedIds.add(pack.id)
+                }
+            }
+        }
+
+        return { usedIds, error: null }
+    } catch (err) {
+        console.error('[getUsedPackIds] Exception:', err)
+        return { usedIds: new Set(), error: 'Failed to check used packs' }
+    }
+}
+
 export async function getSavedPackIds(): Promise<{
     savedIds: Set<string>
     error: string | null

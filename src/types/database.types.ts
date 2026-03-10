@@ -9766,7 +9766,10 @@ export type Database = {
           estimated_duration: string | null
           icon_name: string | null
           id: string
+          prerequisites: string[] | null
           product_category: string | null
+          success_criteria: string[] | null
+          tags: string[] | null
           title: string
           updated_at: string | null
         }
@@ -9778,7 +9781,10 @@ export type Database = {
           estimated_duration?: string | null
           icon_name?: string | null
           id?: string
+          prerequisites?: string[] | null
           product_category?: string | null
+          success_criteria?: string[] | null
+          tags?: string[] | null
           title: string
           updated_at?: string | null
         }
@@ -9790,7 +9796,10 @@ export type Database = {
           estimated_duration?: string | null
           icon_name?: string | null
           id?: string
+          prerequisites?: string[] | null
           product_category?: string | null
+          success_criteria?: string[] | null
+          tags?: string[] | null
           title?: string
           updated_at?: string | null
         }
@@ -9895,6 +9904,7 @@ export type Database = {
           parent_objective_id: string | null
           progress: number | null
           resource_suggestions: Json | null
+          source_pack_id: string | null
           start_date: string | null
           status: string | null
           strategic_risks: Json | null
@@ -9930,6 +9940,7 @@ export type Database = {
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
+          source_pack_id?: string | null
           start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null
@@ -9965,6 +9976,7 @@ export type Database = {
           parent_objective_id?: string | null
           progress?: number | null
           resource_suggestions?: Json | null
+          source_pack_id?: string | null
           start_date?: string | null
           status?: string | null
           strategic_risks?: Json | null

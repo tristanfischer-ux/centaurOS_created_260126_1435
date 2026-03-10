@@ -14,6 +14,25 @@ import {
   Server,
   Layers,
   CircuitBoard,
+  Shield,
+  Briefcase,
+  Megaphone,
+  Scale,
+  Heart,
+  Settings,
+  Code,
+  Lock,
+  Globe,
+  Lightbulb,
+  DollarSign,
+  Clipboard,
+  Zap,
+  BookOpen,
+  Award,
+  PieChart,
+  GitBranch,
+  Database,
+  Cloud,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -67,6 +86,27 @@ export function getPackIcon(iconName: string | null): React.ComponentType<{ clas
     file: FileText,
     boxes: Boxes,
     check: CheckSquare,
+    shield: Shield,
+    briefcase: Briefcase,
+    megaphone: Megaphone,
+    scale: Scale,
+    heart: Heart,
+    cog: Settings,
+    code: Code,
+    lock: Lock,
+    globe: Globe,
+    lightbulb: Lightbulb,
+    'dollar-sign': DollarSign,
+    clipboard: Clipboard,
+    zap: Zap,
+    settings: Settings,
+    book: BookOpen,
+    award: Award,
+    'pie-chart': PieChart,
+    'git-branch': GitBranch,
+    database: Database,
+    cloud: Cloud,
+    layers: Layers,
   }
   return map[iconName || 'target'] || Target
 }
@@ -94,5 +134,5 @@ export function packMatchesCategory(
   tab: 'business' | 'subsystems',
 ): boolean {
   const cat = pack.category?.toLowerCase() || ''
-  return CATEGORY_FILTERS[tab].some(f => cat.includes(f))
+  return CATEGORY_FILTERS[tab].some(f => cat === f)
 }

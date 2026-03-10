@@ -70,6 +70,7 @@ export function PlaybooksSection({ playbooksData, members }: PlaybooksSectionPro
             avatar_url: m.avatar_url,
           }))}
           universalSubsystems={playbooksData.universalSubsystems}
+          usedPackIds={playbooksData.usedPackIds}
           embedded
         />
       </div>

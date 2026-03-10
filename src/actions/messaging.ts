@@ -613,8 +613,12 @@ export async function contactExpert(
         .eq('id', providerId)
         .single()
 
-      // If providerId is not in provider_profiles, assume it's already a user_id
-      const expertUserId = provider?.user_id || providerId
+      // SECURITY: Require a valid provider profile — do not fall back to treating
+      // providerId as a user_id, which would allow messaging arbitrary users.
+      if (!provider) {
+        return { error: 'Expert not found' }
+      }
+      const expertUserId = provider.user_id
 
       // VALIDATION: Validate expert user exists
       const { data: expertProfile } = await supabase
@@ -752,6 +756,10 @@ export async function searchConversations(
   const cappedLimit = Math.min(Math.max(1, limit), 50)
   return withUser(async ({ supabase, user }) => {
     try {
+      // VALIDATION: Bound query length to prevent oversized DB searches
+      if (query.trim().length > 500) {
+        return { error: 'Search query too long (max 500 characters)' }
+      }
       if (!query.trim()) {
         return { success: true as const, data: [] as ConversationWithParticipants[] }
       }

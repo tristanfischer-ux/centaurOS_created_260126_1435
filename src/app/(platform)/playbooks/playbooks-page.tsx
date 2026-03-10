@@ -96,6 +96,8 @@ interface PlaybooksPageProps {
   foundryContext?: FoundryContext
   members?: TeamMember[]
   universalSubsystems?: UniversalSubsystem[]
+  /** Pack IDs that have already been used to create objectives in the current foundry */
+  usedPackIds?: string[]
   /** When true, hides the standalone page header (used when embedded below objectives) */
   embedded?: boolean
 }
@@ -107,6 +109,7 @@ export function PlaybooksPage({
   foundryContext,
   members = [],
   universalSubsystems = [],
+  usedPackIds = [],
   embedded = false,
 }: PlaybooksPageProps) {
   const [activeTab, setActiveTab] = useState<PlaybookTabId>('by-need')
@@ -115,6 +118,8 @@ export function PlaybooksPage({
   const [savedPackIds, setSavedPackIds] = useState<Set<string>>(
     new Set(initialSavedPackIds),
   )
+
+  const usedPackIdSet = useMemo(() => new Set(usedPackIds), [usedPackIds])
 
   // Universal Subsystems state
   const [selectedSubsystem, setSelectedSubsystem] = useState<UniversalSubsystem | null>(null)
@@ -278,6 +283,94 @@ export function PlaybooksPage({
     return sorted
   }, [selectedNeed, needGroups, debouncedSearch, difficultyFilter, sortBy])
 
+  const filteredPopularPacks = useMemo(() => {
+    let filtered = [...popularPacks]
+
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase()
+      filtered = filtered.filter(
+        p =>
+          p.title?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q) ||
+          p.items?.some(i => i.title?.toLowerCase().includes(q)),
+      )
+    }
+
+    if (difficultyFilter !== 'all') {
+      filtered = filtered.filter(
+        p => p.difficulty?.toLowerCase() === difficultyFilter.toLowerCase(),
+      )
+    }
+
+    switch (sortBy) {
+      case 'name':
+        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        break
+      case 'difficulty': {
+        const order: Record<string, number> = { Easy: 1, Medium: 2, Hard: 3 }
+        filtered.sort(
+          (a, b) =>
+            (order[a.difficulty || ''] || 2) - (order[b.difficulty || ''] || 2),
+        )
+        break
+      }
+      case 'duration':
+        filtered.sort((a, b) => {
+          const n = (s: string | null | undefined) => {
+            const m = s?.match(/(\d+)/)
+            return m ? parseInt(m[1]) : 999
+          }
+          return n(a.estimated_duration) - n(b.estimated_duration)
+        })
+        break
+    }
+    return filtered
+  }, [popularPacks, debouncedSearch, difficultyFilter, sortBy])
+
+  const filteredSavedPacks = useMemo(() => {
+    let filtered = [...savedPacks]
+
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase()
+      filtered = filtered.filter(
+        p =>
+          p.title?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q) ||
+          p.items?.some(i => i.title?.toLowerCase().includes(q)),
+      )
+    }
+
+    if (difficultyFilter !== 'all') {
+      filtered = filtered.filter(
+        p => p.difficulty?.toLowerCase() === difficultyFilter.toLowerCase(),
+      )
+    }
+
+    switch (sortBy) {
+      case 'name':
+        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+        break
+      case 'difficulty': {
+        const order: Record<string, number> = { Easy: 1, Medium: 2, Hard: 3 }
+        filtered.sort(
+          (a, b) =>
+            (order[a.difficulty || ''] || 2) - (order[b.difficulty || ''] || 2),
+        )
+        break
+      }
+      case 'duration':
+        filtered.sort((a, b) => {
+          const n = (s: string | null | undefined) => {
+            const m = s?.match(/(\d+)/)
+            return m ? parseInt(m[1]) : 999
+          }
+          return n(a.estimated_duration) - n(b.estimated_duration)
+        })
+        break
+    }
+    return filtered
+  }, [savedPacks, debouncedSearch, difficultyFilter, sortBy])
+
   const availableDifficulties = useMemo(
     () => [...new Set(packs.map(p => p.difficulty).filter(Boolean))] as string[],
     [packs],
@@ -295,7 +388,7 @@ export function PlaybooksPage({
       id: 'by-need',
       label: 'By Need',
       icon: Target,
-      count: gapCount > 0 ? gapCount : allFunctionalPacks.length,
+      count: allFunctionalPacks.length,
       iconColor: 'text-electric-blue',
       activeClasses: 'bg-electric-blue/10 text-electric-blue border-electric-blue',
       group: 'discover',
@@ -560,6 +653,8 @@ export function PlaybooksPage({
                   isSaved={savedPackIds.has(pack.id)}
                   onSaveToggle={handleSaveToggle}
                   members={members}
+                  alreadyUsed={usedPackIdSet.has(pack.id)}
+                  whyTag={needGroups.find(g => g.id === selectedNeed)?.hasGap ? 'Recommended — addresses a gap in your team' : undefined}
                 />
               ))}
             </div>
@@ -577,6 +672,7 @@ export function PlaybooksPage({
           onSaveToggle={handleSaveToggle}
           defaultIndustry={ctx?.industry || undefined}
           members={members}
+          usedPackIds={usedPackIdSet}
         />
       )}
 
@@ -639,17 +735,91 @@ export function PlaybooksPage({
             Browse all available objective packs, sorted by comprehensiveness.
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-            {popularPacks.map(pack => (
-              <PackCard
-                key={pack.id}
-                pack={pack}
-                isSaved={savedPackIds.has(pack.id)}
-                onSaveToggle={handleSaveToggle}
-                members={members}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1 max-w-lg">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search packs..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
               />
-            ))}
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={sortBy} onValueChange={v => setSortBy(v as typeof sortBy)}>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="relevance">Relevant</SelectItem>
+                  <SelectItem value="name">Name A-Z</SelectItem>
+                  <SelectItem value="difficulty">Difficulty</SelectItem>
+                  <SelectItem value="duration">Duration</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Difficulty" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All levels</SelectItem>
+                  {availableDifficulties.map(d => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs gap-1">
+                  <X className="h-3 w-3" /> Clear
+                </Button>
+              )}
+            </div>
           </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">
+              {filteredPopularPacks.length} {filteredPopularPacks.length === 1 ? 'pack' : 'packs'}
+            </span>
+            {hasActiveFilters && (
+              <Badge variant="secondary" className="text-xs">Filtered</Badge>
+            )}
+          </div>
+
+          {filteredPopularPacks.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-12 text-center">
+                <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                <h3 className="text-base font-semibold mb-1">No packs found</h3>
+                <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
+                  Try adjusting your search or filters.
+                </p>
+                <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
+                  <X className="h-3.5 w-3.5" /> Clear filters
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+              {filteredPopularPacks.map(pack => (
+                <PackCard
+                  key={pack.id}
+                  pack={pack}
+                  isSaved={savedPackIds.has(pack.id)}
+                  onSaveToggle={handleSaveToggle}
+                  members={members}
+                  alreadyUsed={usedPackIdSet.has(pack.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -657,7 +827,7 @@ export function PlaybooksPage({
       {/* SAVED tab                                                          */}
       {/* ================================================================== */}
       {activeTab === 'saved' && (
-        <>
+        <div className="space-y-4">
           {savedPacks.length === 0 ? (
             <Card className="border-dashed">
               <CardContent className="py-12 text-center">
@@ -669,19 +839,95 @@ export function PlaybooksPage({
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
-              {savedPacks.map(pack => (
-                <PackCard
-                  key={pack.id}
-                  pack={pack}
-                  isSaved={true}
-                  onSaveToggle={handleSaveToggle}
-                  members={members}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1 max-w-lg">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search saved packs..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-10 pr-10"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={sortBy} onValueChange={v => setSortBy(v as typeof sortBy)}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="relevance">Relevant</SelectItem>
+                      <SelectItem value="name">Name A-Z</SelectItem>
+                      <SelectItem value="difficulty">Difficulty</SelectItem>
+                      <SelectItem value="duration">Duration</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue placeholder="Difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All levels</SelectItem>
+                      {availableDifficulties.map(d => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs gap-1">
+                      <X className="h-3 w-3" /> Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">
+                  {filteredSavedPacks.length} {filteredSavedPacks.length === 1 ? 'pack' : 'packs'}
+                </span>
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="text-xs">Filtered</Badge>
+                )}
+              </div>
+
+              {filteredSavedPacks.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="py-12 text-center">
+                    <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                    <h3 className="text-base font-semibold mb-1">No packs found</h3>
+                    <p className="text-sm text-muted-foreground max-w-sm mx-auto mb-3">
+                      Try adjusting your search or filters.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={clearFilters} className="gap-1.5">
+                      <X className="h-3.5 w-3.5" /> Clear filters
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-fade-in">
+                  {filteredSavedPacks.map(pack => (
+                    <PackCard
+                      key={pack.id}
+                      pack={pack}
+                      isSaved={true}
+                      onSaveToggle={handleSaveToggle}
+                      members={members}
+                      alreadyUsed={usedPackIdSet.has(pack.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
 
       {/* Subsystem dialogs */}

@@ -39,6 +39,9 @@ export function usePresence(options: UsePresenceOptions = {}) {
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null)
   const awayTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const lastActivityRef = useRef<number>(Date.now())
+  // GOTCHA: Ref mirror of myPresence avoids stale closures in intervals/timeouts
+  // registered inside the mount-only useEffect (which captures initial null).
+  const myPresenceRef = useRef<UserPresence | null>(null)
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -77,8 +80,10 @@ export function usePresence(options: UsePresenceOptions = {}) {
         return null
       }
       
-      setMyPresence(data as UserPresence)
-      return data as UserPresence
+      const presence = data as UserPresence
+      setMyPresence(presence)
+      myPresenceRef.current = presence
+      return presence
     } catch (err) {
       // Properly log caught errors
       console.error('Failed to update presence:', {
@@ -129,29 +134,32 @@ export function usePresence(options: UsePresenceOptions = {}) {
 
   // Set current working task
   const setWorkingOn = useCallback((taskId: string | null) => {
-    return updatePresence(myPresence?.status || 'online', taskId)
-  }, [updatePresence, myPresence?.status])
+    return updatePresence(myPresenceRef.current?.status || 'online', taskId)
+  }, [updatePresence])
 
   // Record user activity (resets away timer)
+  // GOTCHA: Uses myPresenceRef to avoid stale closures in event listeners
+  // registered in the mount-only useEffect.
   const recordActivity = useCallback(() => {
     lastActivityRef.current = Date.now()
-    
+
     // If we were away, go back online
-    if (myPresence?.status === 'away') {
-      goOnline(myPresence.current_task_id || undefined)
+    const current = myPresenceRef.current
+    if (current?.status === 'away') {
+      goOnline(current.current_task_id || undefined)
     }
-    
+
     // Reset away timeout
     if (awayTimeoutRef.current) {
       clearTimeout(awayTimeoutRef.current)
     }
     awayTimeoutRef.current = setTimeout(() => {
       // Only go away if we're currently online (not focus mode)
-      if (myPresence?.status === 'online') {
+      if (myPresenceRef.current?.status === 'online') {
         goAway()
       }
     }, awayTimeout)
-  }, [myPresence, goOnline, goAway, awayTimeout])
+  }, [goOnline, goAway, awayTimeout])
 
   // Fetch team presence
   const fetchTeamPresence = useCallback(async () => {
@@ -246,6 +254,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
                 // Update my presence if it's mine
                 if (newPresence.user_id === user.id) {
                   setMyPresence(newPresence)
+                  myPresenceRef.current = newPresence
                 }
               }
             }
@@ -255,12 +264,13 @@ export function usePresence(options: UsePresenceOptions = {}) {
           })
 
         // Start heartbeat only if initialized successfully
+        // GOTCHA: Uses myPresenceRef to avoid stale closure over initial null state
         heartbeatRef.current = setInterval(async () => {
           if (!mounted || !initialized) return
-          
-          const currentStatus = myPresence?.status
-          if (currentStatus && currentStatus !== 'offline') {
-            await updatePresence(currentStatus, myPresence?.current_task_id)
+
+          const current = myPresenceRef.current
+          if (current?.status && current.status !== 'offline') {
+            await updatePresence(current.status, current.current_task_id)
           }
         }, heartbeatInterval)
 
@@ -272,7 +282,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
 
         // Initial away timeout
         awayTimeoutRef.current = setTimeout(() => {
-          if (mounted && myPresence?.status === 'online') {
+          if (mounted && myPresenceRef.current?.status === 'online') {
             goAway()
           }
         }, awayTimeout)
@@ -329,15 +339,14 @@ export function usePresence(options: UsePresenceOptions = {}) {
   }, [recordActivity])
 
   // Handle beforeunload to go offline
+  // DECISION: Removed broken sendBeacon (no auth headers possible).
+  // Offline transition relies on: (1) useEffect cleanup calling goOffline(),
+  // (2) server-side heartbeat timeout detecting stale last_seen.
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable offline status
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-      if (supabaseUrl && myPresence?.user_id) {
-        navigator.sendBeacon(
-          `${supabaseUrl}/rest/v1/rpc/upsert_presence`,
-          JSON.stringify({ p_status: 'offline' })
-        )
+      // Use fetch with keepalive for reliable offline status on page close
+      if (myPresenceRef.current?.user_id) {
+        updatePresence('offline')
       }
     }
 
@@ -345,7 +354,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
     }
-  }, [myPresence?.user_id])
+  }, [updatePresence])
 
   return {
     myPresence,

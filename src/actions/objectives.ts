@@ -88,6 +88,7 @@ export async function createObjective(formData: FormData) {
                     creator_id: user.id,
                     foundry_id: foundryId,
                     is_private: isPrivate,
+                    source_pack_id: validatedPlaybookId || null,
                     ...(parentObjectiveId ? { parent_objective_id: parentObjectiveId } : {}),
                     ...(startDate ? { start_date: startDate } : {}),
                     ...(endDate ? { end_date: endDate } : {}),
@@ -767,6 +768,9 @@ export async function createObjectiveFromSubsystem(input: {
     packSummary: string | null
     packDescription: string | null
     selectedTaskIndices: number[]
+    customTitle?: string
+    customDescription?: string
+    dueDate?: string
     tasks: Array<{
         order: number
         title: string
@@ -792,9 +796,9 @@ export async function createObjectiveFromSubsystem(input: {
             input.selectedTaskIndices.includes(index)
         )
 
-        // Create the objective
-        const objectiveTitle = input.packTitle
-        const objectiveDescription = input.packSummary || `Objective pack for ${input.subsystemName}`
+        // Create the objective — prefer user-customised title/description over pack defaults
+        const objectiveTitle = input.customTitle?.trim() || input.packTitle
+        const objectiveDescription = input.customDescription?.trim() || input.packSummary || `Objective pack for ${input.subsystemName}`
         const extendedDescription = input.packDescription || null
 
         try {
@@ -805,8 +809,10 @@ export async function createObjectiveFromSubsystem(input: {
                     title: objectiveTitle,
                     description: objectiveDescription,
                     extended_description: extendedDescription,
+                    ...(input.dueDate ? { end_date: new Date(input.dueDate).toISOString() } : {}),
                     creator_id: user.id,
                     foundry_id: foundryId,
+                    source_pack_id: input.packId,
                 })
                 .select()
                 .single()

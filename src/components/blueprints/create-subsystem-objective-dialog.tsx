@@ -10,7 +10,7 @@
  * @component
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Dialog,
@@ -21,6 +21,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -135,7 +138,20 @@ export function CreateSubsystemObjectiveDialog({
   const [selectedTasks, setSelectedTasks] = useState<Set<number>>(
     new Set(objectivePack?.tasks.map((_, i) => i) || [])
   )
-  
+  const [objectiveTitle, setObjectiveTitle] = useState(objectivePack?.title || '')
+  const [objectiveDescription, setObjectiveDescription] = useState(objectivePack?.summary || '')
+  const [dueDate, setDueDate] = useState('')
+
+  // Reset editable fields when objectivePack changes
+  useEffect(() => {
+    if (objectivePack) {
+      setObjectiveTitle(objectivePack.title)
+      setObjectiveDescription(objectivePack.summary || '')
+      setSelectedTasks(new Set(objectivePack.tasks.map((_, i) => i)))
+      setDueDate('')
+    }
+  }, [objectivePack])
+
   if (!subsystem || !objectivePack) return null
   
   const toggleTask = (index: number) => {
@@ -180,6 +196,9 @@ export function CreateSubsystemObjectiveDialog({
         packSummary: objectivePack.summary,
         packDescription: objectivePack.extended_description,
         selectedTaskIndices: Array.from(selectedTasks),
+        customTitle: objectiveTitle,
+        customDescription: objectiveDescription,
+        dueDate: dueDate || undefined,
         tasks: objectivePack.tasks,
       })
       
@@ -217,6 +236,38 @@ export function CreateSubsystemObjectiveDialog({
           </DialogDescription>
         </DialogHeader>
         
+        {/* Editable title, description, and due date */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="objective-title">Title</Label>
+            <Input
+              id="objective-title"
+              value={objectiveTitle}
+              onChange={(e) => setObjectiveTitle(e.target.value)}
+              placeholder="Objective title"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="objective-description">Description</Label>
+            <Textarea
+              id="objective-description"
+              value={objectiveDescription}
+              onChange={(e) => setObjectiveDescription(e.target.value)}
+              placeholder="Describe the objective..."
+              rows={3}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="objective-due-date">Due date</Label>
+            <Input
+              id="objective-due-date"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
+        </div>
+
         {/* Task selection */}
         <div className="flex-1 overflow-hidden">
           <div className="flex items-center justify-between mb-3">

@@ -81,4 +81,6 @@ export interface PlaybooksData {
   initialSavedPackIds: string[]
   foundryContext: import('@/actions/foundry-context').FoundryContext | null
   universalSubsystems: import('@/types/blueprints').UniversalSubsystem[]
+  /** Pack IDs that have already been used to create objectives in the current foundry */
+  usedPackIds: string[]
 }

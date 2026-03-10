@@ -17,10 +17,13 @@ import {
   ChevronUp,
   Info,
   CircleDashed,
+  AlertCircle,
+  Trophy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { UserAvatar } from '@/components/ui/user-avatar'
@@ -71,6 +74,8 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
   const setOpen = onOpenChange ?? setInternalOpen
   const [isCreating, setIsCreating] = useState(false)
   const [objectiveTitle, setObjectiveTitle] = useState(pack.title)
+  const [objectiveDescription, setObjectiveDescription] = useState(pack.description || '')
+  const [dueDate, setDueDate] = useState('')
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>(
     pack.items?.map(item => item.id) || []
   )
@@ -95,8 +100,11 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
     try {
       const formData = new FormData()
       formData.append('title', objectiveTitle)
-      formData.append('description', pack.description || '')
+      formData.append('description', objectiveDescription)
       formData.append('playbookId', pack.id)
+      if (dueDate) {
+        formData.append('end_date', dueDate)
+      }
       selectedTaskIds.forEach(id => {
         formData.append('selectedTaskIds', id)
       })
@@ -229,6 +237,46 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
               </Card>
             </div>
 
+            {/* Prerequisites */}
+            {pack.prerequisites && pack.prerequisites.length > 0 && (
+              <Card className="border-status-warning/30">
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-status-warning" />
+                    Prerequisites
+                  </h3>
+                  <ul className="space-y-2">
+                    {pack.prerequisites.map((prereq, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <AlertCircle className="h-3.5 w-3.5 text-status-warning shrink-0 mt-0.5" />
+                        <span>{prereq}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Success Criteria */}
+            {pack.success_criteria && pack.success_criteria.length > 0 && (
+              <Card className="border-status-success/30">
+                <CardContent className="pt-6">
+                  <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <Trophy className="h-4 w-4 text-status-success" />
+                    Success Criteria
+                  </h3>
+                  <ul className="space-y-2">
+                    {pack.success_criteria.map((criterion, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-status-success shrink-0 mt-0.5" />
+                        <span>{criterion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+
             {/* What you'll accomplish */}
             <Card className="bg-orange-50/50 border-orange-100">
               <CardContent className="pt-6">
@@ -291,6 +339,79 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
               <p className="text-xs text-muted-foreground">
                 Customize the objective title to fit your specific needs
               </p>
+            </div>
+
+            {/* Objective Description */}
+            <div className="space-y-2">
+              <Label htmlFor="objective-description">Description</Label>
+              <Textarea
+                id="objective-description"
+                value={objectiveDescription}
+                onChange={(e) => setObjectiveDescription(e.target.value)}
+                placeholder="Describe this objective..."
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                Customize the objective description to fit your specific needs
+              </p>
+            </div>
+
+            {/* Due Date */}
+            <div className="space-y-2">
+              <Label htmlFor="objective-due-date">Due Date (optional)</Label>
+              <Input
+                id="objective-due-date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+
+            {/* Bulk Assignee */}
+            <div className="space-y-2">
+              <Label>Assign all tasks to</Label>
+              <Select
+                value={undefined}
+                onValueChange={(value) => {
+                  const updated = { ...taskAssignees }
+                  for (const key of Object.keys(updated)) {
+                    updated[key] = value
+                  }
+                  setTaskAssignees(updated)
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose team member..." />
+                </SelectTrigger>
+                <SelectContent className="min-w-[200px]">
+                  <SelectItem value="unassigned" className="py-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <CircleDashed className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <span>Unassigned</span>
+                    </div>
+                  </SelectItem>
+                  {members
+                    .filter((member) => member.role !== 'AI_Agent')
+                    .map((member) => (
+                    <SelectItem key={member.id} value={member.id} className="py-2.5">
+                      <div className="flex items-center gap-2">
+                        <UserAvatar
+                          name={member.full_name}
+                          role={member.role}
+                          avatarUrl={member.avatar_url}
+                          size="sm"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">{member.full_name}</span>
+                          <span className="text-xs text-muted-foreground">{member.role}</span>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Task Selection */}

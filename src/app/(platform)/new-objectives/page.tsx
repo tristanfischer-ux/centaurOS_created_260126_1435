@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
 import { ObjectivesBoard } from './objectives-board'
 import { getBlueprintTemplates } from '@/actions/blueprints'
-import { getObjectivePacks, getSavedPackIds } from '@/actions/packs'
+import { getObjectivePacks, getSavedPackIds, getUsedPackIds } from '@/actions/packs'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getUniversalSubsystems } from '@/actions/universal-subsystems'
 
@@ -119,6 +119,7 @@ export default async function NewObjectivesPage() {
     templatesResult,
     packsResult,
     savedPacksResult,
+    usedPacksResult,
     foundryContext,
     universalSubsystems,
   ] = await Promise.all([
@@ -127,6 +128,7 @@ export default async function NewObjectivesPage() {
     getBlueprintTemplates(),
     getObjectivePacks(),
     getSavedPackIds(),
+    getUsedPackIds(),
     getFoundryContext(),
     getUniversalSubsystems(),
   ])
@@ -145,6 +147,7 @@ export default async function NewObjectivesPage() {
     templates: templatesResult.data || [],
     packs: packsResult.packs || [],
     initialSavedPackIds: Array.from(savedPacksResult.savedIds || []),
+    usedPackIds: Array.from(usedPacksResult.usedIds || []),
     foundryContext,
     universalSubsystems,
   }

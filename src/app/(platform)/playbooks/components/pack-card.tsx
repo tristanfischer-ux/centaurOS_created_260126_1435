@@ -39,9 +39,11 @@ interface PackCardProps {
   whyTag?: string
   /** Team members available for task assignment */
   members?: TeamMember[]
+  /** Whether this pack has already been used to create an objective in the current foundry */
+  alreadyUsed?: boolean
 }
 
-export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members = [] }: PackCardProps) {
+export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members = [], alreadyUsed = false }: PackCardProps) {
   const Icon = getPackIcon(pack.icon_name)
   const taskCount = pack.items?.length || 0
   const previewTasks = pack.items?.slice(0, 3) || []
@@ -124,6 +126,11 @@ export function PackCard({ pack, isSaved = false, onSaveToggle, whyTag, members 
               {pack.difficulty && (
                 <Badge className={cn('text-[10px]', getDifficultyColor(pack.difficulty))}>
                   {pack.difficulty}
+                </Badge>
+              )}
+              {alreadyUsed && (
+                <Badge variant="secondary" className="text-[10px]">
+                  Already used
                 </Badge>
               )}
               <span className="text-xs text-muted-foreground flex items-center gap-1">
