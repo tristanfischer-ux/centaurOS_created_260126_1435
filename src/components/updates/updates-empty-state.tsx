@@ -52,7 +52,7 @@ export function ThreadEmptyState() {
   return (
     <EmptyState
       icon={
-        <div className="w-16 h-16 rounded-2xl bg-muted border flex items-center justify-center opacity-100">
+        <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center opacity-100">
           <MousePointerClick className="h-8 w-8 text-muted-foreground" />
         </div>
       }

@@ -218,10 +218,12 @@ export function useConversation(
               })
 
               // Auto-mark as read if from other user and option enabled
-              if (autoMarkRead && 
-                  currentUserRef.current && 
+              if (autoMarkRead &&
+                  currentUserRef.current &&
                   newMessage.sender_id !== currentUserRef.current) {
-                markConversationRead(conversationId)
+                markConversationRead(conversationId).catch(err =>
+                  console.error('[useConversation] Auto-mark read failed:', err)
+                )
               }
             }
           }

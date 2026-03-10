@@ -65,12 +65,17 @@ export function UpdatesThreadPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const onItemsReadRef = useRef(onItemsRead)
   onItemsReadRef.current = onItemsRead
+  const activeSourceRef = useRef(sourceId)
+  activeSourceRef.current = sourceId
 
   // Fetch thread data
   const fetchThread = useCallback(async () => {
     setIsLoading(true)
     try {
       const result = await getThreadForSource(sourceType, sourceId)
+      // Guard: if user switched sources while fetch was in-flight, discard
+      if (activeSourceRef.current !== sourceId) return
+
       if (result.success && result.data) {
         setThreadData(result.data)
 
