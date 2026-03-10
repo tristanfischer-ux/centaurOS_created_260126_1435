@@ -83,13 +83,20 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
   const maxCompleted = Math.max(...trendPoints.map(d => d.completed), 1)
   const maxCreated = Math.max(...trendPoints.map(d => d.created), 1)
 
+  // INTENT: Append T00:00:00 to date-only strings to prevent timezone-related
+  // off-by-one errors (e.g. "2026-03-10" parsed as UTC midnight → Mar 9 in US timezones)
+  const safeDate = (d: string) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return new Date(d + 'T00:00:00')
+    return new Date(d)
+  }
+
   const generatedDate = coverData?.generatedAt
-    ? format(new Date(coverData.generatedAt), 'd MMM yyyy')
-    : format(new Date(document.generatedAt), 'd MMM yyyy')
+    ? format(safeDate(coverData.generatedAt), 'd MMM yyyy')
+    : format(safeDate(document.generatedAt), 'd MMM yyyy')
 
   const dateRangeLabel = coverData
-    ? `${format(new Date(coverData.dateRange.start), 'd MMM')} – ${format(new Date(coverData.dateRange.end), 'd MMM yyyy')}`
-    : `${format(new Date(document.dateRange.start), 'd MMM')} – ${format(new Date(document.dateRange.end), 'd MMM yyyy')}`
+    ? `${format(safeDate(coverData.dateRange.start), 'd MMM')} – ${format(safeDate(coverData.dateRange.end), 'd MMM yyyy')}`
+    : `${format(safeDate(document.dateRange.start), 'd MMM')} – ${format(safeDate(document.dateRange.end), 'd MMM yyyy')}`
 
   return (
     <div className="max-w-2xl mx-auto aspect-[210/297] overflow-hidden rounded-xl border shadow-lg bg-background flex flex-col">

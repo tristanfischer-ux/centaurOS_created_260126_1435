@@ -230,6 +230,10 @@ export default function ReportsPage(): React.JSX.Element {
   const infographicRef = useRef<HTMLDivElement>(null)
   const briefingRef = useRef<HTMLDivElement>(null)
   const briefingContentRef = useRef<HTMLDivElement>(null)
+  // INTENT: Refs for synchronous double-click guards. useState closures can be stale
+  // within the same render cycle, so two rapid clicks bypass `if (isGenerating) return`.
+  const isGeneratingReportRef = useRef(false)
+  const isGeneratingBriefingRef = useRef(false)
 
   // Change 6: Tab-level page mode
   const [pageMode, setPageMode] = useState<PageMode>('reports')
@@ -237,7 +241,10 @@ export default function ReportsPage(): React.JSX.Element {
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)
   const [enabledSections, setEnabledSections] = useState<Set<ReportSectionType>>(defaultSections)
-  const [tone, setTone] = useState<ReportTone>('internal')
+  // DECISION: Separate tone per tab to prevent cross-tab interference.
+  // Before tab-split, tone was shared. Now each workflow has its own.
+  const [reportTone, setReportTone] = useState<ReportTone>('internal')
+  const [briefingTone, setBriefingTone] = useState<ReportTone>('internal')
   const [detailLevel, setDetailLevel] = useState<ReportDetailLevel>('standard')
   // INTENT: Separate generating state per tab to prevent cross-tab interference.
   // Reports and presentations can't be generated simultaneously, but if one is
@@ -291,12 +298,12 @@ export default function ReportsPage(): React.JSX.Element {
   // GOTCHA: new Date('YYYY-MM-DD') parses as UTC midnight — toLocaleDateString in UTC-
   // timezones shifts to the previous day. Appending T12:00:00 avoids the off-by-one.
   const configSummary = useMemo(() => {
-    const toneLabel = TONE_OPTIONS.find(t => t.value === tone)?.label ?? tone
+    const toneLabel = TONE_OPTIONS.find(t => t.value === reportTone)?.label ?? reportTone
     const detailLabel = DETAIL_OPTIONS.find(d => d.value === detailLevel)?.label ?? detailLevel
     const start = new Date(dateRange.start + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     const end = new Date(dateRange.end + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
     return `${toneLabel} tone · ${detailLabel} · ${start}–${end} · ${enabledCount} ${enabledCount === 1 ? 'section' : 'sections'}`
-  }, [tone, detailLevel, dateRange, enabledCount])
+  }, [reportTone, detailLevel, dateRange, enabledCount])
 
   const handleTemplateSelect = useCallback((templateId: ReportTemplateId) => {
     setSelectedTemplate(templateId)
@@ -310,18 +317,15 @@ export default function ReportsPage(): React.JSX.Element {
     setIsConfigExpanded(templateId === 'custom')
 
     if (templateId === 'board-pack') {
-      setTone('board')
+      setReportTone('board')
       setDetailLevel('standard')
     } else if (templateId === 'weekly-update') {
-      setTone('internal')
+      setReportTone('internal')
       setDetailLevel('standard')
-    } else if (templateId === 'strategic-briefing') {
-      setTone('investor')
-    } else if (templateId === 'skill-document') {
-      setTone('internal')
     }
     setReportDocument(null)
-    setBriefingResult(null)
+    // INTENT: Don't clear briefingResult here — it lives on the Presentations tab
+    // and shouldn't be destroyed when the user changes report templates.
     setShareUrl(null)
     setLastSnapshotId(null)
   }, [])
@@ -348,10 +352,12 @@ export default function ReportsPage(): React.JSX.Element {
   }, [])
 
   const handleGenerate = useCallback(async () => {
-    if (isGeneratingReport) return
+    if (isGeneratingReportRef.current) return
+    isGeneratingReportRef.current = true
     setIsGeneratingReport(true)
     setGenerationStep(0)
-    setReportDocument(null)
+    // INTENT: Don't clear the previous report until we have a new one.
+    // This preserves the old report if generation fails.
     setShareUrl(null)
     setLastSnapshotId(null)
 
@@ -365,7 +371,7 @@ export default function ReportsPage(): React.JSX.Element {
         templateId: selectedTemplate,
         sections,
         dateRange,
-        tone,
+        tone: reportTone,
         detailLevel,
       })
 
@@ -391,18 +397,23 @@ export default function ReportsPage(): React.JSX.Element {
       toast.error(`Report generation failed: ${message}`)
     } finally {
       clearInterval(stepInterval)
+      isGeneratingReportRef.current = false
       setIsGeneratingReport(false)
     }
-  }, [isGeneratingReport, enabledSections, selectedTemplate, dateRange, tone, detailLevel])
+  }, [enabledSections, selectedTemplate, dateRange, reportTone, detailLevel])
 
   // Quick-start: select template + immediately generate
   // DECISION: We compute parameters directly from getTemplate() rather than relying
   // on state, because React batches state updates and they won't be committed yet.
   const handleQuickStart = useCallback((templateId: ReportTemplateId) => {
-    if (isGeneratingReport) return
+    if (isGeneratingReportRef.current) return
+    isGeneratingReportRef.current = true
     handleTemplateSelect(templateId)
     // For "custom", just expand config — don't auto-generate
-    if (templateId === 'custom') return
+    if (templateId === 'custom') {
+      isGeneratingReportRef.current = false
+      return
+    }
 
     const template = getTemplate(templateId)
     const sections = template.defaultSections.filter(s => s.enabled).map(s => s.type)
@@ -445,13 +456,16 @@ export default function ReportsPage(): React.JSX.Element {
       })
       .finally(() => {
         clearInterval(stepInterval)
+        isGeneratingReportRef.current = false
         setIsGeneratingReport(false)
       })
-  }, [handleTemplateSelect, isGeneratingReport])
+  }, [handleTemplateSelect])
 
   const handleGenerateBriefing = useCallback(async () => {
-    if (isGeneratingBriefing) return
+    if (isGeneratingBriefingRef.current) return
+    isGeneratingBriefingRef.current = true
     if (!briefingContext.trim()) {
+      isGeneratingBriefingRef.current = false
       toast.error('Provide source material for the briefing')
       return
     }
@@ -462,7 +476,7 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       const result = await generateBriefingAction({
         sourceContext: briefingContext,
-        tone,
+        tone: briefingTone,
         includeCompanyData,
       })
 
@@ -483,9 +497,10 @@ export default function ReportsPage(): React.JSX.Element {
       const message = error instanceof Error ? error.message : 'Unexpected error'
       toast.error(`Briefing generation failed: ${message}`)
     } finally {
+      isGeneratingBriefingRef.current = false
       setIsGeneratingBriefing(false)
     }
-  }, [isGeneratingBriefing, briefingContext, tone, includeCompanyData])
+  }, [briefingContext, briefingTone, includeCompanyData])
 
   const handleExportBriefingPPTX = useCallback(async () => {
     if (!briefingResult) return
@@ -577,13 +592,15 @@ export default function ReportsPage(): React.JSX.Element {
       const result = await generateAIInfographic(reportDocument)
       if (result.success && result.imageUrl) {
         const response = await fetch(result.imageUrl)
+        if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`)
         const blob = await response.blob()
         const url = URL.createObjectURL(blob)
         const a = window.document.createElement('a')
         a.href = url
         a.download = `${reportDocument.foundryName.replace(/\s+/g, '-')}-ai-infographic-${reportDocument.dateRange.start}.png`
         a.click()
-        URL.revokeObjectURL(url)
+        // INTENT: Delay revocation so the browser has time to start the download
+        setTimeout(() => URL.revokeObjectURL(url), 5_000)
         toast.success('AI infographic downloaded')
       } else {
         toast.error(result.error ?? 'Failed to generate AI infographic')
@@ -835,10 +852,10 @@ export default function ReportsPage(): React.JSX.Element {
                             <button
                               key={option.value}
                               type="button"
-                              onClick={() => setTone(option.value)}
+                              onClick={() => setReportTone(option.value)}
                               className={cn(
                                 'rounded-lg border px-3 py-2 text-sm transition-all',
-                                tone === option.value
+                                reportTone === option.value
                                   ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
                                   : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
                               )}
@@ -1086,9 +1103,9 @@ export default function ReportsPage(): React.JSX.Element {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <h2 className={typography.h3}>Report Preview</h2>
-                        {tone !== 'internal' && (
+                        {reportTone !== 'internal' && (
                           <Badge variant="secondary" className="text-xs">
-                            {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                            {TONE_OPTIONS.find(t => t.value === reportTone)?.label} tone
                           </Badge>
                         )}
                       </div>
@@ -1255,10 +1272,10 @@ export default function ReportsPage(): React.JSX.Element {
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => setTone(option.value)}
+                      onClick={() => setBriefingTone(option.value)}
                       className={cn(
                         'rounded-lg border px-3 py-2 text-sm transition-all',
-                        tone === option.value
+                        briefingTone === option.value
                           ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
                           : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
                       )}
@@ -1304,7 +1321,7 @@ export default function ReportsPage(): React.JSX.Element {
                           {briefingResult.slides.length} slides
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                          {TONE_OPTIONS.find(t => t.value === briefingTone)?.label} tone
                         </Badge>
                       </div>
                     </div>

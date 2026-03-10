@@ -340,12 +340,12 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
     }
   }
 
-  // VALIDATION: Numeric fields — guard against NaN from non-numeric form input
-  if (dayRate !== null && isNaN(dayRate)) {
-    return { success: false, error: 'Day rate must be a valid number' }
+  // VALIDATION: Numeric fields — guard against NaN and negative values
+  if (dayRate !== null && (isNaN(dayRate) || dayRate < 0)) {
+    return { success: false, error: 'Day rate must be a non-negative number' }
   }
-  if (yearsExperience !== null && isNaN(yearsExperience)) {
-    return { success: false, error: 'Years of experience must be a valid number' }
+  if (yearsExperience !== null && (isNaN(yearsExperience) || yearsExperience < 0)) {
+    return { success: false, error: 'Years of experience must be a non-negative number' }
   }
 
   // Check if provider profile exists
@@ -546,8 +546,14 @@ export async function uploadAvatar(formData: FormData): Promise<{
     return { success: false, error: 'File must be a JPEG, PNG, GIF, or WebP image' }
   }
 
-  // Build file path: {userId}/avatar.{ext}
-  const ext = file.name.split('.').pop() || 'jpg'
+  // SECURITY: Derive extension from validated MIME type, not user-controlled filename
+  const mimeExtMap: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+  }
+  const ext = mimeExtMap[file.type] || 'jpg'
   const filePath = `${user.id}/avatar.${ext}`
 
   // Upload to Supabase Storage (upsert to replace existing)

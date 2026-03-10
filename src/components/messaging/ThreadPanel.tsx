@@ -105,11 +105,12 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
         },
         async (payload) => {
           try {
+            // SECURITY: Don't fetch email — not needed on client
             const { data: newReply } = await supabase
               .from('messages')
               .select(`
                 *,
-                sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role)
+                sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, role)
               `)
               .eq('id', payload.new.id)
               .single()

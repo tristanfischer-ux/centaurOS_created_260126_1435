@@ -96,6 +96,22 @@ export function RFQCreateForm({
       return
     }
 
+    // Budget validation
+    const parsedBudgetMin = budgetMin !== '' ? parseFloat(budgetMin) : null
+    const parsedBudgetMax = budgetMax !== '' ? parseFloat(budgetMax) : null
+    if (parsedBudgetMin !== null && isNaN(parsedBudgetMin)) {
+      setError('Please enter a valid budget minimum')
+      return
+    }
+    if (parsedBudgetMax !== null && isNaN(parsedBudgetMax)) {
+      setError('Please enter a valid budget maximum')
+      return
+    }
+    if (parsedBudgetMin !== null && parsedBudgetMax !== null && parsedBudgetMin > parsedBudgetMax) {
+      setError('Budget minimum cannot exceed maximum')
+      return
+    }
+
     startTransition(async () => {
       // Get successfully uploaded file paths
       const attachmentPaths = files
@@ -109,8 +125,8 @@ export function RFQCreateForm({
           description: description.trim() || undefined,
           attachments: attachmentPaths.length > 0 ? attachmentPaths : undefined,
         },
-        budget_min: budgetMin ? parseFloat(budgetMin) : null,
-        budget_max: budgetMax ? parseFloat(budgetMax) : null,
+        budget_min: parsedBudgetMin,
+        budget_max: parsedBudgetMax,
         deadline: deadline || null,
         category: category || null,
         urgency,

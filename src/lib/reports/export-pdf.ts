@@ -59,14 +59,19 @@ export async function exportReportAsPDF(
   }
 
   const pdfPromise = html2pdf().set(options).from(element).save()
-  const timeoutPromise = new Promise<never>((_resolve, reject) =>
-    setTimeout(
+  let timeoutId: ReturnType<typeof setTimeout>
+  const timeoutPromise = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(
       () => reject(new Error('PDF generation timed out. Try using your browser\'s Print function instead.')),
       PDF_GENERATION_TIMEOUT_MS
     )
-  )
+  })
 
-  await Promise.race([pdfPromise, timeoutPromise])
+  try {
+    await Promise.race([pdfPromise, timeoutPromise])
+  } finally {
+    clearTimeout(timeoutId!)
+  }
 }
 
 /**
@@ -86,6 +91,11 @@ export function printReport(element: HTMLElement, title: string): void {
     throw new Error('Pop-up blocked. Please allow pop-ups for this site.')
   }
 
+  // SECURITY: Escape title to prevent XSS via document.write()
+  const escapeHtml = (str: string) =>
+    str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  const safeTitle = escapeHtml(title)
+
   // Collect stylesheets from the current document
   const styleSheets = Array.from(document.styleSheets)
     .map(sheet => {
@@ -98,11 +108,20 @@ export function printReport(element: HTMLElement, title: string): void {
     })
     .join('\n')
 
+  // INTENT: Assign onload BEFORE document.close() so it fires reliably.
+  // Some browsers fire onload synchronously during close().
+  printWindow.onload = () => {
+    setTimeout(() => {
+      printWindow.print()
+      printWindow.close()
+    }, 500)
+  }
+
   printWindow.document.write(`
     <!DOCTYPE html>
     <html>
     <head>
-      <title>${title}</title>
+      <title>${safeTitle}</title>
       <style>
         ${styleSheets}
         @media print {
@@ -122,12 +141,4 @@ export function printReport(element: HTMLElement, title: string): void {
   `)
 
   printWindow.document.close()
-
-  // Wait for styles and images to load before printing
-  printWindow.onload = () => {
-    setTimeout(() => {
-      printWindow.print()
-      printWindow.close()
-    }, 500)
-  }
 }

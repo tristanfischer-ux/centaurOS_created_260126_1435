@@ -97,9 +97,16 @@ export function RFQResponseForm({
   const handleSubmit = (responseType: 'accept' | 'info_request' | 'decline' | 'interest') => {
     setError(null)
 
-    if (responseType === 'accept' && quotedPrice === '') {
-      setError('Please provide a quoted price')
-      return
+    if (responseType === 'accept') {
+      if (quotedPrice === '') {
+        setError('Please provide a quoted price')
+        return
+      }
+      const price = parseFloat(quotedPrice)
+      if (isNaN(price) || price < 0) {
+        setError('Please provide a valid non-negative price')
+        return
+      }
     }
 
     if (responseType === 'info_request' && !message.trim()) {
@@ -107,8 +114,16 @@ export function RFQResponseForm({
       return
     }
 
-    if (responseType === 'interest' && indicativeMin && indicativeMax) {
-      if (parseFloat(indicativeMin) > parseFloat(indicativeMax)) {
+    if (responseType === 'interest') {
+      if (indicativeMin && (isNaN(parseFloat(indicativeMin)) || parseFloat(indicativeMin) < 0)) {
+        setError('Please enter a valid non-negative minimum estimate')
+        return
+      }
+      if (indicativeMax && (isNaN(parseFloat(indicativeMax)) || parseFloat(indicativeMax) < 0)) {
+        setError('Please enter a valid non-negative maximum estimate')
+        return
+      }
+      if (indicativeMin && indicativeMax && parseFloat(indicativeMin) > parseFloat(indicativeMax)) {
         setError('Minimum estimate cannot exceed maximum estimate')
         return
       }

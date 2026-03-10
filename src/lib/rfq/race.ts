@@ -330,6 +330,11 @@ export async function acceptRFQ(
       return { success: false, awarded: false, priority_hold: false, error: 'Provider profile not found' }
     }
     const tier = (provider.tier as SupplierTier) || 'pending'
+
+    // SECURITY: Suspended providers cannot accept RFQs
+    if (tier === 'suspended') {
+      return { success: false, awarded: false, priority_hold: false, error: 'Account is suspended' }
+    }
     const rfqType = rfq.rfq_type as RFQType
 
     // Check if broadcast has been delivered to this provider
@@ -345,8 +350,9 @@ export async function acceptRFQ(
       return { success: false, awarded: false, priority_hold: false, error: 'Not invited to this RFQ' }
     }
 
-    // Apply tier delay for approved suppliers (vs verified partners)
-    if (tier === 'approved') {
+    // Apply tier delay for non-verified suppliers
+    // INTENT: Both pending and approved tiers get a delay; only verified_partner skips it
+    if (tier === 'approved' || tier === 'pending') {
       const scheduledTime = new Date(broadcast.scheduled_at)
       const delayTime = new Date(scheduledTime.getTime() + RACE_CONSTANTS.TIER_DELAY_MS)
       
@@ -867,8 +873,9 @@ export async function releasePriorityHold(
       return { success: false, error: 'RFQ is not in priority hold status' }
     }
 
-    // Release the hold
-    const { error: updateError } = await supabase
+    // SECURITY: Optimistic concurrency — only release if still in priority_hold
+    // Prevents TOCTOU race where another request awards between our check and update
+    const { data: releaseData, error: updateError } = await supabase
       .from('rfqs')
       .update({
         status: 'Bidding',
@@ -876,10 +883,16 @@ export async function releasePriorityHold(
         priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
+      .eq('status', 'priority_hold')
+      .select('id')
 
     if (updateError) {
       console.error('Error releasing priority hold:', updateError)
       return { success: false, error: 'Failed to release hold' }
+    }
+
+    if (!releaseData?.length) {
+      return { success: false, error: 'RFQ status changed — please refresh and try again' }
     }
 
     return { success: true, error: null }

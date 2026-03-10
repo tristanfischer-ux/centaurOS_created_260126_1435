@@ -84,15 +84,18 @@ export async function getConversationMessages(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      const [messages, conversation] = await Promise.all([
-        getMessages(supabase, conversationId, limit, before),
-        getConversation(supabase, conversationId)
-      ])
-
-      // AUTH: Verify conversation exists AND user is a participant
-      if (!conversation || !(await isParticipant(supabase, conversationId, user.id))) {
-        return { error: !conversation ? 'Conversation not found' : 'Access denied' }
+      // AUTH: Verify conversation exists AND user is a participant BEFORE fetching data
+      const conversation = await getConversation(supabase, conversationId)
+      if (!conversation) {
+        return { error: 'Conversation not found' }
       }
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: 'Access denied' }
+      }
+
+      // VALIDATION: Cap limit to prevent abuse
+      const safeLim = Math.min(limit, 200)
+      const messages = await getMessages(supabase, conversationId, safeLim, before)
 
       return {
         success: true as const,
@@ -117,6 +120,15 @@ export async function sendNewMessage(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // VALIDATION: Content must be non-empty and bounded
+      const trimmed = content.trim()
+      if (!trimmed && !fileUrl) {
+        return { error: 'Message content is required' }
+      }
+      if (trimmed.length > 10_000) {
+        return { error: 'Message is too long (10,000 character limit)' }
+      }
+
       // AUTH: Verify user is part of this conversation
       const conversation = await getConversation(supabase, conversationId)
       if (!conversation) {
@@ -129,7 +141,7 @@ export async function sendNewMessage(
       const message = await sendMessage(supabase, {
         conversationId,
         senderId: user.id,
-        content,
+        content: trimmed,
         messageType: fileUrl ? 'file' : 'text',
         fileUrl
       })
@@ -698,6 +710,11 @@ export async function toggleConversationMute(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // AUTH: Verify user is a participant before toggling mute
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: 'Access denied' }
+      }
+
       const isMuted = await toggleMute(supabase, conversationId, user.id)
       
       return { success: true as const, isMuted }

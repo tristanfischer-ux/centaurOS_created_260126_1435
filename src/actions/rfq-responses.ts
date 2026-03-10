@@ -89,9 +89,26 @@ export async function submitRFQResponse(
     return { data: null, error: "Invalid response type" }
   }
 
+  // SECURITY: Reject 'accept' responses through this path — must use respondToRFQ
+  // which runs race mechanics (tier delays, auto-award, priority hold)
+  if (params.response_type === 'accept') {
+    return { data: null, error: "Accept responses must go through the main RFQ response flow" }
+  }
+
   // Validate info_request has a message
   if (params.response_type === 'info_request' && !params.message?.trim()) {
     return { data: null, error: "Please provide your questions" }
+  }
+
+  // VALIDATION: Reject negative prices
+  if (params.quoted_price != null && (isNaN(params.quoted_price) || params.quoted_price < 0)) {
+    return { data: null, error: "Quoted price must be a non-negative number" }
+  }
+  if (params.indicative_min != null && (isNaN(params.indicative_min) || params.indicative_min < 0)) {
+    return { data: null, error: "Indicative minimum must be a non-negative number" }
+  }
+  if (params.indicative_max != null && (isNaN(params.indicative_max) || params.indicative_max < 0)) {
+    return { data: null, error: "Indicative maximum must be a non-negative number" }
   }
 
   // Create the response
@@ -196,6 +213,11 @@ export async function updateRFQResponse(
     return { success: false, error: "Cannot update response after RFQ is closed" }
   }
 
+  // VALIDATION: Reject negative prices
+  if (data.quoted_price != null && (isNaN(data.quoted_price) || data.quoted_price < 0)) {
+    return { success: false, error: "Quoted price must be a non-negative number" }
+  }
+
   // Update the response
   const updatePayload: Record<string, unknown> = {}
   if (data.quoted_price !== undefined) updatePayload.quoted_price = data.quoted_price
@@ -274,6 +296,11 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
     return { success: false, error: "Cannot withdraw after RFQ is closed" }
   }
 
+  // SECURITY: Check awarded BEFORE releasing priority hold
+  if (rfq.awarded_to === providerProfile.id) {
+    return { success: false, error: "Cannot withdraw after being awarded" }
+  }
+
   // If this provider holds priority, release it
   // SECURITY: Only release if still in priority_hold to prevent overwriting concurrent award
   if (rfq.priority_holder_id === providerProfile.id) {
@@ -286,11 +313,6 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
       })
       .eq('id', response.rfq_id)
       .eq('status', 'priority_hold')
-  }
-
-  // If this provider was awarded (shouldn't happen but safety check)
-  if (rfq.awarded_to === providerProfile.id) {
-    return { success: false, error: "Cannot withdraw after being awarded" }
   }
 
   // Delete the response

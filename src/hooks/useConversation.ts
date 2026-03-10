@@ -197,11 +197,12 @@ export function useConversation(
             if (!mounted) return
 
             // Fetch the full message with sender info
+            // SECURITY: Don't fetch email — not needed on client
             const { data: newMessage } = await supabase
               .from('messages')
               .select(`
                 *,
-                sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email)
+                sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
               `)
               .eq('id', payload.new.id)
               .single()

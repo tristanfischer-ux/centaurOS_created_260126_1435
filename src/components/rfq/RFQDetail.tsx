@@ -194,7 +194,7 @@ export function RFQDetail({
         sections.push('')
         sections.push('### Attachments')
         for (const url of specs.attachments) {
-          if (typeof url === 'string') {
+          if (typeof url === 'string' && (/^https?:\/\//i.test(url) || url.startsWith('/'))) {
             sections.push(`- ${url}`)
           }
         }
@@ -435,7 +435,8 @@ export function RFQDetail({
                 <ul className="space-y-2">
                   {rfq.specifications.attachments.map((url, index) => {
                     const href = typeof url === 'string' ? url : ''
-                    if (!href) return null
+                    // SECURITY: Block javascript:, data:, vbscript: and other dangerous schemes
+                    if (!href || (!(/^https?:\/\//i).test(href) && !href.startsWith('/'))) return null
                     const lower = href.toLowerCase()
                     const isStep = lower.endsWith('.step') || lower.includes('.step?')
                     const isStl = lower.endsWith('.stl') || lower.includes('.stl?')

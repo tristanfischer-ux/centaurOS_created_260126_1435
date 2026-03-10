@@ -101,7 +101,10 @@ export function SlideDeckRenderer({
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return
 
-      if (e.key === 'ArrowRight' || e.key === ' ') {
+      // INTENT: Space on a focused button should activate the button, not navigate slides.
+      // Only use space for slide navigation when target is the body/document.
+      const isButton = (e.target as HTMLElement)?.tagName === 'BUTTON'
+      if (e.key === 'ArrowRight' || (e.key === ' ' && !isButton)) {
         e.preventDefault()
         goNext()
       } else if (e.key === 'ArrowLeft') {

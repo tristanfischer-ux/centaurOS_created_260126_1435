@@ -171,12 +171,34 @@ export async function getThreadParent(
 ): Promise<{ success: boolean; error?: string; data?: ThreadMessage }> {
   try {
     const supabase = await createClient()
-    
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
-    
+
+    // AUTH: Verify user is a participant of the message's conversation
+    const { data: msgCheck } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .eq('id', messageId)
+      .single()
+
+    if (!msgCheck) {
+      return { success: false, error: 'Message not found' }
+    }
+
+    const { data: participant } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', msgCheck.conversation_id)
+      .eq('profile_id', user.id)
+      .single()
+
+    if (!participant) {
+      return { success: false, error: 'Access denied' }
+    }
+
     const { data: message, error } = await supabase
       .from('messages')
       .select(`
@@ -189,12 +211,12 @@ export async function getThreadParent(
       `)
       .eq('id', messageId)
       .single()
-    
+
     if (error) {
       console.error('Error fetching thread parent:', error)
       return { success: false, error: 'Failed to fetch message' }
     }
-    
+
     return { success: true, data: message as ThreadMessage }
   } catch (error) {
     console.error('Error in getThreadParent:', error)
@@ -212,19 +234,37 @@ export async function getBatchReplyCounts(
     if (messageIds.length === 0) {
       return { success: true, data: {} }
     }
-    
+
+    // VALIDATION: Cap batch size to prevent abuse
+    if (messageIds.length > 100) {
+      return { success: false, error: 'Too many message IDs (max 100)' }
+    }
+
     const supabase = await createClient()
-    
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
       return { success: false, error: 'Not authenticated' }
     }
-    
-    // Fetch reply counts for all messages
+
+    // AUTH: Verify user is a participant of at least one conversation containing these messages
+    const { data: userConvs } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('profile_id', user.id)
+
+    if (!userConvs || userConvs.length === 0) {
+      return { success: true, data: {} }
+    }
+
+    const userConvIds = userConvs.map(c => c.conversation_id)
+
+    // Fetch reply counts only for messages in user's conversations
     const { data: messages, error } = await supabase
       .from('messages')
-      .select('id, reply_count, last_reply_at')
+      .select('id, reply_count, last_reply_at, conversation_id')
       .in('id', messageIds)
+      .in('conversation_id', userConvIds)
     
     if (error) {
       console.error('Error fetching reply counts:', error)

@@ -58,6 +58,8 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
   }, [])
 
   const subscribeToRFQ = useCallback((rfqId: string) => {
+    // SECURITY: Validate UUID format before interpolating into filter string
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rfqId)) return
     if (rfqChannelsRef.current.has(rfqId)) return
 
     const supabase = createClient()
@@ -220,6 +222,8 @@ export function useRFQSubscription(
 
   useEffect(() => {
     if (!rfqId) return
+    // SECURITY: Validate UUID format before interpolating into filter string
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rfqId)) return
 
     const supabase = createClient()
 

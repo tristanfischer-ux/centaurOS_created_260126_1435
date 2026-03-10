@@ -217,6 +217,8 @@ export async function updateRFQ(
       return { data: null, error: 'Cannot update RFQ after bidding has started' }
     }
 
+    // SECURITY: Optimistic concurrency — only update if still Open
+    // Prevents TOCTOU where a concurrent broadcastRFQ changes status to Bidding
     const { data, error } = await supabase
       .from('rfqs')
       .update({
@@ -229,12 +231,13 @@ export async function updateRFQ(
         urgency: updates.urgency,
       })
       .eq('id', rfqId)
+      .eq('status', 'Open')
       .select()
       .single()
 
     if (error) {
       console.error('Error updating RFQ:', error)
-      return { data: null, error: 'Failed to update RFQ' }
+      return { data: null, error: 'Failed to update RFQ — status may have changed' }
     }
 
     return { data: data as unknown as RFQ, error: null }

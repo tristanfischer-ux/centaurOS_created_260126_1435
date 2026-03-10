@@ -31,9 +31,18 @@ export function RFQClarificationsPanel({
   const [isPending, startTransition] = useTransition()
   const [answerDrafts, setAnswerDrafts] = useState<Record<string, string>>({})
   const [publishingId, setPublishingId] = useState<string | null>(null)
+  const [publishError, setPublishError] = useState<string | null>(null)
 
   useEffect(() => {
-    loadClarifications()
+    let cancelled = false
+    async function load() {
+      const result = await getRFQClarifications(rfqId)
+      if (!cancelled && result.data) {
+        setClarifications(result.data)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [rfqId])
 
   async function loadClarifications() {
@@ -48,6 +57,7 @@ export function RFQClarificationsPanel({
     if (!draft.trim()) return
 
     setPublishingId(irId)
+    setPublishError(null)
     startTransition(async () => {
       const result = await publishClarification(rfqId, question, draft.trim())
       if (result.success) {
@@ -57,6 +67,8 @@ export function RFQClarificationsPanel({
           return next
         })
         await loadClarifications()
+      } else {
+        setPublishError(result.error || 'Failed to publish clarification')
       }
       setPublishingId(null)
     })
@@ -158,6 +170,9 @@ export function RFQClarificationsPanel({
                 )
               })}
           </div>
+        )}
+        {publishError && (
+          <p className="text-sm text-destructive">{publishError}</p>
         )}
       </CardContent>
     </Card>

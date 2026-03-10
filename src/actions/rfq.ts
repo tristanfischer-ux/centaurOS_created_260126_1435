@@ -66,6 +66,13 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
     return { data: null, error: "Invalid RFQ type" }
   }
 
+  // VALIDATION: Reject negative budgets
+  if (params.budget_min != null && params.budget_min < 0) {
+    return { data: null, error: "Budget minimum cannot be negative" }
+  }
+  if (params.budget_max != null && params.budget_max < 0) {
+    return { data: null, error: "Budget maximum cannot be negative" }
+  }
   if (params.budget_min != null && params.budget_max != null && params.budget_min > params.budget_max) {
     return { data: null, error: "Minimum budget cannot exceed maximum budget" }
   }
@@ -330,6 +337,23 @@ export async function respondToRFQ(
     return { success: false, error: "You need a provider profile to respond to RFQs" }
   }
 
+  // VALIDATION: Numeric fields must be positive and finite
+  if (response.quoted_price != null && (isNaN(response.quoted_price) || response.quoted_price < 0)) {
+    return { success: false, error: "Quoted price must be a non-negative number" }
+  }
+  if (response.indicative_min != null && (isNaN(response.indicative_min) || response.indicative_min < 0)) {
+    return { success: false, error: "Indicative minimum must be a non-negative number" }
+  }
+  if (response.indicative_max != null && (isNaN(response.indicative_max) || response.indicative_max < 0)) {
+    return { success: false, error: "Indicative maximum must be a non-negative number" }
+  }
+  if (response.indicative_min != null && response.indicative_max != null && response.indicative_min > response.indicative_max) {
+    return { success: false, error: "Indicative minimum cannot exceed maximum" }
+  }
+  if (response.timeline_weeks != null && (isNaN(response.timeline_weeks) || response.timeline_weeks < 0)) {
+    return { success: false, error: "Timeline weeks must be a non-negative number" }
+  }
+
   let result
   switch (response.type) {
     case 'accept':
@@ -532,7 +556,19 @@ export async function getRFQRaceStatus(rfqId: string): Promise<{
     if (!broadcast) return { data: null, error: "Not authorized" }
   }
 
-  return checkRaceStatus(supabase, rfqId)
+  const result = await checkRaceStatus(supabase, rfqId)
+
+  // SECURITY: Strip competitive intelligence from supplier view
+  if (result.data && rfq.buyer_id !== user.id) {
+    result.data.total_responses = 0
+    result.data.accept_count = 0
+    result.data.priority_holder = null
+    if (result.data.winner) {
+      result.data.winner = { id: result.data.winner.id, full_name: result.data.winner.full_name, quoted_price: null }
+    }
+  }
+
+  return result
 }
 
 /**
@@ -768,11 +804,39 @@ export async function getBuyerContext(buyerId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: "Not authenticated" }
 
-  // Get all RFQs from this buyer
+  // SECURITY: Scope to caller's foundry to prevent cross-tenant data leak
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { data: null, error: "User not in a foundry" }
+
+  // SECURITY: Verify caller has a broadcast relationship with this buyer
+  if (user.id !== buyerId) {
+    const { data: providerProfile } = await supabase
+      .from('provider_profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!providerProfile) return { data: null, error: "Not authorized" }
+
+    // Check at least one broadcast from this buyer's RFQs to this provider
+    const { data: hasBroadcast } = await supabase
+      .from('rfq_broadcasts')
+      .select('rfq_id, rfqs!inner(buyer_id)')
+      .eq('provider_id', providerProfile.id)
+      .eq('rfqs.buyer_id', buyerId)
+      .limit(1)
+
+    if (!hasBroadcast || hasBroadcast.length === 0) {
+      return { data: null, error: "Not authorized" }
+    }
+  }
+
+  // Get all RFQs from this buyer within caller's foundry
   const { data: rfqs, error } = await supabase
     .from('rfqs')
     .select('id, status, created_at')
     .eq('buyer_id', buyerId)
+    .eq('foundry_id', foundryId)
 
   if (error || !rfqs) {
     return { data: null, error: error?.message || "Failed to fetch" }
