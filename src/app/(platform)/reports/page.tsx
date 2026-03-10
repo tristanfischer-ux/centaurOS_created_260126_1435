@@ -656,7 +656,11 @@ export default function ReportsPage(): React.JSX.Element {
         const a = window.document.createElement('a')
         a.href = url
         a.download = `${sanitizeFilename(reportDocument.foundryName)}-ai-infographic-${reportDocument.dateRange.start}.png`
+        // GOTCHA: Firefox/Safari require the anchor to be in the DOM for .click()
+        // to trigger a download. Detached elements silently fail.
+        window.document.body.appendChild(a)
         a.click()
+        window.document.body.removeChild(a)
         // INTENT: Delay revocation so the browser has time to start the download
         setTimeout(() => URL.revokeObjectURL(url), 5_000)
         toast.success('AI infographic downloaded')
@@ -816,7 +820,7 @@ export default function ReportsPage(): React.JSX.Element {
       {/* REPORTS TAB                                   */}
       {/* ══════════════════════════════════════════════ */}
       {pageMode === 'reports' && (
-        <div id="tabpanel-reports" role="tabpanel" aria-labelledby="tab-reports">
+        <div id="tabpanel-reports" role="tabpanel" aria-labelledby="tab-reports" className="space-y-8">
           {/* Change 8: Report History (promoted) */}
           <ReportHistory onLoadReport={handleLoadHistoricReport} />
 
@@ -842,7 +846,7 @@ export default function ReportsPage(): React.JSX.Element {
                     role="radio"
                     aria-checked={isSelected}
                     aria-label={template.name}
-                    tabIndex={0}
+                    tabIndex={isSelected ? 0 : -1}
                     className={cn(
                       'cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
                       isSelected && 'ring-2 ring-international-orange',
@@ -1358,7 +1362,7 @@ export default function ReportsPage(): React.JSX.Element {
       {/* PRESENTATIONS TAB                             */}
       {/* ══════════════════════════════════════════════ */}
       {pageMode === 'presentations' && (
-        <div id="tabpanel-presentations" role="tabpanel" aria-labelledby="tab-presentations">
+        <div id="tabpanel-presentations" role="tabpanel" aria-labelledby="tab-presentations" className="space-y-8">
           <section className="space-y-4">
             <h2 className={typography.h3}>Source Material</h2>
             <Card>
