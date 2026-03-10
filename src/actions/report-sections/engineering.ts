@@ -73,7 +73,7 @@ export async function fetchEngineeringActivityData(
     // All active projects (not archived) — expanded select for deep analysis
     supabase
       .from('cad_lab_projects')
-      .select('id, name, stage, status, modules, created_at, reviews, ai_cost_estimates, diagnostic_answers, design_revision, images_generated_at_revision')
+      .select('id, name, stage, status, modules, created_at, reviews, ai_cost_estimates, diagnostic_answers, design_revision, images_generated_at_revision, review_skipped')
       .eq('foundry_id', foundryId)
       .not('status', 'eq', 'archived'),
     // Projects created this period
@@ -178,17 +178,21 @@ export async function fetchEngineeringActivityData(
  * Issues are objects { severity, category, message }, not strings.
  */
 function computeReviewSummary(
-  projects: { id: string; reviews: Json | null }[],
+  projects: { id: string; reviews: Json | null; review_skipped: boolean | null; modules: Json | null }[],
 ): ReviewSummary | undefined {
   try {
-    const totalProjects = projects.length
+    // Only count review-eligible projects: has modules AND was not skipped
+    const eligible = projects.filter(
+      p => Array.isArray(p.modules) && p.modules.length > 0 && !p.review_skipped
+    )
+    const totalProjects = eligible.length
     if (totalProjects === 0) return undefined
 
     const verdicts = { approved: 0, conditional: 0, rejected: 0, pending: 0 }
     let totalReviewed = 0
     const issueFrequency = new Map<string, number>()
 
-    for (const p of projects) {
+    for (const p of eligible) {
       if (!p.reviews || !isRecord(p.reviews)) {
         verdicts.pending++
         continue
