@@ -334,6 +334,16 @@ export function useConversationList(userId?: string) {
 
   useEffect(() => {
     let mounted = true
+    let debounceTimer: NodeJS.Timeout | null = null
+
+    // Debounce realtime-triggered refetches to prevent thundering herd
+    // (global subscriptions fire for ALL conversations/messages in the DB)
+    const debouncedRefetch = () => {
+      if (debounceTimer) clearTimeout(debounceTimer)
+      debounceTimer = setTimeout(() => {
+        if (mounted) fetchConversations()
+      }, 500)
+    }
 
     const init = async () => {
       const { data: { user } } = await supabase.auth.getUser()
@@ -351,11 +361,7 @@ export function useConversationList(userId?: string) {
             schema: 'public',
             table: 'conversations'
           },
-          async () => {
-            if (mounted) {
-              await fetchConversations()
-            }
-          }
+          debouncedRefetch
         )
         .on(
           'postgres_changes',
@@ -364,12 +370,7 @@ export function useConversationList(userId?: string) {
             schema: 'public',
             table: 'messages'
           },
-          async () => {
-            // Refresh to update last message and unread counts
-            if (mounted) {
-              await fetchConversations()
-            }
-          }
+          debouncedRefetch
         )
         .on(
           'postgres_changes',
@@ -378,12 +379,7 @@ export function useConversationList(userId?: string) {
             schema: 'public',
             table: 'conversation_participants'
           },
-          async () => {
-            // Refresh when participant data changes
-            if (mounted) {
-              await fetchConversations()
-            }
-          }
+          debouncedRefetch
         )
         .subscribe((status) => {
           setIsConnected(status === 'SUBSCRIBED')
@@ -394,6 +390,7 @@ export function useConversationList(userId?: string) {
 
     return () => {
       mounted = false
+      if (debounceTimer) clearTimeout(debounceTimer)
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current)
       }

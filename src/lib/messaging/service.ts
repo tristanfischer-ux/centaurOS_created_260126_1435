@@ -385,22 +385,37 @@ export async function getConversationsForUser(
   // Get last message and unread count for each conversation
   const conversationsWithMeta = await Promise.all(
     (data || []).map(async (conv) => {
-      // Get last message
+      // Get last non-deleted message
       const { data: lastMessage } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conv.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
 
-      // Get unread count
-      const { count } = await supabase
-        .from('messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('conversation_id', conv.id)
-        .neq('sender_id', userId)
-        .eq('is_read', false)
+      // Get unread count using participant's last_read_at
+      const participantData = (conv as unknown as { conversation_participants?: { last_read_at: string | null }[] }).conversation_participants?.[0]
+      let count = 0
+      if (participantData?.last_read_at) {
+        const { count: c } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', conv.id)
+          .neq('sender_id', userId)
+          .eq('is_deleted', false)
+          .gt('created_at', participantData.last_read_at)
+        count = c || 0
+      } else {
+        const { count: c } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', conv.id)
+          .neq('sender_id', userId)
+          .eq('is_deleted', false)
+        count = c || 0
+      }
 
       return {
         ...conv,
@@ -429,6 +444,7 @@ export async function getMessages(
       sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email)
     `)
     .eq('conversation_id', conversationId)
+    .eq('is_deleted', false)
     .order('created_at', { ascending: false })
     .limit(limit)
 
@@ -500,6 +516,12 @@ export async function createDirectConversation(
   params: CreateDirectConversationParams
 ): Promise<Conversation> {
   const { creatorId, participantId } = params
+
+  // SECURITY: Validate UUIDs before interpolating into .or() filter
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!uuidRegex.test(creatorId) || !uuidRegex.test(participantId)) {
+    throw new Error('Invalid user ID format')
+  }
 
   // Check if DM already exists between these users (in either direction)
   const { data: existing } = await supabase
@@ -831,11 +853,12 @@ export async function getEnhancedConversationsForUser(
   // Get last message and unread count for each conversation
   const conversationsWithMeta = await Promise.all(
     (data || []).map(async (conv) => {
-      // Get last message
+      // Get last non-deleted message
       const { data: lastMessage } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', conv.id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()

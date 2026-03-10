@@ -32,14 +32,21 @@ const RETRY_DELAY = 1000 // 1 second
  */
 export async function sendMessageOptimistic(
   conversationId: string,
-  senderId: string,
   content: string,
   onOptimisticUpdate?: (message: OptimisticMessage) => void,
   onSuccess?: (message: Message) => void,
   onError?: (error: Error) => void
 ): Promise<boolean> {
   const supabase = createClient()
-  
+
+  // SECURITY: Derive senderId from auth session, never from caller
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    onError?.(new Error('Not authenticated'))
+    return false
+  }
+  const senderId = user.id
+
   // Create optimistic message
   const localId = `local-${Date.now()}-${Math.random()}`
   const optimisticMessage: OptimisticMessage = {

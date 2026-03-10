@@ -120,6 +120,18 @@ export function usePresence(options: UsePresenceOptions = {}) {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
+      // SECURITY: Verify user is participant before setting typing indicator
+      if (conversationId) {
+        const { data: participant } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .eq('profile_id', user.id)
+          .maybeSingle()
+
+        if (!participant) return
+      }
+
       await supabase
         .from('presence')
         .update({
@@ -168,6 +180,7 @@ export function usePresence(options: UsePresenceOptions = {}) {
         .from('presence')
         .select('*')
         .order('last_seen', { ascending: false })
+        .limit(100)
       
       if (error) {
         console.debug('Presence fetch error:', {
