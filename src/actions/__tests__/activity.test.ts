@@ -50,6 +50,20 @@ describe('Activity Actions', () => {
     mockSupabaseClient.auth.getUser.mockResolvedValue({
       data: { user: { id: VALID_USER_ID } }
     })
+
+    // Default from() mock handles profiles query needed by replyToActivity
+    mockSupabaseClient.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+            })
+          })
+        }
+      }
+      return {}
+    })
   })
 
   describe('replyToActivity', () => {
@@ -66,9 +80,22 @@ describe('Activity Actions', () => {
 
     it('should add task comment successfully', async () => {
       mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+              })
+            })
+          }
+        }
         if (table === 'task_comments') {
           return {
-            insert: jest.fn().mockResolvedValue({ error: null })
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_COMMENT_ID, created_at: new Date().toISOString() }, error: null })
+              })
+            })
           }
         }
         return {}
@@ -93,9 +120,22 @@ describe('Activity Actions', () => {
 
     it('should add objective comment successfully', async () => {
       mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+              })
+            })
+          }
+        }
         if (table === 'objective_comments') {
           return {
-            insert: jest.fn().mockResolvedValue({ error: null })
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_COMMENT_ID, created_at: new Date().toISOString() }, error: null })
+              })
+            })
           }
         }
         return {}
@@ -107,9 +147,22 @@ describe('Activity Actions', () => {
 
     it('should send message to conversation successfully', async () => {
       mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+              })
+            })
+          }
+        }
         if (table === 'messages') {
           return {
-            insert: jest.fn().mockResolvedValue({ error: null })
+            insert: jest.fn().mockReturnValue({
+              select: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_COMMENT_ID, created_at: new Date().toISOString() }, error: null })
+              })
+            })
           }
         }
         if (table === 'conversations') {
@@ -127,6 +180,19 @@ describe('Activity Actions', () => {
     })
 
     it('should return error for invalid source type', async () => {
+      // Mock profiles query needed before switch/case is reached
+      mockSupabaseClient.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: jest.fn().mockReturnValue({
+              eq: jest.fn().mockReturnValue({
+                single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test', avatar_url: null, role: 'Founder' } })
+              })
+            })
+          }
+        }
+        return {}
+      })
       const result = await replyToActivity('invalid' as any, VALID_TASK_ID, 'Test reply')
       expect(result.success).toBe(false)
       expect(result.error).toBe('Invalid source type')
@@ -423,9 +489,22 @@ describe('Comment-to-Message Sync Integration', () => {
 
   it('should sync task comment to messages when adding comment', async () => {
     mockSupabaseClient.from.mockImplementation((table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: VALID_USER_ID, full_name: 'Test User', avatar_url: null, role: 'Founder' } })
+            })
+          })
+        }
+      }
       if (table === 'task_comments') {
         return {
-          insert: jest.fn().mockResolvedValue({ error: null })
+          insert: jest.fn().mockReturnValue({
+            select: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({ data: { id: VALID_COMMENT_ID, created_at: new Date().toISOString() }, error: null })
+            })
+          })
         }
       }
       return {}

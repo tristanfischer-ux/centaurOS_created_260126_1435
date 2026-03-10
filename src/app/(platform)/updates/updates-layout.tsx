@@ -19,13 +19,15 @@
  * @component
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ArrowLeft, Activity, MessageSquare } from 'lucide-react'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import { getActivityFeed, markMultipleActivityRead } from '@/actions/activity'
 import { UpdatesHeader } from '@/components/updates/updates-header'
 import { UpdatesFeed } from '@/components/updates/updates-feed'
@@ -95,6 +97,142 @@ export function UpdatesLayout({
   // ── Layout state ────────────────────────────────────────────────────────
   const [screenSize, setScreenSize] = useState<'large' | 'medium' | 'small'>('large')
   const [showThread, setShowThread] = useState(false)
+
+  // ── Deep linking ─────────────────────────────────────────────────────────
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const initializedRef = useRef(false)
+
+  // Read URL params on mount
+  useEffect(() => {
+    if (initializedRef.current) return
+    initializedRef.current = true
+
+    const view = searchParams.get('view') as CommsView | null
+    const thread = searchParams.get('thread')
+    const id = searchParams.get('id')
+
+    if (view === 'conversations') {
+      setActiveView('conversations')
+      if (id) {
+        setSelectedConversationId(id)
+        setShowThread(true)
+      }
+    } else if (view === 'activity' || !view) {
+      setActiveView('activity')
+      if (thread) {
+        const [type, sourceId] = thread.split(':') as [string, string]
+        if ((type === 'task' || type === 'objective' || type === 'conversation') && sourceId) {
+          setSelectedSource({ type, id: sourceId })
+          setShowThread(true)
+        }
+      }
+    }
+  }, [searchParams])
+
+  // Sync state to URL
+  useEffect(() => {
+    const params = new URLSearchParams()
+    params.set('view', activeView)
+
+    if (activeView === 'activity' && selectedSource) {
+      params.set('thread', `${selectedSource.type}:${selectedSource.id}`)
+    } else if (activeView === 'conversations' && selectedConversationId) {
+      params.set('id', selectedConversationId)
+    }
+
+    const newUrl = `/updates?${params.toString()}`
+    router.replace(newUrl, { scroll: false })
+  }, [activeView, selectedSource, selectedConversationId, router])
+
+  // ── Activity feed realtime ────────────────────────────────────────────────
+  const supabaseClient = useMemo(() => {
+    return createClient()
+  }, [])
+
+  useEffect(() => {
+    if (activeView !== 'activity') return
+
+    const channel = supabaseClient
+      .channel(`activity-feed-${foundryId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'task_comments'
+        },
+        async (payload: { new: { id: string; user_id: string; content: string; created_at: string; task_id: string; is_system_log: boolean } }) => {
+          const row = payload.new
+          // Skip own comments and system logs
+          if (row.user_id === userId || row.is_system_log) return
+
+          // Fetch author + task info
+          const [{ data: author }, { data: task }] = await Promise.all([
+            supabaseClient.from('profiles').select('id, full_name, avatar_url, role').eq('id', row.user_id).single(),
+            supabaseClient.from('tasks').select('id, title, task_number').eq('id', row.task_id).single()
+          ])
+
+          if (!author || !task) return
+
+          const newItem: ActivityItem = {
+            id: row.id,
+            type: 'task_comment',
+            content: row.content,
+            created_at: row.created_at,
+            author: { id: author.id, full_name: author.full_name, avatar_url: author.avatar_url, role: author.role },
+            source: { type: 'task', id: task.id, title: task.title, task_number: task.task_number },
+            is_unread: true,
+            is_system_log: false
+          }
+
+          setItems(prev => {
+            if (prev.some(i => i.id === newItem.id)) return prev
+            return [newItem, ...prev]
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'objective_comments'
+        },
+        async (payload: { new: { id: string; user_id: string; content: string; created_at: string; objective_id: string; is_system_log: boolean } }) => {
+          const row = payload.new
+          if (row.user_id === userId || row.is_system_log) return
+
+          const [{ data: author }, { data: objective }] = await Promise.all([
+            supabaseClient.from('profiles').select('id, full_name, avatar_url, role').eq('id', row.user_id).single(),
+            supabaseClient.from('objectives').select('id, title').eq('id', row.objective_id).single()
+          ])
+
+          if (!author || !objective) return
+
+          const newItem: ActivityItem = {
+            id: row.id,
+            type: 'objective_comment',
+            content: row.content,
+            created_at: row.created_at,
+            author: { id: author.id, full_name: author.full_name, avatar_url: author.avatar_url, role: author.role },
+            source: { type: 'objective', id: objective.id, title: objective.title },
+            is_unread: true,
+            is_system_log: false
+          }
+
+          setItems(prev => {
+            if (prev.some(i => i.id === newItem.id)) return prev
+            return [newItem, ...prev]
+          })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabaseClient.removeChannel(channel)
+    }
+  }, [activeView, foundryId, userId, supabaseClient])
 
   useEffect(() => {
     const checkScreenSize = (): void => {
@@ -193,6 +331,42 @@ export function UpdatesLayout({
     }
   }, [selectedSource])
 
+  // ── Activity feed pagination ──────────────────────────────────────────────
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
+  // Update hasMore when initial items load
+  useEffect(() => {
+    setHasMore(initialItems.length >= 50)
+  }, [initialItems])
+
+  const loadMoreActivity = useCallback(async () => {
+    if (isLoadingMore || !hasMore || items.length === 0) return
+    setIsLoadingMore(true)
+    try {
+      const oldestItem = items[items.length - 1]
+      const result = await getActivityFeed({
+        limit: 50,
+        filter,
+        showAllFoundryActivity: true,
+        includeSystemLogs: false,
+        before: oldestItem.created_at
+      })
+      if (result.success && result.data) {
+        setItems(prev => {
+          const existingIds = new Set(prev.map(i => i.id))
+          const newItems = result.data!.filter(i => !existingIds.has(i.id))
+          return [...prev, ...newItems]
+        })
+        setHasMore(result.hasMore ?? false)
+      }
+    } catch (error) {
+      console.error('[CommsLayout] Failed to load more activity:', error instanceof Error ? error.message : 'Unknown error')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, items, filter])
+
   // ── Conversation handlers ───────────────────────────────────────────────
   const handleSelectConversation = useCallback((id: string) => {
     setSelectedConversationId(id)
@@ -257,6 +431,9 @@ export function UpdatesLayout({
       isLoading={isLoading}
       onSelectItem={handleSelectItem}
       onFilterChange={handleFilterChange}
+      onLoadMore={loadMoreActivity}
+      hasMore={hasMore}
+      isLoadingMore={isLoadingMore}
     />
   ) : (
     <ConversationsPanel

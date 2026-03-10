@@ -86,7 +86,7 @@ export async function replyToActivity(
   sourceType: ActivitySourceType,
   sourceId: string,
   content: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; data?: ThreadItem }> {
   try {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -106,17 +106,24 @@ export async function replyToActivity(
       return { success: false, error: validation.error.issues[0]?.message || 'Invalid content' }
     }
 
+    // Fetch user's profile for building ThreadItem
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, role')
+      .eq('id', user.id)
+      .single()
+
     switch (sourceType) {
       case 'task': {
         // Add comment to task
-        const { error } = await supabase.from('task_comments').insert({
+        const { data: inserted, error } = await supabase.from('task_comments').insert({
           task_id: sourceId,
           user_id: user.id,
           content: content.trim(),
           is_system_log: false,
           foundry_id: foundryId
-        })
-        
+        }).select('id, created_at').single()
+
         if (error) {
           console.error('Failed to add task comment:', error)
           return { success: false, error: 'Failed to add comment' }
@@ -133,23 +140,38 @@ export async function replyToActivity(
         } catch (syncError) {
           console.error('Failed to sync task reply to messages:', syncError)
         }
-        
+
         revalidatePath('/tasks')
         revalidatePath('/messages')
         revalidatePath('/updates')
-        return { success: true }
+        return {
+          success: true,
+          data: {
+            id: inserted.id,
+            content: content.trim(),
+            created_at: inserted.created_at || new Date().toISOString(),
+            is_system_log: false,
+            is_unread: false,
+            author: {
+              id: user.id,
+              full_name: userProfile?.full_name || null,
+              avatar_url: userProfile?.avatar_url || null,
+              role: userProfile?.role || null
+            }
+          }
+        }
       }
 
       case 'objective': {
         // Add comment to objective (table created by migration)
-        const { error } = await (supabase as AnySupabaseClient).from('objective_comments').insert({
+        const { data: inserted, error } = await (supabase as AnySupabaseClient).from('objective_comments').insert({
           objective_id: sourceId,
           user_id: user.id,
           content: content.trim(),
           is_system_log: false,
           foundry_id: foundryId
-        })
-        
+        }).select('id, created_at').single()
+
         if (error) {
           console.error('Failed to add objective comment:', error)
           return { success: false, error: 'Failed to add comment' }
@@ -166,21 +188,36 @@ export async function replyToActivity(
         } catch (syncError) {
           console.error('Failed to sync objective reply to messages:', syncError)
         }
-        
+
         revalidatePath('/objectives')
         revalidatePath('/messages')
         revalidatePath('/updates')
-        return { success: true }
+        return {
+          success: true,
+          data: {
+            id: inserted.id,
+            content: content.trim(),
+            created_at: inserted.created_at || new Date().toISOString(),
+            is_system_log: false,
+            is_unread: false,
+            author: {
+              id: user.id,
+              full_name: userProfile?.full_name || null,
+              avatar_url: userProfile?.avatar_url || null,
+              role: userProfile?.role || null
+            }
+          }
+        }
       }
 
       case 'conversation': {
         // Send message to conversation
-        const { error } = await supabase.from('messages').insert({
+        const { data: inserted, error } = await supabase.from('messages').insert({
           conversation_id: sourceId,
           sender_id: user.id,
           content: content.trim()
-        })
-        
+        }).select('id, created_at').single()
+
         if (error) {
           console.error('Failed to send message:', error)
           return { success: false, error: 'Failed to send message' }
@@ -191,10 +228,25 @@ export async function replyToActivity(
           .from('conversations')
           .update({ updated_at: new Date().toISOString() })
           .eq('id', sourceId)
-        
+
         revalidatePath('/messages')
         revalidatePath('/updates')
-        return { success: true }
+        return {
+          success: true,
+          data: {
+            id: inserted.id,
+            content: content.trim(),
+            created_at: inserted.created_at || new Date().toISOString(),
+            is_system_log: false,
+            is_unread: false,
+            author: {
+              id: user.id,
+              full_name: userProfile?.full_name || null,
+              avatar_url: userProfile?.avatar_url || null,
+              role: userProfile?.role || null
+            }
+          }
+        }
       }
 
       default:
@@ -558,9 +610,11 @@ export async function getActivityFeed(options?: {
   filter?: 'all' | 'tasks' | 'objectives' | 'messages' | 'unread' | 'history'
   includeSystemLogs?: boolean
   showAllFoundryActivity?: boolean
+  before?: string
 }): Promise<{
   success: boolean
   data?: ActivityItem[]
+  hasMore?: boolean
   error?: string
 }> {
   try {
@@ -580,6 +634,7 @@ export async function getActivityFeed(options?: {
     const filter = options?.filter || 'all'
     const includeSystemLogs = options?.includeSystemLogs || false
     const showAllFoundryActivity = options?.showAllFoundryActivity || false
+    const before = options?.before
 
     let allTaskIds: string[] = []
     let myObjectiveIds: string[] = []
@@ -664,6 +719,10 @@ export async function getActivityFeed(options?: {
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+      if (before) {
+        taskCommentsQuery = taskCommentsQuery.lt('created_at', before)
+      }
 
       // Only filter out system logs if not explicitly including them
       if (!includeSystemLogs) {
@@ -882,13 +941,13 @@ export async function getActivityFeed(options?: {
       }
     }
 
-    // Sort by created_at descending
+    // Sort all items by date (newest first)
     items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
     // Apply limit after merging
     const limitedItems = items.slice(0, limit)
 
-    return { success: true, data: limitedItems }
+    return { success: true, data: limitedItems, hasMore: items.length >= limit }
   } catch (error) {
     console.error('getActivityFeed error:', error)
     return { 
