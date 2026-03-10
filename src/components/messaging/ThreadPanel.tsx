@@ -104,26 +104,27 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
           filter: `parent_id=eq.${parentMessageId}`
         },
         async (payload) => {
-          // Fetch the full reply with sender info
-          const { data: newReply } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role)
-            `)
-            .eq('id', payload.new.id)
-            .single()
+          try {
+            const { data: newReply } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role)
+              `)
+              .eq('id', payload.new.id)
+              .single()
 
-          if (newReply) {
-            setReplies(prev => {
-              // Dedup: already added optimistically by handleSendReply
-              if (prev.some(r => r.id === newReply.id)) return prev
-              // Only increment reply_count for genuinely new replies (not our own optimistic add)
-              setParentMessage(p =>
-                p ? { ...p, reply_count: p.reply_count + 1 } : p
-              )
-              return [...prev, newReply as unknown as ThreadReply]
-            })
+            if (newReply) {
+              setReplies(prev => {
+                if (prev.some(r => r.id === newReply.id)) return prev
+                setParentMessage(p =>
+                  p ? { ...p, reply_count: p.reply_count + 1 } : p
+                )
+                return [...prev, newReply as unknown as ThreadReply]
+              })
+            }
+          } catch (err) {
+            console.error('[ThreadPanel] Failed to fetch realtime reply:', err)
           }
         }
       )
@@ -168,14 +169,11 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
       if (result.data) {
         setReplies(prev => [...prev, result.data!])
         setReplyContent('')
-        
-        // Update parent message reply count
-        if (parentMessage) {
-          setParentMessage({
-            ...parentMessage,
-            reply_count: parentMessage.reply_count + 1,
-          })
-        }
+
+        // Update parent message reply count (functional updater to avoid stale closure)
+        setParentMessage(prev =>
+          prev ? { ...prev, reply_count: prev.reply_count + 1 } : prev
+        )
       }
     } catch (err) {
       setError('Failed to send reply')

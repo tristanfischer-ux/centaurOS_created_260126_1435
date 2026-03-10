@@ -228,11 +228,20 @@ export function useConversation(
           },
           (payload) => {
             if (!mounted) return
-            
-            setMessages(prev => 
-              prev.map(m => 
-                m.id === payload.new.id 
-                  ? { ...m, ...payload.new } as MessageWithSender
+            // GOTCHA: payload.new is the raw row — it does NOT include joined
+            // relations (sender). Spreading it would overwrite m.sender with undefined.
+            // Only update scalar fields that can actually change.
+            const updated = payload.new as Record<string, unknown>
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === updated.id
+                  ? {
+                      ...m,
+                      content: (updated.content as string) ?? m.content,
+                      is_read: (updated.is_read as boolean) ?? m.is_read,
+                      read_at: (updated.read_at as string | null) ?? m.read_at,
+                      is_starred: (updated.is_starred as boolean) ?? m.is_starred,
+                    }
                   : m
               )
             )

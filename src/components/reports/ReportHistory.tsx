@@ -13,7 +13,14 @@
  */
 
 import { useEffect, useState, useCallback } from 'react'
-import { FileText, Clock, AlertCircle } from 'lucide-react'
+import {
+  FileText,
+  Clock,
+  AlertCircle,
+  CalendarDays,
+  Briefcase,
+  Sliders,
+} from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +42,15 @@ const REPORT_TYPE_LABELS: Record<string, string> = {
   monthly: 'Monthly',
   daily: 'Daily',
   custom: 'Custom',
+}
+
+const REPORT_TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'weekly-update': CalendarDays,
+  weekly: CalendarDays,
+  'board-pack': Briefcase,
+  monthly: Briefcase,
+  daily: CalendarDays,
+  custom: Sliders,
 }
 
 function getReportTypeLabel(type: string): string {
@@ -92,10 +108,13 @@ export function ReportHistory({ onLoadReport }: ReportHistoryProps) {
 
   return (
     <div className="space-y-4">
-      {/* Section header with orange accent */}
+      {/* Change 8: Promoted header with count badge */}
       <div className={typography.pageHeader}>
         <div className={typography.pageHeaderAccent} />
-        <h2 className={typography.h3}>Recent Reports</h2>
+        <h2 className={typography.h3}>Your Reports</h2>
+        {!isLoading && !error && reports.length > 0 && (
+          <Badge variant="secondary" className="text-xs">{reports.length}</Badge>
+        )}
       </div>
 
       {isLoading && <LoadingSkeleton />}
@@ -109,18 +128,25 @@ export function ReportHistory({ onLoadReport }: ReportHistoryProps) {
         </Card>
       )}
 
-      {!isLoading && !error && reports.length === 0 && <EmptyState />}
+      {!isLoading && !error && reports.length === 0 && null}
 
       {!isLoading && !error && reports.length > 0 && (
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {reports.map((report) => (
-            <ReportCard
-              key={report.id}
-              report={report}
-              onClick={() => onLoadReport(report.reportData)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {reports.map((report) => (
+              <ReportCard
+                key={report.id}
+                report={report}
+                onClick={() => onLoadReport(report.reportData)}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex-1 border-t border-border" />
+            <span>or create a new one below</span>
+            <div className="flex-1 border-t border-border" />
+          </div>
+        </>
       )}
     </div>
   )
@@ -148,6 +174,10 @@ function ReportCard({
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-2">
+          {(() => {
+            const TypeIcon = REPORT_TYPE_ICONS[report.reportType] ?? FileText
+            return <TypeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          })()}
           <Badge variant="secondary">{getReportTypeLabel(report.reportType)}</Badge>
           <span className="text-xs text-muted-foreground">
             {new Date(report.reportDate).toLocaleDateString('en-GB', {
@@ -193,22 +223,4 @@ function LoadingSkeleton() {
   )
 }
 
-function EmptyState() {
-  return (
-    <Card>
-      <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-          <FileText className="h-6 w-6 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-sm font-medium text-foreground">
-            No reports generated yet
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Create your first report above to see it here.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
+// INTENT: Empty state is now handled by ReportsHeroShowcase in the parent page

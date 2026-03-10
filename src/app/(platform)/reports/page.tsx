@@ -1,13 +1,13 @@
 'use client'
 
 /**
- * @file page.tsx — Reports page (Phase 3)
+ * @file page.tsx — Reports page (Phase 4 — UX Enhancement)
  *
- * @description Premium report generation page with AI-powered narratives,
- * tone/detail controls, share links, email delivery, report history,
- * multi-format export (PDF, PPTX, DOCX), infographic mode, and scheduling UI.
+ * @description Premium report generation page with tab-separated workflows
+ * (Reports / Presentations / Documents), collapsible configuration, hero
+ * showcase for new users, visual section toggle grid, and enhanced progress.
  *
- * FLOW: Template card → tone/detail → section toggles → generate → preview → export/share/email
+ * FLOW: Tab → Template card → collapsible config → generate → preview → export/share/email
  *
  * @related
  * - src/actions/report-generator.ts — Server action for data collection + AI narrative
@@ -16,12 +16,13 @@
  * - src/components/reports/ReportDocument.tsx — Document renderer
  * - src/components/reports/ReportInfographic.tsx — Dense infographic view
  * - src/components/reports/ReportHistory.tsx — Past reports browser
+ * - src/components/reports/ReportsHeroShowcase.tsx — Hero empty state
  * - src/lib/reports/export-pptx.ts — PPTX slide deck export
  * - src/lib/reports/export-docx.ts — DOCX Word export
  * - src/lib/reports/export-infographic.ts — Infographic PNG export
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 
 import {
   CalendarDays,
@@ -43,6 +44,8 @@ import {
   Mail,
   Copy,
   CheckCheck,
+  CheckCircle2,
+  Circle,
   MessageSquareText,
   Gauge,
   Presentation,
@@ -51,6 +54,12 @@ import {
   Clock,
   Eye,
   FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
+  PoundSterling,
+  Megaphone,
+  Cog,
+  BookOpen,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -85,6 +94,7 @@ import { ReportInfographic } from '@/components/reports/ReportInfographic'
 import { SlideDeckRenderer } from '@/components/reports/SlideDeckRenderer'
 import { ReportHistory } from '@/components/reports/ReportHistory'
 import { SkillDocumentSection } from '@/components/reports/SkillDocumentSection'
+import { ReportsHeroShowcase } from '@/components/reports/ReportsHeroShowcase'
 
 import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
 
@@ -97,6 +107,10 @@ import type {
 } from '@/lib/reports/report-document-types'
 import type { StrategicBriefing } from '@/lib/reports/slide-deck-types'
 
+// ========================
+// Constants
+// ========================
+
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   FileText,
   AlignLeft,
@@ -106,6 +120,10 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   AlertTriangle,
   BarChart3,
   CalendarDays,
+  PoundSterling,
+  Megaphone,
+  Cog,
+  BookOpen,
 }
 
 const TEMPLATE_ICONS: Record<ReportTemplateId, React.ComponentType<{ className?: string }>> = {
@@ -128,20 +146,28 @@ const DETAIL_OPTIONS: { value: ReportDetailLevel; label: string; description: st
   { value: 'detailed', label: 'Detailed', description: 'Full analysis with metrics' },
 ]
 
+const GENERATION_STEPS = [
+  'Collecting metrics…',
+  'Fetching objectives…',
+  'Analysing team activity…',
+  'Checking blockers…',
+  'Generating narrative…',
+  'Assembling report…',
+]
+
+const DATE_RANGE_PRESETS = [
+  { label: 'This Week', preset: 'this-week' as const },
+  { label: 'Last Week', preset: 'last-week' as const },
+  { label: 'This Month', preset: 'this-month' as const },
+  { label: 'Last Month', preset: 'last-month' as const },
+]
+
 function computeDatePreset(label: string): { start: string; end: string } {
   const now = new Date()
   const fmt = (d: Date) => d.toISOString().split('T')[0]
   const dayOfWeek = now.getDay()
 
   switch (label) {
-    case 'This Week':
-      return getDateRangeFromPreset('this-week')
-    case 'Last Week':
-      return getDateRangeFromPreset('last-week')
-    case 'This Month':
-      return getDateRangeFromPreset('this-month')
-    case 'Last Month':
-      return getDateRangeFromPreset('last-month')
     case 'Last 2 Weeks': {
       const twoWeeksAgoMonday = new Date(now)
       twoWeeksAgoMonday.setDate(now.getDate() - ((dayOfWeek + 6) % 7) - 14)
@@ -160,23 +186,38 @@ function computeDatePreset(label: string): { start: string; end: string } {
   }
 }
 
-const GENERATION_STEPS = [
-  'Collecting metrics…',
-  'Fetching objectives…',
-  'Analysing team activity…',
-  'Checking blockers…',
-  'Generating narrative…',
-  'Assembling report…',
-]
-
-const DATE_RANGE_PRESETS = [
-  { label: 'This Week', getRange: () => computeDatePreset('This Week') },
-  { label: 'Last Week', getRange: () => computeDatePreset('Last Week') },
+const EXTENDED_DATE_PRESETS = [
+  ...DATE_RANGE_PRESETS.map(p => ({ label: p.label, getRange: () => getDateRangeFromPreset(p.preset) })),
   { label: 'Last 2 Weeks', getRange: () => computeDatePreset('Last 2 Weeks') },
-  { label: 'This Month', getRange: () => computeDatePreset('This Month') },
-  { label: 'Last Month', getRange: () => computeDatePreset('Last Month') },
   { label: 'Last Quarter', getRange: () => computeDatePreset('Last Quarter') },
 ]
+
+// Capability strip items shown below Generate button
+const CAPABILITY_ITEMS = [
+  { icon: FileDown, label: 'PDF' },
+  { icon: FileSpreadsheet, label: 'DOCX' },
+  { icon: Presentation, label: 'PPTX' },
+  { icon: Printer, label: 'Print' },
+  { icon: Share2, label: 'Share Link' },
+  { icon: Mail, label: 'Email' },
+  { icon: Clock, label: 'Schedule' },
+  { icon: ImageIcon, label: 'Infographic' },
+]
+
+type PageMode = 'reports' | 'presentations' | 'documents'
+
+const PAGE_TABS: { value: PageMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'reports', label: 'Reports', icon: FileText },
+  { value: 'presentations', label: 'Presentations', icon: Presentation },
+  { value: 'documents', label: 'Documents', icon: FileEdit },
+]
+
+// Report-only templates (excludes strategic-briefing and skill-document)
+const REPORT_TEMPLATE_IDS: ReportTemplateId[] = ['weekly-update', 'board-pack', 'custom']
+
+// ========================
+// Component
+// ========================
 
 export default function ReportsPage(): React.JSX.Element {
   const defaultTemplate = getTemplate('weekly-update')
@@ -188,6 +229,10 @@ export default function ReportsPage(): React.JSX.Element {
   const reportRef = useRef<HTMLDivElement>(null)
   const infographicRef = useRef<HTMLDivElement>(null)
   const briefingRef = useRef<HTMLDivElement>(null)
+
+  // Change 6: Tab-level page mode
+  const [pageMode, setPageMode] = useState<PageMode>('reports')
+
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)
   const [enabledSections, setEnabledSections] = useState<Set<ReportSectionType>>(defaultSections)
@@ -201,13 +246,13 @@ export default function ReportsPage(): React.JSX.Element {
   // View mode: full report or infographic
   const [viewMode, setViewMode] = useState<'document' | 'infographic'>('document')
 
+  // Change 2: Collapsible config panel
+  const [isConfigExpanded, setIsConfigExpanded] = useState(false)
+
   // Strategic briefing state
   const [briefingContext, setBriefingContext] = useState('')
   const [includeCompanyData, setIncludeCompanyData] = useState(true)
   const [briefingResult, setBriefingResult] = useState<StrategicBriefing | null>(null)
-
-  const isStrategicBriefing = selectedTemplate === 'strategic-briefing'
-  const isSkillDocument = selectedTemplate === 'skill-document'
 
   // Share dialog state
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
@@ -228,6 +273,24 @@ export default function ReportsPage(): React.JSX.Element {
   const [scheduleDayOfMonth, setScheduleDayOfMonth] = useState(1)
   const [scheduleRecipients, setScheduleRecipients] = useState('')
 
+  // Derived values
+  const currentTemplate = useMemo(() => getTemplate(selectedTemplate), [selectedTemplate])
+  const allSectionTypes = useMemo(
+    () => [...currentTemplate.defaultSections].sort((a, b) => a.order - b.order).map(s => s.type),
+    [currentTemplate]
+  )
+  const enabledCount = enabledSections.size
+  const totalCount = allSectionTypes.length
+
+  // Config summary for collapsed state
+  const configSummary = useMemo(() => {
+    const toneLabel = TONE_OPTIONS.find(t => t.value === tone)?.label ?? tone
+    const detailLabel = DETAIL_OPTIONS.find(d => d.value === detailLevel)?.label ?? detailLevel
+    const start = new Date(dateRange.start).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    const end = new Date(dateRange.end).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    return `${toneLabel} tone · ${detailLabel} · ${start}–${end} · ${enabledCount} sections`
+  }, [tone, detailLevel, dateRange, enabledCount])
+
   const handleTemplateSelect = useCallback((templateId: ReportTemplateId) => {
     setSelectedTemplate(templateId)
     const template = getTemplate(templateId)
@@ -236,6 +299,9 @@ export default function ReportsPage(): React.JSX.Element {
     setEnabledSections(
       new Set(template.defaultSections.filter(s => s.enabled).map(s => s.type))
     )
+    // Auto-expand config for Custom, collapse for others
+    setIsConfigExpanded(templateId === 'custom')
+
     if (templateId === 'board-pack') {
       setTone('board')
       setDetailLevel('standard')
@@ -265,6 +331,15 @@ export default function ReportsPage(): React.JSX.Element {
     })
   }, [])
 
+  const handleSelectAll = useCallback(() => {
+    setEnabledSections(new Set(allSectionTypes))
+  }, [allSectionTypes])
+
+  const handleClearAll = useCallback(() => {
+    // Keep cover, clear everything else
+    setEnabledSections(new Set(['cover'] as ReportSectionType[]))
+  }, [])
+
   const handleGenerate = useCallback(async () => {
     if (isGenerating) return
     setIsGenerating(true)
@@ -273,7 +348,6 @@ export default function ReportsPage(): React.JSX.Element {
     setShareUrl(null)
     setLastSnapshotId(null)
 
-    // Cycle through descriptive progress messages during generation
     const stepInterval = setInterval(() => {
       setGenerationStep(prev => Math.min(prev + 1, GENERATION_STEPS.length - 1))
     }, 1500)
@@ -314,6 +388,59 @@ export default function ReportsPage(): React.JSX.Element {
     }
   }, [isGenerating, enabledSections, selectedTemplate, dateRange, tone, detailLevel])
 
+  // Quick-start: select template + immediately generate
+  // DECISION: We compute parameters directly from getTemplate() rather than relying
+  // on state, because React batches state updates and they won't be committed yet.
+  const handleQuickStart = useCallback((templateId: ReportTemplateId) => {
+    handleTemplateSelect(templateId)
+    // For "custom", just expand config — don't auto-generate
+    if (templateId === 'custom') return
+
+    const template = getTemplate(templateId)
+    const sections = template.defaultSections.filter(s => s.enabled).map(s => s.type)
+    const range = getDateRangeFromPreset(template.defaultDateRange)
+    const templateTone = templateId === 'board-pack' ? 'board' : 'internal'
+
+    // Set generating immediately to prevent double-trigger via Generate button
+    setIsGenerating(true)
+    setGenerationStep(0)
+
+    const stepInterval = setInterval(() => {
+      setGenerationStep(prev => Math.min(prev + 1, GENERATION_STEPS.length - 1))
+    }, 1500)
+
+    generateReport({
+      templateId,
+      sections,
+      dateRange: range,
+      tone: templateTone,
+      detailLevel: 'standard',
+    })
+      .then(result => {
+        if (!result.success || !result.document) {
+          toast.error(result.error ?? 'Failed to generate report')
+          return
+        }
+        setReportDocument(result.document)
+        toast.success('Report generated successfully')
+        saveReportSnapshot(result.document)
+          .then(saveResult => {
+            if (saveResult.success && saveResult.snapshotId) {
+              setLastSnapshotId(saveResult.snapshotId)
+            }
+          })
+          .catch(err => console.warn('[Reports] Failed to save snapshot:', err))
+      })
+      .catch(error => {
+        const message = error instanceof Error ? error.message : 'Unexpected error'
+        toast.error(`Report generation failed: ${message}`)
+      })
+      .finally(() => {
+        clearInterval(stepInterval)
+        setIsGenerating(false)
+      })
+  }, [handleTemplateSelect])
+
   const handleGenerateBriefing = useCallback(async () => {
     if (!briefingContext.trim()) {
       toast.error('Provide source material for the briefing')
@@ -338,9 +465,6 @@ export default function ReportsPage(): React.JSX.Element {
       setBriefingResult(result.briefing)
       toast.success(`Briefing generated — ${result.briefing.slides.length} slides`)
 
-      // GOTCHA: React needs a full render cycle to mount the SlideDeckRenderer
-      // before we can scroll to it. requestAnimationFrame + setTimeout ensures
-      // the DOM node exists when scrollIntoView is called.
       requestAnimationFrame(() => {
         setTimeout(() => {
           briefingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -437,7 +561,6 @@ export default function ReportsPage(): React.JSX.Element {
       const { generateAIInfographic } = await import('@/lib/reports/generate-infographic-image')
       const result = await generateAIInfographic(reportDocument)
       if (result.success && result.imageUrl) {
-        // Download the image
         const response = await fetch(result.imageUrl)
         const blob = await response.blob()
         const url = URL.createObjectURL(blob)
@@ -522,20 +645,17 @@ export default function ReportsPage(): React.JSX.Element {
 
   const handleLoadHistoricReport = useCallback((document: ReportDocumentType) => {
     setReportDocument(document)
+    setPageMode('reports')
     toast.success('Report loaded from history')
     setTimeout(() => {
       reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
   }, [])
 
-  const allSectionTypes = getTemplate(selectedTemplate).defaultSections
-    .sort((a, b) => a.order - b.order)
-    .map(s => s.type)
-
   return (
     <div className="space-y-8">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-border">
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
@@ -548,60 +668,536 @@ export default function ReportsPage(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Report History */}
-      <ReportHistory onLoadReport={handleLoadHistoricReport} />
+      {/* Change 6: Tab Separation */}
+      <div className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 p-1">
+        {PAGE_TABS.map(tab => {
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setPageMode(tab.value)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all',
+                pageMode === tab.value
+                  ? 'bg-background shadow-sm text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
 
-      {/* Template Selector */}
-      <section className="space-y-4">
-        <h2 className={typography.h3}>Choose a Template</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {REPORT_TEMPLATES.map(template => {
-            const isSelected = selectedTemplate === template.id
-            const TemplateIcon = TEMPLATE_ICONS[template.id]
+      {/* ══════════════════════════════════════════════ */}
+      {/* REPORTS TAB                                   */}
+      {/* ══════════════════════════════════════════════ */}
+      {pageMode === 'reports' && (
+        <>
+          {/* Change 8: Report History (promoted) */}
+          <ReportHistory onLoadReport={handleLoadHistoricReport} />
 
-            return (
-              <Card
-                key={template.id}
-                className={cn(
-                  'cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
-                  isSelected && 'ring-2 ring-international-orange'
-                )}
-                onClick={() => handleTemplateSelect(template.id)}
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-lg',
-                      isSelected ? 'bg-international-orange/10' : 'bg-muted'
-                    )}>
-                      <TemplateIcon className={cn(
-                        'h-5 w-5',
-                        isSelected ? 'text-international-orange' : 'text-muted-foreground'
-                      )} />
-                    </div>
+          {/* Change 1: Hero showcase when no report generated */}
+          {!reportDocument && !isGenerating && (
+            <ReportsHeroShowcase onQuickStart={handleQuickStart} />
+          )}
 
-                    {isSelected && (
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-international-orange">
-                        <Check className="h-3.5 w-3.5 text-background" />
+          {/* Change 4: Template Selector with section preview */}
+          <section className="space-y-4">
+            <h2 className={typography.h3}>Choose a Template</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {REPORT_TEMPLATES.filter(t => REPORT_TEMPLATE_IDS.includes(t.id)).map(template => {
+                const isSelected = selectedTemplate === template.id
+                const TemplateIcon = TEMPLATE_ICONS[template.id]
+                const sectionCount = template.defaultSections.filter(s => s.enabled).length
+                const defaultRange = template.defaultDateRange.replace('-', ' ')
+                const defaultToneLabel = template.id === 'board-pack' ? 'Board' : 'Internal'
+
+                return (
+                  <Card
+                    key={template.id}
+                    className={cn(
+                      'cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5',
+                      isSelected && 'ring-2 ring-international-orange',
+                      isGenerating && 'pointer-events-none opacity-60'
+                    )}
+                    onClick={() => handleTemplateSelect(template.id)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between">
+                        <div className={cn(
+                          'flex h-10 w-10 items-center justify-center rounded-lg',
+                          isSelected ? 'bg-international-orange/10' : 'bg-muted'
+                        )}>
+                          <TemplateIcon className={cn(
+                            'h-5 w-5',
+                            isSelected ? 'text-international-orange' : 'text-muted-foreground'
+                          )} />
+                        </div>
+
+                        {isSelected && (
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-international-orange">
+                            <Check className="h-3.5 w-3.5 text-background" />
+                          </div>
+                        )}
                       </div>
+
+                      <h3 className="mt-4 font-display font-semibold text-foreground">
+                        {template.name}
+                      </h3>
+                      <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                        {template.description}
+                      </p>
+
+                      {/* Change 4: Section preview icons + defaults hint */}
+                      <div className="mt-3 flex items-center gap-1.5">
+                        {template.defaultSections
+                          .filter(s => s.enabled)
+                          .slice(0, 6)
+                          .map(s => {
+                            const meta = SECTION_META[s.type]
+                            const SIcon = ICON_MAP[meta?.icon]
+                            return SIcon ? (
+                              <SIcon key={s.type} className="h-3 w-3 text-muted-foreground" />
+                            ) : null
+                          })}
+                        {sectionCount > 6 && (
+                          <span className="text-[10px] text-muted-foreground">+{sectionCount - 6}</span>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">
+                        {sectionCount} sections · {defaultRange} · {defaultToneLabel} tone
+                      </p>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* Change 2: Collapsible Configuration Panel */}
+          <section className="space-y-4">
+            <Card>
+              <CardContent className="p-0">
+                {/* Collapsed summary row */}
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between px-6 py-4 text-left"
+                  onClick={() => setIsConfigExpanded(prev => !prev)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Sliders className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <span className="text-sm text-muted-foreground truncate">{configSummary}</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs font-medium text-international-orange">
+                      {isConfigExpanded ? 'Collapse' : 'Customise'}
+                    </span>
+                    {isConfigExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
                     )}
                   </div>
+                </button>
 
-                  <h3 className="mt-4 font-display font-semibold text-foreground">
-                    {template.name}
-                  </h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                    {template.description}
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      </section>
+                {/* Expanded config */}
+                {isConfigExpanded && (
+                  <div className="border-t border-border px-6 pb-6 pt-4 space-y-6">
+                    {/* Tone & Detail */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium text-foreground">Tone</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {TONE_OPTIONS.map(option => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setTone(option.value)}
+                              className={cn(
+                                'rounded-lg border px-3 py-2 text-sm transition-all',
+                                tone === option.value
+                                  ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                                  : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                              )}
+                            >
+                              <span className="block">{option.label}</span>
+                              <span className="block text-xs opacity-70">{option.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
 
-      {/* ──── Strategic Briefing: Source Context ──── */}
-      {isStrategicBriefing && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Gauge className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium text-foreground">Detail Level</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {DETAIL_OPTIONS.map(option => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              onClick={() => setDetailLevel(option.value)}
+                              className={cn(
+                                'rounded-lg border px-3 py-2 text-sm transition-all',
+                                detailLevel === option.value
+                                  ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
+                                  : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                              )}
+                            >
+                              <span className="block">{option.label}</span>
+                              <span className="block text-xs opacity-70">{option.description}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Date Range */}
+                    <div className="space-y-3">
+                      <span className="text-sm font-medium text-foreground">Date Range</span>
+                      <div className="flex flex-wrap gap-2">
+                        {EXTENDED_DATE_PRESETS.map(preset => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setDateRange(preset.getRange())}
+                            className={cn(
+                              'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
+                              dateRange.start === preset.getRange().start && dateRange.end === preset.getRange().end
+                                ? 'border-international-orange bg-international-orange/5 text-foreground'
+                                : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                            )}
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <div className="w-full sm:flex-1">
+                          <label htmlFor="date-start" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                            Start
+                          </label>
+                          <Input
+                            id="date-start"
+                            type="date"
+                            value={dateRange.start}
+                            onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                          />
+                        </div>
+                        <span className="hidden sm:block text-sm text-muted-foreground pt-5">to</span>
+                        <div className="w-full sm:flex-1">
+                          <label htmlFor="date-end" className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                            End
+                          </label>
+                          <Input
+                            id="date-end"
+                            type="date"
+                            value={dateRange.end}
+                            onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Change 3: Section Toggles as Visual Card Grid */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">Sections</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={handleSelectAll}
+                            className="text-xs text-international-orange hover:underline"
+                          >
+                            Select All
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleClearAll}
+                            className="text-xs text-muted-foreground hover:underline"
+                          >
+                            Clear All
+                          </button>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {enabledCount} of {totalCount}
+                          </Badge>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {allSectionTypes.map(sectionType => {
+                          const meta = SECTION_META[sectionType]
+                          const isCover = sectionType === 'cover'
+                          const isEnabled = enabledSections.has(sectionType)
+                          const SectionIcon = ICON_MAP[meta.icon]
+
+                          return (
+                            <button
+                              key={sectionType}
+                              type="button"
+                              disabled={isCover}
+                              onClick={() => {
+                                if (!isCover) handleSectionToggle(sectionType, !isEnabled)
+                              }}
+                              className={cn(
+                                'relative flex flex-col items-start gap-2 rounded-xl border p-3 text-left transition-all',
+                                isEnabled
+                                  ? 'ring-2 ring-international-orange bg-international-orange/5 border-transparent'
+                                  : 'bg-muted/30 opacity-70 border-border hover:opacity-100',
+                                isCover && 'cursor-default'
+                              )}
+                            >
+                              <div className={cn(
+                                'flex h-8 w-8 items-center justify-center rounded-lg',
+                                isEnabled ? 'bg-international-orange/10' : 'bg-muted'
+                              )}>
+                                {SectionIcon && (
+                                  <SectionIcon className={cn(
+                                    'h-4 w-4',
+                                    isEnabled ? 'text-international-orange' : 'text-muted-foreground'
+                                  )} />
+                                )}
+                              </div>
+                              <div className="space-y-0.5">
+                                <p className={cn(
+                                  'text-xs font-medium',
+                                  isEnabled ? 'text-foreground' : 'text-muted-foreground'
+                                )}>
+                                  {meta.label}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground leading-tight">
+                                  {meta.description}
+                                </p>
+                              </div>
+                              {isCover && (
+                                <Badge variant="secondary" className="absolute top-2 right-2 text-[9px] px-1.5 py-0">
+                                  Always included
+                                </Badge>
+                              )}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </section>
+
+          {/* Change 7: Enhanced Generation Progress */}
+          {isGenerating && (
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                {/* Thin accent bar at top */}
+                <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-international-orange transition-all duration-500"
+                    style={{ width: `${((generationStep + 1) / GENERATION_STEPS.length) * 100}%` }}
+                  />
+                </div>
+
+                {/* Vertical step list */}
+                <div className="space-y-2">
+                  {GENERATION_STEPS.map((step, i) => {
+                    const isCompleted = i < generationStep
+                    const isCurrent = i === generationStep
+                    return (
+                      <div key={step} className="flex items-center gap-3">
+                        {isCompleted ? (
+                          <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                        ) : isCurrent ? (
+                          <Loader2 className="h-4 w-4 text-international-orange animate-spin shrink-0" />
+                        ) : (
+                          <Circle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                        )}
+                        <span className={cn(
+                          'text-sm',
+                          isCompleted ? 'text-muted-foreground' : isCurrent ? 'text-foreground font-medium' : 'text-muted-foreground/40'
+                        )}>
+                          {step}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Generate Button */}
+          {!isGenerating && (
+            <Button
+              className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
+              disabled={isGenerating || enabledSections.size === 0}
+              onClick={handleGenerate}
+            >
+              Generate Report
+            </Button>
+          )}
+
+          {/* Change 5: Pre-Generation Capability Strip */}
+          {!reportDocument && !isGenerating && (
+            <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+              <span className="text-xs text-muted-foreground">After generating:</span>
+              {CAPABILITY_ITEMS.map(item => {
+                const Icon = item.icon
+                return (
+                  <span key={item.label} className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Icon className="h-3 w-3" />
+                    {item.label}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Report Preview */}
+          {reportDocument && (
+            <section className="space-y-4">
+              {/* Export + Share Toolbar */}
+              <div className="sticky top-0 z-40 -mx-1 px-1 py-3 bg-background">
+                <Card>
+                  <CardContent className="flex flex-col gap-3 p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <h2 className={typography.h3}>Report Preview</h2>
+                        {tone !== 'internal' && (
+                          <Badge variant="secondary" className="text-xs">
+                            {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* View toggle */}
+                      <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('document')}
+                          className={cn(
+                            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                            viewMode === 'document'
+                              ? 'bg-background shadow-sm text-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          Document
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setViewMode('infographic')}
+                          className={cn(
+                            'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+                            viewMode === 'infographic'
+                              ? 'bg-background shadow-sm text-foreground'
+                              : 'text-muted-foreground hover:text-foreground'
+                          )}
+                        >
+                          <ImageIcon className="h-3.5 w-3.5" />
+                          Infographic
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={handlePrint}>
+                        <Printer className="mr-1.5 h-3.5 w-3.5" />
+                        Print
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleExportPDF}>
+                        <FileDown className="mr-1.5 h-3.5 w-3.5" />
+                        PDF
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleExportDOCX}>
+                        <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
+                        DOCX
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={handleExportPPTX}>
+                        <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                        PPTX
+                      </Button>
+                      {viewMode === 'infographic' && (
+                        <Button variant="secondary" size="sm" onClick={handleExportInfographic}>
+                          <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
+                          Save Image
+                        </Button>
+                      )}
+                      <Button variant="secondary" size="sm" onClick={handleAIInfographic}>
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        AI Infographic
+                      </Button>
+                      <div className="h-4 w-px bg-border" />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCreateShareLink}
+                        disabled={isCreatingShareLink || !lastSnapshotId}
+                      >
+                        {isCreatingShareLink ? (
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Share2 className="mr-1.5 h-3.5 w-3.5" />
+                        )}
+                        Share
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsEmailDialogOpen(true)}
+                      >
+                        <Mail className="mr-1.5 h-3.5 w-3.5" />
+                        Email
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setIsScheduleDialogOpen(true)}
+                      >
+                        <Clock className="mr-1.5 h-3.5 w-3.5" />
+                        Schedule
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Document Render */}
+              {viewMode === 'document' && (
+                <Card>
+                  <CardContent className="p-8 sm:p-12">
+                    <div ref={reportRef}>
+                      <ReportDocument document={reportDocument} />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Infographic Render */}
+              {viewMode === 'infographic' && (
+                <div className="py-6">
+                  <div ref={infographicRef}>
+                    <ReportInfographic document={reportDocument} />
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* PRESENTATIONS TAB                             */}
+      {/* ══════════════════════════════════════════════ */}
+      {pageMode === 'presentations' && (
         <>
           <section className="space-y-4">
             <h2 className={typography.h3}>Source Material</h2>
@@ -677,394 +1273,57 @@ export default function ReportsPage(): React.JSX.Element {
               </>
             )}
           </Button>
+
+          {/* Strategic Briefing Preview */}
+          {briefingResult && (
+            <section ref={briefingRef} className="space-y-4">
+              <div className="sticky top-0 z-40 -mx-1 px-1 py-3 bg-background">
+                <Card>
+                  <CardContent className="flex flex-col gap-3 p-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <h2 className={typography.h3}>Presentation Preview</h2>
+                        <Badge variant="secondary" className="text-xs">
+                          {briefingResult.slides.length} slides
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={handleExportBriefingPPTX}>
+                        <Presentation className="mr-1.5 h-3.5 w-3.5" />
+                        PPTX
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handlePrint}
+                      >
+                        <Printer className="mr-1.5 h-3.5 w-3.5" />
+                        Print
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <SlideDeckRenderer briefing={briefingResult} />
+            </section>
+          )}
         </>
       )}
 
-      {/* ──── Document Writer: Skill-based generation ──── */}
-      {isSkillDocument && <SkillDocumentSection />}
+      {/* ══════════════════════════════════════════════ */}
+      {/* DOCUMENTS TAB                                 */}
+      {/* ══════════════════════════════════════════════ */}
+      {pageMode === 'documents' && <SkillDocumentSection />}
 
-      {/* ──── Operational Reports: Tone, Date Range, Sections ──── */}
-      {!isStrategicBriefing && !isSkillDocument && (
-        <>
-          {/* Tone & Detail Controls */}
-          <section className="space-y-4">
-            <h2 className={typography.h3}>Narrative Style</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Tone Selector */}
-              <Card>
-                <CardContent className="p-6 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <MessageSquareText className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Tone</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {TONE_OPTIONS.map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setTone(option.value)}
-                        className={cn(
-                          'rounded-lg border px-3 py-2 text-sm transition-all',
-                          tone === option.value
-                            ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
-                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                        )}
-                      >
-                        <span className="block">{option.label}</span>
-                        <span className="block text-xs opacity-70">{option.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Detail Level Selector */}
-              <Card>
-                <CardContent className="p-6 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm font-medium text-foreground">Detail Level</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {DETAIL_OPTIONS.map(option => (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() => setDetailLevel(option.value)}
-                        className={cn(
-                          'rounded-lg border px-3 py-2 text-sm transition-all',
-                          detailLevel === option.value
-                            ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
-                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                        )}
-                      >
-                        <span className="block">{option.label}</span>
-                        <span className="block text-xs opacity-70">{option.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </section>
-
-          {/* Date Range */}
-          <section className="space-y-4">
-            <h2 className={typography.h3}>Date Range</h2>
-            <Card>
-              <CardContent className="p-6 space-y-4">
-                {/* Preset buttons */}
-                <div className="flex flex-wrap gap-2">
-                  {DATE_RANGE_PRESETS.map(preset => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => setDateRange(preset.getRange())}
-                      className={cn(
-                        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
-                        dateRange.start === preset.getRange().start && dateRange.end === preset.getRange().end
-                          ? 'border-international-orange bg-international-orange/5 text-foreground'
-                          : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
-                      )}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <div className="w-full sm:flex-1">
-                    <label htmlFor="date-start" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                      Start
-                    </label>
-                    <Input
-                      id="date-start"
-                      type="date"
-                      value={dateRange.start}
-                      onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                    />
-                  </div>
-                  <span className="hidden sm:block text-sm text-muted-foreground pt-5">to</span>
-                  <div className="w-full sm:flex-1">
-                    <label htmlFor="date-end" className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                      End
-                    </label>
-                    <Input
-                      id="date-end"
-                      type="date"
-                      value={dateRange.end}
-                      onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Section Toggles */}
-          <section className="space-y-4">
-            <h2 className={typography.h3}>Sections</h2>
-            <Card>
-              <CardContent className="p-6">
-                <div className="space-y-1">
-                  {allSectionTypes.map(sectionType => {
-                    const meta = SECTION_META[sectionType]
-                    const isCover = sectionType === 'cover'
-                    const isEnabled = enabledSections.has(sectionType)
-                    const SectionIcon = ICON_MAP[meta.icon]
-
-                    return (
-                      <label
-                        key={sectionType}
-                        className={cn(
-                          'flex items-center gap-4 rounded-lg px-3 py-3 transition-colors',
-                          !isCover && 'cursor-pointer hover:bg-muted/50',
-                          isCover && 'opacity-80'
-                        )}
-                      >
-                        <Checkbox
-                          checked={isEnabled}
-                          disabled={isCover}
-                          onCheckedChange={(checked) => {
-                            if (!isCover) handleSectionToggle(sectionType, checked === true)
-                          }}
-                        />
-
-                        {SectionIcon && (
-                          <SectionIcon className={cn(
-                            'h-4 w-4 shrink-0',
-                            isEnabled ? 'text-foreground' : 'text-muted-foreground'
-                          )} />
-                        )}
-
-                        <div className="min-w-0 flex-1">
-                          <span className={cn(
-                            'block text-sm font-medium',
-                            isEnabled ? 'text-foreground' : 'text-muted-foreground'
-                          )}>
-                            {meta.label}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {meta.description}
-                          </span>
-                        </div>
-
-                        {isCover && (
-                          <span className="text-xs text-muted-foreground">Always included</span>
-                        )}
-                      </label>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* Generation progress bar */}
-          {isGenerating && (
-            <div className="space-y-2">
-              <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-international-orange transition-all duration-500"
-                  style={{ width: `${((generationStep + 1) / GENERATION_STEPS.length) * 100}%` }}
-                />
-              </div>
-              <p className="text-sm text-muted-foreground text-center">{GENERATION_STEPS[generationStep]}</p>
-            </div>
-          )}
-
-          {/* Generate Button */}
-          <Button
-            className="w-full bg-international-orange hover:bg-international-orange-hover text-background font-semibold h-12 text-base"
-            disabled={isGenerating || enabledSections.size === 0}
-            onClick={handleGenerate}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {GENERATION_STEPS[generationStep]}
-              </>
-            ) : (
-              'Generate Report'
-            )}
-          </Button>
-        </>
-      )}
-
-      {/* Report Preview */}
-      {reportDocument && (
-        <section className="space-y-4">
-          {/* Export + Share Toolbar */}
-          <div className="sticky top-0 z-10 -mx-1 px-1 py-3 bg-background">
-            <Card>
-              <CardContent className="flex flex-col gap-3 p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className={typography.h3}>Report Preview</h2>
-                    {tone !== 'internal' && (
-                      <Badge variant="secondary" className="text-xs">
-                        {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* View toggle */}
-                  <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('document')}
-                      className={cn(
-                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
-                        viewMode === 'document'
-                          ? 'bg-background shadow-sm text-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      Document
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('infographic')}
-                      className={cn(
-                        'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
-                        viewMode === 'infographic'
-                          ? 'bg-background shadow-sm text-foreground'
-                          : 'text-muted-foreground hover:text-foreground'
-                      )}
-                    >
-                      <ImageIcon className="h-3.5 w-3.5" />
-                      Infographic
-                    </button>
-                  </div>
-                </div>
-
-                {/* Action buttons */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={handlePrint}>
-                    <Printer className="mr-1.5 h-3.5 w-3.5" />
-                    Print
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={handleExportPDF}>
-                    <FileDown className="mr-1.5 h-3.5 w-3.5" />
-                    PDF
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={handleExportDOCX}>
-                    <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                    DOCX
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={handleExportPPTX}>
-                    <Presentation className="mr-1.5 h-3.5 w-3.5" />
-                    PPTX
-                  </Button>
-                  {viewMode === 'infographic' && (
-                    <Button variant="secondary" size="sm" onClick={handleExportInfographic}>
-                      <ImageIcon className="mr-1.5 h-3.5 w-3.5" />
-                      Save Image
-                    </Button>
-                  )}
-                  <Button variant="secondary" size="sm" onClick={handleAIInfographic}>
-                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    AI Infographic
-                  </Button>
-                  <div className="h-4 w-px bg-border" />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleCreateShareLink}
-                    disabled={isCreatingShareLink || !lastSnapshotId}
-                  >
-                    {isCreatingShareLink ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Share2 className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    Share
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setIsEmailDialogOpen(true)}
-                  >
-                    <Mail className="mr-1.5 h-3.5 w-3.5" />
-                    Email
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setIsScheduleDialogOpen(true)}
-                  >
-                    <Clock className="mr-1.5 h-3.5 w-3.5" />
-                    Schedule
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Document Render */}
-          {viewMode === 'document' && (
-            <Card>
-              <CardContent className="p-8 sm:p-12">
-                <div ref={reportRef}>
-                  <ReportDocument document={reportDocument} />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Infographic Render */}
-          {viewMode === 'infographic' && (
-            <div className="py-6">
-              <div ref={infographicRef}>
-                <ReportInfographic document={reportDocument} />
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Strategic Briefing Preview */}
-      {briefingResult && isStrategicBriefing && (
-        <section ref={briefingRef} className="space-y-4">
-          {/* Briefing Toolbar */}
-          <div className="sticky top-0 z-10 -mx-1 px-1 py-3 bg-background">
-            <Card>
-              <CardContent className="flex flex-col gap-3 p-4">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <h2 className={typography.h3}>Presentation Preview</h2>
-                    <Badge variant="secondary" className="text-xs">
-                      {briefingResult.slides.length} slides
-                    </Badge>
-                    <Badge variant="secondary" className="text-xs">
-                      {TONE_OPTIONS.find(t => t.value === tone)?.label} tone
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="secondary" size="sm" onClick={handleExportBriefingPPTX}>
-                    <Presentation className="mr-1.5 h-3.5 w-3.5" />
-                    PPTX
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handlePrint}
-                  >
-                    <Printer className="mr-1.5 h-3.5 w-3.5" />
-                    Print
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Slide Deck Viewer */}
-          <SlideDeckRenderer briefing={briefingResult} />
-        </section>
-      )}
+      {/* ══════════════════════════════════════════════ */}
+      {/* Dialogs (shared across tabs)                  */}
+      {/* ══════════════════════════════════════════════ */}
 
       {/* Share Link Dialog */}
       <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
