@@ -112,16 +112,27 @@ export function EditEventDialog({ open, onOpenChange, onUpdated, event }: EditEv
 
             // INTENT: Always send field values so users can clear optional fields.
             // The server action converts empty strings to null.
+            // Clear fields that don't apply to the current format
+            const isPhysical = eventFormat === 'in_person' || eventFormat === 'hybrid'
+            const isVirtual = eventFormat === 'online' || eventFormat === 'hybrid'
+
+            const parsedMax = maxAttendees ? parseInt(maxAttendees, 10) : null
+            if (parsedMax !== null && (isNaN(parsedMax) || parsedMax < 1)) {
+                toast.error('Max attendees must be at least 1')
+                setSaving(false)
+                return
+            }
+
             const result = await updateGuildEvent(event.id, {
                 title: title.trim(),
                 description: description.trim(),
                 eventType,
                 eventFormat,
                 eventDate: dateISO,
-                eventUrl: eventUrl.trim(),
-                locationGeo: locationGeo.trim(),
-                locationAddress: locationAddress.trim(),
-                maxAttendees: maxAttendees ? parseInt(maxAttendees, 10) : null,
+                eventUrl: isVirtual ? eventUrl.trim() : '',
+                locationGeo: isPhysical ? locationGeo.trim() : '',
+                locationAddress: isPhysical ? locationAddress.trim() : '',
+                maxAttendees: parsedMax,
                 isExecutiveOnly,
             })
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -99,7 +99,7 @@ interface EventDetailContentProps {
     event: GuildEventDetail
     attendees: EventAttendee[]
     attendeeCount: number
-    isAttending: boolean
+    initialRsvpStatus: 'going' | 'maybe' | null
     canEdit: boolean
     currentUserId: string
 }
@@ -135,13 +135,17 @@ export function EventDetailContent({
     event,
     attendees,
     attendeeCount,
-    isAttending: initialIsAttending,
+    initialRsvpStatus,
     canEdit,
     currentUserId,
 }: EventDetailContentProps) {
     const router = useRouter()
-    const [rsvpStatus, setRsvpStatus] = useState<'going' | 'maybe' | null>(initialIsAttending ? 'going' : null)
+    const [rsvpStatus, setRsvpStatus] = useState<'going' | 'maybe' | null>(initialRsvpStatus)
     const [count, setCount] = useState(attendeeCount)
+
+    // Sync from server props after router.refresh() re-renders with fresh data
+    useEffect(() => { setCount(attendeeCount) }, [attendeeCount])
+    useEffect(() => { setRsvpStatus(initialRsvpStatus) }, [initialRsvpStatus])
     const [loadingRsvp, setLoadingRsvp] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [editOpen, setEditOpen] = useState(false)
@@ -400,7 +404,11 @@ export function EventDetailContent({
                                         className="flex-1"
                                         size="lg"
                                         variant={rsvpStatus === 'going' ? 'outline' : rsvpStatus === 'maybe' ? 'secondary' : 'default'}
-                                        onClick={() => handleSetStatus(rsvpStatus ? 'cancelled' : 'going')}
+                                        onClick={() => handleSetStatus(
+                                            !rsvpStatus ? 'going' :
+                                            rsvpStatus === 'maybe' ? 'going' :
+                                            'cancelled'
+                                        )}
                                         disabled={loadingRsvp || (isFull && !rsvpStatus)}
                                     >
                                         {loadingRsvp ? (

@@ -243,9 +243,16 @@ export function FeaturedEventHero({
                 <div className="flex-1 p-6 space-y-4">
                     {/* Badges Row */}
                     <div className="flex flex-wrap items-center gap-2">
-                        <Badge className="bg-international-orange text-white border-0">
-                            Next Event
-                        </Badge>
+                        {!isPast && (
+                            <Badge className="bg-international-orange text-white border-0">
+                                Next Event
+                            </Badge>
+                        )}
+                        {isPast && (
+                            <Badge variant="outline" className="text-muted-foreground">
+                                Past Event
+                            </Badge>
+                        )}
 
                         {typeConfig && (
                             <Badge variant="secondary" className={typeConfig.className}>
@@ -390,7 +397,7 @@ function RSVPSplitButton({
                 onClick={() => {
                     if (!currentStatus) onStatusChange('going')
                     else if (currentStatus === 'going') onStatusChange('cancelled')
-                    else if (currentStatus === 'maybe') onStatusChange('cancelled')
+                    else if (currentStatus === 'maybe') onStatusChange('going')
                 }}
                 disabled={loading || disabled}
                 className={`${config.className} rounded-r-none`}

@@ -64,13 +64,13 @@ export default async function EventDetailPage({ params }: PageProps) {
         .order('rsvp_at', { ascending: true })
         .limit(50)
 
-    // Check if current user is attending
+    // Check current user's RSVP status (going, maybe, or null)
     const { data: userRsvp } = await supabase
         .from('event_attendees')
-        .select('id')
+        .select('id, status')
         .eq('event_id', id)
         .eq('user_id', user.id)
-        .eq('status', 'going')
+        .in('status', ['going', 'maybe'])
         .maybeSingle()
 
     // Get total attendee count
@@ -89,7 +89,7 @@ export default async function EventDetailPage({ params }: PageProps) {
             event={event}
             attendees={attendees || []}
             attendeeCount={attendeeCount || 0}
-            isAttending={!!userRsvp}
+            initialRsvpStatus={userRsvp?.status === 'going' ? 'going' : userRsvp?.status === 'maybe' ? 'maybe' : null}
             canEdit={canEdit}
             currentUserId={user.id}
         />

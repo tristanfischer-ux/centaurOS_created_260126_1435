@@ -21,6 +21,16 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
     Briefcase,
     CheckCircle2,
     XCircle,
@@ -52,17 +62,20 @@ export function ProjectAssignmentsList() {
     const [loading, setLoading] = useState(true)
     const [isPending, startTransition] = useTransition()
     const [actionId, setActionId] = useState<string | null>(null)
+    // Cancel confirmation
+    const [cancelTarget, setCancelTarget] = useState<Assignment | null>(null)
     // Completion feedback dialog
     const [completedAssignment, setCompletedAssignment] = useState<Assignment | null>(null)
     const [endorseText, setEndorseText] = useState("")
     const [endorsing, setEndorsing] = useState(false)
 
     useEffect(() => {
-        loadAssignments()
+        loadAssignments(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    const loadAssignments = async () => {
-        setLoading(true)
+    const loadAssignments = async (initial = false) => {
+        if (initial) setLoading(true)
         try {
             const result = await getFoundryAssignments()
             if (result.assignments) {
@@ -117,6 +130,9 @@ export function ProjectAssignmentsList() {
             )
             if (result.success) {
                 toast.success(`Endorsement sent to ${completedAssignment.apprenticeName}`)
+                // Only close dialog on success — preserve text on failure for retry
+                setCompletedAssignment(null)
+                setEndorseText("")
             } else {
                 toast.error(result.error || 'Failed to send endorsement')
             }
@@ -124,8 +140,6 @@ export function ProjectAssignmentsList() {
             toast.error('Failed to send endorsement')
         } finally {
             setEndorsing(false)
-            setCompletedAssignment(null)
-            setEndorseText("")
         }
     }
 
@@ -225,7 +239,7 @@ export function ProjectAssignmentsList() {
                                                         Mark Complete
                                                     </DropdownMenuItem>
                                                     <DropdownMenuItem
-                                                        onClick={() => handleStatusUpdate(assignment.id, 'cancelled')}
+                                                        onClick={() => setCancelTarget(assignment)}
                                                         className="text-destructive"
                                                     >
                                                         <XCircle className="h-4 w-4 mr-2" />
@@ -334,20 +348,44 @@ export function ProjectAssignmentsList() {
                         >
                             Done
                         </Button>
-                        {endorseText.trim() && (
-                            <Button
-                                onClick={handleEndorse}
-                                disabled={endorsing}
-                                className="gap-1.5"
-                            >
-                                {endorsing && <Loader2 className="h-4 w-4 animate-spin" />}
-                                <Award className="h-4 w-4" />
-                                Endorse
-                            </Button>
-                        )}
+                        <Button
+                            onClick={handleEndorse}
+                            disabled={!endorseText.trim() || endorsing}
+                            className="gap-1.5"
+                        >
+                            {endorsing && <Loader2 className="h-4 w-4 animate-spin" />}
+                            <Award className="h-4 w-4" />
+                            Endorse
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Cancel Confirmation */}
+            <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel this assignment?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will end {cancelTarget?.apprenticeName}&apos;s work on &ldquo;{cancelTarget?.projectName}&rdquo;. They will be notified.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Keep Assignment</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
+                                if (cancelTarget) {
+                                    handleStatusUpdate(cancelTarget.id, 'cancelled')
+                                    setCancelTarget(null)
+                                }
+                            }}
+                        >
+                            Cancel Assignment
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     )
 }

@@ -287,7 +287,13 @@ export function GuildNetwork({ members, currentUserId, isExecutive }: GuildNetwo
             </div>
 
             {/* Endorse Dialog */}
-            <Dialog open={!!endorseTarget} onOpenChange={(open) => !open && setEndorseTarget(null)}>
+            <Dialog open={!!endorseTarget} onOpenChange={(open) => {
+                if (!open) {
+                    setEndorseTarget(null)
+                    setEndorseText("")
+                    setEndorseRelationship("")
+                }
+            }}>
                 <DialogContent size="sm">
                     <DialogHeader>
                         <DialogTitle>Endorse {endorseTarget?.full_name}</DialogTitle>

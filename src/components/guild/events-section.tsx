@@ -63,12 +63,12 @@ interface EventsSectionProps {
  */
 export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSectionProps) {
     const [localRsvp, setLocalRsvp] = useState<Record<string, RSVPStatus>>(rsvpStatuses)
-    const [loadingRsvp, setLoadingRsvp] = useState<string | null>(null)
+    const [loadingRsvps, setLoadingRsvps] = useState<Set<string>>(new Set())
 
     useEffect(() => { setLocalRsvp(rsvpStatuses) }, [rsvpStatuses])
 
     const handleSetStatus = useCallback(async (eventId: string, newStatus: 'going' | 'maybe' | 'cancelled') => {
-        setLoadingRsvp(eventId)
+        setLoadingRsvps(prev => new Set(prev).add(eventId))
         try {
             const result = await setRSVPStatus(eventId, newStatus)
             if (result.error) {
@@ -88,7 +88,7 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
             console.error('[EventsSection] RSVP failed:', err instanceof Error ? err.message : 'Unknown error')
             toast.error('Failed to update RSVP. Please try again.')
         } finally {
-            setLoadingRsvp(null)
+            setLoadingRsvps(prev => { const next = new Set(prev); next.delete(eventId); return next })
         }
     }, [onRSVPChange])
 
@@ -117,7 +117,8 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {events.map(event => {
                     const eventRsvp = localRsvp[event.id] || { attending: false, count: 0, status: null, goingCount: 0, maybeCount: 0 }
-                    const isLoading = loadingRsvp === event.id
+                    const isLoading = loadingRsvps.has(event.id)
+                    const isPast = new Date(event.event_date) < new Date()
                     const typeConfig = EVENT_TYPE_CONFIG[event.event_type || 'meetup']
                     const TypeIcon = typeConfig?.icon || Calendar
                     const eventDate = new Date(event.event_date)
@@ -214,12 +215,13 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
 
                                 {/* Actions */}
                                 <div className="flex items-center gap-3 pt-1">
-                                    <div className="flex items-center">
+                                    {!isPast && <div className="flex items-center">
                                         <Button
                                             size="sm"
                                             variant={eventRsvp.status ? "outline" : "default"}
                                             onClick={() => {
                                                 if (!eventRsvp.status) handleSetStatus(event.id, 'going')
+                                                else if (eventRsvp.status === 'maybe') handleSetStatus(event.id, 'going')
                                                 else handleSetStatus(event.id, 'cancelled')
                                             }}
                                             disabled={isLoading || (isFull && !eventRsvp.status)}
@@ -275,7 +277,10 @@ export function EventsSection({ events, rsvpStatuses, onRSVPChange }: EventsSect
                                                 )}
                                             </DropdownMenuContent>
                                         </DropdownMenu>
-                                    </div>
+                                    </div>}
+                                    {isPast && (
+                                        <Badge variant="outline" className="text-muted-foreground text-xs">Past Event</Badge>
+                                    )}
 
                                     {(eventRsvp.goingCount > 0 || eventRsvp.maybeCount > 0) && (
                                         <span className="text-xs text-muted-foreground flex items-center gap-1">

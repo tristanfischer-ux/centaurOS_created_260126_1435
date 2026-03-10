@@ -96,10 +96,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
             }
             let filteredEvents: GuildEvent[] = []
             if (eventsResult.data) {
-                // SECURITY: Filter executive-only events for non-executives client-side
-                filteredEvents = isExecutive
-                    ? eventsResult.data
-                    : eventsResult.data.filter(e => !e.is_executive_only)
+                // SECURITY: Executive-only filtering now handled server-side in getGuildEvents
+                filteredEvents = eventsResult.data
                 setEvents(filteredEvents)
 
                 // Load RSVP statuses for all visible events
@@ -184,7 +182,8 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
     const remainingEvents = events.length > 1 ? events.slice(1) : []
 
     // Calculate total attending across all events
-    const totalAttending = Object.values(rsvpStatuses).reduce((sum, s) => sum + s.count, 0)
+    // INTENT: Only count confirmed "going" RSVPs, not "maybe"
+    const totalAttending = Object.values(rsvpStatuses).reduce((sum, s) => sum + s.goingCount, 0)
 
     // Shared events-first layout used by both Manager and Apprentice views
     const eventsLayout = (
