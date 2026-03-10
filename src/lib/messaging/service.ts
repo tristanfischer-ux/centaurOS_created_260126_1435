@@ -543,7 +543,7 @@ export async function createDirectConversation(
     return existing as Conversation
   }
 
-  // Also check via participants table
+  // Also check via participants table — scoped to creator's conversations to avoid unbounded query
   const { data: existingViaParticipants } = await supabase
     .from('conversations')
     .select(`
@@ -553,6 +553,7 @@ export async function createDirectConversation(
     .eq('conversation_type', 'direct')
     .eq('status', 'active')
     .eq('is_group', false)
+    .eq('conversation_participants.profile_id', creatorId)
 
   // Filter to find conversation with exactly these two participants
   const dmConv = existingViaParticipants?.find(conv => {
@@ -584,7 +585,8 @@ export async function createDirectConversation(
     throw new Error(`Failed to create direct conversation: ${error.message}`)
   }
 
-  // Add participant (creator is auto-added by trigger, but add explicitly for safety)
+  // DECISION: Add both participants explicitly — don't rely on trigger existing
+  await addParticipantToConversation(supabase, data.id, creatorId)
   await addParticipantToConversation(supabase, data.id, participantId)
 
   return data as Conversation

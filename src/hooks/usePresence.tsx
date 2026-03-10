@@ -351,23 +351,9 @@ export function usePresence(options: UsePresenceOptions = {}) {
     }
   }, [recordActivity])
 
-  // Handle beforeunload to go offline
-  // DECISION: Removed broken sendBeacon (no auth headers possible).
-  // Offline transition relies on: (1) useEffect cleanup calling goOffline(),
-  // (2) server-side heartbeat timeout detecting stale last_seen.
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Use fetch with keepalive for reliable offline status on page close
-      if (myPresenceRef.current?.user_id) {
-        updatePresence('offline')
-      }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [updatePresence])
+  // DECISION: beforeunload handler removed — async RPC calls don't complete
+  // before page close. Offline transition relies on: (1) useEffect cleanup
+  // calling goOffline(), (2) server-side heartbeat timeout detecting stale last_seen.
 
   return {
     myPresence,

@@ -249,7 +249,8 @@ export async function replyToActivity(
         const { data: inserted, error } = await supabase.from('messages').insert({
           conversation_id: sourceId,
           sender_id: user.id,
-          content: content.trim()
+          content: content.trim(),
+          message_type: 'text'
         }).select('id, created_at').single()
 
         if (error) {
@@ -810,13 +811,15 @@ export async function getActivityFeed(options?: {
 
       // Get read status for task comments (table created by migration)
       const taskCommentIds = taskComments?.map(c => c.id) || []
-      const { data: taskReads } = await (supabase as AnySupabaseClient)
-        .from('task_comment_reads')
-        .select('comment_id')
-        .eq('user_id', user.id)
-        .in('comment_id', taskCommentIds)
-
-      const readTaskCommentIds = new Set(taskReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      let readTaskCommentIds = new Set<string>()
+      if (taskCommentIds.length > 0) {
+        const { data: taskReads } = await (supabase as AnySupabaseClient)
+          .from('task_comment_reads')
+          .select('comment_id')
+          .eq('user_id', user.id)
+          .in('comment_id', taskCommentIds)
+        readTaskCommentIds = new Set(taskReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      }
 
       if (taskComments) {
         for (const comment of taskComments as RawTaskComment[]) {
@@ -935,13 +938,15 @@ export async function getActivityFeed(options?: {
 
       // Get read status for objective comments (table created by migration)
       const objectiveCommentIds = objectiveComments?.map((c: { id: string }) => c.id) || []
-      const { data: objectiveReads } = await (supabase as AnySupabaseClient)
-        .from('objective_comment_reads')
-        .select('comment_id')
-        .eq('user_id', user.id)
-        .in('comment_id', objectiveCommentIds)
-
-      const readObjectiveCommentIds = new Set(objectiveReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      let readObjectiveCommentIds = new Set<string>()
+      if (objectiveCommentIds.length > 0) {
+        const { data: objectiveReads } = await (supabase as AnySupabaseClient)
+          .from('objective_comment_reads')
+          .select('comment_id')
+          .eq('user_id', user.id)
+          .in('comment_id', objectiveCommentIds)
+        readObjectiveCommentIds = new Set(objectiveReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      }
 
       if (objectiveComments) {
         for (const comment of objectiveComments as RawObjectiveComment[]) {
@@ -1169,13 +1174,15 @@ export async function getThreadForSource(
 
       // Fetch read status
       const commentIds = comments?.map(c => c.id) || []
-      const { data: reads } = await (supabase as AnySupabaseClient)
-        .from('task_comment_reads')
-        .select('comment_id')
-        .eq('user_id', user.id)
-        .in('comment_id', commentIds)
-
-      const readIds = new Set(reads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      let readIds = new Set<string>()
+      if (commentIds.length > 0) {
+        const { data: reads } = await (supabase as AnySupabaseClient)
+          .from('task_comment_reads')
+          .select('comment_id')
+          .eq('user_id', user.id)
+          .in('comment_id', commentIds)
+        readIds = new Set(reads?.map((r: { comment_id: string }) => r.comment_id) || [])
+      }
 
       const items: ThreadItem[] = (comments || [])
         .filter((c: { user: unknown }) => c.user !== null)
@@ -1358,13 +1365,15 @@ export async function getThreadForSource(
 
     // Fetch read status
     const objCommentIds = objComments?.map((c: { id: string }) => c.id) || []
-    const { data: objReads } = await (supabase as AnySupabaseClient)
-      .from('objective_comment_reads')
-      .select('comment_id')
-      .eq('user_id', user.id)
-      .in('comment_id', objCommentIds)
-
-    const readObjIds = new Set(objReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+    let readObjIds = new Set<string>()
+    if (objCommentIds.length > 0) {
+      const { data: objReads } = await (supabase as AnySupabaseClient)
+        .from('objective_comment_reads')
+        .select('comment_id')
+        .eq('user_id', user.id)
+        .in('comment_id', objCommentIds)
+      readObjIds = new Set(objReads?.map((r: { comment_id: string }) => r.comment_id) || [])
+    }
 
     const objItems: ThreadItem[] = (objComments || [])
       .filter((c: { user: unknown }) => c.user !== null)

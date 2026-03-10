@@ -243,8 +243,8 @@ export function useConversation(
             // relations (sender). Spreading it would overwrite m.sender with undefined.
             // Only update scalar fields that can actually change.
             const updated = payload.new as Record<string, unknown>
-            setMessages(prev =>
-              prev
+            setMessages(prev => {
+              const next = prev
                 .map(m =>
                   m.id === updated.id
                     ? {
@@ -260,7 +260,9 @@ export function useConversation(
                 // DECISION: Filter out soft-deleted messages immediately on UPDATE,
                 // so they disappear in realtime instead of lingering until refresh.
                 .filter(m => !m.is_deleted)
-            )
+              messagesRef.current = next
+              return next
+            })
           }
         )
         .subscribe((status) => {
