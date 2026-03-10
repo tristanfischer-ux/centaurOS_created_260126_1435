@@ -116,7 +116,7 @@ export function RFQResponseCompareDialog({
                 <td className="py-3 px-2 text-muted-foreground">Quoted Price</td>
                 {responses.map((r) => (
                   <td key={r.id} className="py-3 px-2">
-                    {r.quoted_price ? (
+                    {r.quoted_price != null ? (
                       <span
                         className={cn(
                           'font-semibold',
@@ -164,7 +164,7 @@ export function RFQResponseCompareDialog({
                 <td className="py-3 px-2 text-muted-foreground">Responded</td>
                 {responses.map((r) => (
                   <td key={r.id} className="py-3 px-2 text-xs text-muted-foreground">
-                    {format(new Date(r.responded_at), 'MMM d, HH:mm')}
+                    {r.responded_at ? format(new Date(r.responded_at), 'MMM d, HH:mm') : 'Pending'}
                   </td>
                 ))}
               </tr>

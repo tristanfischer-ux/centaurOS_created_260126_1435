@@ -167,8 +167,6 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         <TabsContent value="overview" className="mt-6">
           <OverviewTab
             bio={profile?.bio ?? null}
-            phoneNumber={profile?.phone_number ?? null}
-            linkedinUrl={linkedinUrl}
             professionalBackground={(profile?.professional_background as {
               summary?: string | null
               previous_companies?: string | null

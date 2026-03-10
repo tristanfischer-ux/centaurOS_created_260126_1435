@@ -60,6 +60,18 @@ export async function submitRFQResponse(
     return { data: null, error: "Race has not started yet" }
   }
 
+  // SECURITY: Verify provider was invited via broadcast
+  const { data: broadcast } = await supabase
+    .from('rfq_broadcasts')
+    .select('id')
+    .eq('rfq_id', params.rfq_id)
+    .eq('provider_id', providerProfile.id)
+    .single()
+
+  if (!broadcast) {
+    return { data: null, error: "Not invited to this RFQ" }
+  }
+
   // Check for existing response
   const { data: existingResponse } = await supabase
     .from('rfq_responses')
@@ -106,49 +118,12 @@ export async function submitRFQResponse(
     return { data: null, error: "Failed to submit response" }
   }
 
-  // Handle race mechanics for accept responses
-  let awarded = false
-  let priority_hold = false
-
-  if (params.response_type === 'accept') {
-    // Check if this is the first accept
-    const { data: acceptResponses } = await supabase
-      .from('rfq_responses')
-      .select('id')
-      .eq('rfq_id', params.rfq_id)
-      .eq('response_type', 'accept')
-
-    const isFirstAccept = acceptResponses?.length === 1
-
-    if (isFirstAccept) {
-      if (rfq.rfq_type === 'commodity') {
-        // Commodity: First click wins - auto award
-        await supabase
-          .from('rfqs')
-          .update({
-            status: 'Awarded',
-            awarded_to: providerProfile.id,
-          })
-          .eq('id', params.rfq_id)
-
-        awarded = true
-      } else if (rfq.rfq_type === 'custom') {
-        // Custom: Set priority hold (2 hours)
-        const holdExpires = new Date(Date.now() + 2 * 60 * 60 * 1000) // 2 hours
-
-        await supabase
-          .from('rfqs')
-          .update({
-            status: 'priority_hold',
-            priority_holder_id: providerProfile.id,
-            priority_hold_expires_at: holdExpires.toISOString(),
-          })
-          .eq('id', params.rfq_id)
-
-        priority_hold = true
-      }
-    }
-  }
+  // DECISION: Race mechanics (auto-award, priority hold) are handled exclusively
+  // by acceptRFQ in race.ts. Do NOT duplicate here — the canonical path has
+  // broadcast checks, tier delays, and status guards this path lacks.
+  // This action is for simple response insertion only.
+  const awarded = false
+  const priority_hold = false
 
   // Update broadcast as delivered/viewed
   await supabase
@@ -300,6 +275,7 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
   }
 
   // If this provider holds priority, release it
+  // SECURITY: Only release if still in priority_hold to prevent overwriting concurrent award
   if (rfq.priority_holder_id === providerProfile.id) {
     await supabase
       .from('rfqs')
@@ -309,6 +285,7 @@ export async function withdrawRFQResponse(responseId: string): Promise<{
         priority_hold_expires_at: null,
       })
       .eq('id', response.rfq_id)
+      .eq('status', 'priority_hold')
   }
 
   // If this provider was awarded (shouldn't happen but safety check)

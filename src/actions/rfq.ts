@@ -62,6 +62,10 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
     return { data: null, error: "RFQ type is required" }
   }
 
+  if (!['commodity', 'custom', 'service'].includes(params.rfq_type)) {
+    return { data: null, error: "Invalid RFQ type" }
+  }
+
   if (params.budget_min != null && params.budget_max != null && params.budget_min > params.budget_max) {
     return { data: null, error: "Minimum budget cannot exceed maximum budget" }
   }
@@ -160,6 +164,34 @@ export async function getRFQDetail(rfqId: string): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { data: null, error: "Not authenticated" }
 
+  // AUTH: Verify user is the buyer or a broadcast recipient before revealing full details
+  const { data: rfqCheck } = await supabase
+    .from("rfqs")
+    .select("buyer_id")
+    .eq("id", rfqId)
+    .single()
+
+  if (!rfqCheck) return { data: null, error: "RFQ not found" }
+
+  if (rfqCheck.buyer_id !== user.id) {
+    const { data: providerProfile } = await supabase
+      .from("provider_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!providerProfile) return { data: null, error: "Not authorized" }
+
+    const { data: broadcast } = await supabase
+      .from("rfq_broadcasts")
+      .select("id")
+      .eq("rfq_id", rfqId)
+      .eq("provider_id", providerProfile.id)
+      .single()
+
+    if (!broadcast) return { data: null, error: "Not authorized" }
+  }
+
   const { data, error } = await getRFQService(supabase, rfqId, user.id)
   return { data, error }
 }
@@ -175,6 +207,10 @@ export async function updateMyRFQ(
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: "Not authenticated" }
+
+  if (updates.budget_min != null && updates.budget_max != null && updates.budget_min > updates.budget_max) {
+    return { success: false, error: "Minimum budget cannot exceed maximum budget" }
+  }
 
   const { error } = await updateRFQService(supabase, rfqId, user.id, updates)
 
@@ -626,16 +662,23 @@ export async function markRFQViewed(rfqId: string): Promise<{
     return { success: false, error: "No provider profile" }
   }
 
-  // Update broadcast record
+  // Update broadcast record — set viewed_at; only set delivered_at if not already set
+  const now = new Date().toISOString()
+  // First: mark as viewed (always)
   const { error } = await supabase
     .from('rfq_broadcasts')
-    .update({
-      viewed_at: new Date().toISOString(),
-      delivered_at: new Date().toISOString(),
-    })
+    .update({ viewed_at: now })
     .eq('rfq_id', rfqId)
     .eq('provider_id', providerProfile.id)
     .is('viewed_at', null)
+
+  // Backfill delivered_at only if missing (don't overwrite existing delivery timestamp)
+  await supabase
+    .from('rfq_broadcasts')
+    .update({ delivered_at: now })
+    .eq('rfq_id', rfqId)
+    .eq('provider_id', providerProfile.id)
+    .is('delivered_at', null)
 
   if (error) {
     console.error("Error marking RFQ viewed:", error)
@@ -872,6 +915,34 @@ export async function getRFQClarifications(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) return { data: [], error: "Not authenticated" }
+
+  // AUTH: Verify user is the buyer or a broadcast recipient
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("buyer_id")
+    .eq("id", rfqId)
+    .single()
+
+  if (!rfq) return { data: [], error: "RFQ not found" }
+
+  if (rfq.buyer_id !== user.id) {
+    const { data: providerProfile } = await supabase
+      .from("provider_profiles")
+      .select("id")
+      .eq("user_id", user.id)
+      .single()
+
+    if (!providerProfile) return { data: [], error: "Not authorized" }
+
+    const { data: broadcast } = await supabase
+      .from("rfq_broadcasts")
+      .select("id")
+      .eq("rfq_id", rfqId)
+      .eq("provider_id", providerProfile.id)
+      .single()
+
+    if (!broadcast) return { data: [], error: "Not authorized" }
+  }
 
   const { data, error } = await supabase
     .from("rfq_clarifications")

@@ -43,17 +43,17 @@ export function RFQClarificationsPanel({
     }
   }
 
-  function handlePublishFromInfoRequest(question: string) {
-    const draft = answerDrafts[question] || ''
+  function handlePublishFromInfoRequest(irId: string, question: string) {
+    const draft = answerDrafts[irId] || ''
     if (!draft.trim()) return
 
-    setPublishingId(question)
+    setPublishingId(irId)
     startTransition(async () => {
       const result = await publishClarification(rfqId, question, draft.trim())
       if (result.success) {
         setAnswerDrafts((prev) => {
           const next = { ...prev }
-          delete next[question]
+          delete next[irId]
           return next
         })
         await loadClarifications()
@@ -129,11 +129,11 @@ export function RFQClarificationsPanel({
                     </p>
                     <Textarea
                       placeholder="Type your answer..."
-                      value={answerDrafts[question] || ''}
+                      value={answerDrafts[ir.id] || ''}
                       onChange={(e) =>
                         setAnswerDrafts((prev) => ({
                           ...prev,
-                          [question]: e.target.value,
+                          [ir.id]: e.target.value,
                         }))
                       }
                       rows={2}
@@ -142,14 +142,14 @@ export function RFQClarificationsPanel({
                     <Button
                       size="sm"
                       onClick={() =>
-                        handlePublishFromInfoRequest(question)
+                        handlePublishFromInfoRequest(ir.id, question)
                       }
                       disabled={
                         isPending ||
-                        !answerDrafts[question]?.trim()
+                        !answerDrafts[ir.id]?.trim()
                       }
                     >
-                      {publishingId === question ? (
+                      {publishingId === ir.id ? (
                         <Loader2 className="w-3 h-3 mr-1 animate-spin" />
                       ) : null}
                       Publish as Clarification

@@ -45,6 +45,10 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const rfqChannelsRef = useRef<Map<string, ReturnType<ReturnType<typeof createClient>['channel']>>>(new Map())
 
+  // Store callbacks in refs to prevent channel reconnect storms
+  const onNewRFQRef = useRef(onNewRFQ)
+  onNewRFQRef.current = onNewRFQ
+
   const clearNewCount = useCallback(() => {
     setNewRFQCount(0)
   }, [])
@@ -155,9 +159,9 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
                 .eq('id', broadcast.rfq_id)
                 .single()
 
-              if (rfq && onNewRFQ) {
+              if (rfq && onNewRFQRef.current) {
                 setNewRFQCount((prev) => prev + 1)
-                onNewRFQ(rfq as unknown as RFQSummary)
+                onNewRFQRef.current(rfq as unknown as RFQSummary)
               }
             }
           }
@@ -183,7 +187,7 @@ export function useRFQFeed(options: UseRFQFeedOptions = {}): UseRFQFeedReturn {
       })
       rfqChannelsRef.current.clear()
     }
-  }, [enabled, onNewRFQ])
+  }, [enabled])
 
   return {
     newRFQCount,

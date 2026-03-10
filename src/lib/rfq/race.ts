@@ -89,12 +89,25 @@ export async function broadcastRFQ(
       }))
     )
 
-    // Create broadcast records
-    const broadcastRecords = broadcasts.map((b) => ({
-      rfq_id: rfqId,
-      provider_id: b.provider_id,
-      scheduled_at: b.scheduled_at,
-    }))
+    // Dedup: skip providers who already have a broadcast for this RFQ
+    const { data: existingBroadcasts } = await supabase
+      .from('rfq_broadcasts')
+      .select('provider_id')
+      .eq('rfq_id', rfqId)
+
+    const existingProviderIds = new Set((existingBroadcasts || []).map((b) => b.provider_id))
+
+    const broadcastRecords = broadcasts
+      .filter((b) => !existingProviderIds.has(b.provider_id))
+      .map((b) => ({
+        rfq_id: rfqId,
+        provider_id: b.provider_id,
+        scheduled_at: b.scheduled_at,
+      }))
+
+    if (broadcastRecords.length === 0) {
+      return { success: true, broadcast_count: existingBroadcasts?.length || 0, error: null }
+    }
 
     const { error: insertError } = await supabase
       .from('rfq_broadcasts')
@@ -105,11 +118,12 @@ export async function broadcastRFQ(
       return { success: false, broadcast_count: 0, error: 'Failed to create broadcasts' }
     }
 
-    // Update RFQ status to Bidding
+    // Update RFQ status to Bidding (only if still Open — don't regress other statuses)
     await supabase
       .from('rfqs')
       .update({ status: 'Bidding' })
       .eq('id', rfqId)
+      .eq('status', 'Open')
 
     // Send notifications to matched suppliers
     const budgetRange = rfq.budget_min != null && rfq.budget_max != null
@@ -390,13 +404,22 @@ export async function acceptRFQ(
 
       if (acceptResponses && acceptResponses.length === 1) {
         // First click wins - auto-award
-        await supabase
+        // SECURITY: Optimistic concurrency — only update if still in expected status
+        // to prevent TOCTOU double-award from concurrent requests
+        const { data: awardUpdate } = await supabase
           .from('rfqs')
           .update({
             status: 'Awarded',
             awarded_to: providerId,
           })
           .eq('id', rfqId)
+          .in('status', ['Open', 'Bidding'])
+          .select('id')
+
+        if (!awardUpdate?.length) {
+          // Another concurrent request already changed the status
+          return { success: true, awarded: false, priority_hold: false, error: null }
+        }
 
         // Automatically create an order for commodity auto-award
         if (quotedPrice != null) {
@@ -430,9 +453,10 @@ export async function acceptRFQ(
 
       if (acceptResponses && acceptResponses.length === 1) {
         // Set priority hold
+        // SECURITY: Optimistic concurrency — only if still in expected status
         const holdExpires = new Date(Date.now() + RACE_CONSTANTS.PRIORITY_HOLD_DURATION_MS)
-        
-        await supabase
+
+        const { data: holdUpdate } = await supabase
           .from('rfqs')
           .update({
             status: 'priority_hold',
@@ -440,8 +464,12 @@ export async function acceptRFQ(
             priority_hold_expires_at: holdExpires.toISOString(),
           })
           .eq('id', rfqId)
+          .in('status', ['Open', 'Bidding'])
+          .select('id')
 
-        return { success: true, awarded: false, priority_hold: true, error: null }
+        if (holdUpdate?.length) {
+          return { success: true, awarded: false, priority_hold: true, error: null }
+        }
       }
     }
 
@@ -532,6 +560,10 @@ export async function declineRFQ(
 
     if (rfqError || !rfq) {
       return { success: false, error: 'RFQ not found' }
+    }
+
+    if (rfq.status !== 'Open' && rfq.status !== 'Bidding' && rfq.status !== 'priority_hold') {
+      return { success: false, error: `RFQ is ${rfq.status}, cannot decline` }
     }
 
     // Check for existing response
@@ -734,7 +766,8 @@ export async function awardRFQ(
     }
 
     // Award the RFQ
-    const { error: updateError } = await supabase
+    // SECURITY: Optimistic concurrency — prevent double-award from concurrent requests
+    const { data: awardData, error: updateError } = await supabase
       .from('rfqs')
       .update({
         status: 'Awarded',
@@ -743,10 +776,17 @@ export async function awardRFQ(
         priority_hold_expires_at: null,
       })
       .eq('id', rfqId)
+      .neq('status', 'Awarded')
+      .neq('status', 'cancelled')
+      .select('id')
 
     if (updateError) {
       console.error('Error awarding RFQ:', updateError)
       return { success: false, error: 'Failed to award RFQ' }
+    }
+
+    if (!awardData?.length) {
+      return { success: false, error: 'RFQ status changed — please refresh and try again' }
     }
 
     // Automatically create an order if a quoted price exists
