@@ -49,8 +49,10 @@ const LEGEND_TEXT = 'hsl(222, 47%, 11%)'
 
 function formatXAxisDate(dateStr: string): string {
   const d = new Date(dateStr)
-  const day = new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d)
-  return `${day} ${d.getDate()}`
+  // INTENT: Use UTC to avoid date-only ISO strings (e.g. '2026-03-10') shifting
+  // to the previous day in UTC-negative timezones
+  const day = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(d)
+  return `${day} ${d.getUTCDate()}`
 }
 
 export function CompletionTrendSection({

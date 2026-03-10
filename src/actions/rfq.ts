@@ -293,6 +293,8 @@ export async function respondToRFQ(
         providerProfile.id,
         response.message
       )
+      revalidatePath("/rfq")
+      revalidatePath(`/rfq/${rfqId}`)
       return { success: result.success, error: result.error }
 
     case 'info_request':
@@ -305,10 +307,35 @@ export async function respondToRFQ(
         providerProfile.id,
         response.message
       )
+      revalidatePath("/rfq")
+      revalidatePath(`/rfq/${rfqId}`)
       return { success: result.success, error: result.error }
 
     case 'interest': {
       // Express interest with indicative pricing — no race state changes
+      // Check RFQ is still accepting responses
+      const { data: interestRfq } = await supabase
+        .from('rfqs')
+        .select('status')
+        .eq('id', rfqId)
+        .single()
+
+      if (!interestRfq || (interestRfq.status !== 'Open' && interestRfq.status !== 'Bidding')) {
+        return { success: false, error: "RFQ is no longer accepting responses" }
+      }
+
+      // Check for duplicate response
+      const { data: existingInterest } = await supabase
+        .from('rfq_responses')
+        .select('id')
+        .eq('rfq_id', rfqId)
+        .eq('provider_id', providerProfile.id)
+        .single()
+
+      if (existingInterest) {
+        return { success: false, error: "Already responded to this RFQ" }
+      }
+
       const { error: interestError } = await supabase
         .from('rfq_responses')
         .insert({
@@ -316,8 +343,8 @@ export async function respondToRFQ(
           provider_id: providerProfile.id,
           response_type: 'interest',
           message: response.message?.trim() || null,
-          indicative_min: response.indicative_min || null,
-          indicative_max: response.indicative_max || null,
+          indicative_min: response.indicative_min ?? null,
+          indicative_max: response.indicative_max ?? null,
         })
 
       if (interestError) {
@@ -461,6 +488,11 @@ export async function duplicateRFQ(rfqId: string): Promise<{
 
   if (fetchError || !source) {
     return { data: null, error: "RFQ not found" }
+  }
+
+  // SECURITY: Only the RFQ owner can duplicate
+  if (source.buyer_id !== user.id) {
+    return { data: null, error: "Not authorized" }
   }
 
   // Create a copy (no broadcast)

@@ -110,7 +110,9 @@ function AtRiskRow({ objective }: { objective: AtRiskObjective }): React.JSX.Ele
               isUrgent ? 'text-destructive' : 'text-muted-foreground'
             )}
           >
-            {objective.daysRemaining}d left
+            {objective.daysRemaining < 0
+              ? `${Math.abs(objective.daysRemaining)}d overdue`
+              : `${objective.daysRemaining}d left`}
           </span>
         </div>
         <ProgressBar
