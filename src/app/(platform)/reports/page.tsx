@@ -453,6 +453,13 @@ export default function ReportsPage(): React.JSX.Element {
         }
         setReportDocument(result.document)
         toast.success('Report generated successfully')
+        // INTENT: Scroll to the generated report — quick-start fires from the hero
+        // at the top of the page, so the user can't see the result without scrolling.
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }, 100)
+        })
         saveReportSnapshot(result.document)
           .then(saveResult => {
             if (saveResult.success && saveResult.snapshotId) {
@@ -658,8 +665,10 @@ export default function ReportsPage(): React.JSX.Element {
 
   const handleSendEmail = useCallback(async () => {
     if (!reportDocument) return
+    // GOTCHA: Don't split on bare whitespace — "john doe@example.com" would become
+    // ["john", "doe@example.com"]. Only split on comma or semicolon.
     const recipients = emailRecipients
-      .split(/[,;\s]+/)
+      .split(/[,;]+/)
       .map(e => e.trim())
       .filter(Boolean)
 
@@ -692,9 +701,13 @@ export default function ReportsPage(): React.JSX.Element {
     setShareUrl(null)
     setPageMode('reports')
     toast.success('Report loaded from history')
-    setTimeout(() => {
-      reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }, 100)
+    // INTENT: Wait for React to commit the DOM before scrolling. requestAnimationFrame
+    // fires after paint, which is more reliable than a fixed 100ms timeout.
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
+    })
   }, [])
 
   return (
