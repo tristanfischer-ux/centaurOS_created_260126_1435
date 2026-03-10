@@ -487,7 +487,7 @@ export function PlaybooksPage({
                   <span
                     className={cn(
                       'text-xs tabular-nums px-1.5 py-0.5 rounded-full min-w-[1.25rem] text-center',
-                      isActive ? 'bg-card/60' : 'bg-muted',
+                      isActive ? 'bg-card' : 'bg-muted',
                     )}
                   >
                     {tab.count}
@@ -862,7 +862,7 @@ export function PlaybooksPage({
                     <button
                       onClick={() => setSearchQuery('')}
                       aria-label="Clear search"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <X className="h-4 w-4" />
                     </button>

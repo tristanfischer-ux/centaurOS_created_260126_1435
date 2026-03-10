@@ -87,6 +87,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
 
   // Reset state when dialog opens to avoid stale values after cancel-reopen
   const resetState = () => {
+    setIsCreating(false)
     setObjectiveTitle(pack.title)
     setObjectiveDescription(pack.description || '')
     setDueDate('')

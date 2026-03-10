@@ -206,7 +206,7 @@ export async function getPackDetails(packId: string): Promise<{ pack: ObjectiveP
         .single()
 
     if (packError || !pack) {
-        return { pack: null, error: packError?.message || 'Pack not found' }
+        return { pack: null, error: packError ? sanitizeErrorMessage(packError) : 'Pack not found' }
     }
 
     // Fetch items
