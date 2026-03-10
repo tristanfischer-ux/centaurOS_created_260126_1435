@@ -103,8 +103,8 @@ export function RFQResponseForm({
         return
       }
       const price = parseFloat(quotedPrice)
-      if (isNaN(price) || price < 0) {
-        setError('Please provide a valid non-negative price')
+      if (isNaN(price) || price <= 0) {
+        setError('Please provide a valid price greater than zero')
         return
       }
     }

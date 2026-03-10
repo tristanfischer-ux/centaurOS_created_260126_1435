@@ -88,6 +88,17 @@ export async function createNewRFQ(params: CreateRFQParams): Promise<{
     return { data: null, error: "Minimum budget cannot exceed maximum budget" }
   }
 
+  // VALIDATION: Deadline must be a valid future date
+  if (params.deadline != null) {
+    const deadlineDate = new Date(params.deadline)
+    if (isNaN(deadlineDate.getTime())) {
+      return { data: null, error: "Invalid deadline date" }
+    }
+    if (deadlineDate < new Date()) {
+      return { data: null, error: "Deadline must be in the future" }
+    }
+  }
+
   // Create the RFQ
   const { data: rfq, error: createError } = await createRFQService(
     supabase,
@@ -378,7 +389,24 @@ export async function respondToRFQ(
     }
     for (const [k, v] of Object.entries(response.pricing_breakdown)) {
       if (k.length > 100) return { success: false, error: "Pricing breakdown key too long" }
-      if (v != null && !Number.isFinite(v)) return { success: false, error: "Pricing breakdown values must be finite numbers" }
+      if (v != null && (!Number.isFinite(v) || v < 0)) return { success: false, error: "Pricing breakdown values must be finite non-negative numbers" }
+    }
+  }
+  // VALIDATION: Bound text fields to prevent DoS
+  if (response.scope_of_work != null && response.scope_of_work.length > 50_000) {
+    return { success: false, error: "Scope of work too large (max 50KB)" }
+  }
+  if (response.message != null && response.message.length > 10_000) {
+    return { success: false, error: "Message too long (max 10,000 characters)" }
+  }
+  // VALIDATION: valid_until must be a valid future date
+  if (response.valid_until != null) {
+    const validDate = new Date(response.valid_until)
+    if (isNaN(validDate.getTime())) {
+      return { success: false, error: "Invalid validity date" }
+    }
+    if (validDate < new Date()) {
+      return { success: false, error: "Validity date must be in the future" }
     }
   }
 
@@ -592,7 +620,7 @@ export async function getRFQRaceStatus(rfqId: string): Promise<{
     result.data.accept_count = 0
     result.data.priority_holder = null
     if (result.data.winner) {
-      result.data.winner = { id: result.data.winner.id, full_name: result.data.winner.full_name, quoted_price: null }
+      result.data.winner = { id: 'redacted', full_name: null, quoted_price: null }
     }
   }
 
@@ -680,7 +708,7 @@ export async function duplicateRFQ(rfqId: string): Promise<{
     user.id,
     foundryId,
     {
-      title: `[Copy] ${source.title}`,
+      title: `[Copy] ${source.title}`.slice(0, 500),
       rfq_type: source.rfq_type,
       specifications: (source.specifications as CreateRFQParams['specifications']) ?? undefined,
       budget_min: source.budget_min,

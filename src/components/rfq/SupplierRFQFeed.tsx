@@ -87,10 +87,9 @@ export const SupplierRFQFeed = memo(function SupplierRFQFeed({
   }, [searchQuery, categoryFilter, urgencyFilter, fetchRFQs, initialRFQs.length])
 
   // Handle respond action
-  const handleRespond = async (rfqId: string) => {
-    // Mark as viewed
-    await markRFQViewed(rfqId)
-    // Navigate to detail page
+  const handleRespond = (rfqId: string) => {
+    // Fire-and-forget — view tracking shouldn't block navigation
+    markRFQViewed(rfqId).catch(() => {})
     router.push(`/rfq/${rfqId}`)
   }
 

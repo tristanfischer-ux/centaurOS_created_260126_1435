@@ -225,7 +225,7 @@ export async function updateRFQResponse(
     if (keys.length > 20) return { success: false, error: "Too many pricing breakdown items (max 20)" }
     for (const [k, v] of Object.entries(data.pricing_breakdown)) {
       if (k.length > 100) return { success: false, error: "Pricing breakdown key too long" }
-      if (v != null && !Number.isFinite(v)) return { success: false, error: "Pricing breakdown values must be finite numbers" }
+      if (v != null && (!Number.isFinite(v) || v < 0)) return { success: false, error: "Pricing breakdown values must be finite non-negative numbers" }
     }
   }
 
@@ -233,10 +233,22 @@ export async function updateRFQResponse(
   const updatePayload: Record<string, unknown> = {}
   if (data.quoted_price !== undefined) updatePayload.quoted_price = data.quoted_price
   if (data.message !== undefined) updatePayload.message = data.message?.trim() || null
-  if (data.scope_of_work !== undefined) updatePayload.scope_of_work = data.scope_of_work
+  if (data.scope_of_work !== undefined) {
+    if (data.scope_of_work != null && data.scope_of_work.length > 50_000) {
+      return { success: false, error: "Scope of work too large (max 50KB)" }
+    }
+    updatePayload.scope_of_work = data.scope_of_work
+  }
   if (data.pricing_breakdown !== undefined) updatePayload.pricing_breakdown = data.pricing_breakdown
   if (data.timeline_weeks !== undefined) updatePayload.timeline_weeks = data.timeline_weeks
-  if (data.valid_until !== undefined) updatePayload.valid_until = data.valid_until
+  if (data.valid_until !== undefined) {
+    if (data.valid_until != null) {
+      const validDate = new Date(data.valid_until)
+      if (isNaN(validDate.getTime())) return { success: false, error: "Invalid validity date" }
+      if (validDate < new Date()) return { success: false, error: "Validity date must be in the future" }
+    }
+    updatePayload.valid_until = data.valid_until
+  }
 
   const { error: updateError } = await supabase
     .from('rfq_responses')

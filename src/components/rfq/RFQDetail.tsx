@@ -200,7 +200,8 @@ export function RFQDetail({
         }
       }
 
-      await exportAsPDF(sections.join('\n'), `RFQ-${rfq.title.replace(/[^a-z0-9]/gi, '-')}.pdf`)
+      const safeName = rfq.title.replace(/[^a-z0-9]/gi, '-').slice(0, 100)
+      await exportAsPDF(sections.join('\n'), `RFQ-${safeName}.pdf`)
     } catch (err) {
       console.error('Failed to generate PDF:', err)
       setError('Failed to generate PDF')
@@ -594,6 +595,7 @@ export function RFQDetail({
                       isAwarded={rfq.awarded_to === response.provider_id}
                       canAward={
                         isOwner &&
+                        !rfq.awarded_to &&
                         (rfq.status === 'Bidding' || rfq.status === 'priority_hold' || rfq.status === 'Closed')
                       }
                       onAward={() => handleAward(response.provider_id)}
@@ -653,11 +655,13 @@ export function RFQDetail({
                             </Button>
                           </CollapsibleTrigger>
                           <CollapsibleContent className="ml-4">
-                            <RFQInfoRequestThread
-                              rfqId={rfq.id}
-                              sellerId={response.provider.user_id}
-                              initialQuestion={response.message || ''}
-                            />
+                            {expandedThreads.has(response.id) && (
+                              <RFQInfoRequestThread
+                                rfqId={rfq.id}
+                                sellerId={response.provider.user_id}
+                                initialQuestion={response.message || ''}
+                              />
+                            )}
                           </CollapsibleContent>
                         </Collapsible>
                       )}

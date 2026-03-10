@@ -282,13 +282,30 @@ export async function acceptRFQ(
       return { success: false, awarded: false, priority_hold: false, error: 'RFQ not found' }
     }
 
+    // Auto-expire stale priority holds so the race can continue
+    if (rfq.status === 'priority_hold' && rfq.priority_hold_expires_at) {
+      if (new Date(rfq.priority_hold_expires_at) <= new Date()) {
+        const { data: released } = await supabase
+          .from('rfqs')
+          .update({ status: 'Bidding', priority_holder_id: null, priority_hold_expires_at: null })
+          .eq('id', rfqId)
+          .eq('status', 'priority_hold')
+          .select('id')
+        if (released?.length) {
+          rfq.status = 'Bidding'
+          rfq.priority_holder_id = null
+          rfq.priority_hold_expires_at = null
+        }
+      }
+    }
+
     // Check if RFQ is still open for responses
     if (rfq.status !== 'Open' && rfq.status !== 'Bidding') {
-      return { 
-        success: false, 
-        awarded: false, 
-        priority_hold: false, 
-        error: `RFQ is ${rfq.status}, cannot accept` 
+      return {
+        success: false,
+        awarded: false,
+        priority_hold: false,
+        error: `RFQ is ${rfq.status}, cannot accept`
       }
     }
 

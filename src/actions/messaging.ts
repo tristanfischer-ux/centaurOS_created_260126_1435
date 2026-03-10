@@ -189,6 +189,23 @@ export async function startConversation(
     try {
       const { sellerId, orderId, rfqId, listingId, initialMessage } = params
 
+      // VALIDATION: Verify seller exists and prevent self-messaging
+      const { data: seller } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', sellerId)
+        .single()
+      if (!seller) {
+        return { error: 'Seller not found' }
+      }
+      if (sellerId === user.id) {
+        return { error: 'Cannot message yourself' }
+      }
+      // VALIDATION: Bound initial message length
+      if (initialMessage && initialMessage.trim().length > 10_000) {
+        return { error: 'Message is too long (10,000 character limit)' }
+      }
+
       // Create the conversation
       const conversation = await createConversation(supabase, {
         buyerId: user.id,
@@ -311,6 +328,17 @@ export async function createSystemMessage(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // SECURITY: Only platform admins can create system messages.
+      // Regular users must not forge messages that appear as platform-generated.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (!profile || profile.role !== 'Founder') {
+        return { error: 'Only administrators can create system messages' }
+      }
+
       // SECURITY: Verify user is a participant
       if (!(await isParticipant(supabase, conversationId, user.id))) {
         return { error: 'Access denied' }
@@ -320,12 +348,12 @@ export async function createSystemMessage(
       const sanitizedContent = content.trim().slice(0, 2000) // Limit length
 
       await sendSystemMessage(supabase, conversationId, sanitizedContent)
-      
+
       return { success: true as const }
     } catch (error) {
       console.error('Failed to create system message:', error)
-      return { 
-        error: sanitizeErrorMessage(error) 
+      return {
+        error: sanitizeErrorMessage(error)
       }
     }
   })

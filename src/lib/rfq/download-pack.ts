@@ -98,6 +98,12 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
       const url = attachments[i]
       if (typeof url !== 'string' || !url) continue
 
+      // SECURITY: Only allow HTTPS URLs to prevent protocol abuse
+      try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'https:') continue
+      } catch { continue }
+
       try {
         const response = await fetch(url)
         if (!response.ok) continue

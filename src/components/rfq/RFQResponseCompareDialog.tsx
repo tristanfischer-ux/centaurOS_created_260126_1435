@@ -58,6 +58,7 @@ export function RFQResponseCompareDialog({
   children,
 }: RFQResponseCompareDialogProps) {
   const [open, setOpen] = useState(false)
+  const [awardingId, setAwardingId] = useState<string | null>(null)
   const bestPriceId = findBestPrice(responses)
 
   return (
@@ -182,10 +183,13 @@ export function RFQResponseCompareDialog({
                     ) : !awardedTo ? (
                       <Button
                         size="sm"
-                        onClick={() => onAward(r.provider_id)}
-                        disabled={isPending}
+                        onClick={() => {
+                          setAwardingId(r.provider_id)
+                          onAward(r.provider_id)
+                        }}
+                        disabled={isPending || awardingId !== null}
                       >
-                        {isPending ? (
+                        {(isPending || awardingId !== null) && awardingId === r.provider_id ? (
                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
                           <>
