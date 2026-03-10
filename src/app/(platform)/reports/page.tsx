@@ -229,6 +229,7 @@ export default function ReportsPage(): React.JSX.Element {
   const reportRef = useRef<HTMLDivElement>(null)
   const infographicRef = useRef<HTMLDivElement>(null)
   const briefingRef = useRef<HTMLDivElement>(null)
+  const briefingContentRef = useRef<HTMLDivElement>(null)
 
   // Change 6: Tab-level page mode
   const [pageMode, setPageMode] = useState<PageMode>('reports')
@@ -511,7 +512,7 @@ export default function ReportsPage(): React.JSX.Element {
   const handlePrint = useCallback(() => {
     // INTENT: Use briefingRef when in presentations tab, reportRef for report tab.
     const isPresentations = pageMode === 'presentations'
-    const printEl = isPresentations ? briefingRef.current : reportRef.current
+    const printEl = isPresentations ? briefingContentRef.current : reportRef.current
     if (!printEl || (isPresentations ? !briefingResult : !reportDocument)) return
     const title = isPresentations
       ? (briefingResult?.title ?? 'Strategic Briefing')
@@ -1322,7 +1323,9 @@ export default function ReportsPage(): React.JSX.Element {
                 </Card>
               </div>
 
-              <SlideDeckRenderer briefing={briefingResult} />
+              <div ref={briefingContentRef}>
+                <SlideDeckRenderer briefing={briefingResult} />
+              </div>
             </section>
           )}
         </>
