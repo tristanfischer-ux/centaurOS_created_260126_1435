@@ -279,6 +279,9 @@ export default function ReportsPage(): React.JSX.Element {
   // INTENT: Track the tone used when the report was generated, so the preview
   // badge reflects the actual report content, not the current config state.
   const [generatedTone, setGeneratedTone] = useState<ReportTone>('internal')
+  // INTENT: Same pattern as generatedTone — track the briefing tone at generation time
+  // so the preview badge reflects the actual content, not the current picker state.
+  const [generatedBriefingTone, setGeneratedBriefingTone] = useState<ReportTone>('internal')
 
   // Change 2: Collapsible config panel
   const [isConfigExpanded, setIsConfigExpanded] = useState(false)
@@ -347,7 +350,12 @@ export default function ReportsPage(): React.JSX.Element {
       setReportTone('internal')
       setDetailLevel('standard')
     }
-    setReportDocument(null)
+    // INTENT: Only clear the previous report on manual template selection.
+    // handleQuickStart also calls this, but preserves the old report on generation
+    // failure — it clears reportDocument only on success (same as handleGenerate).
+    if (!isGeneratingReportRef.current) {
+      setReportDocument(null)
+    }
     // INTENT: Don't clear briefingResult here — it lives on the Presentations tab
     // and shouldn't be destroyed when the user changes report templates.
     setShareUrl(null)
@@ -535,6 +543,7 @@ export default function ReportsPage(): React.JSX.Element {
       }
 
       setBriefingResult(result.briefing)
+      setGeneratedBriefingTone(briefingTone)
       toast.success(`Briefing generated — ${result.briefing.slides.length} slides`)
 
       requestAnimationFrame(() => {
@@ -1428,7 +1437,7 @@ export default function ReportsPage(): React.JSX.Element {
                           {briefingResult.slides.length} slides
                         </Badge>
                         <Badge variant="secondary" className="text-xs">
-                          {TONE_OPTIONS.find(t => t.value === briefingTone)?.label} tone
+                          {TONE_OPTIONS.find(t => t.value === generatedBriefingTone)?.label} tone
                         </Badge>
                       </div>
                     </div>
@@ -1675,12 +1684,17 @@ export default function ReportsPage(): React.JSX.Element {
             </Button>
             <Button
               onClick={() => {
-                toast.success(
-                  scheduleEnabled
-                    // GOTCHA: Match the same split pattern as handleSendEmail — users may use semicolons.
-                    ? `Scheduled ${scheduleFrequency} delivery to ${scheduleRecipients.split(/[,;]+/).map(s => s.trim()).filter(Boolean).length} recipient(s)`
-                    : 'Scheduling disabled'
-                )
+                if (scheduleEnabled) {
+                  // GOTCHA: Match the same split pattern as handleSendEmail — users may use semicolons.
+                  const recipientCount = scheduleRecipients.split(/[,;]+/).map(s => s.trim()).filter(Boolean).length
+                  if (recipientCount === 0) {
+                    toast.error('Enter at least one recipient email address')
+                    return
+                  }
+                  toast.success(`Scheduled ${scheduleFrequency} delivery to ${recipientCount} recipient(s)`)
+                } else {
+                  toast.success('Scheduling disabled')
+                }
                 setIsScheduleDialogOpen(false)
               }}
             >
