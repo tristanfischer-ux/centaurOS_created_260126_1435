@@ -59,6 +59,8 @@ function clientKeywordMatch(query: string, listings: EnrichedPersonListing[]): T
             ...((attrs.expertise as string[]) ?? []),
             (attrs.role as string) || '',
             (attrs.location as string) || '',
+            ...((attrs.industries as string[]) ?? []),
+            ...((attrs.previous_companies as string[]) ?? []),
         ].join(' ').toLowerCase()
 
         let score = 0

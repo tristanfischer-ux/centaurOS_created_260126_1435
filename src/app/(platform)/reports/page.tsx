@@ -968,7 +968,10 @@ export default function ReportsPage(): React.JSX.Element {
                             id="date-start"
                             type="date"
                             value={dateRange.start}
-                            onChange={e => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                            onChange={e => {
+                              // GOTCHA: Don't allow empty — Invalid Date propagates to configSummary and server action
+                              if (e.target.value) setDateRange(prev => ({ ...prev, start: e.target.value }))
+                            }}
                           />
                         </div>
                         <span className="hidden sm:block text-sm text-muted-foreground pt-5">to</span>
@@ -980,7 +983,9 @@ export default function ReportsPage(): React.JSX.Element {
                             id="date-end"
                             type="date"
                             value={dateRange.end}
-                            onChange={e => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                            onChange={e => {
+                              if (e.target.value) setDateRange(prev => ({ ...prev, end: e.target.value }))
+                            }}
                           />
                         </div>
                       </div>
@@ -1080,7 +1085,14 @@ export default function ReportsPage(): React.JSX.Element {
             <Card>
               <CardContent className="p-6 space-y-4">
                 {/* Thin accent bar at top */}
-                <div className="h-1 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-1 w-full rounded-full bg-muted overflow-hidden"
+                  role="progressbar"
+                  aria-label="Report generation progress"
+                  aria-valuenow={Math.round(((generationStep + 1) / GENERATION_STEPS.length) * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
                   <div
                     className="h-full rounded-full bg-international-orange transition-all duration-500"
                     style={{ width: `${((generationStep + 1) / GENERATION_STEPS.length) * 100}%` }}
@@ -1261,7 +1273,7 @@ export default function ReportsPage(): React.JSX.Element {
               {viewMode === 'document' && (
                 <Card>
                   <CardContent className="p-8 sm:p-12">
-                    <div ref={reportRef}>
+                    <div ref={reportRef} className="scroll-mt-28">
                       <ReportDocument document={reportDocument} />
                     </div>
                   </CardContent>

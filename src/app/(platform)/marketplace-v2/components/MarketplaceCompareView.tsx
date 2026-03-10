@@ -86,7 +86,9 @@ function getComparisonValue(listing: MarketplaceListing, key: string): React.Rea
     switch (key) {
         case 'price': {
             const price = (attrs.rate || attrs.cost || attrs.price || attrs.day_rate) as string | undefined
-            return price ? `£${price}` : '—'
+            if (!price) return '—'
+            const priceStr = String(price)
+            return /^[£$€]/.test(priceStr) ? priceStr : `£${priceStr}`
         }
         case 'rating': {
             const avg = attrs.rating_average as number | undefined
