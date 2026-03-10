@@ -4,11 +4,11 @@
  * @file strategic-briefing.ts
  *
  * @description Server action that generates a strategic briefing slide deck
- * using the Gemini API. Collects optional company data from Supabase and
+ * using the Claude Opus API. Collects optional company data from Supabase and
  * combines it with user-provided source context to produce a full presentation.
  *
  * FLOW: User provides source text → action enriches with company data →
- * Gemini generates slide structure → returns StrategicBriefing
+ * Claude generates slide structure → returns StrategicBriefing
  *
  * @related
  * - src/lib/reports/ai-slide-generator.ts — Core generation logic
@@ -40,7 +40,7 @@ interface GenerateBriefingActionRequest {
  * Generate a strategic briefing slide deck.
  *
  * @description Authenticates the user, optionally enriches source context
- * with company data from Supabase, then calls the Gemini-powered slide
+ * with company data from Supabase, then calls the Claude-powered slide
  * generator to produce a full presentation.
  *
  * @param request - Source context, tone, and whether to include company data
@@ -75,6 +75,11 @@ export async function generateBriefingAction(
     const companyName = foundry?.name ?? 'My Company'
     console.info('[StrategicBriefing] Company:', companyName, '| Tone:', request.tone)
 
+    // SECURITY: Cap source context length to prevent excessive API token consumption
+    if (request.sourceContext.length > 50_000) {
+      return { success: false, error: 'Source context too large (max 50,000 characters)' }
+    }
+
     let enrichedContext = request.sourceContext
 
     if (request.includeCompanyData) {
@@ -86,7 +91,7 @@ export async function generateBriefingAction(
       }
     }
 
-    console.info('[StrategicBriefing] Calling Gemini (source length:', enrichedContext.length, 'chars)')
+    console.info('[StrategicBriefing] Calling Claude (source length:', enrichedContext.length, 'chars)')
     const genStart = Date.now()
 
     const generationRequest: GenerateBriefingRequest = {
@@ -97,7 +102,7 @@ export async function generateBriefingAction(
     }
 
     const result = await generateStrategicBriefing(generationRequest)
-    console.info('[StrategicBriefing] Gemini returned in', Date.now() - genStart, 'ms | success:', result.success, '| slides:', result.briefing?.slides?.length ?? 0)
+    console.info('[StrategicBriefing] Claude returned in', Date.now() - genStart, 'ms | success:', result.success, '| slides:', result.briefing?.slides?.length ?? 0)
 
     if (result.success && result.briefing) {
       result.briefing.foundryId = foundryId
@@ -116,7 +121,7 @@ export async function generateBriefingAction(
 
 // ─── Company Data Enrichment ─────────────────────────────────────
 
-// INTENT: Pull key company data points from Supabase so Gemini can
+// INTENT: Pull key company data points from Supabase so Claude can
 // reference real metrics, objectives, and team information in the
 // presentation. This bridges ForgeOS data with the narrative generator.
 async function gatherCompanyContext(

@@ -3,6 +3,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { withUser, type ActionError } from '@/lib/server-action-utils'
+import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import {
   createConversation,
   sendMessage,
@@ -447,17 +448,21 @@ export async function startTaskDiscussion(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      // Get task details and assignees
+      // SECURITY: Verify task belongs to caller's foundry to prevent cross-foundry IDOR
+      const foundryId = await getFoundryIdCached()
+      if (!foundryId) return { error: 'No foundry context' }
+
       const { data: task, error: taskError } = await supabase
         .from('tasks')
         .select(`
-          id, 
-          title, 
+          id,
+          title,
           task_number,
           assignee_id,
           creator_id
         `)
         .eq('id', taskId)
+        .eq('foundry_id', foundryId)
         .single()
 
       if (taskError || !task) {
@@ -528,11 +533,15 @@ export async function startObjectiveDiscussion(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
-      // Get objective details
+      // SECURITY: Verify objective belongs to caller's foundry to prevent cross-foundry IDOR
+      const foundryId = await getFoundryIdCached()
+      if (!foundryId) return { error: 'No foundry context' }
+
       const { data: objective, error: objError } = await supabase
         .from('objectives')
         .select('id, title, creator_id')
         .eq('id', objectiveId)
+        .eq('foundry_id', foundryId)
         .single()
 
       if (objError || !objective) {

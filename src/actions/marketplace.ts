@@ -329,6 +329,9 @@ export async function searchMarketplaceListings(
         query = query.eq('subcategory', params.subcategory)
     }
 
+    // SECURITY: Sanitize values for use in PostgREST filter expressions.
+    const sanitize = (v: string) => v.replace(/[,()\."*]/g, '')
+
     // Apply advanced filters
     const af = params.advancedFilters
     if (af) {
@@ -349,23 +352,24 @@ export async function searchMarketplaceListings(
         }
         if (af.skills && af.skills.length > 0) {
             // INTENT: Filter by overlap with attributes.expertise array using JSONB containment.
-            // Each skill is checked individually with OR logic.
+            // SECURITY: Sanitize to prevent PostgREST filter injection via crafted skill strings.
             const skillFilters = af.skills.map(
-                (skill) => `attributes->expertise.cs.["${skill}"]`
+                (skill) => `attributes->expertise.cs.["${sanitize(skill)}"]`
             ).join(',')
             query = query.or(skillFilters)
         }
         if (af.companyTypes && af.companyTypes.length > 0) {
+            // SECURITY: Sanitize to prevent PostgREST filter injection
             const typeFilters = af.companyTypes.map(
-                (t) => `attributes->>company_type.ilike.%${t}%`
+                (t) => `attributes->>company_type.ilike.%${sanitize(t)}%`
             ).join(',')
             query = query.or(typeFilters)
         }
         if (af.companySizes && af.companySizes.length > 0) {
-            // INTENT: Company size is stored in attributes under both ch_company_size and company_size keys.
+            // SECURITY: Sanitize to prevent PostgREST filter injection
             const sizeFilters = af.companySizes.flatMap((s) => [
-                `attributes->>ch_company_size.ilike.%${s}%`,
-                `attributes->>company_size.ilike.%${s}%`,
+                `attributes->>ch_company_size.ilike.%${sanitize(s)}%`,
+                `attributes->>company_size.ilike.%${sanitize(s)}%`,
             ]).join(',')
             query = query.or(sizeFilters)
         }
@@ -447,13 +451,13 @@ export async function searchMarketplaceListings(
                 if (af.location) semQuery = semQuery.ilike('attributes->>location', `%${af.location}%`)
                 if (af.availability) semQuery = semQuery.ilike('attributes->>availability', `%${af.availability}%`)
                 if (af.companyTypes && af.companyTypes.length > 0) {
-                    const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${t}%`).join(',')
+                    const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${sanitize(t)}%`).join(',')
                     semQuery = semQuery.or(typeFilters)
                 }
                 if (af.companySizes && af.companySizes.length > 0) {
                     const sizeFilters = af.companySizes.flatMap((s) => [
-                        `attributes->>ch_company_size.ilike.%${s}%`,
-                        `attributes->>company_size.ilike.%${s}%`,
+                        `attributes->>ch_company_size.ilike.%${sanitize(s)}%`,
+                        `attributes->>company_size.ilike.%${sanitize(s)}%`,
                     ]).join(',')
                     semQuery = semQuery.or(sizeFilters)
                 }
@@ -535,13 +539,13 @@ export async function searchMarketplaceListings(
             if (af.location) cq = cq.ilike('attributes->>location', `%${af.location}%`)
             if (af.availability) cq = cq.ilike('attributes->>availability', `%${af.availability}%`)
             if (af.companyTypes && af.companyTypes.length > 0) {
-                const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${t}%`).join(',')
+                const typeFilters = af.companyTypes.map((t) => `attributes->>company_type.ilike.%${sanitize(t)}%`).join(',')
                 cq = cq.or(typeFilters)
             }
             if (af.companySizes && af.companySizes.length > 0) {
                 const sizeFilters = af.companySizes.flatMap((s) => [
-                    `attributes->>ch_company_size.ilike.%${s}%`,
-                    `attributes->>company_size.ilike.%${s}%`,
+                    `attributes->>ch_company_size.ilike.%${sanitize(s)}%`,
+                    `attributes->>company_size.ilike.%${sanitize(s)}%`,
                 ]).join(',')
                 cq = cq.or(sizeFilters)
             }

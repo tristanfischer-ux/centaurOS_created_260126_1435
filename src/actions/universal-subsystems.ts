@@ -215,8 +215,13 @@ export async function searchSubsystems(query: string): Promise<UniversalSubsyste
   }
   
   const supabase = await createClient()
-  const searchTerm = `%${query.trim().toLowerCase()}%`
-  
+  // SECURITY: Sanitize search to prevent PostgREST filter injection
+  const sanitized = query.trim().toLowerCase().replace(/[,()\."*]/g, '')
+  if (!sanitized) {
+    return []
+  }
+  const searchTerm = `%${sanitized}%`
+
   const { data, error } = await supabase
     .from('universal_subsystems')
     .select('*')

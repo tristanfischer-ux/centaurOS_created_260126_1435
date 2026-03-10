@@ -716,12 +716,16 @@ export async function archiveObjectiveByTitle(
         const searchTerm = title.trim()
         if (!searchTerm) return { error: 'Title is required' }
 
+        // SECURITY: Escape LIKE wildcards to prevent matching all objectives
+        // with a crafted title like "%". Also sanitize PostgREST metacharacters.
+        const escaped = searchTerm.replace(/%/g, '\\%').replace(/_/g, '\\_')
+
         const { data: matches, error: searchError } = await supabase
             .from('objectives')
             .select('id, title')
             .eq('foundry_id', foundryId)
             .is('deleted_at', null)
-            .ilike('title', `%${searchTerm}%`)
+            .ilike('title', `%${escaped}%`)
             .limit(5)
 
         if (searchError) {

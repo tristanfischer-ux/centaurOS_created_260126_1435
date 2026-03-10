@@ -151,11 +151,18 @@ export const CITY_REGION_MAP: Record<string, string> = {
 }
 
 /**
- * Sorted city entries — longest first so "stoke-on-trent" matches before "stoke",
+ * Pre-compiled city→region matchers.
+ * Sorted longest-first so "stoke-on-trent" matches before "stoke",
  * "newcastle upon tyne" before "newcastle", etc.
+ * Pre-compiled at module load to avoid creating ~80 RegExp objects per call.
  */
-const SORTED_CITY_ENTRIES = Object.entries(CITY_REGION_MAP)
-  .sort((a, b) => b[0].length - a[0].length)
+const CITY_MATCHERS: Array<{ pattern: RegExp; region: string }> =
+  Object.entries(CITY_REGION_MAP)
+    .sort((a, b) => b[0].length - a[0].length)
+    .map(([city, region]) => ({
+      pattern: new RegExp(`\\b${city.replace(/[-]/g, '[-\\s]')}\\b`),
+      region,
+    }))
 
 /**
  * Try to derive a UK region from a free-text location string using city keywords.
@@ -163,9 +170,7 @@ const SORTED_CITY_ENTRIES = Object.entries(CITY_REGION_MAP)
  */
 export function deriveRegionFromKeywords(location: string): string | null {
   const lower = location.toLowerCase()
-  for (const [city, region] of SORTED_CITY_ENTRIES) {
-    // Word-boundary check: \b handles spaces, punctuation, start/end of string
-    const pattern = new RegExp(`\\b${city.replace(/[-]/g, '[-\\s]')}\\b`)
+  for (const { pattern, region } of CITY_MATCHERS) {
     if (pattern.test(lower)) return region
   }
   return null

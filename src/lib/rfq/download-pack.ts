@@ -95,6 +95,7 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
   const attachments = rfq.specifications?.attachments
   if (Array.isArray(attachments)) {
     const maxAttachments = 50
+    const usedNames = new Set<string>()
     for (let i = 0; i < Math.min(attachments.length, maxAttachments); i++) {
       const url = attachments[i]
       if (typeof url !== 'string' || !url) continue
@@ -106,7 +107,8 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
       } catch { continue }
 
       try {
-        const response = await fetch(url)
+        // SECURITY: Disable redirect following to prevent HTTPS→HTTP downgrade
+        const response = await fetch(url, { redirect: 'error' })
         if (!response.ok) continue
 
         const blob = await response.blob()
@@ -116,10 +118,21 @@ export async function downloadTechPack(rfq: RFQWithDetails): Promise<void> {
         const segments = urlPath.split('/')
         const rawName = segments[segments.length - 1] || `attachment-${i + 1}`
         // SECURITY: Sanitize filename — strip path traversal, control chars, reserved chars
-        const fileName = decodeURIComponent(rawName)
+        let fileName = decodeURIComponent(rawName)
           .replace(/\.\./g, '_')
           .replace(/[/\\:*?"<>|\x00-\x1f]/g, '_')
         if (!fileName || fileName === '.' || fileName === '..') continue
+
+        // Deduplicate filenames to prevent silent overwrites
+        if (usedNames.has(fileName)) {
+          const ext = fileName.lastIndexOf('.')
+          const base = ext > 0 ? fileName.slice(0, ext) : fileName
+          const suffix = ext > 0 ? fileName.slice(ext) : ''
+          let counter = 1
+          while (usedNames.has(`${base}-${counter}${suffix}`)) counter++
+          fileName = `${base}-${counter}${suffix}`
+        }
+        usedNames.add(fileName)
 
         zip.file(`attachments/${fileName}`, blob)
       } catch {

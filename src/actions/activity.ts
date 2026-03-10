@@ -350,8 +350,8 @@ export async function markActivityRead(
 export async function markMultipleActivityRead(
   items: Array<{ type: 'task_comment' | 'objective_comment'; commentId: string }>
 ): Promise<{ success: boolean; error?: string }> {
-  if (items.length > 500) {
-    return { success: false, error: 'Too many items (max 500)' }
+  if (items.length > 200) {
+    return { success: false, error: 'Too many items (max 200)' }
   }
 
   try {
@@ -672,11 +672,24 @@ export async function getActivityFeed(options?: {
       return { success: false, error: 'Foundry not found' }
     }
 
-    const limit = options?.limit || 30
+    // SECURITY: Cap limit to prevent DoS via oversized requests
+    const limit = Math.min(options?.limit || 30, 200)
     const filter = options?.filter || 'all'
     const includeSystemLogs = options?.includeSystemLogs || false
-    const showAllFoundryActivity = options?.showAllFoundryActivity || false
+    let showAllFoundryActivity = options?.showAllFoundryActivity || false
     const before = options?.before
+
+    // SECURITY: Only Executives/Founders can view all foundry activity
+    if (showAllFoundryActivity) {
+      const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      if (!callerProfile || (callerProfile.role !== 'Executive' && callerProfile.role !== 'Founder')) {
+        showAllFoundryActivity = false
+      }
+    }
 
     let allTaskIds: string[] = []
     let myObjectiveIds: string[] = []

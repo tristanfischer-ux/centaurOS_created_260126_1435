@@ -76,10 +76,12 @@ export async function deleteTeam(teamId: string) {
         }
     }
 
+    // SECURITY: Include foundry_id for defense-in-depth against TOCTOU races
     const { error } = await supabase
         .from('teams')
         .delete()
         .eq('id', teamId)
+        .eq('foundry_id', foundry_id)
 
     if (error) {
         console.error('Error deleting team:', error)
@@ -137,10 +139,12 @@ export async function updateTeamName(teamId: string, name: string) {
         return { error: 'Unauthorized: You must be a team member to update the team name' }
     }
 
+    // SECURITY: Include foundry_id for defense-in-depth against TOCTOU races
     const { error } = await supabase
         .from('teams')
         .update({ name: validatedName.trim() })
         .eq('id', teamId)
+        .eq('foundry_id', foundry_id)
 
     if (error) {
         return { error: `Failed to update team name: ${sanitizeErrorMessage(error)}` }

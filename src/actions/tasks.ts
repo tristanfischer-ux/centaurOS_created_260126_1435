@@ -837,6 +837,18 @@ export async function addTaskComment(taskId: string, content: string) {
 
         const { content: validatedContent } = validation.data
 
+        // SECURITY: Verify the task belongs to the caller's foundry to prevent
+        // cross-foundry comment injection via a known task UUID.
+        const { data: task, error: taskLookupError } = await supabase
+            .from('tasks')
+            .select('id')
+            .eq('id', taskId)
+            .eq('foundry_id', foundryId)
+            .single()
+        if (taskLookupError || !task) {
+            return { error: 'Task not found' }
+        }
+
         const { error } = await supabase.from('task_comments').insert({
             task_id: taskId,
             foundry_id: foundryId,
@@ -1673,8 +1685,15 @@ export async function updateTaskDetails(taskId: string, updates: { title?: strin
             return { error: authCheck.error || 'Unauthorized' }
         }
 
+        // SECURITY: Whitelist allowed fields to prevent mass assignment.
+        // TypeScript types are erased at runtime — a malicious caller could pass
+        // additional fields (e.g., status, foundry_id) that Supabase would apply.
+        const safeUpdates: Record<string, unknown> = {}
+        if (updates.title !== undefined) safeUpdates.title = updates.title
+        if (updates.description !== undefined) safeUpdates.description = updates.description
+
         const { error } = await supabase.from('tasks')
-            .update(updates)
+            .update(safeUpdates)
             .eq('id', taskId)
             .eq('foundry_id', foundryId)
 

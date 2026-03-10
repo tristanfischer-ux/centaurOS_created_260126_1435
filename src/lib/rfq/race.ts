@@ -273,6 +273,13 @@ export async function acceptRFQ(
   error: string | null
 }> {
   try {
+    // SECURITY: Defense-in-depth validation on quotedPrice.
+    // The calling server action validates too, but this library function is
+    // exported and could be called from other code paths.
+    if (quotedPrice != null && (!Number.isFinite(quotedPrice) || quotedPrice < 0)) {
+      return { success: false, awarded: false, priority_hold: false, error: 'Invalid quoted price' }
+    }
+
     // Get the RFQ
     const { data: rfq, error: rfqError } = await supabase
       .from('rfqs')

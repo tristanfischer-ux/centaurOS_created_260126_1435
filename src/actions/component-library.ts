@@ -82,8 +82,12 @@ export async function getComponents(
     .select("id, name, manufacturer, geometry_type_slug, material, verified, thumbnail_url, tags", { count: "exact" })
 
   // Apply search filter
+  // SECURITY: Sanitize search to prevent PostgREST filter injection
   if (search) {
-    query = query.or(`name.ilike.%${search}%,manufacturer.ilike.%${search}%,geometry_type_slug.ilike.%${search}%`)
+    const sanitized = search.replace(/[,()\."*]/g, '')
+    if (sanitized) {
+      query = query.or(`name.ilike.%${sanitized}%,manufacturer.ilike.%${sanitized}%,geometry_type_slug.ilike.%${sanitized}%`)
+    }
   }
 
   // Apply category filter (matches geometry_type_slug category prefix)

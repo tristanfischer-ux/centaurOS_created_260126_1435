@@ -241,12 +241,12 @@ export function RFQWizard({
       return
     }
 
-    if (budgetMin && parseFloat(budgetMin) < 0) {
-      setError('Budget minimum cannot be negative')
+    if (budgetMin && (!Number.isFinite(parseFloat(budgetMin)) || parseFloat(budgetMin) < 0)) {
+      setError('Please enter a valid budget minimum')
       return
     }
-    if (budgetMax && parseFloat(budgetMax) < 0) {
-      setError('Budget maximum cannot be negative')
+    if (budgetMax && (!Number.isFinite(parseFloat(budgetMax)) || parseFloat(budgetMax) < 0)) {
+      setError('Please enter a valid budget maximum')
       return
     }
     if (budgetMin && budgetMax && parseFloat(budgetMin) > parseFloat(budgetMax)) {
