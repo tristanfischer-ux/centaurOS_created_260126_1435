@@ -17,7 +17,6 @@ import {
     Loader2,
     X,
     Clock,
-    MessageSquare,
     CalendarCheck,
     Users,
     TrendingUp,
@@ -41,6 +40,11 @@ import type { MarketplaceListing } from '@/actions/marketplace'
  * <TalentFinder onViewDetail={handleViewDetail} />
  */
 
+/** Escape special regex characters in user input to prevent ReDoS. */
+function escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 /** Client-side keyword matching — mirrors performKeywordMatching in people-marketplace.ts
  *  but runs against already-fetched listings to avoid a redundant server round trip. */
 function clientKeywordMatch(query: string, listings: EnrichedPersonListing[]): TalentMatchResult {
@@ -60,7 +64,9 @@ function clientKeywordMatch(query: string, listings: EnrichedPersonListing[]): T
         let score = 0
         const matched: string[] = []
         for (const w of words) {
-            if (text.includes(w)) { score += 10; matched.push(w) }
+            // Use word-boundary matching (same as server-side performKeywordMatching)
+            const pattern = new RegExp('\\b' + escapeRegex(w) + '\\b', 'i')
+            if (pattern.test(text)) { score += 10; matched.push(w) }
         }
         if (listing.is_verified) score += 5
         if (listing.trustData.averageRating && listing.trustData.averageRating >= 4.5) score += 5
@@ -136,19 +142,23 @@ export function TalentFinder({ onViewDetail }: TalentFinderProps) {
         setAnimationComplete(false)
         const matches = results.matches
         let index = 0
+        let timeoutId: ReturnType<typeof setTimeout>
 
         const addNext = () => {
             if (index < matches.length) {
                 setVisibleMatches(prev => [...prev, matches[index]])
                 index++
-                setTimeout(addNext, 200)
+                timeoutId = setTimeout(addNext, 200)
             } else {
                 setAnimationComplete(true)
             }
         }
 
         // Start animation after a small delay
-        setTimeout(addNext, 300)
+        timeoutId = setTimeout(addNext, 300)
+
+        // Cleanup: cancel pending timeouts when results change or component unmounts
+        return () => clearTimeout(timeoutId)
     }, [results])
 
     const handleSearch = useCallback(async () => {
@@ -524,32 +534,18 @@ function TalentMatchCard({
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="gap-1 text-xs h-8"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                toast.info('Messaging coming soon')
-                            }}
-                        >
-                            <MessageSquare className="w-3.5 h-3.5" />
-                            Message
-                        </Button>
-                        <Button
-                            size="sm"
-                            variant="default"
-                            className="gap-1 text-xs h-8"
-                            onClick={(e) => {
-                                e.stopPropagation()
-                                onViewDetail(listing)
-                            }}
-                        >
-                            View Profile
-                            <ArrowRight className="w-3 h-3" />
-                        </Button>
-                    </div>
+                    <Button
+                        size="sm"
+                        variant="default"
+                        className="gap-1 text-xs h-8"
+                        onClick={(e) => {
+                            e.stopPropagation()
+                            onViewDetail(listing)
+                        }}
+                    >
+                        View Profile
+                        <ArrowRight className="w-3 h-3" />
+                    </Button>
                 </div>
             </CardContent>
         </Card>
