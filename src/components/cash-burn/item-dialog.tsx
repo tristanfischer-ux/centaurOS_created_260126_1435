@@ -80,6 +80,7 @@ interface ItemDialogProps {
   onOpenChange: (open: boolean) => void
   mode: 'cash-out' | 'cash-in'
   initialData?: Partial<CreateCashOutInput & CreateCashInInput>
+  defaultCostType?: string
   onSave: (data: CreateCashOutInput | CreateCashInInput) => void
 }
 
@@ -92,6 +93,7 @@ export function ItemDialog({
   onOpenChange,
   mode,
   initialData,
+  defaultCostType,
   onSave,
 }: ItemDialogProps) {
   // Shared fields
@@ -133,8 +135,9 @@ export function ItemDialog({
       setNotes(initialData?.notes ?? '')
 
       if (mode === 'cash-out') {
-        setCategory(initialData?.category ?? 'salaries')
-        setCostType(initialData?.cost_type ?? 'fixed')
+        const resolvedCostType = initialData?.cost_type ?? (defaultCostType as CostType) ?? 'fixed'
+        setCategory(initialData?.category ?? (resolvedCostType === 'variable' ? 'contractors' : 'salaries'))
+        setCostType(resolvedCostType)
         setPnlCategory(initialData?.pnl_category ?? '')
       } else {
         const st = initialData?.source_type ?? 'revenue'
@@ -157,7 +160,7 @@ export function ItemDialog({
         }
       }
     }
-  }, [open, initialData, mode, weekOptions])
+  }, [open, initialData, mode, weekOptions, defaultCostType])
 
   // Auto-set cost type based on category group — only when user changes category
   useEffect(() => {

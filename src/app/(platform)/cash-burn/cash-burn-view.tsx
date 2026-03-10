@@ -9,8 +9,10 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import { Flame, AlertTriangle } from 'lucide-react'
+import Link from 'next/link'
+import { Flame, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatCurrency } from '@/types/payments'
 import { KpiRow } from '@/components/cash-burn/kpi-row'
@@ -95,14 +97,14 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       .sort((a, b) => b.value - a.value)
   }, [cashOut])
 
-  // Stacked bar data for cash in vs out
+  // Stacked bar data for cash in vs out (scenario-adjusted)
   const stackedBarData = useMemo(() => {
     return projection.weeks.map((w, i) => ({
       label: i % 4 === 0 ? w.weekLabel : `W${i + 1}`,
-      'Cash In': cashInGrid[i]?.totalIn ?? 0,
-      'Cash Out': cashOutGrid[i]?.totalOut ?? 0,
+      'Cash In': w.totalIn,
+      'Cash Out': w.totalOut,
     }))
-  }, [projection.weeks, cashInGrid, cashOutGrid])
+  }, [projection.weeks])
 
   // Weekly table data
   const weeklyTableRows = useMemo(() => {
@@ -230,7 +232,9 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         {
           label: 'Weekly Burn Rate',
           value: formatCurrency(Math.round(projection.monthlyBurnRate * 12 / 52)),
-          detail: projection.monthlyBurnRate > 0 ? 'Net negative' : 'Net positive',
+          detail: cashOut.length === 0 && cashIn.length === 0
+            ? 'No data entered'
+            : projection.monthlyBurnRate > 0 ? 'Net negative' : 'Net positive',
         },
         {
           label: 'Runway',
@@ -247,6 +251,41 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           detail: cashZeroDate ? undefined : 'Cash positive throughout',
         },
       ]} />
+
+      {cashOut.length === 0 && cashIn.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center space-y-4">
+            <div className="flex justify-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                <TrendingDown className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">No costs or revenue entered yet</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Set up your costs and revenue to see burn rate, runway, and cash projections.
+              </p>
+            </div>
+            <div className="flex justify-center gap-3">
+              <Button asChild variant="default" size="sm">
+                <Link href="/cash-burn/cash-out">
+                  <TrendingDown className="h-4 w-4 mr-1.5" />
+                  Set up costs
+                </Link>
+              </Button>
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/cash-burn/cash-in">
+                  <TrendingUp className="h-4 w-4 mr-1.5" />
+                  Add revenue
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main area */}

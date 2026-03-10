@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Pencil, Trash2, Plus } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -47,6 +48,8 @@ export function ItemsSection({
   onDelete,
   emptyMessage,
 }: ItemsSectionProps) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -118,14 +121,29 @@ export function ItemsSection({
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDelete(item.id)}
-                    aria-label={`Delete ${item.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {confirmDeleteId === item.id ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        onDelete(item.id)
+                        setConfirmDeleteId(null)
+                      }}
+                      onBlur={() => setConfirmDeleteId(null)}
+                      aria-label={`Confirm delete ${item.name}`}
+                    >
+                      Confirm
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setConfirmDeleteId(item.id)}
+                      aria-label={`Delete ${item.name}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

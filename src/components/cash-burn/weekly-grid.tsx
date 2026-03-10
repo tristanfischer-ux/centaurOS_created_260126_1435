@@ -74,13 +74,16 @@ export function WeeklyGrid({ columns, rows, formatValue = formatCurrency, title 
                       {columns.map((col) => {
                         const val = row[col.key]
                         const isLabel = col.key === 'weekLabel' || col.key === 'label'
+                        const isNegative = typeof val === 'number' && val < 0
                         return (
                           <td
                             key={col.key}
                             className={`py-2 px-3 whitespace-nowrap ${
                               isLabel
                                 ? 'text-foreground font-medium'
-                                : 'text-foreground tabular-nums'
+                                : isNegative
+                                  ? 'text-destructive tabular-nums'
+                                  : 'text-foreground tabular-nums'
                             }`}
                           >
                             {isLabel || typeof val === 'string'

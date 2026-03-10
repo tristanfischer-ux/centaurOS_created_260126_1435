@@ -384,7 +384,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
           { key: 'grants', label: 'Grants' },
           { key: 'other', label: 'Other' },
           { key: 'total', label: 'Total' },
-          { key: 'cumulative', label: 'Cumulative' },
+          { key: 'cumulative', label: 'Cumulative Inflows' },
         ]}
         rows={weeklyTableRows}
       />
