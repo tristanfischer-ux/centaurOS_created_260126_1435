@@ -257,11 +257,12 @@ export function ConversationThread({
   useEffect(() => {
     if (messages.length === 0) return
 
+    let stale = false
     const messageIds = messages.map(m => m.id)
-    
+
     getBatchReplyCounts(messageIds).then(result => {
+      if (stale) return
       if (result.success && result.data) {
-        // Extract just the count from each entry
         const counts: Record<string, number> = {}
         for (const [id, data] of Object.entries(result.data)) {
           counts[id] = data.count
@@ -269,6 +270,8 @@ export function ConversationThread({
         setReplyCounts(counts)
       }
     })
+
+    return () => { stale = true }
   }, [messages.length]) // Only refetch when message count changes
 
   // Handle send message

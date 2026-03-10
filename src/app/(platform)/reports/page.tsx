@@ -652,8 +652,10 @@ export default function ReportsPage(): React.JSX.Element {
     }
   }, [reportDocument, emailRecipients, shareUrl])
 
-  const handleLoadHistoricReport = useCallback((document: ReportDocumentType) => {
+  const handleLoadHistoricReport = useCallback((document: ReportDocumentType, snapshotId: string) => {
     setReportDocument(document)
+    setLastSnapshotId(snapshotId)
+    setShareUrl(null)
     setPageMode('reports')
     toast.success('Report loaded from history')
     setTimeout(() => {

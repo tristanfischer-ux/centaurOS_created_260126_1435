@@ -32,7 +32,7 @@ import type { ReportHistoryItem } from '@/actions/report-history'
 import type { ReportDocument } from '@/lib/reports/report-document-types'
 
 interface ReportHistoryProps {
-  onLoadReport: (document: ReportDocument) => void
+  onLoadReport: (document: ReportDocument, snapshotId: string) => void
 }
 
 const REPORT_TYPE_LABELS: Record<string, string> = {
@@ -137,7 +137,7 @@ export function ReportHistory({ onLoadReport }: ReportHistoryProps) {
               <ReportCard
                 key={report.id}
                 report={report}
-                onClick={() => onLoadReport(report.reportData)}
+                onClick={() => onLoadReport(report.reportData, report.id)}
               />
             ))}
           </div>
@@ -180,7 +180,7 @@ function ReportCard({
           })()}
           <Badge variant="secondary">{getReportTypeLabel(report.reportType)}</Badge>
           <span className="text-xs text-muted-foreground">
-            {new Date(report.reportDate).toLocaleDateString('en-GB', {
+            {new Date(report.reportDate + 'T12:00:00').toLocaleDateString('en-GB', {
               day: 'numeric',
               month: 'short',
               year: 'numeric',

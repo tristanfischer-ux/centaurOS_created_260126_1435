@@ -219,8 +219,13 @@ export async function markConversationRead(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // AUTH: Verify user is a participant before marking read
+      if (!(await isParticipant(supabase, conversationId, user.id))) {
+        return { error: 'Access denied' }
+      }
+
       const count = await markAsRead(supabase, conversationId, user.id)
-      
+
       return { success: true as const, markedCount: count }
     } catch (error) {
       console.error('Failed to mark conversation as read:', error)

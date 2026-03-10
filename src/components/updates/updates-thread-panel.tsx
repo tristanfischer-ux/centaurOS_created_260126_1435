@@ -63,6 +63,8 @@ export function UpdatesThreadPanel({
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const onItemsReadRef = useRef(onItemsRead)
+  onItemsReadRef.current = onItemsRead
 
   // Fetch thread data
   const fetchThread = useCallback(async () => {
@@ -83,11 +85,11 @@ export function UpdatesThreadPanel({
 
           if (unreadItems.length > 0) {
             await markMultipleActivityRead(unreadItems)
-            onItemsRead?.()
+            onItemsReadRef.current?.()
           }
         } else {
           // For conversations, just notify parent that we've viewed them
-          onItemsRead?.()
+          onItemsReadRef.current?.()
         }
       }
     } catch (error) {
@@ -96,7 +98,7 @@ export function UpdatesThreadPanel({
     } finally {
       setIsLoading(false)
     }
-  }, [sourceType, sourceId, onItemsRead])
+  }, [sourceType, sourceId])
 
   useEffect(() => {
     fetchThread()
