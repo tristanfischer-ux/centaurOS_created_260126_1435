@@ -787,7 +787,7 @@ export async function getActivityFeed(options?: {
     // Fetch task history events (status changes, assignments, completions, etc.)
     // Include when filter is 'all', 'tasks', or specifically 'history'
     if ((filter === 'all' || filter === 'tasks' || filter === 'history') && allTaskIds.length > 0) {
-      const { data: taskHistory } = await (supabase as AnySupabaseClient)
+      let taskHistoryQuery = (supabase as AnySupabaseClient)
         .from('task_history')
         .select(`
           id, task_id, user_id, action_type, changes, created_at,
@@ -798,6 +798,12 @@ export async function getActivityFeed(options?: {
         .neq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(limit)
+
+      if (before) {
+        taskHistoryQuery = taskHistoryQuery.lt('created_at', before)
+      }
+
+      const { data: taskHistory } = await taskHistoryQuery
 
       if (taskHistory) {
         for (const history of taskHistory as RawTaskHistory[]) {
@@ -904,10 +910,10 @@ export async function getActivityFeed(options?: {
 
     // Fetch conversation messages (only true direct messages, not task/objective synced conversations)
     if ((filter === 'all' || filter === 'messages' || filter === 'unread') && myConversationIds.length > 0) {
-      const { data: messages } = await supabase
+      let messagesQuery = supabase
         .from('messages')
         .select(`
-          id, content, created_at,
+          id, content, created_at, is_deleted,
           sender:profiles!sender_id(id, full_name, avatar_url, role),
           conversation:conversations!conversation_id(id, buyer_id, seller_id, task_id, objective_id, title)
         `)
@@ -916,16 +922,26 @@ export async function getActivityFeed(options?: {
         .order('created_at', { ascending: false })
         .limit(limit)
 
+      if (before) {
+        messagesQuery = messagesQuery.lt('created_at', before)
+      }
+
+      const { data: messages } = await messagesQuery
+
       if (messages) {
         for (const message of messages) {
           const msg = message as {
             id: string
-            content: string
+            content: string | null
+            is_deleted: boolean
             created_at: string | null
             sender: { id: string; full_name: string | null; avatar_url: string | null; role: string | null } | null
             conversation: { id: string; buyer_id: string; seller_id: string; task_id: string | null; objective_id: string | null; title: string | null } | null
           }
           if (!msg.sender || !msg.conversation) continue
+
+          // Skip deleted messages from the feed
+          if (msg.is_deleted) continue
 
           // Skip task-linked and objective-linked conversations -- those are synced
           // duplicates already shown as task_comment / objective_comment items
@@ -938,7 +954,7 @@ export async function getActivityFeed(options?: {
           items.push({
             id: msg.id,
             type: 'message',
-            content: msg.content,
+            content: msg.content || '',
             created_at: msg.created_at || new Date().toISOString(),
             author: {
               id: msg.sender.id,

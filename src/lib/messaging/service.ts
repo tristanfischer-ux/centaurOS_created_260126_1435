@@ -97,6 +97,7 @@ export interface ConversationWithParticipants extends Conversation {
   } | null
   last_message?: Message | null
   unread_count?: number
+  is_muted?: boolean
   // Enhanced fields
   participants?: ConversationParticipant[]
   task?: {
@@ -880,7 +881,8 @@ export async function getEnhancedConversationsForUser(
       return {
         ...conv,
         last_message: lastMessage as Message | null,
-        unread_count: unreadCount
+        unread_count: unreadCount,
+        is_muted: participantRecord?.is_muted || false
       } as ConversationWithParticipants
     })
   )
@@ -967,7 +969,9 @@ export async function searchConversations(
   searchQuery: string,
   limit = 20
 ): Promise<ConversationWithParticipants[]> {
-  const searchPattern = `%${searchQuery}%`
+  // SECURITY: Escape LIKE wildcards to prevent pattern injection
+  const escapedQuery = searchQuery.replace(/[%_\\]/g, '\\$&')
+  const searchPattern = `%${escapedQuery}%`
 
   // Search by title
   const { data: byTitle } = await supabase
@@ -1029,10 +1033,10 @@ export async function editMessage(
   userId: string,
   newContent: string
 ): Promise<{ success: boolean; error?: string }> {
-  // Verify ownership
+  // Verify ownership and check if deleted
   const { data: message, error: fetchError } = await supabase
     .from('messages')
-    .select('sender_id')
+    .select('sender_id, is_deleted')
     .eq('id', messageId)
     .single()
 
@@ -1042,6 +1046,10 @@ export async function editMessage(
 
   if (message.sender_id !== userId) {
     return { success: false, error: 'You can only edit your own messages' }
+  }
+
+  if (message.is_deleted) {
+    return { success: false, error: 'Cannot edit a deleted message' }
   }
 
   const { error } = await supabase

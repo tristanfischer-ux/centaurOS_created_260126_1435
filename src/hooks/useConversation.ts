@@ -251,8 +251,8 @@ export function useConversation(
                       content: (updated.content as string) ?? m.content,
                       is_read: (updated.is_read as boolean) ?? m.is_read,
                       read_at: (updated.read_at as string | null) ?? m.read_at,
-                      edited_at: (updated.edited_at as string | null) ?? null,
-                      is_deleted: (updated.is_deleted as boolean) ?? false,
+                      edited_at: (updated.edited_at as string | null) ?? m.edited_at ?? null,
+                      is_deleted: (updated.is_deleted as boolean) ?? m.is_deleted ?? false,
                     }
                   : m
               )

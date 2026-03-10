@@ -282,7 +282,7 @@ function ConversationRow({
             {displayName}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
-            {!!(conversation as unknown as Record<string, unknown>).is_muted && (
+            {conversation.is_muted && (
               <BellOff className="h-3 w-3 text-muted-foreground" />
             )}
             {conversation.last_message && (
@@ -299,7 +299,9 @@ function ConversationRow({
         </div>
         {conversation.last_message && (
           <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {conversation.last_message.content || 'File attachment'}
+            {(conversation.last_message as unknown as { is_deleted?: boolean })?.is_deleted
+              ? 'Message deleted'
+              : conversation.last_message.content || 'File attachment'}
           </p>
         )}
       </div>
