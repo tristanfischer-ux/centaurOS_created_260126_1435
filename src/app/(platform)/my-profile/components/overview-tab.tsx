@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import type { ProfileEnrichment } from '../profile-hub-view'
 
 /**
- * OverviewTab - Bio, professional background, contact info, activity stats, and milestones.
+ * OverviewTab - Bio, professional background, activity stats, and milestones.
  *
  * @description Shows the user's bio, professional background (summary, previous
  * companies, education), enhanced platform stats with trend indicators, a

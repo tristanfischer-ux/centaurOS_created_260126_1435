@@ -78,6 +78,7 @@ export function LinksTab({
                   icon={Phone}
                   label="Phone"
                   value={phoneNumber}
+                  href={`tel:${sanitizePhone(phoneNumber)}`}
                 />
               )}
               {location && (
@@ -162,10 +163,12 @@ function InfoRow({
   icon: Icon,
   label,
   value,
+  href,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   value: string
+  href?: string
 }) {
   return (
     <div className="flex items-center gap-3 py-2">
@@ -176,7 +179,13 @@ function InfoRow({
         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {label}
         </p>
-        <p className="text-sm text-foreground">{value}</p>
+        {href ? (
+          <a href={href} className="text-sm text-foreground underline underline-offset-2 hover:text-international-orange transition-colors">
+            {value}
+          </a>
+        ) : (
+          <p className="text-sm text-foreground">{value}</p>
+        )}
       </div>
     </div>
   )
@@ -185,4 +194,9 @@ function InfoRow({
 /** Format a URL for display by removing protocol and trailing slash. */
 function formatUrl(url: string): string {
   return url.replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
+
+/** Sanitize a phone number for tel: href — keep leading + and digits only. */
+function sanitizePhone(phone: string): string {
+  return phone.replace(/(?!^\+)[^\d]/g, '')
 }

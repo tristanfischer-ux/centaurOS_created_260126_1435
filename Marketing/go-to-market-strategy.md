@@ -94,7 +94,7 @@ Acquire the first 122 paid subscribers (conservative), stretch target 200 within
 |--------|---------|---------|---------|----------|
 | Registered users | 50 | 190 | ~560 | ~2,000 |
 | Paid subscribers | 4 | 13 | 36 | 122 |
-| Monthly Revenue | £464 | £1,508 | £4,676 | ~£16,350 |
+| Monthly Revenue | £484 | £1,628 | £4,676 | ~£16,350 |
 | Marketplace providers | 20 | 50 | 100 | 250 |
 | Blog posts published | 4 | 12 | 24 | 50 |
 | Email list size | 100 | 500 | 1,500 | 5,000 |
