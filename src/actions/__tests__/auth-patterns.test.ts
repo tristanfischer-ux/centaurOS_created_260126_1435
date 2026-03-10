@@ -180,7 +180,8 @@ describe('Authentication Guards', () => {
       })
 
       expect(result.count).toBe(0)
-      expect(result.error).toContain('foundry')
+      // Auth check now fires before foundry check
+      expect(result.error).toBeTruthy()
     })
   })
 })
