@@ -140,7 +140,7 @@ export function MessagingSidebar({
         >
           <PanelRight className="h-5 w-5" />
           {totalUnread > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-international-orange text-[10px] text-white flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-international-orange text-[10px] text-primary-foreground flex items-center justify-center">
               {totalUnread > 9 ? '9+' : totalUnread}
             </span>
           )}

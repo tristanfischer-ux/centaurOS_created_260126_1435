@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Pencil, Trash2, Plus } from 'lucide-react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,13 @@ export function ItemsSection({
   emptyMessage,
 }: ItemsSectionProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  // Auto-dismiss confirm state after 3 seconds
+  useEffect(() => {
+    if (!confirmDeleteId) return
+    const timer = setTimeout(() => setConfirmDeleteId(null), 3000)
+    return () => clearTimeout(timer)
+  }, [confirmDeleteId])
 
   return (
     <Card>
@@ -129,7 +136,6 @@ export function ItemsSection({
                         onDelete(item.id)
                         setConfirmDeleteId(null)
                       }}
-                      onBlur={() => setConfirmDeleteId(null)}
                       aria-label={`Confirm delete ${item.name}`}
                     >
                       Confirm

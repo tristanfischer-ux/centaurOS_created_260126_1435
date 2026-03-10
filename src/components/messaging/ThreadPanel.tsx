@@ -116,12 +116,14 @@ export function ThreadPanel({ parentMessageId, onClose, open }: ThreadPanelProps
 
           if (newReply) {
             setReplies(prev => {
+              // Dedup: already added optimistically by handleSendReply
               if (prev.some(r => r.id === newReply.id)) return prev
+              // Only increment reply_count for genuinely new replies (not our own optimistic add)
+              setParentMessage(p =>
+                p ? { ...p, reply_count: p.reply_count + 1 } : p
+              )
               return [...prev, newReply as unknown as ThreadReply]
             })
-            setParentMessage(prev =>
-              prev ? { ...prev, reply_count: prev.reply_count + 1 } : prev
-            )
           }
         }
       )

@@ -122,6 +122,10 @@ export function UpdatesThreadPanel({
       const result = await replyToActivity(sourceType as ActivitySourceType, sourceId, replyContent.trim())
       if (result.success) {
         setReplyContent('')
+        // Reset textarea height after clearing
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+        }
         // Refresh thread to show the new reply
         await fetchThread()
         toast.success('Reply sent')

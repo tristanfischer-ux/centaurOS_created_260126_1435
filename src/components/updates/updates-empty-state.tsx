@@ -20,7 +20,7 @@ export function FeedEmptyState({ filter }: { filter: string }) {
     return (
       <EmptyState
         icon={
-          <div className="w-16 h-16 rounded-2xl bg-status-success-light border border-status-success/20 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-2xl bg-status-success-light border border-status-success/20 flex items-center justify-center opacity-100">
             <BellOff className="h-8 w-8 text-status-success" />
           </div>
         }
@@ -34,7 +34,7 @@ export function FeedEmptyState({ filter }: { filter: string }) {
   return (
     <EmptyState
       icon={
-        <div className="w-16 h-16 rounded-2xl bg-international-orange/10 border border-muted flex items-center justify-center">
+        <div className="w-16 h-16 rounded-2xl bg-international-orange/10 border border-muted flex items-center justify-center opacity-100">
           <Inbox className="h-8 w-8 text-international-orange" />
         </div>
       }
@@ -52,7 +52,7 @@ export function ThreadEmptyState() {
   return (
     <EmptyState
       icon={
-        <div className="w-16 h-16 rounded-2xl bg-muted border flex items-center justify-center">
+        <div className="w-16 h-16 rounded-2xl bg-muted border flex items-center justify-center opacity-100">
           <MousePointerClick className="h-8 w-8 text-muted-foreground" />
         </div>
       }
