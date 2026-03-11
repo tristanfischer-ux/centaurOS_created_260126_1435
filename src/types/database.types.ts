@@ -11748,6 +11748,74 @@ export type Database = {
           },
         ]
       }
+      price_index: {
+        Row: {
+          avg_price_per_kg: number
+          created_at: string
+          id: string
+          product_category: string
+          product_id: string | null
+          quality_grade: string | null
+          sample_count: number
+          volume_kg: number
+          week_start: string
+        }
+        Insert: {
+          avg_price_per_kg: number
+          created_at?: string
+          id?: string
+          product_category: string
+          product_id?: string | null
+          quality_grade?: string | null
+          sample_count?: number
+          volume_kg?: number
+          week_start: string
+        }
+        Update: {
+          avg_price_per_kg?: number
+          created_at?: string
+          id?: string
+          product_category?: string
+          product_id?: string | null
+          quality_grade?: string | null
+          sample_count?: number
+          volume_kg?: number
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_index_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
       profile_views: {
         Row: {
           id: string
@@ -18809,6 +18877,10 @@ export type Database = {
       }
       switch_active_foundry: {
         Args: { p_foundry_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      toggle_conversation_mute: {
+        Args: { p_conversation_id: string; p_profile_id: string }
         Returns: boolean
       }
       unlockrows: { Args: { "": string }; Returns: number }
