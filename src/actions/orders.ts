@@ -60,6 +60,9 @@ export async function createOrder(
 
 /**
  * Accept an order (seller action)
+ *
+ * SECURITY: Uses atomic status check to prevent double-accept race condition.
+ * Sets escrow_status to "held" so approveCompletion can later release payment.
  */
 export async function acceptOrder(
   orderId: string
@@ -87,30 +90,60 @@ export async function acceptOrder(
       return { success: false, error: "Not authorized to accept this order" }
     }
 
-    const result = await updateOrderStatusService(
-      supabase,
-      orderId,
-      "accepted",
-      user.id
-    )
+    // SECURITY: Atomic status transition — only accept if still pending.
+    // Prevents race condition where two concurrent Accept clicks both succeed.
+    const { data: updated, error: updateError } = await supabase
+      .from("orders")
+      .update({
+        status: "accepted",
+        escrow_status: "held",
+      })
+      .eq("id", orderId)
+      .eq("status", "pending")
+      .select("id")
 
-    if (result.success) {
-      revalidatePath("/orders")
-      revalidatePath(`/orders/${orderId}`)
+    if (updateError) {
+      console.error("[OrderActions] acceptOrder update failed:", { error: updateError.message, orderId })
+      return { success: false, error: "Failed to accept order" }
     }
 
-    return result
+    // If no rows were updated, the order was no longer pending (race condition lost)
+    if (!updated || updated.length === 0) {
+      return { success: false, error: "Order is no longer pending" }
+    }
+
+    // Log the acceptance event
+    await logOrderEvent(supabase, orderId, "accepted", {
+      from_status: "pending",
+      to_status: "accepted",
+    }, user.id)
+
+    revalidatePath("/orders")
+    revalidatePath(`/orders/${orderId}`)
+
+    return { success: true, error: null }
   })
 }
 
 /**
  * Decline an order (seller action)
+ *
+ * VALIDATION: Reason must be a non-empty string (max 1000 chars).
  */
 export async function declineOrder(
   orderId: string,
   reason: string
 ): Promise<{ success: boolean; error: string | null }> {
   return withUser(async ({ supabase, user }) => {
+    // VALIDATION: Sanitize and validate reason
+    const trimmedReason = reason.trim()
+    if (!trimmedReason) {
+      return { success: false, error: "A reason is required when declining an order" }
+    }
+    if (trimmedReason.length > 1000) {
+      return { success: false, error: "Reason must be 1000 characters or fewer" }
+    }
+
     // Verify user is the seller
     const { data: order, error: fetchError } = await supabase
       .from("orders")
@@ -134,11 +167,11 @@ export async function declineOrder(
     }
 
     // Declining sets status to cancelled with reason logged
-    const result = await cancelOrderService(supabase, orderId, reason, user.id)
+    const result = await cancelOrderService(supabase, orderId, trimmedReason, user.id)
 
     if (result.success) {
       // Log the decline event separately
-      await logOrderEvent(supabase, orderId, "declined", { reason }, user.id)
+      await logOrderEvent(supabase, orderId, "declined", { reason: trimmedReason }, user.id)
       revalidatePath("/orders")
       revalidatePath(`/orders/${orderId}`)
     }
