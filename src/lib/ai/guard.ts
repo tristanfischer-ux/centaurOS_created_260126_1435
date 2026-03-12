@@ -47,7 +47,6 @@ type AIGuardResult =
     }
   | {
       denied: false
-      response: NextResponse
       userId: string
       /** Guaranteed non-null when denied=false */
       foundryId: string
@@ -144,7 +143,6 @@ export async function aiGuard(
 
   return {
     denied: false as const,
-    response: NextResponse.json({}), // unused when not denied
     userId: user.id,
     foundryId,
     trackUsage: trackUsageFn,

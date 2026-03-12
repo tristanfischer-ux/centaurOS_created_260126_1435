@@ -188,6 +188,12 @@ Analyze these options and provide your recommendation.`;
             temperature: 0.7,
         });
 
+        guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens,
+            completionTokens: completion.usage?.completion_tokens,
+        }).catch(() => {})
+
         if (!completion.choices || completion.choices.length === 0) {
             return NextResponse.json(
                 { error: "AI returned no response" },

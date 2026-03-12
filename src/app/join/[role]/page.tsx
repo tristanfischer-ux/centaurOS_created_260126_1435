@@ -10,9 +10,14 @@ import { redirect } from "next/navigation";
  */
 export default async function JoinRolePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ role: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { role } = await params;
-  redirect(`/join?role=${encodeURIComponent(role.toLowerCase())}`);
+  const query = await searchParams;
+  const redirectParam = typeof query.redirect === 'string' ? query.redirect : undefined;
+  const redirectSuffix = redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : '';
+  redirect(`/join?role=${encodeURIComponent(role.toLowerCase())}${redirectSuffix}`);
 }

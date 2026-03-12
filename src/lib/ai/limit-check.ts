@@ -124,7 +124,10 @@ async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
     if (!subscription) return 'free'
 
     const tier = subscription.tier as string
-    if (!(tier in SUBSCRIPTION_PLANS)) return 'free'
+    if (!(tier in SUBSCRIPTION_PLANS)) {
+      console.warn('[AILimitCheck] Unknown subscription tier, defaulting to free:', { foundryId, tier })
+      return 'free'
+    }
     return tier as SubscriptionTier
   } catch (error) {
     console.error('[AILimitCheck] Error getting foundry tier:', {
