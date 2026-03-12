@@ -31,6 +31,8 @@ export interface ListingExecutive {
     provider_profile_id: string | null
     status: string
     created_at: string
+    day_rate: number | null
+    currency: string | null
 }
 
 export interface PublicExecutive {
@@ -42,6 +44,8 @@ export interface PublicExecutive {
     specializations: string[]
     availability: string
     provider_profile_id: string | null
+    day_rate: number | null
+    currency: string | null
 }
 
 export interface AddExecutiveData {
@@ -52,6 +56,8 @@ export interface AddExecutiveData {
     bio?: string
     specializations?: string[]
     availability?: 'full_time' | 'part_time' | 'advisory' | 'project_based'
+    day_rate?: number
+    currency?: string
 }
 
 export interface UpdateExecutiveData {
@@ -63,6 +69,8 @@ export interface UpdateExecutiveData {
     specializations?: string[]
     availability?: string
     status?: string
+    day_rate?: number
+    currency?: string
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -135,6 +143,8 @@ export async function addExecutiveToListing(
         p_bio: executive.bio,
         p_specializations: executive.specializations ?? [],
         p_availability: executive.availability ?? 'part_time',
+        p_day_rate: executive.day_rate,
+        p_currency: executive.currency ?? 'GBP',
     })
 
     if (error) {
@@ -171,6 +181,8 @@ export async function updateExecutive(
         p_specializations: updates.specializations,
         p_availability: updates.availability,
         p_status: updates.status,
+        p_day_rate: updates.day_rate,
+        p_currency: updates.currency,
     })
 
     if (error) {
