@@ -5,17 +5,19 @@
  *
  * @description Format selection dialog for downloading a design report.
  * Offers Word (.docx), Slides (.pptx), or PDF (print dialog) export.
- * Assembles DesignReportData from the CadLab context, then dynamic-imports
- * the appropriate exporter.
+ * Optional "Professional narration" toggle runs a two-phase AI pipeline
+ * (Opus structures → Gemini writes) before formatting.
  *
  * @related
  * - src/lib/cad-lab/design-report-types.ts — DesignReportData shape
  * - src/lib/cad-lab/export-design-report-docx.ts — DOCX exporter
  * - src/lib/cad-lab/export-design-report-pptx.ts — PPTX exporter
+ * - src/actions/cad-lab-report.ts — AI pipeline (structureReportOutline + writeReportSections)
  */
 
 import { useState, useCallback } from "react"
-import { FileDown, FileText, Presentation, Printer, Loader2 } from "lucide-react"
+import { FileDown, FileText, Presentation, Printer, Loader2, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -26,9 +28,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 import { useCadLab } from "../cad-lab-context"
 import type { DesignReportFormat, DesignReportData, ReportStage } from "@/lib/cad-lab/design-report-types"
+
+type AiPhase = 'idle' | 'structuring' | 'writing' | 'formatting' | 'done' | 'error'
 
 interface DesignReportDialogProps {
   open: boolean
@@ -75,9 +81,20 @@ const STAGE_LABELS: Record<ReportStage, string> = {
   cad: 'CAD',
 }
 
+const AI_PHASE_LABELS: Record<AiPhase, string> = {
+  idle: '',
+  structuring: 'Structuring report...',
+  writing: 'Writing sections...',
+  formatting: 'Formatting document...',
+  done: 'Done',
+  error: 'Falling back to standard export...',
+}
+
 export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stageData }: DesignReportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
   const [isExporting, setIsExporting] = useState(false)
+  const [aiEnabled, setAiEnabled] = useState(true)
+  const [aiPhase, setAiPhase] = useState<AiPhase>('idle')
 
   const {
     subject,
@@ -129,14 +146,40 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
   const handleExport = useCallback(async () => {
     if (!selectedFormat) return
     setIsExporting(true)
+    setAiPhase('idle')
 
     try {
       const data = assembleData()
 
+      // INTENT: AI narration pipeline — Opus structures, Gemini writes, then format
+      if (aiEnabled && selectedFormat !== "pdf") {
+        try {
+          // Phase 1: Opus structures
+          setAiPhase('structuring')
+          const { structureReportOutline } = await import("@/actions/cad-lab-report")
+          const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
+
+          // Phase 2: Gemini writes sections
+          setAiPhase('writing')
+          const { writeReportSections } = await import("@/actions/cad-lab-report")
+          const aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
+
+          data.aiContent = aiContent
+          setAiPhase('formatting')
+        } catch (aiErr) {
+          console.error("[DesignReport] AI narration failed, falling back:", aiErr)
+          setAiPhase('error')
+          toast.info("Professional narration unavailable — exporting standard report")
+          // Fall through to standard export without aiContent
+        }
+      }
+
       if (selectedFormat === "docx") {
+        if (aiPhase !== 'error') setAiPhase('formatting')
         const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
         await exportDesignReportAsDOCX(data)
       } else if (selectedFormat === "pptx") {
+        if (aiPhase !== 'error') setAiPhase('formatting')
         const { exportDesignReportAsPPTX } = await import("@/lib/cad-lab/export-design-report-pptx")
         await exportDesignReportAsPPTX(data)
       } else {
@@ -144,13 +187,16 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         window.print()
       }
 
+      setAiPhase('done')
       onOpenChange(false)
     } catch (err) {
       console.error("[DesignReport] Export failed:", err)
+      toast.error("Export failed — please try again")
     } finally {
       setIsExporting(false)
+      setAiPhase('idle')
     }
-  }, [selectedFormat, assembleData, onOpenChange])
+  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, aiPhase])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -196,6 +242,31 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           })}
         </div>
 
+        {/* Professional narration toggle */}
+        {selectedFormat && selectedFormat !== "pdf" && (
+          <div className="flex items-center justify-between py-2 px-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-international-orange" />
+              <Label htmlFor="ai-narration" className="text-sm font-medium text-foreground cursor-pointer">
+                Professional narration
+              </Label>
+            </div>
+            <Switch
+              id="ai-narration"
+              checked={aiEnabled}
+              onCheckedChange={setAiEnabled}
+            />
+          </div>
+        )}
+
+        {/* AI progress indicator */}
+        {isExporting && aiEnabled && aiPhase !== 'idle' && aiPhase !== 'done' && (
+          <div className="flex items-center gap-2 px-1 py-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-international-orange" />
+            <span className="text-xs text-muted-foreground">{AI_PHASE_LABELS[aiPhase]}</span>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isExporting}>
             Cancel
@@ -204,7 +275,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             {isExporting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                Exporting...
+                {AI_PHASE_LABELS[aiPhase] || "Exporting..."}
               </>
             ) : (
               "Download"

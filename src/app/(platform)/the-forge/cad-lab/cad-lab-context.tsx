@@ -1442,6 +1442,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         failureModes: [],
         unknowns: [],
         status: "pending" as const,
+        revisionNumber: 1,
         ...(sm.mirrorOf ? { mirrorOf: sm.mirrorOf } : {}),
       }))
 
@@ -3132,8 +3133,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       researchReport: editableReport,
       projectSubject: subject,
     }).then((revised) => {
+      // GOTCHA: withAIGate returns { error, limitReached } when quota exhausted —
+      // guard before iterating as module revisions (would corrupt state with fake IDs)
+      const revAsAny = revised as Record<string, unknown>
+      if (revAsAny && typeof revAsAny === "object" && "error" in revAsAny) {
+        toast.error(String(revAsAny.error))
+        return
+      }
+
       const revisedIds = Object.keys(revised)
-      if (revisedIds.length === 0) return
+      if (revisedIds.length === 0) {
+        toast.error("Module revision failed — no modules were updated")
+        return
+      }
 
       setModules((prev) =>
         prev.map((mod) => {
@@ -3157,19 +3169,33 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             whyItMatters: fields.whyItMatters,
             failureModes: fields.failureModes,
             unknowns: fields.unknowns,
+            revisionNumber: (mod.revisionNumber ?? 1) + 1,
+            lastRevisionSource: "checkpoint" as const,
           }
         }),
       )
       debouncedSaveModules()
       setRevisedModuleIds(new Set(revisedIds))
-      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback`)
+
+      // INTENT: Bump project-level design revision so images become stale
+      const nextRevision = designRevisionRef.current + 1
+      setDesignRevision(nextRevision)
+      if (activeProjectIdRef.current) {
+        saveCadLabDesignRevision(activeProjectIdRef.current, nextRevision, imagesGeneratedAtRevision)
+          .catch(err => console.error("[CAD-LAB] Failed to save design revision:", err))
+      }
+
+      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback — regenerating drawings...`)
+
+      // INTENT: Auto-chain drawing regeneration after checkpoint revisions (same as review handler)
+      setTimeout(() => regenDrawingsRef.current?.(), 200)
     }).catch((err) => {
       console.error("[CAD-LAB] Checkpoint revision failed:", err)
       toast.error("Module revision failed — proceeding with original descriptions")
     }).finally(() => {
       setIsRevising(false)
     })
-  }, [checkpointAcknowledged, isRevising, checkpoints, editableReport, subject, debouncedSaveModules])
+  }, [checkpointAcknowledged, isRevising, checkpoints, editableReport, subject, debouncedSaveModules, imagesGeneratedAtRevision])
 
   // ── Interactive code workbench: execute edited code ──
   const handleExecuteModuleCode = useCallback(async (moduleId: string, code: string) => {

@@ -578,6 +578,15 @@ export default function SpecifyPage(): React.ReactNode {
               modelAudit={modelAudit}
             />
 
+            {/* Design revision banner — shows revision status on Overview tab too */}
+            <DesignRevisionBanner
+              designRevision={designRevision}
+              imagesStale={imagesStale}
+              revisedModuleCount={revisedModuleIds.size}
+              isRegenerating={isRegeneratingImages}
+              progressLines={progressLines}
+            />
+
             {/* Module summary cards */}
             <div>
               <div className="flex items-center justify-between mb-3">
@@ -604,7 +613,7 @@ export default function SpecifyPage(): React.ReactNode {
                           <h3 className="text-sm font-medium text-foreground truncate">{mod.name}</h3>
                           <div className="flex items-center gap-1.5">
                             {(mod.revisionNumber ?? 1) > 1 && (
-                              <Badge variant="secondary" className="text-[10px]">Rev {mod.revisionNumber}</Badge>
+                              <Badge variant="secondary" className="text-[10px]" title={`Revised via ${mod.lastRevisionSource ?? "unknown"} — revision ${mod.revisionNumber}`}>Rev {mod.revisionNumber}</Badge>
                             )}
                             {getSpecStatusBadge(status)}
                           </div>
@@ -797,7 +806,7 @@ export default function SpecifyPage(): React.ReactNode {
                         <div className="flex items-center gap-2">
                           <h3 className="text-sm font-medium text-foreground truncate">{mod.name}</h3>
                           {(mod.revisionNumber ?? 1) > 1 && (
-                            <Badge variant="secondary" className="text-[10px]">Rev {mod.revisionNumber}</Badge>
+                            <Badge variant="secondary" className="text-[10px]" title={`Revised via ${mod.lastRevisionSource ?? "unknown"} — revision ${mod.revisionNumber}`}>Rev {mod.revisionNumber}</Badge>
                           )}
                           {getSpecStatusBadge(status)}
                           <span className="text-[10px] text-muted-foreground">
@@ -1268,7 +1277,7 @@ export default function SpecifyPage(): React.ReactNode {
                         {mod.name}
                         {getSpecStatusBadge(status)}
                         {(mod.revisionNumber ?? 1) > 1 && (
-                          <Badge variant="secondary" className="text-[10px]">
+                          <Badge variant="secondary" className="text-[10px]" title={`Revised via ${mod.lastRevisionSource ?? "unknown"} — revision ${mod.revisionNumber}`}>
                             Rev {mod.revisionNumber}
                           </Badge>
                         )}

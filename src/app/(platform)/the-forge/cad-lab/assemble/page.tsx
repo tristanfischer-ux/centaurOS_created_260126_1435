@@ -855,6 +855,24 @@ export default function AssemblePage(): React.ReactNode {
         open={isReportDialogOpen}
         onOpenChange={setIsReportDialogOpen}
         stage="assemble"
+        stageData={{
+          assemblyPartners: assemblerMatches.map((m) => ({
+            name: m.name,
+            score: m.matchScore,
+            reasons: m.matchReasons,
+          })),
+          brandingNotes: [
+            branding.packagingType && `Packaging: ${branding.packagingType}`,
+            branding.customInserts?.length && `Custom inserts: ${branding.customInserts.join(", ")}`,
+            branding.regulatoryLabels?.length && `Regulatory labels: ${branding.regulatoryLabels.join(", ")}`,
+            branding.unboxingNotes && `Unboxing: ${branding.unboxingNotes}`,
+          ].filter(Boolean).join(". ") || undefined,
+          shippingNotes: [
+            shipping.fulfilmentModel && `Fulfilment: ${shipping.fulfilmentModel.replace(/_/g, " ")}`,
+            shipping.estimatedShippingCost != null && `Est. shipping cost: £${shipping.estimatedShippingCost}`,
+            shipping.shippingAddress && `Address: ${[shipping.shippingAddress.line1, shipping.shippingAddress.city, shipping.shippingAddress.postcode, shipping.shippingAddress.country].filter(Boolean).join(", ")}`,
+          ].filter(Boolean).join(". ") || undefined,
+        }}
       />
     </div>
   )

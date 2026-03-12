@@ -798,7 +798,22 @@ export default function SourcePage(): React.ReactNode {
         open={isReportDialogOpen}
         onOpenChange={setIsReportDialogOpen}
         stage="source"
-        stageData={{ classifiedParts: reportClassifiedParts }}
+        stageData={{
+          classifiedParts: reportClassifiedParts,
+          supplierMatches: Object.fromEntries(
+            [...supplierMatches.entries()].map(([moduleId, matches]) => [
+              moduleId,
+              matches.map((m) => ({
+                providerId: m.id,
+                providerName: m.name,
+                matchScore: m.matchScore,
+                matchReasons: m.matchReasons,
+                tier: "approved" as const,
+                isAvailable: true,
+              })),
+            ]),
+          ),
+        }}
       />
     </div>
   )

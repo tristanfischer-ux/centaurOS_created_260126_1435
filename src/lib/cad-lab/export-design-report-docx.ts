@@ -28,7 +28,7 @@ import {
   LevelFormat,
 } from 'docx'
 
-import type { DesignReportData } from '@/lib/cad-lab/design-report-types'
+import type { DesignReportData, AiReportSection } from '@/lib/cad-lab/design-report-types'
 import {
   parseMarkdownToDocx,
   ORANGE,
@@ -142,6 +142,11 @@ const DIAG_LABELS: Record<string, string> = {
  * and trigger a browser download.
  */
 export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<void> {
+  // INTENT: If AI narration is available, use the polished prose path
+  if (data.aiContent) {
+    return buildAiDocx(data)
+  }
+
   const children: DocChild[] = []
 
   // ── 1. Cover page ──
@@ -285,7 +290,8 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
 
     for (let idx = 0; idx < data.modules.length; idx++) {
       const mod = data.modules[idx]
-      children.push(h3(`${idx + 1}. ${mod.name}`))
+      const revSuffix = (mod.revisionNumber ?? 1) >= 2 ? ` (Rev ${mod.revisionNumber})` : ''
+      children.push(h3(`${idx + 1}. ${mod.name}${revSuffix}`))
 
       // Blueprint image
       const imgResult = imageResults[idx]
@@ -682,6 +688,12 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     ],
   })
 
+  await downloadDocx(doc, data)
+}
+
+// ─── Download Helper ─────────────────────────────────────────────────
+
+async function downloadDocx(doc: Document, data: DesignReportData): Promise<void> {
   const blob = await Packer.toBlob(doc)
   const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
   const stageLabel = data.stage ? `-${data.stage.charAt(0).toUpperCase() + data.stage.slice(1)}` : ''
@@ -694,4 +706,333 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+}
+
+// ─── Reusable Table Builders ─────────────────────────────────────────
+
+function buildSpecsTable(data: DesignReportData): Table | null {
+  const moduleIdsWithDiag = Object.keys(data.diagnosticAnswers)
+  if (moduleIdsWithDiag.length === 0) return null
+
+  const specHeaderCells = [headerCell('Module', 20)]
+  for (const key of DIAG_KEYS) {
+    specHeaderCells.push(headerCell(DIAG_LABELS[key], 13))
+  }
+
+  const specRows: TableRow[] = [new TableRow({ children: specHeaderCells })]
+
+  for (const moduleId of moduleIdsWithDiag) {
+    const mod = data.modules.find((m) => m.id === moduleId)
+    const answers = data.diagnosticAnswers[moduleId]
+    if (!mod || !answers) continue
+
+    const cells = [dataCell(mod.name, 20)]
+    for (const key of DIAG_KEYS) {
+      cells.push(dataCell(answers[key] ?? '—', 13))
+    }
+    specRows.push(new TableRow({ children: cells }))
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: specRows })
+}
+
+function buildCostTable(data: DesignReportData): Table | null {
+  const costModuleIds = Object.keys(data.aiCostEstimates)
+  if (costModuleIds.length === 0) return null
+
+  const costRows: TableRow[] = [
+    new TableRow({
+      children: [
+        headerCell('Module', 30),
+        headerCell('Total / Unit', 20),
+        headerCell('Confidence', 15),
+        headerCell('Assumptions', 35),
+      ],
+    }),
+  ]
+
+  for (const moduleId of costModuleIds) {
+    const mod = data.modules.find((m) => m.id === moduleId)
+    const est = data.aiCostEstimates[moduleId]
+    if (!mod || !est) continue
+
+    costRows.push(
+      new TableRow({
+        children: [
+          dataCell(mod.name, 30),
+          dataCell(`£${est.totalPerUnit.toFixed(2)}`, 20),
+          dataCell(est.confidence, 15),
+          dataCell(est.assumptions?.join('; ') ?? '—', 35),
+        ],
+      }),
+    )
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: costRows })
+}
+
+function buildReviewTable(data: DesignReportData): Table | null {
+  if (!data.moduleReviews) return null
+  const reviewModuleIds = Object.keys(data.moduleReviews)
+  if (reviewModuleIds.length === 0) return null
+
+  const rows: TableRow[] = [
+    new TableRow({
+      children: [
+        headerCell('Module', 20),
+        headerCell('Specialist', 20),
+        headerCell('Verdict', 10),
+        headerCell('Summary', 50),
+      ],
+    }),
+  ]
+
+  for (const moduleId of reviewModuleIds) {
+    const mod = data.modules.find((m) => m.id === moduleId)
+    const reviews = data.moduleReviews[moduleId]
+    if (!mod || !reviews) continue
+    for (const r of reviews) {
+      rows.push(
+        new TableRow({
+          children: [
+            dataCell(mod.name, 20),
+            dataCell(r.specialistName, 20),
+            dataCell(r.verdict.toUpperCase(), 10),
+            dataCell(r.summary ?? '', 50),
+          ],
+        }),
+      )
+    }
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows })
+}
+
+function buildClassificationTable(data: DesignReportData): Table | null {
+  if (!data.classifiedParts || data.classifiedParts.length === 0) return null
+
+  const rows: TableRow[] = [
+    new TableRow({
+      children: [
+        headerCell('Part', 25),
+        headerCell('Module', 20),
+        headerCell('Type', 10),
+        headerCell('Confidence', 10),
+        headerCell('Reasons', 35),
+      ],
+    }),
+  ]
+
+  for (const part of data.classifiedParts) {
+    rows.push(
+      new TableRow({
+        children: [
+          dataCell(part.partName, 25),
+          dataCell(part.moduleName, 20),
+          dataCell(part.type.toUpperCase(), 10),
+          dataCell(part.confidence, 10),
+          dataCell(part.reasons.join('; '), 35),
+        ],
+      }),
+    )
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows })
+}
+
+// ─── AI Prose Document Builder ───────────────────────────────────────
+
+async function buildAiDocx(data: DesignReportData): Promise<void> {
+  const aiContent = data.aiContent!
+  const children: DocChild[] = []
+
+  // ── Cover page (same as legacy) ──
+  children.push(
+    new Paragraph({
+      spacing: { after: 400 },
+      children: [
+        new TextRun({
+          text: 'FRACTIONAL FORGE',
+          size: 28,
+          color: MID_TEXT,
+          characterSpacing: 80,
+          font: 'Calibri',
+        }),
+      ],
+    }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({ text: data.projectName, bold: true, size: 48, color: DARK_TEXT, font: 'Calibri' }),
+      ],
+    }),
+    textParagraph(
+      data.stage === 'concept' ? 'Concept Report'
+        : data.stage === 'specify' ? 'Specification Report'
+        : data.stage === 'source' ? 'Sourcing Report'
+        : data.stage === 'assemble' ? 'Assembly Report'
+        : data.stage === 'cad' ? 'CAD Report'
+        : 'Engineering Design Report',
+      { after: 200, color: MID_TEXT, size: 24 },
+    ),
+    textParagraph(
+      new Date(data.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      { after: 400, color: MID_TEXT },
+    ),
+  )
+
+  // Hero image
+  if (data.heroImageUrl) {
+    const heroBuffer = await fetchImageAsBuffer(data.heroImageUrl)
+    if (heroBuffer) {
+      children.push(
+        new Paragraph({
+          spacing: { after: 200 },
+          children: [
+            new ImageRun({
+              data: heroBuffer,
+              transformation: { width: 600, height: 340 },
+              type: 'png',
+            }),
+          ],
+        }),
+      )
+    }
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }))
+
+  // ── Executive Summary ──
+  if (aiContent.executiveSummary) {
+    children.push(sectionHeading('Executive Summary'))
+    const summaryParagraphs = parseMarkdownToDocx(aiContent.executiveSummary)
+    children.push(...summaryParagraphs)
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── Pre-fetch module images ──
+  const imageUrls = data.modules.map((m) => m.imageUrl)
+  const imageResults = await Promise.allSettled(
+    imageUrls.map((url) => (url ? fetchImageAsBuffer(url) : Promise.resolve(null))),
+  )
+
+  // ── AI Sections ──
+  for (const section of aiContent.sections) {
+    children.push(sectionHeading(section.title))
+
+    // Prose (parsed as markdown to handle bold, bullets, etc.)
+    if (section.prose) {
+      const proseParagraphs = parseMarkdownToDocx(section.prose)
+      children.push(...proseParagraphs)
+    }
+
+    // Key points as bullets
+    if (section.keyPoints.length > 0) {
+      children.push(
+        new Paragraph({
+          spacing: { before: 200, after: 100 },
+          children: [new TextRun({ text: 'Key Points:', bold: true, size: 22, color: DARK_TEXT, font: 'Calibri' })],
+        }),
+      )
+      for (const point of section.keyPoints) {
+        children.push(mdBulletParagraph(point))
+      }
+    }
+
+    // Data table if flagged
+    if (section.includeTable) {
+      const table = getTableForSection(section, data)
+      if (table) {
+        children.push(textParagraph('', { after: 100 }))
+        children.push(table)
+      }
+    }
+
+    // Module image if flagged
+    if (section.includeImage && section.moduleId) {
+      const modIdx = data.modules.findIndex((m) => m.id === section.moduleId)
+      if (modIdx >= 0) {
+        const imgResult = imageResults[modIdx]
+        const imgBuffer = imgResult?.status === 'fulfilled' ? imgResult.value : null
+        if (imgBuffer) {
+          children.push(
+            new Paragraph({
+              spacing: { before: 120, after: 120 },
+              children: [
+                new ImageRun({
+                  data: imgBuffer,
+                  transformation: { width: 400, height: 250 },
+                  type: 'png',
+                }),
+              ],
+            }),
+          )
+        }
+      }
+    }
+
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── Footer ──
+  children.push(
+    new Paragraph({
+      spacing: { before: 600 },
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: 'Generated by ForgeOS', size: 18, color: MID_TEXT, italics: true, font: 'Calibri' }),
+      ],
+    }),
+  )
+
+  const doc = new Document({
+    creator: 'ForgeOS',
+    title: `${data.projectName} — Engineering Design Report`,
+    description: `Design report for ${data.projectName}`,
+    numbering: {
+      config: [
+        {
+          reference: 'default-numbering',
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.DECIMAL,
+              text: '%1.',
+              alignment: AlignmentType.START,
+              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+            },
+          ],
+        },
+      ],
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+          },
+        },
+        children,
+      },
+    ],
+  })
+
+  await downloadDocx(doc, data)
+}
+
+/** Map section type to the appropriate data table. */
+function getTableForSection(section: AiReportSection, data: DesignReportData): Table | null {
+  switch (section.sectionType) {
+    case 'specifications':
+      return buildSpecsTable(data)
+    case 'cost-analysis':
+      return buildCostTable(data)
+    case 'specialist-reviews':
+      return buildReviewTable(data)
+    case 'part-classification':
+      return buildClassificationTable(data)
+    default:
+      return null
+  }
 }

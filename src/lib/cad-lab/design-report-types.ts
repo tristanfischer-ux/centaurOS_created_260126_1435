@@ -5,9 +5,13 @@
  * Assembled from useCadLab() context before being passed to format-specific
  * exporters (DOCX, PPTX, PDF).
  *
+ * Also defines the AI report pipeline types (ReportOutline, AiReportContent)
+ * used by the two-phase Opus→Gemini narration flow.
+ *
  * @related
  * - src/lib/cad-lab-types.ts — CadLabModule, AiCostEstimate, VisualStyleSpec
  * - src/app/(platform)/the-forge/cad-lab/cad-lab-context.tsx — data source
+ * - src/actions/cad-lab-report.ts — AI report pipeline (structureReportOutline + writeReportSections)
  */
 
 import type { CadLabModule, AiCostEstimate, CadLabDesignBrief, SpecialistReview, CadLabResult } from '@/lib/cad-lab-types'
@@ -66,4 +70,54 @@ export interface DesignReportData {
 
   // CAD-stage extras
   unifiedCadResult?: CadLabResult | null
+
+  // AI-generated narration (optional — when populated, exporters use prose instead of raw data)
+  aiContent?: AiReportContent
+}
+
+// ─── AI Report Pipeline Types ────────────────────────────────────────
+
+export type ReportSectionType =
+  | 'executive-summary' | 'product-overview' | 'research-findings'
+  | 'module-overview' | 'module-detail' | 'specifications'
+  | 'cost-analysis' | 'specialist-reviews' | 'part-classification'
+  | 'supplier-analysis' | 'assembly-logistics' | 'cad-output' | 'conclusions'
+
+/** Phase 1 output: Opus structures the report outline */
+export interface ReportOutline {
+  executiveSummary: string
+  narrativeThread: string
+  sections: ReportSectionOutline[]
+}
+
+export interface ReportSectionOutline {
+  id: string
+  title: string
+  sectionType: ReportSectionType
+  brief: string
+  keyPoints: string[]
+  dataHighlights: string[]
+  includeTable?: boolean
+  includeImage?: boolean
+  moduleId?: string
+}
+
+/** Phase 2 output: Gemini writes prose for each section */
+export interface AiReportContent {
+  executiveSummary: string
+  sections: AiReportSection[]
+  generatedAt: string
+  opusTokens: { in: number; out: number }
+  geminiTokens: { in: number; out: number }
+}
+
+export interface AiReportSection {
+  id: string
+  title: string
+  sectionType: ReportSectionType
+  prose: string
+  keyPoints: string[]
+  includeTable: boolean
+  includeImage: boolean
+  moduleId?: string
 }
