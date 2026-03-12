@@ -67,7 +67,9 @@ export async function updatePreferences(
   // Ensure preferences exist before updating
   await getOrCreateUserPreferences(supabase, user.id, foundryId)
 
-  // AUDIT: Log settings change
+  const result = await updateUserPreferences(supabase, user.id, foundryId, prefs)
+
+  // AUDIT: Log settings change AFTER successful update (not before)
   logAudit({
     action: 'settings.updated',
     entityType: 'user_preferences',
@@ -76,5 +78,5 @@ export async function updatePreferences(
     foundryId,
   })
 
-  return updateUserPreferences(supabase, user.id, foundryId, prefs)
+  return result
 }

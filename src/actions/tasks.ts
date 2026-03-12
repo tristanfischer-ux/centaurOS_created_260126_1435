@@ -2340,11 +2340,12 @@ export async function deleteTasks(taskIds: string[]) {
                 console.error('[TaskService] Failed to sync task deletions to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
             }
 
-            // AUDIT: Log bulk task deletion
+            // AUDIT: Log bulk task deletion (cap IDs at 20 to avoid bloating JSONB)
+            const deletedIds = taskIds.filter(id => !failedIds.includes(id))
             logAudit({
                 action: 'task.deleted',
                 entityType: 'task',
-                metadata: { deletedCount, taskIds: taskIds.filter(id => !failedIds.includes(id)) },
+                metadata: { deletedCount, taskIds: deletedIds.slice(0, 20) },
                 userId: user.id,
                 foundryId,
             })

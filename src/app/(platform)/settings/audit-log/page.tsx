@@ -26,7 +26,8 @@ function getActionConfig(action: string) {
 
 // ─── Metadata formatter ──────────────────────────────────────────────────────
 
-function formatMetadata(metadata: Record<string, unknown>): string {
+function formatMetadata(metadata: Record<string, unknown> | null | undefined): string {
+  if (!metadata || typeof metadata !== 'object') return '—'
   const parts: string[] = []
   for (const [key, value] of Object.entries(metadata)) {
     if (value == null) continue
@@ -76,14 +77,17 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   const limit = 50
   const offset = (page - 1) * limit
 
+  // SECURITY: Only allow known action values — reject arbitrary strings
+  const allActions = Object.keys(ACTION_CONFIG)
+  const actionFilter = params.action && allActions.includes(params.action) ? params.action : undefined
+
   const { data: logs, count } = await getAuditLogs({
-    action: params.action,
+    action: actionFilter,
     limit,
     offset,
   })
 
   const totalPages = Math.ceil(count / limit)
-  const allActions = Object.keys(ACTION_CONFIG)
 
   return (
     <div className="max-w-5xl space-y-6">
@@ -149,7 +153,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                         </Badge>
                       </div>
                       <p className="text-xs text-muted-foreground truncate">
-                        {formatMetadata(log.metadata as Record<string, unknown>)}
+                        {formatMetadata(log.metadata)}
                       </p>
                     </div>
 
