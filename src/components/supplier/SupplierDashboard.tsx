@@ -282,7 +282,7 @@ export function SupplierDashboard({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
-              <CardTitle className="text-lg">RFQ Opportunities <HelpTooltip content="Request for Quote — send your requirements to suppliers and receive competitive quotes." /></CardTitle>
+              <CardTitle className="text-lg inline-flex items-center gap-1.5">RFQ Opportunities <HelpTooltip content="Request for Quote — send your requirements to suppliers and receive competitive quotes." /></CardTitle>
               <CardDescription>New requests matching your profile</CardDescription>
             </div>
             <Link href="/supplier-portal/rfqs">

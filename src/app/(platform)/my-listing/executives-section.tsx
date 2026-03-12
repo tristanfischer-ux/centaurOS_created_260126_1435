@@ -222,7 +222,7 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
         <>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                    <CardTitle className="text-base">
+                    <CardTitle className="text-base inline-flex items-center gap-1.5">
                         Fractional Executives
                         <HelpTooltip content="Team members who offer their specialist expertise to startups on a part-time or project basis." />
                     </CardTitle>

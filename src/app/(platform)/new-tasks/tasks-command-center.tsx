@@ -322,7 +322,7 @@ export function TasksCommandCenter({
             <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
               <LayoutGrid className="h-3.5 w-3.5" />
               Board
-              <HelpTooltip content="Drag tasks between columns to change their status. Cards are ordered by priority." side="bottom" />
+              <HelpTooltip content="Drag tasks between columns to change their status. Cards are ordered by priority." side="bottom" focusable={false} />
             </TabsTrigger>
             <TabsTrigger value="list" className="text-xs gap-1.5 px-3">
               <List className="h-3.5 w-3.5" />
