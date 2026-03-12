@@ -113,7 +113,23 @@ export async function withAIGate<T>(
     }
 
     // Execute the action with the extended context
-    const result = await action({ ...authCtx, trackUsage })
+    let result: T
+    try {
+      result = await action({ ...authCtx, trackUsage })
+    } catch (err) {
+      // SECURITY: Track usage even when the action throws — AI tokens were
+      // already consumed. Without this, thrown errors bypass the monthly counter.
+      if (!manuallyTracked) {
+        trackAIUsage({
+          foundryId: authCtx.foundryId,
+          userId: authCtx.user.id,
+          feature,
+        }).catch((trackErr) => {
+          console.error('[withAIGate] Auto-track failed on throw:', trackErr)
+        })
+      }
+      throw err
+    }
 
     // AUTO-TRACK: If the action succeeded and didn't manually call trackUsage,
     // record a baseline usage entry so limits are enforced even when actions
@@ -130,8 +146,8 @@ export async function withAIGate<T>(
           foundryId: authCtx.foundryId,
           userId: authCtx.user.id,
           feature,
-        }).catch(() => {
-          // INTENT: Fire-and-forget — don't let tracking failures break the action
+        }).catch((trackErr) => {
+          console.error('[withAIGate] Auto-track failed:', trackErr)
         })
       }
     }

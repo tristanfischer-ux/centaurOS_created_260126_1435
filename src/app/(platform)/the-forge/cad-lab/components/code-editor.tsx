@@ -71,7 +71,7 @@ export function CodeEditor({
   // Dynamic editor height based on line count (#13)
   // GOTCHA: window.innerHeight in useMemo causes SSR hydration mismatch.
   // Use state + effect pattern (same as isMac above) to read viewport safely.
-  const [maxEditorH, setMaxEditorH] = useState(300)
+  const [maxEditorH, setMaxEditorH] = useState(400)
   useEffect(() => {
     const update = () => setMaxEditorH(Math.min(600, window.innerHeight * 0.5))
     update()

@@ -36,7 +36,8 @@ import {
     extractDecisionSummary,
     recordDecision,
 } from "@/lib/agents/decision-journal"
-import { estimateAICost } from "@/lib/ai/usage-tracking"
+import { estimateAICost, trackAIUsage } from "@/lib/ai/usage-tracking"
+import type { AIFeature } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
 import { recordInteraction } from "@/lib/agents/founder-preferences"
 import { addSpan, finishRollout } from "@/lib/agent-spans"
@@ -175,24 +176,23 @@ export function createPostResponseCallback(
             }
         }
 
-        // Usage logging (requires foundry for billing)
+        // Usage logging (requires foundry for billing) — uses trackAIUsage to
+        // atomically increment monthly counters via increment_ai_usage RPC
         if (foundryId) {
             try {
                 const inputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
                 const outputTokens = countTokens(fullOutput)
-                const totalTokens = inputTokens + outputTokens
+                const featureKey = `specialist_${modality}` as AIFeature
 
-                await supabase.from("ai_usage_log").insert({
-                    user_id: userId,
-                    foundry_id: foundryId,
-                    feature: `specialist-${modality}`,
+                await trackAIUsage({
+                    foundryId,
+                    userId,
+                    feature: featureKey,
                     model: `${providerId}/${modelId}`,
-                    prompt_tokens: inputTokens,
-                    completion_tokens: outputTokens,
-                    total_tokens: totalTokens,
-                    estimated_cost_usd: estimateAICost(modelId, inputTokens, outputTokens),
-                    key_source: keySource,
-                    metadata: { modality, providerId, modelId },
+                    promptTokens: inputTokens,
+                    completionTokens: outputTokens,
+                    estimatedCostUsd: estimateAICost(modelId, inputTokens, outputTokens),
+                    metadata: { modality, providerId, modelId, keySource },
                 })
             } catch (err) {
                 console.warn("[PostResponse] Failed to log usage:", err)

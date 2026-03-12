@@ -1,7 +1,7 @@
 'use server'
 
 import OpenAI from 'openai'
-// import pdf from 'pdf-parse'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 let openaiClient: OpenAI | null = null
 
@@ -35,10 +35,11 @@ export type AnalysisResult = {
     success: boolean
     data?: ExtractedObjective[]
     error?: string
+    limitReached?: boolean
 }
 
 export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisResult> {
-    try {
+    return withAIGate('business_plan_analysis', async ({ trackUsage }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { success: false, error: 'AI analysis service is not configured' }
@@ -78,7 +79,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
                 {
                     role: 'system',
                     content: `You are an expert business analyst AI. Your goal is to analyze business plans and extract strategic objectives and actionable tasks.
-          
+
           Output JSON format:
           {
             "objectives": [
@@ -94,7 +95,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
               }
             ]
           }
-          
+
           Guidelines:
           - Analyze the entire document and extract ALL distinct structural pillars or strategic goals found.
           - Do not limit the number of objectives; capture everything relevant to the plan's success.
@@ -111,6 +112,12 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
             response_format: { type: 'json_object' },
         })
 
+        await trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens,
+            completionTokens: completion.usage?.completion_tokens,
+        })
+
         const result = JSON.parse(completion.choices[0].message.content || '{}') as { objectives: ExtractedObjective[] }
 
         // Add default status
@@ -124,8 +131,5 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
         })) || []
 
         return { success: true, data: objectives }
-    } catch (error) {
-        console.error('Error analyzing business plan:', error)
-        return { success: false, error: 'Failed to analyze business plan. Please try again.' }
-    }
+    })
 }

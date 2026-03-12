@@ -72,6 +72,15 @@ export type AIFeature =
   | 'backfill_embeddings'
   // Slide & media
   | 'slide_image'
+  // Specialist chat modalities
+  | 'specialist_text'
+  | 'specialist_image'
+  | 'specialist_audio'
+  | 'specialist_video'
+  // Enrichment & reports
+  | 'enrichment'
+  | 'weekly_report'
+  | 'ai_worker'
   | 'other'
 
 /** Conversation modes that can be tracked alongside features */

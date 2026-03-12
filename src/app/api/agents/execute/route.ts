@@ -3,7 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { checkAILimit } from "@/lib/ai/limit-check"
-import { estimateAICost } from "@/lib/ai/usage-tracking"
+import { estimateAICost, trackAIUsage } from "@/lib/ai/usage-tracking"
+import type { AIFeature } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
 import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
@@ -1071,24 +1072,22 @@ Rules:
         systemPromptWithContext += customSystemPromptSuffix
     }
 
-    // AUDIT: Usage logging for non-text modalities (image, audio, video)
+    // AUDIT: Usage logging — uses trackAIUsage to atomically increment monthly counters
+    const featureKey = `specialist_${modality}` as AIFeature
     const logUsageAfterCompletion = async (outputLength: number): Promise<void> => {
         if (!foundryId) return
         try {
             const inputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
             const outputTokens = Math.ceil(outputLength / 4) // Non-text outputs (URLs, base64) use rough estimate
-            const totalTokens = inputTokens + outputTokens
-            await supabase.from("ai_usage_log").insert({
-                user_id: user.id,
-                foundry_id: foundryId,
-                feature: `specialist-${modality}`,
+            await trackAIUsage({
+                foundryId,
+                userId: user.id,
+                feature: featureKey,
                 model: `${providerId}/${modelId}`,
-                prompt_tokens: inputTokens,
-                completion_tokens: outputTokens,
-                total_tokens: totalTokens,
-                estimated_cost_usd: estimateAICost(modelId, inputTokens, outputTokens),
-                key_source: keySource,
-                metadata: { modality, providerId, modelId },
+                promptTokens: inputTokens,
+                completionTokens: outputTokens,
+                estimatedCostUsd: estimateAICost(modelId, inputTokens, outputTokens),
+                metadata: { modality, providerId, modelId, keySource },
             })
         } catch (err) {
             console.warn("[agents/execute] Failed to log usage:", err)
