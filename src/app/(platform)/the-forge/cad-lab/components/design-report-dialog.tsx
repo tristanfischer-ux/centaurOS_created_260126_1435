@@ -148,6 +148,10 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     setIsExporting(true)
     setAiPhase('idle')
 
+    // GOTCHA: Track AI failure locally — reading aiPhase state inside an async
+    // callback sees the stale closure value, not the latest. See cad-lab-react-patterns.md.
+    let aiFailed = false
+
     try {
       const data = assembleData()
 
@@ -156,17 +160,16 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         try {
           // Phase 1: Opus structures
           setAiPhase('structuring')
-          const { structureReportOutline } = await import("@/actions/cad-lab-report")
+          const { structureReportOutline, writeReportSections } = await import("@/actions/cad-lab-report")
           const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
 
           // Phase 2: Gemini writes sections
           setAiPhase('writing')
-          const { writeReportSections } = await import("@/actions/cad-lab-report")
           const aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
 
           data.aiContent = aiContent
-          setAiPhase('formatting')
         } catch (aiErr) {
+          aiFailed = true
           console.error("[DesignReport] AI narration failed, falling back:", aiErr)
           setAiPhase('error')
           toast.info("Professional narration unavailable — exporting standard report")
@@ -174,12 +177,12 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         }
       }
 
+      if (!aiFailed) setAiPhase('formatting')
+
       if (selectedFormat === "docx") {
-        if (aiPhase !== 'error') setAiPhase('formatting')
         const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
         await exportDesignReportAsDOCX(data)
       } else if (selectedFormat === "pptx") {
-        if (aiPhase !== 'error') setAiPhase('formatting')
         const { exportDesignReportAsPPTX } = await import("@/lib/cad-lab/export-design-report-pptx")
         await exportDesignReportAsPPTX(data)
       } else {
@@ -196,7 +199,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       setIsExporting(false)
       setAiPhase('idle')
     }
-  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, aiPhase])
+  }, [selectedFormat, assembleData, onOpenChange, aiEnabled])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

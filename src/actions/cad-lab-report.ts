@@ -26,6 +26,42 @@ import type {
   ReportSectionOutline,
 } from "@/lib/cad-lab/design-report-types"
 
+// ─── Payload Optimization ────────────────────────────────────────────
+
+// INTENT: Server actions receive data via React Flight serialization.
+// Strip fields only needed client-side (image URLs, large blobs) to stay
+// well under the serialization depth/size limits. See forgeos-rules.md rule #5.
+
+function stripForServer(data: DesignReportData): DesignReportData {
+  return {
+    ...data,
+    // Strip heroImageUrl — only used by client-side DOCX/PPTX builders
+    heroImageUrl: null,
+    // Strip module imageUrl — only used by client-side builders, not needed for narration
+    modules: data.modules.map((m) => ({
+      ...m,
+      imageUrl: undefined,
+    })),
+    // Strip unifiedCadResult heavy fields — only text data needed for report narration
+    unifiedCadResult: data.unifiedCadResult ? {
+      ...data.unifiedCadResult,
+      stepUrl: undefined,
+      stlUrl: undefined,
+      glbUrl: undefined,
+      stepData: undefined,
+      stlData: undefined,
+      svgIso: undefined,
+      svgTop: undefined,
+      svgFront: undefined,
+      svgBack: undefined,
+      svgRight: undefined,
+      svgLeft: undefined,
+      svgExploded: undefined,
+      code: undefined,
+    } : data.unifiedCadResult,
+  }
+}
+
 // ─── Data Truncation Helpers ─────────────────────────────────────────
 
 function truncateStr(text: string | undefined | null, max: number): string {
@@ -162,13 +198,19 @@ function buildDataSummary(data: DesignReportData): string {
 // ─── Extract JSON from AI response ───────────────────────────────────
 
 function extractJson(text: string): string {
-  const trimmed = text.trim()
-  const first = trimmed.indexOf("{")
-  const last = trimmed.lastIndexOf("}")
+  // GOTCHA: Opus often wraps JSON in ```json ... ``` — must strip fences first.
+  // Also strip single-line // comments and trailing commas (same as extractJsonObject in cad-lab.ts).
+  let cleaned = text.trim()
+  cleaned = cleaned.replace(/```(?:json)?\s*/gi, "").replace(/```\s*/g, "")
+  cleaned = cleaned.replace(/^\s*\/\/.*$/gm, "")
+  cleaned = cleaned.replace(/,\s*([}\]])/g, "$1")
+
+  const first = cleaned.indexOf("{")
+  const last = cleaned.lastIndexOf("}")
   if (first !== -1 && last > first) {
-    return trimmed.slice(first, last + 1)
+    return cleaned.slice(first, last + 1)
   }
-  return trimmed
+  return cleaned
 }
 
 // ─── Phase 1: Opus Structures ────────────────────────────────────────
@@ -188,11 +230,12 @@ const STAGE_CONTEXT: Record<string, string> = {
  * @returns ReportOutline — structured sections for Gemini to write
  */
 export async function structureReportOutline(
-  data: DesignReportData,
+  rawData: DesignReportData,
 ): Promise<{ outline: ReportOutline; tokensIn: number; tokensOut: number }> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
+  const data = stripForServer(rawData)
   const dataSummary = buildDataSummary(data)
   const stageContext = STAGE_CONTEXT[data.stage] ?? ""
 
@@ -265,7 +308,18 @@ ${dataSummary}`
   const tokensOut: number = result.usage?.output_tokens ?? 0
 
   const jsonStr = extractJson(text)
-  const outline: ReportOutline = JSON.parse(jsonStr)
+  let outline: ReportOutline
+  try {
+    outline = JSON.parse(jsonStr)
+  } catch (parseErr) {
+    console.error("[CAD-REPORT] Opus returned invalid JSON:", text.slice(0, 500))
+    throw new Error("Failed to parse report outline — Opus returned invalid JSON")
+  }
+
+  // GOTCHA: Validate minimum structure to avoid downstream crashes
+  if (!outline.sections || !Array.isArray(outline.sections) || outline.sections.length === 0) {
+    throw new Error("Report outline has no sections")
+  }
 
   return { outline, tokensIn, tokensOut }
 }
@@ -501,11 +555,13 @@ ${dataSlice}`
  */
 export async function writeReportSections(
   outline: ReportOutline,
-  data: DesignReportData,
+  rawData: DesignReportData,
   opusTokens: { in: number; out: number },
 ): Promise<AiReportContent> {
   const apiKey = process.env.GOOGLE_AI_API_KEY
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+
+  const data = stripForServer(rawData)
 
   // Write all sections in parallel
   const results = await Promise.allSettled(

@@ -755,11 +755,9 @@ async function buildAiPptx(data: DesignReportData): Promise<void> {
       })
     }
 
-    // Table slide if flagged and has data
+    // Table slide if flagged — buildTableSlide adds the slide directly to pres
     if (section.includeTable) {
-      const tableSlide = buildTableSlide(pres, section, data)
-      // tableSlide is added directly to pres inside buildTableSlide
-      void tableSlide // suppress unused warning — slide was added
+      buildTableSlide(pres, section, data)
     }
   }
 
