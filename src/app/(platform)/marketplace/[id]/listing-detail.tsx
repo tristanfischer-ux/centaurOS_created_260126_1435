@@ -52,6 +52,8 @@ import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
 import type { PublicExecutive } from "@/actions/listing-executives"
+import type { MarketplaceReview } from "@/actions/marketplace-reviews"
+import { ListingReviewsSection, ListingRatingSummary } from "@/components/marketplace/listing-reviews"
 import { toast } from "sonner"
 
 interface TrustSignalsData {
@@ -71,9 +73,11 @@ interface MarketplaceListingDetailProps {
     trustSignals?: TrustSignalsData | null
     ratings?: RatingsData | null
     executives?: PublicExecutive[]
+    reviews?: MarketplaceReview[]
+    currentUserId?: string | null
 }
 
-export function MarketplaceListingDetail({ listing, trustSignals, ratings, executives = [] }: MarketplaceListingDetailProps) {
+export function MarketplaceListingDetail({ listing, trustSignals, ratings, executives = [], reviews = [], currentUserId = null }: MarketplaceListingDetailProps) {
     const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
     const [isContacting, setIsContacting] = useState(false)
@@ -129,6 +133,11 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             </span>
                         )}
                     </div>
+                    {/* Star rating summary */}
+                    <ListingRatingSummary
+                        averageRating={listing.average_rating != null ? Number(listing.average_rating) : null}
+                        reviewCount={listing.review_count ?? 0}
+                    />
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -218,6 +227,13 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
 
                     {/* All Attributes */}
                     <AttributesSection attrs={attrs} category={category} />
+
+                    {/* Reviews Section */}
+                    <ListingReviewsSection
+                        listingId={listing.id}
+                        initialReviews={reviews}
+                        currentUserId={currentUserId}
+                    />
                 </div>
 
                 {/* Sidebar */}
@@ -800,6 +816,17 @@ const AVAILABILITY_LABELS: Record<string, string> = {
     project_based: 'Project-Based',
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+    GBP: '\u00a3',
+    USD: '$',
+    EUR: '\u20ac',
+}
+
+function formatDayRate(rate: number, currency: string | null): string {
+    const symbol = CURRENCY_SYMBOLS[currency ?? 'GBP'] ?? currency ?? '\u00a3'
+    return `${symbol}${rate.toLocaleString()}/day`
+}
+
 function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
     return (
         <Card>
@@ -829,6 +856,11 @@ function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
                             <Badge variant="secondary" className="text-xs">
                                 {AVAILABILITY_LABELS[exec.availability] ?? exec.availability}
                             </Badge>
+                            {exec.day_rate != null && (
+                                <span className="text-sm font-medium text-international-orange">
+                                    {formatDayRate(exec.day_rate, exec.currency)}
+                                </span>
+                            )}
                         </div>
                         {exec.bio && (
                             <p className="text-sm text-muted-foreground mt-1">

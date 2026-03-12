@@ -353,7 +353,7 @@ export const MarketCard = memo(function MarketCard({
                                             className={cn(
                                                 "h-3 w-3",
                                                 s <= Math.round(reviewData.avg)
-                                                    ? "fill-amber-400 text-amber-400"
+                                                    ? "text-warning fill-warning"
                                                     : "text-muted-foreground"
                                             )}
                                         />
@@ -496,7 +496,7 @@ export const MarketCard = memo(function MarketCard({
                             )}
                             {attrs.rating && (
                                 <div className="flex items-center gap-2">
-                                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                    <Star className="w-4 h-4 text-warning fill-warning" />
                                     <div>
                                         <p className="text-xs text-muted-foreground">Rating</p>
                                         <p className="text-sm font-medium text-foreground">{attrs.rating}/5</p>

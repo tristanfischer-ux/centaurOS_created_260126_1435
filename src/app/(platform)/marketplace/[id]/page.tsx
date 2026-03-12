@@ -5,6 +5,7 @@ import { MarketplaceListing } from "@/actions/marketplace"
 import { getProviderTrustSignals } from "@/actions/trust-signals"
 import { getProviderRatings } from "@/actions/ratings"
 import { getListingExecutives } from "@/actions/listing-executives"
+import { getReviewsForListing } from "@/actions/marketplace-reviews"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -25,29 +26,39 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
         notFound()
     }
 
-    // Fetch trust signals and ratings if there's a provider_id
+    // Get the current user (may be null for unauthenticated visitors)
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Fetch trust signals, ratings, executives, and reviews in parallel
     let trustSignals = null
     let ratings = null
-    
-    if (listing.created_by_provider_id) {
-        const [trustResult, ratingsResult] = await Promise.all([
-            getProviderTrustSignals(listing.created_by_provider_id),
-            getProviderRatings(listing.created_by_provider_id)
-        ])
-        
-        // getProviderTrustSignals returns { portfolio, certifications, badges, error }
+
+    const [execResult, reviewsResult, ...providerResults] = await Promise.all([
+        getListingExecutives(id),
+        getReviewsForListing(id),
+        ...(listing.created_by_provider_id
+            ? [
+                getProviderTrustSignals(listing.created_by_provider_id),
+                getProviderRatings(listing.created_by_provider_id),
+              ]
+            : []),
+    ])
+
+    if (listing.created_by_provider_id && providerResults.length === 2) {
+        const [trustResult, ratingsResult] = providerResults as [
+            Awaited<ReturnType<typeof getProviderTrustSignals>>,
+            Awaited<ReturnType<typeof getProviderRatings>>,
+        ]
         if (!trustResult.error) {
             trustSignals = {
                 portfolio: trustResult.portfolio,
                 certifications: trustResult.certifications,
-                badges: trustResult.badges
+                badges: trustResult.badges,
             }
         }
         ratings = { summary: ratingsResult.data, reviews: [], error: ratingsResult.error }
     }
 
-    // Fetch executives for this listing
-    const execResult = await getListingExecutives(id)
     const executives = execResult.data ?? []
 
     return (
@@ -56,6 +67,8 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
             trustSignals={trustSignals}
             ratings={ratings}
             executives={executives}
+            reviews={reviewsResult.reviews}
+            currentUserId={user?.id ?? null}
         />
     )
 }

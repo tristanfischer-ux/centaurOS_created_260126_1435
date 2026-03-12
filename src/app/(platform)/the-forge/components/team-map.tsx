@@ -96,6 +96,8 @@ export function TeamMap({
       financial_health: null,
       enrichment_quality: null,
       security_clearances: null,
+      average_rating: null,
+      review_count: null,
     }
   }, [])
 

@@ -215,6 +215,10 @@ export interface MarketplaceListing {
     enrichment_quality: string | null
     /** Security clearances held (Nightshift enrichment). */
     security_clearances: string[] | null
+    /** Denormalised average rating (1.00–5.00) from marketplace_reviews. */
+    average_rating: number | null
+    /** Denormalised review count from marketplace_reviews. */
+    review_count: number | null
 }
 
 /**
@@ -228,7 +232,7 @@ const LISTING_COLUMNS = [
     'created_by_provider_id', 'process_capabilities', 'industries',
     'certifications', 'materials', 'key_equipment', 'financial_health',
     'enrichment_quality', 'security_clearances', 'created_at',
-    'data_quality_score',
+    'data_quality_score', 'average_rating', 'review_count',
 ].join(', ')
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'

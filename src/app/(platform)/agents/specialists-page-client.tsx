@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { HelpTooltip } from "@/components/ui/help-tooltip"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Monitor } from "lucide-react"
 import { SpecialistsLanding } from "./specialists-landing"
 import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
 
@@ -46,6 +46,15 @@ export function SpecialistsPageClient({
     initialCustomPrompts,
 }: SpecialistsPageClientProps) {
     const [view, setView] = useState<PageView>("specialists")
+    const [isMobile, setIsMobile] = useState(false)
+    const [showBuilderAnyway, setShowBuilderAnyway] = useState(false)
+
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 768)
+        check()
+        window.addEventListener("resize", check)
+        return () => window.removeEventListener("resize", check)
+    }, [])
 
     return (
         <div className="flex flex-col h-[calc(100dvh-2rem)] -m-4 sm:-m-6 lg:-m-8">
