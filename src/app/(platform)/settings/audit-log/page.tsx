@@ -34,6 +34,8 @@ function formatMetadata(metadata: Record<string, unknown> | null | undefined): s
     const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())
     if (Array.isArray(value)) {
       parts.push(`${label}: ${value.length > 3 ? `${value.slice(0, 3).join(', ')}… (${value.length})` : value.join(', ')}`)
+    } else if (typeof value === 'object') {
+      parts.push(`${label}: ${JSON.stringify(value)}`)
     } else {
       parts.push(`${label}: ${value}`)
     }
@@ -94,13 +96,13 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
       {/* Action filters */}
       <div className="flex flex-wrap items-center gap-2">
         <Link href="/settings/audit-log">
-          <Badge variant={!params.action ? 'default' : 'outline'} size="sm" className="cursor-pointer">
+          <Badge variant={!actionFilter ? 'default' : 'outline'} size="sm" className="cursor-pointer">
             All
           </Badge>
         </Link>
         {allActions.map(action => {
           const config = getActionConfig(action)
-          const isActive = params.action === action
+          const isActive = actionFilter === action
           return (
             <Link key={action} href={`/settings/audit-log?action=${action}`}>
               <Badge
@@ -124,7 +126,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
             <EmptyState
               icon={<ScrollText className="h-10 w-10" />}
               title="No audit events"
-              description={params.action ? 'No events match this filter.' : 'Activity will appear here as your team takes actions.'}
+              description={actionFilter ? 'No events match this filter.' : 'Activity will appear here as your team takes actions.'}
             />
           ) : (
             <div className="divide-y divide-border">
@@ -138,7 +140,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                     {/* User avatar */}
                     <UserAvatar
                       name={profile?.full_name ?? 'Unknown'}
-                      role={(profile?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'}
+                      role={profile?.role}
                       size="sm"
                     />
 
@@ -181,7 +183,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 {page > 1 && (
                   <Link
                     href={`/settings/audit-log?${new URLSearchParams({
-                      ...(params.action ? { action: params.action } : {}),
+                      ...(actionFilter ? { action: actionFilter } : {}),
                       page: String(page - 1),
                     })}`}
                     className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -192,7 +194,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                 {page < totalPages && (
                   <Link
                     href={`/settings/audit-log?${new URLSearchParams({
-                      ...(params.action ? { action: params.action } : {}),
+                      ...(actionFilter ? { action: actionFilter } : {}),
                       page: String(page + 1),
                     })}`}
                     className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"

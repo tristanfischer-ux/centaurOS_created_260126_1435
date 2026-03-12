@@ -38,7 +38,7 @@ interface AuditLogEntry {
   action: string
   entity_type: string | null
   entity_id: string | null
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown> | null
   created_at: string
   user_id: string
   profiles: {
@@ -123,7 +123,8 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<{
   count: number
   error?: string
 }> {
-  const { action, limit = 50, offset = 0 } = options
+  const { action, limit: rawLimit = 50, offset = 0 } = options
+  const limit = Math.min(Math.max(1, rawLimit), 100)
 
   const supabase = await createClient()
 

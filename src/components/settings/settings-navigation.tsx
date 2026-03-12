@@ -31,7 +31,7 @@ export function SettingsNavigation({ isCompanyAdmin, isFounder }: SettingsNaviga
     ]
 
     return (
-        <nav className="flex items-center gap-1 overflow-x-auto border-b border-slate-100">
+        <nav className="flex items-center gap-1 overflow-x-auto border-b border-border">
             {navigation.map((item) => {
                 const isActive = item.href === '/settings'
                     ? pathname === '/settings'
