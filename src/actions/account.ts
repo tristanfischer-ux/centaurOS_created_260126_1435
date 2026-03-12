@@ -127,26 +127,64 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       }
     }
 
-    // GOTCHA: profiles.paired_ai_id → profiles(id) has NO ON DELETE clause
-    // (defaults to RESTRICT). If another profile points to this user via
-    // paired_ai_id, the auth cascade delete of profiles will fail.
-    // Must null out inbound references before deleting the auth user.
-    await adminSupabase
+    // FK CLEANUP: Several tables reference auth.users(id) or profiles(id)
+    // with NO ON DELETE clause (defaults to RESTRICT). These MUST be cleaned
+    // before deleteUser(), or the cascade to profiles will fail with a FK violation.
+    //
+    // GOTCHA: profiles.paired_ai_id → profiles(id) is the self-reference blocker.
+    // The rest are nullable columns that can be SET NULL, or rows that can be deleted.
+
+    // 1. Self-reference: null out inbound paired_ai_id references
+    const { error: pairingError } = await adminSupabase
       .from("profiles")
       .update({ paired_ai_id: null })
       .eq("paired_ai_id", user.id)
 
-    // Cleanup: Remove from teams, tasks, memberships (after GDPR succeeds)
-    // GOTCHA: Supabase client returns { error } on query failures, but network
-    // errors throw. Use allSettled so a single failure doesn't crash the action.
-    const cleanupResults = await Promise.allSettled([
+    if (pairingError) {
+      console.error("[deleteMyAccount] Failed to clear paired_ai_id refs:", pairingError)
+      return { error: "Failed to unlink paired profiles. Please contact support." }
+    }
+
+    // 2. Null out RESTRICT FK columns on auth.users(id) — these block deleteUser()
+    // Tables: cad_lab_projects, xray_scans, forge_contracts, finance_expenses,
+    // component_catalogue, cad_grammar_versions, waitlist, assembly parts
+    const authFkCleanup = await Promise.allSettled([
+      adminSupabase.from("cad_lab_projects").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("xray_scans").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("forge_contracts").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("finance_expenses").update({ approved_by: null }).eq("approved_by", user.id),
+      adminSupabase.from("cad_grammar_versions").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("component_catalogue").update({ creator_id: null }).eq("creator_id", user.id),
+      adminSupabase.from("manufacturing_orders").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("waitlist").update({ approved_by: null }).eq("approved_by", user.id),
+    ])
+
+    // 3. Null out RESTRICT FK columns on profiles(id)
+    // Tables: manufacturing_rfqs, activity_events, task_shares, task_files,
+    // agent_action_log, sheets_sync, marketplace_recommendations, etc.
+    const profileFkCleanup = await Promise.allSettled([
+      adminSupabase.from("manufacturing_rfqs").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("activity_events").update({ user_id: null }).eq("user_id", user.id),
+      adminSupabase.from("task_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
+      adminSupabase.from("objective_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
+      adminSupabase.from("task_files").update({ uploaded_by: null }).eq("uploaded_by", user.id),
+      adminSupabase.from("sheets_sync_log").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("marketplace_recommendations").update({ dismissed_by: null }).eq("dismissed_by", user.id),
+      adminSupabase.from("rfq_clarifications").update({ answered_by: null }).eq("answered_by", user.id),
+      adminSupabase.from("agent_action_log").update({ requires_approval_from: null, approved_by: null }).or(`requires_approval_from.eq.${user.id},approved_by.eq.${user.id}`),
+    ])
+
+    // 4. Standard cleanup: Remove from teams, tasks, memberships
+    const membershipCleanup = await Promise.allSettled([
       adminSupabase.from("task_assignees").delete().eq("profile_id", user.id),
       adminSupabase.from("tasks").update({ assignee_id: null }).eq("assignee_id", user.id),
       adminSupabase.from("team_members").delete().eq("profile_id", user.id),
       adminSupabase.from("foundry_memberships").delete().eq("user_id", user.id),
     ])
 
-    const cleanupErrors = cleanupResults
+    // Log non-fatal cleanup errors (GDPR data is already handled)
+    const allCleanup = [...authFkCleanup, ...profileFkCleanup, ...membershipCleanup]
+    const cleanupErrors = allCleanup
       .map((r) =>
         r.status === "rejected"
           ? r.reason
@@ -155,7 +193,6 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       .filter(Boolean)
 
     if (cleanupErrors.length > 0) {
-      // Log but don't block — GDPR data is already handled, these are FK refs
       console.error("[deleteMyAccount] Non-fatal cleanup errors:", cleanupErrors)
     }
 
