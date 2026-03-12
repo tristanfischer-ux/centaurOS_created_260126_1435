@@ -709,18 +709,31 @@ export async function retryFailedPayment(
         return { success: false, error: 'This payment cannot be retried' }
       }
       
+      // Look up the Stripe payment method ID from the saved payment method record.
+      // paymentMethodId is the DB UUID, not the Stripe pm_xxx ID.
+      const { data: savedMethod, error: methodError } = await supabase
+        .from('saved_payment_methods')
+        .select('stripe_payment_method_id')
+        .eq('id', paymentMethodId)
+        .eq('user_id', user.id)
+        .single()
+
+      if (methodError || !savedMethod) {
+        return { success: false, error: 'Payment method not found' }
+      }
+
       const { customerId, error: customerError } = await getOrCreateStripeCustomer()
-      
+
       if (customerError || !customerId) {
         return { success: false, error: 'Failed to get customer' }
       }
-      
+
       // Create new payment intent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: failedPayment.amount,
         currency: (failedPayment.currency ?? 'GBP').toLowerCase(),
         customer: customerId,
-        payment_method: paymentMethodId,
+        payment_method: savedMethod.stripe_payment_method_id,
         confirm: true,
         off_session: true,
         metadata: {

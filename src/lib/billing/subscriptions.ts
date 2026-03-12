@@ -321,7 +321,7 @@ export async function handleSubscriptionEvent(
         console.warn('[Subscriptions] Could not derive tier from price ID or metadata, defaulting to starter')
       }
 
-      await supabase.from('user_subscriptions').upsert({
+      const { error: upsertError } = await supabase.from('user_subscriptions').upsert({
         user_id: userId,
         stripe_subscription_id: subscription.id,
         stripe_customer_id: subscription.customer as string,
@@ -330,13 +330,21 @@ export async function handleSubscriptionEvent(
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
         cancel_at_period_end: subscription.cancel_at_period_end,
-        trial_end: subscription.trial_end 
-          ? new Date(subscription.trial_end * 1000).toISOString() 
+        trial_end: subscription.trial_end
+          ? new Date(subscription.trial_end * 1000).toISOString()
           : null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id',
       })
+
+      if (upsertError) {
+        console.error('[Subscriptions] Failed to upsert subscription:', {
+          userId,
+          tier,
+          error: upsertError.message,
+        })
+      }
       break
     }
     

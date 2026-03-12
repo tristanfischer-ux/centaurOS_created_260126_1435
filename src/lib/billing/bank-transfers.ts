@@ -5,6 +5,7 @@
 
 import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 // ==========================================
 // TYPES
@@ -334,7 +335,8 @@ export async function handleBankTransferReceived(
   paymentIntentId: string
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    // SECURITY: Use admin client — webhook handlers have no user session/cookies
+    const supabase = createAdminClient()
     
     // Find the bank transfer request
     const { data: request, error: fetchError } = await supabase
@@ -368,7 +370,8 @@ export async function handleBankTransferCompleted(
   paymentIntentId: string
 ): Promise<void> {
   try {
-    const supabase = await createClient()
+    // SECURITY: Use admin client — webhook handlers have no user session/cookies
+    const supabase = createAdminClient()
     
     // Get the payment intent to get the amount
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId)

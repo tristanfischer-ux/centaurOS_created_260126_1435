@@ -66,7 +66,10 @@ async function acquireEventLock(event: Stripe.Event): Promise<{ acquired: boolea
         },
         {
           onConflict: 'stripe_event_id',
-          ignoreDuplicates: false,
+          // SECURITY: Must be true (ON CONFLICT DO NOTHING). With false, the upsert
+          // overwrites processed=true back to false on retries, defeating idempotency
+          // and causing duplicate balance credits, notifications, and order updates.
+          ignoreDuplicates: true,
         }
       )
       .select('processed')
