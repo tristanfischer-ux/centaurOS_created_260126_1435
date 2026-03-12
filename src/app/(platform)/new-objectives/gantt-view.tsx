@@ -913,7 +913,7 @@ export function ObjectivesGanttView({ objectives, strategicObjectives = [], onSe
         </div>
 
         {/* ─── Gantt Chart ─────────────────────────────────────────── */}
-        <div className="bg-background rounded-xl border overflow-hidden shadow-sm">
+        <div className="bg-background rounded-xl border overflow-x-auto overflow-y-hidden shadow-sm">
           <Gantt
             key={ganttKey}
             tasks={ganttTasks}

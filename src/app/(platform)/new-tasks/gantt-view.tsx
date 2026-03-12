@@ -374,7 +374,7 @@ export function TasksGanttView({ tasks, selectedId, onSelect, onCreateNew }: Tas
       </div>
 
       {/* ─── Gantt Chart ─────────────────────────────────────────── */}
-      <div className="bg-background rounded-xl border overflow-hidden shadow-sm">
+      <div className="bg-background rounded-xl border overflow-x-auto overflow-y-hidden shadow-sm">
         <Gantt
           key={`gantt-tasks-${dateOffset.getTime()}`}
           tasks={ganttTasks}
