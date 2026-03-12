@@ -18,7 +18,7 @@ export interface TaskWithData {
   task_number: number | null
   status: string
   assignee_id: string | null
-  creator_id: string
+  creator_id: string | null
   start_date: string | null
   end_date: string | null
   risk_level: string | null

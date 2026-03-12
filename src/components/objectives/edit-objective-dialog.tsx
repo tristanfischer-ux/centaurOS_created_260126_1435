@@ -17,7 +17,7 @@ interface Objective {
     description: string | null
     extended_description: string | null
     is_private?: boolean
-    creator_id?: string
+    creator_id?: string | null
 }
 
 interface EditObjectiveDialogProps {

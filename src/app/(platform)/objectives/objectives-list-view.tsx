@@ -63,7 +63,7 @@ interface Objective {
     created_at: string | null
     tasks: Task[]
     is_private?: boolean
-    creator_id?: string
+    creator_id?: string | null
     is_strategic_goal?: boolean | null
     parent_objective_id?: string | null
     is_demo?: boolean

@@ -109,7 +109,7 @@ interface Task {
     task_files?: { id: string }[]
     objective?: { id: string; title: string } | null
     is_private?: boolean
-    creator_id?: string
+    creator_id?: string | null
     metadata?: unknown
 }
 
@@ -118,7 +118,7 @@ interface Comment {
     content: string
     is_system_log: boolean
     created_at: string
-    user_id: string
+    user_id: string | null
     user?: { full_name: string; role: string }
 }
 

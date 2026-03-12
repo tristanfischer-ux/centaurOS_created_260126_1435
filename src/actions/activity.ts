@@ -1192,14 +1192,8 @@ export async function getThreadForSource(
       }
 
       const items: ThreadItem[] = (comments || [])
-        .filter((c: { user: unknown }) => c.user !== null)
-        .map((c: {
-          id: string
-          content: string
-          created_at: string | null
-          is_system_log: boolean | null
-          user: { id: string; full_name: string | null; avatar_url: string | null; role: string | null }
-        }) => ({
+        .filter((c): c is typeof c & { user: NonNullable<typeof c.user> } => c.user !== null)
+        .map((c) => ({
           id: c.id,
           content: c.content,
           created_at: c.created_at || new Date().toISOString(),

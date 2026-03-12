@@ -127,29 +127,28 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       }
     }
 
-    // FK CLEANUP: Several tables reference auth.users(id) or profiles(id)
-    // with NO ON DELETE clause (defaults to RESTRICT). These MUST be cleaned
-    // before deleteUser(), or the cascade to profiles will fail with a FK violation.
-    //
-    // GOTCHA: profiles.paired_ai_id → profiles(id) is the self-reference blocker.
-    // NOT NULL RESTRICT columns (cad_lab_projects, xray_scans, forge_contracts,
-    // manufacturing_orders) must DELETE rows. Nullable RESTRICT columns SET NULL.
+    // FK CLEANUP: Tables referencing auth.users(id) with RESTRICT (no ON DELETE)
+    // must be cleaned before deleteUser(). Migration 20260312400000 added
+    // ON DELETE SET NULL to profiles(id) FKs (tasks, objectives, comments,
+    // guild_events, foundry_memberships.invited_by, etc.), so those are now
+    // handled by the cascade. Only auth.users(id) RESTRICT FKs and a few
+    // remaining profiles(id) RESTRICT FKs need manual cleanup here.
 
-    // 1. Self-reference: null out inbound paired_ai_id references
+    // 1. Self-reference: null out inbound paired_ai_id references (defense-in-depth;
+    //    migration adds ON DELETE SET NULL but this runs first as a safety net)
     const { error: pairingError } = await adminSupabase
       .from("profiles")
       .update({ paired_ai_id: null })
       .eq("paired_ai_id", user.id)
 
     if (pairingError) {
+      // Non-fatal: migration ON DELETE SET NULL handles this in the cascade
       console.error("[deleteMyAccount] Failed to clear paired_ai_id refs:", pairingError)
-      return { error: "Failed to unlink paired profiles. Please contact support." }
     }
 
     // 2. Clean RESTRICT FK columns on auth.users(id) — these block deleteUser()
     // GOTCHA: cad_lab_projects, xray_scans, forge_contracts, manufacturing_orders
     // have created_by NOT NULL — can't set null, must DELETE rows.
-    // cad_assemblies.creator_id is nullable (was wrongly listed as component_catalogue).
     const authFkCleanup = await Promise.allSettled([
       adminSupabase.from("cad_lab_projects").delete().eq("created_by", user.id),
       adminSupabase.from("xray_scans").delete().eq("created_by", user.id),
@@ -161,11 +160,12 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       adminSupabase.from("waitlist").update({ approved_by: null }).eq("approved_by", user.id),
     ])
 
-    // 3. Clean RESTRICT FK columns on profiles(id)
-    // GOTCHA: activity_events has ON DELETE CASCADE + NOT NULL — handled automatically, skip.
-    // sheets_service_credentials was DROPPED (migration 20260227200001) — skip.
+    // 3. Clean remaining RESTRICT FK columns on profiles(id)
+    // DECISION: tasks.creator_id, objectives.creator_id, task_comments.user_id,
+    // objective_comments.user_id, guild_events.created_by, foundry_memberships.invited_by,
+    // manufacturing_rfqs.created_by are now ON DELETE SET NULL (migration 20260312400000).
+    // Only the below still need manual cleanup.
     const profileFkCleanup = await Promise.allSettled([
-      adminSupabase.from("manufacturing_rfqs").update({ created_by: null }).eq("created_by", user.id),
       adminSupabase.from("task_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
       adminSupabase.from("objective_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
       adminSupabase.from("task_files").update({ uploaded_by: null }).eq("uploaded_by", user.id),

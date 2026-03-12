@@ -24,7 +24,7 @@ interface Comment {
     content: string
     is_system_log: boolean | null
     created_at: string
-    user_id: string
+    user_id: string | null
     user?: { full_name: string; role: string }
 }
 

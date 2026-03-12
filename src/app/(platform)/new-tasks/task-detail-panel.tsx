@@ -39,7 +39,7 @@ interface TaskComment {
   content: string
   is_system_log: boolean
   created_at: string
-  user_id: string
+  user_id: string | null
   user?: { full_name: string | null; role: string | null }
 }
 

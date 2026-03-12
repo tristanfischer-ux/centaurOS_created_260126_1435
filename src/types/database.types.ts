@@ -10027,7 +10027,7 @@ export type Database = {
           message_id: string | null
           objective_id: string
           synced_from_message: boolean | null
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           content: string
@@ -10038,7 +10038,7 @@ export type Database = {
           message_id?: string | null
           objective_id: string
           synced_from_message?: boolean | null
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           content?: string
@@ -10049,7 +10049,7 @@ export type Database = {
           message_id?: string | null
           objective_id?: string
           synced_from_message?: boolean | null
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -10207,7 +10207,7 @@ export type Database = {
           blueprint_id: string | null
           created_at: string | null
           created_by_agent_id: string | null
-          creator_id: string
+          creator_id: string | null
           deleted_at: string | null
           description: string | null
           end_date: string | null
@@ -10243,7 +10243,7 @@ export type Database = {
           blueprint_id?: string | null
           created_at?: string | null
           created_by_agent_id?: string | null
-          creator_id: string
+          creator_id?: string | null
           deleted_at?: string | null
           description?: string | null
           end_date?: string | null
@@ -10279,7 +10279,7 @@ export type Database = {
           blueprint_id?: string | null
           created_at?: string | null
           created_by_agent_id?: string | null
-          creator_id?: string
+          creator_id?: string | null
           deleted_at?: string | null
           description?: string | null
           end_date?: string | null
@@ -15432,7 +15432,7 @@ export type Database = {
           message_id: string | null
           synced_from_message: boolean | null
           task_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           content: string
@@ -15443,7 +15443,7 @@ export type Database = {
           message_id?: string | null
           synced_from_message?: boolean | null
           task_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           content?: string
@@ -15454,7 +15454,7 @@ export type Database = {
           message_id?: string | null
           synced_from_message?: boolean | null
           task_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -15760,7 +15760,7 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           created_by_agent_id: string | null
-          creator_id: string
+          creator_id: string | null
           deleted_at: string | null
           description: string | null
           end_date: string | null
@@ -15797,7 +15797,7 @@ export type Database = {
           client_visible?: boolean | null
           created_at?: string | null
           created_by_agent_id?: string | null
-          creator_id: string
+          creator_id?: string | null
           deleted_at?: string | null
           description?: string | null
           end_date?: string | null
@@ -15834,7 +15834,7 @@ export type Database = {
           client_visible?: boolean | null
           created_at?: string | null
           created_by_agent_id?: string | null
-          creator_id?: string
+          creator_id?: string | null
           deleted_at?: string | null
           description?: string | null
           end_date?: string | null
@@ -17646,7 +17646,7 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           created_by_agent_id: string | null
-          creator_id: string
+          creator_id: string | null
           deleted_at: string | null
           description: string | null
           end_date: string | null
@@ -17823,7 +17823,7 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           created_by_agent_id: string | null
-          creator_id: string
+          creator_id: string | null
           deleted_at: string | null
           description: string | null
           end_date: string | null
@@ -17996,7 +17996,7 @@ export type Database = {
           client_visible: boolean | null
           created_at: string | null
           created_by_agent_id: string | null
-          creator_id: string
+          creator_id: string | null
           deleted_at: string | null
           description: string | null
           end_date: string | null

@@ -31,7 +31,7 @@ async function canModifyTask(
     taskId: string,
     userId: string,
     userFoundryId: string
-): Promise<{ allowed: boolean; error?: string; task?: { creator_id: string; assignee_id: string | null; foundry_id: string } }> {
+): Promise<{ allowed: boolean; error?: string; task?: { creator_id: string | null; assignee_id: string | null; foundry_id: string } }> {
     // Fetch task with ownership info
     const { data: task, error: taskError } = await supabase
         .from('tasks')
