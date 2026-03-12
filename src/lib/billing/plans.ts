@@ -82,7 +82,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxOrders: 5,
       maxTeamMembers: 1,
       maxRetainers: 0,
-      maxAiTasksPerMonth: 20,
+      maxAiTasksPerMonth: 500,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
