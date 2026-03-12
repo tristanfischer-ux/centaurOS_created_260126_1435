@@ -68,10 +68,19 @@ export async function createBankTransferRequest(
   try {
     // Minimum amount for bank transfers: £500
     if (amount < 50000) {
-      return { 
-        request: null, 
-        instructions: null, 
-        error: 'Minimum amount for bank transfer is £500' 
+      return {
+        request: null,
+        instructions: null,
+        error: 'Minimum amount for bank transfer is £500'
+      }
+    }
+
+    // Maximum amount: £1,000,000 (matches escrow MAX_TRANSACTION_AMOUNT)
+    if (amount > 100000000) {
+      return {
+        request: null,
+        instructions: null,
+        error: 'Maximum amount for bank transfer is £1,000,000',
       }
     }
 

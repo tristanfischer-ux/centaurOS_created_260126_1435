@@ -274,7 +274,8 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
       orderId: referenceId,
       difference: paymentIntent.amount - expectedAmount
     })
-    // Alert but don't fail - log for investigation
+    // SECURITY: Block processing — underpaid order must not have escrow held
+    return
   }
   
   // SECURITY: Verify currency matches

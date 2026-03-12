@@ -319,7 +319,7 @@ export async function deletePaymentMethod(
           .select('id')
           .eq('user_id', user.id)
           .limit(1)
-          .single()
+          .maybeSingle()
         
         if (remaining) {
           await supabase
@@ -451,6 +451,10 @@ export async function createBalanceTopUpIntent(
 }> {
   return withUser(async ({ user }) => {
     try {
+      if (!Number.isInteger(amount) || amount <= 0) {
+        return { clientSecret: null, paymentIntentId: null, error: 'Invalid amount' }
+      }
+
       if (amount < 500) { // £5 minimum
         return { clientSecret: null, paymentIntentId: null, error: 'Minimum top-up amount is £5' }
       }
@@ -521,7 +525,7 @@ export async function confirmBalanceTopUp(
         .from('balance_transactions')
         .select('id')
         .eq('stripe_payment_intent_id', paymentIntentId)
-        .single()
+        .maybeSingle()
 
       if (existing) {
         // Already processed
@@ -851,6 +855,9 @@ export async function updatePayoutPreferences(
       }
       
       // Validate minimum payout amount
+      if (preferences.minimumPayoutAmount != null && preferences.minimumPayoutAmount <= 0) {
+        return { success: false, error: 'Minimum payout amount must be positive' }
+      }
       if (preferences.minimumPayoutAmount != null && preferences.minimumPayoutAmount < 100) {
         return { success: false, error: 'Minimum payout amount must be at least £1' }
       }
@@ -912,6 +919,10 @@ export async function requestPayout(
         return { request: null, error: `Insufficient balance. Available: £${(availableGBP / 100).toFixed(2)}` }
       }
       
+      if (!Number.isInteger(amount) || amount <= 0) {
+        return { request: null, error: 'Invalid payout amount' }
+      }
+
       if (amount < 100) { // £1 minimum
         return { request: null, error: 'Minimum payout amount is £1' }
       }

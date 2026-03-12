@@ -29,6 +29,20 @@ import type {
 } from './plans'
 import { SUBSCRIPTION_PLANS } from './plans'
 
+// SECURITY: Reverse lookup from Stripe price ID to tier.
+// Prevents tier escalation via metadata tampering — the actual price paid
+// is the source of truth, not user-controllable metadata.
+const PRICE_ID_TO_TIER: Record<string, SubscriptionTier> = Object.fromEntries(
+  Object.values(SUBSCRIPTION_PLANS).flatMap((plan) => {
+    const entries: [string, SubscriptionTier][] = []
+    if (plan.stripePriceIdMonthly) entries.push([plan.stripePriceIdMonthly, plan.tier])
+    if (plan.stripePriceIdAnnual) entries.push([plan.stripePriceIdAnnual, plan.tier])
+    return entries
+  })
+)
+
+const VALID_TIERS: Set<string> = new Set(['free', 'starter', 'professional', 'enterprise'])
+
 // ==========================================
 // SUBSCRIPTION MANAGEMENT
 // ==========================================
@@ -279,18 +293,36 @@ export async function handleSubscriptionEvent(
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const subscription = event.data.object as Stripe.Subscription
-      const userId = subscription.metadata.user_id
-      
+      const userId = subscription.metadata?.user_id
+
       if (!userId) {
         console.error('[Subscriptions] No user_id in subscription metadata')
         return
       }
-      
+
+      // SECURITY: Derive tier from the actual Stripe price ID, not metadata.
+      // Metadata is user-controllable; the price they paid is not.
+      const priceId = subscription.items.data[0]?.price?.id
+      const metadataTier = subscription.metadata?.tier
+      const priceDerivedTier = priceId ? PRICE_ID_TO_TIER[priceId] : undefined
+
+      let tier: SubscriptionTier = 'starter'
+      if (priceDerivedTier) {
+        tier = priceDerivedTier
+        if (metadataTier && metadataTier !== priceDerivedTier) {
+          console.error('[Subscriptions] SECURITY: Tier mismatch — metadata says', metadataTier, 'but price ID maps to', priceDerivedTier)
+        }
+      } else if (metadataTier && VALID_TIERS.has(metadataTier)) {
+        tier = metadataTier as SubscriptionTier
+      } else {
+        console.warn('[Subscriptions] Could not derive tier from price ID or metadata, defaulting to starter')
+      }
+
       await supabase.from('user_subscriptions').upsert({
         user_id: userId,
         stripe_subscription_id: subscription.id,
         stripe_customer_id: subscription.customer as string,
-        tier: subscription.metadata.tier || 'starter',
+        tier,
         status: subscription.status,
         current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
         current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
@@ -307,7 +339,7 @@ export async function handleSubscriptionEvent(
     
     case 'customer.subscription.deleted': {
       const subscription = event.data.object as Stripe.Subscription
-      const userId = subscription.metadata.user_id
+      const userId = subscription.metadata?.user_id
       
       if (!userId) return
       

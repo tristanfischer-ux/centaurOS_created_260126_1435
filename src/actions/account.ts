@@ -114,26 +114,35 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       // Schedule full deletion when retention period ends
       // GOTCHA: scheduleFullDeletion calls anonymizeUser again internally — harmless (idempotent)
       if (eligibility.retentionEndDate) {
-        await scheduleFullDeletion(
+        const scheduleResult = await scheduleFullDeletion(
           adminSupabase,
           user.id,
           new Date(eligibility.retentionEndDate)
         )
+        if (scheduleResult.error) {
+          // Non-fatal: user is already anonymized + auth will be deleted.
+          // Financial records just won't get automated scheduled cleanup.
+          console.error("[deleteMyAccount] Failed to schedule full deletion:", scheduleResult.error)
+        }
       }
     }
 
     // Cleanup: Remove from teams, tasks, memberships (after GDPR succeeds)
-    // GOTCHA: Supabase client returns { error } instead of throwing — must check each
-    const cleanupOps = [
+    // GOTCHA: Supabase client returns { error } on query failures, but network
+    // errors throw. Use allSettled so a single failure doesn't crash the action.
+    const cleanupResults = await Promise.allSettled([
       adminSupabase.from("task_assignees").delete().eq("profile_id", user.id),
       adminSupabase.from("tasks").update({ assignee_id: null }).eq("assignee_id", user.id),
       adminSupabase.from("team_members").delete().eq("profile_id", user.id),
       adminSupabase.from("foundry_memberships").delete().eq("user_id", user.id),
-    ]
+    ])
 
-    const cleanupResults = await Promise.all(cleanupOps)
     const cleanupErrors = cleanupResults
-      .map((r) => r.error)
+      .map((r) =>
+        r.status === "rejected"
+          ? r.reason
+          : r.value.error
+      )
       .filter(Boolean)
 
     if (cleanupErrors.length > 0) {

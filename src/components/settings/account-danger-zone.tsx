@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Trash2, AlertTriangle, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,12 +25,23 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
   const [confirmText, setConfirmText] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [blockers, setBlockers] = useState<
+    Array<{ dataType: string; reason: string }> | null
+  >(null)
+
+  // SECURITY: Ref guard prevents double invocation from rapid clicks.
+  // React may batch setIsDeleting(true) and re-render after the second
+  // click handler already fires — the ref is synchronous so it catches this.
+  const deletingRef = useRef(false)
 
   const isConfirmed = confirmText === "DELETE"
 
   async function handleDelete() {
+    if (deletingRef.current) return
+    deletingRef.current = true
     setIsDeleting(true)
     setError(null)
+    setBlockers(null)
 
     const result = await deleteMyAccount()
 
@@ -43,7 +54,9 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
     }
 
     setError(result.error || "An unexpected error occurred.")
+    if (result.blockers) setBlockers(result.blockers)
     setIsDeleting(false)
+    deletingRef.current = false
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -55,6 +68,7 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
     if (!nextOpen) {
       setConfirmText("")
       setError(null)
+      setBlockers(null)
     }
   }
 
@@ -85,7 +99,11 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
           <DialogTrigger asChild>
             <Button variant="destructive">Delete My Account</Button>
           </DialogTrigger>
-          <DialogContent size="md">
+          <DialogContent
+            size="md"
+            onInteractOutside={(e) => { if (isDeleting) e.preventDefault() }}
+            onEscapeKeyDown={(e) => { if (isDeleting) e.preventDefault() }}
+          >
             <DialogHeader>
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-full bg-destructive/10 text-destructive">
@@ -116,10 +134,17 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
 
             {error && (
               <div
-                className="rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 space-y-2"
                 role="alert"
               >
                 <p className="text-sm text-destructive">{error}</p>
+                {blockers && blockers.length > 0 && (
+                  <ul className="text-xs text-destructive/80 list-disc list-inside space-y-1">
+                    {blockers.map((b) => (
+                      <li key={b.dataType}>{b.reason}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
