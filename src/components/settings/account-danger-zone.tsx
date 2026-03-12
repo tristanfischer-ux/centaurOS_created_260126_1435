@@ -29,9 +29,11 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
     Array<{ dataType: string; reason: string }> | null
   >(null)
 
-  // SECURITY: Ref guard prevents double invocation from rapid clicks.
-  // React may batch setIsDeleting(true) and re-render after the second
-  // click handler already fires — the ref is synchronous so it catches this.
+  // SECURITY: Ref guard prevents double invocation from rapid clicks AND
+  // provides synchronous read for stale-closure-prone callbacks
+  // (onInteractOutside, onEscapeKeyDown, handleOpenChange).
+  // React may not re-render between setIsDeleting(true) and the next
+  // user interaction during the async gap — the ref is always current.
   const deletingRef = useRef(false)
 
   const isConfirmed = confirmText === "DELETE"
@@ -43,27 +45,32 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
     setError(null)
     setBlockers(null)
 
-    const result = await deleteMyAccount()
+    try {
+      const result = await deleteMyAccount()
 
-    if (result.success) {
-      // GOTCHA: After auth deletion the session cookie is invalid.
-      // router.push does client-side navigation which may fail —
-      // hard redirect ensures a clean page load and cookie clear.
-      window.location.href = "/login"
-      return
+      if (result.success) {
+        // GOTCHA: After auth deletion the session cookie is invalid.
+        // router.push does client-side navigation which may fail —
+        // hard redirect ensures a clean page load and cookie clear.
+        window.location.href = "/login"
+        return
+      }
+
+      setError(result.error || "An unexpected error occurred.")
+      if (result.blockers) setBlockers(result.blockers)
+    } catch {
+      // Network errors (offline, timeout) throw from the server action call.
+      // Without this catch the dialog would be permanently stuck in loading state.
+      setError("A network error occurred. Please check your connection and try again.")
     }
 
-    setError(result.error || "An unexpected error occurred.")
-    if (result.blockers) setBlockers(result.blockers)
     setIsDeleting(false)
     deletingRef.current = false
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    // SECURITY: Prevent closing dialog while deletion is in-flight.
-    // Closing would reset state but the server action keeps running,
-    // leading to stale setError/setIsDeleting calls on unmounted state.
-    if (isDeleting) return
+    // SECURITY: Use ref, not state — state may be stale during async gap
+    if (deletingRef.current) return
     setOpen(nextOpen)
     if (!nextOpen) {
       setConfirmText("")
@@ -101,8 +108,8 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
           </DialogTrigger>
           <DialogContent
             size="md"
-            onInteractOutside={(e) => { if (isDeleting) e.preventDefault() }}
-            onEscapeKeyDown={(e) => { if (isDeleting) e.preventDefault() }}
+            onInteractOutside={(e) => { if (deletingRef.current) e.preventDefault() }}
+            onEscapeKeyDown={(e) => { if (deletingRef.current) e.preventDefault() }}
           >
             <DialogHeader>
               <div className="flex items-center gap-3">

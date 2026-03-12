@@ -127,6 +127,15 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       }
     }
 
+    // GOTCHA: profiles.paired_ai_id → profiles(id) has NO ON DELETE clause
+    // (defaults to RESTRICT). If another profile points to this user via
+    // paired_ai_id, the auth cascade delete of profiles will fail.
+    // Must null out inbound references before deleting the auth user.
+    await adminSupabase
+      .from("profiles")
+      .update({ paired_ai_id: null })
+      .eq("paired_ai_id", user.id)
+
     // Cleanup: Remove from teams, tasks, memberships (after GDPR succeeds)
     // GOTCHA: Supabase client returns { error } on query failures, but network
     // errors throw. Use allSettled so a single failure doesn't crash the action.
