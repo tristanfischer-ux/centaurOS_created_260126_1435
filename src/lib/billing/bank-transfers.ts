@@ -66,6 +66,14 @@ export async function createBankTransferRequest(
   error: string | null
 }> {
   try {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return {
+        request: null,
+        instructions: null,
+        error: 'Invalid transfer amount',
+      }
+    }
+
     // Minimum amount for bank transfers: £500
     if (amount < 50000) {
       return {

@@ -907,18 +907,7 @@ export async function requestPayout(
       if (!provider || !provider.stripe_account_id) {
         return { request: null, error: 'Provider not found or Stripe account not connected' }
       }
-      
-      // Check available balance from Stripe
-      const balance = await stripe.balance.retrieve({
-        stripeAccount: provider.stripe_account_id,
-      })
-      
-      const availableGBP = balance.available.find(b => b.currency === 'gbp')?.amount || 0
-      
-      if (amount > availableGBP) {
-        return { request: null, error: `Insufficient balance. Available: £${(availableGBP / 100).toFixed(2)}` }
-      }
-      
+
       if (!Number.isInteger(amount) || amount <= 0) {
         return { request: null, error: 'Invalid payout amount' }
       }
@@ -926,7 +915,18 @@ export async function requestPayout(
       if (amount < 100) { // £1 minimum
         return { request: null, error: 'Minimum payout amount is £1' }
       }
-      
+
+      // Check available balance from Stripe (after input validation to avoid wasted API call)
+      const balance = await stripe.balance.retrieve({
+        stripeAccount: provider.stripe_account_id,
+      })
+
+      const availableGBP = balance.available.find(b => b.currency === 'gbp')?.amount || 0
+
+      if (amount > availableGBP) {
+        return { request: null, error: `Insufficient balance. Available: £${(availableGBP / 100).toFixed(2)}` }
+      }
+
       // Create payout request
       const { data, error } = await supabase
         .from('payout_requests')

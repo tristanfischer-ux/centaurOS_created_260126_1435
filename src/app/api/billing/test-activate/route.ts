@@ -57,10 +57,10 @@ function verifyTestBillingAccess(request: NextRequest): NextResponse | null {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  // SECURITY: Only available in test mode. If a real Stripe secret key is
-  // configured, test activation must be disabled regardless of which price
-  // env vars happen to be set.
-  if (process.env.STRIPE_SECRET_KEY) {
+  // SECURITY: Only available in test mode. If a live Stripe secret key is
+  // configured, test activation must be disabled. Test keys (sk_test_*) are
+  // allowed so dev/staging environments retain access to this endpoint.
+  if (process.env.STRIPE_SECRET_KEY?.startsWith('sk_live_')) {
     return NextResponse.json(
       { error: 'Test mode is disabled when Stripe is configured' },
       { status: 403 }

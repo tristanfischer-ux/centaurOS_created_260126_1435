@@ -166,7 +166,7 @@ async function handleBalanceTopUp(paymentIntent: Stripe.PaymentIntent, userId: s
     .from('balance_transactions')
     .select('id')
     .eq('stripe_payment_intent_id', paymentIntent.id)
-    .single()
+    .maybeSingle()
 
   if (existing) {
     console.log('Balance top-up already processed:', paymentIntent.id)
@@ -267,15 +267,25 @@ async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent)
   const expectedAmount = Math.round(Number(orderValidation.total_amount) * 100) // Convert to cents
   const tolerance = 1 // Allow 1 cent tolerance for rounding
   
-  if (Math.abs(paymentIntent.amount - expectedAmount) > tolerance) {
-    console.error('[SECURITY] Payment amount mismatch!', {
+  if (paymentIntent.amount < expectedAmount - tolerance) {
+    console.error('[SECURITY] Payment UNDERPAID — blocking escrow!', {
       expected: expectedAmount,
       received: paymentIntent.amount,
       orderId: referenceId,
-      difference: paymentIntent.amount - expectedAmount
+      shortfall: expectedAmount - paymentIntent.amount,
     })
     // SECURITY: Block processing — underpaid order must not have escrow held
     return
+  }
+
+  if (paymentIntent.amount > expectedAmount + tolerance) {
+    // Overpayment: log for investigation but allow processing (not a security risk)
+    console.warn('[SECURITY] Payment OVERPAID — processing but flagging', {
+      expected: expectedAmount,
+      received: paymentIntent.amount,
+      orderId: referenceId,
+      surplus: paymentIntent.amount - expectedAmount,
+    })
   }
   
   // SECURITY: Verify currency matches

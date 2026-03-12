@@ -141,13 +141,16 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
   const finishWizard = () => {
     wizard.goNext()
     setShowConfetti(true)
-    startTransition(async () => {
-      await completeSetupWizard()
+    // GOTCHA: Don't wrap in startTransition — that would delay the Done step
+    // render until completeSetupWizard finishes. Fire-and-forget instead so
+    // the confetti shows immediately.
+    completeSetupWizard().catch(() => {
+      // Non-critical — worst case wizard shows once more on next visit
     })
   }
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && handleClose()}>
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && !isPending && handleClose()}>
       <DialogContent size="lg" className="gap-0">
         {/* Stepper — hidden on welcome and done steps */}
         {wizard.currentStep !== 'welcome' && wizard.currentStep !== 'done' && (
@@ -332,7 +335,7 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-3 py-4 sm:grid-cols-3">
-              <Link href="/objectives" onClick={() => setOpen(false)}>
+              <Link href="/objectives" onClick={() => { setOpen(false); onComplete() }}>
                 <Card className="h-full hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer">
                   <CardContent className="pt-4 pb-4 text-center">
                     <Target className="h-6 w-6 mx-auto mb-2 text-international-orange" />
@@ -341,7 +344,7 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/the-forge" onClick={() => setOpen(false)}>
+              <Link href="/the-forge" onClick={() => { setOpen(false); onComplete() }}>
                 <Card className="h-full hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer">
                   <CardContent className="pt-4 pb-4 text-center">
                     <Sparkles className="h-6 w-6 mx-auto mb-2 text-international-orange" />
@@ -350,7 +353,7 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
                   </CardContent>
                 </Card>
               </Link>
-              <Link href="/settings" onClick={() => setOpen(false)}>
+              <Link href="/settings" onClick={() => { setOpen(false); onComplete() }}>
                 <Card className="h-full hover:shadow-md hover:-translate-y-0.5 active:scale-[0.99] transition-all duration-200 cursor-pointer">
                   <CardContent className="pt-4 pb-4 text-center">
                     <Compass className="h-6 w-6 mx-auto mb-2 text-international-orange" />

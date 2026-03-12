@@ -25,7 +25,7 @@ import type { Json } from '@/types/database.types'
  * @returns Eligibility flag plus user context for the wizard greeting
  */
 export async function checkSetupWizardEligibility(): Promise<
-  | { shouldShow: true; userName: string; foundryId: string; userId: string }
+  | { shouldShow: true; userName: string }
   | { shouldShow: false }
   | { error: string }
 > {
@@ -80,7 +80,8 @@ export async function checkSetupWizardEligibility(): Promise<
 
     const userName = profile.full_name || user.email?.split('@')[0] || 'there'
 
-    return { shouldShow: true, userName, foundryId, userId: user.id }
+    // SECURITY: Only return what the client needs — no foundryId or userId
+    return { shouldShow: true, userName }
   })
 }
 
@@ -171,18 +172,33 @@ export async function saveWizardMission(
   mission: string
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
-    const purposeData: FoundryPurposeData = {
-      purpose: mission.trim(),
-      mission: null,
-      vision: null,
-      questionnaire: null,
+    const trimmed = mission.trim()
+    // VALIDATION: Server-side length guard (client maxLength=300)
+    if (!trimmed || trimmed.length > 300) {
+      return { error: 'Mission must be 1–300 characters' }
+    }
+
+    // INTENT: Merge into existing purpose_data to preserve mission/vision/questionnaire
+    // from the full purpose wizard. Only overwrite the `purpose` field.
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('purpose_data')
+      .eq('id', foundryId)
+      .single()
+
+    const existing = (foundry?.purpose_data as Record<string, unknown>) ?? {}
+    const merged: FoundryPurposeData = {
+      purpose: trimmed,
+      mission: (existing.mission as string) ?? null,
+      vision: (existing.vision as string) ?? null,
+      questionnaire: (existing.questionnaire as FoundryPurposeData['questionnaire']) ?? null,
       updatedAt: new Date().toISOString(),
       updatedBy: user.id,
     }
 
     const { error } = await supabase
       .from('foundries')
-      .update({ purpose_data: purposeData as unknown as Json })
+      .update({ purpose_data: merged as unknown as Json })
       .eq('id', foundryId)
 
     if (error) {
@@ -210,11 +226,17 @@ export async function createWizardTeam(
   inviteEmail?: string
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
+    const trimmedName = name.trim()
+    // VALIDATION: Server-side length guard (client maxLength=100)
+    if (!trimmedName || trimmedName.length > 100) {
+      return { error: 'Team name must be 1–100 characters' }
+    }
+
     // INTENT: Insert team directly (bypass createTeamSchema min(2) validation)
     const { data: team, error: teamError } = await supabase
       .from('teams')
       .insert({
-        name: name.trim(),
+        name: trimmedName,
         foundry_id: foundryId,
         created_by: user.id,
       })
@@ -268,10 +290,20 @@ export async function createWizardObjective(
   targetDate?: string
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
+    const trimmedTitle = title.trim()
+    // VALIDATION: Server-side length guard (client maxLength=200)
+    if (!trimmedTitle || trimmedTitle.length > 200) {
+      return { error: 'Objective title must be 1–200 characters' }
+    }
+    // VALIDATION: targetDate must be ISO date if provided
+    if (targetDate && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      return { error: 'Invalid target date format' }
+    }
+
     const { error } = await supabase
       .from('objectives')
       .insert({
-        title: title.trim(),
+        title: trimmedTitle,
         foundry_id: foundryId,
         creator_id: user.id,
         status: 'active',
