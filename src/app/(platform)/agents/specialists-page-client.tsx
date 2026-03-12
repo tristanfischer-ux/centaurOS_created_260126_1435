@@ -98,6 +98,28 @@ export function SpecialistsPageClient({
                         />
                     </div>
                 </div>
+            ) : isMobile && !showBuilderAnyway ? (
+                <div className="flex-1 min-h-0 flex items-center justify-center px-6">
+                    <div className="text-center max-w-sm space-y-4">
+                        <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mx-auto">
+                            <Monitor className="h-7 w-7 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-foreground">
+                            Best on a larger screen
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            The project builder uses drag-and-drop to chain specialists together.
+                            It works best on a tablet or desktop.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowBuilderAnyway(true)}
+                            className="min-h-[44px]"
+                        >
+                            Show anyway
+                        </Button>
+                    </div>
+                </div>
             ) : (
                 <div className="flex-1 min-h-0">
                     <AgentsWorkflowView
