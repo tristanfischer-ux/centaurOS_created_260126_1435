@@ -142,7 +142,14 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
     color: DARK_TEXT,
   })
 
-  coverSlide.addText('Engineering Design Report', {
+  const coverSubtitle = data.stage === 'concept' ? 'Concept Report'
+    : data.stage === 'specify' ? 'Specification Report'
+    : data.stage === 'source' ? 'Sourcing Report'
+    : data.stage === 'assemble' ? 'Assembly Report'
+    : data.stage === 'cad' ? 'CAD Report'
+    : 'Engineering Design Report'
+
+  coverSlide.addText(coverSubtitle, {
     x: MARGIN, y: 2.0, w: 4.5, h: 0.35,
     fontSize: 14,
     fontFace: 'Helvetica Neue',
@@ -397,9 +404,186 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
     })
   }
 
+  // ── 8. Stage-specific slides ──
+
+  // Specify: Reviews Summary
+  if (data.stage === 'specify' && data.moduleReviews) {
+    const reviewModuleIds = Object.keys(data.moduleReviews)
+    if (reviewModuleIds.length > 0) {
+      const reviewSlide = pres.addSlide()
+      addSectionTitle(reviewSlide, 'Specialist Reviews')
+
+      const reviewHeader: PptxGenJS.TableRow = [
+        { text: 'Module', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+        { text: 'Specialist', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+        { text: 'Verdict', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' } },
+        { text: 'Summary', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+      ]
+
+      const reviewDataRows: PptxGenJS.TableRow[] = []
+      for (const moduleId of reviewModuleIds.slice(0, 10)) {
+        const mod = data.modules.find((m) => m.id === moduleId)
+        const reviews = data.moduleReviews[moduleId]
+        if (!mod || !reviews) continue
+        for (const review of reviews.slice(0, 2)) {
+          reviewDataRows.push([
+            { text: mod.name, options: { fontSize: 8, color: DARK_TEXT } },
+            { text: review.specialistName, options: { fontSize: 8, color: DARK_TEXT } },
+            { text: review.verdict.toUpperCase(), options: { fontSize: 8, color: DARK_TEXT, align: 'center' as const } },
+            { text: truncate(review.summary, 60), options: { fontSize: 8, color: DARK_TEXT } },
+          ])
+        }
+      }
+
+      if (reviewDataRows.length > 0) {
+        reviewSlide.addTable([reviewHeader, ...reviewDataRows], {
+          x: MARGIN, y: 1.0, w: CONTENT_W,
+          colW: [2.0, 2.0, 1.0, 4.0],
+          border: { type: 'solid', pt: 0.5, color: 'E2E8F0' },
+          rowH: 0.3,
+          fontFace: 'Helvetica Neue',
+        })
+      }
+    }
+  }
+
+  // Source: Classification Summary
+  if (data.stage === 'source' && data.classifiedParts && data.classifiedParts.length > 0) {
+    const clsSlide = pres.addSlide()
+    addSectionTitle(clsSlide, 'Part Classification')
+
+    const clsHeader: PptxGenJS.TableRow = [
+      { text: 'Part', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+      { text: 'Module', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+      { text: 'Type', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' } },
+      { text: 'Reasons', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    ]
+
+    const clsDataRows: PptxGenJS.TableRow[] = data.classifiedParts.slice(0, 12).map((part) => [
+      { text: truncate(part.partName, 30), options: { fontSize: 8, color: DARK_TEXT } },
+      { text: truncate(part.moduleName, 20), options: { fontSize: 8, color: DARK_TEXT } },
+      { text: part.type.toUpperCase(), options: { fontSize: 8, color: DARK_TEXT, align: 'center' as const } },
+      { text: truncate(part.reasons.join('; '), 50), options: { fontSize: 8, color: DARK_TEXT } },
+    ])
+
+    clsSlide.addTable([clsHeader, ...clsDataRows], {
+      x: MARGIN, y: 1.0, w: CONTENT_W,
+      colW: [2.5, 2.0, 1.0, 3.5],
+      border: { type: 'solid', pt: 0.5, color: 'E2E8F0' },
+      rowH: 0.3,
+      fontFace: 'Helvetica Neue',
+    })
+  }
+
+  // Source: Top Suppliers
+  if (data.stage === 'source' && data.supplierMatches) {
+    const matchModuleIds = Object.keys(data.supplierMatches)
+    if (matchModuleIds.length > 0) {
+      const supplierSlide = pres.addSlide()
+      addSectionTitle(supplierSlide, 'Top Suppliers')
+
+      const supHeader: PptxGenJS.TableRow = [
+        { text: 'Module', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+        { text: 'Supplier', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+        { text: 'Score', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG }, align: 'center' } },
+        { text: 'Reasons', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+      ]
+
+      const supDataRows: PptxGenJS.TableRow[] = []
+      for (const moduleId of matchModuleIds.slice(0, 8)) {
+        const mod = data.modules.find((m) => m.id === moduleId)
+        const matches = data.supplierMatches[moduleId]
+        if (!mod || !matches) continue
+        for (const match of matches.slice(0, 2)) {
+          supDataRows.push([
+            { text: mod.name, options: { fontSize: 8, color: DARK_TEXT } },
+            { text: match.providerName, options: { fontSize: 8, color: DARK_TEXT } },
+            { text: String(match.matchScore), options: { fontSize: 8, color: DARK_TEXT, align: 'center' as const } },
+            { text: truncate(match.matchReasons.join(', '), 40), options: { fontSize: 8, color: DARK_TEXT } },
+          ])
+        }
+      }
+
+      if (supDataRows.length > 0) {
+        supplierSlide.addTable([supHeader, ...supDataRows], {
+          x: MARGIN, y: 1.0, w: CONTENT_W,
+          colW: [2.0, 2.5, 1.0, 3.5],
+          border: { type: 'solid', pt: 0.5, color: 'E2E8F0' },
+          rowH: 0.3,
+          fontFace: 'Helvetica Neue',
+        })
+      }
+    }
+  }
+
+  // Assemble: Assembly & Logistics
+  if (data.stage === 'assemble') {
+    const hasContent = (data.assemblyPartners && data.assemblyPartners.length > 0) || data.brandingNotes || data.shippingNotes
+    if (hasContent) {
+      const assembleSlide = pres.addSlide()
+      addSectionTitle(assembleSlide, 'Assembly & Logistics')
+
+      const bullets: { text: string; options: object }[] = []
+
+      if (data.assemblyPartners && data.assemblyPartners.length > 0) {
+        for (const partner of data.assemblyPartners.slice(0, 3)) {
+          bullets.push({
+            text: `${partner.name} (Score: ${partner.score})`,
+            options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 },
+          })
+        }
+      }
+
+      if (data.brandingNotes) {
+        bullets.push({
+          text: `Branding: ${truncate(data.brandingNotes, 80)}`,
+          options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 },
+        })
+      }
+
+      if (data.shippingNotes) {
+        bullets.push({
+          text: `Shipping: ${truncate(data.shippingNotes, 80)}`,
+          options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 },
+        })
+      }
+
+      if (bullets.length > 0) {
+        assembleSlide.addText(bullets, {
+          x: MARGIN, y: 1.0, w: CONTENT_W, h: 3.8,
+          valign: 'top',
+        })
+      }
+    }
+  }
+
+  // CAD: Output Summary
+  if (data.stage === 'cad' && data.unifiedCadResult?.success) {
+    const cadSlide = pres.addSlide()
+    addSectionTitle(cadSlide, 'CAD Output')
+
+    const result = data.unifiedCadResult
+    const bullets: { text: string; options: object }[] = []
+
+    if (result.stepUrl) bullets.push({ text: `STEP file generated`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+    if (result.stlUrl) bullets.push({ text: `STL file generated`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+    if (result.massGrams != null) bullets.push({ text: `Mass: ${result.massGrams.toFixed(1)} g`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+    if (result.volumeMm3 != null) bullets.push({ text: `Volume: ${result.volumeMm3.toFixed(1)} mm³`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+    if (result.bbox) bullets.push({ text: `Bounding Box: ${result.bbox.xLen.toFixed(1)} × ${result.bbox.yLen.toFixed(1)} × ${result.bbox.zLen.toFixed(1)} mm`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+    if (result.modelUsed) bullets.push({ text: `Model: ${result.modelUsed}`, options: { fontSize: 10, fontFace: 'Helvetica Neue', color: MID_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 4 } })
+
+    if (bullets.length > 0) {
+      cadSlide.addText(bullets, {
+        x: MARGIN, y: 1.0, w: CONTENT_W, h: 3.8,
+        valign: 'top',
+      })
+    }
+  }
+
   // ── Download ──
   const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
+  const stageLabel = data.stage ? `-${data.stage.charAt(0).toUpperCase() + data.stage.slice(1)}` : ''
   const dateStr = new Date(data.generatedAt).toISOString().split('T')[0]
 
-  await pres.writeFile({ fileName: `${safeName}-Design-Report-${dateStr}.pptx` })
+  await pres.writeFile({ fileName: `${safeName}${stageLabel}-Report-${dateStr}.pptx` })
 }

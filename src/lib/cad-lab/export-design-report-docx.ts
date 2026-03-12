@@ -165,7 +165,15 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
         new TextRun({ text: data.projectName, bold: true, size: 48, color: DARK_TEXT, font: 'Calibri' }),
       ],
     }),
-    textParagraph('Engineering Design Report', { after: 200, color: MID_TEXT, size: 24 }),
+    textParagraph(
+      data.stage === 'concept' ? 'Concept Report'
+        : data.stage === 'specify' ? 'Specification Report'
+        : data.stage === 'source' ? 'Sourcing Report'
+        : data.stage === 'assemble' ? 'Assembly Report'
+        : data.stage === 'cad' ? 'CAD Report'
+        : 'Engineering Design Report',
+      { after: 200, color: MID_TEXT, size: 24 },
+    ),
     textParagraph(
       new Date(data.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
       { after: 400, color: MID_TEXT },
@@ -418,7 +426,219 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     )
   }
 
-  // ── 7. Footer ──
+  // ── 7. Stage-specific sections ──
+
+  // Specify: Specialist Reviews
+  if (data.stage === 'specify' && data.moduleReviews) {
+    const reviewModuleIds = Object.keys(data.moduleReviews)
+    if (reviewModuleIds.length > 0) {
+      children.push(sectionHeading('Specialist Reviews'))
+
+      for (const moduleId of reviewModuleIds) {
+        const mod = data.modules.find((m) => m.id === moduleId)
+        const reviews = data.moduleReviews[moduleId]
+        if (!mod || !reviews || reviews.length === 0) continue
+
+        children.push(h3(mod.name))
+        for (const review of reviews) {
+          children.push(textParagraph(
+            `${review.specialistName} — ${review.verdict.toUpperCase()}`,
+            { after: 80 },
+          ))
+          if (review.summary) children.push(textParagraph(review.summary, { after: 80, color: MID_TEXT }))
+          if (review.recommendations?.length > 0) {
+            for (const rec of review.recommendations) {
+              children.push(mdBulletParagraph(rec))
+            }
+          }
+        }
+      }
+
+      if (data.reviewSkipped) {
+        children.push(textParagraph('Note: Specialist reviews were skipped by the user.', { after: 120, italic: true, color: MID_TEXT }))
+      }
+
+      children.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+  }
+
+  // Source: Part Classification
+  if (data.stage === 'source' && data.classifiedParts && data.classifiedParts.length > 0) {
+    children.push(sectionHeading('Part Classification'))
+
+    const clsRows: TableRow[] = [
+      new TableRow({
+        children: [
+          headerCell('Part', 25),
+          headerCell('Module', 20),
+          headerCell('Type', 10),
+          headerCell('Confidence', 10),
+          headerCell('Reasons', 35),
+        ],
+      }),
+    ]
+
+    for (const part of data.classifiedParts) {
+      clsRows.push(
+        new TableRow({
+          children: [
+            dataCell(part.partName, 25),
+            dataCell(part.moduleName, 20),
+            dataCell(part.type.toUpperCase(), 10),
+            dataCell(part.confidence, 10),
+            dataCell(part.reasons.join('; '), 35),
+          ],
+        }),
+      )
+    }
+
+    children.push(
+      new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: clsRows }),
+    )
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // Source: Supplier Matches
+  if (data.stage === 'source' && data.supplierMatches) {
+    const matchModuleIds = Object.keys(data.supplierMatches)
+    if (matchModuleIds.length > 0) {
+      children.push(sectionHeading('Supplier Matches'))
+
+      for (const moduleId of matchModuleIds) {
+        const mod = data.modules.find((m) => m.id === moduleId)
+        const matches = data.supplierMatches[moduleId]
+        if (!mod || !matches || matches.length === 0) continue
+
+        children.push(h3(mod.name))
+        for (const match of matches.slice(0, 3)) {
+          children.push(textParagraph(
+            `${match.providerName} — Score: ${match.matchScore}`,
+            { after: 60 },
+          ))
+          if (match.matchReasons.length > 0) {
+            children.push(textParagraph(match.matchReasons.join(', '), { after: 80, color: MID_TEXT, size: 18 }))
+          }
+        }
+      }
+
+      children.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+  }
+
+  // Source: Technique Recommendations
+  if (data.stage === 'source' && data.techniqueRecommendations) {
+    const techModuleIds = Object.keys(data.techniqueRecommendations)
+    if (techModuleIds.length > 0) {
+      children.push(sectionHeading('Technique Recommendations'))
+
+      for (const moduleId of techModuleIds) {
+        const mod = data.modules.find((m) => m.id === moduleId)
+        const recs = data.techniqueRecommendations[moduleId]
+        if (!mod || !recs || recs.length === 0) continue
+
+        children.push(h3(mod.name))
+        for (const rec of recs.slice(0, 3)) {
+          children.push(textParagraph(
+            `${rec.name} — Score: ${rec.score}/100 (${rec.supplierCount} suppliers)`,
+            { after: 60 },
+          ))
+          if (rec.reasons.length > 0) {
+            for (const reason of rec.reasons) {
+              children.push(mdBulletParagraph(reason))
+            }
+          }
+        }
+      }
+
+      children.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+  }
+
+  // Assemble: Assembly Partners, Branding, Shipping
+  if (data.stage === 'assemble') {
+    if (data.assemblyPartners && data.assemblyPartners.length > 0) {
+      children.push(sectionHeading('Assembly Partners'))
+
+      const partnerRows: TableRow[] = [
+        new TableRow({
+          children: [
+            headerCell('Partner', 30),
+            headerCell('Score', 15),
+            headerCell('Reasons', 55),
+          ],
+        }),
+      ]
+
+      for (const partner of data.assemblyPartners) {
+        partnerRows.push(
+          new TableRow({
+            children: [
+              dataCell(partner.name, 30),
+              dataCell(String(partner.score), 15),
+              dataCell(partner.reasons.join('; '), 55),
+            ],
+          }),
+        )
+      }
+
+      children.push(
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: partnerRows }),
+      )
+      children.push(textParagraph('', { after: 200 }))
+    }
+
+    if (data.brandingNotes) {
+      children.push(sectionHeading('Branding & Packaging'))
+      children.push(textParagraph(data.brandingNotes, { after: 200 }))
+    }
+
+    if (data.shippingNotes) {
+      children.push(sectionHeading('Shipping & Fulfilment'))
+      children.push(textParagraph(data.shippingNotes, { after: 200 }))
+    }
+
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // CAD: Unified Result Summary
+  if (data.stage === 'cad' && data.unifiedCadResult) {
+    const result = data.unifiedCadResult
+    children.push(sectionHeading('CAD Output'))
+
+    if (result.success) {
+      const cadDetails: [string, string][] = []
+      if (result.stepUrl) cadDetails.push(['STEP File', result.stepUrl])
+      if (result.stlUrl) cadDetails.push(['STL File', result.stlUrl])
+      if (result.massGrams != null) cadDetails.push(['Mass', `${result.massGrams.toFixed(1)} g`])
+      if (result.volumeMm3 != null) cadDetails.push(['Volume', `${result.volumeMm3.toFixed(1)} mm³`])
+      if (result.bbox) cadDetails.push(['Bounding Box', `${result.bbox.xLen.toFixed(1)} × ${result.bbox.yLen.toFixed(1)} × ${result.bbox.zLen.toFixed(1)} mm`])
+
+      if (cadDetails.length > 0) {
+        children.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({ children: [headerCell('Property', 30), headerCell('Value', 70)] }),
+              ...cadDetails.map(
+                ([label, value]) =>
+                  new TableRow({ children: [dataCell(label, 30), dataCell(value, 70)] }),
+              ),
+            ],
+          }),
+        )
+      }
+
+      if (result.modelUsed) {
+        children.push(textParagraph(`CAD model: ${result.modelUsed}`, { after: 120, color: MID_TEXT, italic: true, size: 18 }))
+      }
+    } else {
+      children.push(textParagraph('CAD generation was attempted but did not produce a successful result.', { after: 120, color: MID_TEXT }))
+    }
+
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── 8. Footer ──
   children.push(
     new Paragraph({
       spacing: { before: 600 },
@@ -464,8 +684,9 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
 
   const blob = await Packer.toBlob(doc)
   const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
+  const stageLabel = data.stage ? `-${data.stage.charAt(0).toUpperCase() + data.stage.slice(1)}` : ''
   const dateStr = new Date(data.generatedAt).toISOString().split('T')[0]
-  const filename = `${safeName}-Design-Report-${dateStr}.docx`
+  const filename = `${safeName}${stageLabel}-Report-${dateStr}.docx`
 
   const url = URL.createObjectURL(blob)
   const link = window.document.createElement('a')
