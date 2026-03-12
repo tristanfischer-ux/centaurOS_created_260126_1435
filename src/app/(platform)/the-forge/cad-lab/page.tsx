@@ -28,6 +28,7 @@ import {
   RotateCcw,
   AlertTriangle,
   Info,
+  FileDown,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -42,6 +43,7 @@ import { ProductOverviewCard } from "./components/product-overview-card"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
 import { CheckpointRevisionDiffs } from "./components/checkpoint-revision-diffs"
+import { DesignReportDialog } from "./components/design-report-dialog"
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -65,7 +67,10 @@ export default function CadLabResearchPage(): React.ReactNode {
     productOverview, setProductOverview,
     handleUpdateModule,
     researchModelUsed, decompositionModelUsed,
+    handleRefreshModuleImages,
   } = useCadLab()
+
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)
@@ -233,6 +238,16 @@ export default function CadLabResearchPage(): React.ReactNode {
                 )}
               </button>
             ))}
+            <div className="flex-1" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsReportDialogOpen(true)}
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Download Report</span>
+            </Button>
           </div>
         </nav>
       )}
@@ -459,6 +474,18 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <p className="text-sm font-semibold text-foreground">
                   {Math.min(revealedModuleIds.size, modules.length)} of {modules.length} sub-assemblies
                 </p>
+                {(() => {
+                  const heroReady = systemIllustrationStatus === "complete" || !!systemIllustrationUrl
+                  const hasStuck = modules.some(m => !m.imageStatus || m.imageStatus === "pending")
+                  const hasFailed = modules.some(m => m.imageStatus === "failed")
+                  if (!heroReady || isGeneratingImages || (!hasStuck && !hasFailed)) return null
+                  return (
+                    <Button variant="ghost" size="sm" onClick={handleRefreshModuleImages} className="gap-1.5 text-xs">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      {hasStuck ? "Generate Illustrations" : "Retry All Failed"}
+                    </Button>
+                  )
+                })()}
               </div>
 
               {/* Illustration progress card — prominent feedback during image generation */}
@@ -569,6 +596,8 @@ export default function CadLabResearchPage(): React.ReactNode {
           )}
         </AnimatePresence>
       )}
+
+      <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} />
     </div>
   )
 }

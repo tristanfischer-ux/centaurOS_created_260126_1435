@@ -1,0 +1,476 @@
+/**
+ * @file export-design-report-docx.ts
+ *
+ * @description Exports a Design Report as a branded .docx Word document.
+ * Sections: cover page, product overview, research findings, module breakdown
+ * with blueprint images, specifications summary, and cost estimates.
+ *
+ * @related
+ * - src/lib/cad-lab/design-report-types.ts — DesignReportData shape
+ * - src/lib/reports/markdown-to-docx.ts — Shared markdown parser
+ * - src/lib/reports/export-docx.ts — Pattern reference (fetchImageAsBuffer)
+ */
+
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  HeadingLevel,
+  AlignmentType,
+  WidthType,
+  PageBreak,
+  BorderStyle,
+  ImageRun,
+  LevelFormat,
+} from 'docx'
+
+import type { DesignReportData } from '@/lib/cad-lab/design-report-types'
+import {
+  parseMarkdownToDocx,
+  ORANGE,
+  DARK_TEXT,
+  MID_TEXT,
+  LIGHT_BG,
+  bodyParagraph as mdBodyParagraph,
+  bulletParagraph as mdBulletParagraph,
+} from '@/lib/reports/markdown-to-docx'
+
+// ─── Helpers ────────────────────────────────────────────────────────
+
+const THIN_BORDER = {
+  top: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+  bottom: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+  left: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+  right: { style: BorderStyle.SINGLE, size: 1, color: 'E2E8F0' },
+} as const
+
+async function fetchImageAsBuffer(url: string): Promise<ArrayBuffer | null> {
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10_000)
+    const response = await fetch(url, { signal: controller.signal })
+    clearTimeout(timeout)
+    if (!response.ok) return null
+    return await response.arrayBuffer()
+  } catch {
+    return null
+  }
+}
+
+function headerCell(text: string, widthPct: number): TableCell {
+  return new TableCell({
+    width: { size: widthPct, type: WidthType.PERCENTAGE },
+    borders: THIN_BORDER,
+    shading: { fill: LIGHT_BG },
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, bold: true, size: 18, color: MID_TEXT, font: 'Calibri' })],
+      }),
+    ],
+  })
+}
+
+function dataCell(text: string, widthPct: number): TableCell {
+  return new TableCell({
+    width: { size: widthPct, type: WidthType.PERCENTAGE },
+    borders: THIN_BORDER,
+    children: [
+      new Paragraph({
+        children: [new TextRun({ text, size: 20, color: DARK_TEXT, font: 'Calibri' })],
+      }),
+    ],
+  })
+}
+
+function sectionHeading(text: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 400, after: 200 },
+    children: [
+      new TextRun({ text, bold: true, size: 32, color: ORANGE, font: 'Calibri' }),
+    ],
+  })
+}
+
+function h3(text: string): Paragraph {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    spacing: { before: 240, after: 120 },
+    children: [
+      new TextRun({ text, bold: true, size: 28, color: DARK_TEXT, font: 'Calibri' }),
+    ],
+  })
+}
+
+function textParagraph(text: string, opts?: { after?: number; color?: string; italic?: boolean; size?: number }): Paragraph {
+  return new Paragraph({
+    spacing: { after: opts?.after ?? 120 },
+    children: [
+      new TextRun({
+        text,
+        size: opts?.size ?? 22,
+        color: opts?.color ?? DARK_TEXT,
+        font: 'Calibri',
+        italics: opts?.italic,
+      }),
+    ],
+  })
+}
+
+type DocChild = Paragraph | Table
+
+// ─── Diagnostic key labels ──────────────────────────────────────────
+
+const DIAG_KEYS = ['mfg_process', 'material', 'tolerance', 'finish', 'batch_size', 'environment'] as const
+const DIAG_LABELS: Record<string, string> = {
+  mfg_process: 'Process',
+  material: 'Material',
+  tolerance: 'Tolerance',
+  finish: 'Finish',
+  batch_size: 'Batch',
+  environment: 'Environment',
+}
+
+// ─── Public API ─────────────────────────────────────────────────────
+
+/**
+ * @description Generate a branded Word document from design report data
+ * and trigger a browser download.
+ */
+export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<void> {
+  const children: DocChild[] = []
+
+  // ── 1. Cover page ──
+  children.push(
+    new Paragraph({
+      spacing: { after: 400 },
+      children: [
+        new TextRun({
+          text: 'FRACTIONAL FORGE',
+          size: 28,
+          color: MID_TEXT,
+          characterSpacing: 80,
+          font: 'Calibri',
+        }),
+      ],
+    }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({ text: data.projectName, bold: true, size: 48, color: DARK_TEXT, font: 'Calibri' }),
+      ],
+    }),
+    textParagraph('Engineering Design Report', { after: 200, color: MID_TEXT, size: 24 }),
+    textParagraph(
+      new Date(data.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+      { after: 400, color: MID_TEXT },
+    ),
+  )
+
+  // Hero image on cover
+  if (data.heroImageUrl) {
+    const heroBuffer = await fetchImageAsBuffer(data.heroImageUrl)
+    if (heroBuffer) {
+      children.push(
+        new Paragraph({
+          spacing: { after: 200 },
+          children: [
+            new ImageRun({
+              data: heroBuffer,
+              transformation: { width: 600, height: 340 },
+              type: 'png',
+            }),
+          ],
+        }),
+      )
+    }
+  }
+
+  children.push(new Paragraph({ children: [new PageBreak()] }))
+
+  // ── 2. Product Overview ──
+  if (data.productOverview) {
+    children.push(sectionHeading('Product Overview'))
+    children.push(textParagraph(data.productOverview, { after: 200 }))
+
+    // Design brief table
+    if (data.designBrief) {
+      const briefEntries: [string, string][] = []
+      if (data.designBrief.useCase) briefEntries.push(['Use Case', data.designBrief.useCase])
+      if (data.designBrief.targetProcess) briefEntries.push(['Target Process', data.designBrief.targetProcess])
+      if (data.designBrief.targetMaterial) briefEntries.push(['Target Material', data.designBrief.targetMaterial])
+      if (data.designBrief.toleranceTarget) briefEntries.push(['Tolerance Target', data.designBrief.toleranceTarget])
+      if (data.designBrief.quantityTarget) briefEntries.push(['Quantity Target', data.designBrief.quantityTarget])
+      if (data.designBrief.complianceNotes) briefEntries.push(['Compliance', data.designBrief.complianceNotes])
+
+      if (briefEntries.length > 0) {
+        children.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [headerCell('Parameter', 35), headerCell('Value', 65)],
+              }),
+              ...briefEntries.map(
+                ([label, value]) =>
+                  new TableRow({ children: [dataCell(label, 35), dataCell(value, 65)] }),
+              ),
+            ],
+          }),
+        )
+        children.push(textParagraph('', { after: 200 }))
+      }
+    }
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── 3. Research Findings ──
+  if (data.researchReport) {
+    children.push(sectionHeading('Research Findings'))
+    const researchParagraphs = parseMarkdownToDocx(data.researchReport)
+    children.push(...researchParagraphs)
+
+    // Source citations
+    if (data.sources.length > 0) {
+      children.push(
+        new Paragraph({
+          spacing: { before: 300, after: 120 },
+          children: [
+            new TextRun({ text: 'Sources', bold: true, size: 24, color: DARK_TEXT, font: 'Calibri' }),
+          ],
+        }),
+      )
+      for (const source of data.sources) {
+        children.push(mdBulletParagraph(`${source.title} — ${source.url}`))
+      }
+    }
+
+    if (data.researchModelUsed) {
+      children.push(
+        textParagraph(`Research model: ${data.researchModelUsed}`, { after: 120, color: MID_TEXT, italic: true, size: 18 }),
+      )
+    }
+
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── 4. Module Breakdown ──
+  if (data.modules.length > 0) {
+    children.push(sectionHeading('Module Breakdown'))
+
+    if (data.decompositionModelUsed) {
+      children.push(
+        textParagraph(`Decomposition model: ${data.decompositionModelUsed}`, { after: 200, color: MID_TEXT, italic: true, size: 18 }),
+      )
+    }
+
+    // Pre-fetch all module images in parallel
+    const imageUrls = data.modules.map((m) => m.imageUrl)
+    const imageResults = await Promise.allSettled(
+      imageUrls.map((url) => (url ? fetchImageAsBuffer(url) : Promise.resolve(null))),
+    )
+
+    for (let idx = 0; idx < data.modules.length; idx++) {
+      const mod = data.modules[idx]
+      children.push(h3(`${idx + 1}. ${mod.name}`))
+
+      // Blueprint image
+      const imgResult = imageResults[idx]
+      const imgBuffer = imgResult.status === 'fulfilled' ? imgResult.value : null
+      if (imgBuffer) {
+        children.push(
+          new Paragraph({
+            spacing: { after: 120 },
+            children: [
+              new ImageRun({
+                data: imgBuffer,
+                transformation: { width: 400, height: 250 },
+                type: 'png',
+              }),
+            ],
+          }),
+        )
+      }
+
+      // Purpose & description
+      if (mod.purpose) children.push(textParagraph(mod.purpose, { after: 80 }))
+      if (mod.description) children.push(mdBodyParagraph(mod.description))
+
+      // Key parts
+      if (mod.keyParts && mod.keyParts.length > 0) {
+        children.push(
+          new Paragraph({
+            spacing: { before: 120, after: 60 },
+            children: [new TextRun({ text: 'Key Parts:', bold: true, size: 22, color: DARK_TEXT, font: 'Calibri' })],
+          }),
+        )
+        for (const part of mod.keyParts) {
+          children.push(mdBulletParagraph(part))
+        }
+      }
+
+      // Failure modes
+      if (mod.failureModes && mod.failureModes.length > 0) {
+        children.push(
+          new Paragraph({
+            spacing: { before: 120, after: 60 },
+            children: [new TextRun({ text: 'Failure Modes:', bold: true, size: 22, color: DARK_TEXT, font: 'Calibri' })],
+          }),
+        )
+        for (const fm of mod.failureModes) {
+          children.push(mdBulletParagraph(fm))
+        }
+      }
+
+      // Module specs table
+      const specRows: [string, string][] = []
+      if (mod.leadWeeks != null) specRows.push(['Lead Time', `${mod.leadWeeks} weeks`])
+      if (mod.estimatedMassKg != null) specRows.push(['Estimated Mass', `${mod.estimatedMassKg} kg`])
+      if (mod.inputs && mod.inputs.length > 0) specRows.push(['Inputs', mod.inputs.join(', ')])
+      if (mod.outputs && mod.outputs.length > 0) specRows.push(['Outputs', mod.outputs.join(', ')])
+
+      if (specRows.length > 0) {
+        children.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: specRows.map(
+              ([label, value]) =>
+                new TableRow({ children: [dataCell(label, 30), dataCell(value, 70)] }),
+            ),
+          }),
+        )
+      }
+
+      children.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+  }
+
+  // ── 5. Specifications Summary ──
+  const moduleIdsWithDiag = Object.keys(data.diagnosticAnswers)
+  if (moduleIdsWithDiag.length > 0) {
+    children.push(sectionHeading('Specifications Summary'))
+
+    const specHeaderCells = [headerCell('Module', 20)]
+    for (const key of DIAG_KEYS) {
+      specHeaderCells.push(headerCell(DIAG_LABELS[key], 13))
+    }
+
+    const specRows: TableRow[] = [new TableRow({ children: specHeaderCells })]
+
+    for (const moduleId of moduleIdsWithDiag) {
+      const mod = data.modules.find((m) => m.id === moduleId)
+      const answers = data.diagnosticAnswers[moduleId]
+      if (!mod || !answers) continue
+
+      const cells = [dataCell(mod.name, 20)]
+      for (const key of DIAG_KEYS) {
+        cells.push(dataCell(answers[key] ?? '—', 13))
+      }
+      specRows.push(new TableRow({ children: cells }))
+    }
+
+    children.push(
+      new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: specRows }),
+    )
+    children.push(new Paragraph({ children: [new PageBreak()] }))
+  }
+
+  // ── 6. Cost Estimates ──
+  const costModuleIds = Object.keys(data.aiCostEstimates)
+  if (costModuleIds.length > 0) {
+    children.push(sectionHeading('Cost Estimates'))
+
+    const costRows: TableRow[] = [
+      new TableRow({
+        children: [
+          headerCell('Module', 30),
+          headerCell('Total / Unit', 20),
+          headerCell('Confidence', 15),
+          headerCell('Assumptions', 35),
+        ],
+      }),
+    ]
+
+    for (const moduleId of costModuleIds) {
+      const mod = data.modules.find((m) => m.id === moduleId)
+      const est = data.aiCostEstimates[moduleId]
+      if (!mod || !est) continue
+
+      costRows.push(
+        new TableRow({
+          children: [
+            dataCell(mod.name, 30),
+            dataCell(`£${est.totalPerUnit.toFixed(2)}`, 20),
+            dataCell(est.confidence, 15),
+            dataCell(est.assumptions?.join('; ') ?? '—', 35),
+          ],
+        }),
+      )
+    }
+
+    children.push(
+      new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: costRows }),
+    )
+  }
+
+  // ── 7. Footer ──
+  children.push(
+    new Paragraph({
+      spacing: { before: 600 },
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({ text: 'Generated by ForgeOS', size: 18, color: MID_TEXT, italics: true, font: 'Calibri' }),
+      ],
+    }),
+  )
+
+  // ── Build document ──
+  const doc = new Document({
+    creator: 'ForgeOS',
+    title: `${data.projectName} — Engineering Design Report`,
+    description: `Design report for ${data.projectName}`,
+    numbering: {
+      config: [
+        {
+          reference: 'default-numbering',
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.DECIMAL,
+              text: '%1.',
+              alignment: AlignmentType.START,
+              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+            },
+          ],
+        },
+      ],
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+          },
+        },
+        children,
+      },
+    ],
+  })
+
+  const blob = await Packer.toBlob(doc)
+  const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
+  const dateStr = new Date(data.generatedAt).toISOString().split('T')[0]
+  const filename = `${safeName}-Design-Report-${dateStr}.docx`
+
+  const url = URL.createObjectURL(blob)
+  const link = window.document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+}
