@@ -117,8 +117,8 @@ export async function withAIGate<T>(
     try {
       result = await action({ ...authCtx, trackUsage })
     } catch (err) {
-      // SECURITY: Track usage even when the action throws — AI tokens were
-      // already consumed. Without this, thrown errors bypass the monthly counter.
+      // SECURITY: Track usage even when the action throws — the AI call may
+      // have already been made. Without this, thrown errors bypass the monthly counter.
       if (!manuallyTracked) {
         trackAIUsage({
           foundryId: authCtx.foundryId,

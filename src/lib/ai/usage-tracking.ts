@@ -77,6 +77,7 @@ export type AIFeature =
   | 'specialist_image'
   | 'specialist_audio'
   | 'specialist_video'
+  | 'specialist_slides'
   // Enrichment & reports
   | 'enrichment'
   | 'weekly_report'
