@@ -1,0 +1,139 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { Trash2, AlertTriangle, Loader2 } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { deleteMyAccount } from "@/actions/account"
+
+interface AccountDangerZoneProps {
+  userEmail: string
+}
+
+export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const isConfirmed = confirmText === "DELETE"
+
+  async function handleDelete() {
+    setIsDeleting(true)
+    setError(null)
+
+    const result = await deleteMyAccount()
+
+    if (result.success) {
+      router.push("/login")
+      return
+    }
+
+    setError(result.error || "An unexpected error occurred.")
+    setIsDeleting(false)
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen)
+    if (!nextOpen) {
+      setConfirmText("")
+      setError(null)
+    }
+  }
+
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div>
+            <CardTitle className="text-base">Delete Account</CardTitle>
+            <CardDescription className="mt-1">
+              Permanently delete your account and all associated data. This action cannot be undone.
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ul className="text-sm text-muted-foreground space-y-1 mb-4 list-disc list-inside">
+          <li>You will be removed from all foundries</li>
+          <li>Your profile and personal data will be deleted</li>
+          <li>Task assignments will be unlinked (tasks themselves are preserved)</li>
+          <li>This cannot be undone</li>
+        </ul>
+
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+          <DialogTrigger asChild>
+            <Button variant="destructive">Delete My Account</Button>
+          </DialogTrigger>
+          <DialogContent size="md">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-full bg-destructive/10 text-destructive">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <DialogTitle>Delete your account?</DialogTitle>
+              </div>
+              <DialogDescription className="pt-2">
+                This will permanently delete the account for <strong>{userEmail}</strong>.
+                Your profile, memberships, and assignments will be removed. Tasks and foundries
+                you belong to will not be deleted.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Type <strong>DELETE</strong> to confirm:
+              </p>
+              <Input
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                disabled={isDeleting}
+                autoComplete="off"
+              />
+            </div>
+
+            {error && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="secondary"
+                onClick={() => handleOpenChange(false)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={!isConfirmed || isDeleting}
+              >
+                {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Permanently Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </CardContent>
+    </Card>
+  )
+}

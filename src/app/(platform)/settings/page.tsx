@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
+import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
 import {
     User,
     ArrowRight,
@@ -13,6 +14,7 @@ import {
     Shield,
     Mail,
     FileSpreadsheet,
+    Trash2,
 } from 'lucide-react'
 
 /**
@@ -121,6 +123,9 @@ export default async function SettingsPage() {
                 </Link>
             </div>
 
+            {/* Setup wizard restart */}
+            <RestartSetupWizardCard />
+
             {/* Notification preferences teaser */}
             <Card>
                 <CardHeader>
@@ -146,6 +151,24 @@ export default async function SettingsPage() {
 
             {/* Sign out */}
             <SignOutCard />
+
+            {/* Delete account */}
+            <Link href="/settings/account" className="block">
+                <Card className="border-destructive/30 hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-lg bg-destructive/10 text-destructive">
+                                <Trash2 className="h-5 w-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-foreground">Delete Account</p>
+                                <p className="text-xs text-muted-foreground">Permanently delete your account and all associated data.</p>
+                            </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                </Card>
+            </Link>
         </div>
     )
 }
