@@ -359,13 +359,15 @@ export default function SpecifyPage(): React.ReactNode {
   const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped)
 
   // ── Batch review orchestrator ──
-  // INTENT: Sequential auto-review of all unreviewed modules. Reuses SpecialistReviewPanel's
-  // existing two-phase flow (quick verdict → full review) by setting triggerReview prop
-  // on one module at a time, then advancing on completion or error.
+  // INTENT: Parallel auto-review of all unreviewed modules (up to BATCH_CONCURRENCY at once).
+  // Reuses SpecialistReviewPanel's existing two-phase flow (quick verdict → full review)
+  // by setting triggerReview prop on active modules, refilling from queue on completion.
 
+  const BATCH_CONCURRENCY = 3
   const [batchReviewActive, setBatchReviewActive] = useState(false)
-  const [batchCurrentModuleId, setBatchCurrentModuleId] = useState<string | null>(null)
+  const [batchActiveEntries, setBatchActiveEntries] = useState<Map<string, string>>(new Map()) // Map<moduleId, specialistId>
   const [batchCompletedCount, setBatchCompletedCount] = useState(0)
+  const [batchTotalCount, setBatchTotalCount] = useState(0)
   const [batchQueue, setBatchQueue] = useState<Array<{ moduleId: string; specialistId: string }>>([])
   const batchCancelledRef = useRef(false)
 
@@ -394,36 +396,51 @@ export default function SpecifyPage(): React.ReactNode {
     }
     if (queue.length === 0) return
     batchCancelledRef.current = false
-    setBatchQueue(queue)
+    const initialBatch = queue.slice(0, BATCH_CONCURRENCY)
+    const remaining = queue.slice(BATCH_CONCURRENCY)
+    setBatchActiveEntries(new Map(initialBatch.map((q) => [q.moduleId, q.specialistId])))
+    setBatchQueue(remaining)
     setBatchCompletedCount(0)
+    setBatchTotalCount(queue.length)
     setBatchReviewActive(true)
-    setBatchCurrentModuleId(queue[0].moduleId)
   }, [modules, diagnosticAnswers, moduleReviews])
 
-  const advanceBatchReview = useCallback(() => {
+  // INTENT: Called when a single module's review completes (success or error).
+  // Removes it from the active set, then pulls the next queued module in (unless cancelled).
+  // Uses separate setState calls — React 18 batches them into a single render.
+  const advanceBatchReview = useCallback((completedModuleId: string) => {
     setBatchCompletedCount((prev) => prev + 1)
-    if (batchCancelledRef.current) {
-      setBatchReviewActive(false)
-      setBatchCurrentModuleId(null)
-      setBatchQueue([])
-      return
-    }
-    setBatchQueue((prev) => {
-      const remaining = prev.slice(1)
-      if (remaining.length === 0) {
-        setBatchReviewActive(false)
-        setBatchCurrentModuleId(null)
-        return []
-      }
-      setBatchCurrentModuleId(remaining[0].moduleId)
-      return remaining
+
+    // Step 1: Remove completed module from active set
+    setBatchActiveEntries((prev) => {
+      const next = new Map(prev)
+      next.delete(completedModuleId)
+      return next
     })
+
+    // Step 2: Pull next from queue into active set (if not cancelled)
+    if (!batchCancelledRef.current) {
+      setBatchQueue((prevQueue) => {
+        if (prevQueue.length === 0) return prevQueue
+        const [nextEntry, ...rest] = prevQueue
+        setBatchActiveEntries((prev) => new Map(prev).set(nextEntry.moduleId, nextEntry.specialistId))
+        return rest
+      })
+    }
   }, [])
 
   const cancelBatchReview = useCallback(() => {
     batchCancelledRef.current = true
-    // Current in-flight review finishes naturally; no more will start
+    // In-flight reviews finish naturally; advanceBatchReview won't pull new modules
   }, [])
+
+  // INTENT: Detect batch completion — when all active reviews have drained and no queue remains.
+  // Runs after React batches the state updates from advanceBatchReview.
+  useEffect(() => {
+    if (batchReviewActive && batchActiveEntries.size === 0) {
+      setBatchReviewActive(false)
+    }
+  }, [batchReviewActive, batchActiveEntries.size])
 
   // ── Tab navigation ──
   const TABS = [
@@ -1183,7 +1200,7 @@ export default function SpecifyPage(): React.ReactNode {
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-international-orange" />
-                          <span>{batchCompletedCount}/{batchQueue.length + batchCompletedCount} reviewed</span>
+                          <span>{batchCompletedCount}/{batchTotalCount} reviewed</span>
                         </div>
                         <Button variant="ghost" size="sm" onClick={cancelBatchReview} className="h-7 gap-1 text-xs">
                           <XCircle className="h-3 w-3" />
@@ -1225,10 +1242,10 @@ export default function SpecifyPage(): React.ReactNode {
               const diagComplete = isDiagnosticsFilledForModule(diagnosticAnswers, mod.id)
               const reviews = moduleReviews[mod.id] ?? []
 
-              // INTENT: Batch orchestrator sets triggerReview only on the current target module.
+              // INTENT: Batch orchestrator sets triggerReview on all active modules (up to BATCH_CONCURRENCY).
               // Other modules get undefined — their individual buttons still work normally.
-              const isBatchTarget = batchReviewActive && batchCurrentModuleId === mod.id
-              const batchEntry = isBatchTarget ? batchQueue.find((q) => q.moduleId === mod.id) : undefined
+              const isBatchTarget = batchReviewActive && batchActiveEntries.has(mod.id)
+              const batchSpecialistId = batchActiveEntries.get(mod.id)
 
               return (
                 <Card key={mod.id} className={cn(isBatchTarget && "ring-2 ring-international-orange/30")}>
@@ -1263,13 +1280,13 @@ export default function SpecifyPage(): React.ReactNode {
                         diagnosticAnswers={diagnosticAnswers}
                         onReviewComplete={(review) => {
                           handleReviewComplete(mod.id, review)
-                          if (isBatchTarget) advanceBatchReview()
+                          if (isBatchTarget) advanceBatchReview(mod.id)
                         }}
                         pendingReviewKeys={pendingReviewKeys}
                         onMarkPending={markReviewPending}
                         onClearPending={clearReviewPending}
-                        triggerReview={batchEntry?.specialistId}
-                        onReviewError={isBatchTarget ? () => advanceBatchReview() : undefined}
+                        triggerReview={batchSpecialistId}
+                        onReviewError={isBatchTarget ? () => advanceBatchReview(mod.id) : undefined}
                       />
                     ) : !activeProjectId ? (
                       <p className="text-xs text-muted-foreground italic">
