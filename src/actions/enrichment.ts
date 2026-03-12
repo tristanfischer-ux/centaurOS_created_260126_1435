@@ -28,6 +28,9 @@ import { analyzeCompetitors } from '@/lib/enrichment/competitor-discovery'
 import type { CompanyIntelligence, CompanyProfile } from '@/types/foundry'
 import type { Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { checkAILimit } from '@/lib/ai/limit-check'
+import { trackAIUsage } from '@/lib/ai/usage-tracking'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -76,6 +79,16 @@ export async function enrichCompanyWebsite(foundryId: string): Promise<Enrichmen
     return { success: false, error: 'Only Founders and Executives can trigger enrichment' }
   }
 
+  // SECURITY: Check AI quota and rate limit before expensive AI calls
+  const limitCheck = await checkAILimit(foundryId)
+  if (!limitCheck.allowed) {
+    return { success: false, error: limitCheck.message || 'AI usage limit reached' }
+  }
+  const rl = await rateLimit('aiEnrichment', foundryId)
+  if (!rl.success) {
+    return { success: false, error: rl.error || 'Too many enrichment requests. Please wait.' }
+  }
+
   try {
     // 1. Fetch the company website URL
     const { data: foundry } = await supabase
@@ -122,6 +135,9 @@ export async function enrichCompanyWebsite(foundryId: string): Promise<Enrichmen
 
     // 3. Summarize with AI
     const aiSummary = await summarizeWebsiteContent(scrapeResult.pages, companyName)
+
+    // Track AI usage (fire-and-forget)
+    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.5' }).catch(() => {})
 
     // 4. Merge with existing company_intel (preserve competitor data, etc.)
     const existingIntel = foundry.company_intel as CompanyIntelligence | null
@@ -300,6 +316,16 @@ export async function enrichCompetitors(foundryId: string): Promise<EnrichmentAc
     return { success: false, error: 'Insufficient permissions' }
   }
 
+  // SECURITY: Check AI quota and rate limit before expensive AI calls
+  const limitCheck = await checkAILimit(foundryId)
+  if (!limitCheck.allowed) {
+    return { success: false, error: limitCheck.message || 'AI usage limit reached' }
+  }
+  const rl = await rateLimit('aiEnrichment', foundryId)
+  if (!rl.success) {
+    return { success: false, error: rl.error || 'Too many enrichment requests. Please wait.' }
+  }
+
   try {
     // 1. Fetch company data
     const { data: foundry } = await supabase
@@ -334,6 +360,9 @@ export async function enrichCompetitors(foundryId: string): Promise<EnrichmentAc
 
     // 2. Analyze competitors
     const competitorProfiles = await analyzeCompetitors(competitorInputs, companyContext)
+
+    // Track AI usage (fire-and-forget)
+    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.5' }).catch(() => {})
 
     // 3. Merge into existing company_intel
     const existingIntel = foundry.company_intel as CompanyIntelligence | null

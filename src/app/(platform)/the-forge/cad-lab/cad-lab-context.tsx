@@ -638,6 +638,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         projectSubject: subject,
       })
 
+      // GOTCHA: withAIGate returns { error, limitReached } when quota exhausted,
+      // cast as the return type. Detect this before treating as module revisions.
+      const revAsAny = revised as Record<string, unknown>
+      if ('error' in revAsAny && typeof revAsAny.error === 'string') {
+        toast.error(revAsAny.error as string)
+        return
+      }
+
       if (Object.keys(revised).length === 0) {
         toast.error("Revision failed — no modules were updated")
         return

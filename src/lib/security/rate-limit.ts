@@ -103,8 +103,14 @@ export const RATE_LIMIT_CONFIGS = {
     aiOutreach: { limit: 5, window: 60 * 1000 },            // 5 outreach AI calls per minute (heavy multi-turn)
     aiGrammar: { limit: 20, window: 60 * 1000 },             // 20 grammar AI calls per minute (research uses 3 per invocation)
     
+    // AI worker & enrichment
+    aiWorker: { limit: 10, window: 60 * 1000 },             // 10 AI worker triggers per minute per foundry
+    aiEnrichment: { limit: 5, window: 60 * 1000 },          // 5 enrichment calls per minute per foundry
+
     // Telegram bot
     telegram: { limit: 20, window: 60 * 60 * 1000 },      // 20 commands per hour
+    telegramSpecialist: { limit: 15, window: 60 * 1000 },  // 15 specialist messages per minute per user
+    telegramVoice: { limit: 5, window: 60 * 1000 },        // 5 voice transcriptions per minute per user
     
     // Email/invitations
     emailInvite: { limit: 10, window: 60 * 60 * 1000 },   // 10 invitations per hour

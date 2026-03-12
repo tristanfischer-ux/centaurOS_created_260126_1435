@@ -4,6 +4,9 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { Database } from '@/types/database.types'
 import { runAIWorker } from '@/lib/ai-worker'
+import { checkAILimit } from '@/lib/ai/limit-check'
+import { trackAIUsage } from '@/lib/ai/usage-tracking'
+import { rateLimit } from '@/lib/security/rate-limit'
 import { logTaskHistory } from '@/lib/audit'
 import { createTaskSchema, updateTaskDatesSchema, addCommentSchema, validate } from '@/lib/validations'
 import { withRetry } from '@/lib/retry'
@@ -394,9 +397,16 @@ export async function createTask(formData: FormData) {
           // Continue - logging failure shouldn't fail task creation
       }
 
-      // Trigger AI Worker for primary assignee
+      // Trigger AI Worker for primary assignee (gated by quota + rate limit)
       try {
-          await runAIWorker(data.id, validatedAssigneeIds[0])
+          const limitCheck = await checkAILimit(foundryId)
+          const rl = await rateLimit('aiWorker', foundryId)
+          if (limitCheck.allowed && rl.success) {
+              await runAIWorker(data.id, validatedAssigneeIds[0])
+              trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-4o' }).catch(() => {})
+          } else {
+              console.info('[TaskService] AI worker skipped (quota/rate limit):', { foundryId, allowed: limitCheck.allowed, rateLimited: !rl.success })
+          }
       } catch (error) {
           console.error('[TaskService] Failed to trigger AI worker:', { error: error instanceof Error ? error.message : 'Unknown error' })
           // Continue - AI worker failure shouldn't fail task creation
@@ -677,9 +687,16 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
 
-        // Trigger AI Worker
+        // Trigger AI Worker (gated by quota + rate limit)
         try {
-            await runAIWorker(taskId, newAssigneeId)
+            const limitCheck = await checkAILimit(foundryId)
+            const rl = await rateLimit('aiWorker', foundryId)
+            if (limitCheck.allowed && rl.success) {
+                await runAIWorker(taskId, newAssigneeId)
+                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-4o' }).catch(() => {})
+            } else {
+                console.info('[TaskService] AI worker skipped on forward (quota/rate limit):', { foundryId })
+            }
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             // Continue - AI worker failure shouldn't fail forwarding
@@ -1511,9 +1528,20 @@ export async function triggerAIWorker(taskId: string) {
             return { error: 'Task is not assigned to an AI agent' }
         }
 
+        // SECURITY: Check AI quota before triggering (explicit user action — return error on denial)
+        const limitCheck = await checkAILimit(foundryId)
+        if (!limitCheck.allowed) {
+            return { error: limitCheck.message }
+        }
+        const rl = await rateLimit('aiWorker', foundryId)
+        if (!rl.success) {
+            return { error: rl.error || 'Too many AI requests. Please wait a moment.' }
+        }
+
         // Run the AI worker
         try {
             await runAIWorker(taskId, task.assignee_id)
+            trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-4o' }).catch(() => {})
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             return { error: 'Failed to trigger AI worker' }
@@ -1811,9 +1839,16 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
             console.error('[TaskService] Failed to log task history:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
         }
 
-        // Potentially trigger AI worker if new primary is AI?
+        // Potentially trigger AI worker if new primary is AI? (gated by quota + rate limit)
         try {
-            await runAIWorker(taskId, primaryAssigneeId)
+            const limitCheck = await checkAILimit(foundryId)
+            const rl = await rateLimit('aiWorker', foundryId)
+            if (limitCheck.allowed && rl.success) {
+                await runAIWorker(taskId, primaryAssigneeId)
+                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-4o' }).catch(() => {})
+            } else {
+                console.info('[TaskService] AI worker skipped on assignee update (quota/rate limit):', { foundryId })
+            }
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             // Continue - AI worker failure shouldn't fail assignee update

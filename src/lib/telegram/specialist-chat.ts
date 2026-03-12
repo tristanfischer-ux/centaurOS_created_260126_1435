@@ -35,6 +35,9 @@ import {
 } from '@/lib/agent-memory'
 
 import type { AIProviderId } from '@/lib/ai-providers/types'
+import { checkAILimit } from '@/lib/ai/limit-check'
+import { trackAIUsage } from '@/lib/ai/usage-tracking'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -307,6 +310,16 @@ export async function sendToSpecialist(
         console.warn('[Telegram/SpecialistChat] Failed to record user message:', err)
     }
 
+    // SECURITY: Check AI quota and rate limit before calling AI provider
+    const limitCheck = await checkAILimit(session.foundryId)
+    if (!limitCheck.allowed) {
+        throw new Error(limitCheck.message || 'AI usage limit reached')
+    }
+    const rl = await rateLimit('telegramSpecialist', session.userId)
+    if (!rl.success) {
+        throw new Error(rl.error || 'Too many messages. Please wait a moment.')
+    }
+
     // Call AI provider directly
     const streamFn = getTextProvider(providerId)
     if (!streamFn) {
@@ -332,6 +345,9 @@ export async function sendToSpecialist(
             console.error('[Telegram/SpecialistChat] Stream error:', error)
         },
     })
+
+    // Track AI usage (fire-and-forget)
+    trackAIUsage({ foundryId: session.foundryId, userId: session.userId, feature: 'specialist_text', model: modelId }).catch(() => {})
 
     // Record assistant response to memory (fire-and-forget)
     if (fullOutput) {
@@ -739,9 +755,23 @@ export async function handleSpecialistVoiceMessage(
     })
 
     try {
+        // SECURITY: Rate limit voice transcriptions
+        const voiceRl = await rateLimit('telegramVoice', userId)
+        if (!voiceRl.success) {
+            await editMessage({
+                chat_id: chatId,
+                message_id: processingMsg.message_id,
+                text: `Too many voice messages. Please wait a moment and try again.`,
+            })
+            return true
+        }
+
         // Transcribe using Whisper
         const { transcribeVoice } = await import('./ai-processor')
         const transcription = await transcribeVoice(audioBuffer, mimeType)
+
+        // Track STT usage (fire-and-forget)
+        trackAIUsage({ foundryId, userId, feature: 'specialist_stt', model: 'whisper-1' }).catch(() => {})
 
         if (!transcription || transcription.trim().length === 0) {
             await editMessage({
