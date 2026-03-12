@@ -16,12 +16,7 @@ import { getMyDailyPulse, type DailyPulseResult } from "@/actions/reports"
 import { getStrategyHealthSummary } from "@/actions/canvas"
 import { getUnreadCount } from "@/actions/messaging"
 import { TodayView } from "./today-view"
-import dynamic from "next/dynamic"
-
-const SetupWizardTrigger = dynamic(
-    () => import("@/components/onboarding/setup-wizard-trigger").then((mod) => ({ default: mod.SetupWizardTrigger })),
-    { ssr: false }
-)
+import { SetupWizardTrigger } from "@/components/onboarding/setup-wizard-trigger"
 
 export const metadata: Metadata = {
     title: "Today | ForgeOS",
