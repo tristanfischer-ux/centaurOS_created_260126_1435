@@ -189,6 +189,8 @@ export async function updateSession(request: NextRequest) {
                 '/help',
                 '/rfq',
                 '/profile',
+                '/my-listing',
+                '/claim',
             ]
 
             const isAllowedForSupplier = supplierAllowedRoutes.some(route =>

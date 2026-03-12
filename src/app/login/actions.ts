@@ -94,14 +94,15 @@ export async function login(formData: FormData) {
             .eq('id', loggedInUser.id)
             .single()
         
-        // Suppliers go to their dedicated portal
-        if (profile?.account_type === 'supplier') {
-            redirect('/supplier-portal')
-        }
-
-        // INTENT: Honor the redirect param for non-supplier accounts
+        // INTENT: Honor the redirect param first — suppliers may be returning
+        // to a claim page after login, and must not be short-circuited.
         if (redirectTo) {
             redirect(redirectTo)
+        }
+
+        // Suppliers go to their dedicated portal (only when no redirect)
+        if (profile?.account_type === 'supplier') {
+            redirect('/supplier-portal')
         }
 
         // Check how many foundries the user belongs to

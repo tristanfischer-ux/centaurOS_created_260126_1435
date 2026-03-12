@@ -16,6 +16,14 @@ import { validateClaimToken, redeemClaim } from '@/actions/listing-claims'
 import type { ClaimValidation } from '@/actions/listing-claims'
 import { toast } from 'sonner'
 
+/** Mask email for display: j***@example.com */
+function maskEmail(email: string): string {
+    const [local, domain] = email.split('@')
+    if (!domain) return '***'
+    const visible = local.slice(0, 1)
+    return `${visible}***@${domain}`
+}
+
 interface ClaimViewProps {
     token: string
     isAuthenticated: boolean
@@ -58,8 +66,17 @@ export function ClaimView({ token, isAuthenticated }: ClaimViewProps) {
         })
     }
 
+    // SECURITY: Validate token format before embedding in URLs
+    const safeToken = /^[a-f0-9]+$/.test(token) ? token : ''
+
     const handleLogin = () => {
-        router.push(`/login?redirect=/claim/${token}`)
+        if (!safeToken) return
+        router.push(`/login?redirect=/claim/${safeToken}`)
+    }
+
+    const handleSignUp = () => {
+        if (!safeToken) return
+        router.push(`/join/factory?redirect=/claim/${safeToken}`)
     }
 
     if (isLoading) {
@@ -125,7 +142,7 @@ export function ClaimView({ token, isAuthenticated }: ClaimViewProps) {
                             {claim?.company_name}
                         </h3>
                         <p className="text-sm text-muted-foreground mt-1">
-                            This listing was sent to {claim?.email}
+                            This listing was sent to {claim?.email ? maskEmail(claim.email) : 'your email'}
                         </p>
                     </div>
 
@@ -154,18 +171,36 @@ export function ClaimView({ token, isAuthenticated }: ClaimViewProps) {
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     <p className="text-sm text-muted-foreground">
-                                        To claim this listing, you need to create a free Fractional Forge account
-                                        or sign in to an existing one.
+                                        To claim this listing, create a free Fractional Forge account.
+                                        It takes under a minute and there&rsquo;s no cost or commitment.
                                     </p>
                                     <Button
+                                        onClick={handleSignUp}
+                                        className="w-full"
+                                        size="lg"
+                                    >
+                                        Create Free Account &amp; Claim
+                                    </Button>
+                                    <div className="relative">
+                                        <div className="absolute inset-0 flex items-center">
+                                            <span className="w-full border-t border-border" />
+                                        </div>
+                                        <div className="relative flex justify-center text-xs uppercase">
+                                            <span className="bg-card px-2 text-muted-foreground">
+                                                or
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="outline"
                                         onClick={handleLogin}
                                         className="w-full"
                                         size="lg"
                                     >
                                         <LogIn className="h-4 w-4 mr-2" />
-                                        Sign In to Claim
+                                        Already have an account? Sign in
                                     </Button>
                                 </div>
                             )}

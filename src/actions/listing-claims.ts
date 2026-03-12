@@ -144,6 +144,16 @@ export async function redeemClaim(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Please sign in to claim this listing' }
 
+    // SECURITY: Verify the authenticated user's email matches the claim token's
+    // intended recipient. Prevents claim hijacking if a token URL is leaked.
+    const validation = await validateClaimToken(token)
+    if (!validation.data?.is_valid) {
+        return { error: 'This claim link is invalid or has expired' }
+    }
+    if (user.email?.toLowerCase() !== validation.data.email?.toLowerCase()) {
+        return { error: 'This claim was sent to a different email address. Please sign in with the email that received the claim link.' }
+    }
+
     const { data, error } = await supabase.rpc('redeem_listing_claim', { p_token: token })
 
     if (error) {
