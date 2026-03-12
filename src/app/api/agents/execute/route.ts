@@ -3,8 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { NextResponse } from "next/server"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { checkAILimit } from "@/lib/ai/limit-check"
-import { estimateAICost, trackAIUsage } from "@/lib/ai/usage-tracking"
-import type { AIFeature } from "@/lib/ai/usage-tracking"
+import { estimateAICost, trackAIUsage, MODALITY_FEATURE_MAP } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
 import { getTextProvider, getImageProvider, getAudioProvider, getVideoProvider } from "@/lib/ai-providers/registry"
 import { decryptApiKey } from "@/lib/ai-providers/key-vault"
@@ -1073,7 +1072,7 @@ Rules:
     }
 
     // AUDIT: Usage logging — uses trackAIUsage to atomically increment monthly counters
-    const featureKey = `specialist_${modality}` as AIFeature
+    const featureKey = MODALITY_FEATURE_MAP[modality] ?? 'other'
     const logUsageAfterCompletion = async (outputLength: number): Promise<void> => {
         if (!foundryId) return
         try {

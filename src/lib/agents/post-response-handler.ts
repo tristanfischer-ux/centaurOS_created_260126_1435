@@ -36,8 +36,7 @@ import {
     extractDecisionSummary,
     recordDecision,
 } from "@/lib/agents/decision-journal"
-import { estimateAICost, trackAIUsage } from "@/lib/ai/usage-tracking"
-import type { AIFeature } from "@/lib/ai/usage-tracking"
+import { estimateAICost, trackAIUsage, MODALITY_FEATURE_MAP } from "@/lib/ai/usage-tracking"
 import { countTokens } from "@/lib/agent-memory"
 import { recordInteraction } from "@/lib/agents/founder-preferences"
 import { addSpan, finishRollout } from "@/lib/agent-spans"
@@ -182,7 +181,7 @@ export function createPostResponseCallback(
             try {
                 const inputTokens = countTokens(finalPrompt) + countTokens(systemPromptWithContext)
                 const outputTokens = countTokens(fullOutput)
-                const featureKey = `specialist_${modality}` as AIFeature
+                const featureKey = MODALITY_FEATURE_MAP[modality] ?? 'other'
 
                 await trackAIUsage({
                     foundryId,

@@ -115,6 +115,7 @@ Do not say "I will do this". DO IT.`
 
         const completion = await openai.chat.completions.create({
             model: "gpt-4o",
+            max_tokens: 4096,
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: "Execute." }

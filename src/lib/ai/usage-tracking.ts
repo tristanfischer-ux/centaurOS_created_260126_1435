@@ -82,7 +82,22 @@ export type AIFeature =
   | 'enrichment'
   | 'weekly_report'
   | 'ai_worker'
+  // System
+  | 'background_sweep'
   | 'other'
+
+/**
+ * Type-safe mapping from output modality to AIFeature.
+ * Using `satisfies` ensures adding a new modality without updating this map
+ * produces a compile error — unlike the unsafe `as AIFeature` cast pattern.
+ */
+export const MODALITY_FEATURE_MAP: Record<string, AIFeature> = {
+  text: 'specialist_text',
+  image: 'specialist_image',
+  audio: 'specialist_audio',
+  video: 'specialist_video',
+  slides: 'specialist_slides',
+}
 
 /** Conversation modes that can be tracked alongside features */
 export type ConversationModeTracking = 'text' | 'voice' | 'avatar'
@@ -237,7 +252,7 @@ export async function trackAIUsage(
   try {
     const supabase = await createClient()
 
-    const model = params.model || 'gpt-4o'
+    const model = params.model || 'unknown'
     const promptTokens = params.promptTokens || 0
     const completionTokens = params.completionTokens || 0
     const estimatedCost = params.estimatedCostUsd
