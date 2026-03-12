@@ -14,6 +14,7 @@
 import { NextResponse } from "next/server"
 import { v4 as uuidv4 } from "uuid"
 import { createClient } from "@/lib/supabase/server"
+import { aiGuard } from "@/lib/ai/guard"
 import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { getSkillById } from "@/lib/document-skills"
@@ -37,12 +38,11 @@ type SSEEvent =
 // ─── POST handler ───────────────────────────────────────────────────
 
 export async function POST(request: Request): Promise<Response> {
-  // AUTH: Verify user session
+  // AUTH + AI GATE: Verify user session and check AI usage limits
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const guard = await aiGuard(supabase, 'report_generation')
+  if (guard.denied) return guard.response
+  const user = { id: guard.userId }
 
   // SECURITY: Rate limit
   const rateLimitResult = await rateLimit("api", `doc-skill:${user.id}`, {

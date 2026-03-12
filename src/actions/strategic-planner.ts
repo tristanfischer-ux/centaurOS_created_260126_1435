@@ -14,6 +14,7 @@
 import { revalidatePath } from 'next/cache'
 import OpenAI from 'openai'
 import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import type {
@@ -202,7 +203,7 @@ export async function generateStrategicPlan(
   goal: string,
   deadline: string
 ): Promise<{ plan?: StrategicPlan; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('strategic_planner', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI calls to prevent cost abuse
     const rateLimitError = await checkRateLimit('aiStrategicPlan', `ai:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

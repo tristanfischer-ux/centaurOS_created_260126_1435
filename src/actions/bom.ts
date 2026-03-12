@@ -13,6 +13,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type {
   StructuredPart,
@@ -135,7 +136,7 @@ export async function skeletonBom(
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomSkeletonResult> {
-  return withAuth(async ({ supabase }) => {
+  return withAIGate('bom', async ({ supabase }) => {
     if (!modules.length) {
       return { success: false, error: "No modules to generate BOM from", parts: [], bomLines: [] }
     }
@@ -279,7 +280,7 @@ export async function expandBomParts(
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomExpansionResult> {
-  return withAuth(async () => {
+  return withAIGate('bom', async () => {
     if (!skeletonParts.length) {
       return { success: false, error: "No skeleton parts to expand", expansions: {} }
     }
@@ -429,7 +430,7 @@ export async function generateBomFromModules(
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
 ): Promise<BomGenerationResult | { error: string }> {
-  return withAuth(async ({ supabase }) => {
+  return withAIGate('bom', async ({ supabase }) => {
     const start = Date.now()
 
     if (!modules.length) {

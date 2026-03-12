@@ -23,6 +23,7 @@ import { createClient } from "@/lib/supabase/server"
 import { researchAndCreateGrammar } from "@/actions/cad-grammar-research"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -343,18 +344,7 @@ export async function listGrammarVersions(
 export async function selectGrammar(
   productDescription: string,
 ): Promise<GrammarSelectionResult> {
-  // AUTH: Verify authenticated user
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return {
-      found: false,
-      grammar: null,
-      confidence: 0,
-      reasoning: "Authentication required",
-      shouldFallback: false,
-    }
-  }
+  return withAIGate('cad_lab_grammar', async ({ user }) => {
 
   // SECURITY: Rate limit AI calls
   const rateLimitError = await checkRateLimit('aiGrammar', user.id)
@@ -470,6 +460,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
       shouldFallback: true,
     }
   }
+  })
 }
 
 // ─── Parameter Extraction ───────────────────────────────────────────
@@ -491,20 +482,7 @@ export async function extractGrammarParams(
   grammar: CadGrammar,
   productDescription: string,
 ): Promise<GrammarParamsResult> {
-  // AUTH: Verify authenticated user
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return {
-      success: false,
-      error: "Authentication required",
-      params: {},
-      reasoning: "",
-      defaultedParams: [],
-      tokensIn: 0,
-      tokensOut: 0,
-    }
-  }
+  return withAIGate('cad_lab_grammar', async ({ user }) => {
 
   // SECURITY: Rate limit AI calls
   const rateLimitError = await checkRateLimit('aiGrammar', user.id)
@@ -595,6 +573,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
       tokensOut: 0,
     }
   }
+  })
 }
 
 // ─── Modal Execution ────────────────────────────────────────────────

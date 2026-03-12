@@ -18,7 +18,7 @@
  * - Personality: src/lib/agents/personality.ts
  */
 
-import { withAuth } from "@/lib/server-action-utils"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import type { Json } from "@/types/database.types"
 import type {
     CadLabModule,
@@ -94,7 +94,7 @@ export type ReviewResult =
 export async function requestSpecialistReview(
     req: ReviewRequest,
 ): Promise<ReviewResult> {
-    return withAuth(async ({ supabase, foundryId, user }) => {
+    return withAIGate('cad_lab_review', async ({ supabase, foundryId, user }) => {
         const userId = user.id
         const startTime = Date.now()
 
@@ -364,7 +364,7 @@ export interface QuickVerdictResult {
 export async function quickSpecialistVerdict(
     req: ReviewRequest,
 ): Promise<{ quickVerdict: QuickVerdictResult } | { error: string }> {
-    return withAuth(async () => {
+    return withAIGate('cad_lab_review', async () => {
         // ── Validate inputs ──
         if (!req.projectId || !/^[0-9a-f-]{36}$/.test(req.projectId)) {
             return { error: "Invalid project ID" }
@@ -605,7 +605,7 @@ export type CheckpointResult =
 export async function requestDecompositionCheckpoints(
     req: CheckpointRequest,
 ): Promise<CheckpointResult> {
-    return withAuth(async ({ supabase, foundryId }) => {
+    return withAIGate('cad_lab_review', async ({ supabase, foundryId }) => {
         if (!req.projectId || !/^[0-9a-f-]{36}$/.test(req.projectId)) {
             return { error: "Invalid project ID" }
         }
@@ -845,7 +845,7 @@ export async function reviseModulesFromCheckpoints(
     req: RevisionRequest,
 ): Promise<Record<string, RevisedModuleFields>> {
     // SECURITY: Authenticate caller to prevent unauthenticated API credit burn
-    return withAuth(async () => {
+    return withAIGate('cad_lab_review', async () => {
         const apiKey = process.env.ANTHROPIC_API_KEY
         if (!apiKey) {
             console.error("[CAD-REVIEWS] No API key for module revision")
@@ -984,7 +984,7 @@ export interface ReviewRevisionRequest {
 export async function reviseModulesFromReviews(
     req: ReviewRevisionRequest,
 ): Promise<Record<string, RevisedModuleFields>> {
-    return withAuth(async () => {
+    return withAIGate('cad_lab_review', async () => {
         const apiKey = process.env.ANTHROPIC_API_KEY
         if (!apiKey) {
             console.error("[CAD-REVIEWS] No API key for review-based revision")

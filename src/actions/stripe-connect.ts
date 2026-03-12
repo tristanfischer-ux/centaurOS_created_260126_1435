@@ -39,12 +39,10 @@ export async function createProviderStripeAccount(): Promise<{
         }
 
         // Check if user already has a Stripe account
-        // Note: This assumes there's a stripe_account_id column on profiles
-        // You may need to add this column or use a separate table
         const { data: existingAccount } = await supabase
-            .from('profiles')
+            .from('provider_profiles')
             .select('stripe_account_id')
-            .eq('id', user.id)
+            .eq('user_id', user.id)
             .single()
 
         if (existingAccount?.stripe_account_id) {
@@ -61,16 +59,19 @@ export async function createProviderStripeAccount(): Promise<{
             return { success: false, error: result.error }
         }
 
-        // Store the account ID in the database
+        // Store the account ID in the provider profile
         const { error: updateError } = await supabase
-            .from('profiles')
+            .from('provider_profiles')
             .update({ stripe_account_id: result.accountId })
-            .eq('id', user.id)
+            .eq('user_id', user.id)
 
         if (updateError) {
             console.error('Error storing Stripe account ID:', updateError)
-            // The account was created but we couldn't store it
-            // Return success but log the error
+            return {
+                success: false,
+                accountId: result.accountId ?? undefined,
+                error: 'Stripe account was created but could not be saved. Please contact support.',
+            }
         }
 
         revalidatePath('/settings')
@@ -103,14 +104,14 @@ export async function getStripeOnboardingLink(): Promise<{
             return { error: "Not authenticated" }
         }
 
-        // Get user's Stripe account ID
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
+        // Get user's Stripe account ID from provider profile
+        const { data: providerProfile, error: profileError } = await supabase
+            .from('provider_profiles')
             .select('stripe_account_id')
-            .eq('id', user.id)
+            .eq('user_id', user.id)
             .single()
 
-        if (profileError || !profile?.stripe_account_id) {
+        if (profileError || !providerProfile?.stripe_account_id) {
             return { error: "No Stripe account found. Please create one first." }
         }
 
@@ -118,7 +119,7 @@ export async function getStripeOnboardingLink(): Promise<{
         const refreshUrl = `${BASE_URL}/provider-portal/payments/callback?refresh=true`
         const returnUrl = `${BASE_URL}/provider-portal/payments/callback?onboarding=complete`
 
-        const result = await createAccountLink(profile.stripe_account_id, refreshUrl, returnUrl)
+        const result = await createAccountLink(providerProfile.stripe_account_id, refreshUrl, returnUrl)
         if (result.error) {
             return { error: result.error }
         }
@@ -165,17 +166,17 @@ export async function checkStripeAccountStatus(): Promise<{
             }
         }
 
-        // Get user's Stripe account ID
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
+        // Get user's Stripe account ID from provider profile
+        const { data: providerProfile, error: profileError } = await supabase
+            .from('provider_profiles')
             .select('stripe_account_id')
-            .eq('id', user.id)
+            .eq('user_id', user.id)
             .single()
 
-        if (profileError || !profile?.stripe_account_id) {
-            return { 
-                hasAccount: false, 
-                isReady: false, 
+        if (profileError || !providerProfile?.stripe_account_id) {
+            return {
+                hasAccount: false,
+                isReady: false,
                 chargesEnabled: false,
                 payoutsEnabled: false,
                 detailsSubmitted: false
@@ -183,7 +184,7 @@ export async function checkStripeAccountStatus(): Promise<{
         }
 
         // Get account status from Stripe
-        const statusResult = await getAccountStatus(profile.stripe_account_id)
+        const statusResult = await getAccountStatus(providerProfile.stripe_account_id)
         if (statusResult.error) {
             return { 
                 hasAccount: true, 
@@ -198,7 +199,7 @@ export async function checkStripeAccountStatus(): Promise<{
         const account = statusResult.account!
 
         // Check if account is ready
-        const readyResult = await isAccountReady(profile.stripe_account_id)
+        const readyResult = await isAccountReady(providerProfile.stripe_account_id)
         const isReady = readyResult.ready
 
         return {
@@ -242,22 +243,22 @@ export async function getStripeDashboardLink(): Promise<{
             return { error: "Not authenticated" }
         }
 
-        // Get user's Stripe account ID
-        const { data: profile, error: profileError } = await supabase
-            .from('profiles')
+        // Get user's Stripe account ID from provider profile
+        const { data: providerProfile, error: profileError } = await supabase
+            .from('provider_profiles')
             .select('stripe_account_id')
-            .eq('id', user.id)
+            .eq('user_id', user.id)
             .single()
 
-        if (profileError || !profile?.stripe_account_id) {
+        if (profileError || !providerProfile?.stripe_account_id) {
             return { error: "No Stripe account found" }
         }
 
         // For Standard Connect accounts, users manage their account via the Stripe Dashboard
         // We can create a login link to redirect them there
         const { stripe } = await import('@/lib/stripe/client')
-        
-        const loginLink = await stripe.accounts.createLoginLink(profile.stripe_account_id)
+
+        const loginLink = await stripe.accounts.createLoginLink(providerProfile.stripe_account_id)
 
         return { url: loginLink.url }
     } catch (error) {

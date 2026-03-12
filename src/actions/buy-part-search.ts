@@ -10,6 +10,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -734,6 +735,8 @@ export async function searchBuyPartProducts(
 ): Promise<BuyPartSearchResult[]> {
   if (partNames.length === 0) return []
 
+  return withAIGate('cad_lab_buy_search', async () => {
+
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     console.error("[BUY-SEARCH] ANTHROPIC_API_KEY not set")
@@ -783,4 +786,5 @@ export async function searchBuyPartProducts(
   console.log(`[BUY-SEARCH] Final: ${totalWithProducts}/${allResults.length} parts have products`)
 
   return allResults
+  })
 }

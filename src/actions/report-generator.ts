@@ -21,6 +21,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 import { generateExecutiveNarrative, generateSectionNarrative } from '@/lib/reports/ai-narrative'
 import { generateAllReportImages } from '@/lib/reports/report-image-generator'
@@ -69,18 +70,8 @@ import type {
  * @returns The composed ReportDocument or an error
  */
 export async function generateReport(request: GenerateReportRequest): Promise<GenerateReportResponse> {
+  return withAIGate('report_generation', async ({ supabase, user, foundryId }) => {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return { success: false, error: 'Not authenticated' }
-    }
-
-    const foundryId = await getFoundryIdCached()
-    if (!foundryId) {
-      return { success: false, error: 'No foundry context' }
-    }
 
     const { data: foundry } = await supabase
       .from('foundries')
@@ -369,6 +360,7 @@ export async function generateReport(request: GenerateReportRequest): Promise<Ge
     console.error('[ReportGenerator] Failed to generate report:', error)
     return { success: false, error: sanitizeErrorMessage(error) }
   }
+  })
 }
 
 // ========================

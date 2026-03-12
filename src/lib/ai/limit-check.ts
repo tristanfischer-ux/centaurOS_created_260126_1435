@@ -79,16 +79,15 @@ export async function checkAILimit(
       error: error instanceof Error ? error.message : 'Unknown error',
     })
 
-    // SECURITY: On error, allow the call but log it.
-    // Blocking users due to our internal errors is worse than occasional cost overrun.
-    // The monthly aggregate acts as a safety net regardless.
+    // SECURITY: Fail closed — deny on error to prevent cost overruns.
+    // A temporary Supabase outage should block AI calls, not open the floodgates.
     return {
-      allowed: true,
+      allowed: false,
       currentUsage: 0,
-      limit: 20,
-      remaining: 20,
+      limit: 0,
+      remaining: 0,
       tier: 'free',
-      message: 'Limit check failed, allowing request',
+      message: 'Unable to verify usage limits. Please try again shortly.',
     }
   }
 }
@@ -122,8 +121,15 @@ async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
 
     if (!subscription) return 'free'
 
-    return subscription.tier as SubscriptionTier
-  } catch {
-    return 'free'
+    const tier = subscription.tier as string
+    if (!(tier in SUBSCRIPTION_PLANS)) return 'free'
+    return tier as SubscriptionTier
+  } catch (error) {
+    console.error('[AILimitCheck] Error getting foundry tier:', {
+      foundryId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+    // SECURITY: Re-throw so checkAILimit fails closed
+    throw error
   }
 }

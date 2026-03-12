@@ -1,6 +1,6 @@
 "use server"
 
-import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { z } from 'zod'
 import {
@@ -132,7 +132,7 @@ async function extractSection(
 export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
-  return withAuth(async ({ user }) => {
+  return withAIGate('analyze', async ({ user }) => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) return { error: 'AI analysis service is not configured' }
 

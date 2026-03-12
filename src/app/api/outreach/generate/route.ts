@@ -10,28 +10,19 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
+import { aiGuard } from "@/lib/ai/guard"
 import { buildOutreachPrompt, parseSequenceResponse } from "@/lib/outreach/prompt-builder"
 import type { Campaign, Contact, OutreachKBEntry } from "@/types/outreach"
 
 export const maxDuration = 120
 
 export async function POST(request: Request) {
-    // 1. Authenticate
+    // AUTH + AI GATE: Verify user session and check AI usage limits
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // 2. Resolve foundry
-    const { data: profile } = await supabase
-        .from("profiles")
-        .select("foundry_id, active_foundry_id")
-        .eq("id", user.id)
-        .single()
-
-    const foundryId = profile?.active_foundry_id || profile?.foundry_id
+    const guard = await aiGuard(supabase, 'outreach')
+    if (guard.denied) return guard.response
+    const user = { id: guard.userId }
+    const foundryId = guard.foundryId
     if (!foundryId) {
         return NextResponse.json({ error: "Missing foundry" }, { status: 403 })
     }

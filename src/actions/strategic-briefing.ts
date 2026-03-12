@@ -19,6 +19,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { generateStrategicBriefing } from '@/lib/reports/ai-slide-generator'
 
 import type {
@@ -49,22 +50,9 @@ interface GenerateBriefingActionRequest {
 export async function generateBriefingAction(
   request: GenerateBriefingActionRequest,
 ): Promise<GenerateBriefingResponse> {
+  return withAIGate('strategic_briefing', async ({ supabase, user, foundryId }) => {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      console.info('[StrategicBriefing] No authenticated user')
-      return { success: false, error: 'Not authenticated' }
-    }
-
     console.info('[StrategicBriefing] Starting generation for user:', user.id)
-
-    const foundryId = await getFoundryIdCached()
-    if (!foundryId) {
-      console.info('[StrategicBriefing] No foundry context')
-      return { success: false, error: 'No foundry context' }
-    }
 
     const { data: foundry } = await supabase
       .from('foundries')
@@ -117,6 +105,7 @@ export async function generateBriefingAction(
       error: sanitizeErrorMessage(message),
     }
   }
+  })
 }
 
 // ─── Company Data Enrichment ─────────────────────────────────────

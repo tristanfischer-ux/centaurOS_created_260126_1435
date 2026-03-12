@@ -25,6 +25,7 @@
 "use server"
 
 import { withAuth } from "@/lib/server-action-utils"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/the-forge/services/scan"
 import { matchPeopleForModules } from "@/app/(platform)/the-forge/services/people"
@@ -118,7 +119,7 @@ async function loadScanForFoundry<T = { id: string; spec: Json }>(
 export async function scanIdeaAction(idea: string, researchReport?: string): Promise<
   { scanId: string; spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI-powered scan
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -234,7 +235,7 @@ export async function refineScanAction(
   currentSpec: XRaySpec,
   researchReport?: string,
 ): Promise<{ scanId: string; spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI-powered refinement
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -313,7 +314,7 @@ export async function refineModuleAction(
   editedModule: ModuleSpec,
   fullSpec: XRaySpec,
 ): Promise<{ module: ModuleSpec } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('xray', async () => {
     try {
       const refined = await refineModuleAI(editedModule, fullSpec)
       return { module: refined }
@@ -342,7 +343,7 @@ export async function deriveProcessClassAction(
   moduleId: string,
   answers: Record<string, string>,
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI-powered diagnostic derivation
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -445,7 +446,7 @@ export async function deriveProcessClassAction(
 export async function generateImagesAction(scanId: string): Promise<
   { spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, foundryId }) => {
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -502,7 +503,7 @@ export async function generateImagesAction(scanId: string): Promise<
 export async function generateModuleImagesAction(scanId: string): Promise<
   { spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit image generation
     const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -590,7 +591,7 @@ export async function generateCadModelsAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit CAD model generation
     const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -728,7 +729,7 @@ export async function generateCadModelsAction(
 export async function generateSystemCadAction(scanId: string): Promise<
   { spec: XRaySpec } | { error: string }
 > {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit system CAD generation
     const rl = await checkRateLimit("aiCadLab", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -995,7 +996,7 @@ export async function matchPeopleAction(
   modules: ModuleSpec[],
   forceRefresh = false,
 ): Promise<{ people: PersonMatch[] } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI matching
     const rl = await checkRateLimit("aiMatch", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -1046,7 +1047,7 @@ export async function matchSuppliersAction(
   isGatingDiagComplete: boolean,
   forceRefresh = false,
 ): Promise<{ suppliersByModule: Record<string, SupplierMatch[]> } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI matching
     const rl = await checkRateLimit("aiMatch", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -1102,7 +1103,7 @@ export async function analyzeModulesAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, foundryId }) => {
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1309,7 +1310,7 @@ export async function runStructuralAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit structural analysis
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -1434,7 +1435,7 @@ export async function runCfdAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit CFD analysis
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -1533,7 +1534,7 @@ export async function runTopologyOptimizationAction(
   moduleIds?: string[],
   volumeFraction: number = 0.5,
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, foundryId }) => {
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1619,7 +1620,7 @@ export async function runThermalAnalysisAction(
   scanId: string,
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit thermal analysis
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -1725,7 +1726,7 @@ export async function runPremiumAnalysisAction(
   analysisTypes: ("emi" | "fatigue" | "impact")[],
   moduleIds?: string[],
 ): Promise<{ spec: XRaySpec } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, foundryId }) => {
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId)
     if ("error" in loadResult) return { error: loadResult.error }
     const { scan } = loadResult
@@ -1826,7 +1827,7 @@ export async function runConvergenceStepAction(
   shouldContinue: boolean
   spec: XRaySpec
 } | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit convergence step (calls AI)
     const rl = await checkRateLimit("aiAnalysis", `xray:${user.id}`)
     if (rl) return { error: rl }
@@ -2012,7 +2013,7 @@ export async function createEngineeringReviewAction(
   scanId: string,
   evaluation?: ConvergenceEvaluation,
 ): Promise<EngineeringReviewResult | { error: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     const loadResult = await loadScanForFoundry(supabase, scanId, foundryId, "id, spec, name")
     if ("error" in loadResult) return { error: loadResult.error }
     const scan = loadResult.scan
@@ -2315,7 +2316,7 @@ export async function copyScanAction(
 export async function seedDemoConceptAction(): Promise<
   { demoScanId: string } | { error: string }
 > {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, user, foundryId }) => {
     const { data, error } = await supabase.rpc("seed_demo_forge_concept", {
       p_foundry_id: foundryId,
       p_user_id: user.id,
@@ -2501,7 +2502,7 @@ RULES:
 export async function runConceptResearchAction(
   idea: string,
 ): Promise<ConceptResearchResult | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('xray', async () => {
     const start = Date.now()
 
     // VALIDATION: Ensure idea is non-empty
@@ -2685,7 +2686,7 @@ export async function enrichModulesAction(
   spec: XRaySpec,
   forceRefresh = false,
 ): Promise<{ enrichments: ModuleEnrichment[] } | { error: string }> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAIGate('xray', async ({ supabase, foundryId }) => {
     // Check for cached data first
     if (scanId && !forceRefresh) {
       const loadResult = await loadScanForFoundry<{ enrichments: Json | null }>(

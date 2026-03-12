@@ -12,6 +12,7 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
@@ -166,7 +167,7 @@ export async function getTeamPulse(): Promise<{ data?: TeamPulseData; error?: st
  * @security Requires authenticated user with foundry membership
  */
 export async function generateDailyStandup(): Promise<{ data?: DailyStandup; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('team_pulse', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit
     const rateLimitError = await checkRateLimit('aiStrategicPlan', `standup:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

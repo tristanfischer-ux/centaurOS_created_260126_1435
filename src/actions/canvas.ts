@@ -20,6 +20,7 @@
 import { revalidatePath } from 'next/cache'
 import OpenAI from 'openai'
 import { withAuth, type ActionError } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import type { Json } from '@/types/database.types'
@@ -1624,7 +1625,7 @@ export async function generateMilestonePlan(
   goalId: string,
   userPrompt?: string
 ): Promise<{ plan?: StrategicPlan; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('canvas', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI calls to prevent cost abuse
     const rateLimitError = await checkRateLimit('aiStrategicPlan', `ai:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

@@ -14,6 +14,7 @@
 import { revalidatePath } from 'next/cache'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import type { Json } from '@/types/database.types'
@@ -69,7 +70,7 @@ export interface GeneratedPlan {
 export async function generatePlanFromSentence(
   sentence: string
 ): Promise<{ plan?: GeneratedPlan; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('plan_generator', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI calls
     const rateLimitError = await checkRateLimit('aiStrategicPlan', `ai:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

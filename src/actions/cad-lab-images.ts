@@ -23,7 +23,7 @@ import { generateModuleImage, generateResearchIllustration, prepareReferenceImag
 import type { ModuleBoundingBox } from "@/app/(platform)/the-forge/services/image-generator"
 import { getDesignSynthesisPrompt, getProductIdentityPrompt, getDesignReconciliationPrompt } from "@/lib/cad-lab/domain-prompts"
 import type { ModuleConnection } from "@/lib/cad-lab-types"
-import { withAuth } from "@/lib/server-action-utils"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -56,7 +56,7 @@ export async function uploadSharedImageAssetsAction(
   referenceBase64?: string,
   visualStyle?: VisualStyleSpec,
 ): Promise<{ referenceUrl?: string; visualStyleUrl?: string } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const admin = createAdminClient()
       const timestamp = Date.now()
@@ -113,7 +113,7 @@ export async function uploadSharedImageAssetsAction(
 export async function cleanupSharedImageAssetsAction(
   projectId: string,
 ): Promise<{ success: boolean } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const admin = createAdminClient()
       const { data: files } = await admin.storage
@@ -168,7 +168,7 @@ export async function generateCadLabSingleImageAction(
   referenceBase64OrUrl?: string,
   moduleCropBase64?: string,
 ): Promise<ImageGenResult | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       // INTENT: Resolve shared assets from URLs if strings were passed (Supabase Storage).
       // Same-region fetch is ~10ms vs ~800KB saved per React Flight request.
@@ -233,7 +233,7 @@ export async function generateCadLabModuleImagesAction(
   visualStyle?: VisualStyleSpec,
   referenceBase64?: string,
 ): Promise<GenerateImagesResult | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     const updatedModules = [...modules]
     let successCount = 0
     let failedCount = 0
@@ -304,7 +304,7 @@ export async function generateCadLabSystemIllustrationAction(
   researchExcerpt?: string,
   heroPrompt?: string,
 ): Promise<{ url: string } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt)
       return { url }
@@ -329,7 +329,7 @@ export async function generateCadLabSystemIllustrationAction(
 export async function fetchAndCropReferenceAction(
   url: string,
 ): Promise<{ base64: string } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const response = await fetchWithTimeout(url, {}, 10_000)
       if (!response.ok) {
@@ -363,7 +363,7 @@ export async function generateVisualStyleAction(
   modules: Array<{ name: string; purpose: string }>,
   researchExcerpt?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping visual style generation")
@@ -440,7 +440,7 @@ export async function analyseHeroForModulesAction(
   heroBase64: string,
   moduleNames: string[],
 ): Promise<{ boxes: Record<string, ModuleBoundingBox> } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const boxes = await analyseHeroBoundingBoxes(heroBase64, moduleNames)
       return { boxes }
@@ -464,7 +464,7 @@ export async function cropModuleRegionAction(
   heroBase64: string,
   box: ModuleBoundingBox,
 ): Promise<{ base64: string } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     try {
       const base64 = await cropModuleRegion(heroBase64, box)
       return { base64 }
@@ -491,7 +491,7 @@ export async function generateProductIdentityAction(
   subject: string,
   researchReport: string,
 ): Promise<{ visualStyle: Partial<VisualStyleSpec> } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping product identity")
@@ -572,7 +572,7 @@ export async function generateDesignSynthesisAction(
   connections?: ModuleConnection[],
   researchExcerpt?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping design synthesis")
@@ -677,7 +677,7 @@ export async function reconcileDesignAction(
   researchExcerpt?: string,
   productIdentity?: Partial<VisualStyleSpec>,
 ): Promise<ReconciliationResult | { error: string }> {
-  return withAuth(async () => {
+  return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping reconciliation")

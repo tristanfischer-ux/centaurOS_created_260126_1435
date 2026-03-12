@@ -14,6 +14,7 @@
  */
 
 import { NextResponse } from "next/server"
+import { aiGuard } from "@/lib/ai/guard"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { generateCadLabInterface, generateCadLabModelSmart } from "@/actions/cad-lab"
@@ -126,14 +127,11 @@ async function uploadDrawingManifest(
  * @returns The completed module data or an error
  */
 export async function POST(request: Request): Promise<Response> {
-  // AUTH: Verify user session
+  // AUTH + AI GATE: Verify user session and check AI usage limits
   const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  const guard = await aiGuard(supabase, 'cad_lab_generate_module')
+  if (guard.denied) return guard.response
+  const user = { id: guard.userId }
 
   // SECURITY: Rate limit expensive AI/CAD module generation to control abuse and cost.
   const rateLimitResult = await rateLimit('api', `cad-lab-module:${user.id}`, {

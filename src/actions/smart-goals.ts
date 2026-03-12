@@ -12,11 +12,10 @@
  */
 
 import OpenAI from 'openai'
-import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import { escapeHtml } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 let openaiClient: OpenAI | null = null
 
@@ -116,15 +115,7 @@ export async function smartifyGoal(
   const openai = getOpenAIClient()
   if (!openai) return { error: 'AI not configured' }
 
-  // AUTH: Verify user is authenticated
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  const foundryId = await getFoundryIdCached()
-  if (!foundryId) return { error: 'User not in a foundry' }
+  return withAIGate('smart_goals', async ({ user, foundryId }) => {
 
   // SECURITY: Rate limit AI calls to prevent cost abuse
   const rateLimitError = await checkRateLimit('aiSmartGoal', `ai:${user.id}`)
@@ -250,6 +241,7 @@ Guidelines:
     })
     return { error: 'Failed to analyze your idea. Please try again.' }
   }
+  })
 }
 
 /**
@@ -279,14 +271,8 @@ export async function scoreSmartGoal(
     }
   }
 
-  // AUTH: Verify user is authenticated
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return { error: 'Unauthorized' }
-
-  // SECURITY: Rate limit AI calls to prevent cost abuse
+  return withAIGate('smart_goals', async ({ user }) => {
+    // SECURITY: Rate limit AI calls to prevent cost abuse
   const rateLimitError = await checkRateLimit('aiSmartGoal', `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError }
 
@@ -342,4 +328,5 @@ Be fair but encouraging. A simple clear action gets at least 3 on specific.`,
     })
     return { error: 'Failed to score. Please try again.' }
   }
+  })
 }

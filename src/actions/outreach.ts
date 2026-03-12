@@ -29,6 +29,7 @@ import type {
     OutreachKBEntry,
 } from '@/types/outreach'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
 
@@ -566,9 +567,7 @@ export async function researchContact(
     campaignId: string,
     contactId: string,
 ): Promise<{ success?: boolean; error?: string }> {
-    const ctx = await getAuthContext()
-    if ('error' in ctx) return { error: ctx.error }
-    const { supabase, user, foundry_id } = ctx
+    return withAIGate('outreach', async ({ supabase, user, foundryId: foundry_id }) => {
 
     // SECURITY: Rate limit AI calls
     const rateLimitError = await checkRateLimit('aiOutreach', user.id)
@@ -640,6 +639,7 @@ export async function researchContact(
 
     revalidatePath(`/outreach/${campaignId}`)
     return { success: true }
+    })
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -650,9 +650,7 @@ export async function generateSequenceForContact(
     campaignId: string,
     contactId: string,
 ): Promise<{ success?: boolean; emailCount?: number; error?: string }> {
-    const ctx = await getAuthContext()
-    if ('error' in ctx) return { error: ctx.error }
-    const { supabase, user, foundry_id } = ctx
+    return withAIGate('outreach', async ({ supabase, user, foundryId: foundry_id }) => {
 
     // SECURITY: Rate limit AI calls
     const rateLimitError = await checkRateLimit('aiOutreach', user.id)
@@ -753,6 +751,7 @@ export async function generateSequenceForContact(
 
     revalidatePath(`/outreach/${campaignId}`)
     return { success: true, emailCount: parsedEmails.length }
+    })
 }
 
 export async function generateSequencesForBatch(

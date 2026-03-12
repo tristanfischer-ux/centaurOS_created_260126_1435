@@ -13,11 +13,10 @@
  * - src/lib/document-skills/data-collector.ts — Auto-data collection
  */
 
-import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { rateLimit } from '@/lib/security/rate-limit'
 import { getSkillById } from '@/lib/document-skills'
 import { collectAutoData } from '@/lib/document-skills/data-collector'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 import type { DocumentQuestion } from '@/lib/document-skills/types'
 
@@ -40,12 +39,7 @@ export async function generateDocumentQuestions(
   userContext: string,
   includeAutoData: boolean,
 ): Promise<GenerateQuestionsResult> {
-  // AUTH
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    return { success: false, error: 'Unauthorized' }
-  }
+  return withAIGate('document_questions', async ({ user, foundryId }) => {
 
   // SECURITY: Rate limit — shares bucket with document generation
   const rateLimitResult = await rateLimit('api', `doc-skill:${user.id}`, {
@@ -74,7 +68,6 @@ export async function generateDocumentQuestions(
     // Collect auto-data if requested (for smarter questions)
     let autoDataText = ''
     if (includeAutoData && skill.autoDataSources.length > 0) {
-      const foundryId = await getFoundryIdCached()
       if (foundryId) {
         try {
           autoDataText = await collectAutoData(skill.autoDataSources, foundryId)
@@ -146,4 +139,5 @@ Rules:
     const message = err instanceof Error ? err.message : 'Failed to generate questions'
     return { success: false, error: message }
   }
+  })
 }

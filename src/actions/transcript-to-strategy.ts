@@ -28,6 +28,7 @@ import OpenAI from 'openai'
 import { z } from 'zod'
 import { zodResponseFormat } from 'openai/helpers/zod'
 import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { revalidatePath } from 'next/cache'
 import { withRetry } from '@/lib/retry'
@@ -291,7 +292,7 @@ function computeTaskDates(
  * @security Rate limited to prevent cost abuse. User input treated as DATA only.
  */
 export async function parseTranscriptToStrategy(text: string): Promise<{ plan?: ParsedStrategicPlan; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('transcript_to_strategy', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit AI calls to prevent cost abuse
     const rateLimitError = await checkRateLimit('aiAnalysis', `ai:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

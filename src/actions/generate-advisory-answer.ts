@@ -9,7 +9,7 @@ import {
     AdvisoryCategory
 } from '@/types/advisory'
 import { buildAIContext } from '@/lib/ai-context/builder'
-import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 let openaiClient: OpenAI | null = null
@@ -35,7 +35,7 @@ function getOpenAIClient(): OpenAI | null {
 export async function generateAdvisoryAnswer(
     input: GenerateAnswerInput
 ): Promise<{ result?: GenerateAnswerResult; error?: string }> {
-    return withAuth(async ({ user, foundryId }) => {
+    return withAIGate('advisory_answers', async ({ user, foundryId }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { error: 'AI advisory service is not configured' }
@@ -193,7 +193,7 @@ Please provide a helpful, practical answer for a startup founder.`
 export async function generateStructuredAnswer(
     input: GenerateAnswerInput
 ): Promise<{ result?: StructuredAnswer; error?: string }> {
-    return withAuth(async ({ user }) => {
+    return withAIGate('advisory_answers', async ({ user }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { error: 'AI advisory service is not configured' }
@@ -277,7 +277,7 @@ export async function suggestQuestionCategory(
     title: string,
     body: string
 ): Promise<{ category?: AdvisoryCategory; tags?: string[]; error?: string }> {
-    return withAuth(async ({ user }) => {
+    return withAIGate('advisory_answers', async ({ user }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { error: 'AI advisory service is not configured' }

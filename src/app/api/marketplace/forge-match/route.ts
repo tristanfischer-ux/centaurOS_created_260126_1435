@@ -3,6 +3,7 @@ import OpenAI from 'openai'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { rateLimit } from '@/lib/security/rate-limit'
+import { aiGuard } from '@/lib/ai/guard'
 
 // SECURITY: Zod schema for input validation
 const ForgeMatchRequestSchema = z.object({
@@ -51,6 +52,12 @@ export async function POST(
     request: NextRequest
 ): Promise<NextResponse<ForgeMatchResponse | ErrorResponse>> {
     try {
+        // AUTH + AI GATE: Verify user session and check AI usage limits (MUST be first)
+        const supabase = await createClient()
+        const guard = await aiGuard(supabase, 'forge_match')
+        if (guard.denied) return guard.response as NextResponse<ErrorResponse>
+        const user = { id: guard.userId }
+
         // SECURITY: Fail closed when OpenAI key is not configured.
         if (!process.env.OPENAI_API_KEY) {
             console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
@@ -65,17 +72,6 @@ export async function POST(
             return NextResponse.json(
                 { error: 'Forge matching service is not configured' },
                 { status: 503 }
-            )
-        }
-
-        // Create Supabase client and authenticate
-        const supabase = await createClient()
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
-        
-        if (authError || !user) {
-            return NextResponse.json(
-                { error: 'Unauthorized' },
-                { status: 401 }
             )
         }
 
@@ -116,13 +112,7 @@ export async function POST(
         }
 
         // Verify the authenticated user's foundry matches the member's foundry
-        const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('foundry_id')
-            .eq('id', user.id)
-            .single()
-
-        if (!userProfile || userProfile.foundry_id !== member.foundry_id) {
+        if (!guard.foundryId || guard.foundryId !== member.foundry_id) {
             return NextResponse.json(
                 { error: 'Unauthorized: Member belongs to a different foundry' },
                 { status: 403 }

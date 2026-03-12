@@ -12,7 +12,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { logInsights } from '@/lib/intelligence/insight-logger'
 import type { InsightEntry } from '@/lib/intelligence/insight-logger'
@@ -79,7 +79,7 @@ export interface WeeklyDigest {
  * @security Requires authenticated user with foundry membership
  */
 export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('progress_report', async ({ supabase, user, foundryId }) => {
     // SECURITY: Rate limit
     const rateLimitError = await checkRateLimit('aiStrategicPlan', `digest:${user.id}`)
     if (rateLimitError) return { error: rateLimitError }

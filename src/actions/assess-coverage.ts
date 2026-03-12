@@ -10,7 +10,7 @@ import {
     BusinessFunctionCategory,
     DEFAULT_BUSINESS_FUNCTIONS 
 } from '@/types/org-blueprint'
-import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
 let openaiClient: OpenAI | null = null
@@ -36,7 +36,7 @@ function getOpenAIClient(): OpenAI | null {
 export async function assessCoverage(
     input: GapAssessmentInput
 ): Promise<{ result?: GapAssessmentResult; error?: string }> {
-    return withAuth(async ({ user }) => {
+    return withAIGate('coverage_assessment', async ({ user }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { error: 'AI coverage analysis service is not configured' }
@@ -201,7 +201,7 @@ export async function assessSingleFunction(
     functionCategory: string,
     foundryContext: string
 ): Promise<{ suggestion?: { status: CoverageStatus; priority: GapPriority; reasoning: string }; error?: string }> {
-    return withAuth(async ({ user }) => {
+    return withAIGate('coverage_assessment', async ({ user }) => {
         const openai = getOpenAIClient()
         if (!openai) {
             return { error: 'AI single-function assessment service is not configured' }

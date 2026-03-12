@@ -20,6 +20,7 @@ import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import { classifyPart } from "@/lib/part-classification"
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ export async function estimateModuleCostsAi(
   productOverview?: string,
   techniqueInsights?: Record<string, ProcessInsights>,
 ): Promise<EstimateResult | EstimateError> {
+  return withAIGate('cad_lab_cost', async () => {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
     return { success: false, error: "ANTHROPIC_API_KEY not configured" }
@@ -260,4 +262,5 @@ Return ONLY valid JSON.`
     console.error("[CAD-LAB-COST] AI estimation failed:", msg)
     return { success: false, error: msg }
   }
+  })
 }

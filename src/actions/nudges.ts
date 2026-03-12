@@ -10,7 +10,7 @@
  * @security All actions require authentication and enforce foundry isolation
  */
 
-import { withAuth } from '@/lib/server-action-utils'
+import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { logInsights, formatRecentInsightsForPrompt } from '@/lib/intelligence/insight-logger'
 import { ensureFreshProfile, formatProfileForAI } from '@/lib/intelligence/profile-builder'
@@ -67,7 +67,7 @@ export interface MorningBriefing {
  * @security Requires authenticated user with foundry membership
  */
 export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; error?: string }> {
-  return withAuth(async ({ supabase, user, foundryId }) => {
+  return withAIGate('nudges', async ({ supabase, user, foundryId }) => {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
     const yesterday = new Date(today)

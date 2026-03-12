@@ -38,6 +38,40 @@ export type AIFeature =
   | 'specialist_voice'    // Tier 2: Real-time voice session
   | 'specialist_avatar'   // Tier 3/4: Avatar video session
   | 'cad_lab_buy_search'
+  // CAD Lab features
+  | 'cad_lab_generate'
+  | 'cad_lab_generate_module'
+  | 'cad_lab_review'
+  | 'cad_lab_cost'
+  | 'cad_lab_images'
+  | 'cad_lab_classify'
+  | 'cad_lab_projects'
+  | 'cad_lab_grammar'
+  // Analysis & strategy
+  | 'analyze'
+  | 'xray'
+  | 'strategic_planner'
+  | 'canvas'
+  | 'transcript_to_strategy'
+  | 'strategic_briefing'
+  // Reports & documents
+  | 'report_generation'
+  | 'progress_report'
+  | 'document_questions'
+  // Planning & goals
+  | 'plan_generator'
+  | 'smart_goals'
+  | 'nudges'
+  | 'team_pulse'
+  // Marketplace & sourcing
+  | 'bom'
+  | 'outreach'
+  | 'forge_match'
+  | 'component_library'
+  | 'step_template_matching'
+  | 'backfill_embeddings'
+  // Slide & media
+  | 'slide_image'
   | 'other'
 
 /** Conversation modes that can be tracked alongside features */
@@ -257,11 +291,8 @@ export async function getCurrentMonthUsage(
     })
 
     if (error || !data) {
-      console.error('[AIUsageTracking] Failed to get monthly usage:', {
-        foundryId,
-        error: error?.message,
-      })
-      return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
+      // SECURITY: Throw on error so callers (checkAILimit) fail closed
+      throw new Error(`Failed to get monthly usage: ${error?.message ?? 'no data'}`)
     }
 
     const row = Array.isArray(data) ? data[0] : data
@@ -279,6 +310,7 @@ export async function getCurrentMonthUsage(
       foundryId,
       error: error instanceof Error ? error.message : 'Unknown error',
     })
-    return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
+    // SECURITY: Re-throw so checkAILimit fails closed
+    throw error
   }
 }
