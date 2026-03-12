@@ -87,6 +87,9 @@ export async function withAIGate<T>(
       } as T
     }
 
+    // Track whether the action calls trackUsage manually
+    let manuallyTracked = false
+
     // Create tracking callback bound to this request's context
     const trackUsage = async (params: {
       model?: string
@@ -95,6 +98,7 @@ export async function withAIGate<T>(
       estimatedCostUsd?: number
       metadata?: Record<string, unknown>
     }) => {
+      manuallyTracked = true
       // AUDIT: Log AI usage for cost tracking and tier enforcement
       await trackAIUsage({
         foundryId: authCtx.foundryId,
@@ -109,6 +113,29 @@ export async function withAIGate<T>(
     }
 
     // Execute the action with the extended context
-    return await action({ ...authCtx, trackUsage })
+    const result = await action({ ...authCtx, trackUsage })
+
+    // AUTO-TRACK: If the action succeeded and didn't manually call trackUsage,
+    // record a baseline usage entry so limits are enforced even when actions
+    // forget to track. Skip if manually tracked to prevent double-counting.
+    if (!manuallyTracked) {
+      const resultObj = result as Record<string, unknown> | null | undefined
+      const hasError =
+        resultObj &&
+        typeof resultObj === 'object' &&
+        'error' in resultObj &&
+        !!resultObj['error']
+      if (!hasError) {
+        trackAIUsage({
+          foundryId: authCtx.foundryId,
+          userId: authCtx.user.id,
+          feature,
+        }).catch(() => {
+          // INTENT: Fire-and-forget — don't let tracking failures break the action
+        })
+      }
+    }
+
+    return result
   })
 }

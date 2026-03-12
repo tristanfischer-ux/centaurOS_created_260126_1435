@@ -69,11 +69,20 @@ export function CodeEditor({
   }, [])
 
   // Dynamic editor height based on line count (#13)
+  // GOTCHA: window.innerHeight in useMemo causes SSR hydration mismatch.
+  // Use state + effect pattern (same as isMac above) to read viewport safely.
+  const [maxEditorH, setMaxEditorH] = useState(300)
+  useEffect(() => {
+    const update = () => setMaxEditorH(Math.min(600, window.innerHeight * 0.5))
+    update()
+    window.addEventListener("resize", update)
+    return () => window.removeEventListener("resize", update)
+  }, [])
+
   const editorHeight = useMemo(() => {
     const lineCount = code.split("\n").length
-    const maxH = typeof window !== "undefined" ? Math.min(600, window.innerHeight * 0.5) : 600
-    return Math.max(200, Math.min(maxH, lineCount * 19 + 20))
-  }, [code])
+    return Math.max(200, Math.min(maxEditorH, lineCount * 19 + 20))
+  }, [code, maxEditorH])
 
   // GOTCHA: Monaco's addAction fires once at mount — a useCallback dependency on
   // onRun won't re-register the action. Use a ref to always call the latest onRun.

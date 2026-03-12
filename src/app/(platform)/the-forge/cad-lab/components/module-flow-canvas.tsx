@@ -543,7 +543,7 @@ export function ModuleFlowCanvas({
       </div>
 
       {/* Canvas */}
-      <div className={isFullscreen ? "flex-1" : "h-[50vh] sm:h-[500px] md:h-[650px] min-h-[300px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
+      <div className={isFullscreen ? "flex-1" : "h-[50dvh] sm:h-[500px] md:h-[650px] min-h-[200px] sm:min-h-[300px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
         <ReactFlowProvider>
           <ModuleFlowCanvasInner
             modules={modules}

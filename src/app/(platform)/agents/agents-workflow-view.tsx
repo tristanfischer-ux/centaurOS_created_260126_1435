@@ -1220,7 +1220,7 @@ function AgentsFlowInner({
 
             {/* AI is provided by the platform -- no key configuration needed */}
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
                 {/* Sidebar */}
                 {sidebarOpen && (
                     <PromptLibrarySidebar

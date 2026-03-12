@@ -46,7 +46,7 @@ export function SpecialistsPageClient({
     initialCustomPrompts,
 }: SpecialistsPageClientProps) {
     const [view, setView] = useState<PageView>("specialists")
-    const [isMobile, setIsMobile] = useState(false)
+    const [isMobile, setIsMobile] = useState<boolean | null>(null)
     const [showBuilderAnyway, setShowBuilderAnyway] = useState(false)
 
     useEffect(() => {
@@ -74,7 +74,7 @@ export function SpecialistsPageClient({
                             </Button>
                         )}
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
+                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight inline-flex items-center gap-1.5">
                             {view === "specialists" ? "AI Team" : "Team Project"}
                             {view === "project-builder" && (
                                 <HelpTooltip content="Chain multiple specialists together. Each step's output feeds into the next." />
@@ -97,6 +97,10 @@ export function SpecialistsPageClient({
                             onOpenProjectBuilder={() => setView("project-builder")}
                         />
                     </div>
+                </div>
+            ) : isMobile === null ? (
+                <div className="flex-1 min-h-0 flex items-center justify-center">
+                    <Skeleton className="h-full w-full m-6" />
                 </div>
             ) : isMobile && !showBuilderAnyway ? (
                 <div className="flex-1 min-h-0 flex items-center justify-center px-6">

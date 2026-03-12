@@ -89,7 +89,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
     }
 
     return (
-        <div className="w-80 border-r bg-background flex flex-col h-full">
+        <div className="w-72 sm:w-80 border-r bg-background flex flex-col h-full absolute top-0 left-0 sm:relative z-30 sm:z-auto shadow-lg sm:shadow-none">
             {/* Header */}
             <div className="p-4 border-b">
                 <div className="flex items-center justify-between mb-3">
@@ -108,7 +108,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                         </Button>
                         <button
                             onClick={onClose}
-                            className="p-1 rounded-md hover:bg-muted text-muted-foreground"
+                            className="p-2 sm:p-1.5 min-h-[44px] sm:min-h-0 min-w-[44px] sm:min-w-0 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground"
                         >
                             <X className="w-4 h-4" />
                         </button>
