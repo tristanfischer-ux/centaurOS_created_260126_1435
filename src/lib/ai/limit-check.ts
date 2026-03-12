@@ -44,6 +44,12 @@ export interface AILimitCheckResult {
 export async function checkAILimit(
   foundryId: string
 ): Promise<AILimitCheckResult> {
+  // SECURITY: Developer foundries bypass quota entirely (set via Vercel env var)
+  const devFoundries = process.env.DEVELOPER_FOUNDRY_IDS?.split(',').map(s => s.trim()) ?? []
+  if (devFoundries.includes(foundryId)) {
+    return { allowed: true, currentUsage: 0, limit: 999999, remaining: 999999, tier: 'enterprise' }
+  }
+
   try {
     // Get the foundry owner's subscription tier
     const tier = await getFoundryTier(foundryId)

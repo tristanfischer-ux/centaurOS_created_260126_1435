@@ -75,14 +75,14 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     features: [
       'Up to 5 orders per month',
       'Basic marketplace access',
-      '20 smart assists per month',
+      '50 smart assists per month',
       'Standard support',
     ],
     limits: {
       maxOrders: 5,
       maxTeamMembers: 1,
       maxRetainers: 0,
-      maxAiTasksPerMonth: 500,
+      maxAiTasksPerMonth: 50,
       apiAccess: false,
       prioritySupport: false,
       dedicatedAccount: false,
