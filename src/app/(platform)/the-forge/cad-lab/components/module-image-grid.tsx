@@ -18,7 +18,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, Sparkles, Wrench, X } from "lucide-react"
+import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, RefreshCw, Sparkles, Wrench, X } from "lucide-react"
 import { ModuleImageCard } from "./module-image-card"
 import {
   Dialog,
@@ -43,6 +43,8 @@ interface ModuleImageGridProps {
   onToggleExpand: (id: string) => void
   onModuleSave?: (updated: CadLabModule) => void
   onRetryModule?: (moduleId: string) => void
+  onReloadModule?: (moduleId: string) => void
+  reloadingModuleIds?: Set<string>
 }
 
 // ─── Module Detail Dialog ─────────────────────────────────────────────
@@ -52,11 +54,15 @@ function ModuleDetailDialog({
   open,
   onOpenChange,
   onSave,
+  onReload,
+  isReloading,
 }: {
   module: CadLabModule
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave?: (updated: CadLabModule) => void
+  onReload?: () => void
+  isReloading?: boolean
 }): React.ReactNode {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -132,17 +138,35 @@ function ModuleDetailDialog({
             <>
               <div className="flex items-center justify-between">
                 <DialogTitle>{module.name}</DialogTitle>
-                {onSave && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 gap-1.5 text-xs text-muted-foreground"
-                    onClick={() => setIsEditing(true)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                    Edit
-                  </Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {onReload && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs text-muted-foreground"
+                      disabled={isReloading}
+                      onClick={() => onReload()}
+                    >
+                      {isReloading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3 w-3" />
+                      )}
+                      Reload
+                    </Button>
+                  )}
+                  {onSave && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1.5 text-xs text-muted-foreground"
+                      onClick={() => setIsEditing(true)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                      Edit
+                    </Button>
+                  )}
+                </div>
               </div>
               <DialogDescription>{module.purpose}</DialogDescription>
             </>
@@ -443,6 +467,8 @@ export function ModuleImageGrid({
   onToggleExpand,
   onModuleSave,
   onRetryModule,
+  onReloadModule,
+  reloadingModuleIds,
 }: ModuleImageGridProps): React.ReactNode {
   const visibleModules = modules.filter((m) => revealedModuleIds.has(m.id))
   const selectedModule = expandedModuleId
@@ -471,6 +497,8 @@ export function ModuleImageGrid({
                 isExpanded={expandedModuleId === module.id}
                 onToggleExpand={() => onToggleExpand(module.id)}
                 onRetry={onRetryModule ? () => onRetryModule(module.id) : undefined}
+                onReload={onReloadModule ? () => onReloadModule(module.id) : undefined}
+                isReloading={reloadingModuleIds?.has(module.id)}
               />
             </motion.div>
           ))}
@@ -486,6 +514,8 @@ export function ModuleImageGrid({
             if (!open) onToggleExpand(selectedModule.id)
           }}
           onSave={onModuleSave}
+          onReload={onReloadModule ? () => onReloadModule(selectedModule.id) : undefined}
+          isReloading={reloadingModuleIds?.has(selectedModule.id)}
         />
       )}
     </>

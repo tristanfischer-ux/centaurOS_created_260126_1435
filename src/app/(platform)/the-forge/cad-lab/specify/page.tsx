@@ -39,6 +39,7 @@ import {
   ClipboardCheck,
   Grid3x3,
   FlipHorizontal2,
+  FileDown,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -87,6 +88,7 @@ import { getTechniqueInsightsByProcess, getProcessRecommendations } from "@/acti
 import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
+import { DesignReportDialog } from "../components/design-report-dialog"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -189,6 +191,7 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Local state: expanded module for spec editing ──
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
   const [showPartsMap, setShowPartsMap] = useState(false)
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // ── DFM Insights — fetched per process from Nightshift technique knowledge ──
   const [processInsights, setProcessInsights] = useState<Record<string, ProcessInsights>>({})
@@ -550,6 +553,16 @@ export default function SpecifyPage(): React.ReactNode {
               {tab.label}
             </button>
           ))}
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsReportDialogOpen(true)}
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Download Report</span>
+          </Button>
         </div>
       </nav>
 
@@ -1391,6 +1404,13 @@ export default function SpecifyPage(): React.ReactNode {
           setActiveTab("specs")
           setExpandedModuleId(moduleId)
         }}
+      />
+
+      <DesignReportDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+        stage="specify"
+        stageData={{ moduleReviews, reviewSkipped }}
       />
     </div>
   )

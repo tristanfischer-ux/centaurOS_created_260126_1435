@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Layers,
   ClipboardList,
+  FileDown,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -34,6 +35,7 @@ import { useCadLab } from "../cad-lab-context"
 import { FullscreenOverlay } from "../cad-lab-utils"
 import { ModuleResultsView, type ViewTab } from "../components/module-results-view"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { DesignReportDialog } from "../components/design-report-dialog"
 
 // ─── Synthetic module ID for unified model ────────────────────────────
 const UNIFIED_MODULE_ID = "__unified__"
@@ -71,6 +73,7 @@ export default function CadStagePage(): React.ReactNode {
   const [activeViewTab, setActiveViewTab] = useState<ViewTab>("3d")
   const [fullscreenView, setFullscreenView] = useState<string | null>(null)
   const [modulesExpanded, setModulesExpanded] = useState(false)
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // ── Derived state ──
   const designStillRunning = systemIllustrationStatus === "generating"
@@ -158,6 +161,15 @@ export default function CadStagePage(): React.ReactNode {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground hover:text-foreground"
+                onClick={() => setIsReportDialogOpen(true)}
+              >
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Report</span>
+              </Button>
               {hasUnifiedResult && hasDownloadable && (
                 <Button
                   variant="outline"
@@ -307,6 +319,13 @@ export default function CadStagePage(): React.ReactNode {
           onClose={() => setFullscreenView(null)}
         />
       )}
+
+      <DesignReportDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+        stage="cad"
+        stageData={{ unifiedCadResult: unifiedResult }}
+      />
     </div>
   )
 }

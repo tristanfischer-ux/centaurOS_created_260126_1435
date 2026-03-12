@@ -22,6 +22,7 @@ import {
   Package,
   AlertCircle,
   RefreshCw,
+  FileDown,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -44,6 +45,8 @@ import type { CadLabModule } from "@/lib/cad-lab-types"
 import type { CadLabSupplierMatch, ScoreBreakdown } from "@/actions/cad-lab-supplier-match"
 import { SupplierIntelligenceTab } from "@/components/cad/supplier-intelligence-tab"
 import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
+import { DesignReportDialog } from "../components/design-report-dialog"
+import { classifyPart } from "@/lib/part-classification"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -254,8 +257,29 @@ export default function SourcePage(): React.ReactNode {
     return names
   }, [sankeyCategories])
 
+  // INTENT: Build classified parts for the report export
+  const reportClassifiedParts = useMemo(() => {
+    return eligibleModules.flatMap((mod) => {
+      const diag = diagnosticAnswers[mod.id]
+      const costEstimate = aiCostEstimates?.[mod.id]
+      const partNames = costEstimate?.parts?.map((p) => p.name) ?? mod.keyParts
+      return partNames.map((name) => {
+        const cls = classifyPart(name, diag?.mfg_process ?? "Unknown", diag?.material ?? "Unknown")
+        const override = partCategoryOverrides[`${mod.id}::${name}`]
+        return {
+          partName: name,
+          moduleName: mod.name,
+          type: (override?.type ?? cls.type) as "buy" | "make",
+          confidence: override ? "high" : cls.confidence,
+          reasons: cls.reasons,
+        }
+      })
+    })
+  }, [eligibleModules, diagnosticAnswers, aiCostEstimates, partCategoryOverrides])
+
   // DECISION: activeTab declared here (before effects that reference it) to avoid block-scoping TDZ error.
   const [activeTab, setActiveTab] = useState("suppliers")
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // ── Auto-trigger buy search when buy parts exist but no results cached ──
   const buySearchTriggeredRef = useRef(false)
@@ -584,14 +608,25 @@ export default function SourcePage(): React.ReactNode {
               {tab.label}
             </button>
           ))}
-          <button
-            onClick={handleRefreshActiveTab}
-            disabled={isRefreshing}
-            title="Refresh current tab"
-            className="ml-auto p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+              onClick={() => setIsReportDialogOpen(true)}
+            >
+              <FileDown className="h-4 w-4" />
+              <span className="hidden sm:inline">Download Report</span>
+            </Button>
+            <button
+              onClick={handleRefreshActiveTab}
+              disabled={isRefreshing}
+              title="Refresh current tab"
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -758,6 +793,13 @@ export default function SourcePage(): React.ReactNode {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <DesignReportDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+        stage="source"
+        stageData={{ classifiedParts: reportClassifiedParts }}
+      />
     </div>
   )
 }

@@ -28,11 +28,13 @@ import {
 } from "@/components/ui/dialog"
 
 import { useCadLab } from "../cad-lab-context"
-import type { DesignReportFormat, DesignReportData } from "@/lib/cad-lab/design-report-types"
+import type { DesignReportFormat, DesignReportData, ReportStage } from "@/lib/cad-lab/design-report-types"
 
 interface DesignReportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  stage?: ReportStage
+  stageData?: Partial<DesignReportData>
 }
 
 const FORMAT_OPTIONS: {
@@ -65,7 +67,15 @@ const FORMAT_OPTIONS: {
   },
 ]
 
-export function DesignReportDialog({ open, onOpenChange }: DesignReportDialogProps) {
+const STAGE_LABELS: Record<ReportStage, string> = {
+  concept: 'Concept',
+  specify: 'Specification',
+  source: 'Sourcing',
+  assemble: 'Assembly',
+  cad: 'CAD',
+}
+
+export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stageData }: DesignReportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
   const [isExporting, setIsExporting] = useState(false)
 
@@ -98,6 +108,7 @@ export function DesignReportDialog({ open, onOpenChange }: DesignReportDialogPro
       projectName: subject || "Untitled Project",
       generatedAt: new Date().toISOString(),
       heroImageUrl: systemIllustrationUrl ?? null,
+      stage,
       productOverview: productOverview || "",
       researchReport: editableReport || "",
       sources,
@@ -107,11 +118,12 @@ export function DesignReportDialog({ open, onOpenChange }: DesignReportDialogPro
       aiCostEstimates,
       researchModelUsed: researchModelUsed ?? null,
       decompositionModelUsed: decompositionModelUsed ?? null,
+      ...stageData,
     }
   }, [
     subject, editableReport, researchResult, modules, diagnosticAnswers,
     aiCostEstimates, productOverview, designBrief, systemIllustrationUrl,
-    researchModelUsed, decompositionModelUsed,
+    researchModelUsed, decompositionModelUsed, stage, stageData,
   ])
 
   const handleExport = useCallback(async () => {
@@ -146,7 +158,7 @@ export function DesignReportDialog({ open, onOpenChange }: DesignReportDialogPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="h-5 w-5 text-international-orange" />
-            Download Report
+            Download {STAGE_LABELS[stage]} Report
           </DialogTitle>
           <DialogDescription>
             Export your design as a shareable document.

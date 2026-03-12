@@ -29,6 +29,7 @@ import {
   ExternalLink,
   Check,
   Info,
+  FileDown,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -48,6 +49,7 @@ import { SupplierDetailDialog } from "@/components/cad/supplier-detail-dialog"
 import { AssemblerCompareDialog } from "@/components/cad/assembler-compare-dialog"
 import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
 import { toast } from "sonner"
+import { DesignReportDialog } from "../components/design-report-dialog"
 import {
   DEFAULT_BRANDING,
   DEFAULT_SHIPPING,
@@ -390,6 +392,7 @@ export default function AssemblePage(): React.ReactNode {
   )
 
   const [activeTab, setActiveTab] = useState("flow")
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [selectedAssembler, setSelectedAssembler] = useState<AssemblyCompanyMatch | null>(null)
   const assemblerDetailCache = useRef(new Map<string, SupplierDetail>())
 
@@ -479,6 +482,16 @@ export default function AssemblePage(): React.ReactNode {
               </button>
             )
           })}
+          <div className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground hover:text-foreground"
+            onClick={() => setIsReportDialogOpen(true)}
+          >
+            <FileDown className="h-4 w-4" />
+            <span className="hidden sm:inline">Download Report</span>
+          </Button>
         </div>
       </nav>
 
@@ -836,6 +849,12 @@ export default function AssemblePage(): React.ReactNode {
           // Close dialog if fewer than 2 remain
           if (compareIds.size <= 2) setShowCompare(false)
         }}
+      />
+
+      <DesignReportDialog
+        open={isReportDialogOpen}
+        onOpenChange={setIsReportDialogOpen}
+        stage="assemble"
       />
     </div>
   )

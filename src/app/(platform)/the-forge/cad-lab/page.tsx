@@ -68,6 +68,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleUpdateModule,
     researchModelUsed, decompositionModelUsed,
     handleRefreshModuleImages,
+    handleReExpandModule, reExpandingModuleIds,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
@@ -529,6 +530,8 @@ export default function CadLabResearchPage(): React.ReactNode {
                 onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
                 onModuleSave={handleUpdateModule}
                 onRetryModule={handleRetryModule}
+                onReloadModule={handleReExpandModule}
+                reloadingModuleIds={reExpandingModuleIds}
               />
 
               {/* Process flow — how modules connect via inputs and outputs */}
@@ -597,7 +600,7 @@ export default function CadLabResearchPage(): React.ReactNode {
         </AnimatePresence>
       )}
 
-      <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} />
+      <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} stage="concept" />
     </div>
   )
 }
