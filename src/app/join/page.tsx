@@ -15,6 +15,7 @@ import {
   Building2,
   Briefcase,
   GraduationCap,
+  Factory,
   TestTube2,
   Loader2,
 } from "lucide-react";
@@ -188,15 +189,13 @@ function WaitlistForm() {
 function JoinPageInner() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("token");
-
-  // No token → waitlist only
-  if (!inviteToken) {
-    return <WaitlistForm />;
-  }
+  const redirectParam = searchParams.get("redirect");
+  const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectParam);
 
   // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)
   const roleParam = searchParams.get("role");
   const isDemoMode = searchParams.get("demo") === "true";
+  const isFactorySignup = roleParam === "factory" || roleParam === "supplier" || isClaimFlow;
 
   const initialPath: UserPath | null = roleParam === "founder"
     ? "founder"
@@ -207,15 +206,12 @@ function JoinPageInner() {
   const initialJoiningRole: JoiningRole =
     roleParam === "apprentice" ? "apprentice" : "executive";
 
+  // Hooks must be called unconditionally before any early returns
   const [selectedPath, setSelectedPath] = useState<UserPath | null>(initialPath);
   const [joiningRole, setJoiningRole] = useState<JoiningRole>(initialJoiningRole);
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
-
-  // useActionState: errors returned inline, form data preserved on failure.
-  // On success the server action calls redirect() so this state is never updated.
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
 
-  // Fetch demo data if in demo mode
   useEffect(() => {
     if (isDemoMode && selectedPath) {
       const role = selectedPath === "founder" ? "founder" : joiningRole;
@@ -225,6 +221,173 @@ function JoinPageInner() {
 
   // Determine the actual role to submit
   const effectiveRole = selectedPath === "founder" ? "founder" : joiningRole;
+
+  // No token and not a claim flow → waitlist only
+  if (!inviteToken && !isClaimFlow) {
+    return <WaitlistForm />;
+  }
+
+  // Factory/supplier claim flow — simplified single-path signup
+  if (isFactorySignup) {
+    return (
+      <div className="min-h-screen bg-background text-foreground">
+        <nav className="px-4 sm:px-6 py-4 sm:py-6">
+          <div className="max-w-2xl mx-auto flex items-center justify-between">
+            <Link
+              href="/"
+              className="text-muted-foreground hover:text-foreground text-sm font-mono uppercase tracking-widest flex items-center gap-2 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Link>
+            <Link
+              href={`/login${redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ""}`}
+              className="text-muted-foreground hover:text-international-orange text-sm font-mono uppercase tracking-widest transition-colors"
+            >
+              Sign in
+            </Link>
+          </div>
+        </nav>
+        <div className="px-4 sm:px-6 pb-12 sm:pb-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="max-w-2xl mx-auto space-y-8"
+          >
+            <div className="text-center space-y-3">
+              <div className="flex justify-center">
+                <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-international-orange/10">
+                  <Factory className="w-7 h-7 text-international-orange" />
+                </div>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-black text-foreground">
+                Claim Your Company Listing
+              </h1>
+              <p className="text-muted-foreground text-base sm:text-lg max-w-lg mx-auto">
+                Create a free account to manage your listing on Fractional Forge
+              </p>
+            </div>
+
+            {state.error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                role="alert"
+                aria-live="polite"
+                className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
+              >
+                <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
+                {state.error}
+              </motion.div>
+            )}
+
+            <form action={formAction} className="space-y-5">
+              <input type="hidden" name="role" value="supplier" />
+              {inviteToken && <input type="hidden" name="invite_token" value={inviteToken} />}
+              {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
+
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium text-foreground">
+                  Full Name
+                  <span className="text-destructive ml-1" aria-label="required">*</span>
+                </Label>
+                <Input
+                  id="name"
+                  name="name"
+                  placeholder="Jane Smith"
+                  key={`name-${state.values?.name ?? ""}`}
+                  defaultValue={state.values?.name || ""}
+                  className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                  required
+                  aria-required="true"
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                  Email
+                  <span className="text-destructive ml-1" aria-label="required">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  key={`email-${state.values?.email ?? ""}`}
+                  defaultValue={state.values?.email || ""}
+                  className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                  required
+                  aria-required="true"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                  Password
+                  <span className="text-destructive ml-1" aria-label="required">*</span>
+                </Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Create a strong password"
+                  defaultValue=""
+                  className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                  required
+                  aria-required="true"
+                  minLength={8}
+                  aria-describedby="password-hint"
+                />
+                <p id="password-hint" className="text-xs text-muted-foreground">
+                  Min 8 characters, with uppercase, lowercase, and a number
+                </p>
+              </div>
+
+              <motion.div
+                whileHover={isPending ? {} : { scale: 1.01 }}
+                whileTap={isPending ? {} : { scale: 0.98 }}
+                className="pt-2"
+              >
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Free Account & Claim"
+                  )}
+                </Button>
+              </motion.div>
+            </form>
+
+            <p className="text-xs text-center text-muted-foreground">
+              Already have an account?{" "}
+              <Link
+                href={`/login${redirectParam ? `?redirect=${encodeURIComponent(redirectParam)}` : ""}`}
+                className="text-international-orange hover:underline font-medium"
+              >
+                Sign in
+              </Link>
+            </p>
+
+            <p className="text-xs text-center text-muted-foreground">
+              By creating an account, you agree to our{" "}
+              <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>
+              {" "}and{" "}
+              <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>.
+            </p>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -390,7 +553,8 @@ function JoinPageInner() {
               >
                 <form action={formAction} className="space-y-5">
                   <input type="hidden" name="role" value={effectiveRole} />
-                  <input type="hidden" name="invite_token" value={inviteToken} />
+                  {inviteToken && <input type="hidden" name="invite_token" value={inviteToken} />}
+                  {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
 
                   {/* Role sub-selection for Joining path */}
                   {selectedPath === "joining" && (

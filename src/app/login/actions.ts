@@ -28,7 +28,7 @@ export async function login(formData: FormData) {
                 resetIn: rateLimitResult.resetTime 
             }
         })
-        redirect(`/login?error=${encodeURIComponent('Too many login attempts. Please try again in 15 minutes.')}`)
+        redirect('/login?error=rate-limited')
     }
 
     const supabase = await createClient()
@@ -39,22 +39,22 @@ export async function login(formData: FormData) {
     // Security: Validate and sanitize email
     const email = sanitizeEmail(rawEmail)
     if (!email) {
-        redirect('/login?error=Invalid email address')
+        redirect('/login?error=invalid-email')
     }
 
     // Security: Password validation with strength requirements
     if (!password) {
-        redirect('/login?error=Password is required')
+        redirect('/login?error=password-required')
     }
-    
+
     // Check password length (min 8 characters for security)
     if (password.length < 8) {
-        redirect('/login?error=Password must be at least 8 characters')
+        redirect('/login?error=password-too-short')
     }
-    
+
     // Check password max length (prevent DoS with extremely long passwords)
     if (password.length > 128) {
-        redirect('/login?error=Password is too long')
+        redirect('/login?error=password-too-long')
     }
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -66,7 +66,7 @@ export async function login(formData: FormData) {
         // Security: Log failed login attempt
         const userAgentHeader = headersList.get('user-agent') || undefined
         await logFailedLogin(email, clientIP, userAgentHeader, error.message)
-        redirect('/login?error=Invalid email or password')
+        redirect('/login?error=invalid-credentials')
     }
 
     // Success - log and reset rate limit for this IP
@@ -105,7 +105,6 @@ export async function login(formData: FormData) {
         }
 
         // Check how many foundries the user belongs to
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { count } = await supabase
             .from('foundry_memberships')
             .select('*', { count: 'exact', head: true })

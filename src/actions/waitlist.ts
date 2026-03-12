@@ -55,13 +55,8 @@ export async function joinWaitlist(email: string): Promise<JoinWaitlistResult> {
     return { success: false, error: "Something went wrong. Please try again later." };
   }
 
+  // SECURITY: Return the same message regardless of status to prevent email enumeration
   if (existing) {
-    if (existing.status === "pending") {
-      return { success: true, message: "You're already on the list! We'll be in touch." };
-    }
-    if (existing.status === "approved") {
-      return { success: true, message: "You're already approved. Check your email for the signup link." };
-    }
     return { success: true, message: "Thanks! We'll be in touch when your spot is ready." };
   }
 

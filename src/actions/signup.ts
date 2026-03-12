@@ -114,27 +114,54 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return { error, values: formValues };
   }
 
-  // Invite-only gate: signup requires a valid waitlist invite token
+  // Invite-only gate: signup requires a valid waitlist invite token or a claim redirect
   const inviteToken = (formData.get("invite_token") as string)?.trim() || null;
-  if (!inviteToken) {
+  const redirectTo = (formData.get("redirect") as string)?.trim() || null;
+  // SECURITY: Strict claim flow detection — must be exactly /claim/{hex_token}
+  const isClaimFlow = redirectTo != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectTo);
+
+  if (!inviteToken && !isClaimFlow) {
     return errorWithValues("Signup is currently invite-only. Join the waitlist to get an invite.");
   }
 
+  // Validate invite token when present (claim flow users may not have one)
   const adminForWaitlist = createAdminClient();
-  const { data: waitlistEntry, error: waitlistError } = await adminForWaitlist
-    .from("waitlist")
-    .select("id, email, status, redeemed_at")
-    .eq("invite_token", inviteToken)
-    .maybeSingle();
+  let waitlistEntry: { id: string; email: string; status: string; redeemed_at: string | null } | null = null;
 
-  if (waitlistError || !waitlistEntry) {
-    return errorWithValues("This invite link is invalid or could not be found.");
+  if (inviteToken) {
+    const { data, error: waitlistError } = await adminForWaitlist
+      .from("waitlist")
+      .select("id, email, status, redeemed_at")
+      .eq("invite_token", inviteToken)
+      .maybeSingle();
+
+    if (waitlistError || !data) {
+      return errorWithValues("This invite link is invalid or could not be found.");
+    }
+    if (data.status !== "approved") {
+      return errorWithValues("This invite has not been approved yet.");
+    }
+    if (data.redeemed_at) {
+      return errorWithValues("This invite link has already been used.");
+    }
+    waitlistEntry = data;
   }
-  if (waitlistEntry.status !== "approved") {
-    return errorWithValues("This invite has not been approved yet.");
-  }
-  if (waitlistEntry.redeemed_at) {
-    return errorWithValues("This invite link has already been used.");
+
+  // SECURITY: Validate claim token against the database to prevent invite-only bypass.
+  // Without this, anyone could sign up by crafting ?redirect=/claim/<fake-hex>.
+  if (isClaimFlow && !inviteToken) {
+    const claimToken = redirectTo!.split("/claim/")[1];
+    const { data: claimValid } = await adminForWaitlist
+      .from("listing_claim_tokens")
+      .select("id")
+      .eq("token", claimToken)
+      .in("status", ["pending", "clicked"])
+      .gt("expires_at", new Date().toISOString())
+      .single();
+
+    if (!claimValid) {
+      return errorWithValues("This claim link is invalid or has expired. Please contact us for a new one.");
+    }
   }
 
   // Security: Get client IP for rate limiting
@@ -176,6 +203,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return errorWithValues("All fields are required");
   }
 
+  // SECURITY: Validate role against allowlist to prevent arbitrary role injection
+  const validRoles: SignupRole[] = ["founder", "executive", "apprentice", "supplier"];
+  if (!validRoles.includes(role)) {
+    return errorWithValues("Invalid signup role");
+  }
+
   // Security: Validate password strength
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
@@ -187,8 +220,8 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return errorWithValues("Company name is required");
   }
 
-  // Suppliers must provide a business name
-  if (role === "supplier" && !businessName) {
+  // Suppliers must provide a business name (unless claiming a listing — it already has one)
+  if (role === "supplier" && !businessName && !isClaimFlow) {
     return errorWithValues("Business name is required");
   }
 
@@ -549,6 +582,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
   revalidatePath("/", "layout");
 
+  // Claim flow: redirect back to the claim page to complete the claim
+  // SECURITY: Strict regex — only /claim/{hex}, no traversal/query/encoded chars
+  if (isClaimFlow && redirectTo && /^\/claim\/[a-f0-9]+$/.test(redirectTo)) {
+    redirect(redirectTo);
+  }
+
   if (role === "supplier") {
     redirect("/supplier-portal");
   }
@@ -569,8 +608,14 @@ export async function submitApplication(formData: FormData) {
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
 
-  if (!email || !fullName || !role) {
-    return redirect(`/join/${role || "network"}?error=All fields are required`);
+  // SECURITY: Validate role against allowlist to prevent path traversal in redirect
+  const validAppRoles: ApplicationRole[] = ["vc", "factory", "university", "network"];
+  if (!role || !validAppRoles.includes(role)) {
+    return redirect("/join?error=Invalid+role");
+  }
+
+  if (!email || !fullName) {
+    return redirect(`/join/${role}?error=All+fields+are+required`);
   }
 
   // Build application data based on role

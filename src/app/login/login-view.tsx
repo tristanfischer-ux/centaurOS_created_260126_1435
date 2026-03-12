@@ -10,6 +10,7 @@
 
 import { Suspense } from 'react'
 import { useFormStatus } from 'react-dom'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { motion, type Variants } from 'framer-motion'
 import { login } from './actions'
@@ -41,13 +42,27 @@ function SubmitButton(): React.ReactNode {
 }
 
 /**
- * ErrorMessage — Displays auth errors from URL params.
+ * SECURITY: Map error codes to safe messages. Never render raw URL params —
+ * an attacker can craft phishing URLs with arbitrary "error" text.
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+    'invalid-credentials': 'Invalid email or password',
+    'rate-limited': 'Too many login attempts. Please try again in 15 minutes.',
+    'invalid-email': 'Invalid email address',
+    'password-required': 'Password is required',
+    'password-too-short': 'Password must be at least 8 characters',
+    'password-too-long': 'Password is too long',
+}
+
+/**
+ * ErrorMessage — Displays auth errors from URL params (code-mapped only).
  */
 function ErrorMessage(): React.ReactNode {
     const searchParams = useSearchParams()
-    const error = searchParams.get('error')
+    const errorCode = searchParams.get('error')
+    const message = errorCode ? ERROR_MESSAGES[errorCode] : null
 
-    if (!error) return null
+    if (!message) return null
 
     return (
         <motion.div
@@ -58,7 +73,7 @@ function ErrorMessage(): React.ReactNode {
             className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-sm mb-6 flex items-center gap-3"
         >
             <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
-            {error}
+            {message}
         </motion.div>
     )
 }
@@ -166,6 +181,18 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
 
                 <motion.div variants={formItemVariants}>
                     <SubmitButton />
+                </motion.div>
+
+                <motion.div variants={formItemVariants} className="text-center pt-2">
+                    <span className="text-sm text-muted-foreground">
+                        Don&apos;t have an account?{' '}
+                        <Link
+                            href={redirect ? `/join?redirect=${encodeURIComponent(redirect)}` : '/join'}
+                            className="text-international-orange hover:underline font-medium"
+                        >
+                            Create one for free
+                        </Link>
+                    </span>
                 </motion.div>
 
                 <motion.div variants={formItemVariants} className="text-center pt-4">
