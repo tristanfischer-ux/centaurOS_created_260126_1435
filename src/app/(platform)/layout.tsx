@@ -5,6 +5,7 @@ import { PWARegister } from "@/components/PWARegister";
 import { DragDropPolyfill } from "@/components/DragDropPolyfill";
 import { CommandPalette } from "@/components/CommandPalette";
 import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
+import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { OnboardingModal } from "@/components/OnboardingModal";
@@ -105,6 +106,7 @@ export default async function PlatformLayout({
                     <div className="flex h-screen overflow-hidden gap-0">
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
+                        <KeyboardShortcuts />
                         <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
                         <MainContentArea>
