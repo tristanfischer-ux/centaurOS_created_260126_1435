@@ -179,8 +179,8 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
             </div>
           )}
 
-          {/* Pagination */}
-          {totalPages > 1 && (
+          {/* Pagination — hide when out of range (e.g. ?page=999) */}
+          {totalPages > 1 && logs.length > 0 && (
             <div className="flex items-center justify-between pt-4 mt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">
                 Page {page} of {totalPages} ({count} events)
