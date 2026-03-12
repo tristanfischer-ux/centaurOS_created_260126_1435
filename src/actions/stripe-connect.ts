@@ -38,18 +38,23 @@ export async function createProviderStripeAccount(): Promise<{
             return { success: false, error: "Profile not found" }
         }
 
-        // Check if user already has a Stripe account
-        const { data: existingAccount } = await supabase
+        // Check if user has a provider_profiles row
+        const { data: existingAccount, error: existingError } = await supabase
             .from('provider_profiles')
             .select('stripe_account_id')
             .eq('user_id', user.id)
             .single()
 
+        if (existingError && existingError.code === 'PGRST116') {
+            // No provider_profiles row exists — user hasn't completed provider setup
+            return { success: false, error: 'Please complete your provider profile setup first.' }
+        }
+
         if (existingAccount?.stripe_account_id) {
-            return { 
-                success: true, 
+            return {
+                success: true,
                 accountId: existingAccount.stripe_account_id,
-                error: "Account already exists" 
+                error: "Account already exists"
             }
         }
 
@@ -59,25 +64,37 @@ export async function createProviderStripeAccount(): Promise<{
             return { success: false, error: result.error }
         }
 
+        if (!result.accountId) {
+            return { success: false, error: 'Stripe account creation returned no account ID.' }
+        }
+
         // Store the account ID in the provider profile
-        const { error: updateError } = await supabase
+        // SECURITY: Use stripe_account_id IS NULL as atomic guard to prevent race condition
+        const { data: updated, error: updateError } = await supabase
             .from('provider_profiles')
             .update({ stripe_account_id: result.accountId })
             .eq('user_id', user.id)
+            .is('stripe_account_id', null)
+            .select('id')
 
         if (updateError) {
             console.error('Error storing Stripe account ID:', updateError)
             return {
                 success: false,
-                accountId: result.accountId ?? undefined,
+                accountId: result.accountId,
                 error: 'Stripe account was created but could not be saved. Please contact support.',
             }
+        }
+
+        if (!updated || updated.length === 0) {
+            // Race condition: another request already set the account ID
+            return { success: true, accountId: result.accountId, error: 'Account already exists' }
         }
 
         revalidatePath('/settings')
         revalidatePath('/marketplace')
 
-        return { success: true, accountId: result.accountId! }
+        return { success: true, accountId: result.accountId }
     } catch (error) {
         console.error('Error creating provider Stripe account:', error)
         return { 

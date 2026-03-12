@@ -11,6 +11,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 import { aiGuard } from "@/lib/ai/guard"
+import { rateLimit } from "@/lib/security/rate-limit"
 import { buildOutreachPrompt, parseSequenceResponse } from "@/lib/outreach/prompt-builder"
 import type { Campaign, Contact, OutreachKBEntry } from "@/types/outreach"
 
@@ -25,6 +26,12 @@ export async function POST(request: Request) {
     const foundryId = guard.foundryId
     if (!foundryId) {
         return NextResponse.json({ error: "Missing foundry" }, { status: 403 })
+    }
+
+    // SECURITY: Rate limit outreach generation (20 per hour per user)
+    const rateLimitResult = await rateLimit('api', `outreach:${user.id}`, { limit: 20, window: 60 * 60 * 1000 })
+    if (!rateLimitResult.success) {
+        return NextResponse.json({ error: "Rate limit exceeded. Please wait before generating more sequences." }, { status: 429 })
     }
 
     // 3. Parse body
@@ -198,6 +205,8 @@ export async function POST(request: Request) {
                     controller.close()
                     return
                 }
+
+                await guard.trackUsage({ model: 'claude-sonnet-4-6' })
 
                 controller.enqueue(encoder.encode(
                     `data: ${JSON.stringify({ done: true, emailCount })}\n\n`

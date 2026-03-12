@@ -301,6 +301,8 @@ export async function POST(request: Request): Promise<Response> {
             domain: detectedDomain,
           }).catch(() => {})
 
+          await guard.trackUsage({ model: 'zoo-text-to-cad' })
+
           const elapsedMs = Date.now() - startTime
           console.info("[CAD-LAB-UNIFIED] Generation complete:", { projectId, elapsedMs })
 

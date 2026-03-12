@@ -207,6 +207,12 @@ Please suggest the top 3 AI tools that would form the best partnership with this
             temperature: 0.7,
         })
 
+        await guard.trackUsage({
+            model: 'gpt-4o',
+            promptTokens: completion.usage?.prompt_tokens,
+            completionTokens: completion.usage?.completion_tokens,
+        })
+
         const content = completion.choices[0]?.message?.content
         if (!content) {
             return NextResponse.json(

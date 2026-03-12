@@ -109,7 +109,9 @@ async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
       .eq('id', foundryId)
       .single()
 
-    if (!foundry?.owner_id) return 'free'
+    if (!foundry?.owner_id) {
+      throw new Error(`Foundry not found or has no owner: ${foundryId}`)
+    }
 
     // Check their subscription
     const { data: subscription } = await supabase

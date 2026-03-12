@@ -487,6 +487,8 @@ export async function POST(request: Request): Promise<Response> {
 
       const elapsedMs = Date.now() - startTime
 
+      await guard.trackUsage({ model: 'zoo-text-to-cad' })
+
       // AUDIT: Log module generation complete
       console.info("[CAD-LAB-MODULE] Generation complete:", {
         projectId,

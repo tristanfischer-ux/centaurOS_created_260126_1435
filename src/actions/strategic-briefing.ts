@@ -16,10 +16,9 @@
  * - src/app/(platform)/reports/page.tsx — UI that calls this action
  */
 
-import { createClient } from '@/lib/supabase/server'
-import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateStrategicBriefing } from '@/lib/reports/ai-slide-generator'
 
 import type {
@@ -102,7 +101,7 @@ export async function generateBriefingAction(
     console.error('[StrategicBriefing] Action failed:', { message })
     return {
       success: false,
-      error: sanitizeErrorMessage(message),
+      error: message,
     }
   }
   })
@@ -114,7 +113,7 @@ export async function generateBriefingAction(
 // reference real metrics, objectives, and team information in the
 // presentation. This bridges ForgeOS data with the narrative generator.
 async function gatherCompanyContext(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: SupabaseClient,
   foundryId: string,
 ): Promise<string | null> {
   try {

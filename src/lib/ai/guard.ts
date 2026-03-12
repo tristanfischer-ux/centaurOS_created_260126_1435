@@ -83,27 +83,39 @@ export async function aiGuard(
 
   const foundryId = profile?.foundry_id as string | null
 
-  // Check AI limit if user has a foundry
-  if (foundryId) {
-    const limitCheck = await checkAILimit(foundryId)
-    if (!limitCheck.allowed) {
-      return {
-        denied: true,
-        response: NextResponse.json(
-          {
-            error: limitCheck.message,
-            usage: {
-              current: limitCheck.currentUsage,
-              limit: limitCheck.limit,
-              remaining: 0,
-            },
+  // SECURITY: Require foundry membership for AI access
+  if (!foundryId) {
+    return {
+      denied: true,
+      response: NextResponse.json(
+        { error: 'You must belong to a foundry to use AI features.' },
+        { status: 403 }
+      ),
+      userId: user.id,
+      foundryId: null,
+      trackUsage: async () => {},
+    }
+  }
+
+  // Check AI limit
+  const limitCheck = await checkAILimit(foundryId)
+  if (!limitCheck.allowed) {
+    return {
+      denied: true,
+      response: NextResponse.json(
+        {
+          error: limitCheck.message,
+          usage: {
+            current: limitCheck.currentUsage,
+            limit: limitCheck.limit,
+            remaining: 0,
           },
-          { status: 429 }
-        ),
-        userId: user.id,
-        foundryId,
-        trackUsage: async () => {},
-      }
+        },
+        { status: 429 }
+      ),
+      userId: user.id,
+      foundryId,
+      trackUsage: async () => {},
     }
   }
 
@@ -115,8 +127,6 @@ export async function aiGuard(
     estimatedCostUsd?: number
     metadata?: Record<string, unknown>
   }) => {
-    if (!foundryId) return
-
     // AUDIT: Log AI usage for cost tracking
     await trackAIUsage({
       foundryId,

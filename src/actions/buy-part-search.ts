@@ -11,6 +11,7 @@
 
 import Anthropic from "@anthropic-ai/sdk"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { checkRateLimit } from '@/lib/security/rate-limit'
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -735,7 +736,19 @@ export async function searchBuyPartProducts(
 ): Promise<BuyPartSearchResult[]> {
   if (partNames.length === 0) return []
 
-  return withAIGate('cad_lab_buy_search', async () => {
+  // SECURITY: Cap input to prevent unbounded scraping + AI calls
+  const MAX_PARTS = 20
+  if (partNames.length > MAX_PARTS) {
+    return partNames.map((name) => ({ partName: name, products: [] }))
+  }
+
+  return withAIGate('cad_lab_buy_search', async ({ user }) => {
+
+  // SECURITY: Rate limit buy-part search (10 per hour per user)
+  const rateLimitError = await checkRateLimit('aiBuySearch', user.id)
+  if (rateLimitError) {
+    return partNames.map((name) => ({ partName: name, products: [] }))
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) {

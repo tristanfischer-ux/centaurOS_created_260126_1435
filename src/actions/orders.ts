@@ -82,7 +82,7 @@ export async function acceptOrder(
     // Get provider profile to verify ownership
     const { data: providerProfile } = await supabase
       .from("provider_profiles")
-      .select("id, user_id, stripe_account_id")
+      .select("id, user_id, stripe_account_id, stripe_onboarding_complete")
       .eq("id", order.seller_id)
       .single()
 
@@ -90,11 +90,18 @@ export async function acceptOrder(
       return { success: false, error: "Not authorized to accept this order" }
     }
 
-    // SECURITY: Verify provider has Stripe payments set up before accepting orders
+    // SECURITY: Verify provider has Stripe payments fully set up before accepting orders
     if (!providerProfile.stripe_account_id) {
       return {
         success: false,
         error: "Please set up your payment account before accepting orders. Go to Settings → Payments to connect Stripe."
+      }
+    }
+
+    if (!providerProfile.stripe_onboarding_complete) {
+      return {
+        success: false,
+        error: "Please complete your Stripe onboarding before accepting orders. Go to Settings → Payments to finish setup."
       }
     }
 

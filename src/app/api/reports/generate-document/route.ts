@@ -15,7 +15,6 @@ import { NextResponse } from "next/server"
 import { v4 as uuidv4 } from "uuid"
 import { createClient } from "@/lib/supabase/server"
 import { aiGuard } from "@/lib/ai/guard"
-import { getFoundryIdCached } from "@/lib/supabase/foundry-context"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { getSkillById } from "@/lib/document-skills"
 import { collectAutoData } from "@/lib/document-skills/data-collector"
@@ -80,7 +79,7 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Unknown skill" }, { status: 400 })
   }
 
-  const foundryId = await getFoundryIdCached()
+  const foundryId = guard.foundryId
   if (!foundryId) {
     return NextResponse.json({ error: "No foundry context" }, { status: 400 })
   }
@@ -179,6 +178,12 @@ export async function POST(request: Request): Promise<Response> {
 
         const finalMessage = await messageStream.finalMessage()
         tokensUsed = (finalMessage.usage?.input_tokens ?? 0) + (finalMessage.usage?.output_tokens ?? 0)
+
+        await guard.trackUsage({
+          model: 'claude-opus-4-6',
+          promptTokens: finalMessage.usage?.input_tokens,
+          completionTokens: finalMessage.usage?.output_tokens,
+        })
 
         if (!fullContent.trim()) {
           emit({ type: "error", message: "Document generation returned empty content" })
