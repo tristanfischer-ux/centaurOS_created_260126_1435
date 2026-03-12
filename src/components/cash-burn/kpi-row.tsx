@@ -22,7 +22,7 @@ export function KpiRow({ items }: KpiRowProps) {
           <CardContent className="pt-4 pb-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               {item.label}
-              {item.tooltip && <HelpTooltip content={item.tooltip} side="right" className="ml-1 inline-flex align-middle" />}
+              {item.tooltip && <HelpTooltip content={item.tooltip} side="right" className="ml-1" />}
             </p>
             <p className="text-2xl font-display font-bold text-foreground mt-1">{item.value}</p>
             {item.detail && (

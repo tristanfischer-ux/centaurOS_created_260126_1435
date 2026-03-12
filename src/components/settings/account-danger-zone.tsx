@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Trash2, AlertTriangle, Loader2 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,7 +21,6 @@ interface AccountDangerZoneProps {
 }
 
 export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
-  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [confirmText, setConfirmText] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
@@ -37,7 +35,10 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
     const result = await deleteMyAccount()
 
     if (result.success) {
-      router.push("/login")
+      // GOTCHA: After auth deletion the session cookie is invalid.
+      // router.push does client-side navigation which may fail —
+      // hard redirect ensures a clean page load and cookie clear.
+      window.location.href = "/login"
       return
     }
 
@@ -46,6 +47,10 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
   }
 
   function handleOpenChange(nextOpen: boolean) {
+    // SECURITY: Prevent closing dialog while deletion is in-flight.
+    // Closing would reset state but the server action keeps running,
+    // leading to stale setError/setIsDeleting calls on unmounted state.
+    if (isDeleting) return
     setOpen(nextOpen)
     if (!nextOpen) {
       setConfirmText("")
@@ -105,11 +110,15 @@ export function AccountDangerZone({ userEmail }: AccountDangerZoneProps) {
                 placeholder="DELETE"
                 disabled={isDeleting}
                 autoComplete="off"
+                aria-label="Type DELETE to confirm account deletion"
               />
             </div>
 
             {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+              <div
+                className="rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+                role="alert"
+              >
                 <p className="text-sm text-destructive">{error}</p>
               </div>
             )}

@@ -30,10 +30,14 @@ interface DeleteAccountResult {
  * Self-service account deletion.
  *
  * @description Checks sole-founder status across all foundries, verifies GDPR
- * eligibility (disputes, orders, financial retention), cleans up memberships
- * and assignments, then deletes or anonymizes the user.
+ * eligibility (disputes, orders, financial retention), processes GDPR deletion
+ * first, then cleans up memberships/assignments, then deletes auth user.
  *
  * @returns Result with success or error details (sole-founder foundries, blockers)
+ *
+ * @security Operation order: validate → GDPR → cleanup → audit → auth delete.
+ * GDPR runs before cleanup so a GDPR failure doesn't leave the user with
+ * deleted memberships but a live account (half-deleted state).
  */
 export async function deleteMyAccount(): Promise<DeleteAccountResult> {
   // INTENT: supabase from withUser is user-scoped; we need admin for cross-table ops
@@ -58,15 +62,15 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
 
       for (const membership of founderMemberships) {
         // Check if other Founders exist in this foundry
-        const { count } = await adminSupabase
+        const { count, error: countError } = await adminSupabase
           .from("foundry_memberships")
           .select("*", { count: "exact", head: true })
           .eq("foundry_id", membership.foundry_id)
           .eq("role", "Founder")
           .neq("user_id", user.id)
 
-        if (count === 0) {
-          // INTENT: foundries is a joined object from the select above
+        // GOTCHA: count is null on query error — treat as sole founder (fail-safe)
+        if (countError || count === null || count === 0) {
           const foundryData = membership.foundries as unknown as { name: string } | null
           soleFounderFoundries.push(foundryData?.name || "Unknown foundry")
         }
@@ -91,33 +95,9 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       }
     }
 
-    // Cleanup: Remove from teams, tasks, memberships (before auth deletion)
-    try {
-      await adminSupabase
-        .from("task_assignees")
-        .delete()
-        .eq("profile_id", user.id)
-
-      await adminSupabase
-        .from("tasks")
-        .update({ assignee_id: null })
-        .eq("assignee_id", user.id)
-
-      await adminSupabase
-        .from("team_members")
-        .delete()
-        .eq("profile_id", user.id)
-
-      await adminSupabase
-        .from("foundry_memberships")
-        .delete()
-        .eq("user_id", user.id)
-    } catch (cleanupError) {
-      console.error("[deleteMyAccount] Cleanup error:", cleanupError)
-      return { error: "Failed to clean up account data. Please try again." }
-    }
-
-    // GDPR: Process deletion or anonymization
+    // GDPR: Process deletion or anonymization BEFORE cleanup
+    // DECISION: GDPR runs first so a failure here doesn't leave the user
+    // with deleted memberships but a live account (half-deleted orphan state).
     if (eligibility.canDelete) {
       const result = await processImmediateDeletion(adminSupabase, user.id)
       if (!result.success) {
@@ -132,6 +112,7 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       }
 
       // Schedule full deletion when retention period ends
+      // GOTCHA: scheduleFullDeletion calls anonymizeUser again internally — harmless (idempotent)
       if (eligibility.retentionEndDate) {
         await scheduleFullDeletion(
           adminSupabase,
@@ -139,6 +120,25 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
           new Date(eligibility.retentionEndDate)
         )
       }
+    }
+
+    // Cleanup: Remove from teams, tasks, memberships (after GDPR succeeds)
+    // GOTCHA: Supabase client returns { error } instead of throwing — must check each
+    const cleanupOps = [
+      adminSupabase.from("task_assignees").delete().eq("profile_id", user.id),
+      adminSupabase.from("tasks").update({ assignee_id: null }).eq("assignee_id", user.id),
+      adminSupabase.from("team_members").delete().eq("profile_id", user.id),
+      adminSupabase.from("foundry_memberships").delete().eq("user_id", user.id),
+    ]
+
+    const cleanupResults = await Promise.all(cleanupOps)
+    const cleanupErrors = cleanupResults
+      .map((r) => r.error)
+      .filter(Boolean)
+
+    if (cleanupErrors.length > 0) {
+      // Log but don't block — GDPR data is already handled, these are FK refs
+      console.error("[deleteMyAccount] Non-fatal cleanup errors:", cleanupErrors)
     }
 
     // AUDIT: Log before auth deletion (after this, the user record is gone)

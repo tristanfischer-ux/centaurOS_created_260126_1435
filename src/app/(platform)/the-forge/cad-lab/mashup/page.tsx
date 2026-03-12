@@ -173,7 +173,7 @@ export default function MashupPage(): React.ReactElement {
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Mashup Lab <HelpTooltip content="Combine multiple modules into a single assembly. Mashups inherit parameters from their component modules." /></h1>
+            <h1 className={`${typography.h1} inline-flex items-center gap-1.5`}>Mashup Lab <HelpTooltip content="Combine multiple modules into a single assembly. Mashups inherit parameters from their component modules." /></h1>
           </div>
           <p className={typography.pageSubtitle}>
             Combine two or more STEP files into a hybrid product &mdash; e.g. a radio in a toaster, or an RC car that&apos;s also a drone.

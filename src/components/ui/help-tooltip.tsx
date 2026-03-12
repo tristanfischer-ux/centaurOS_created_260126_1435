@@ -1,3 +1,5 @@
+'use client'
+
 import { HelpCircle } from 'lucide-react'
 import {
   Tooltip,
@@ -24,8 +26,14 @@ export function HelpTooltip({ content, side = 'top', className }: HelpTooltipPro
     <TooltipProvider delayDuration={200}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <span className={className}>
-            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors cursor-help" />
+          <span
+            role="img"
+            aria-label="Help"
+            className={`inline-flex items-center align-middle cursor-help ${className ?? ''}`}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
           </span>
         </TooltipTrigger>
         <TooltipContent side={side} className="max-w-[250px]">
