@@ -15,8 +15,10 @@ import {
   ReportSectionHeader,
   SectionNarrativeIntro,
   StatCallout,
+  TrendArrow,
   formatPence,
 } from '@/components/reports/report-visuals'
+import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 
 import type { WorkshopAssembleSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -43,8 +45,23 @@ export function WorkshopAssembleSection({
   sectionNarrative,
   templateId,
   sectionNumber,
+  previousTotalOrders,
+  previousDelivered,
+  previousAtRisk,
 }: WorkshopAssembleSectionProps): React.JSX.Element {
   const isEmpty = totalOrders === 0
+
+  // Deltas
+  const totalDelta = previousTotalOrders != null
+    ? calculatePercentChange(totalOrders, previousTotalOrders)
+    : undefined
+  const deliveredDelta = previousDelivered != null
+    ? calculatePercentChange(statusCounts.delivered, previousDelivered)
+    : undefined
+  // At risk: fewer is better, so invert the trend direction
+  const atRiskDelta = previousAtRisk != null
+    ? calculatePercentChange(statusCounts.atRisk, previousAtRisk)
+    : undefined
 
   return (
     <div className="space-y-8">
@@ -70,7 +87,13 @@ export function WorkshopAssembleSection({
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <Card>
               <CardContent className="p-3 text-center">
-                <StatCallout value={String(statusCounts.inProduction)} label="In Production" size="sm" />
+                <StatCallout
+                  value={String(statusCounts.inProduction)}
+                  label="In Production"
+                  size="sm"
+                  trend={totalDelta != null ? getTrendDirection(totalDelta) : undefined}
+                  changePercent={totalDelta != null ? Math.round(totalDelta) : undefined}
+                />
               </CardContent>
             </Card>
             <Card>
@@ -91,7 +114,13 @@ export function WorkshopAssembleSection({
                 <div className="flex items-center justify-center gap-1">
                   <CheckCircle2 className="h-3.5 w-3.5 text-status-success" />
                 </div>
-                <StatCallout value={String(statusCounts.delivered)} label="Delivered" size="sm" />
+                <StatCallout
+                  value={String(statusCounts.delivered)}
+                  label="Delivered"
+                  size="sm"
+                  trend={deliveredDelta != null ? getTrendDirection(deliveredDelta) : undefined}
+                  changePercent={deliveredDelta != null ? Math.round(deliveredDelta) : undefined}
+                />
               </CardContent>
             </Card>
             <Card>
@@ -102,6 +131,12 @@ export function WorkshopAssembleSection({
                   </div>
                 )}
                 <StatCallout value={String(statusCounts.atRisk)} label="At Risk" size="sm" />
+                {atRiskDelta != null && atRiskDelta !== 0 && (
+                  <TrendArrow
+                    trend={atRiskDelta > 0 ? 'down' : 'up'}
+                    changePercent={Math.abs(Math.round(atRiskDelta))}
+                  />
+                )}
               </CardContent>
             </Card>
           </div>

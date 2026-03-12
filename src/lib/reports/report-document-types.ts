@@ -300,6 +300,15 @@ export interface KnowledgeLearningSectionData {
 }
 
 // ========================
+// Workshop: Shared
+// ========================
+
+export interface WorkshopFunnelStage {
+  stage: 'design' | 'specify' | 'source' | 'assemble' | 'complete'
+  count: number
+}
+
+// ========================
 // Workshop: Design
 // ========================
 
@@ -325,6 +334,15 @@ export interface WorkshopDesignSectionData {
   projects: WorkshopDesignProject[]
   generationMetrics?: GenerationMetricsSummary
   sectionNarrative?: string
+  workshopFunnel?: WorkshopFunnelStage[]
+  previousTotalProjects?: number
+  previousActiveProjects?: number
+  generationTrend?: { date: string; count: number }[]
+  firstAttemptSuccessRate?: number
+  totalTokensUsed?: number
+  qualityFailureRate?: number
+  avgRepairAttempts?: number
+  previousGenerationCount?: number
 }
 
 // ========================
@@ -357,6 +375,8 @@ export interface WorkshopSpecifySectionData {
   materialBreakdown: { material: string; count: number }[]
   diagnosticTable: SpecifyDiagnosticRow[]
   sectionNarrative?: string
+  previousReviewHealth?: SpecifyReviewHealth
+  previousAveragePerUnitCost?: number
 }
 
 // ========================
@@ -387,6 +407,15 @@ export interface WorkshopSourceSectionData {
   rfqResponseStats: RFQResponseStats
   orderSummary: SourceOrderSummary
   sectionNarrative?: string
+  previousRfqTotal?: number
+  previousOrderTotal?: number
+  previousOrderValue?: number
+  quoteStats?: { avg: number; min: number; max: number; count: number }
+  avgLeadTimeWeeks?: number
+  shortlistRate?: number
+  budgetCompliance?: { withinBudget: number; overBudget: number; underBudget: number; total: number }
+  avgResponseDays?: number
+  uniqueSupplierCount?: number
 }
 
 // ========================
@@ -416,6 +445,9 @@ export interface WorkshopAssembleSectionData {
   statusCounts: AssemblyStatusCounts
   totalOrders: number
   sectionNarrative?: string
+  previousTotalOrders?: number
+  previousDelivered?: number
+  previousAtRisk?: number
 }
 
 export type SectionData =

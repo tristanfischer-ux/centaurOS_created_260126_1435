@@ -4,10 +4,10 @@
  * @file WorkshopSourceSection.tsx
  *
  * @description Source phase report section — RFQ pipeline, response stats,
- * manufacturing orders by status.
+ * manufacturing orders, quote analytics, supplier metrics, and deltas.
  */
 
-import { ShoppingCart, FileText, Factory } from 'lucide-react'
+import { ShoppingCart, FileText, Factory, Users, Clock, PoundSterling } from 'lucide-react'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -15,8 +15,10 @@ import {
   ReportSectionHeader,
   SectionNarrativeIntro,
   StatCallout,
+  TrendArrow,
   formatPence,
 } from '@/components/reports/report-visuals'
+import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 
 import type { WorkshopSourceSectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -43,8 +45,28 @@ export function WorkshopSourceSection({
   sectionNarrative,
   templateId,
   sectionNumber,
+  previousRfqTotal,
+  previousOrderTotal,
+  previousOrderValue,
+  quoteStats,
+  avgLeadTimeWeeks,
+  shortlistRate,
+  budgetCompliance,
+  avgResponseDays,
+  uniqueSupplierCount,
 }: WorkshopSourceSectionProps): React.JSX.Element {
   const isEmpty = rfqPipeline.total === 0 && orderSummary.total === 0
+
+  // Deltas
+  const rfqDelta = previousRfqTotal != null
+    ? calculatePercentChange(rfqPipeline.total, previousRfqTotal)
+    : undefined
+  const orderDelta = previousOrderTotal != null
+    ? calculatePercentChange(orderSummary.total, previousOrderTotal)
+    : undefined
+  const valueDelta = previousOrderValue != null
+    ? calculatePercentChange(orderSummary.totalEstimatedValue, previousOrderValue)
+    : undefined
 
   return (
     <div className="space-y-8">
@@ -79,7 +101,16 @@ export function WorkshopSourceSection({
 
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
                   <div>
-                    <p className="text-lg font-bold font-display">{rfqPipeline.total}</p>
+                    <p className="text-lg font-bold font-display">
+                      {rfqPipeline.total}
+                      {rfqDelta != null && (
+                        <TrendArrow
+                          trend={getTrendDirection(rfqDelta)}
+                          changePercent={Math.round(rfqDelta)}
+                          className="ml-1 text-xs align-middle"
+                        />
+                      )}
+                    </p>
                     <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
                   </div>
                   <div>
@@ -108,6 +139,108 @@ export function WorkshopSourceSection({
             </Card>
           )}
 
+          {/* Quote analytics */}
+          {quoteStats != null && (
+            <Card>
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-international-orange/10">
+                    <PoundSterling className="h-4 w-4 text-international-orange" />
+                  </div>
+                  <h3 className="text-sm font-semibold">Quote Analytics</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                  <div>
+                    <p className="text-lg font-bold font-display">{formatPence(quoteStats.avg * 100)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Quote</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold font-display">{formatPence(quoteStats.min * 100)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Min</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold font-display">{formatPence(quoteStats.max * 100)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Max</p>
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold font-display">{quoteStats.count}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Quotes</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Supplier metrics row */}
+          {(uniqueSupplierCount != null || shortlistRate != null || avgLeadTimeWeeks != null) && (
+            <div className="grid gap-4 md:grid-cols-3">
+              {uniqueSupplierCount != null && (
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Users className="h-3.5 w-3.5 text-electric-blue" />
+                    </div>
+                    <StatCallout value={String(uniqueSupplierCount)} label="Unique Suppliers" size="sm" />
+                  </CardContent>
+                </Card>
+              )}
+              {shortlistRate != null && (
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <StatCallout value={`${shortlistRate}%`} label="Shortlist Rate" size="sm" />
+                  </CardContent>
+                </Card>
+              )}
+              {avgLeadTimeWeeks != null && (
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <StatCallout value={`${avgLeadTimeWeeks}w`} label="Avg Lead Time" size="sm" />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Response velocity + budget compliance */}
+          {(avgResponseDays != null || budgetCompliance != null) && (
+            <div className="grid gap-4 md:grid-cols-2">
+              {avgResponseDays != null && (
+                <Card>
+                  <CardContent className="p-4 text-center">
+                    <div className="flex items-center justify-center gap-1 mb-1">
+                      <Clock className="h-3.5 w-3.5 text-international-orange" />
+                    </div>
+                    <StatCallout
+                      value={`${avgResponseDays}d`}
+                      label="Avg Response Time"
+                      size="sm"
+                    />
+                  </CardContent>
+                </Card>
+              )}
+              {budgetCompliance != null && (
+                <Card>
+                  <CardContent className="p-4">
+                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 text-center">
+                      Budget Compliance
+                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                      <Badge variant="success" className="text-[10px]">
+                        Within: {budgetCompliance.withinBudget}
+                      </Badge>
+                      <Badge variant="destructive" className="text-[10px]">
+                        Over: {budgetCompliance.overBudget}
+                      </Badge>
+                      <Badge variant="secondary" className="text-[10px]">
+                        Under: {budgetCompliance.underBudget}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
           {/* Manufacturing orders */}
           {orderSummary.total > 0 && (
             <Card>
@@ -121,13 +254,21 @@ export function WorkshopSourceSection({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <StatCallout value={String(orderSummary.total)} label="Total Orders" size="md" />
+                    <StatCallout
+                      value={String(orderSummary.total)}
+                      label="Total Orders"
+                      size="md"
+                      trend={orderDelta != null ? getTrendDirection(orderDelta) : undefined}
+                      changePercent={orderDelta != null ? Math.round(orderDelta) : undefined}
+                    />
                   </div>
                   <div className="text-center">
                     <StatCallout
                       value={formatPence(orderSummary.totalEstimatedValue * 100)}
                       label="Estimated Value"
                       size="md"
+                      trend={valueDelta != null ? getTrendDirection(valueDelta) : undefined}
+                      changePercent={valueDelta != null ? Math.round(valueDelta) : undefined}
                     />
                   </div>
                 </div>

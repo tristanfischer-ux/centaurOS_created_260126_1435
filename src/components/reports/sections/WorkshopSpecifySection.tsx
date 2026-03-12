@@ -15,8 +15,10 @@ import {
   ReportSectionHeader,
   SectionNarrativeIntro,
   StatCallout,
+  TrendArrow,
   formatPence,
 } from '@/components/reports/report-visuals'
+import { calculatePercentChange, getTrendDirection } from '@/lib/reports/trends'
 
 import type { WorkshopSpecifySectionData, ReportTemplateId } from '@/lib/reports/report-document-types'
 
@@ -42,9 +44,24 @@ export function WorkshopSpecifySection({
   sectionNarrative,
   templateId,
   sectionNumber,
+  previousReviewHealth,
+  previousAveragePerUnitCost,
 }: WorkshopSpecifySectionProps): React.JSX.Element {
   const totalReviews = reviewHealth.pass + reviewHealth.warn + reviewHealth.fail + reviewHealth.pending + reviewHealth.skipped
   const isEmpty = totalReviews === 0 && !costOverview && processBreakdown.length === 0
+
+  // Review health delta (compare pass counts)
+  const prevPassCount = previousReviewHealth
+    ? previousReviewHealth.pass
+    : undefined
+  const passCountDelta = prevPassCount != null
+    ? calculatePercentChange(reviewHealth.pass, prevPassCount)
+    : undefined
+
+  // Cost delta
+  const costDelta = previousAveragePerUnitCost != null && costOverview
+    ? calculatePercentChange(costOverview.totalEstimatedCost, previousAveragePerUnitCost)
+    : undefined
 
   return (
     <div className="space-y-8">
@@ -97,7 +114,7 @@ export function WorkshopSpecifySection({
                 </div>
 
                 {/* Legend */}
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   {(['pass', 'warn', 'fail', 'pending', 'skipped'] as const).map(verdict => {
                     const count = reviewHealth[verdict]
                     if (count === 0) return null
@@ -112,6 +129,13 @@ export function WorkshopSpecifySection({
                       </div>
                     )
                   })}
+                  {passCountDelta != null && (
+                    <TrendArrow
+                      trend={getTrendDirection(passCountDelta)}
+                      changePercent={Math.round(passCountDelta)}
+                      className="ml-2"
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -133,6 +157,8 @@ export function WorkshopSpecifySection({
                       value={formatPence(costOverview.totalEstimatedCost * 100)}
                       label="Total Estimated"
                       size="sm"
+                      trend={costDelta != null ? getTrendDirection(costDelta) : undefined}
+                      changePercent={costDelta != null ? Math.round(costDelta) : undefined}
                     />
                   </div>
                   <div className="text-center">
