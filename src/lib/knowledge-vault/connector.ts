@@ -114,7 +114,7 @@ export async function discoverConnections(
       }
     } else {
       // Without LLM: create "related" links for high-scoring candidates
-      const threshold = 3
+      const threshold = 1.5
       for (const candidate of topCandidates) {
         if (candidate.score >= threshold) {
           const created = await createKnowledgeLink(
@@ -223,7 +223,7 @@ function extractTerms(text: string): Set<string> {
       .toLowerCase()
       .replace(/[^\w\s]/g, '')
       .split(/\s+/)
-      .filter((word) => word.length > 3 && !STOP_WORDS.has(word))
+      .filter((word) => word.length > 2 && !STOP_WORDS.has(word))
   )
 }
 

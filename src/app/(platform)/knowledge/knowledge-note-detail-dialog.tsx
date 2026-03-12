@@ -4,8 +4,8 @@
  * KnowledgeNoteDetailDialog — Full detail view for a knowledge note.
  *
  * @description Shows the complete note content, metadata, provenance,
- * connected notes, and quick actions. Uses Dialog (not Sheet) per
- * ForgeOS standards.
+ * connected notes, and quick actions. Supports inline edit-on-verify,
+ * task creation, and contradiction flagging.
  *
  * @component
  */
@@ -27,7 +27,14 @@ import {
   Sparkles,
   ExternalLink,
   ArrowRight,
+  Pencil,
+  ListTodo,
+  Flag,
+  Search,
+  X,
+  Loader2,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   Dialog,
@@ -37,10 +44,24 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { fetchKnowledgeNoteDetail } from '@/actions/knowledge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  fetchKnowledgeNoteDetail,
+  fetchKnowledgeNotes,
+  verifyAndUpdateNote,
+  linkNotes,
+} from '@/actions/knowledge'
 import type {
   KnowledgeNote,
   KnowledgeLinkWithNote,
@@ -86,6 +107,10 @@ const SPECIALIST_NAMES: Record<string, string> = {
   'legal-counsel': 'Leo (Legal)',
 }
 
+const ALL_NOTE_TYPES: KnowledgeNoteType[] = [
+  'claim', 'decision', 'insight', 'fact', 'preference', 'lesson', 'observation',
+]
+
 interface KnowledgeNoteDetailDialogProps {
   /** The note ID to display */
   noteId: string
@@ -119,9 +144,24 @@ export function KnowledgeNoteDetailDialog({
   const [links, setLinks] = useState<KnowledgeLinkWithNote[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
+  // Edit-on-verify state
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [editType, setEditType] = useState<KnowledgeNoteType>('claim')
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Contradiction flagging state
+  const [showContradictionSearch, setShowContradictionSearch] = useState(false)
+  const [contradictionQuery, setContradictionQuery] = useState('')
+  const [contradictionResults, setContradictionResults] = useState<Array<{ id: string; title: string; note_type: KnowledgeNoteType }>>([])
+  const [isSearching, setIsSearching] = useState(false)
+
   useEffect(() => {
     if (open && noteId) {
       setIsLoading(true)
+      setIsEditMode(false)
+      setShowContradictionSearch(false)
       fetchKnowledgeNoteDetail(noteId).then((result) => {
         if (result.data) {
           setNote(result.data.note)
@@ -135,6 +175,91 @@ export function KnowledgeNoteDetailDialog({
   if (!open) return null
 
   const typeInfo = note ? TYPE_LABELS[note.note_type] : null
+
+  // ─── Edit-on-Verify Handlers ────────────────────────────────────
+
+  const enterEditMode = () => {
+    if (!note) return
+    setEditTitle(note.title)
+    setEditContent(note.content)
+    setEditType(note.note_type)
+    setIsEditMode(true)
+  }
+
+  const handleConfirmAndVerify = async () => {
+    if (!note) return
+    setIsSaving(true)
+    const result = await verifyAndUpdateNote(note.id, {
+      title: editTitle,
+      content: editContent,
+      note_type: editType,
+    })
+    setIsSaving(false)
+
+    if (result.data) {
+      setNote(result.data)
+      setIsEditMode(false)
+      toast.success('Note verified and updated')
+      onUpdate()
+    } else {
+      toast.error(result.error ?? 'Failed to verify note')
+    }
+  }
+
+  // ─── Contradiction Search Handlers ──────────────────────────────
+
+  const searchForContradiction = async () => {
+    if (!contradictionQuery.trim()) return
+    setIsSearching(true)
+    const result = await fetchKnowledgeNotes({
+      filters: {
+        searchQuery: contradictionQuery,
+        includeArchived: false,
+      },
+      pageSize: 10,
+      sortBy: 'created_at',
+      sortOrder: 'desc',
+    })
+    setIsSearching(false)
+
+    if (result.data) {
+      setContradictionResults(
+        result.data.notes
+          .filter((n) => n.id !== noteId)
+          .map((n) => ({ id: n.id, title: n.title, note_type: n.note_type }))
+      )
+    }
+  }
+
+  const handleFlagContradiction = async (targetId: string) => {
+    const result = await linkNotes(noteId, targetId, 'contradicts', 'User-flagged contradiction')
+    if (!result.error) {
+      toast.success('Contradiction flagged')
+      setShowContradictionSearch(false)
+      setContradictionQuery('')
+      setContradictionResults([])
+      // Refresh links
+      const detail = await fetchKnowledgeNoteDetail(noteId)
+      if (detail.data) {
+        setLinks(detail.data.links)
+      }
+      onUpdate()
+    } else {
+      toast.error(result.error)
+    }
+  }
+
+  // ─── Create Task Handler ────────────────────────────────────────
+
+  const handleCreateTask = () => {
+    if (!note) return
+    const params = new URLSearchParams({
+      create: 'true',
+      title: `Review: ${note.title}`,
+      description: note.content,
+    })
+    window.open(`/the-forge/tasks?${params.toString()}`, '_blank')
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -172,10 +297,18 @@ export function KnowledgeNoteDetailDialog({
                       )}
                     </div>
                   )}
-                  <DialogTitle className="text-xl leading-tight">
-                    {note.title}
-                  </DialogTitle>
-                  {note.description && (
+                  {isEditMode ? (
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="text-xl font-semibold"
+                    />
+                  ) : (
+                    <DialogTitle className="text-xl leading-tight">
+                      {note.title}
+                    </DialogTitle>
+                  )}
+                  {!isEditMode && note.description && (
                     <p className="text-sm text-muted-foreground">{note.description}</p>
                   )}
                 </div>
@@ -185,14 +318,40 @@ export function KnowledgeNoteDetailDialog({
             <ScrollArea className="max-h-[60vh]">
               <div className="space-y-6 pr-4">
                 {/* Content */}
-                <div className="prose prose-sm max-w-none">
-                  <div className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                    {note.content}
+                {isEditMode ? (
+                  <div className="space-y-3">
+                    <Textarea
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      rows={6}
+                      className="text-sm"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Type:</span>
+                      <Select value={editType} onValueChange={(v) => setEditType(v as KnowledgeNoteType)}>
+                        <SelectTrigger className="w-[160px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ALL_NOTE_TYPES.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {TYPE_LABELS[t].label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="prose prose-sm max-w-none">
+                    <div className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                      {note.content}
+                    </div>
+                  </div>
+                )}
 
                 {/* Tags */}
-                {note.tags.length > 0 && (
+                {!isEditMode && note.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {note.tags.map((tag) => (
                       <Badge key={tag} variant="secondary" className="text-xs font-mono">
@@ -304,57 +463,161 @@ export function KnowledgeNoteDetailDialog({
                     </div>
                   </>
                 )}
+
+                {/* Contradiction Search */}
+                {showContradictionSearch && (
+                  <>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                          Flag Contradiction
+                        </h4>
+                        <button
+                          onClick={() => { setShowContradictionSearch(false); setContradictionResults([]) }}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            placeholder="Search for contradicting note..."
+                            value={contradictionQuery}
+                            onChange={(e) => setContradictionQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') searchForContradiction() }}
+                            className="pl-9 h-9 text-sm"
+                          />
+                        </div>
+                        <Button size="sm" onClick={searchForContradiction} disabled={isSearching}>
+                          {isSearching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Search'}
+                        </Button>
+                      </div>
+                      {contradictionResults.length > 0 && (
+                        <div className="space-y-1">
+                          {contradictionResults.map((result) => {
+                            const resultTypeInfo = TYPE_LABELS[result.note_type]
+                            return (
+                              <button
+                                key={result.id}
+                                onClick={() => handleFlagContradiction(result.id)}
+                                className="flex items-center gap-2 w-full text-left p-2 rounded-md hover:bg-muted transition-colors text-sm"
+                              >
+                                <span className={resultTypeInfo.color}>{resultTypeInfo.icon}</span>
+                                <span className="text-foreground truncate flex-1">{result.title}</span>
+                                <Flag className="h-3 w-3 text-destructive flex-shrink-0" />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             </ScrollArea>
 
             {/* Actions Footer */}
             <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-100">
               <div className="flex items-center gap-1 sm:gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    onPin(note.id, !note.is_pinned)
-                    setNote({ ...note, is_pinned: !note.is_pinned })
-                  }}
-                  className={cn(
-                    note.is_pinned && 'text-international-orange'
-                  )}
-                >
-                  <Pin className={cn('h-4 w-4 mr-1.5', note.is_pinned && 'fill-current')} />
-                  {note.is_pinned ? 'Unpin' : 'Pin'}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    onVerify(note.id, !note.is_verified)
-                    setNote({
-                      ...note,
-                      is_verified: !note.is_verified,
-                      verified_at: !note.is_verified ? new Date().toISOString() : null,
-                    })
-                  }}
-                  className={cn(
-                    note.is_verified && 'text-status-success'
-                  )}
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                  {note.is_verified ? 'Unverify' : 'Verify'}
-                </Button>
+                {isEditMode ? (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleConfirmAndVerify}
+                      disabled={isSaving || !editTitle.trim()}
+                    >
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <CheckCircle2 className="h-4 w-4 mr-1.5" />}
+                      Confirm & Verify
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsEditMode(false)}
+                      disabled={isSaving}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        onPin(note.id, !note.is_pinned)
+                        setNote({ ...note, is_pinned: !note.is_pinned })
+                      }}
+                      className={cn(
+                        note.is_pinned && 'text-international-orange'
+                      )}
+                    >
+                      <Pin className={cn('h-4 w-4 mr-1.5', note.is_pinned && 'fill-current')} />
+                      {note.is_pinned ? 'Unpin' : 'Pin'}
+                    </Button>
+
+                    {!note.is_verified ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={enterEditMode}
+                      >
+                        <Pencil className="h-4 w-4 mr-1.5" />
+                        Verify & Edit
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          onVerify(note.id, false)
+                          setNote({ ...note, is_verified: false, verified_at: null })
+                        }}
+                        className="text-status-success"
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                        Unverify
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCreateTask}
+                    >
+                      <ListTodo className="h-4 w-4 mr-1.5" />
+                      Create Task
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowContradictionSearch(true)}
+                    >
+                      <Flag className="h-4 w-4 mr-1.5" />
+                      Flag Contradiction
+                    </Button>
+                  </>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  onArchive(note.id)
-                  onOpenChange(false)
-                }}
-                className="text-destructive hover:text-destructive"
-              >
-                <Archive className="h-4 w-4 mr-1.5" />
-                Archive
-              </Button>
+
+              {!isEditMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    onArchive(note.id)
+                    onOpenChange(false)
+                  }}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Archive className="h-4 w-4 mr-1.5" />
+                  Archive
+                </Button>
+              )}
             </div>
           </>
         )}

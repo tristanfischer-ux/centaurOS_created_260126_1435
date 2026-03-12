@@ -13,7 +13,7 @@
  * <KnowledgeVaultView foundryId="abc" userId="123" userRole="Founder" />
  */
 
-import React, { useState, useEffect, useCallback, useTransition } from 'react'
+import React, { useState, useEffect, useCallback, useTransition, useMemo } from 'react'
 import {
   Brain,
   Search,
@@ -36,7 +36,13 @@ import {
   ChevronDown,
   Archive,
   Loader2,
+  ChevronRight,
+  LayoutGrid,
+  Layers,
+  RefreshCw,
+  CheckSquare,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -53,7 +59,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu'
-import { fetchKnowledgeNotes, fetchKnowledgeDomains, fetchVaultStats, toggleNotePin, toggleNoteVerified, archiveNote } from '@/actions/knowledge'
+import {
+  fetchKnowledgeNotes,
+  fetchKnowledgeDomains,
+  fetchVaultStats,
+  toggleNotePin,
+  toggleNoteVerified,
+  archiveNote,
+  rebuildAllConnections,
+  batchVerifyNotes,
+  batchArchiveNotes,
+} from '@/actions/knowledge'
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
@@ -129,6 +145,15 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>('created_at')
   const [activeTab, setActiveTab] = useState<'all' | 'pinned' | 'unverified'>('all')
   const [page, setPage] = useState(1)
+
+  // View mode
+  const [viewMode, setViewMode] = useState<'grid' | 'clustered'>('grid')
+
+  // Bulk selection
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedNoteIds, setSelectedNoteIds] = useState<Set<string>>(new Set())
+  const [isRebuilding, setIsRebuilding] = useState(false)
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
 
   // Dialogs
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
@@ -218,6 +243,61 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
     loadInitialData()
   }
 
+  // ─── Selection Handlers ───────────────────────────────────────────
+
+  const toggleSelection = (noteId: string) => {
+    setSelectedNoteIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(noteId)) { next.delete(noteId) } else { next.add(noteId) }
+      return next
+    })
+  }
+
+  const selectAll = () => { setSelectedNoteIds(new Set(notes.map((n) => n.id))) }
+
+  const clearSelection = () => { setSelectedNoteIds(new Set()); setSelectionMode(false) }
+
+  const handleBatchVerify = async () => {
+    if (selectedNoteIds.size === 0) return
+    setIsBatchProcessing(true)
+    const result = await batchVerifyNotes(Array.from(selectedNoteIds))
+    setIsBatchProcessing(false)
+    if (result.data) { toast.success(`Verified ${result.data.count} notes`); clearSelection(); loadNotes(); loadInitialData() }
+    else { toast.error(result.error ?? 'Failed to batch verify') }
+  }
+
+  const handleBatchArchive = async () => {
+    if (selectedNoteIds.size === 0) return
+    setIsBatchProcessing(true)
+    const result = await batchArchiveNotes(Array.from(selectedNoteIds))
+    setIsBatchProcessing(false)
+    if (result.data) { toast.success(`Archived ${result.data.count} notes`); clearSelection(); loadNotes(); loadInitialData() }
+    else { toast.error(result.error ?? 'Failed to batch archive') }
+  }
+
+  const handleRebuildConnections = async () => {
+    setIsRebuilding(true)
+    const result = await rebuildAllConnections()
+    setIsRebuilding(false)
+    if (result.data) { toast.success(`Created ${result.data.connectionsCreated} connections across ${result.data.notesProcessed} notes`); loadNotes(); loadInitialData() }
+    else { toast.error(result.error ?? 'Failed to rebuild connections') }
+  }
+
+  // ─── Clustering ─────────────────────────────────────────────────
+
+  const clusteredNotes = useMemo(() => {
+    if (viewMode !== 'clustered') return null
+    const clusters = new Map<string, KnowledgeNoteSummary[]>()
+    for (const note of notes) {
+      let group = 'Uncategorized'
+      if (note.tags.length > 0) { group = note.tags[0] }
+      else if (note.domain_id) { const domain = domains.find((d) => d.id === note.domain_id); if (domain) group = domain.name }
+      if (!clusters.has(group)) { clusters.set(group, []) }
+      clusters.get(group)!.push(note)
+    }
+    return Array.from(clusters.entries()).sort((a, b) => b[1].length !== a[1].length ? b[1].length - a[1].length : a[0].localeCompare(b[0]))
+  }, [notes, domains, viewMode])
+
   const toggleTypeFilter = (type: KnowledgeNoteType) => {
     setSelectedTypes((prev) =>
       prev.includes(type)
@@ -268,6 +348,12 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
+          {stats != null && stats.totalLinks === 0 && stats.totalNotes > 5 && (
+            <Button variant="outline" size="sm" onClick={handleRebuildConnections} disabled={isRebuilding}>
+              {isRebuilding ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : <RefreshCw className="h-4 w-4 sm:mr-2" />}
+              <span className="hidden sm:inline">{isRebuilding ? 'Rebuilding...' : 'Rebuild Connections'}</span>
+            </Button>
+          )}
           <DocumentUploadZone
             compact
             onExtractionComplete={() => { loadNotes(); loadInitialData() }}
@@ -434,6 +520,22 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
                 </TabsList>
               </Tabs>
 
+              {/* View mode toggle */}
+              <div className="flex items-center gap-1 rounded-md border border-input p-0.5">
+                <button onClick={() => setViewMode('grid')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'grid' ? 'bg-international-orange text-white' : 'text-muted-foreground hover:text-foreground')}>
+                  <LayoutGrid className="h-3.5 w-3.5" /> Grid
+                </button>
+                <button onClick={() => setViewMode('clustered')} className={cn('inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors', viewMode === 'clustered' ? 'bg-international-orange text-white' : 'text-muted-foreground hover:text-foreground')}>
+                  <Layers className="h-3.5 w-3.5" /> Clustered
+                </button>
+              </div>
+
+              {/* Select mode toggle */}
+              <Button variant={selectionMode ? 'default' : 'outline'} size="sm" onClick={() => { if (selectionMode) { clearSelection() } else { setSelectionMode(true) } }}>
+                <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+                {selectionMode ? 'Cancel' : 'Select'}
+              </Button>
+
               <div className="flex flex-wrap gap-1.5">
                 {ALL_NOTE_TYPES.map((type) => (
                   <button
@@ -463,7 +565,22 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
             </div>
           </div>
 
-          {/* ── Notes Grid ────────────────────────────────────────── */}
+          {/* ── Bulk Action Bar ────────────────────────────────────── */}
+          {selectionMode && selectedNoteIds.size > 0 && (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted border border-border">
+              <span className="text-sm font-medium text-foreground">{selectedNoteIds.size} selected</span>
+              <button onClick={selectAll} className="text-xs text-international-orange hover:underline">Select all {notes.length}</button>
+              <div className="flex-1" />
+              <Button variant="outline" size="sm" onClick={handleBatchVerify} disabled={isBatchProcessing}>
+                {isBatchProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />} Verify
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleBatchArchive} disabled={isBatchProcessing} className="text-destructive">
+                {isBatchProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Archive className="h-3.5 w-3.5 mr-1.5" />} Archive
+              </Button>
+            </div>
+          )}
+
+          {/* ── Notes Grid / Clustered View ────────────────────────── */}
           {isPending ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -482,44 +599,39 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
                 }
               />
             </div>
+          ) : viewMode === 'clustered' && clusteredNotes ? (
+            <>
+              <div className="space-y-6">
+                {clusteredNotes.map(([clusterLabel, clusterNotes]) => (
+                  <ClusterSection key={clusterLabel} label={clusterLabel} count={clusterNotes.length}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {clusterNotes.map((note) => (
+                        <KnowledgeNoteCard key={note.id} note={note} domains={domains} onClick={() => setSelectedNoteId(note.id)} onPin={() => handlePin(note.id, !note.is_pinned)} onVerify={() => handleVerify(note.id, !note.is_verified)} onArchive={() => handleArchive(note.id)} selectionMode={selectionMode} isSelected={selectedNoteIds.has(note.id)} onToggleSelect={() => toggleSelection(note.id)} />
+                      ))}
+                    </div>
+                  </ClusterSection>
+                ))}
+              </div>
+              {totalNotes > 24 && (
+                <div className="flex items-center justify-center gap-2 pt-4">
+                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
+                  <span className="text-sm text-muted-foreground">Page {page} of {Math.ceil(totalNotes / 24)}</span>
+                  <Button variant="outline" size="sm" disabled={page * 24 >= totalNotes} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                </div>
+              )}
+            </>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {notes.map((note) => (
-                  <KnowledgeNoteCard
-                    key={note.id}
-                    note={note}
-                    domains={domains}
-                    onClick={() => setSelectedNoteId(note.id)}
-                    onPin={() => handlePin(note.id, !note.is_pinned)}
-                    onVerify={() => handleVerify(note.id, !note.is_verified)}
-                    onArchive={() => handleArchive(note.id)}
-                  />
+                  <KnowledgeNoteCard key={note.id} note={note} domains={domains} onClick={() => setSelectedNoteId(note.id)} onPin={() => handlePin(note.id, !note.is_pinned)} onVerify={() => handleVerify(note.id, !note.is_verified)} onArchive={() => handleArchive(note.id)} selectionMode={selectionMode} isSelected={selectedNoteIds.has(note.id)} onToggleSelect={() => toggleSelection(note.id)} />
                 ))}
               </div>
-
-              {/* Pagination */}
               {totalNotes > 24 && (
                 <div className="flex items-center justify-center gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page === 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm text-muted-foreground">
-                    Page {page} of {Math.ceil(totalNotes / 24)}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page * 24 >= totalNotes}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                  </Button>
+                  <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>Previous</Button>
+                  <span className="text-sm text-muted-foreground">Page {page} of {Math.ceil(totalNotes / 24)}</span>
+                  <Button variant="outline" size="sm" disabled={page * 24 >= totalNotes} onClick={() => setPage((p) => p + 1)}>Next</Button>
                 </div>
               )}
             </>
@@ -547,6 +659,22 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         domains={domains}
         onCreated={handleNoteCreated}
       />
+    </div>
+  )
+}
+
+// ─── Cluster Section ────────────────────────────────────────────────
+
+function ClusterSection({ label, count, children }: { label: string; count: number; children: React.ReactNode }) {
+  const [isExpanded, setIsExpanded] = useState(true)
+  return (
+    <div className="space-y-3">
+      <button onClick={() => setIsExpanded(!isExpanded)} className="flex items-center gap-2 w-full text-left group">
+        <ChevronRight className={cn('h-4 w-4 text-muted-foreground transition-transform duration-200', isExpanded && 'rotate-90')} />
+        <h3 className="text-sm font-semibold text-foreground">{label}</h3>
+        <Badge variant="secondary" className="text-xs font-mono">{count}</Badge>
+      </button>
+      {isExpanded && <div className="pl-6">{children}</div>}
     </div>
   )
 }

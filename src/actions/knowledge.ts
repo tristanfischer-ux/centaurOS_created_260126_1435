@@ -167,7 +167,7 @@ export async function createNote(data: {
       note.title,
       note.content,
       note.tags,
-      false
+      true
     ).catch((err) => {
       console.error('[knowledge] Connection discovery failed:', {
         noteId: note.id,
@@ -556,6 +556,182 @@ export async function extractKnowledgeFromText(
       error: err instanceof Error ? err.message : 'Unknown error',
     })
     return { data: null, error: 'Extraction failed' }
+  }
+}
+
+
+// ─── Batch Operations ───────────────────────────────────────────────
+
+/**
+ * Rebuilds connections for all non-archived notes in the vault.
+ *
+ * @description Iterates all notes and runs discoverConnections with the
+ * updated lower threshold. Useful when connection params change.
+ *
+ * @returns Count of connections created and notes processed
+ *
+ * @security Requires authenticated user. Rate-limited.
+ */
+export async function rebuildAllConnections(): Promise<{
+  data: { connectionsCreated: number; notesProcessed: number } | null
+  error: string | null
+}> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  const rateLimitError = await checkRateLimit('aiAnalysis', `rebuild-connections:${auth.userId}`)
+  if (rateLimitError) return { data: null, error: rateLimitError }
+
+  try {
+    let connectionsCreated = 0
+    let notesProcessed = 0
+    let page = 1
+    const pageSize = 50
+
+    while (true) {
+      const { notes } = await queryKnowledgeNotes(auth.foundryId, {
+        filters: { includeArchived: false },
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+        page,
+        pageSize,
+      })
+
+      if (notes.length === 0) break
+
+      for (const note of notes) {
+        const result = await discoverConnections(
+          auth.foundryId,
+          note.id,
+          note.title,
+          note.description,
+          note.tags,
+          false
+        )
+        connectionsCreated += result.connectionsCreated
+        notesProcessed++
+      }
+
+      if (notes.length < pageSize) break
+      page++
+    }
+
+    return { data: { connectionsCreated, notesProcessed }, error: null }
+  } catch (err) {
+    console.error('[knowledge] Rebuild connections failed:', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Failed to rebuild connections' }
+  }
+}
+
+/**
+ * Batch verify multiple notes at once.
+ *
+ * @param noteIds - IDs of notes to verify (max 100)
+ * @returns Count of verified notes
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function batchVerifyNotes(
+  noteIds: string[]
+): Promise<{ data: { count: number } | null; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  if (noteIds.length === 0) return { data: { count: 0 }, error: null }
+  if (noteIds.length > 100) return { data: null, error: 'Maximum 100 notes per batch' }
+
+  try {
+    let count = 0
+    for (const noteId of noteIds) {
+      const ok = await verifyKnowledgeNote(noteId, auth.userId, true)
+      if (ok) count++
+    }
+    return { data: { count }, error: null }
+  } catch (err) {
+    console.error('[knowledge] Batch verify failed:', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Failed to batch verify notes' }
+  }
+}
+
+/**
+ * Batch archive multiple notes at once.
+ *
+ * @param noteIds - IDs of notes to archive (max 100)
+ * @returns Count of archived notes
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function batchArchiveNotes(
+  noteIds: string[]
+): Promise<{ data: { count: number } | null; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  if (noteIds.length === 0) return { data: { count: 0 }, error: null }
+  if (noteIds.length > 100) return { data: null, error: 'Maximum 100 notes per batch' }
+
+  try {
+    let count = 0
+    for (const noteId of noteIds) {
+      const ok = await archiveKnowledgeNote(noteId, true)
+      if (ok) count++
+    }
+    return { data: { count }, error: null }
+  } catch (err) {
+    console.error('[knowledge] Batch archive failed:', {
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Failed to batch archive notes' }
+  }
+}
+
+/**
+ * Updates a note and marks it as verified in a single call.
+ * Used by the edit-on-verify flow in the detail dialog.
+ *
+ * @param noteId - The note to update and verify
+ * @param updates - Fields to update
+ * @returns The updated note, or error
+ *
+ * @security Requires authenticated user with foundry membership
+ */
+export async function verifyAndUpdateNote(
+  noteId: string,
+  updates: {
+    title?: string
+    content?: string
+    description?: string
+    note_type?: KnowledgeNoteType
+  }
+): Promise<{ data: KnowledgeNote | null; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { data: null, error: 'Unauthorized' }
+
+  try {
+    const note = await updateKnowledgeNote(noteId, updates)
+    if (!note) return { data: null, error: 'Failed to update note' }
+
+    await verifyKnowledgeNote(noteId, auth.userId, true)
+
+    return {
+      data: {
+        ...note,
+        is_verified: true,
+        verified_by: auth.userId,
+        verified_at: new Date().toISOString(),
+      },
+      error: null,
+    }
+  } catch (err) {
+    console.error('[knowledge] Verify and update failed:', {
+      noteId,
+      error: err instanceof Error ? err.message : 'Unknown error',
+    })
+    return { data: null, error: 'Failed to update and verify note' }
   }
 }
 

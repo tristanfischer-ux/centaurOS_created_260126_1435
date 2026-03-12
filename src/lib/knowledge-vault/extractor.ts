@@ -62,7 +62,7 @@ Extract ONLY genuinely valuable knowledge — facts, decisions, insights, and le
 - Pleasantries, greetings, or small talk
 - Vague statements without specifics ("things are going well")
 - Repetitions of information already in the conversation
-- Questions without answers (unless the question itself reveals important context)
+- Questions or unclear items — only extract definitive statements, decisions, or verified facts
 - Generic advice that anyone could give ("you should focus on growth")
 
 ## Quality Bar
@@ -73,8 +73,8 @@ If you're unsure whether something is worth extracting, don't extract it. The va
 
 - **0.9-1.0**: Explicitly stated facts, decisions with clear rationale, direct quotes
 - **0.7-0.89**: Well-supported insights, clear patterns with evidence
-- **0.5-0.69**: Reasonable inferences, emerging patterns, uncertain observations
-- Below 0.5: Don't extract — not confident enough for the vault
+- **0.6-0.69**: Reasonable inferences, emerging patterns with some support
+- Below 0.6: Don't extract — not confident enough for the vault
 
 ## Output Format
 
@@ -275,7 +275,7 @@ async function callExtractionLLM(
       .filter((note: Record<string, unknown>) => {
         if (!note.title || !note.content || !note.note_type) return false
         if (!validTypes.includes(note.note_type as KnowledgeNoteType)) return false
-        if (typeof note.confidence === 'number' && note.confidence < 0.5) return false
+        if (typeof note.confidence === 'number' && note.confidence < 0.6) return false
         return true
       })
       .map((note: Record<string, unknown>) => ({

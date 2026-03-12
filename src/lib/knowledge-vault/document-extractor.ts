@@ -96,6 +96,7 @@ Extract ONLY genuinely valuable knowledge — facts, decisions, insights, and le
 - Vague statements without specifics ("things are going well")
 - Boilerplate legal disclaimers or standard terms
 - Repetitions of information already extracted
+- Questions or unclear items — only extract definitive statements, decisions, or verified facts
 - Generic advice that anyone could give ("you should focus on growth")
 
 ## Quality Bar
@@ -106,8 +107,8 @@ Better to extract 3 excellent notes than 15 mediocre ones. The vault should be h
 
 - **0.8-1.0**: Explicitly stated facts with supporting data, clear decisions with rationale
 - **0.6-0.79**: Well-supported insights, patterns with partial evidence
-- **0.5-0.59**: Reasonable inferences from context
-- Below 0.5: Don't extract — not confident enough for the vault
+- **0.6-0.69**: Reasonable inferences from context with some support
+- Below 0.6: Don't extract — not confident enough for the vault
 
 ## Output Format
 
@@ -343,7 +344,7 @@ async function callDocumentExtractionLLM(
       .filter((note: Record<string, unknown>) => {
         if (!note.title || !note.content || !note.note_type) return false
         if (!validTypes.includes(note.note_type as KnowledgeNoteType)) return false
-        if (typeof note.confidence === 'number' && note.confidence < 0.5) return false
+        if (typeof note.confidence === 'number' && note.confidence < 0.6) return false
         return true
       })
       .map((note: Record<string, unknown>) => ({

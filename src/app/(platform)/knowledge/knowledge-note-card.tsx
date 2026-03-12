@@ -118,6 +118,12 @@ interface KnowledgeNoteCardProps {
   onVerify: () => void
   /** Called when archive is triggered */
   onArchive: () => void
+  /** Whether bulk selection mode is active */
+  selectionMode?: boolean
+  /** Whether this card is currently selected */
+  isSelected?: boolean
+  /** Called when selection is toggled */
+  onToggleSelect?: () => void
 }
 
 export function KnowledgeNoteCard({
@@ -127,6 +133,9 @@ export function KnowledgeNoteCard({
   onPin,
   onVerify,
   onArchive,
+  selectionMode,
+  isSelected,
+  onToggleSelect,
 }: KnowledgeNoteCardProps) {
   const typeStyle = TYPE_STYLES[note.note_type]
   const domain = note.domain_id ? domains.find((d) => d.id === note.domain_id) : null
@@ -141,12 +150,23 @@ export function KnowledgeNoteCard({
   return (
     <Card
       className={cn(
-        'group cursor-pointer border-l-4 transition-all duration-200 hover:shadow-md',
-        typeStyle.borderClass
+        'group cursor-pointer border-l-4 transition-all duration-200 hover:shadow-md relative',
+        typeStyle.borderClass,
+        isSelected && 'ring-2 ring-international-orange'
       )}
-      onClick={onClick}
+      onClick={selectionMode ? onToggleSelect : onClick}
     >
-      <CardContent className="pt-4 pb-3 px-4 space-y-3">
+      {selectionMode && (
+        <div
+          className="absolute top-3 left-3 z-10 flex items-center justify-center h-5 w-5 rounded border-2 border-muted-foreground/40 bg-card transition-colors cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); onToggleSelect?.() }}
+        >
+          {isSelected && (
+            <CheckCircle2 className="h-4 w-4 text-international-orange" />
+          )}
+        </div>
+      )}
+      <CardContent className={cn('pt-4 pb-3 px-4 space-y-3', selectionMode && 'pl-10')}>
         {/* Top row: type badge + actions */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap">

@@ -91,11 +91,8 @@ export async function queryKnowledgeNotes(
     query = query.overlaps('tags', filters.tags)
   }
   if (filters.searchQuery) {
-    query = query.textSearch(
-      'title',
-      filters.searchQuery,
-      { type: 'websearch', config: 'english' }
-    )
+    const q = `%${filters.searchQuery}%`
+    query = query.or(`title.ilike.${q},description.ilike.${q}`)
   }
 
   // Apply sorting
