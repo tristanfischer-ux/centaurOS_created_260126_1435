@@ -123,8 +123,9 @@ export async function getAuditLogs(options: GetAuditLogsOptions = {}): Promise<{
   count: number
   error?: string
 }> {
-  const { action, limit: rawLimit = 50, offset = 0 } = options
+  const { action, limit: rawLimit = 50, offset: rawOffset = 0 } = options
   const limit = Math.min(Math.max(1, rawLimit), 100)
+  const offset = Math.max(0, rawOffset)
 
   const supabase = await createClient()
 

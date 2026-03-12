@@ -83,7 +83,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
   const allActions = Object.keys(ACTION_CONFIG)
   const actionFilter = params.action && allActions.includes(params.action) ? params.action : undefined
 
-  const { data: logs, count } = await getAuditLogs({
+  const { data: logs, count, error: logsError } = await getAuditLogs({
     action: actionFilter,
     limit,
     offset,
@@ -122,7 +122,13 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           <CardTitle className="text-lg font-display">Audit Log</CardTitle>
         </CardHeader>
         <CardContent>
-          {logs.length === 0 ? (
+          {logsError ? (
+            <EmptyState
+              icon={<ScrollText className="h-10 w-10" />}
+              title="Failed to load audit log"
+              description="Something went wrong fetching audit events. Please try again later."
+            />
+          ) : logs.length === 0 ? (
             <EmptyState
               icon={<ScrollText className="h-10 w-10" />}
               title="No audit events"
