@@ -32,6 +32,10 @@ interface ModuleImageCardProps {
   onToggleExpand?: () => void
   /** Retry callback for failed image generation */
   onRetry?: () => void
+  /** Re-expand module text data (description, keyParts, failureModes, etc.) */
+  onReload?: () => void
+  /** Whether this module is currently being re-expanded */
+  isReloading?: boolean
 }
 
 // ─── Image Section ────────────────────────────────────────────────────
@@ -97,7 +101,7 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
 
 // ─── Main Component ───────────────────────────────────────────────────
 
-export function ModuleImageCard({ module, onToggleExpand, onRetry }: ModuleImageCardProps): React.ReactNode {
+export function ModuleImageCard({ module, onToggleExpand, onRetry, onReload, isReloading }: ModuleImageCardProps): React.ReactNode {
   return (
     <Card
       className="overflow-hidden border hover:border-international-orange/30 transition-colors cursor-pointer hover:-translate-y-0.5 active:scale-[0.99] duration-200"
@@ -106,11 +110,29 @@ export function ModuleImageCard({ module, onToggleExpand, onRetry }: ModuleImage
       {/* Image */}
       <ImageSection module={module} onRetry={onRetry} />
 
-      {/* Content — name + purpose only */}
+      {/* Content — name + reload button + purpose */}
       <CardContent className="p-4 space-y-1">
-        <h3 className="text-sm font-semibold text-foreground leading-tight">
-          {module.name}
-        </h3>
+        <div className="flex items-center justify-between gap-1">
+          <h3 className="text-sm font-semibold text-foreground leading-tight">
+            {module.name}
+          </h3>
+          {onReload && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0 text-muted-foreground hover:text-international-orange"
+              disabled={isReloading}
+              onClick={(e) => { e.stopPropagation(); onReload(); }}
+              aria-label={`Reload ${module.name}`}
+            >
+              {isReloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground line-clamp-2">
           {module.purpose}
         </p>

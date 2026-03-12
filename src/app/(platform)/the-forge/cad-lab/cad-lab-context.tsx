@@ -328,6 +328,10 @@ export interface CadLabContextValue {
   initialized: boolean
   initializeCadLab: () => void
 
+  // Per-module re-expansion (reload sparse modules without full re-decomposition)
+  reExpandingModuleIds: Set<string>
+  handleReExpandModule: (moduleId: string) => Promise<void>
+
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }
@@ -445,6 +449,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [modules, setModules] = useState<CadLabModule[]>([])
   const [expandedModuleId, setExpandedModuleId] = useState<string | null>(null)
   const [generatingModuleIds, setGeneratingModuleIds] = useState<Set<string>>(new Set())
+  const [reExpandingModuleIds, setReExpandingModuleIds] = useState<Set<string>>(new Set())
 
   const startGenerating = useCallback((id: string) => {
     setGeneratingModuleIds((prev) => new Set(prev).add(id))
@@ -994,6 +999,67 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setModules((prev) => prev.map((m) => m.id === updated.id ? updated : m))
     debouncedSaveModules()
   }, [debouncedSaveModules])
+
+  // ── Re-expand a single module (reload sparse data without full re-decomposition) ──
+  const handleReExpandModule = useCallback(async (moduleId: string) => {
+    const currentModules = modulesRef.current
+    const target = currentModules.find((m) => m.id === moduleId)
+    if (!target) return
+
+    // INTENT: Reconstruct SkeletonModule[] from current modules — SkeletonModule is a strict subset
+    const skeletons = currentModules.map((m) => ({
+      id: m.id,
+      name: m.name,
+      purpose: m.purpose,
+      inputs: m.inputs,
+      outputs: m.outputs,
+    }))
+
+    setReExpandingModuleIds((prev) => new Set(prev).add(moduleId))
+
+    try {
+      const expRes = await expandModuleDetail(
+        skeletons,
+        moduleId,
+        subject,
+        editableReport,
+        modelId,
+        detectedDomain ?? undefined,
+        visualStyle?.consistencyBrief,
+      )
+
+      if (expRes.success && expRes.expansion) {
+        setModules((prev) => prev.map((m) =>
+          m.id === moduleId
+            ? {
+                ...m,
+                description: expRes.expansion!.description,
+                keyParts: expRes.expansion!.keyParts,
+                failureModes: expRes.expansion!.failureModes,
+                unknowns: expRes.expansion!.unknowns,
+                whyItMatters: expRes.expansion!.whyItMatters,
+                leadWeeks: expRes.expansion!.leadWeeks,
+                ...(expRes.expansion!.estimatedMassKg ? { estimatedMassKg: expRes.expansion!.estimatedMassKg } : {}),
+              }
+            : m
+        ))
+        debouncedSaveModules()
+        toast.success(`${target.name} re-expanded`)
+      } else {
+        console.error(`[CAD-LAB] Re-expansion failed for ${target.name}:`, expRes.error)
+        toast.error(`Failed to re-expand ${target.name}`)
+      }
+    } catch (err) {
+      console.error(`[CAD-LAB] Re-expansion error for ${target.name}:`, err)
+      toast.error(`Failed to re-expand ${target.name}`)
+    } finally {
+      setReExpandingModuleIds((prev) => {
+        const next = new Set(prev)
+        next.delete(moduleId)
+        return next
+      })
+    }
+  }, [subject, editableReport, modelId, detectedDomain, visualStyle?.consistencyBrief, debouncedSaveModules])
 
   // ── Debounced save: diagnostic answers ──
   const diagPendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3551,6 +3617,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     isRegeneratingImages,
     handleRegenerateDrawingsAfterRevision,
     reEstimateCosts,
+    reExpandingModuleIds,
+    handleReExpandModule,
     initialized,
     initializeCadLab,
     handleDownload,
