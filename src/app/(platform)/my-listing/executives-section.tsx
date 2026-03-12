@@ -15,9 +15,11 @@ import {
     Pencil,
     Linkedin,
     Briefcase,
+    PoundSterling,
     X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -56,6 +58,17 @@ const AVAILABILITY_LABELS: Record<string, string> = {
     project_based: 'Project-Based',
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+    GBP: '\u00a3',
+    USD: '$',
+    EUR: '\u20ac',
+}
+
+function formatDayRate(rate: number, currency: string | null): string {
+    const symbol = CURRENCY_SYMBOLS[currency ?? 'GBP'] ?? currency ?? '\u00a3'
+    return `${symbol}${rate.toLocaleString()}/day`
+}
+
 interface ExecutivesSectionProps {
     listingId: string
 }
@@ -75,6 +88,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
     const [bio, setBio] = useState('')
     const [specializations, setSpecializations] = useState('')
     const [availability, setAvailability] = useState('part_time')
+    const [dayRate, setDayRate] = useState('')
+    const [currency, setCurrency] = useState('GBP')
 
     useEffect(() => {
         loadExecutives()
@@ -98,6 +113,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
         setBio('')
         setSpecializations('')
         setAvailability('part_time')
+        setDayRate('')
+        setCurrency('GBP')
         setEditingExec(null)
     }
 
@@ -119,6 +136,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                 : ''
         )
         setAvailability(exec.availability || 'part_time')
+        setDayRate(exec.day_rate != null ? String(exec.day_rate) : '')
+        setCurrency(exec.currency ?? 'GBP')
         setShowDialog(true)
     }
 
@@ -142,6 +161,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                     bio: bio || undefined,
                     specializations: specs,
                     availability,
+                    day_rate: dayRate ? Number(dayRate) : undefined,
+                    currency: currency || undefined,
                 })
                 if (result.error) {
                     toast.error(result.error)
@@ -159,6 +180,8 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                     bio: bio || undefined,
                     specializations: specs,
                     availability: availability as AddExecutiveData['availability'],
+                    day_rate: dayRate ? Number(dayRate) : undefined,
+                    currency: currency || undefined,
                 }
                 const result = await addExecutiveToListing(listingId, data)
                 if (result.error) {
@@ -201,6 +224,7 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="text-base">
                         Fractional Executives
+                        <HelpTooltip content="Team members who offer their specialist expertise to startups on a part-time or project basis." />
                     </CardTitle>
                     <Button size="sm" onClick={openAdd}>
                         <UserPlus className="h-4 w-4 mr-1.5" />
@@ -209,9 +233,16 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                 </CardHeader>
                 <CardContent>
                     {executives.length === 0 ? (
-                        <div className="text-center py-6 text-sm text-muted-foreground">
-                            No executives added yet. Add your fractional executives to
-                            showcase available talent.
+                        <div className="rounded-lg border border-dashed border-border bg-muted/30 p-6 text-center space-y-2">
+                            <p className="text-sm font-medium text-foreground">
+                                Earn extra income from your team&rsquo;s expertise
+                            </p>
+                            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                                A fractional executive is someone from your company who can offer their
+                                specialist knowledge to startups on a part-time or project basis &mdash;
+                                even just a few hours a month. Add anyone from your team whose experience
+                                could help others, and set a day rate.
+                            </p>
                         </div>
                     ) : (
                         <div className="space-y-3">
@@ -234,6 +265,11 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                                                 {AVAILABILITY_LABELS[exec.availability] ??
                                                     exec.availability}
                                             </Badge>
+                                            {exec.day_rate != null && (
+                                                <span className="text-sm font-medium text-international-orange">
+                                                    {formatDayRate(exec.day_rate, exec.currency)}
+                                                </span>
+                                            )}
                                         </div>
                                         {exec.bio && (
                                             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -304,8 +340,15 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>
-                            {editingExec ? 'Edit Executive' : 'Add Executive'}
+                            {editingExec ? 'Edit Fractional Executive' : 'Add a Fractional Executive'}
                         </DialogTitle>
+                        {!editingExec && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Add someone from your team who can offer their specialist knowledge
+                                to startups on a flexible basis. They&rsquo;ll appear on your listing
+                                so potential clients can see who&rsquo;s available and what they cost.
+                            </p>
+                        )}
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -361,6 +404,40 @@ export function ExecutivesSection({ listingId }: ExecutivesSectionProps) {
                                         <SelectItem value="project_based">
                                             Project-Based
                                         </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="exec_day_rate">
+                                    <PoundSterling className="h-3.5 w-3.5 inline mr-1" />
+                                    Day Rate
+                                </Label>
+                                <Input
+                                    id="exec_day_rate"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={dayRate}
+                                    onChange={(e) => setDayRate(e.target.value)}
+                                    placeholder="500"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="exec_currency">Currency</Label>
+                                <Select
+                                    value={currency}
+                                    onValueChange={setCurrency}
+                                >
+                                    <SelectTrigger id="exec_currency">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="GBP">GBP</SelectItem>
+                                        <SelectItem value="USD">USD</SelectItem>
+                                        <SelectItem value="EUR">EUR</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

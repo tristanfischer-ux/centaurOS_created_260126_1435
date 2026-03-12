@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -172,7 +173,7 @@ export default function MashupPage(): React.ReactElement {
         <div className="min-w-0 flex-1">
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Mashup Lab</h1>
+            <h1 className={typography.h1}>Mashup Lab <HelpTooltip content="Combine multiple modules into a single assembly. Mashups inherit parameters from their component modules." /></h1>
           </div>
           <p className={typography.pageSubtitle}>
             Combine two or more STEP files into a hybrid product &mdash; e.g. a radio in a toaster, or an RC car that&apos;s also a drone.

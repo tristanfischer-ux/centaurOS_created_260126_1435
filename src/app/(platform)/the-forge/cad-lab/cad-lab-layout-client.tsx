@@ -107,18 +107,18 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
   return (
     <div className="space-y-6 pb-16">
       {/* ── Header: title + badges + save status + projects ── */}
-      <div className="flex items-center justify-between pb-4 border-b border-muted">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-international-orange" />
-          <h1 className="text-2xl font-bold text-foreground">The Forge</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-muted">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-8 w-1 rounded-full bg-international-orange flex-shrink-0" />
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground truncate">The Forge</h1>
           {sector && (
-            <span className="flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded">
+            <span className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-international-orange-light text-international-orange px-2.5 py-1 rounded flex-shrink-0">
               <Factory className="h-3 w-3" />
               {SECTOR_LABELS[sector]}
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {activeProjectId && (
             <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
               {isSaving ? (

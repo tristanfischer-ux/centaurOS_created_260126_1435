@@ -4,6 +4,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { 
   ShoppingCart, 
   FileText, 
@@ -281,7 +282,7 @@ export function SupplierDashboard({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div>
-              <CardTitle className="text-lg">RFQ Opportunities</CardTitle>
+              <CardTitle className="text-lg">RFQ Opportunities <HelpTooltip content="Request for Quote — send your requirements to suppliers and receive competitive quotes." /></CardTitle>
               <CardDescription>New requests matching your profile</CardDescription>
             </div>
             <Link href="/supplier-portal/rfqs">

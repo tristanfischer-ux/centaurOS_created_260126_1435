@@ -3593,6 +3593,175 @@ export type Database = {
           },
         ]
       }
+      buyer_intent_responses: {
+        Row: {
+          available_from: string
+          created_at: string
+          foundry_id: string
+          growing_method: string | null
+          id: string
+          intent_id: string
+          message: string | null
+          offered_price_per_kg: number
+          offered_quantity_kg: number
+          profile_id: string
+          quality_grade: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          available_from: string
+          created_at?: string
+          foundry_id: string
+          growing_method?: string | null
+          id?: string
+          intent_id: string
+          message?: string | null
+          offered_price_per_kg: number
+          offered_quantity_kg: number
+          profile_id: string
+          quality_grade?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          available_from?: string
+          created_at?: string
+          foundry_id?: string
+          growing_method?: string | null
+          id?: string
+          intent_id?: string
+          message?: string | null
+          offered_price_per_kg?: number
+          offered_quantity_kg?: number
+          profile_id?: string
+          quality_grade?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_intent_responses_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_responses_intent_id_fkey"
+            columns: ["intent_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_intent_signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_responses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_responses_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      buyer_intent_signals: {
+        Row: {
+          category: string
+          created_at: string
+          desired_end_date: string | null
+          desired_start_date: string
+          foundry_id: string
+          growing_method: string | null
+          id: string
+          is_public: boolean
+          max_price_per_kg: number | null
+          notes: string | null
+          product_id: string
+          profile_id: string
+          quality_grade: string
+          response_count: number
+          status: string
+          target_price_per_kg: number | null
+          updated_at: string
+          weekly_quantity_kg: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          desired_end_date?: string | null
+          desired_start_date: string
+          foundry_id: string
+          growing_method?: string | null
+          id?: string
+          is_public?: boolean
+          max_price_per_kg?: number | null
+          notes?: string | null
+          product_id: string
+          profile_id: string
+          quality_grade?: string
+          response_count?: number
+          status?: string
+          target_price_per_kg?: number | null
+          updated_at?: string
+          weekly_quantity_kg: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          desired_end_date?: string | null
+          desired_start_date?: string
+          foundry_id?: string
+          growing_method?: string | null
+          id?: string
+          is_public?: boolean
+          max_price_per_kg?: number | null
+          notes?: string | null
+          product_id?: string
+          profile_id?: string
+          quality_grade?: string
+          response_count?: number
+          status?: string
+          target_price_per_kg?: number | null
+          updated_at?: string
+          weekly_quantity_kg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "buyer_intent_signals_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_signals_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_signals_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "buyer_intent_signals_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_assemblies: {
         Row: {
           assembly_params: Json | null
@@ -4849,6 +5018,48 @@ export type Database = {
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crop_advisor_alerts: {
+        Row: {
+          alert_key: string
+          alert_type: string
+          created_at: string
+          foundry_id: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          alert_key: string
+          alert_type: string
+          created_at?: string
+          foundry_id: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          alert_key?: string
+          alert_type?: string
+          created_at?: string
+          foundry_id?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crop_advisor_alerts_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crop_advisor_alerts_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -8133,6 +8344,8 @@ export type Database = {
           availability: string | null
           bio: string | null
           created_at: string | null
+          currency: string | null
+          day_rate: number | null
           email: string | null
           full_name: string
           id: string
@@ -8149,6 +8362,8 @@ export type Database = {
           availability?: string | null
           bio?: string | null
           created_at?: string | null
+          currency?: string | null
+          day_rate?: number | null
           email?: string | null
           full_name: string
           id?: string
@@ -8165,6 +8380,8 @@ export type Database = {
           availability?: string | null
           bio?: string | null
           created_at?: string | null
+          currency?: string | null
+          day_rate?: number | null
           email?: string | null
           full_name?: string
           id?: string
@@ -8525,6 +8742,7 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           attributes: Json | null
+          average_rating: number | null
           category: Database["public"]["Enums"]["marketplace_category"]
           certifications: Json | null
           city: string | null
@@ -8569,6 +8787,7 @@ export type Database = {
           products: Json | null
           quality_systems: string | null
           relevance_score: number | null
+          review_count: number | null
           search_vector: unknown
           security_clearances: Json | null
           specialties: Json | null
@@ -8584,6 +8803,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           attributes?: Json | null
+          average_rating?: number | null
           category: Database["public"]["Enums"]["marketplace_category"]
           certifications?: Json | null
           city?: string | null
@@ -8628,6 +8848,7 @@ export type Database = {
           products?: Json | null
           quality_systems?: string | null
           relevance_score?: number | null
+          review_count?: number | null
           search_vector?: unknown
           security_clearances?: Json | null
           specialties?: Json | null
@@ -8643,6 +8864,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           attributes?: Json | null
+          average_rating?: number | null
           category?: Database["public"]["Enums"]["marketplace_category"]
           certifications?: Json | null
           city?: string | null
@@ -8687,6 +8909,7 @@ export type Database = {
           products?: Json | null
           quality_systems?: string | null
           relevance_score?: number | null
+          review_count?: number | null
           search_vector?: unknown
           security_clearances?: Json | null
           specialties?: Json | null
@@ -8796,6 +9019,67 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_reviews: {
+        Row: {
+          body: string | null
+          created_at: string | null
+          foundry_id: string
+          id: string
+          is_verified_purchase: boolean | null
+          listing_id: string
+          rating: number
+          reviewer_id: string
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string | null
+          foundry_id: string
+          id?: string
+          is_verified_purchase?: boolean | null
+          listing_id: string
+          rating: number
+          reviewer_id: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string | null
+          foundry_id?: string
+          id?: string
+          is_verified_purchase?: boolean | null
+          listing_id?: string
+          rating?: number
+          reviewer_id?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_reviews_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_reviews_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
           },
         ]
       }
@@ -15453,6 +15737,7 @@ export type Database = {
           nudge_count: number | null
           objective_id: string
           owner_agent_id: string | null
+          parent_task_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -15489,6 +15774,7 @@ export type Database = {
           nudge_count?: number | null
           objective_id: string
           owner_agent_id?: string | null
+          parent_task_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
@@ -15525,6 +15811,7 @@ export type Database = {
           nudge_count?: number | null
           objective_id?: string
           owner_agent_id?: string | null
+          parent_task_id?: string | null
           progress?: number | null
           risk_level?: Database["public"]["Enums"]["risk_level"]
           start_date?: string | null
@@ -15596,6 +15883,13 @@ export type Database = {
             columns: ["owner_agent_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -17060,6 +17354,8 @@ export type Database = {
         Args: {
           p_availability?: string
           p_bio?: string
+          p_currency?: string
+          p_day_rate?: number
           p_email?: string
           p_full_name: string
           p_linkedin_url?: string
@@ -17327,6 +17623,7 @@ export type Database = {
           nudge_count: number | null
           objective_id: string
           owner_agent_id: string | null
+          parent_task_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -17503,6 +17800,7 @@ export type Database = {
           nudge_count: number | null
           objective_id: string
           owner_agent_id: string | null
+          parent_task_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -17675,6 +17973,7 @@ export type Database = {
           nudge_count: number | null
           objective_id: string
           owner_agent_id: string | null
+          parent_task_id: string | null
           progress: number | null
           risk_level: Database["public"]["Enums"]["risk_level"]
           start_date: string | null
@@ -17718,6 +18017,8 @@ export type Database = {
         Returns: {
           availability: string
           bio: string
+          currency: string
+          day_rate: number
           full_name: string
           id: string
           linkedin_url: string
@@ -17767,6 +18068,8 @@ export type Database = {
           availability: string
           bio: string
           created_at: string
+          currency: string
+          day_rate: number
           email: string
           full_name: string
           id: string
@@ -18921,6 +19224,8 @@ export type Database = {
         Args: {
           p_availability?: string
           p_bio?: string
+          p_currency?: string
+          p_day_rate?: number
           p_email?: string
           p_exec_id: string
           p_full_name?: string

@@ -506,16 +506,16 @@ export function ModuleFlowCanvas({
       {/* Header with orange accent bar */}
       <div className="border-b border-border">
         <div className="h-1 bg-international-orange/60" />
-        <div className="px-5 py-3 flex items-center justify-between">
-          <div>
+        <div className="px-3 sm:px-5 py-3 flex items-center justify-between gap-2">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Module integration flow</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground truncate">
               {flowEdges.length} interface{flowEdges.length !== 1 ? "s" : ""} mapped
               {interfaceContracts && interfaceContracts.length > 0 && " (contract-validated)"}
-              {" \u00B7 "}Drag nodes to rearrange
+              <span className="hidden sm:inline">{" \u00B7 "}Drag nodes to rearrange</span>
             </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             <Button
               variant="ghost"
               size="sm"
@@ -543,7 +543,7 @@ export function ModuleFlowCanvas({
       </div>
 
       {/* Canvas */}
-      <div className={isFullscreen ? "flex-1" : "h-[650px] min-h-[500px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
+      <div className={isFullscreen ? "flex-1" : "h-[50vh] sm:h-[500px] md:h-[650px] min-h-[300px]"} style={isFullscreen ? { height: "calc(100vh - 120px)" } : undefined}>
         <ReactFlowProvider>
           <ModuleFlowCanvasInner
             modules={modules}

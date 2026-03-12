@@ -71,7 +71,8 @@ export function CodeEditor({
   // Dynamic editor height based on line count (#13)
   const editorHeight = useMemo(() => {
     const lineCount = code.split("\n").length
-    return Math.max(200, Math.min(600, lineCount * 19 + 20))
+    const maxH = typeof window !== "undefined" ? Math.min(600, window.innerHeight * 0.5) : 600
+    return Math.max(200, Math.min(maxH, lineCount * 19 + 20))
   }, [code])
 
   // GOTCHA: Monaco's addAction fires once at mount — a useCallback dependency on

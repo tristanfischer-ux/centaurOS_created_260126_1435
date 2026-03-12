@@ -10,7 +10,7 @@
  * @component
  */
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -34,7 +34,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { UserAvatar } from '@/components/ui/user-avatar'
-import { AlertTriangle, MessageSquare, Paperclip, GripVertical } from 'lucide-react'
+import { AlertTriangle, MessageSquare, Paperclip, GripVertical, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import type { TaskWithData } from './types'
@@ -101,14 +101,20 @@ const COLUMN_TO_STATUS: Record<string, string> = {
 
 // ─── Draggable Board Card ─────────────────────────────────────────
 
+interface SubtaskCount {
+  total: number
+  completed: number
+}
+
 interface SortableBoardCardProps {
   task: TaskWithData
   isSelected: boolean
   onSelect: (id: string) => void
   isDragOverlay?: boolean
+  subtaskCount?: SubtaskCount
 }
 
-function SortableBoardCard({ task, isSelected, onSelect, isDragOverlay }: SortableBoardCardProps) {
+function SortableBoardCard({ task, isSelected, onSelect, isDragOverlay, subtaskCount }: SortableBoardCardProps) {
   const {
     attributes,
     listeners,
@@ -211,6 +217,14 @@ function SortableBoardCard({ task, isSelected, onSelect, isDragOverlay }: Sortab
           )}
         </div>
       </div>
+
+      {/* Subtask progress indicator */}
+      {subtaskCount && subtaskCount.total > 0 && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Check className="h-3 w-3" />
+          <span className="tabular-nums">{subtaskCount.completed}/{subtaskCount.total}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -222,9 +236,10 @@ interface DroppableColumnProps {
   selectedId: string | null
   onSelect: (id: string) => void
   isOver: boolean
+  subtaskCounts: Record<string, SubtaskCount>
 }
 
-function DroppableColumn({ column, selectedId, onSelect, isOver }: DroppableColumnProps) {
+function DroppableColumn({ column, selectedId, onSelect, isOver, subtaskCounts }: DroppableColumnProps) {
   const { setNodeRef } = useDroppable({ id: column.key })
 
   return (
@@ -272,6 +287,7 @@ function DroppableColumn({ column, selectedId, onSelect, isOver }: DroppableColu
                     task={task}
                     isSelected={selectedId === task.id}
                     onSelect={onSelect}
+                    subtaskCount={subtaskCounts[task.id]}
                   />
                 ))
               )}
@@ -290,6 +306,18 @@ export function BoardView({ tasks, selectedId, onSelect }: BoardViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [overColumnKey, setOverColumnKey] = useState<string | null>(null)
   const [optimisticTasks, setOptimisticTasks] = useState<Map<string, string>>(new Map())
+  const [subtaskCounts, setSubtaskCounts] = useState<Record<string, SubtaskCount>>({})
+
+  // Fetch subtask counts for all tasks
+  useEffect(() => {
+    const taskIds = tasks.map(t => t.id)
+    if (taskIds.length === 0) return
+    import('@/actions/tasks').then(({ getSubtaskCounts }) => {
+      getSubtaskCounts(taskIds).then(result => {
+        if (result.data) setSubtaskCounts(result.data)
+      })
+    })
+  }, [tasks])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -434,6 +462,7 @@ export function BoardView({ tasks, selectedId, onSelect }: BoardViewProps) {
             selectedId={selectedId}
             onSelect={onSelect}
             isOver={overColumnKey === col.key}
+            subtaskCounts={subtaskCounts}
           />
         ))}
       </div>

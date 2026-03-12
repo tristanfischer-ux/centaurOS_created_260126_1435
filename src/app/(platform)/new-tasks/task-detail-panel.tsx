@@ -16,15 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { getStatusBadgeClass } from '@/lib/status-colors'
-import { completeTask, getTaskComments, addTaskComment } from '@/actions/tasks'
+import { completeTask, getTaskComments, addTaskComment, getSubtasks, createSubtask, toggleSubtaskComplete } from '@/actions/tasks'
 import { toast } from 'sonner'
 import { useCelebration } from '@/hooks/useCelebration'
 import { formatDistanceToNow } from 'date-fns'
 import {
   X, Calendar, Clock, User, Target, FileText, AlertTriangle,
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
-  Sparkles, Send, Loader2, Flame,
+  Sparkles, Send, Loader2, Flame, ListChecks, Plus, CheckCircle2,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
@@ -84,6 +85,80 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
     task.description,
     task.strategy?.title ?? task.objective?.title,
   )
+
+  // Subtasks state and fetch
+  interface Subtask {
+    id: string
+    title: string
+    status: string
+    assignee_id: string | null
+    end_date: string | null
+    assignee: { id: string; full_name: string | null; role: string | null } | null
+  }
+  const [subtasks, setSubtasks] = useState<Subtask[]>([])
+  const [isLoadingSubtasks, setIsLoadingSubtasks] = useState(true)
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
+  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false)
+
+  useEffect(() => {
+    const fetchSubtasks = async () => {
+      if (!task.id) return
+      setIsLoadingSubtasks(true)
+      const res = await getSubtasks(task.id)
+      if (res.data) {
+        setSubtasks(res.data as Subtask[])
+      }
+      setIsLoadingSubtasks(false)
+    }
+    fetchSubtasks()
+  }, [task.id])
+
+  const handleAddSubtask = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newSubtaskTitle.trim()) return
+    setIsCreatingSubtask(true)
+    try {
+      const result = await createSubtask(task.id, newSubtaskTitle)
+      if ('error' in result && result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setSubtasks(prev => [...prev, result.data as Subtask])
+        setNewSubtaskTitle('')
+      }
+    } finally {
+      setIsCreatingSubtask(false)
+    }
+  }
+
+  const handleToggleSubtask = async (subtaskId: string) => {
+    // Optimistic update
+    setSubtasks(prev => prev.map(s =>
+      s.id === subtaskId ? { ...s, status: s.status === 'Completed' ? 'Pending' : 'Completed' } : s
+    ))
+    const result = await toggleSubtaskComplete(subtaskId)
+    if ('error' in result && result.error) {
+      toast.error(result.error)
+      // Revert on error
+      const res = await getSubtasks(task.id)
+      if (res.data) setSubtasks(res.data as Subtask[])
+    }
+  }
+
+  const handleCompleteParent = () => {
+    startTransition(async () => {
+      const result = await completeTask(task.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else {
+        celebrateTaskComplete(task.title)
+        router.refresh()
+      }
+    })
+  }
+
+  const subtaskCompleted = subtasks.filter(s => s.status === 'Completed').length
+  const subtaskTotal = subtasks.length
+  const allSubtasksDone = subtaskTotal > 0 && subtaskCompleted === subtaskTotal
 
   // Discussion: comments state and fetch
   const [comments, setComments] = useState<TaskComment[]>([])
@@ -264,6 +339,108 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
               </p>
             </div>
           )}
+
+          {/* Subtasks / Checklist */}
+          <Separator />
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                <ListChecks className="h-3.5 w-3.5" />
+                Subtasks
+                {subtaskTotal > 0 && (
+                  <span className="text-foreground font-semibold normal-case tracking-normal">
+                    {subtaskCompleted} of {subtaskTotal} complete
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            {subtaskTotal > 0 && (
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-success transition-all duration-300"
+                  style={{ width: `${Math.round((subtaskCompleted / subtaskTotal) * 100)}%` }}
+                />
+              </div>
+            )}
+
+            {/* Subtask list */}
+            {isLoadingSubtasks ? (
+              <div className="flex items-center justify-center py-4 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <span className="text-xs">Loading...</span>
+              </div>
+            ) : (
+              <div className="space-y-0.5">
+                {subtasks.map(subtask => {
+                  const isComplete = subtask.status === 'Completed'
+                  return (
+                    <div
+                      key={subtask.id}
+                      className="flex items-center gap-2 py-2 px-3 rounded-md hover:bg-muted/50 transition-colors group"
+                    >
+                      <Checkbox
+                        checked={isComplete}
+                        onCheckedChange={() => handleToggleSubtask(subtask.id)}
+                        aria-label={`Mark "${subtask.title}" as ${isComplete ? 'incomplete' : 'complete'}`}
+                      />
+                      <Link
+                        href={`/new-tasks?taskId=${subtask.id}`}
+                        className={cn(
+                          'flex-1 text-sm truncate',
+                          isComplete
+                            ? 'line-through text-muted-foreground'
+                            : 'text-foreground hover:underline'
+                        )}
+                      >
+                        {subtask.title}
+                      </Link>
+                      {subtask.assignee?.full_name && (
+                        <UserAvatar name={subtask.assignee.full_name} role={subtask.assignee.role} size="xs" />
+                      )}
+                      {subtask.end_date && (
+                        <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">
+                          {new Date(subtask.end_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* All done prompt */}
+            {allSubtasksDone && task.status !== 'Completed' && (
+              <div className="flex items-center gap-2 py-2 px-3 rounded-md bg-success/10 text-sm">
+                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
+                <span className="text-foreground">All subtasks done!</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-7 text-xs text-success hover:text-success"
+                  onClick={handleCompleteParent}
+                  disabled={isPending}
+                >
+                  Mark parent as complete?
+                </Button>
+              </div>
+            )}
+
+            {/* Inline add subtask */}
+            <form onSubmit={handleAddSubtask} className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
+              <input
+                type="text"
+                value={newSubtaskTitle}
+                onChange={e => setNewSubtaskTitle(e.target.value)}
+                placeholder="Add a subtask..."
+                disabled={isCreatingSubtask}
+                className="flex-1 bg-transparent border-0 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1 py-1"
+              />
+              {isCreatingSubtask && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+            </form>
+          </div>
 
           <Separator />
 

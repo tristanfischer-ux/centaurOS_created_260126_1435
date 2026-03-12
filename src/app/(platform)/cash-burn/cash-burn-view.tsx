@@ -247,6 +247,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         },
         {
           label: 'Weekly Burn Rate',
+          tooltip: 'Your monthly burn rate is calculated from the last 3 months of expenses. Runway = cash ÷ burn rate.',
           value: formatCurrency(Math.round(projection.monthlyBurnRate * 12 / 52)),
           detail: cashOut.length === 0 && cashIn.length === 0
             ? 'No data entered'
@@ -254,6 +255,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         },
         {
           label: 'Runway',
+          tooltip: 'How many months your current cash will last at the current burn rate.',
           value: projection.runwayWeeks === null ? 'Sustainable' : `${projection.runwayWeeks} weeks`,
           detail: projection.runwayWeeks !== null && projection.runwayWeeks > 0
             ? `~${Math.round(projection.runwayWeeks / 4.33)} months`

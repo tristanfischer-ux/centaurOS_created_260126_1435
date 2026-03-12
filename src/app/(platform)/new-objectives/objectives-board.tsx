@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import {
@@ -400,7 +401,7 @@ export function ObjectivesBoard({
           </nav>
           <div className={typography.pageHeader}>
             <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Objectives</h1>
+            <h1 className={typography.h1}>Objectives <HelpTooltip content="Objectives and Key Results (OKRs) help you set measurable goals and track progress across your team." /></h1>
           </div>
           <p className={typography.pageSubtitle}>
             Your objectives, grouped by strategy

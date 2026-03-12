@@ -4,6 +4,7 @@ import { useState } from "react"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
+import { HelpTooltip } from "@/components/ui/help-tooltip"
 import { ArrowLeft } from "lucide-react"
 import { SpecialistsLanding } from "./specialists-landing"
 import type { AgentWorkflowRow, AgentCustomPromptRow } from "@/actions/agent-workflows"
@@ -66,6 +67,9 @@ export function SpecialistsPageClient({
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
                         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
                             {view === "specialists" ? "AI Team" : "Team Project"}
+                            {view === "project-builder" && (
+                                <HelpTooltip content="Chain multiple specialists together. Each step's output feeds into the next." />
+                            )}
                         </h1>
                     </div>
                 </div>
