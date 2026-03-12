@@ -132,7 +132,8 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
     // before deleteUser(), or the cascade to profiles will fail with a FK violation.
     //
     // GOTCHA: profiles.paired_ai_id → profiles(id) is the self-reference blocker.
-    // The rest are nullable columns that can be SET NULL, or rows that can be deleted.
+    // NOT NULL RESTRICT columns (cad_lab_projects, xray_scans, forge_contracts,
+    // manufacturing_orders) must DELETE rows. Nullable RESTRICT columns SET NULL.
 
     // 1. Self-reference: null out inbound paired_ai_id references
     const { error: pairingError } = await adminSupabase
@@ -145,30 +146,29 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       return { error: "Failed to unlink paired profiles. Please contact support." }
     }
 
-    // 2. Null out RESTRICT FK columns on auth.users(id) — these block deleteUser()
-    // Tables: cad_lab_projects, xray_scans, forge_contracts, finance_expenses,
-    // component_catalogue, cad_grammar_versions, waitlist, assembly parts
+    // 2. Clean RESTRICT FK columns on auth.users(id) — these block deleteUser()
+    // GOTCHA: cad_lab_projects, xray_scans, forge_contracts, manufacturing_orders
+    // have created_by NOT NULL — can't set null, must DELETE rows.
+    // cad_assemblies.creator_id is nullable (was wrongly listed as component_catalogue).
     const authFkCleanup = await Promise.allSettled([
-      adminSupabase.from("cad_lab_projects").update({ created_by: null }).eq("created_by", user.id),
-      adminSupabase.from("xray_scans").update({ created_by: null }).eq("created_by", user.id),
-      adminSupabase.from("forge_contracts").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("cad_lab_projects").delete().eq("created_by", user.id),
+      adminSupabase.from("xray_scans").delete().eq("created_by", user.id),
+      adminSupabase.from("forge_contracts").delete().eq("created_by", user.id),
+      adminSupabase.from("manufacturing_orders").delete().eq("created_by", user.id),
       adminSupabase.from("finance_expenses").update({ approved_by: null }).eq("approved_by", user.id),
       adminSupabase.from("cad_grammar_versions").update({ created_by: null }).eq("created_by", user.id),
-      adminSupabase.from("component_catalogue").update({ creator_id: null }).eq("creator_id", user.id),
-      adminSupabase.from("manufacturing_orders").update({ created_by: null }).eq("created_by", user.id),
+      adminSupabase.from("cad_assemblies").update({ creator_id: null }).eq("creator_id", user.id),
       adminSupabase.from("waitlist").update({ approved_by: null }).eq("approved_by", user.id),
     ])
 
-    // 3. Null out RESTRICT FK columns on profiles(id)
-    // Tables: manufacturing_rfqs, activity_events, task_shares, task_files,
-    // agent_action_log, sheets_sync, marketplace_recommendations, etc.
+    // 3. Clean RESTRICT FK columns on profiles(id)
+    // GOTCHA: activity_events has ON DELETE CASCADE + NOT NULL — handled automatically, skip.
+    // sheets_service_credentials was DROPPED (migration 20260227200001) — skip.
     const profileFkCleanup = await Promise.allSettled([
       adminSupabase.from("manufacturing_rfqs").update({ created_by: null }).eq("created_by", user.id),
-      adminSupabase.from("activity_events").update({ user_id: null }).eq("user_id", user.id),
       adminSupabase.from("task_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
       adminSupabase.from("objective_shares").delete().or(`shared_by.eq.${user.id},shared_with_user_id.eq.${user.id}`),
       adminSupabase.from("task_files").update({ uploaded_by: null }).eq("uploaded_by", user.id),
-      adminSupabase.from("sheets_sync_log").update({ created_by: null }).eq("created_by", user.id),
       adminSupabase.from("marketplace_recommendations").update({ dismissed_by: null }).eq("dismissed_by", user.id),
       adminSupabase.from("rfq_clarifications").update({ answered_by: null }).eq("answered_by", user.id),
       adminSupabase.from("agent_action_log").update({ requires_approval_from: null, approved_by: null }).or(`requires_approval_from.eq.${user.id},approved_by.eq.${user.id}`),
