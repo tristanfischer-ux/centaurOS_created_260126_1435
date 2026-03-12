@@ -87,8 +87,15 @@ export async function createProviderStripeAccount(): Promise<{
         }
 
         if (!updated || updated.length === 0) {
-            // Race condition: another request already set the account ID
-            return { success: true, accountId: result.accountId, error: 'Account already exists' }
+            // Race condition: another request already set the account ID.
+            // Re-fetch the winning account ID (not the orphaned new one).
+            const { data: winner } = await supabase
+                .from('provider_profiles')
+                .select('stripe_account_id')
+                .eq('user_id', user.id)
+                .single()
+            console.warn('[StripeConnect] Race condition: orphaned Stripe account created:', result.accountId)
+            return { success: true, accountId: winner?.stripe_account_id ?? result.accountId, error: 'Account already exists' }
         }
 
         revalidatePath('/settings')

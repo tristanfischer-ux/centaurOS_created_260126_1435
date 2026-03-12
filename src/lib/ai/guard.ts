@@ -24,27 +24,35 @@ import { checkAILimit } from '@/lib/ai/limit-check'
 import { trackAIUsage } from '@/lib/ai/usage-tracking'
 import type { AIFeature } from '@/lib/ai/usage-tracking'
 
-interface AIGuardResult {
-  /** Whether the request was denied (limit exceeded or auth failed) */
-  denied: boolean
-  /** Pre-built NextResponse to return if denied */
-  response: NextResponse
-  /** The authenticated user ID */
-  userId: string
-  /** The user's foundry ID (may be null) */
-  foundryId: string | null
-  /**
-   * Track usage after the AI call completes.
-   * Call this with token counts from the OpenAI response.
-   */
-  trackUsage: (params: {
-    model?: string
-    promptTokens?: number
-    completionTokens?: number
-    estimatedCostUsd?: number
-    metadata?: Record<string, unknown>
-  }) => Promise<void>
+/** Shared params for trackUsage callback */
+interface TrackUsageParams {
+  model?: string
+  promptTokens?: number
+  completionTokens?: number
+  estimatedCostUsd?: number
+  metadata?: Record<string, unknown>
 }
+
+/**
+ * Discriminated union: when denied=false, foundryId is guaranteed non-null.
+ * This lets TypeScript narrow the type after `if (guard.denied) return guard.response`.
+ */
+type AIGuardResult =
+  | {
+      denied: true
+      response: NextResponse
+      userId: string
+      foundryId: string | null
+      trackUsage: (params: TrackUsageParams) => Promise<void>
+    }
+  | {
+      denied: false
+      response: NextResponse
+      userId: string
+      /** Guaranteed non-null when denied=false */
+      foundryId: string
+      trackUsage: (params: TrackUsageParams) => Promise<void>
+    }
 
 /**
  * Gate an AI feature behind subscription limits and track usage.
@@ -120,13 +128,7 @@ export async function aiGuard(
   }
 
   // Create tracking callback
-  const trackUsageFn = async (params: {
-    model?: string
-    promptTokens?: number
-    completionTokens?: number
-    estimatedCostUsd?: number
-    metadata?: Record<string, unknown>
-  }) => {
+  const trackUsageFn = async (params: TrackUsageParams) => {
     // AUDIT: Log AI usage for cost tracking
     await trackAIUsage({
       foundryId,
@@ -141,7 +143,7 @@ export async function aiGuard(
   }
 
   return {
-    denied: false,
+    denied: false as const,
     response: NextResponse.json({}), // unused when not denied
     userId: user.id,
     foundryId,

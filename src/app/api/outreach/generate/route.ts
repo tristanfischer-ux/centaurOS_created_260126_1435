@@ -206,7 +206,7 @@ export async function POST(request: Request) {
                     return
                 }
 
-                await guard.trackUsage({ model: 'claude-sonnet-4-6' })
+                guard.trackUsage({ model: 'claude-sonnet-4-6' }).catch(() => {})
 
                 controller.enqueue(encoder.encode(
                     `data: ${JSON.stringify({ done: true, emailCount })}\n\n`

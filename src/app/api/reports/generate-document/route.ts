@@ -179,11 +179,11 @@ export async function POST(request: Request): Promise<Response> {
         const finalMessage = await messageStream.finalMessage()
         tokensUsed = (finalMessage.usage?.input_tokens ?? 0) + (finalMessage.usage?.output_tokens ?? 0)
 
-        await guard.trackUsage({
+        guard.trackUsage({
           model: 'claude-opus-4-6',
           promptTokens: finalMessage.usage?.input_tokens,
           completionTokens: finalMessage.usage?.output_tokens,
-        })
+        }).catch(() => {})
 
         if (!fullContent.trim()) {
           emit({ type: "error", message: "Document generation returned empty content" })
