@@ -8,6 +8,7 @@
 
 import { stripe } from '@/lib/stripe/client'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getBaseUrl } from '@/lib/domains'
 import Stripe from 'stripe'
 
@@ -287,7 +288,9 @@ export async function resumeSubscription(
 export async function handleSubscriptionEvent(
   event: Stripe.Event
 ): Promise<void> {
-  const supabase = await createClient()
+  // SECURITY: Use admin client — this is called from webhook handler (no user session/cookies).
+  // createClient() would create an unauthenticated client, causing RLS-blocked upserts.
+  const supabase = createAdminClient()
   
   switch (event.type) {
     case 'customer.subscription.created':

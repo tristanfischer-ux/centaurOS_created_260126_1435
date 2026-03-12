@@ -290,12 +290,13 @@ export function isCardExpiringSoon(method: SavedPaymentMethod): boolean {
   if (!method.cardExpMonth || !method.cardExpYear) return false
   
   const now = new Date()
-  // Use last day of expiry month (day 0 of next month = last day of this month)
-  const expDate = new Date(method.cardExpYear, method.cardExpMonth, 0)
+  // Use first day of NEXT month as boundary (= first moment card is expired).
+  // Matches isCardExpired's boundary to avoid time-of-day gaps on the last day.
+  const expDate = new Date(method.cardExpYear, method.cardExpMonth)
   const threeMonthsFromNow = new Date()
   threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3)
 
-  return expDate <= threeMonthsFromNow && expDate >= now
+  return expDate <= threeMonthsFromNow && expDate > now
 }
 
 /**
