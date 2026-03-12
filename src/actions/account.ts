@@ -146,7 +146,31 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       console.error("[deleteMyAccount] Failed to clear paired_ai_id refs:", pairingError)
     }
 
-    // 2. Clean RESTRICT FK columns on auth.users(id) — these block deleteUser()
+    // 2. Pre-cleanup: manufacturing_order_lines.part_id → parts(id) is ON DELETE RESTRICT.
+    // cad_lab_projects → parts cascades, but manufacturing_order_lines blocks it.
+    // Must remove order_lines + assembly_jobs refs to this user's parts FIRST.
+    const { data: userProjects } = await adminSupabase
+      .from("cad_lab_projects")
+      .select("id")
+      .eq("created_by", user.id)
+
+    if (userProjects && userProjects.length > 0) {
+      const projectIds = userProjects.map((p) => p.id)
+      const { data: userParts } = await adminSupabase
+        .from("parts")
+        .select("id")
+        .in("cad_lab_project_id", projectIds)
+
+      if (userParts && userParts.length > 0) {
+        const partIds = userParts.map((p) => p.id)
+        await Promise.allSettled([
+          adminSupabase.from("manufacturing_order_lines").delete().in("part_id", partIds),
+          adminSupabase.from("assembly_jobs").update({ assembly_part_id: null }).in("assembly_part_id", partIds),
+        ])
+      }
+    }
+
+    // 3. Clean RESTRICT FK columns on auth.users(id) — these block deleteUser()
     // GOTCHA: cad_lab_projects, xray_scans, forge_contracts, manufacturing_orders
     // have created_by NOT NULL — can't set null, must DELETE rows.
     const authFkCleanup = await Promise.allSettled([
@@ -160,7 +184,7 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       adminSupabase.from("waitlist").update({ approved_by: null }).eq("approved_by", user.id),
     ])
 
-    // 3. Clean remaining RESTRICT FK columns on profiles(id)
+    // 4. Clean remaining RESTRICT FK columns on profiles(id)
     // DECISION: tasks.creator_id, objectives.creator_id, task_comments.user_id,
     // objective_comments.user_id, guild_events.created_by, foundry_memberships.invited_by,
     // manufacturing_rfqs.created_by are now ON DELETE SET NULL (migration 20260312400000).
@@ -174,7 +198,7 @@ export async function deleteMyAccount(): Promise<DeleteAccountResult> {
       adminSupabase.from("agent_action_log").update({ requires_approval_from: null, approved_by: null }).or(`requires_approval_from.eq.${user.id},approved_by.eq.${user.id}`),
     ])
 
-    // 4. Standard cleanup: Remove from teams, tasks, memberships
+    // 5. Standard cleanup: Remove from teams, tasks, memberships
     const membershipCleanup = await Promise.allSettled([
       adminSupabase.from("task_assignees").delete().eq("profile_id", user.id),
       adminSupabase.from("tasks").update({ assignee_id: null }).eq("assignee_id", user.id),
