@@ -1993,15 +1993,19 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
     }
 
-    // Final persist
-    // INTENT: Read latest modules via pure updater, then save OUTSIDE setState
-    // to avoid triggering Router update during render (server actions dispatch
-    // router actions in Next.js, which is illegal inside a setState updater).
-    let snapshot: CadLabModule[] = []
-    setModules((current) => { snapshot = current; return current })
-    saveCadLabModules(projectId, JSON.stringify(snapshot))
-      .then(() => setLastSaved(new Date().toISOString()))
-      .catch(() => { /* Non-critical */ })
+    // Final persist — use ref to read current modules synchronously.
+    // GOTCHA: The previous approach used setModules(updater) to extract state,
+    // but React 18 automatic batching defers the updater, so snapshot was []
+    // and we overwrote valid modules with an empty array.
+    const snapshot = modulesRef.current
+    if (snapshot.length > 0) {
+      saveCadLabModules(projectId, JSON.stringify(snapshot))
+        .then(() => setLastSaved(new Date().toISOString()))
+        .catch((err) => {
+          console.error("[CAD-LAB] Failed to save modules after image generation:", err)
+          toast.error("Illustrations generated but failed to save — please try again")
+        })
+    }
 
     // Recount after retries
     const finalCompleted = snapshot.filter(m =>
