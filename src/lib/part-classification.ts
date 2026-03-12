@@ -27,6 +27,8 @@ export interface ClassifyResult {
   materialDetected: boolean
   /** Classification confidence: high = explicit keyword, medium = process/material detected, low = all fallback */
   confidence: "high" | "medium" | "low"
+  /** Human-readable reasons explaining why this classification was chosen */
+  reasons: string[]
 }
 
 // ─── Patterns ────────────────────────────────────────────────────────
@@ -103,6 +105,62 @@ export const MATERIAL_PATTERNS: [RegExp, string][] = [
   [/\b(cork)\b/i, "Cork"],
 ]
 
+// ─── Known values (shared between server actions and client UI) ──────
+
+export const KNOWN_PROCESSES = [
+  "CNC Machining",
+  "Welding",
+  "Sheet Metal",
+  "Injection Moulding",
+  "3D Printing",
+  "Casting",
+  "Composites",
+  "Extrusion",
+  "EDM",
+  "Waterjet",
+  "Thermoforming",
+  "Blow Moulding",
+  "Rotational Moulding",
+  "Grinding/Finishing",
+  "Heat Treatment",
+  "Plating",
+  "Brazing/Soldering",
+  "Riveting",
+  "Manual/Assembly",
+] as const
+
+export const KNOWN_MATERIALS = [
+  "Aluminum",
+  "Mild Steel",
+  "Stainless Steel",
+  "Carbon Fiber",
+  "Fibreglass",
+  "ABS",
+  "Nylon",
+  "Elastomer",
+  "Brass",
+  "Bronze",
+  "Titanium",
+  "Polycarbonate",
+  "Copper",
+  "Polyethylene",
+  "Acetal",
+  "Cast Iron",
+  "Magnesium",
+  "Zinc",
+  "Nickel Alloy",
+  "PEEK",
+  "PTFE",
+  "PVC",
+  "Ceramic",
+  "Glass",
+  "Wood",
+  "Foam",
+  "Leather",
+  "Fabric",
+  "Cork",
+] as const
+
 // ─── Helpers ─────────────────────────────────────────────────────────
 
 /** Extract the part-name segment before the first spec delimiter (— : ;)
@@ -161,6 +219,11 @@ export function classifyPart(
 
   const isMake = MAKE_INDICATORS.test(nameSegment)
   const isBuy = BUY_KEYWORDS.test(nameSegment)
+  const reasons: string[] = []
+
+  // INTENT: Extract the matched keyword for reason strings
+  const makeMatch = nameSegment.match(MAKE_INDICATORS)
+  const buyMatch = nameSegment.match(BUY_KEYWORDS)
 
   // DECISION: Position-based tiebreaker — when both match, the rightmost
   // keyword wins (head noun heuristic for English compound nouns).
@@ -168,11 +231,18 @@ export function classifyPart(
     const makePos = lastMatchEndPosition(MAKE_INDICATORS, nameSegment)
     const buyPos = lastMatchEndPosition(BUY_KEYWORDS, nameSegment)
     if (buyPos > makePos) {
-      return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true, processDetected: false, materialDetected: false, confidence: "high" }
+      reasons.push(`Contains buy indicator: '${buyMatch?.[0] ?? "unknown"}'`)
+      if (makeMatch) reasons.push(`Also matched make indicator '${makeMatch[0]}', but buy keyword appeared later in name`)
+      return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true, processDetected: false, materialDetected: false, confidence: "high", reasons }
     }
-    // else fall through to make
+    reasons.push(`Contains make indicator: '${makeMatch?.[0] ?? "unknown"}'`)
+    reasons.push(`Also matched buy indicator '${buyMatch?.[0] ?? "unknown"}', but make keyword appeared later in name`)
+    // fall through to make
   } else if (!isMake && isBuy) {
-    return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true, processDetected: false, materialDetected: false, confidence: "high" }
+    reasons.push(`Contains buy indicator: '${buyMatch?.[0] ?? "unknown"}'`)
+    return { type: "buy", process: "Buy", material: "Off-the-shelf", explicit: true, processDetected: false, materialDetected: false, confidence: "high", reasons }
+  } else if (isMake) {
+    reasons.push(`Contains make indicator: '${makeMatch?.[0] ?? "unknown"}'`)
   }
 
   // DECISION: Name-first detection — try name segment first for process/material,
@@ -180,22 +250,22 @@ export function classifyPart(
   let process = fallbackProcess
   let processDetected = false
   for (const [re, label] of PROCESS_PATTERNS) {
-    if (re.test(nameSegment)) { process = label; processDetected = true; break }
+    if (re.test(nameSegment)) { process = label; processDetected = true; reasons.push(`Manufacturing process detected: ${label}`); break }
   }
   if (!processDetected) {
     for (const [re, label] of PROCESS_PATTERNS) {
-      if (re.test(fullName)) { process = label; processDetected = true; break }
+      if (re.test(fullName)) { process = label; processDetected = true; reasons.push(`Manufacturing process detected: ${label}`); break }
     }
   }
 
   let material = fallbackMaterial
   let materialDetected = false
   for (const [re, label] of MATERIAL_PATTERNS) {
-    if (re.test(nameSegment)) { material = label; materialDetected = true; break }
+    if (re.test(nameSegment)) { material = label; materialDetected = true; reasons.push(`Material detected: ${label}`); break }
   }
   if (!materialDetected) {
     for (const [re, label] of MATERIAL_PATTERNS) {
-      if (re.test(fullName)) { material = label; materialDetected = true; break }
+      if (re.test(fullName)) { material = label; materialDetected = true; reasons.push(`Material detected: ${label}`); break }
     }
   }
 
@@ -205,5 +275,9 @@ export function classifyPart(
     ? "high"
     : (processDetected || materialDetected) ? "medium" : "low"
 
-  return { type: "make", process, material, explicit: isMake, processDetected, materialDetected, confidence }
+  if (reasons.length === 0) {
+    reasons.push("Default classification — no strong indicators found")
+  }
+
+  return { type: "make", process, material, explicit: isMake, processDetected, materialDetected, confidence, reasons }
 }

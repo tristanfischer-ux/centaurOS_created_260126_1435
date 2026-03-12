@@ -8,8 +8,9 @@
  * so users can review and override before the Sankey diagram renders.
  */
 
-import { useState, useMemo } from "react"
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, RotateCcw } from "lucide-react"
+import { useState, useMemo, useCallback } from "react"
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, Loader2, RotateCcw, Wand2 } from "lucide-react"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -22,65 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
-import { classifyPart } from "@/lib/part-classification"
+import { classifyPart, KNOWN_PROCESSES, KNOWN_MATERIALS } from "@/lib/part-classification"
 import type { CadLabModule, AiCostEstimate, PartCategoryOverride } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
-
-// ─── Known process and material options for dropdowns ─────────────────
-
-const KNOWN_PROCESSES = [
-  "CNC Machining",
-  "Welding",
-  "Sheet Metal",
-  "Injection Moulding",
-  "3D Printing",
-  "Casting",
-  "Composites",
-  "Extrusion",
-  "EDM",
-  "Waterjet",
-  "Thermoforming",
-  "Blow Moulding",
-  "Rotational Moulding",
-  "Grinding/Finishing",
-  "Heat Treatment",
-  "Plating",
-  "Brazing/Soldering",
-  "Riveting",
-  "Manual/Assembly",
-] as const
-
-const KNOWN_MATERIALS = [
-  "Aluminum",
-  "Mild Steel",
-  "Stainless Steel",
-  "Carbon Fiber",
-  "Fibreglass",
-  "ABS",
-  "Nylon",
-  "Elastomer",
-  "Brass",
-  "Bronze",
-  "Titanium",
-  "Polycarbonate",
-  "Copper",
-  "Polyethylene",
-  "Acetal",
-  "Cast Iron",
-  "Magnesium",
-  "Zinc",
-  "Nickel Alloy",
-  "PEEK",
-  "PTFE",
-  "PVC",
-  "Ceramic",
-  "Glass",
-  "Wood",
-  "Foam",
-  "Leather",
-  "Fabric",
-  "Cork",
-] as const
+import { classifyPartsAi } from "@/actions/cad-lab-classify"
+import type { PartToClassify } from "@/actions/cad-lab-classify"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -94,6 +41,7 @@ interface ClassifiedPart {
   material: string
   confidence: "high" | "medium" | "low"
   isOverridden: boolean
+  reasons: string[]
 }
 
 interface ClassificationReviewPanelProps {
@@ -116,6 +64,8 @@ export function ClassificationReviewPanel({
   onClearOverride,
 }: ClassificationReviewPanelProps): React.ReactNode {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isAutoClassifying, setIsAutoClassifying] = useState(false)
+  const [aiReasonings, setAiReasonings] = useState<Map<string, string>>(new Map())
 
   // Build classified parts list from modules + AI estimates
   const classifiedParts = useMemo(() => {
@@ -154,6 +104,7 @@ export function ClassificationReviewPanel({
             material,
             confidence: override ? "high" : cls.confidence,
             isOverridden: !!override,
+            reasons: cls.reasons,
           })
         }
       } else {
@@ -177,6 +128,7 @@ export function ClassificationReviewPanel({
             material: override?.material ?? cls.material,
             confidence: override ? "high" : cls.confidence,
             isOverridden: !!override,
+            reasons: cls.reasons,
           })
         }
       }
@@ -192,6 +144,65 @@ export function ClassificationReviewPanel({
   const needsReviewCount = classifiedParts.filter(
     (p) => p.confidence !== "high" && !p.isOverridden,
   ).length
+
+  const handleAutoClassify = useCallback(async () => {
+    const reviewParts = classifiedParts.filter(
+      (p) => p.confidence !== "high" && !p.isOverridden,
+    )
+    if (reviewParts.length === 0) return
+
+    setIsAutoClassifying(true)
+    try {
+      const partsToClassify: PartToClassify[] = reviewParts.map((p) => {
+        const mod = modules.find((m) => m.id === p.moduleId)!
+        const diag = diagnosticAnswers?.[p.moduleId]
+        return {
+          partKey: p.partKey,
+          partName: p.partName,
+          moduleName: p.moduleName,
+          modulePurpose: mod.purpose,
+          currentProcess: diag?.mfg_process || "Unknown Process",
+          currentMaterial: diag?.material || "Unknown Material",
+        }
+      })
+
+      const result = await classifyPartsAi(partsToClassify)
+      if (!result.success) {
+        toast.error(`Classification failed: ${result.error}`)
+        return
+      }
+
+      // Batch-apply overrides and store reasonings
+      const newReasonings = new Map(aiReasonings)
+      let applied = 0
+      for (const cls of result.classifications) {
+        if (cls.type === "buy") {
+          onOverride(cls.partKey, { type: "buy", process: undefined, material: undefined })
+        } else {
+          onOverride(cls.partKey, { type: cls.type, process: cls.process, material: cls.material })
+        }
+        if (cls.reasoning) {
+          newReasonings.set(cls.partKey, cls.reasoning)
+        }
+        applied++
+      }
+      setAiReasonings(newReasonings)
+      toast.success(`Classified ${applied} parts`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Classification failed")
+    } finally {
+      setIsAutoClassifying(false)
+    }
+  }, [classifiedParts, modules, diagnosticAnswers, aiReasonings, onOverride])
+
+  const handleClearOverride = useCallback((partKey: string) => {
+    onClearOverride(partKey)
+    setAiReasonings((prev) => {
+      const next = new Map(prev)
+      next.delete(partKey)
+      return next
+    })
+  }, [onClearOverride])
 
   if (classifiedParts.length === 0) return null
 
@@ -219,6 +230,30 @@ export function ClassificationReviewPanel({
             Review part classifications before viewing supplier matches
           </p>
         </button>
+
+        {/* Auto-Classify button — outside the collapse toggle */}
+        {needsReviewCount > 0 && !isCollapsed && (
+          <div className="mt-2 flex justify-end">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={isAutoClassifying}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleAutoClassify()
+              }}
+            >
+              {isAutoClassifying ? (
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+              ) : (
+                <Wand2 className="h-3.5 w-3.5 mr-1.5" />
+              )}
+              {isAutoClassifying
+                ? "Classifying..."
+                : `Auto-Classify ${needsReviewCount} parts`}
+            </Button>
+          </div>
+        )}
       </CardHeader>
 
       {!isCollapsed && (
@@ -238,16 +273,18 @@ export function ClassificationReviewPanel({
             <div className="max-h-[400px] overflow-y-auto">
               {classifiedParts.map((part) => {
                 const needsReview = part.confidence !== "high" && !part.isOverridden
+                const reasoning = aiReasonings.get(part.partKey)
 
                 return (
                   <div
                     key={part.partKey}
                     className={cn(
-                      "grid grid-cols-[1fr_120px_100px_140px_140px_40px] gap-2 px-3 py-2 text-sm items-center border-b border-border last:border-b-0",
+                      "border-b border-border last:border-b-0",
                       needsReview && "bg-warning/5 border-l-2 border-l-warning",
                       part.isOverridden && "bg-success/5 border-l-2 border-l-success",
                     )}
                   >
+                  <div className="grid grid-cols-[1fr_120px_100px_140px_140px_40px] gap-2 px-3 py-2 text-sm items-center">
                     {/* Part name */}
                     <div className="flex items-center gap-1.5 min-w-0">
                       {needsReview ? (
@@ -330,7 +367,7 @@ export function ClassificationReviewPanel({
                     <div className="flex justify-center">
                       {part.isOverridden && (
                         <button
-                          onClick={() => onClearOverride(part.partKey)}
+                          onClick={() => handleClearOverride(part.partKey)}
                           title="Reset to auto-classification"
                           className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                         >
@@ -338,6 +375,23 @@ export function ClassificationReviewPanel({
                         </button>
                       )}
                     </div>
+                  </div>
+
+                  {/* Classification reasons — rule-based (hidden when AI reasoning present) */}
+                  {part.reasons.length > 0 && !reasoning && (
+                    <div className="px-3 pb-2 pl-8 space-y-0.5">
+                      {part.reasons.map((r, i) => (
+                        <p key={i} className="text-xs text-muted-foreground italic">{r}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* AI reasoning line — replaces rule-based reasons when AI has classified */}
+                  {reasoning && (
+                    <p className="px-3 pb-2 pl-8 text-xs text-muted-foreground italic">
+                      AI: {reasoning}
+                    </p>
+                  )}
                   </div>
                 )
               })}
