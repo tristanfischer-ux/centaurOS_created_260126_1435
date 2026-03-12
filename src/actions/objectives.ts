@@ -8,6 +8,7 @@ import { withAuth } from '@/lib/server-action-utils'
 import { withRetry } from '@/lib/retry'
 import { scheduleTaskDates } from '@/lib/schedule-task-dates'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { logAudit } from '@/actions/audit'
 
 
 
@@ -460,12 +461,12 @@ export async function deleteObjective(id: string, childAction: 'keep' | 'cascade
         // 1. Verify ownership AND foundry isolation
         const { data: objective, error: fetchError } = await supabase
             .from('objectives')
-            .select('creator_id, foundry_id')
+            .select('creator_id, foundry_id, title')
             .eq('id', id)
             .single()
 
         if (fetchError || !objective) return { error: 'Objective not found' }
-        
+
         // SECURITY: Check foundry isolation first
         if (objective.foundry_id !== foundryId) {
             console.warn(`[SECURITY] User ${user.id} attempted to delete objective ${id} from different foundry`)
@@ -534,6 +535,16 @@ export async function deleteObjective(id: string, childAction: 'keep' | 'cascade
             console.error('[ObjectiveService] Delete error:', { id, error: deleteError.message })
             return { error: sanitizeErrorMessage(deleteError) }
         }
+
+        // AUDIT: Log objective deletion
+        logAudit({
+            action: 'objective.deleted',
+            entityType: 'objective',
+            entityId: id,
+            metadata: { title: objective.title },
+            userId: user.id,
+            foundryId,
+        })
 
         revalidatePath('/objectives')
         revalidatePath('/new-objectives')

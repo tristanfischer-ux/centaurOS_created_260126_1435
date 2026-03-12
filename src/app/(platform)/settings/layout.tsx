@@ -22,6 +22,7 @@ export default async function SettingsLayout({
         .single()
 
     const isCompanyAdmin = profile?.role === 'Founder' || profile?.role === 'Executive'
+    const isFounder = profile?.role === 'Founder'
 
     return (
         <div className="space-y-6">
@@ -35,7 +36,7 @@ export default async function SettingsLayout({
             </div>
 
             {/* Tab Navigation */}
-            <SettingsNavigation isCompanyAdmin={isCompanyAdmin} />
+            <SettingsNavigation isCompanyAdmin={isCompanyAdmin} isFounder={isFounder} />
 
             {/* Content */}
             <div>{children}</div>

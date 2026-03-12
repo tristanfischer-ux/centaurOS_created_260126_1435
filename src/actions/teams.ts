@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { updateTeamNameSchema, validate } from '@/lib/validations'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { logAudit } from '@/actions/audit'
 
 export async function deleteTeam(teamId: string) {
     const supabase = await createClient()
@@ -22,7 +23,7 @@ export async function deleteTeam(teamId: string) {
 
     const { data: team, error: teamError } = await supabase
         .from('teams')
-        .select('foundry_id')
+        .select('foundry_id, name')
         .eq('id', teamId)
         .single()
 
@@ -87,6 +88,16 @@ export async function deleteTeam(teamId: string) {
         console.error('Error deleting team:', error)
         return { error: 'Failed to delete team' }
     }
+
+    // AUDIT: Log team deletion
+    logAudit({
+        action: 'team.deleted',
+        entityType: 'team',
+        entityId: teamId,
+        metadata: { teamName: team.name },
+        userId: user.id,
+        foundryId: foundry_id,
+    })
 
     revalidatePath('/team')
     return { success: true }

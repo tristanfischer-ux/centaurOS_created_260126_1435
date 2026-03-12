@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { registerPushSubscription, unregisterPushSubscription } from '@/lib/notifications/channels/push'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { logAudit } from '@/actions/audit'
 
 // Types
 export interface ChannelPreferences {
@@ -192,14 +193,22 @@ export async function updateNotificationPreferences(
             return { success: false, error: sanitizeErrorMessage(error) }
         }
 
+        // AUDIT: Log notification preference change
+        logAudit({
+            action: 'settings.updated',
+            entityType: 'notification_preferences',
+            metadata: { channel, changedFields: Object.keys(preferences) },
+            userId: user.id,
+        })
+
         revalidatePath('/settings/notifications')
         return { success: true, error: null }
 
     } catch (err) {
         console.error('Failed to update notification preferences:', err)
-        return { 
-            success: false, 
-            error: sanitizeErrorMessage(err) 
+        return {
+            success: false,
+            error: sanitizeErrorMessage(err)
         }
     }
 }

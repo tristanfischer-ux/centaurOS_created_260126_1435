@@ -11,6 +11,7 @@ import { sanitizeFileName, sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { syncTaskCommentToMessages } from '@/lib/messaging/comment-sync'
 import { syncTaskToCalendar } from '@/actions/google-calendar'
 import { withAuth } from '@/lib/server-action-utils'
+import { logAudit } from '@/actions/audit'
 
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
@@ -2338,6 +2339,15 @@ export async function deleteTasks(taskIds: string[]) {
             } catch (err) {
                 console.error('[TaskService] Failed to sync task deletions to Google Sheets:', { error: err instanceof Error ? err.message : 'Unknown error' })
             }
+
+            // AUDIT: Log bulk task deletion
+            logAudit({
+                action: 'task.deleted',
+                entityType: 'task',
+                metadata: { deletedCount, taskIds: taskIds.filter(id => !failedIds.includes(id)) },
+                userId: user.id,
+                foundryId,
+            })
         }
 
         revalidatePath('/tasks')

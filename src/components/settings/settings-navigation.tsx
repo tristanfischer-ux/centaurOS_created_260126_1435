@@ -3,13 +3,14 @@
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { User, Shield, Building2, HelpCircle, CreditCard, Brain } from 'lucide-react'
+import { User, Shield, Building2, HelpCircle, CreditCard, Brain, ScrollText } from 'lucide-react'
 
 interface SettingsNavigationProps {
     isCompanyAdmin: boolean
+    isFounder?: boolean
 }
 
-export function SettingsNavigation({ isCompanyAdmin }: SettingsNavigationProps) {
+export function SettingsNavigation({ isCompanyAdmin, isFounder }: SettingsNavigationProps) {
     const pathname = usePathname()
 
     const accountNav = { name: 'Account', href: '/settings', icon: User }
@@ -17,12 +18,14 @@ export function SettingsNavigation({ isCompanyAdmin }: SettingsNavigationProps) 
     const companyNav = { name: 'Company', href: '/settings/company', icon: Building2 }
     const intelligenceNav = { name: 'Intelligence', href: '/settings/intelligence', icon: Brain }
     const privacyNav = { name: 'Privacy & Data', href: '/settings/privacy', icon: Shield }
+    const auditLogNav = { name: 'Audit Log', href: '/settings/audit-log', icon: ScrollText }
     const helpNav = { name: 'Help & Support', href: '/settings/help', icon: HelpCircle }
 
     const navigation = [
         accountNav,
         billingNav,
         ...(isCompanyAdmin ? [companyNav, intelligenceNav] : []),
+        ...(isFounder ? [auditLogNav] : []),
         privacyNav,
         helpNav,
     ]

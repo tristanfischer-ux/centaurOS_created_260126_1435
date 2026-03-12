@@ -8,6 +8,7 @@ import { sendInvitationEmail } from '@/lib/notifications/channels/email'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { getBaseUrl } from '@/lib/domains'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { logAudit } from '@/actions/audit'
 import type { Database } from '@/types/database.types'
 
 type MemberRole = Database['public']['Enums']['member_role']
@@ -154,11 +155,21 @@ export async function createInvitation(
     expiresAt: expiresAt.toISOString(),
     customMessage,
   })
-  
+
+  // AUDIT: Log invitation
+  logAudit({
+    action: 'user.invited',
+    entityType: 'invitation',
+    entityId: invitation.id,
+    metadata: { email: email.toLowerCase(), role },
+    userId: user.id,
+    foundryId: foundry.id,
+  })
+
   revalidatePath('/team')
-  
-  return { 
-    success: true, 
+
+  return {
+    success: true,
     invitation: { id: invitation.id, token: invitation.token }
   }
 }

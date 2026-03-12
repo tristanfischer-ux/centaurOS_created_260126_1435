@@ -17,6 +17,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logAudit } from '@/actions/audit'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -164,6 +165,15 @@ export async function redeemClaim(
     if (!data) {
         return { error: 'Claim token is invalid or expired' }
     }
+
+    // AUDIT: Log listing claim (foundryId resolved inside logAudit; may skip if no foundry)
+    logAudit({
+        action: 'listing.claimed',
+        entityType: 'listing',
+        entityId: validation.data.listing_id,
+        metadata: { companyName: validation.data.company_name },
+        userId: user.id,
+    })
 
     revalidatePath('/my-listing')
     return { success: true }

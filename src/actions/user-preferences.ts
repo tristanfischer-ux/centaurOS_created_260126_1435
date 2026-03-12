@@ -6,6 +6,7 @@ import {
   updateUserPreferences, 
   getOrCreateUserPreferences 
 } from '@/lib/preferences/service'
+import { logAudit } from '@/actions/audit'
 import type { UserPreferences, UserPreferencesUpdate } from '@/types/preferences'
 
 /**
@@ -65,6 +66,15 @@ export async function updatePreferences(
 
   // Ensure preferences exist before updating
   await getOrCreateUserPreferences(supabase, user.id, foundryId)
-  
+
+  // AUDIT: Log settings change
+  logAudit({
+    action: 'settings.updated',
+    entityType: 'user_preferences',
+    metadata: { changedFields: Object.keys(prefs) },
+    userId: user.id,
+    foundryId,
+  })
+
   return updateUserPreferences(supabase, user.id, foundryId, prefs)
 }
