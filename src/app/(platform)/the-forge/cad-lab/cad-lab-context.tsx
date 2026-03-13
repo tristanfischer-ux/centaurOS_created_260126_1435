@@ -3138,12 +3138,14 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const revAsAny = revised as Record<string, unknown>
       if (revAsAny && typeof revAsAny === "object" && "error" in revAsAny) {
         toast.error(String(revAsAny.error))
+        setCheckpointAcknowledged(false) // allow retry
         return
       }
 
       const revisedIds = Object.keys(revised)
       if (revisedIds.length === 0) {
         toast.error("Module revision failed — no modules were updated")
+        setCheckpointAcknowledged(false) // allow retry
         return
       }
 
@@ -3152,7 +3154,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           const fields = revised[mod.id]
           if (!fields) return mod
           // GUARD: Never overwrite an existing snapshot (prevents double-revision)
-          if (mod.conceptSnapshot) return { ...mod, ...fields }
+          if (mod.conceptSnapshot) return {
+            ...mod,
+            ...fields,
+            revisionNumber: (mod.revisionNumber ?? 1) + 1,
+            lastRevisionSource: "checkpoint" as const,
+          }
           return {
             ...mod,
             conceptSnapshot: {
@@ -3185,13 +3192,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           .catch(err => console.error("[CAD-LAB] Failed to save design revision:", err))
       }
 
-      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback — regenerating drawings...`)
+      const hasImages = modulesRef.current.some(m => m.imageUrl)
+      toast.success(`${revisedIds.length} module${revisedIds.length === 1 ? "" : "s"} revised with specialist feedback${hasImages ? " — regenerating drawings..." : ""}`)
 
       // INTENT: Auto-chain drawing regeneration after checkpoint revisions (same as review handler)
-      setTimeout(() => regenDrawingsRef.current?.(), 200)
+      if (hasImages) {
+        setTimeout(() => regenDrawingsRef.current?.(), 200)
+      }
     }).catch((err) => {
       console.error("[CAD-LAB] Checkpoint revision failed:", err)
       toast.error("Module revision failed — proceeding with original descriptions")
+      setCheckpointAcknowledged(false) // allow retry
     }).finally(() => {
       setIsRevising(false)
     })
