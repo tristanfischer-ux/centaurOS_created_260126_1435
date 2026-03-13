@@ -919,6 +919,9 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
 
   // ── AI Sections ──
   for (const section of aiContent.sections) {
+    // GOTCHA: Executive summary already rendered above — skip duplicate
+    if (section.sectionType === 'executive-summary') continue
+
     children.push(sectionHeading(section.title))
 
     // Prose (parsed as markdown to handle bold, bullets, etc.)
@@ -928,7 +931,7 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
     }
 
     // Key points as bullets
-    if (section.keyPoints.length > 0) {
+    if (section.keyPoints?.length > 0) {
       children.push(
         new Paragraph({
           spacing: { before: 200, after: 100 },

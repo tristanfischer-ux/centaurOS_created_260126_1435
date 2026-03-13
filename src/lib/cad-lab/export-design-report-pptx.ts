@@ -738,7 +738,7 @@ async function buildAiPptx(data: DesignReportData): Promise<void> {
     }
 
     // Key points as bullets (below prose or image)
-    if (section.keyPoints.length > 0 && !hasImage) {
+    if (section.keyPoints?.length > 0 && !hasImage) {
       const bullets = section.keyPoints.slice(0, 4).map((p) => ({
         text: truncate(p, 80),
         options: {

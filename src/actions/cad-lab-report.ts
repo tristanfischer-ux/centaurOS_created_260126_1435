@@ -496,10 +496,10 @@ Type: ${section.sectionType}
 Writer's brief: ${section.brief}
 
 Key points to cover:
-${section.keyPoints.map((p) => `- ${p}`).join("\n")}
+${(section.keyPoints ?? []).map((p) => `- ${p}`).join("\n")}
 
 Data highlights to reference:
-${section.dataHighlights.map((d) => `- ${d}`).join("\n")}
+${(section.dataHighlights ?? []).map((d) => `- ${d}`).join("\n")}
 
 Raw data for this section:
 ${dataSlice}`
@@ -537,7 +537,7 @@ ${dataSlice}`
     title: section.title,
     sectionType: section.sectionType,
     prose: text,
-    keyPoints: section.keyPoints,
+    keyPoints: section.keyPoints ?? [],
     includeTable: section.includeTable ?? false,
     includeImage: section.includeImage ?? false,
     moduleId: section.moduleId,
@@ -594,7 +594,7 @@ export async function writeReportSections(
       title: section.title,
       sectionType: section.sectionType,
       prose: "",
-      keyPoints: section.keyPoints,
+      keyPoints: section.keyPoints ?? [],
       includeTable: section.includeTable ?? false,
       includeImage: section.includeImage ?? false,
       moduleId: section.moduleId,
