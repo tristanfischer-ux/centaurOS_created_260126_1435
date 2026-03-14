@@ -11,7 +11,7 @@ import type { FoundryInfo } from './foundry-context'
  * memberships. Cached for 60s per user to avoid 3-5 DB round-trips on
  * every page navigation.
  */
-type UserRole = 'Founder' | 'Executive' | 'Apprentice' | 'AI_Agent'
+type UserRole = 'Founder' | 'Executive' | 'Apprentice' | 'AI_Agent' | 'Supplier'
 type AccountType = 'team_builder' | 'supplier'
 
 export interface CachedLayoutData {

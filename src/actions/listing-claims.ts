@@ -18,6 +18,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/actions/audit'
+import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { headers } from 'next/headers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -117,6 +119,14 @@ export async function generateClaimToken(
 export async function validateClaimToken(
     token: string
 ): Promise<{ data?: ClaimValidation; error?: string }> {
+    // SECURITY: Rate limit claim token validation to prevent token enumeration
+    const headersList = await headers()
+    const ip = getClientIP(headersList)
+    const rateLimitError = await checkRateLimit('claimValidation', ip)
+    if (rateLimitError) {
+        return { error: 'Too many requests. Please try again in a moment.' }
+    }
+
     const supabase = await createClient()
 
     const { data, error } = await supabase.rpc('validate_listing_claim', { p_token: token })

@@ -88,7 +88,7 @@ export const inviteMemberSchema = z.object({
   name: z.string()
     .min(2, 'Name must be at least 2 characters')
     .max(100, 'Name must be 100 characters or less'),
-  role: z.enum(['Executive', 'Apprentice', 'AI_Agent', 'Founder'])
+  role: z.enum(['Executive', 'Apprentice', 'AI_Agent', 'Founder', 'Supplier'])
 })
 
 export const createTeamSchema = z.object({

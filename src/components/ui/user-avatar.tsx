@@ -33,6 +33,10 @@ export const ROLE_COLORS = {
     bg: "bg-muted",
     text: "text-muted-foreground",
   },
+  Supplier: {
+    bg: "bg-blue-50",
+    text: "text-blue-600",
+  },
   AI_Agent: {
     bg: "bg-purple-100",
     text: "text-purple-600",

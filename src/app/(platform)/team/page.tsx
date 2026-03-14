@@ -266,7 +266,7 @@ export default async function TeamPage() {
     interface MemberMetrics {
         id: string
         full_name: string
-        role: "Founder" | "Executive" | "Apprentice" | "AI_Agent"
+        role: "Founder" | "Executive" | "Apprentice" | "AI_Agent" | "Supplier"
         avatar_url: string | null
         paired_ai_id: string | null
         bio: string | null

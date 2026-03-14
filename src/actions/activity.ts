@@ -1305,7 +1305,7 @@ export async function getThreadForSource(
           id: string
           content: string | null
           created_at: string | null
-          sender: { id: string; full_name: string | null; avatar_url: string | null; role: 'Executive' | 'Apprentice' | 'AI_Agent' | 'Founder' }
+          sender: { id: string; full_name: string | null; avatar_url: string | null; role: 'Executive' | 'Apprentice' | 'AI_Agent' | 'Founder' | 'Supplier' }
         }) => ({
           id: m.id,
           content: m.content ?? '',
