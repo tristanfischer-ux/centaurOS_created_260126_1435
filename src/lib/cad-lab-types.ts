@@ -875,6 +875,8 @@ export interface ProviderResult {
   error?: string
   estimatedCostUsd?: number
   completedAt?: string
+  /** Transient progress message from SSE (not persisted) */
+  progressMessage?: string
 }
 
 /** Pipeline stage for the 4-stage product development flow */

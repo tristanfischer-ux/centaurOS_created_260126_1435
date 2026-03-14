@@ -103,13 +103,33 @@ export async function imageToMeshViaTripo(imageBase64: string): Promise<TripoRes
       15_000,
     )
 
-    if (!pollRes.ok) continue
+    if (!pollRes.ok) {
+      if (pollRes.status === 401 || pollRes.status === 403) {
+        throw new Error(`Tripo auth failed (${pollRes.status})`)
+      }
+      if (pollRes.status === 404) {
+        throw new Error(`Tripo task not found: ${taskId}`)
+      }
+      console.warn(`[TRIPO] Poll returned ${pollRes.status}, retrying...`)
+      continue
+    }
 
     const task = (await pollRes.json()) as TripoTaskResponse
 
     if (task.data.status === "success") {
       const modelUrl = task.data.output?.model
       if (!modelUrl) throw new Error("Tripo succeeded but no model URL in response")
+
+      // SECURITY: Validate download URL to prevent SSRF via compromised API response
+      try {
+        const parsed = new URL(modelUrl)
+        if (parsed.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) {
+          throw new Error("Tripo returned suspicious download URL")
+        }
+      } catch (urlErr) {
+        if (urlErr instanceof Error && urlErr.message.includes("suspicious")) throw urlErr
+        throw new Error("Tripo returned invalid download URL")
+      }
 
       // Download GLB binary
       const glbRes = await fetchWithTimeout(modelUrl, { method: "GET" }, 30_000)

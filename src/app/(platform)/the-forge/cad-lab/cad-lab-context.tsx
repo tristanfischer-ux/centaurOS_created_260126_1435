@@ -3507,11 +3507,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Provider A/B comparison ──
   // INTENT: Fires N parallel requests to generate-provider (one per provider).
   // Each streams SSE independently. Results populate providerResults incrementally.
+  // INTENT: Ref for AbortController so we can cancel in-flight provider requests
+  // when user navigates away or starts a new comparison.
+  const compareAbortRef = useRef<AbortController | null>(null)
+
   const handleCompareProviders = useCallback(async (providers: ABProvider[]) => {
     if (!activeProjectIdRef.current || providers.length === 0) return
+
+    // SECURITY: Cancel any in-flight comparison to prevent resource waste
+    if (compareAbortRef.current) {
+      compareAbortRef.current.abort()
+    }
+    const abortController = new AbortController()
+    compareAbortRef.current = abortController
+
     setIsComparingProviders(true)
 
-    // Initialize all providers as pending
+    // Initialize all providers as generating
     const initial: Record<string, ProviderResult> = {}
     for (const p of providers) {
       initial[p] = { provider: p, status: "generating" }
@@ -3531,6 +3543,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             projectId: activeProjectIdRef.current,
             provider,
           }),
+          signal: abortController.signal,
         })
 
         if (!response.ok) {
@@ -3544,6 +3557,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           let buffer = ""
 
           while (true) {
+            if (abortController.signal.aborted) {
+              await reader.cancel()
+              break
+            }
             const { done, value } = await reader.read()
             if (done) break
             buffer += decoder.decode(value, { stream: true })
@@ -3564,6 +3581,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   }
                   if (event.type === "provider_complete" && event.result) {
                     setProviderResults((prev) => ({ ...prev, [provider]: event.result as ProviderResult }))
+                  } else if (event.type === "provider_progress" && event.message) {
+                    // INTENT: Show progress messages to user during generation
+                    setProviderResults((prev) => ({
+                      ...prev,
+                      [provider]: { ...prev[provider], provider, status: "generating", progressMessage: event.message },
+                    }))
                   } else if (event.type === "provider_error") {
                     setProviderResults((prev) => ({
                       ...prev,
@@ -3576,6 +3599,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           }
         }
       } catch (err) {
+        // Don't report abort errors as failures
+        if (err instanceof DOMException && err.name === "AbortError") return
         const msg = err instanceof Error ? err.message : "Unknown error"
         setProviderResults((prev) => ({
           ...prev,
@@ -3585,7 +3610,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     })
 
     await Promise.allSettled(promises)
-    setIsComparingProviders(false)
+    // Only update isComparing if this is still the active comparison
+    if (compareAbortRef.current === abortController) {
+      setIsComparingProviders(false)
+    }
   }, [])
 
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but

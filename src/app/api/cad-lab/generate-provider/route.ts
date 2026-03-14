@@ -42,6 +42,38 @@ interface GenerateProviderBody {
 
 const CAD_LAB_STORAGE_BUCKET = "xray-images"
 const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d", "zoo", "gencad"]
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB
+
+// SECURITY: SSRF protection — only allow image fetches from Supabase Storage
+const ALLOWED_IMAGE_HOSTS = [
+  "jyarhvinengfyrwgtskq.supabase.co",
+]
+
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:") return false
+    return ALLOWED_IMAGE_HOSTS.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`))
+  } catch {
+    return false
+  }
+}
+
+// SECURITY: Sanitize error messages — never leak internal details to client
+function sanitizeErrorForClient(err: unknown): string {
+  if (err instanceof Error) {
+    // Strip stack traces, internal URLs, API keys
+    const msg = err.message
+    if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND")) return "Provider endpoint unreachable"
+    if (msg.includes("401") || msg.includes("403")) return "Provider authentication failed"
+    if (msg.includes("429")) return "Provider rate limit exceeded"
+    if (msg.includes("timed out") || msg.includes("timeout")) return "Provider timed out"
+    if (msg.includes("not configured")) return msg // Safe — just says "X not configured"
+    // Generic — don't leak raw error
+    return "Generation failed"
+  }
+  return "Generation failed"
+}
 
 // ─── Storage helper (same pattern as generate-unified) ───────────────
 
@@ -190,9 +222,30 @@ export async function POST(request: Request): Promise<Response> {
         // ── Fetch hero image as base64 (needed by most providers) ──
         let imageBase64 = ""
         if (systemIllustrationUrl) {
+          // SECURITY: SSRF protection — only fetch from allowed domains
+          if (!isAllowedImageUrl(systemIllustrationUrl)) {
+            throw new Error("Image URL not from allowed domain")
+          }
+
           const imageRes = await fetch(systemIllustrationUrl)
           if (!imageRes.ok) throw new Error(`Failed to fetch hero image: ${imageRes.status}`)
+
+          // SECURITY: Reject oversized images to prevent OOM
+          const contentLength = parseInt(imageRes.headers.get("content-length") ?? "0", 10)
+          if (contentLength > MAX_IMAGE_BYTES) {
+            throw new Error(`Image too large (${Math.round(contentLength / 1024 / 1024)}MB)`)
+          }
+
+          // SECURITY: Validate Content-Type is actually an image
+          const contentType = imageRes.headers.get("content-type") ?? ""
+          if (!contentType.startsWith("image/")) {
+            throw new Error("URL did not return an image")
+          }
+
           const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
+          if (imageBuffer.length > MAX_IMAGE_BYTES) {
+            throw new Error(`Image too large (${Math.round(imageBuffer.length / 1024 / 1024)}MB)`)
+          }
           imageBase64 = imageBuffer.toString("base64")
         }
 
@@ -309,10 +362,17 @@ export async function POST(request: Request): Promise<Response> {
           completedAt: new Date().toISOString(),
         }
 
-        // ── Save to provider_results JSONB (merge, don't overwrite) ──
+        // ── Save to provider_results JSONB (atomic merge — re-read to avoid stale overwrite) ──
         emit({ type: "provider_progress", provider, message: "Saving result..." })
         try {
-          const existingResults = (project.provider_results as Record<string, ProviderResult> | null) ?? {}
+          // DECISION: Re-read provider_results fresh to avoid race condition
+          // when N providers write concurrently (each has its own stale snapshot)
+          const { data: freshProject } = await supabase
+            .from("cad_lab_projects")
+            .select("provider_results")
+            .eq("id", projectId)
+            .single()
+          const existingResults = (freshProject?.provider_results as Record<string, ProviderResult> | null) ?? {}
           const updatedResults = { ...existingResults, [provider]: providerResult }
 
           const { error: saveError } = await supabase
@@ -335,20 +395,28 @@ export async function POST(request: Request): Promise<Response> {
         emit({ type: "provider_complete", provider, result: providerResult })
         controller.close()
       } catch (err) {
-        const errMsg = err instanceof Error ? err.message : "Unknown error"
-        console.error(`[PROVIDER-${provider.toUpperCase()}] Failed:`, errMsg)
+        const rawMsg = err instanceof Error ? err.message : "Unknown error"
+        const clientMsg = sanitizeErrorForClient(err)
+        console.error(`[PROVIDER-${provider.toUpperCase()}] Failed:`, rawMsg)
 
-        // Save failure to provider_results
+        // Save failure to provider_results (atomic merge)
         try {
-          const existingResults = (project.provider_results as Record<string, ProviderResult> | null) ?? {}
           const failedResult: ProviderResult = {
             provider,
             status: "failed",
-            error: errMsg,
+            error: clientMsg, // SECURITY: sanitized for storage/client
             generationTimeMs: Date.now() - startTime,
             estimatedCostUsd: 0,
             completedAt: new Date().toISOString(),
           }
+
+          // DECISION: Re-read provider_results to avoid stale merge overwriting concurrent writes
+          const { data: freshProject } = await supabase
+            .from("cad_lab_projects")
+            .select("provider_results")
+            .eq("id", projectId)
+            .single()
+          const existingResults = (freshProject?.provider_results as Record<string, ProviderResult> | null) ?? {}
           const updatedResults = { ...existingResults, [provider]: failedResult }
 
           await supabase
@@ -357,7 +425,7 @@ export async function POST(request: Request): Promise<Response> {
             .eq("id", projectId)
         } catch { /* best-effort */ }
 
-        emit({ type: "provider_error", provider, error: errMsg })
+        emit({ type: "provider_error", provider, error: clientMsg })
         controller.close()
       }
     },

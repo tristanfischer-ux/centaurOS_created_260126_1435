@@ -93,13 +93,34 @@ export async function imageToMeshViaMeshy(imageUrl: string): Promise<MeshyResult
       15_000,
     )
 
-    if (!pollRes.ok) continue
+    if (!pollRes.ok) {
+      // INTENT: Fail fast on fatal HTTP errors instead of wasting poll budget
+      if (pollRes.status === 401 || pollRes.status === 403) {
+        throw new Error(`Meshy auth failed (${pollRes.status})`)
+      }
+      if (pollRes.status === 404) {
+        throw new Error(`Meshy task not found: ${taskId}`)
+      }
+      console.warn(`[MESHY] Poll returned ${pollRes.status}, retrying...`)
+      continue
+    }
 
     const task = (await pollRes.json()) as MeshyTaskResponse
 
     if (task.status === "SUCCEEDED") {
       const glbUrl = task.model_urls?.glb
       if (!glbUrl) throw new Error("Meshy SUCCEEDED but no GLB URL in response")
+
+      // SECURITY: Validate download URL to prevent SSRF via compromised API response
+      try {
+        const parsed = new URL(glbUrl)
+        if (parsed.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) {
+          throw new Error("Meshy returned suspicious download URL")
+        }
+      } catch (urlErr) {
+        if (urlErr instanceof Error && urlErr.message.includes("suspicious")) throw urlErr
+        throw new Error("Meshy returned invalid download URL")
+      }
 
       // Download GLB binary
       const glbRes = await fetchWithTimeout(glbUrl, { method: "GET" }, 30_000)

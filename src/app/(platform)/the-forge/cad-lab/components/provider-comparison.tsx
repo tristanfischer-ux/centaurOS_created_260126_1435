@@ -133,14 +133,26 @@ interface ProviderComparisonProps {
 export function ProviderComparison({ providerResults, isComparing }: ProviderComparisonProps) {
   const results = Object.values(providerResults)
 
-  const handleDownloadModel = useCallback((result: ProviderResult) => {
+  const handleDownloadModel = useCallback(async (result: ProviderResult) => {
     const url = result.glbUrl || result.stlUrl || result.stepUrl
     if (!url) return
     const ext = result.stepUrl ? "step" : result.glbUrl ? "glb" : "stl"
-    const link = document.createElement("a")
-    link.href = url
-    link.download = `model-${result.provider}.${ext}`
-    link.click()
+    try {
+      // DECISION: Fetch as blob to avoid cross-origin download attribute being ignored
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = objectUrl
+      link.download = `model-${result.provider}.${ext}`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(objectUrl)
+    } catch {
+      // Fallback: open in new tab
+      window.open(url, "_blank")
+    }
   }, [])
 
   if (results.length === 0 && !isComparing) return null
@@ -192,7 +204,9 @@ export function ProviderComparison({ providerResults, isComparing }: ProviderCom
                 ) : result.status === "generating" || result.status === "pending" ? (
                   <div className="h-[300px] rounded-lg border border-border bg-muted flex flex-col items-center justify-center gap-2">
                     <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
-                    <p className="text-sm text-muted-foreground">Generating...</p>
+                    <p className="text-sm text-muted-foreground">
+                      {result.progressMessage || "Generating..."}
+                    </p>
                   </div>
                 ) : (
                   <div className="h-[300px] rounded-lg border border-destructive/20 bg-destructive/5 flex flex-col items-center justify-center gap-2 px-4">

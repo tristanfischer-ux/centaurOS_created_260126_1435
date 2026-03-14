@@ -34,8 +34,35 @@ interface ModelViewerProps {
 
 // ─── GLB Model (loaded from URL) ─────────────────────────────────────
 
+// INTENT: Dispose GPU resources (geometries, materials, textures) to prevent WebGL memory leaks
+function disposeScene(scene: THREE.Object3D) {
+  scene.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry?.dispose()
+      const materials = Array.isArray(child.material) ? child.material : [child.material]
+      for (const mat of materials) {
+        if (mat && typeof mat.dispose === "function") {
+          // Dispose all textures on the material
+          for (const key of Object.keys(mat)) {
+            const val = (mat as Record<string, unknown>)[key]
+            if (val instanceof THREE.Texture) val.dispose()
+          }
+          mat.dispose()
+        }
+      }
+    }
+  })
+}
+
 function GLBModel({ url }: { url: string }) {
   const gltf = useLoader(GLTFLoader, url)
+
+  // SECURITY: Dispose GPU resources on unmount or URL change
+  useEffect(() => {
+    return () => {
+      disposeScene(gltf.scene)
+    }
+  }, [gltf.scene])
 
   const { boundingSphere, yMin } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(gltf.scene)
@@ -79,7 +106,7 @@ function GLBModel({ url }: { url: string }) {
 function STLModel({ stlData, stlUrl }: { stlData?: string; stlUrl?: string }) {
   const [urlGeometry, setUrlGeometry] = useState<THREE.BufferGeometry | null>(null)
 
-  // Load STL from URL
+  // Load STL from URL — dispose previous geometry on URL change
   useEffect(() => {
     if (!stlUrl) return
     const loader = new STLLoader()
@@ -87,8 +114,17 @@ function STLModel({ stlData, stlUrl }: { stlData?: string; stlUrl?: string }) {
       geo.center()
       geo.rotateX(-Math.PI / 2)
       geo.computeVertexNormals()
-      setUrlGeometry(geo)
+      setUrlGeometry((prev) => {
+        prev?.dispose()
+        return geo
+      })
     })
+    return () => {
+      setUrlGeometry((prev) => {
+        prev?.dispose()
+        return null
+      })
+    }
   }, [stlUrl])
 
   const geometry = useMemo(() => {
