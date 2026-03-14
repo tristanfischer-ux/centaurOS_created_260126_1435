@@ -79,6 +79,19 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
+  // SECURITY: Validate URL to prevent SSRF — only allow Supabase Storage URLs
+  try {
+    const parsedUrl = new URL(systemIllustrationUrl)
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
+    const allowedHost = supabaseUrl ? new URL(supabaseUrl).hostname : ""
+    if (parsedUrl.protocol !== "https:" || (allowedHost && parsedUrl.hostname !== allowedHost)) {
+      console.error("[CAD-LAB-GENCAD] SSRF blocked:", { url: systemIllustrationUrl })
+      return NextResponse.json({ error: "Invalid hero image URL" }, { status: 400 })
+    }
+  } catch {
+    return NextResponse.json({ error: "Invalid hero image URL" }, { status: 400 })
+  }
+
   // GUARD: GenCAD env vars
   if (!process.env.GENCAD_MODAL_URL || !process.env.GENCAD_AUTH_TOKEN) {
     return NextResponse.json(
@@ -214,10 +227,20 @@ export async function POST(request: Request): Promise<Response> {
         })
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
+        // SECURITY: Log full error server-side, send sanitized message to client
         console.error("[CAD-LAB-GENCAD] Generation failed:", errMsg)
+        // Only expose safe, expected error messages to the client
+        const safeErrors = [
+          "Hero image exceeds 10 MB size limit",
+          "Failed to fetch hero image",
+          "GenCAD returned invalid response shape",
+          "GenCAD returned empty STL data",
+        ]
+        const clientMsg = safeErrors.find((s) => errMsg.includes(s))
+          ?? "Generation failed. Please try again."
         emit({
           type: "error",
-          message: `GenCAD generation failed: ${errMsg}`,
+          message: clientMsg,
         })
       } finally {
         controller.close()

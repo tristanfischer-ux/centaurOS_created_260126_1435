@@ -55,18 +55,31 @@ export async function imageToCADViaGenCAD(
   )
 
   if (!response.ok) {
+    // SECURITY: Truncate error body to prevent log injection / memory pressure
     const detail = await response.text().catch(() => "Unknown error")
-    throw new Error(`GenCAD endpoint returned ${response.status}: ${detail}`)
+    throw new Error(`GenCAD endpoint returned ${response.status}: ${detail.slice(0, 500)}`)
   }
 
   const data = (await response.json()) as GenCADResponse
 
-  if (!data.success || !data.stl_base64) {
-    throw new Error("GenCAD returned unsuccessful response")
+  // SECURITY: Validate response shape before trusting
+  if (
+    !data.success ||
+    typeof data.stl_base64 !== "string" ||
+    !data.stl_base64 ||
+    typeof data.generation_time_ms !== "number" ||
+    typeof data.stl_size_bytes !== "number"
+  ) {
+    throw new Error("GenCAD returned invalid response shape")
+  }
+
+  const stlBuffer = Buffer.from(data.stl_base64, "base64")
+  if (stlBuffer.length === 0) {
+    throw new Error("GenCAD returned empty STL data")
   }
 
   return {
-    stlBuffer: Buffer.from(data.stl_base64, "base64"),
+    stlBuffer,
     provider: "gencad",
     generationTimeMs: data.generation_time_ms,
     stlSizeBytes: data.stl_size_bytes,
