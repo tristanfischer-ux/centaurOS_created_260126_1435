@@ -76,6 +76,7 @@ export async function imageToMeshViaTrellis(imageBase64: string): Promise<Trelli
 
   const glbBuffer = Buffer.from(data.glb_base64, "base64")
   if (glbBuffer.length === 0) throw new Error("TRELLIS returned empty GLB data")
+  if (glbBuffer.length > 100 * 1024 * 1024) throw new Error("TRELLIS GLB too large (>100MB)")
 
   const elapsed = Date.now() - start
   console.info(`[TRELLIS] Generation complete: ${elapsed}ms, glb=${Math.round(glbBuffer.length / 1024)}kb`)

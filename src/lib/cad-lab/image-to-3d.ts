@@ -88,8 +88,8 @@ async function zooTextToCad(prompt: string): Promise<ImageTo3DResult> {
   )
 
   if (!createRes.ok) {
-    const text = await createRes.text()
-    throw new Error(`Zoo text-to-CAD creation failed (${createRes.status}): ${text}`)
+    const text = await createRes.text().catch(() => "Unknown error")
+    throw new Error(`Zoo text-to-CAD creation failed (${createRes.status}): ${text.slice(0, 500)}`)
   }
 
   const createData = (await createRes.json()) as {

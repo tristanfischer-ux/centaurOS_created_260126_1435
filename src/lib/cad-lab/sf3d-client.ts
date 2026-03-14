@@ -75,6 +75,7 @@ export async function imageToMeshViaSF3D(imageBase64: string): Promise<SF3DResul
 
   const glbBuffer = Buffer.from(data.glb_base64, "base64")
   if (glbBuffer.length === 0) throw new Error("SF3D returned empty GLB data")
+  if (glbBuffer.length > 100 * 1024 * 1024) throw new Error("SF3D GLB too large (>100MB)")
 
   const elapsed = Date.now() - start
   console.info(`[SF3D] Generation complete: ${elapsed}ms, glb=${Math.round(glbBuffer.length / 1024)}kb`)

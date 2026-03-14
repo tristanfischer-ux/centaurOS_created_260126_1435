@@ -22,6 +22,11 @@ import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
  * @throws Error if GLB parsing fails or contains no geometry
  */
 export async function glbToStl(glbBuffer: Buffer): Promise<Buffer> {
+  // SECURITY: Reject oversized GLBs before parsing
+  if (glbBuffer.length > 100 * 1024 * 1024) {
+    throw new Error("GLB too large for conversion (>100MB)")
+  }
+
   const loader = new GLTFLoader()
   const exporter = new STLExporter()
 
@@ -45,16 +50,25 @@ export async function glbToStl(glbBuffer: Buffer): Promise<Buffer> {
   const scene = new THREE.Scene()
   scene.add(gltf.scene)
 
-  // Verify the scene has geometry
+  // Verify the scene has geometry + count vertices to prevent decompression bombs
   let hasMesh = false
+  let totalVertices = 0
+  const MAX_VERTICES = 5_000_000
+
   scene.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
+    if (child instanceof THREE.Mesh && child.geometry) {
       hasMesh = true
+      const posAttr = child.geometry.getAttribute("position")
+      if (posAttr) totalVertices += posAttr.count
     }
   })
 
   if (!hasMesh) {
     throw new Error("GLB contains no mesh geometry")
+  }
+
+  if (totalVertices > MAX_VERTICES) {
+    throw new Error(`GLB has too many vertices (${totalVertices.toLocaleString()}) for STL conversion`)
   }
 
   // Export to STL (binary format for smaller size)

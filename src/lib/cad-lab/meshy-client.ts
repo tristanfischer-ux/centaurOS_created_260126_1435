@@ -10,6 +10,7 @@
  */
 
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { isSafeExternalUrl } from "@/lib/security/url-validation"
 
 const MESHY_API_BASE = "https://api.meshy.ai/openapi/v2"
 const MESHY_POLL_INTERVAL_MS = 5_000
@@ -112,14 +113,8 @@ export async function imageToMeshViaMeshy(imageUrl: string): Promise<MeshyResult
       if (!glbUrl) throw new Error("Meshy SUCCEEDED but no GLB URL in response")
 
       // SECURITY: Validate download URL to prevent SSRF via compromised API response
-      try {
-        const parsed = new URL(glbUrl)
-        if (parsed.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) {
-          throw new Error("Meshy returned suspicious download URL")
-        }
-      } catch (urlErr) {
-        if (urlErr instanceof Error && urlErr.message.includes("suspicious")) throw urlErr
-        throw new Error("Meshy returned invalid download URL")
+      if (!isSafeExternalUrl(glbUrl)) {
+        throw new Error("Meshy returned suspicious download URL")
       }
 
       // Download GLB binary

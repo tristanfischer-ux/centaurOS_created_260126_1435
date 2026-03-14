@@ -10,6 +10,7 @@
  */
 
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { isSafeExternalUrl } from "@/lib/security/url-validation"
 
 const TRIPO_API_BASE = "https://api.tripo3d.ai/v2/openapi"
 const TRIPO_POLL_INTERVAL_MS = 5_000
@@ -121,14 +122,8 @@ export async function imageToMeshViaTripo(imageBase64: string): Promise<TripoRes
       if (!modelUrl) throw new Error("Tripo succeeded but no model URL in response")
 
       // SECURITY: Validate download URL to prevent SSRF via compromised API response
-      try {
-        const parsed = new URL(modelUrl)
-        if (parsed.protocol !== "https:" || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) {
-          throw new Error("Tripo returned suspicious download URL")
-        }
-      } catch (urlErr) {
-        if (urlErr instanceof Error && urlErr.message.includes("suspicious")) throw urlErr
-        throw new Error("Tripo returned invalid download URL")
+      if (!isSafeExternalUrl(modelUrl)) {
+        throw new Error("Tripo returned suspicious download URL")
       }
 
       // Download GLB binary

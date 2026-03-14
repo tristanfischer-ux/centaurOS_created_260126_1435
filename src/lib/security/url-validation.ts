@@ -132,6 +132,24 @@ export function isValidRedirectUrl(url: string, allowedHosts?: string[]): boolea
 }
 
 /**
+ * Check if a URL is safe for server-side fetch to an external API.
+ * Blocks private IPs, loopback, link-local, cloud metadata, and non-HTTPS.
+ * Used to validate URLs returned by third-party APIs before server-side fetch.
+ */
+export function isSafeExternalUrl(url: string): boolean {
+    try {
+        const parsed = new URL(url.trim())
+        if (parsed.protocol !== 'https:') return false
+        if (isBlockedHostname(parsed.hostname)) return false
+        // Block userinfo in URL (e.g., https://user:pass@evil.com)
+        if (parsed.username || parsed.password) return false
+        return true
+    } catch {
+        return false
+    }
+}
+
+/**
  * Sanitize a URL for logging (remove sensitive parts)
  */
 export function sanitizeUrlForLogging(url: string): string {
