@@ -189,6 +189,8 @@ export function UserManagementTab({ foundryId, isFounder }: UserManagementTabPro
                 return 'bg-international-orange/10 text-international-orange border-0'
             case 'Executive':
                 return 'bg-electric-blue/10 text-electric-blue border-0'
+            case 'Supplier':
+                return 'bg-blue-50 text-blue-600 border-0'
             case 'AI_Agent':
                 return 'bg-purple-100 text-purple-700 border-0'
             default:

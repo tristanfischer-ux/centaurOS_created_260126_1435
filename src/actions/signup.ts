@@ -56,11 +56,12 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
   return { valid: true };
 }
 
-function capitalizeRole(role: string): "Founder" | "Executive" | "Apprentice" {
-  const mapping: Record<string, "Founder" | "Executive" | "Apprentice"> = {
+function capitalizeRole(role: string): "Founder" | "Executive" | "Apprentice" | "Supplier" {
+  const mapping: Record<string, "Founder" | "Executive" | "Apprentice" | "Supplier"> = {
     founder: "Founder",
     executive: "Executive",
     apprentice: "Apprentice",
+    supplier: "Supplier",
   };
   return mapping[role] || "Apprentice";
 }
@@ -374,8 +375,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   }
 
   // 3. Create profile
-  // Suppliers get 'Apprentice' role (minimal permissions) but 'supplier' account_type
-  const memberRole = role === 'supplier' ? 'Apprentice' : capitalizeRole(role);
+  const memberRole = capitalizeRole(role);
 
   // VALIDATION: For shared foundries, verify the foundry exists before inserting profile
   if (foundryId === "forge-guild" || foundryId === "forge-suppliers") {

@@ -88,11 +88,18 @@ function getAvatarGradient(role: string, name: string | null): string {
                 : 'from-orange-400 to-amber-500'
         case 'AI_Agent':
             // Violet distinguishes AI from humans
-            return variant === 0 
-                ? 'from-violet-500 to-violet-600' 
-                : variant === 1 
+            return variant === 0
+                ? 'from-violet-500 to-violet-600'
+                : variant === 1
                 ? 'from-violet-400 to-violet-600'
                 : 'from-violet-500 to-purple-600'
+        case 'Supplier':
+            // Blue for suppliers
+            return variant === 0
+                ? 'from-blue-500 to-blue-600'
+                : variant === 1
+                ? 'from-blue-400 to-blue-600'
+                : 'from-blue-500 to-sky-600'
         case 'Apprentice':
         default:
             // Neutral slate for apprentices
@@ -112,6 +119,7 @@ const roleBadgeStyles: Record<string, string> = {
     'Founder': 'bg-orange-100 text-orange-700',
     'Executive': 'bg-orange-50 text-orange-600',
     'Apprentice': 'bg-muted text-muted-foreground',
+    'Supplier': 'bg-blue-50 text-blue-600',
     'AI_Agent': 'bg-violet-100 text-violet-700'
 }
 

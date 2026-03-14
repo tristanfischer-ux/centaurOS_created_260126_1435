@@ -278,24 +278,35 @@ Rules:
 DATA:
 ${dataSummary}`
 
-  const response = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+  const response = await withRetry(
+    () => fetchWithTimeout(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-opus-4-6",
+          max_tokens: 4096,
+          temperature: 0.3,
+          system: systemPrompt,
+          messages: [{ role: "user", content: userPrompt }],
+        }),
       },
-      body: JSON.stringify({
-        model: "claude-opus-4-6",
-        max_tokens: 4096,
-        temperature: 0.3,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
+      60_000,
+    ),
+    {
+      maxRetries: 2,
+      baseDelay: 2000,
+      shouldRetry: (error) => {
+        const msg = error.message.toLowerCase()
+        return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+          msg.includes('network') || msg.includes('timeout') || msg.includes('529')
+      },
     },
-    60_000,
   )
 
   if (!response.ok) {

@@ -52,7 +52,7 @@ interface MarketplaceOnboardingModalProps {
     /** Recommended listings to show in step 2 */
     recommendations?: MarketplaceListing[]
     /** User role for personalized copy */
-    userRole?: 'Executive' | 'Apprentice' | 'Founder' | 'AI_Agent'
+    userRole?: 'Executive' | 'Apprentice' | 'Founder' | 'Supplier' | 'AI_Agent'
     /** Callback when onboarding is completed */
     onComplete?: () => void
     /** Force show the modal even if previously completed */
@@ -140,6 +140,8 @@ export function MarketplaceOnboardingModal({
                 return 'As a Founder, you have the power to rapidly scale your team with the best people, products, and digital agents in the world.'
             case 'Apprentice':
                 return 'As an Apprentice, you can explore available resources, suggest additions to your team, and learn from the best.'
+            case 'Supplier':
+                return 'As a Supplier, you can showcase your capabilities, respond to sourcing requests, and connect with teams building the future.'
             default:
                 return 'Access the world\'s most capable people, products, and digital tools. Find what you need to build faster.'
         }

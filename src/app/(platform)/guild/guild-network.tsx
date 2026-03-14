@@ -64,6 +64,8 @@ function getRoleBadgeClass(role: string | null): string {
             return 'bg-chart-5/20 text-chart-5 border-chart-5/30'
         case 'Executive':
             return 'bg-status-warning-light text-status-warning-dark border-status-warning/30'
+        case 'Supplier':
+            return 'bg-blue-50 text-blue-600 border-blue-200'
         case 'Apprentice':
             return 'bg-status-info-light text-status-info border-status-info/30'
         case 'AI_Agent':
@@ -73,7 +75,7 @@ function getRoleBadgeClass(role: string | null): string {
     }
 }
 
-const ROLE_FILTERS = ['All', 'Founder', 'Executive', 'Apprentice'] as const
+const ROLE_FILTERS = ['All', 'Founder', 'Executive', 'Apprentice', 'Supplier'] as const
 
 // ==========================================
 // COMPONENT

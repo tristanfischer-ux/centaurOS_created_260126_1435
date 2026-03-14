@@ -75,7 +75,7 @@ interface TestProfile {
   id: string
   email: string
   full_name: string | null
-  role: 'Executive' | 'Apprentice' | 'AI_Agent' | 'Founder'
+  role: 'Executive' | 'Apprentice' | 'AI_Agent' | 'Founder' | 'Supplier'
   foundry_id: string
   avatar_url: string | null
   bio: string | null

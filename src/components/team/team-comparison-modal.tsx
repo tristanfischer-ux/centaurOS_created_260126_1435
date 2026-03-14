@@ -55,6 +55,7 @@ function getRoleBadgeClass(role: string): string {
     switch (role) {
         case 'Founder': return 'bg-accent/10 text-accent border-0'
         case 'Executive': return 'bg-status-warning-light text-status-warning-dark border-0'
+        case 'Supplier': return 'bg-blue-50 text-blue-600 border-0'
         case 'AI_Agent': return 'bg-status-info-light text-status-info-dark border-0'
         case 'Apprentice':
         default: return 'bg-electric-blue-light text-electric-blue border-0'

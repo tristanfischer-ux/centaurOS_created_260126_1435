@@ -50,6 +50,7 @@ function getRoleConfig(role: string) {
     switch (role) {
         case 'Founder': return { color: 'text-international-orange', bg: 'bg-international-orange/10', border: 'border-international-orange/30' }
         case 'Executive': return { color: 'text-international-orange/80', bg: 'bg-international-orange/5', border: 'border-international-orange/20' }
+        case 'Supplier': return { color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-200' }
         case 'AI_Agent': return { color: 'text-chart-5', bg: 'bg-chart-5/10', border: 'border-chart-5/30' }
         default: return { color: 'text-muted-foreground', bg: 'bg-muted', border: 'border-muted' }
     }

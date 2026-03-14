@@ -32,8 +32,9 @@ function getRoleColors(role: string): string {
     switch (role) {
         case 'Founder': return 'bg-accent/10 text-accent border-accent/30'
         case 'Executive': return 'bg-status-warning-light text-status-warning-dark border-status-warning-light'
+        case 'Supplier': return 'bg-blue-50 text-blue-600 border-blue-200'
         case 'AI_Agent': return 'bg-status-info-light text-status-info-dark border-status-info-light'
-        case 'Apprentice': 
+        case 'Apprentice':
         default: return 'bg-electric-blue-light text-electric-blue border-electric-blue-light'
     }
 }
