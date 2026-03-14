@@ -77,6 +77,8 @@ import type {
   SpecialistReview,
   AiCostEstimate,
   PartCategoryOverride,
+  ABProvider,
+  ProviderResult,
 } from "@/lib/cad-lab-types"
 import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints, reviseModulesFromReviews } from "@/actions/cad-lab-reviews"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
@@ -324,6 +326,11 @@ export interface CadLabContextValue {
   /** Directly trigger cost re-estimation (bypasses effect system to avoid cascading re-renders) */
   reEstimateCosts: () => void
 
+  // Provider A/B comparison
+  providerResults: Record<string, ProviderResult>
+  isComparingProviders: boolean
+  handleCompareProviders: (providers: ABProvider[]) => Promise<void>
+
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
   initializeCadLab: () => void
@@ -529,6 +536,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const unifiedPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const unifiedBgOpIdRef = useRef<string | null>(null)
   const { startOp, updateOp, completeOp, failOp } = useBackgroundOps()
+
+  // ── Provider A/B comparison ──
+  const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
+  const [isComparingProviders, setIsComparingProviders] = useState(false)
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -2861,6 +2872,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setProductOverview("")
     setUnifiedResult(null)
     setUnifiedCode(null)
+    setProviderResults({})
   }, [])
 
   // ── Load a saved project ──
@@ -3012,6 +3024,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore unified CAD result from database
       setUnifiedResult((p.unifiedResult as CadLabResult | null) ?? null)
       setUnifiedCode(p.unifiedCode ?? null)
+
+      // Restore provider A/B comparison results
+      setProviderResults(p.providerResults ?? {})
 
       // Restore design revision state
       setDesignRevision(p.designRevision ?? 1)
@@ -3489,6 +3504,90 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [])
 
+  // ── Provider A/B comparison ──
+  // INTENT: Fires N parallel requests to generate-provider (one per provider).
+  // Each streams SSE independently. Results populate providerResults incrementally.
+  const handleCompareProviders = useCallback(async (providers: ABProvider[]) => {
+    if (!activeProjectIdRef.current || providers.length === 0) return
+    setIsComparingProviders(true)
+
+    // Initialize all providers as pending
+    const initial: Record<string, ProviderResult> = {}
+    for (const p of providers) {
+      initial[p] = { provider: p, status: "generating" }
+    }
+    setProviderResults(initial)
+
+    // Fire all provider requests in parallel
+    const promises = providers.map(async (provider) => {
+      try {
+        const response = await fetch("/api/cad-lab/generate-provider", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "text/event-stream",
+          },
+          body: JSON.stringify({
+            projectId: activeProjectIdRef.current,
+            provider,
+          }),
+        })
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({ error: "Unknown error" })) as { error?: string }
+          throw new Error(errBody.error || `HTTP ${response.status}`)
+        }
+
+        if (response.body) {
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ""
+
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+
+            const messages = buffer.split("\n\n")
+            buffer = messages.pop() ?? ""
+
+            for (const msg of messages) {
+              for (const line of msg.split("\n")) {
+                if (!line.startsWith("data: ")) continue
+                try {
+                  const event = JSON.parse(line.slice(6)) as {
+                    type: string
+                    provider?: string
+                    result?: ProviderResult
+                    error?: string
+                    message?: string
+                  }
+                  if (event.type === "provider_complete" && event.result) {
+                    setProviderResults((prev) => ({ ...prev, [provider]: event.result as ProviderResult }))
+                  } else if (event.type === "provider_error") {
+                    setProviderResults((prev) => ({
+                      ...prev,
+                      [provider]: { provider, status: "failed", error: event.error ?? "Unknown error" },
+                    }))
+                  }
+                } catch { /* skip malformed SSE */ }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error"
+        setProviderResults((prev) => ({
+          ...prev,
+          [provider]: { provider, status: "failed", error: msg },
+        }))
+      }
+    })
+
+    await Promise.allSettled(promises)
+    setIsComparingProviders(false)
+  }, [])
+
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
   // updates unifiedResult/unifiedCode instead of per-module state.
   // GOTCHA: Uses functional update `setUnifiedResult(prev => ...)` to avoid stale closure —
@@ -3656,6 +3755,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     reEstimateCosts,
     reExpandingModuleIds,
     handleReExpandModule,
+    providerResults,
+    isComparingProviders,
+    handleCompareProviders,
     initialized,
     initializeCadLab,
     handleDownload,

@@ -29,6 +29,7 @@ import type {
   SpecialistReview,
   AiCostEstimate,
   PartCategoryOverride,
+  ProviderResult,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 
@@ -131,6 +132,9 @@ export interface CadLabProjectData {
 
   /** Whether the user explicitly skipped specialist reviews before finalization */
   reviewSkipped: boolean
+
+  /** Provider A/B comparison results (keyed by provider name) */
+  providerResults: Record<string, ProviderResult> | null
 
   createdAt: string
   updatedAt: string
@@ -248,6 +252,7 @@ export async function loadCadLabProject(
         designRevision: (project.design_revision as number) ?? 1,
         imagesGeneratedAtRevision: (project.images_generated_at_revision as number) ?? 1,
         reviewSkipped: (project.review_skipped as boolean) ?? false,
+        providerResults: (project.provider_results as Record<string, ProviderResult> | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },

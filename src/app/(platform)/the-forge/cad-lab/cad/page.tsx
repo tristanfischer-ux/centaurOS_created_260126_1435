@@ -25,6 +25,7 @@ import {
   Layers,
   ClipboardList,
   FileDown,
+  GitCompare,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -36,6 +37,8 @@ import { FullscreenOverlay } from "../cad-lab-utils"
 import { ModuleResultsView, type ViewTab } from "../components/module-results-view"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { DesignReportDialog } from "../components/design-report-dialog"
+import { ProviderComparison } from "../components/provider-comparison"
+import type { ABProvider } from "@/lib/cad-lab-types"
 
 // ─── Synthetic module ID for unified model ────────────────────────────
 const UNIFIED_MODULE_ID = "__unified__"
@@ -59,6 +62,9 @@ export default function CadStagePage(): React.ReactNode {
     handleGenerateUnifiedModel,
     visualStyle,
     systemIllustrationStatus,
+    providerResults,
+    isComparingProviders,
+    handleCompareProviders,
   } = useCadLab()
 
   // INTENT: CAD stage gate — mirrors getStageAccess() logic.
@@ -181,6 +187,22 @@ export default function CadStagePage(): React.ReactNode {
                   Download STEP + STL
                 </Button>
               )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs"
+                disabled={cadBusy || isComparingProviders}
+                onClick={() => {
+                  const providers: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d", "zoo", "gencad"]
+                  handleCompareProviders(providers)
+                }}
+              >
+                {isComparingProviders ? (
+                  <><Loader2 className="h-3 w-3 animate-spin" />Comparing...</>
+                ) : (
+                  <><GitCompare className="h-3 w-3" />Compare Providers</>
+                )}
+              </Button>
               <Button
                 onClick={handleGenerateUnifiedModel}
                 disabled={cadBusy}
@@ -310,6 +332,12 @@ export default function CadStagePage(): React.ReactNode {
           onDownload={handleDownload}
         />
       )}
+
+      {/* ── Provider A/B comparison grid ── */}
+      <ProviderComparison
+        providerResults={providerResults}
+        isComparing={isComparingProviders}
+      />
 
       {/* ── Fullscreen SVG overlay ── */}
       {fullscreenView && unifiedResult && (

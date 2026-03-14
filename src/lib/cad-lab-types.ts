@@ -159,6 +159,9 @@ export type GenerationEvent =
   | { type: "complete"; module: CadLabModule }
   | { type: "unified_complete"; result: Omit<CadLabResult, "stepData">; code: string }
   | { type: "error"; message: string }
+  | { type: "provider_progress"; provider: ABProvider; message: string }
+  | { type: "provider_complete"; provider: ABProvider; result: ProviderResult }
+  | { type: "provider_error"; provider: ABProvider; error: string }
 
 // ─── Result Types ────────────────────────────────────────────────────
 
@@ -851,6 +854,27 @@ export interface PartCategoryOverride {
   type?: "buy" | "make"
   process?: string
   material?: string
+}
+
+// ─── Provider A/B Comparison Types ────────────────────────────────────
+
+/** Available 3D generation providers for A/B comparison */
+export type ABProvider = "meshy" | "tripo" | "trellis" | "sf3d" | "zoo" | "gencad"
+
+/** Result from a single provider in the A/B comparison */
+export interface ProviderResult {
+  provider: ABProvider
+  status: "pending" | "generating" | "completed" | "failed"
+  glbUrl?: string
+  stlUrl?: string
+  stepUrl?: string
+  generationTimeMs?: number
+  glbSizeKb?: number
+  stlSizeKb?: number
+  triangleCount?: number
+  error?: string
+  estimatedCostUsd?: number
+  completedAt?: string
 }
 
 /** Pipeline stage for the 4-stage product development flow */

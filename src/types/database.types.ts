@@ -4084,6 +4084,7 @@ export type Database = {
           part_category_overrides: Json | null
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
           product_overview: string | null
+          provider_results: Json | null
           quality_ratings: Json | null
           research: Json | null
           result: Json | null
@@ -4125,6 +4126,7 @@ export type Database = {
           part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
+          provider_results?: Json | null
           quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
@@ -4166,6 +4168,7 @@ export type Database = {
           part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
+          provider_results?: Json | null
           quality_ratings?: Json | null
           research?: Json | null
           result?: Json | null
@@ -19461,7 +19464,12 @@ export type Database = {
         | "Services"
         | "AI"
         | "Finance"
-      member_role: "Executive" | "Apprentice" | "AI_Agent" | "Founder"
+      member_role:
+        | "Executive"
+        | "Apprentice"
+        | "AI_Agent"
+        | "Founder"
+        | "Supplier"
       notification_channel: "push" | "email" | "sms" | "in_app"
       notification_priority: "critical" | "high" | "medium" | "low"
       offboarding_action: "reassign_delete" | "soft_delete" | "anonymize"
@@ -19736,7 +19744,13 @@ export const Constants = {
         "other",
       ],
       marketplace_category: ["People", "Products", "Services", "AI", "Finance"],
-      member_role: ["Executive", "Apprentice", "AI_Agent", "Founder"],
+      member_role: [
+        "Executive",
+        "Apprentice",
+        "AI_Agent",
+        "Founder",
+        "Supplier",
+      ],
       notification_channel: ["push", "email", "sms", "in_app"],
       notification_priority: ["critical", "high", "medium", "low"],
       offboarding_action: ["reassign_delete", "soft_delete", "anonymize"],
