@@ -135,8 +135,13 @@ export async function imageToMeshViaTripo(imageBase64: string): Promise<TripoRes
       const glbRes = await fetchWithTimeout(modelUrl, { method: "GET" }, 30_000)
       if (!glbRes.ok) throw new Error(`Failed to download Tripo model: ${glbRes.status}`)
 
+      // SECURITY: Reject oversized downloads to prevent OOM
+      const dlContentLength = parseInt(glbRes.headers.get("content-length") ?? "0", 10)
+      if (dlContentLength > 100 * 1024 * 1024) throw new Error("Tripo model too large (>100MB)")
+
       const glbBuffer = Buffer.from(await glbRes.arrayBuffer())
       if (glbBuffer.length === 0) throw new Error("Tripo returned empty model")
+      if (glbBuffer.length > 100 * 1024 * 1024) throw new Error("Tripo model too large (>100MB)")
 
       return {
         glbBuffer,

@@ -6,6 +6,8 @@
  * rejection after timeoutMs, while AbortController.abort() attempts to kill the TCP
  * connection for cleanup.
  *
+ * DECISION: Single timer handles both abort + rejection to prevent dangling timers.
+ *
  * @see Commit 0795994c — original discovery in cad-lab.ts
  */
 
@@ -24,16 +26,19 @@ export async function fetchWithTimeout(
   timeoutMs: number,
 ): Promise<Response> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let timer: ReturnType<typeof setTimeout>
   try {
     const response = await Promise.race([
       fetch(url, { ...init, signal: controller.signal }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("Request timeout")), timeoutMs),
-      ),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort()
+          reject(new Error("Request timeout"))
+        }, timeoutMs)
+      }),
     ])
     return response
   } finally {
-    clearTimeout(timer)
+    clearTimeout(timer!)
   }
 }

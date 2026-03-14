@@ -7,6 +7,8 @@
  * @security API keys read from environment variables only.
  */
 
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+
 // ─── Types ───────────────────────────────────────────────────────────
 
 export type ImageTo3DProvider = "zoo"
@@ -72,14 +74,18 @@ async function zooTextToCad(prompt: string): Promise<ImageTo3DResult> {
   const start = Date.now()
 
   // Step 1: Create text-to-CAD async operation
-  const createRes = await fetch(`${ZOO_API_BASE}/ai/text-to-cad/step`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      "Content-Type": "application/json",
+  const createRes = await fetchWithTimeout(
+    `${ZOO_API_BASE}/ai/text-to-cad/step`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
     },
-    body: JSON.stringify({ prompt }),
-  })
+    30_000,
+  )
 
   if (!createRes.ok) {
     const text = await createRes.text()
@@ -107,11 +113,21 @@ async function zooTextToCad(prompt: string): Promise<ImageTo3DResult> {
   while (Date.now() < deadline) {
     await sleep(ZOO_POLL_INTERVAL_MS)
 
-    const pollRes = await fetch(`${ZOO_API_BASE}/async/operations/${operationId}`, {
-      headers: { Authorization: `Bearer ${apiToken}` },
-    })
+    const pollRes = await fetchWithTimeout(
+      `${ZOO_API_BASE}/async/operations/${operationId}`,
+      { headers: { Authorization: `Bearer ${apiToken}` } },
+      15_000,
+    )
 
-    if (!pollRes.ok) continue
+    if (!pollRes.ok) {
+      if (pollRes.status === 401 || pollRes.status === 403) {
+        throw new Error(`Zoo auth failed (${pollRes.status})`)
+      }
+      if (pollRes.status === 404) {
+        throw new Error(`Zoo operation not found: ${operationId}`)
+      }
+      continue
+    }
 
     const pollData = (await pollRes.json()) as {
       status: string

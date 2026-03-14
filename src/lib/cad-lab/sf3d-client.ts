@@ -57,6 +57,12 @@ export async function imageToMeshViaSF3D(imageBase64: string): Promise<SF3DResul
     throw new Error(`SF3D endpoint returned ${response.status}: ${detail.slice(0, 500)}`)
   }
 
+  // SECURITY: Reject oversized responses to prevent OOM
+  const contentLength = parseInt(response.headers.get("content-length") ?? "0", 10)
+  if (contentLength > 100 * 1024 * 1024) {
+    throw new Error("SF3D response too large (>100MB)")
+  }
+
   const data = (await response.json()) as SF3DResponse
 
   if (

@@ -53,7 +53,7 @@ function isAllowedImageUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
     if (parsed.protocol !== "https:") return false
-    return ALLOWED_IMAGE_HOSTS.some((h) => parsed.hostname === h || parsed.hostname.endsWith(`.${h}`))
+    return ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)
   } catch {
     return false
   }
@@ -68,7 +68,7 @@ function sanitizeErrorForClient(err: unknown): string {
     if (msg.includes("401") || msg.includes("403")) return "Provider authentication failed"
     if (msg.includes("429")) return "Provider rate limit exceeded"
     if (msg.includes("timed out") || msg.includes("timeout")) return "Provider timed out"
-    if (msg.includes("not configured")) return msg // Safe — just says "X not configured"
+    if (msg.includes("not configured")) return "Provider is not currently available"
     // Generic — don't leak raw error
     return "Generation failed"
   }
@@ -124,8 +124,9 @@ export async function POST(request: Request): Promise<Response> {
   const user = { id: guard.userId }
 
   // SECURITY: Rate limit — shared budget
+  // SECURITY: Tightened rate limit — 20 provider requests/hr = ~3 full comparisons
   const rateLimitResult = await rateLimit("api", `cad-lab-provider:${user.id}`, {
-    limit: 60,
+    limit: 20,
     window: 60 * 60 * 1000,
   })
   if (!rateLimitResult.success) {
@@ -362,23 +363,14 @@ export async function POST(request: Request): Promise<Response> {
           completedAt: new Date().toISOString(),
         }
 
-        // ── Save to provider_results JSONB (atomic merge — re-read to avoid stale overwrite) ──
+        // ── Save to provider_results JSONB (atomic merge via RPC — no TOCTOU race) ──
         emit({ type: "provider_progress", provider, message: "Saving result..." })
         try {
-          // DECISION: Re-read provider_results fresh to avoid race condition
-          // when N providers write concurrently (each has its own stale snapshot)
-          const { data: freshProject } = await supabase
-            .from("cad_lab_projects")
-            .select("provider_results")
-            .eq("id", projectId)
-            .single()
-          const existingResults = (freshProject?.provider_results as Record<string, ProviderResult> | null) ?? {}
-          const updatedResults = { ...existingResults, [provider]: providerResult }
-
-          const { error: saveError } = await supabase
-            .from("cad_lab_projects")
-            .update({ provider_results: updatedResults as unknown as Json })
-            .eq("id", projectId)
+          const { error: saveError } = await supabase.rpc("merge_provider_result", {
+            p_project_id: projectId,
+            p_provider: provider,
+            p_result: providerResult as unknown as Json,
+          })
 
           if (saveError) {
             console.warn(`[PROVIDER-${provider.toUpperCase()}] DB save failed:`, saveError.message)
@@ -399,7 +391,7 @@ export async function POST(request: Request): Promise<Response> {
         const clientMsg = sanitizeErrorForClient(err)
         console.error(`[PROVIDER-${provider.toUpperCase()}] Failed:`, rawMsg)
 
-        // Save failure to provider_results (atomic merge)
+        // Save failure to provider_results (atomic merge via RPC)
         try {
           const failedResult: ProviderResult = {
             provider,
@@ -410,19 +402,11 @@ export async function POST(request: Request): Promise<Response> {
             completedAt: new Date().toISOString(),
           }
 
-          // DECISION: Re-read provider_results to avoid stale merge overwriting concurrent writes
-          const { data: freshProject } = await supabase
-            .from("cad_lab_projects")
-            .select("provider_results")
-            .eq("id", projectId)
-            .single()
-          const existingResults = (freshProject?.provider_results as Record<string, ProviderResult> | null) ?? {}
-          const updatedResults = { ...existingResults, [provider]: failedResult }
-
-          await supabase
-            .from("cad_lab_projects")
-            .update({ provider_results: updatedResults as unknown as Json })
-            .eq("id", projectId)
+          await supabase.rpc("merge_provider_result", {
+            p_project_id: projectId,
+            p_provider: provider,
+            p_result: failedResult as unknown as Json,
+          })
         } catch { /* best-effort */ }
 
         emit({ type: "provider_error", provider, error: clientMsg })

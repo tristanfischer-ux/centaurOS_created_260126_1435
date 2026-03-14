@@ -3565,6 +3565,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             if (done) break
             buffer += decoder.decode(value, { stream: true })
 
+            // SECURITY: Guard against unbounded buffer accumulation
+            if (buffer.length > 1_000_000) {
+              console.warn(`[PROVIDER-${provider}] SSE buffer exceeded 1MB, aborting`)
+              await reader.cancel()
+              break
+            }
+
             const messages = buffer.split("\n\n")
             buffer = messages.pop() ?? ""
 

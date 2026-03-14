@@ -126,8 +126,13 @@ export async function imageToMeshViaMeshy(imageUrl: string): Promise<MeshyResult
       const glbRes = await fetchWithTimeout(glbUrl, { method: "GET" }, 30_000)
       if (!glbRes.ok) throw new Error(`Failed to download Meshy GLB: ${glbRes.status}`)
 
+      // SECURITY: Reject oversized downloads to prevent OOM
+      const dlContentLength = parseInt(glbRes.headers.get("content-length") ?? "0", 10)
+      if (dlContentLength > 100 * 1024 * 1024) throw new Error("Meshy GLB too large (>100MB)")
+
       const glbBuffer = Buffer.from(await glbRes.arrayBuffer())
       if (glbBuffer.length === 0) throw new Error("Meshy returned empty GLB")
+      if (glbBuffer.length > 100 * 1024 * 1024) throw new Error("Meshy GLB too large (>100MB)")
 
       return {
         glbBuffer,

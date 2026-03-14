@@ -18071,6 +18071,34 @@ export type Database = {
           title: string
         }[]
       }
+      get_listing_preview_by_claim_token: {
+        Args: { p_token: string }
+        Returns: {
+          category: Database["public"]["Enums"]["marketplace_category"]
+          certifications: Json
+          city: string
+          company_size: string
+          contact_name: string
+          country: string
+          description: string
+          email: string
+          employee_count_exact: number
+          founded_year: number
+          industries: Json
+          is_valid: boolean
+          key_equipment: Json
+          lead_time: string
+          materials: Json
+          process_capabilities: Json
+          production_capacity: string
+          products: Json
+          quality_systems: string
+          specialties: Json
+          subcategory: string
+          title: string
+          website_url: string
+        }[]
+      }
       get_marketplace_recommendations: {
         Args: { p_foundry_id: string; p_limit?: number }
         Returns: {
@@ -18485,6 +18513,10 @@ export type Database = {
           title: string
           topic: string
         }[]
+      }
+      merge_provider_result: {
+        Args: { p_project_id: string; p_provider: string; p_result: Json }
+        Returns: undefined
       }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }

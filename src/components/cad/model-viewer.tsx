@@ -34,17 +34,20 @@ interface ModelViewerProps {
 
 // ─── GLB Model (loaded from URL) ─────────────────────────────────────
 
-// INTENT: Dispose GPU resources (geometries, materials, textures) to prevent WebGL memory leaks
+// INTENT: Dispose GPU resources (geometries, materials, textures) to prevent WebGL memory leaks.
+// Handles Mesh, SkinnedMesh, Points, Line, LineSegments, Sprite — all types that hold GPU resources.
 function disposeScene(scene: THREE.Object3D) {
   scene.traverse((child) => {
-    if (child instanceof THREE.Mesh) {
-      child.geometry?.dispose()
-      const materials = Array.isArray(child.material) ? child.material : [child.material]
+    const obj = child as THREE.Mesh
+    if (obj.geometry && typeof obj.geometry.dispose === "function") {
+      obj.geometry.dispose()
+    }
+    if (obj.material) {
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
       for (const mat of materials) {
         if (mat && typeof mat.dispose === "function") {
-          // Dispose all textures on the material
           for (const key of Object.keys(mat)) {
-            const val = (mat as Record<string, unknown>)[key]
+            const val = (mat as unknown as Record<string, unknown>)[key]
             if (val instanceof THREE.Texture) val.dispose()
           }
           mat.dispose()
