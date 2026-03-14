@@ -33,10 +33,11 @@ interface GenCADResponse {
 export async function imageToCADViaGenCAD(
   imageBase64: string,
 ): Promise<GenCADResult> {
-  const url = process.env.GENCAD_MODAL_URL
+  // GOTCHA: Vercel env vars can have trailing whitespace/newlines — always trim
+  const url = process.env.GENCAD_MODAL_URL?.trim()
   if (!url) throw new Error("GENCAD_MODAL_URL not configured")
 
-  const authToken = process.env.GENCAD_AUTH_TOKEN
+  const authToken = process.env.GENCAD_AUTH_TOKEN?.trim()
   if (!authToken) throw new Error("GENCAD_AUTH_TOKEN not configured")
 
   const response = await fetchWithTimeout(
