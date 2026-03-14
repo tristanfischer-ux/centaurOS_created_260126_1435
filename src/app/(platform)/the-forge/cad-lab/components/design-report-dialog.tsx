@@ -190,6 +190,14 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         window.print()
       }
 
+      // INTENT: Show token usage after successful AI export so user sees cost
+      if (data.aiContent) {
+        const { opusTokens, geminiTokens } = data.aiContent
+        const totalIn = opusTokens.in + geminiTokens.in
+        const totalOut = opusTokens.out + geminiTokens.out
+        toast.success(`Report generated — ${totalIn.toLocaleString()} input, ${totalOut.toLocaleString()} output tokens`)
+      }
+
       setAiPhase('done')
       onOpenChange(false)
     } catch (err) {

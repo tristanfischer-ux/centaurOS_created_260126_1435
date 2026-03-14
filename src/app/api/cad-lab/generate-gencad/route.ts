@@ -51,7 +51,8 @@ export async function POST(request: Request): Promise<Response> {
   let projectId: string
   try {
     const body = (await request.json()) as { projectId?: string }
-    if (!body.projectId || !/^[0-9a-f-]{36}$/.test(body.projectId)) {
+    // SECURITY: Proper UUID v4 format validation
+    if (!body.projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(body.projectId)) {
       return NextResponse.json({ error: "Invalid projectId" }, { status: 400 })
     }
     projectId = body.projectId
@@ -118,7 +119,15 @@ export async function POST(request: Request): Promise<Response> {
         if (!imageRes.ok) {
           throw new Error(`Failed to fetch hero image: ${imageRes.status}`)
         }
+        // SECURITY: Cap image size at 10 MB to prevent OOM
+        const contentLength = Number(imageRes.headers.get("content-length") ?? 0)
+        if (contentLength > 10 * 1024 * 1024) {
+          throw new Error("Hero image exceeds 10 MB size limit")
+        }
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
+        if (imageBuffer.length > 10 * 1024 * 1024) {
+          throw new Error("Hero image exceeds 10 MB size limit")
+        }
         const imageBase64 = imageBuffer.toString("base64")
 
         // 2. Call GenCAD Modal endpoint
@@ -181,7 +190,9 @@ export async function POST(request: Request): Promise<Response> {
           promptTokens: 0,
           completionTokens: 0,
           estimatedCostUsd: 0.01, // approximate GPU cost per generation
-        }).catch(() => {})
+        }).catch((e) => {
+          console.warn("[CAD-LAB-GENCAD] trackUsage failed:", e instanceof Error ? e.message : e)
+        })
 
         const elapsed = Date.now() - startTime
         console.info("[CAD-LAB-GENCAD] Generation complete:", {

@@ -18,6 +18,7 @@
  */
 
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { withRetry } from "@/lib/retry"
 import type {
   DesignReportData,
   ReportOutline,
@@ -321,6 +322,22 @@ ${dataSummary}`
     throw new Error("Report outline has no sections")
   }
 
+  // INTENT: Default missing fields per section instead of crashing — a partially-correct
+  // outline still produces a useful report. Opus sometimes omits optional fields.
+  outline.sections = outline.sections.map((s, i) => ({
+    id: s.id ?? `section-${i}`,
+    title: s.title ?? `Section ${i + 1}`,
+    sectionType: s.sectionType ?? 'conclusions',
+    brief: s.brief ?? '',
+    keyPoints: Array.isArray(s.keyPoints) ? s.keyPoints : [],
+    dataHighlights: Array.isArray(s.dataHighlights) ? s.dataHighlights : [],
+    includeTable: s.includeTable ?? false,
+    includeImage: s.includeImage ?? false,
+    moduleId: s.moduleId,
+  }))
+  outline.executiveSummary ??= ''
+  outline.narrativeThread ??= ''
+
   return { outline, tokensIn, tokensOut }
 }
 
@@ -563,10 +580,32 @@ export async function writeReportSections(
 
   const data = stripForServer(rawData)
 
-  // Write all sections in parallel
-  const results = await Promise.allSettled(
-    outline.sections.map((section) => writeOneSection(section, data, apiKey)),
-  )
+  // INTENT: Batch sections into chunks of 4 with 1s delay between batches
+  // to avoid Gemini rate limits (429). Each call wrapped in retry with
+  // exponential backoff on transient errors.
+  const BATCH_SIZE = 4
+  const BATCH_DELAY_MS = 1000
+  const results: PromiseSettledResult<AiReportSection & { tokensIn: number; tokensOut: number }>[] = []
+  for (let i = 0; i < outline.sections.length; i += BATCH_SIZE) {
+    const batch = outline.sections.slice(i, i + BATCH_SIZE)
+    const batchResults = await Promise.allSettled(
+      batch.map((section) =>
+        withRetry(() => writeOneSection(section, data, apiKey), {
+          maxRetries: 3,
+          baseDelay: 1000,
+          shouldRetry: (error) => {
+            const msg = error.message.toLowerCase()
+            return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+              msg.includes('network') || msg.includes('timeout') || msg.includes('econnreset')
+          },
+        }),
+      ),
+    )
+    results.push(...batchResults)
+    if (i + BATCH_SIZE < outline.sections.length) {
+      await new Promise((r) => setTimeout(r, BATCH_DELAY_MS))
+    }
+  }
 
   let geminiIn = 0
   let geminiOut = 0

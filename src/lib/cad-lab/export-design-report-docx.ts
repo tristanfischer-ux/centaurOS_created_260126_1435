@@ -149,62 +149,9 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
 
   const children: DocChild[] = []
 
-  // ── 1. Cover page ──
-  children.push(
-    new Paragraph({
-      spacing: { after: 400 },
-      children: [
-        new TextRun({
-          text: 'FRACTIONAL FORGE',
-          size: 28,
-          color: MID_TEXT,
-          characterSpacing: 80,
-          font: 'Calibri',
-        }),
-      ],
-    }),
-    new Paragraph({
-      heading: HeadingLevel.HEADING_1,
-      spacing: { after: 200 },
-      children: [
-        new TextRun({ text: data.projectName, bold: true, size: 48, color: DARK_TEXT, font: 'Calibri' }),
-      ],
-    }),
-    textParagraph(
-      data.stage === 'concept' ? 'Concept Report'
-        : data.stage === 'specify' ? 'Specification Report'
-        : data.stage === 'source' ? 'Sourcing Report'
-        : data.stage === 'assemble' ? 'Assembly Report'
-        : data.stage === 'cad' ? 'CAD Report'
-        : 'Engineering Design Report',
-      { after: 200, color: MID_TEXT, size: 24 },
-    ),
-    textParagraph(
-      new Date(data.generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
-      { after: 400, color: MID_TEXT },
-    ),
-  )
-
-  // Hero image on cover
-  if (data.heroImageUrl) {
-    const heroBuffer = await fetchImageAsBuffer(data.heroImageUrl)
-    if (heroBuffer) {
-      children.push(
-        new Paragraph({
-          spacing: { after: 200 },
-          children: [
-            new ImageRun({
-              data: heroBuffer,
-              transformation: { width: 600, height: 340 },
-              type: 'png',
-            }),
-          ],
-        }),
-      )
-    }
-  }
-
-  children.push(new Paragraph({ children: [new PageBreak()] }))
+  // ── 1. Cover page (shared helper) ──
+  const coverChildren = await buildCoverPage(data)
+  children.push(...coverChildren)
 
   // ── 2. Product Overview ──
   if (data.productOverview) {
@@ -655,39 +602,8 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     }),
   )
 
-  // ── Build document ──
-  const doc = new Document({
-    creator: 'ForgeOS',
-    title: `${data.projectName} — Engineering Design Report`,
-    description: `Design report for ${data.projectName}`,
-    numbering: {
-      config: [
-        {
-          reference: 'default-numbering',
-          levels: [
-            {
-              level: 0,
-              format: LevelFormat.DECIMAL,
-              text: '%1.',
-              alignment: AlignmentType.START,
-              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
-            },
-          ],
-        },
-      ],
-    },
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
-          },
-        },
-        children,
-      },
-    ],
-  })
-
+  // ── Build document (shared helper) ──
+  const doc = buildDocxDocument(children, data)
   await downloadDocx(doc, data)
 }
 
@@ -840,13 +756,100 @@ function buildClassificationTable(data: DesignReportData): Table | null {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows })
 }
 
-// ─── AI Prose Document Builder ───────────────────────────────────────
+function buildSupplierTable(data: DesignReportData): Table | null {
+  if (!data.supplierMatches) return null
+  const matchModuleIds = Object.keys(data.supplierMatches)
+  if (matchModuleIds.length === 0) return null
 
-async function buildAiDocx(data: DesignReportData): Promise<void> {
-  const aiContent = data.aiContent!
+  const rows: TableRow[] = [
+    new TableRow({
+      children: [
+        headerCell('Module', 25),
+        headerCell('Supplier', 25),
+        headerCell('Score', 10),
+        headerCell('Reasons', 40),
+      ],
+    }),
+  ]
+
+  for (const moduleId of matchModuleIds) {
+    const mod = data.modules.find((m) => m.id === moduleId)
+    const matches = data.supplierMatches[moduleId]
+    if (!mod || !matches) continue
+    for (const m of matches.slice(0, 3)) {
+      rows.push(
+        new TableRow({
+          children: [
+            dataCell(mod.name, 25),
+            dataCell(m.providerName, 25),
+            dataCell(String(m.matchScore), 10),
+            dataCell(m.matchReasons.join(', '), 40),
+          ],
+        }),
+      )
+    }
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows })
+}
+
+function buildAssemblyTable(data: DesignReportData): Table | null {
+  if (!data.assemblyPartners || data.assemblyPartners.length === 0) return null
+
+  const rows: TableRow[] = [
+    new TableRow({
+      children: [
+        headerCell('Partner', 30),
+        headerCell('Score', 15),
+        headerCell('Reasons', 55),
+      ],
+    }),
+  ]
+
+  for (const partner of data.assemblyPartners) {
+    rows.push(
+      new TableRow({
+        children: [
+          dataCell(partner.name, 30),
+          dataCell(String(partner.score), 15),
+          dataCell(partner.reasons.join('; '), 55),
+        ],
+      }),
+    )
+  }
+
+  return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows })
+}
+
+function buildCadOutputTable(data: DesignReportData): Table | null {
+  if (!data.unifiedCadResult?.success) return null
+
+  const r = data.unifiedCadResult
+  const details: [string, string][] = []
+  if (r.massGrams != null) details.push(['Mass', `${r.massGrams.toFixed(1)} g`])
+  if (r.volumeMm3 != null) details.push(['Volume', `${r.volumeMm3.toFixed(1)} mm³`])
+  if (r.bbox) details.push(['Bounding Box', `${r.bbox.xLen.toFixed(1)} × ${r.bbox.yLen.toFixed(1)} × ${r.bbox.zLen.toFixed(1)} mm`])
+  if (r.modelUsed) details.push(['Model', r.modelUsed])
+  if (details.length === 0) return null
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({ children: [headerCell('Property', 30), headerCell('Value', 70)] }),
+      ...details.map(
+        ([label, value]) =>
+          new TableRow({ children: [dataCell(label, 30), dataCell(value, 70)] }),
+      ),
+    ],
+  })
+}
+
+// ─── Shared Builders ─────────────────────────────────────────────────
+
+/** Build the branded cover page elements — used by both legacy and AI paths. */
+async function buildCoverPage(data: DesignReportData): Promise<DocChild[]> {
   const children: DocChild[] = []
 
-  // ── Cover page (same as legacy) ──
   children.push(
     new Paragraph({
       spacing: { after: 400 },
@@ -882,7 +885,6 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
     ),
   )
 
-  // Hero image
   if (data.heroImageUrl) {
     const heroBuffer = await fetchImageAsBuffer(data.heroImageUrl)
     if (heroBuffer) {
@@ -902,6 +904,53 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
   }
 
   children.push(new Paragraph({ children: [new PageBreak()] }))
+  return children
+}
+
+/** Build the Document wrapper — shared config between legacy and AI paths. */
+function buildDocxDocument(children: DocChild[], data: DesignReportData): Document {
+  return new Document({
+    creator: 'ForgeOS',
+    title: `${data.projectName} — Engineering Design Report`,
+    description: `Design report for ${data.projectName}`,
+    numbering: {
+      config: [
+        {
+          reference: 'default-numbering',
+          levels: [
+            {
+              level: 0,
+              format: LevelFormat.DECIMAL,
+              text: '%1.',
+              alignment: AlignmentType.START,
+              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+            },
+          ],
+        },
+      ],
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
+          },
+        },
+        children,
+      },
+    ],
+  })
+}
+
+// ─── AI Prose Document Builder ───────────────────────────────────────
+
+async function buildAiDocx(data: DesignReportData): Promise<void> {
+  const aiContent = data.aiContent!
+  const children: DocChild[] = []
+
+  // ── Cover page (shared helper) ──
+  const coverChildren = await buildCoverPage(data)
+  children.push(...coverChildren)
 
   // ── Executive Summary ──
   if (aiContent.executiveSummary) {
@@ -989,38 +1038,7 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
     }),
   )
 
-  const doc = new Document({
-    creator: 'ForgeOS',
-    title: `${data.projectName} — Engineering Design Report`,
-    description: `Design report for ${data.projectName}`,
-    numbering: {
-      config: [
-        {
-          reference: 'default-numbering',
-          levels: [
-            {
-              level: 0,
-              format: LevelFormat.DECIMAL,
-              text: '%1.',
-              alignment: AlignmentType.START,
-              style: { paragraph: { indent: { left: 720, hanging: 360 } } },
-            },
-          ],
-        },
-      ],
-    },
-    sections: [
-      {
-        properties: {
-          page: {
-            margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 },
-          },
-        },
-        children,
-      },
-    ],
-  })
-
+  const doc = buildDocxDocument(children, data)
   await downloadDocx(doc, data)
 }
 
@@ -1035,6 +1053,12 @@ function getTableForSection(section: AiReportSection, data: DesignReportData): T
       return buildReviewTable(data)
     case 'part-classification':
       return buildClassificationTable(data)
+    case 'supplier-analysis':
+      return buildSupplierTable(data)
+    case 'assembly-logistics':
+      return buildAssemblyTable(data)
+    case 'cad-output':
+      return buildCadOutputTable(data)
     default:
       return null
   }

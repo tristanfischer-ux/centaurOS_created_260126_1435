@@ -45,7 +45,6 @@ export async function imageToCADViaGenCAD(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-GenCAD-Token": authToken,
       },
       body: JSON.stringify({
         image_base64: imageBase64,
