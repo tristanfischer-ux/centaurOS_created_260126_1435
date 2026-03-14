@@ -152,6 +152,11 @@ function STLModel({ stlData, stlUrl }: { stlData?: string; stlUrl?: string }) {
     return urlGeometry ?? new THREE.BoxGeometry(1, 1, 1)
   }, [stlData, urlGeometry])
 
+  // Dispose geometry on unmount to prevent WebGL memory leaks
+  useEffect(() => {
+    return () => { geometry.dispose() }
+  }, [geometry])
+
   const { boundingSphere, yMin, vertexCount } = useMemo(() => {
     geometry.computeBoundingSphere()
     geometry.computeBoundingBox()

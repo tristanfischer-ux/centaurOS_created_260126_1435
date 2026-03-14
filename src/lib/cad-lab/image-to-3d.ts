@@ -163,6 +163,7 @@ function extractZooOutputs(
   )
   if (!stepEntry) throw new Error("Zoo outputs missing STEP file")
   const stepBuffer = Buffer.from(stepEntry[1], "base64")
+  if (stepBuffer.length > 100 * 1024 * 1024) throw new Error("Zoo STEP output too large (>100MB)")
 
   // Find GLTF/GLB output (Zoo returns both formats by default)
   const glbEntry = Object.entries(outputs).find(([key]) => {
@@ -170,6 +171,7 @@ function extractZooOutputs(
     return lower.endsWith(".glb") || lower.endsWith(".gltf")
   })
   const glbBuffer = glbEntry ? Buffer.from(glbEntry[1], "base64") : Buffer.alloc(0)
+  if (glbBuffer.length > 100 * 1024 * 1024) throw new Error("Zoo GLB output too large (>100MB)")
 
   const elapsed = Date.now() - startTime
   console.info(

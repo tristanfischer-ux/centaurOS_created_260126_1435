@@ -61,6 +61,12 @@ export async function imageToCADViaGenCAD(
     throw new Error(`GenCAD endpoint returned ${response.status}: ${detail.slice(0, 500)}`)
   }
 
+  // SECURITY: Reject oversized responses to prevent OOM
+  const contentLength = parseInt(response.headers.get("content-length") ?? "0", 10)
+  if (contentLength > 100 * 1024 * 1024) {
+    throw new Error("GenCAD response too large (>100MB)")
+  }
+
   const data = (await response.json()) as GenCADResponse
 
   // SECURITY: Validate response shape before trusting
@@ -77,6 +83,9 @@ export async function imageToCADViaGenCAD(
   const stlBuffer = Buffer.from(data.stl_base64, "base64")
   if (stlBuffer.length === 0) {
     throw new Error("GenCAD returned empty STL data")
+  }
+  if (stlBuffer.length > 100 * 1024 * 1024) {
+    throw new Error("GenCAD STL too large (>100MB)")
   }
 
   return {

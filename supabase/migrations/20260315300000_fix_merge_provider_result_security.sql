@@ -1,8 +1,11 @@
 -- SECURITY FIX: merge_provider_result was SECURITY DEFINER, bypassing RLS.
 -- Any authenticated user could write to any project's provider_results.
 -- Fix: SECURITY INVOKER (respects RLS) + provider allowlist.
+-- Explicit DROP for defense-in-depth (prevents rollback to SECURITY DEFINER).
 
-CREATE OR REPLACE FUNCTION merge_provider_result(
+DROP FUNCTION IF EXISTS merge_provider_result(uuid, text, jsonb);
+
+CREATE FUNCTION merge_provider_result(
   p_project_id uuid,
   p_provider text,
   p_result jsonb
