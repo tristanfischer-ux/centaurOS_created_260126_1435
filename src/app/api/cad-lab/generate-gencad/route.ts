@@ -80,12 +80,17 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   // SECURITY: Validate URL to prevent SSRF — only allow Supabase Storage URLs
+  // Fails closed: if NEXT_PUBLIC_SUPABASE_URL is missing, reject all URLs
   try {
     const parsedUrl = new URL(systemIllustrationUrl)
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""
-    const allowedHost = supabaseUrl ? new URL(supabaseUrl).hostname : ""
-    if (parsedUrl.protocol !== "https:" || (allowedHost && parsedUrl.hostname !== allowedHost)) {
-      console.error("[CAD-LAB-GENCAD] SSRF blocked:", { url: systemIllustrationUrl })
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseUrl) {
+      console.error("[CAD-LAB-GENCAD] SSRF check failed: NEXT_PUBLIC_SUPABASE_URL not configured")
+      return NextResponse.json({ error: "Server misconfigured" }, { status: 500 })
+    }
+    const allowedHost = new URL(supabaseUrl).hostname
+    if (parsedUrl.protocol !== "https:" || parsedUrl.hostname !== allowedHost) {
+      console.error("[CAD-LAB-GENCAD] SSRF blocked:", { url: systemIllustrationUrl, allowedHost })
       return NextResponse.json({ error: "Invalid hero image URL" }, { status: 400 })
     }
   } catch {
