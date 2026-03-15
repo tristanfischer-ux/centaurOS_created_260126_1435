@@ -175,8 +175,9 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
-  // For Zoo, need a text prompt
-  if (provider === "zoo" && !visualStyle?.cadGeometryPrompt && !visualStyle?.heroImagePrompt) {
+  // For Zoo, need a text prompt — fall back to project subject if no design prompt
+  const zooPrompt = visualStyle?.cadGeometryPrompt ?? visualStyle?.heroImagePrompt ?? project.subject
+  if (provider === "zoo" && !zooPrompt) {
     return NextResponse.json(
       { error: "No design prompt found for Zoo. Re-run the Design stage." },
       { status: 400 },
@@ -285,7 +286,7 @@ export async function POST(request: Request): Promise<Response> {
             break
           }
           case "zoo": {
-            const textPrompt = visualStyle?.cadGeometryPrompt ?? visualStyle?.heroImagePrompt ?? ""
+            const textPrompt = zooPrompt ?? ""
             const result = await imageToMesh(imageBase64, { textPrompt })
             glbBuffer = result.glbBuffer.length > 0 ? result.glbBuffer : undefined
             stlBuffer = result.stlBuffer

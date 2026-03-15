@@ -37,7 +37,14 @@ interface TripoTaskResponse {
     type: string
     status: "queued" | "running" | "success" | "failed" | "cancelled"
     output?: {
-      model?: string // URL to download the model
+      // GOTCHA: Tripo v2.5+ returns pbr_model (not model). The model field
+      // is no longer present in task responses. Both output.pbr_model and
+      // result.pbr_model.url contain the GLB URL.
+      pbr_model?: string
+      model?: string // Legacy fallback
+    }
+    result?: {
+      pbr_model?: { type: string; url: string }
     }
     message?: string
   }
@@ -118,7 +125,11 @@ export async function imageToMeshViaTripo(imageBase64: string): Promise<TripoRes
     const task = (await pollRes.json()) as TripoTaskResponse
 
     if (task.data.status === "success") {
-      const modelUrl = task.data.output?.model
+      // GOTCHA: Tripo v2.5+ puts the GLB URL at output.pbr_model (not output.model).
+      // Also available at result.pbr_model.url. Check all locations.
+      const modelUrl = task.data.output?.pbr_model
+        ?? task.data.output?.model
+        ?? task.data.result?.pbr_model?.url
       if (!modelUrl) throw new Error("Tripo succeeded but no model URL in response")
 
       // SECURITY: Validate download URL to prevent SSRF via compromised API response
