@@ -293,8 +293,8 @@ export async function POST(request: Request): Promise<Response> {
           }
         }
 
-        // ── Convert GLB → STL if needed ──
-        if (glbBuffer && !stlBuffer) {
+        // ── Convert GLB → STL if needed (skip for Zoo — it has native STEP) ──
+        if (glbBuffer && !stlBuffer && !stepBuffer) {
           try {
             emit({ type: "provider_progress", provider, message: "Converting GLB to STL..." })
             stlBuffer = await glbToStl(glbBuffer)
