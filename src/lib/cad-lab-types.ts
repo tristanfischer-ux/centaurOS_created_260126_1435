@@ -859,7 +859,7 @@ export interface PartCategoryOverride {
 // ─── Provider A/B Comparison Types ────────────────────────────────────
 
 /** Available 3D generation providers for A/B comparison */
-export type ABProvider = "meshy" | "tripo" | "trellis" | "sf3d" | "zoo"
+export type ABProvider = "meshy" | "tripo" | "trellis" | "sf3d"
 
 /** Result from a single provider in the A/B comparison */
 export interface ProviderResult {

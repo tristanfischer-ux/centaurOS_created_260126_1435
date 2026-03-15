@@ -67,7 +67,22 @@ function GLBModel({ url }: { url: string }) {
     }
   }, [gltf.scene])
 
+  // GOTCHA: Some providers (TRELLIS) export meshes rotated 90° around X axis
+  // (Z-up convention vs Y-up). Detect by checking if the bounding box is
+  // taller than it is wide/deep and auto-correct orientation.
   const { boundingSphere, yMin } = useMemo(() => {
+    // First compute raw bounds to detect orientation
+    const rawBox = new THREE.Box3().setFromObject(gltf.scene)
+    const size = new THREE.Vector3()
+    rawBox.getSize(size)
+
+    // If the model is significantly taller than wide, it's likely Z-up → rotate to Y-up
+    const heightRatio = size.y / Math.max(size.x, size.z, 0.001)
+    if (heightRatio > 2.0) {
+      gltf.scene.rotation.x = -Math.PI / 2
+      gltf.scene.updateMatrixWorld(true)
+    }
+
     const box = new THREE.Box3().setFromObject(gltf.scene)
     const sphere = new THREE.Sphere()
     box.getBoundingSphere(sphere)

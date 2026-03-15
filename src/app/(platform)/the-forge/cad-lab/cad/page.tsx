@@ -193,7 +193,7 @@ export default function CadStagePage(): React.ReactNode {
                 className="gap-1.5 text-xs"
                 disabled={cadBusy || isComparingProviders}
                 onClick={() => {
-                  const providers: ABProvider[] = ["tripo", "trellis", "meshy", "sf3d", "zoo"]
+                  const providers: ABProvider[] = ["tripo", "trellis", "meshy", "sf3d"]
                   handleCompareProviders(providers)
                 }}
               >

@@ -17,7 +17,6 @@ import { aiGuard } from "@/lib/ai/guard"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { rateLimit } from "@/lib/security/rate-limit"
-import { imageToMesh } from "@/lib/cad-lab/image-to-3d"
 import { imageToMeshViaMeshy } from "@/lib/cad-lab/meshy-client"
 import { imageToMeshViaTripo } from "@/lib/cad-lab/tripo-client"
 import { imageToMeshViaTrellis } from "@/lib/cad-lab/trellis-client"
@@ -40,7 +39,7 @@ interface GenerateProviderBody {
 }
 
 const CAD_LAB_STORAGE_BUCKET = "xray-images"
-const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d", "zoo"]
+const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d"]
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // SECURITY: SSRF protection — only allow image fetches from Supabase Storage
@@ -109,7 +108,6 @@ const ESTIMATED_COSTS: Record<ABProvider, number> = {
   tripo: 0.20,
   trellis: 0.03,
   sf3d: 0.01,
-  zoo: 0.10,
 }
 
 // ─── POST handler ────────────────────────────────────────────────────
@@ -166,18 +164,9 @@ export async function POST(request: Request): Promise<Response> {
   const systemIllustrationUrl = project.system_illustration_url as string | null
 
   // GUARD: Need a hero image for image-to-3D providers
-  if (!systemIllustrationUrl && provider !== "zoo") {
+  if (!systemIllustrationUrl) {
     return NextResponse.json(
       { error: "No product illustration available. Re-run the Design stage." },
-      { status: 400 },
-    )
-  }
-
-  // For Zoo, need a text prompt — fall back to project subject if no design prompt
-  const zooPrompt = visualStyle?.cadGeometryPrompt ?? visualStyle?.heroImagePrompt ?? project.subject
-  if (provider === "zoo" && !zooPrompt) {
-    return NextResponse.json(
-      { error: "No design prompt found for Zoo. Re-run the Design stage." },
       { status: 400 },
     )
   }
@@ -209,7 +198,6 @@ export async function POST(request: Request): Promise<Response> {
         tripo: () => !!process.env.TRIPO_API_KEY?.trim(),
         trellis: () => !!(process.env.TRELLIS_MODAL_URL?.trim() && process.env.TRELLIS_AUTH_TOKEN?.trim()),
         sf3d: () => !!(process.env.SF3D_MODAL_URL?.trim() && process.env.SF3D_AUTH_TOKEN?.trim()),
-        zoo: () => !!process.env.ZOO_API_TOKEN?.trim(),
       }
       if (!configCheck[provider]()) {
         emit({ type: "provider_error", provider, error: `${provider} not configured — missing API key or endpoint URL` })
@@ -279,15 +267,6 @@ export async function POST(request: Request): Promise<Response> {
           case "sf3d": {
             const result = await imageToMeshViaSF3D(imageBase64)
             glbBuffer = result.glbBuffer
-            generationTimeMs = result.generationTimeMs
-            break
-          }
-          case "zoo": {
-            const textPrompt = zooPrompt ?? ""
-            const result = await imageToMesh(imageBase64, { textPrompt })
-            glbBuffer = result.glbBuffer.length > 0 ? result.glbBuffer : undefined
-            stlBuffer = result.stlBuffer
-            stepBuffer = result.stepBuffer
             generationTimeMs = result.generationTimeMs
             break
           }
