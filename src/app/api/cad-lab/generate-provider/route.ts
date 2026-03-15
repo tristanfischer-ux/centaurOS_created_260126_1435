@@ -22,7 +22,6 @@ import { imageToMeshViaMeshy } from "@/lib/cad-lab/meshy-client"
 import { imageToMeshViaTripo } from "@/lib/cad-lab/tripo-client"
 import { imageToMeshViaTrellis } from "@/lib/cad-lab/trellis-client"
 import { imageToMeshViaSF3D } from "@/lib/cad-lab/sf3d-client"
-import { imageToCADViaGenCAD } from "@/lib/cad-lab/gencad"
 import { glbToStl } from "@/lib/cad-lab/mesh-convert"
 import type {
   ABProvider,
@@ -41,7 +40,7 @@ interface GenerateProviderBody {
 }
 
 const CAD_LAB_STORAGE_BUCKET = "xray-images"
-const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d", "zoo", "gencad"]
+const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d", "zoo"]
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // SECURITY: SSRF protection — only allow image fetches from Supabase Storage
@@ -111,7 +110,6 @@ const ESTIMATED_COSTS: Record<ABProvider, number> = {
   trellis: 0.03,
   sf3d: 0.01,
   zoo: 0.10,
-  gencad: 0.01,
 }
 
 // ─── POST handler ────────────────────────────────────────────────────
@@ -212,7 +210,6 @@ export async function POST(request: Request): Promise<Response> {
         trellis: () => !!(process.env.TRELLIS_MODAL_URL?.trim() && process.env.TRELLIS_AUTH_TOKEN?.trim()),
         sf3d: () => !!(process.env.SF3D_MODAL_URL?.trim() && process.env.SF3D_AUTH_TOKEN?.trim()),
         zoo: () => !!process.env.ZOO_API_TOKEN?.trim(),
-        gencad: () => !!(process.env.GENCAD_MODAL_URL?.trim() && process.env.GENCAD_AUTH_TOKEN?.trim()),
       }
       if (!configCheck[provider]()) {
         emit({ type: "provider_error", provider, error: `${provider} not configured — missing API key or endpoint URL` })
@@ -291,12 +288,6 @@ export async function POST(request: Request): Promise<Response> {
             glbBuffer = result.glbBuffer.length > 0 ? result.glbBuffer : undefined
             stlBuffer = result.stlBuffer
             stepBuffer = result.stepBuffer
-            generationTimeMs = result.generationTimeMs
-            break
-          }
-          case "gencad": {
-            const result = await imageToCADViaGenCAD(imageBase64)
-            stlBuffer = result.stlBuffer
             generationTimeMs = result.generationTimeMs
             break
           }

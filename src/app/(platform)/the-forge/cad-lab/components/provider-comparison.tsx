@@ -24,7 +24,6 @@ const PROVIDER_INFO: Record<ABProvider, { label: string; tier: string; badgeVari
   trellis: { label: "TRELLIS.2", tier: "Self-hosted", badgeVariant: "secondary" },
   sf3d: { label: "SF3D", tier: "Self-hosted", badgeVariant: "secondary" },
   zoo: { label: "Zoo.dev", tier: "Parametric", badgeVariant: "outline" },
-  gencad: { label: "GenCAD", tier: "Baseline", badgeVariant: "outline" },
 }
 
 // ─── Lazy-loaded viewer cell ─────────────────────────────────────────
