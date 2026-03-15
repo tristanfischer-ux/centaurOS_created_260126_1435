@@ -29,10 +29,13 @@ import {
   AlertTriangle,
   Info,
   FileDown,
+  Box,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { ModelViewer } from "@/components/cad/model-viewer"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
@@ -69,9 +72,12 @@ export default function CadLabResearchPage(): React.ReactNode {
     researchModelUsed, decompositionModelUsed,
     handleRefreshModuleImages,
     handleReExpandModule, reExpandingModuleIds,
+    trellisPreviewUrl, trellisPreviewStatus, trellisPreviewError,
+    handleGenerateTrellisPreview,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [is3DDialogOpen, setIs3DDialogOpen] = useState(false)
 
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)
@@ -289,10 +295,35 @@ export default function CadLabResearchPage(): React.ReactNode {
                         )}
                       </div>
                       <CardContent className="pt-4 pb-4">
-                        <h2 className="text-base font-semibold text-foreground">{subject}</h2>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          System overview — full research report available in the Specify stage.
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h2 className="text-base font-semibold text-foreground">{subject}</h2>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              System overview — full research report available in the Specify stage.
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="shrink-0 gap-1.5 text-xs"
+                            disabled={trellisPreviewStatus === "generating"}
+                            onClick={() => {
+                              if (trellisPreviewStatus === "complete" && trellisPreviewUrl) {
+                                setIs3DDialogOpen(true)
+                              } else {
+                                handleGenerateTrellisPreview()
+                                setIs3DDialogOpen(true)
+                              }
+                            }}
+                          >
+                            {trellisPreviewStatus === "generating" ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Box className="h-3.5 w-3.5" />
+                            )}
+                            See in 3D
+                          </Button>
+                        </div>
                       </CardContent>
                     </Card>
                   )}
@@ -601,6 +632,43 @@ export default function CadLabResearchPage(): React.ReactNode {
       )}
 
       <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} stage="concept" />
+
+      {/* TRELLIS 3D preview dialog */}
+      <Dialog open={is3DDialogOpen} onOpenChange={setIs3DDialogOpen}>
+        <DialogContent size="lg" className="p-0 pt-10 overflow-hidden">
+          {trellisPreviewStatus === "complete" && trellisPreviewUrl ? (
+            <div className="w-full aspect-square">
+              <ModelViewer glbUrl={trellisPreviewUrl} backgroundColor="#f9fafb" className="!border-0 !rounded-none" />
+            </div>
+          ) : trellisPreviewStatus === "generating" ? (
+            <div className="w-full aspect-square flex flex-col items-center justify-center gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-international-orange" />
+              <p className="text-sm text-muted-foreground">Generating 3D preview...</p>
+              <p className="text-xs text-muted-foreground">This usually takes 15–30 seconds</p>
+            </div>
+          ) : trellisPreviewStatus === "failed" ? (
+            <div className="w-full aspect-square flex flex-col items-center justify-center gap-3">
+              <AlertTriangle className="h-8 w-8 text-muted-foreground/30" />
+              <p className="text-sm text-muted-foreground">
+                {trellisPreviewError ?? "3D preview generation failed"}
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs gap-1.5"
+                onClick={handleGenerateTrellisPreview}
+              >
+                <RotateCcw className="h-3 w-3" />
+                Retry
+              </Button>
+            </div>
+          ) : (
+            <div className="w-full aspect-square flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

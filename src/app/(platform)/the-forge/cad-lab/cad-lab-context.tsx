@@ -331,6 +331,12 @@ export interface CadLabContextValue {
   isComparingProviders: boolean
   handleCompareProviders: (providers: ABProvider[]) => Promise<void>
 
+  // TRELLIS 3D preview (Design tab)
+  trellisPreviewUrl: string | null
+  trellisPreviewStatus: "idle" | "generating" | "complete" | "failed"
+  trellisPreviewError: string | null
+  handleGenerateTrellisPreview: () => void
+
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
   initializeCadLab: () => void
@@ -540,6 +546,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // ── Provider A/B comparison ──
   const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
   const [isComparingProviders, setIsComparingProviders] = useState(false)
+
+  // ── TRELLIS 3D preview (Design tab) ──
+  const [trellisPreviewUrl, setTrellisPreviewUrl] = useState<string | null>(null)
+  const [trellisPreviewStatus, setTrellisPreviewStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
+  const [trellisPreviewError, setTrellisPreviewError] = useState<string | null>(null)
+  const trellisAbortRef = useRef<AbortController | null>(null)
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -3028,6 +3040,18 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore provider A/B comparison results
       setProviderResults(p.providerResults ?? {})
 
+      // Restore TRELLIS preview from provider results if available
+      const trellisResult = (p.providerResults ?? {})["trellis"]
+      if (trellisResult?.status === "completed" && trellisResult.glbUrl) {
+        setTrellisPreviewUrl(trellisResult.glbUrl)
+        setTrellisPreviewStatus("complete")
+        setTrellisPreviewError(null)
+      } else {
+        setTrellisPreviewUrl(null)
+        setTrellisPreviewStatus("idle")
+        setTrellisPreviewError(null)
+      }
+
       // Restore design revision state
       setDesignRevision(p.designRevision ?? 1)
       setImagesGeneratedAtRevision(p.imagesGeneratedAtRevision ?? 1)
@@ -3623,6 +3647,94 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [])
 
+  // ── TRELLIS 3D Preview handler (Design tab "See in 3D") ──
+  const handleGenerateTrellisPreview = useCallback(() => {
+    const projectId = activeProjectIdRef.current
+    if (!projectId || trellisPreviewStatus === "generating") return
+
+    // If TRELLIS was already generated via Compare Providers, reuse it
+    const existing = providerResults["trellis"]
+    if (existing?.status === "completed" && existing.glbUrl) {
+      setTrellisPreviewUrl(existing.glbUrl)
+      setTrellisPreviewStatus("complete")
+      setTrellisPreviewError(null)
+      return
+    }
+
+    // Cancel any in-flight preview request
+    if (trellisAbortRef.current) {
+      trellisAbortRef.current.abort()
+    }
+    const abortController = new AbortController()
+    trellisAbortRef.current = abortController
+
+    setTrellisPreviewStatus("generating")
+    setTrellisPreviewError(null)
+
+    // Fire SSE request (async IIFE to keep the callback sync for useCallback)
+    ;(async () => {
+      try {
+        const response = await fetch("/api/cad-lab/generate-provider", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+          body: JSON.stringify({ projectId, provider: "trellis" }),
+          signal: abortController.signal,
+        })
+
+        if (!response.ok) {
+          const errBody = await response.json().catch(() => ({ error: "Unknown error" }))
+          throw new Error(errBody.error || `HTTP ${response.status}`)
+        }
+
+        if (response.body) {
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ""
+
+          while (true) {
+            if (abortController.signal.aborted) {
+              await reader.cancel()
+              break
+            }
+            const { done, value } = await reader.read()
+            if (done) break
+            buffer += decoder.decode(value, { stream: true })
+
+            if (buffer.length > 1_000_000) {
+              console.warn("[TRELLIS-PREVIEW] SSE buffer exceeded 1MB, aborting")
+              await reader.cancel()
+              break
+            }
+
+            const messages = buffer.split("\n\n")
+            buffer = messages.pop() ?? ""
+
+            for (const msg of messages) {
+              for (const line of msg.split("\n")) {
+                if (!line.startsWith("data: ")) continue
+                try {
+                  const event = JSON.parse(line.slice(6))
+                  if (event.type === "provider_complete" && event.result?.glbUrl) {
+                    setTrellisPreviewUrl(event.result.glbUrl)
+                    setTrellisPreviewStatus("complete")
+                  } else if (event.type === "provider_error") {
+                    setTrellisPreviewStatus("failed")
+                    setTrellisPreviewError(event.error ?? "Generation failed")
+                  }
+                } catch { /* skip malformed SSE */ }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return
+        const msg = err instanceof Error ? err.message : "Unknown error"
+        setTrellisPreviewStatus("failed")
+        setTrellisPreviewError(msg)
+      }
+    })()
+  }, [providerResults, trellisPreviewStatus])
+
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
   // updates unifiedResult/unifiedCode instead of per-module state.
   // GOTCHA: Uses functional update `setUnifiedResult(prev => ...)` to avoid stale closure —
@@ -3793,6 +3905,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     providerResults,
     isComparingProviders,
     handleCompareProviders,
+    trellisPreviewUrl,
+    trellisPreviewStatus,
+    trellisPreviewError,
+    handleGenerateTrellisPreview,
     initialized,
     initializeCadLab,
     handleDownload,
