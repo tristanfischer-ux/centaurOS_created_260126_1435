@@ -54,7 +54,9 @@ export async function imageToMesh(
 // ─── Zoo.dev Text-to-CAD Provider ───────────────────────────────────
 
 const ZOO_API_BASE = "https://api.zoo.dev"
-const ZOO_TIMEOUT_MS = 240_000
+// DECISION: 280s polling budget — Zoo complex models can take 290s,
+// but Vercel maxDuration is 300s. Leave 20s for image fetch + upload.
+const ZOO_TIMEOUT_MS = 280_000
 const ZOO_POLL_INTERVAL_MS = 3_000
 
 /**
