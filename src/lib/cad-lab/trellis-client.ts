@@ -50,7 +50,7 @@ export async function imageToMeshViaTrellis(imageBase64: string): Promise<Trelli
         auth_token: authToken,
       }),
     },
-    120_000, // TRELLIS can take 15-30s on cold start, 120s generous
+    240_000, // TRELLIS cold start ~100s + inference ~50s + decimation ~20s = ~170s
   )
 
   if (!response.ok) {
