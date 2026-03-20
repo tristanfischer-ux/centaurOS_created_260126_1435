@@ -230,7 +230,9 @@ async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string
   if (intel?.competitors && intel.competitors.length > 0) {
     lines.push('\n### Competitor Profiles')
     for (const c of intel.competitors) {
-      lines.push(`\n**${c.name}** (${c.website})`)
+      // GOTCHA: JSONB doesn't enforce types — website can be empty/null despite the TS interface
+      const nameLabel = c.website ? `**${c.name}** (${c.website})` : `**${c.name}**`
+      lines.push(`\n${nameLabel}`)
       if (c.description) lines.push(`- ${c.description}`)
       if (c.differentiator) lines.push(`- Differentiator: ${c.differentiator}`)
     }
@@ -244,10 +246,16 @@ async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string
     if (purpose.vision) lines.push(`- **Vision:** ${purpose.vision}`)
   }
 
-  // Company overview
-  if (intel?.website_summary) lines.push(`\n### Company Overview\n${intel.website_summary}`)
-  if (profile?.business_model) lines.push(`- **Business Model:** ${profile.business_model}`)
-  if (intel?.pricing_model) lines.push(`- **Pricing Model:** ${intel.pricing_model}`)
+  // Company overview — group under one header so bullets aren't orphaned
+  {
+    const overviewLines: string[] = []
+    if (intel?.website_summary) overviewLines.push(intel.website_summary)
+    if (profile?.business_model) overviewLines.push(`- **Business Model:** ${profile.business_model}`)
+    if (intel?.pricing_model) overviewLines.push(`- **Pricing Model:** ${intel.pricing_model}`)
+    if (overviewLines.length > 0) {
+      lines.push(`\n### Company Overview\n${overviewLines.join('\n')}`)
+    }
+  }
 
   // Only return if we have more than just the header
   return lines.length > 1 ? lines.join('\n') : ''
