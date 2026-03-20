@@ -1,14 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
+import { setupNewUser } from '@/lib/auth/setup-new-user'
+import { escapeHtml } from '@/lib/security/sanitize'
 
 /**
  * Validates redirect path to prevent open redirect attacks.
  * Only allows relative paths (starting with /) that don't redirect to external domains.
- * 
+ *
  * @security Prevents open redirect via crafted next= parameter
  */
 function sanitizeRedirectPath(path: string | null): string {
-  const defaultPath = '/new-objectives'
+  const defaultPath = '/today'
   if (!path) return defaultPath
   // SECURITY: Must be a relative path, not an absolute URL or protocol-relative URL
   if (!path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
@@ -18,9 +21,14 @@ function sanitizeRedirectPath(path: string | null): string {
 }
 
 /**
- * Auth callback handler for email confirmation and magic links.
- * When users click the verification link in their email, they are redirected here.
- * This route exchanges the code for a session and redirects to the dashboard.
+ * Auth callback handler for email confirmation, magic links, and OAuth.
+ * When users click the verification link or return from Google OAuth,
+ * they are redirected here. This route exchanges the code for a session
+ * and redirects to the dashboard.
+ *
+ * For NEW OAuth users (no profile yet): reads the forge_signup_context
+ * cookie to determine their role, then calls setupNewUser() to create
+ * profile/foundry/memberships/demo data.
  */
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
@@ -39,10 +47,10 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    
+
     // Exchange the code for a session
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    
+
     if (exchangeError) {
       console.error('Error exchanging code for session:', exchangeError)
       const loginUrl = new URL('/login', requestUrl.origin)
@@ -52,7 +60,7 @@ export async function GET(request: Request) {
 
     // Get the user to check their role for appropriate redirect
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (user) {
       // Fetch user profile to get role and account type
       const { data: profile } = await supabase
@@ -61,15 +69,70 @@ export async function GET(request: Request) {
         .eq('id', user.id)
         .single()
 
-      // Redirect based on account type and role
+      // NEW USER via OAuth — no profile exists yet
+      if (!profile) {
+        console.info('[Auth Callback] New OAuth user, setting up profile:', user.id)
+
+        // Read signup context from cookie (set by GoogleOAuthButton before redirect)
+        const cookieStore = await cookies()
+        const contextCookie = cookieStore.get('forge_signup_context')
+        let signupRole: 'founder' | 'executive' | 'apprentice' | 'supplier' = 'apprentice'
+        let companyName: string | undefined
+        let signupIndustry: string | undefined
+        let signupStage: string | undefined
+
+        if (contextCookie?.value) {
+          try {
+            const ctx = JSON.parse(decodeURIComponent(contextCookie.value))
+            if (ctx.role && ['founder', 'executive', 'apprentice', 'supplier'].includes(ctx.role)) {
+              signupRole = ctx.role
+            }
+            companyName = ctx.companyName
+            signupIndustry = ctx.industry
+            signupStage = ctx.stage
+          } catch (e) {
+            console.warn('[Auth Callback] Failed to parse signup context cookie:', e)
+          }
+        }
+
+        // SECURITY: Sanitize all user-derived values before DB writes
+        const rawName = user.user_metadata?.full_name
+          || user.user_metadata?.name
+          || user.email?.split('@')[0]
+          || 'User'
+        const fullName = escapeHtml(String(rawName).trim().slice(0, 100))
+        const sanitizedCompany = companyName ? escapeHtml(String(companyName).trim().slice(0, 100)) : undefined
+        const sanitizedIndustry = signupIndustry ? escapeHtml(String(signupIndustry).trim().slice(0, 100)) : undefined
+        const sanitizedStage = signupStage ? escapeHtml(String(signupStage).trim().slice(0, 100)) : undefined
+
+        const { redirectPath } = await setupNewUser({
+          supabase,
+          userId: user.id,
+          email: user.email || '',
+          fullName,
+          role: signupRole,
+          companyName: sanitizedCompany,
+          industry: sanitizedIndustry,
+          stage: sanitizedStage,
+        })
+
+        // Honor `next` param for claim flow — user needs to land on /claim/<token>
+        const finalRedirect = (next !== '/today' && next.startsWith('/')) ? next : redirectPath
+
+        // Clear the signup context cookie
+        const response = NextResponse.redirect(new URL(finalRedirect, requestUrl.origin))
+        response.cookies.set('forge_signup_context', '', { path: '/', maxAge: 0 })
+        return response
+      }
+
+      // EXISTING USER — redirect based on account type and role
       let redirectPath = next
-      
+
       // Suppliers go to supplier portal
-      if (profile?.account_type === 'supplier') {
+      if (profile.account_type === 'supplier') {
         redirectPath = '/supplier-portal'
-      } else if (profile?.role === 'Founder' || profile?.role === 'Executive' || profile?.role === 'Apprentice') {
-        // All trial roles create their marketplace listing first
-        redirectPath = '/marketplace-setup'
+      } else if (profile.role === 'Founder' || profile.role === 'Executive' || profile.role === 'Apprentice') {
+        redirectPath = '/today'
       } else {
         // Check if user has marketplace orders (buyer)
         const { count: orderCount } = await supabase
@@ -78,15 +141,12 @@ export async function GET(request: Request) {
           .eq('buyer_id', user.id)
 
         if (orderCount && orderCount > 0) {
-          // User is a buyer with orders, redirect to buyer dashboard
           redirectPath = '/buyer'
         } else {
-          // All other users go to objectives page
-          redirectPath = '/new-objectives'
+          redirectPath = '/today'
         }
       }
 
-      // Redirect to the appropriate page with a success message
       const redirectUrl = new URL(redirectPath, requestUrl.origin)
       redirectUrl.searchParams.set('verified', 'true')
       return NextResponse.redirect(redirectUrl)

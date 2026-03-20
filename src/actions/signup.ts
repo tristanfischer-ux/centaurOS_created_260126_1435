@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail, escapeHtml, sanitizeErrorMessage } from "@/lib/security/sanitize";
+import { setupNewUser, capitalizeRole } from "@/lib/auth/setup-new-user";
 
 // Direct signup roles (Founder, Executive, Apprentice, Supplier)
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
@@ -56,35 +57,13 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
   return { valid: true };
 }
 
-function capitalizeRole(role: string): "Founder" | "Executive" | "Apprentice" | "Supplier" {
-  const mapping: Record<string, "Founder" | "Executive" | "Apprentice" | "Supplier"> = {
-    founder: "Founder",
-    executive: "Executive",
-    apprentice: "Apprentice",
-    supplier: "Supplier",
-  };
-  return mapping[role] || "Apprentice";
-}
-
-/**
- * Generate a URL-friendly slug from a company name
- */
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 50);
-}
-
 /**
  * Direct signup for Founders, Executives, and Apprentices.
  * Creates auth user and profile immediately.
  * For Founders: also creates a foundry record with company details.
  *
- * @description Uses the useActionState-compatible signature so errors
- * are returned inline (preserving form data) instead of redirecting.
- * Only success paths call redirect().
+ * @description Open signup — no invite token required. Claim flow still
+ * supported for suppliers claiming a listing via /claim/<token>.
  *
  * @param _prevState - Previous action state (required by useActionState)
  * @param formData - The submitted form data
@@ -95,7 +74,6 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const role = (formData.get("role") as SignupRole) || "general";
 
   // Capture raw form values up front so every error return can echo them back.
-  // This allows useActionState to repopulate inputs on the client after an error.
   const rawEmail = formData.get("email") as string;
   const rawFullName = formData.get("name") as string;
   const rawCompanyName = formData.get("company_name") as string | null;
@@ -115,44 +93,16 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return { error, values: formValues };
   }
 
-  // Invite-only gate: signup requires a valid waitlist invite token or a claim redirect
-  const inviteToken = (formData.get("invite_token") as string)?.trim() || null;
+  // Claim flow detection (still needed for supplier listing claims)
   const redirectTo = (formData.get("redirect") as string)?.trim() || null;
   // SECURITY: Strict claim flow detection — must be exactly /claim/{hex_token}
   const isClaimFlow = redirectTo != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectTo);
 
-  if (!inviteToken && !isClaimFlow) {
-    return errorWithValues("Signup is currently invite-only. Join the waitlist to get an invite.");
-  }
-
-  // Validate invite token when present (claim flow users may not have one)
-  const adminForWaitlist = createAdminClient();
-  let waitlistEntry: { id: string; email: string; status: string; redeemed_at: string | null } | null = null;
-
-  if (inviteToken) {
-    const { data, error: waitlistError } = await adminForWaitlist
-      .from("waitlist")
-      .select("id, email, status, redeemed_at")
-      .eq("invite_token", inviteToken)
-      .maybeSingle();
-
-    if (waitlistError || !data) {
-      return errorWithValues("This invite link is invalid or could not be found.");
-    }
-    if (data.status !== "approved") {
-      return errorWithValues("This invite has not been approved yet.");
-    }
-    if (data.redeemed_at) {
-      return errorWithValues("This invite link has already been used.");
-    }
-    waitlistEntry = data;
-  }
-
-  // SECURITY: Validate claim token against the database to prevent invite-only bypass.
-  // Without this, anyone could sign up by crafting ?redirect=/claim/<fake-hex>.
-  if (isClaimFlow && !inviteToken) {
+  // SECURITY: Validate claim token against the database to prevent abuse
+  if (isClaimFlow) {
+    const adminForClaim = createAdminClient();
     const claimToken = redirectTo!.split("/claim/")[1];
-    const { data: claimValid } = await adminForWaitlist
+    const { data: claimValid } = await adminForClaim
       .from("listing_claim_tokens")
       .select("id")
       .eq("token", claimToken)
@@ -246,7 +196,6 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     });
 
     if (adminCreateError) {
-      // "User already registered" is not a rate-limit issue — surface it
       console.error("[Signup] Admin createUser failed:", adminCreateError.message);
       throw adminCreateError; // fall through to regular signUp
     }
@@ -267,13 +216,8 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
         userId,
         error: earlySignInError.message,
       });
-      // Don't bail — the user was created. Fall through and try sign-in
-      // again at the end of the flow (step 5). Profile creation via the
-      // unauthenticated client may still work if RLS permits inserts.
     }
   } catch (adminError) {
-    // Admin client unavailable or createUser failed — use regular signUp.
-    // This WILL send a confirmation email and is subject to Supabase rate limits.
     console.warn("[Signup] Admin creation unavailable, falling back to signUp():", {
       error: adminError instanceof Error ? adminError.message : "Unknown error",
     });
@@ -301,221 +245,24 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     userId = authData.user.id;
   }
 
-  // Alias for the rest of the function — keeps diff small
-  const authData = { user: { id: userId } };
-
-  let foundryId: string;
-  let accountType: 'team_builder' | 'supplier' | null = null;
-
-  // 2. Create foundry for Founders, create business for Suppliers, or use shared "forge-guild" for others
-  if (role === "founder" && companyName) {
-    accountType = 'team_builder';
-
-    // FIX: Profile must exist before foundry (FK: foundries.owner_id → profiles.id).
-    // Create profile with temporary shared foundry, then create the real foundry,
-    // then update the profile to point to the new foundry.
-    const { error: tempProfileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      email,
-      full_name: fullName,
-      role: capitalizeRole(role),
-      foundry_id: "forge-guild",
-      active_foundry_id: "forge-guild",
-      account_type: accountType,
-    });
-
-    if (tempProfileError) {
-      console.error("[Signup] Founder profile creation failed:", {
-        userId: authData.user.id,
-        error: tempProfileError.message,
-        code: tempProfileError.code,
-      });
-      return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
-    }
-
-    const baseSlug = generateSlug(companyName);
-    const uniqueSlug = `${baseSlug}-${authData.user.id.slice(0, 6)}`;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: foundry, error: foundryError } = await (supabase as any)
-      .from("foundries")
-      .insert({
-        name: companyName,
-        slug: uniqueSlug,
-        industry: industry || null,
-        stage: stage || null,
-        owner_id: authData.user.id,
-      })
-      .select("id")
-      .single();
-
-    if (foundryError) {
-      console.error("[Signup] Foundry creation error:", foundryError);
-      foundryId = "forge-guild";
-    } else {
-      foundryId = foundry.id;
-      // Update profile to point to the real foundry
-      await supabase.from("profiles").update({
-        foundry_id: foundryId,
-        active_foundry_id: foundryId,
-      }).eq("id", authData.user.id);
-    }
-  } else if (role === "supplier" && businessName) {
-    accountType = 'supplier'; // Suppliers get supplier account type
-    
-    // Suppliers join a dedicated supplier foundry (isolated from team management)
-    foundryId = "forge-suppliers";
-    
-    // Note: businessName and businessType are captured for later use when creating their listing
-  } else {
-    accountType = 'team_builder'; // Executives and Apprentices are team builders
-    
-    // Executives and Apprentices join the shared Guild
-    foundryId = "forge-guild";
-  }
-
-  // 3. Create profile
-  const memberRole = capitalizeRole(role);
-
-  // VALIDATION: For shared foundries, verify the foundry exists before inserting profile
-  if (foundryId === "forge-guild" || foundryId === "forge-suppliers") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: foundryExists } = await (supabase as any)
-      .from("foundries")
-      .select("id")
-      .eq("id", foundryId)
-      .single();
-
-    if (!foundryExists) {
-      console.error(`[Signup] Shared foundry "${foundryId}" does not exist. Creating it now.`);
-      // Auto-create the shared foundry if it's missing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: createFoundryError } = await (supabase as any)
-        .from("foundries")
-        .insert({
-          id: foundryId,
-          name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
-          slug: foundryId,
-          owner_id: authData.user.id,
-        });
-      if (createFoundryError) {
-        console.error(`[Signup] Failed to create shared foundry "${foundryId}":`, createFoundryError);
-        // Fall back: set foundryId to null so the user can still sign up
-        // Their profile will lack a foundry, but they won't be completely blocked
-      }
-    }
-  }
-  
-  // Founders already have their profile created in the founder branch above.
-  // Only create a profile here for non-founder roles.
-  if (role !== "founder") {
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      email,
-      full_name: fullName,
-      role: memberRole,
-      foundry_id: foundryId,
-      active_foundry_id: foundryId,
-      account_type: accountType,
-    });
-
-    if (profileError) {
-      console.error("[Signup] Profile creation failed:", {
-        userId: authData.user.id,
-        foundryId,
-        role: memberRole,
-        error: profileError.message,
-        code: profileError.code,
-        details: profileError.details,
-      });
-      return errorWithValues("Account created but profile setup failed. Please try logging in — your profile will be created automatically.");
-    }
-  }
-
-  // 3b. Create foundry_memberships record for multi-foundry support
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).from("foundry_memberships").insert({
-    user_id: authData.user.id,
-    foundry_id: foundryId,
-    role: memberRole,
-    is_primary: true,
-    joined_at: new Date().toISOString(),
+  // 2. Set up profile, foundry, memberships, demo data via shared helper
+  await setupNewUser({
+    supabase,
+    userId,
+    email,
+    fullName,
+    role,
+    companyName,
+    industry,
+    stage,
+    businessName,
+    businessType,
   });
 
-  // 3c. Seed demo data for new founders so they can explore the app with sample content
-  if (role === "founder" && foundryId && authData.user) {
-    // Seed demo forge concept (The Forge example)
-    try {
-      await supabase.rpc("seed_demo_forge_concept", {
-        p_foundry_id: foundryId,
-        p_user_id: authData.user.id,
-      })
-    } catch (demoError) {
-      // Non-critical — don't fail signup if demo seeding fails
-      console.warn("[Signup] Failed to seed demo forge concept:", demoError)
-    }
-
-    // Seed demo strategic goals, objectives, and tasks for learning the app
-    try {
-      await supabase.rpc("seed_founder_demo_data", {
-        p_foundry_id: foundryId,
-        p_user_id: authData.user.id,
-      })
-    } catch (demoError) {
-      // Non-critical — don't fail signup if demo seeding fails
-      console.warn("[Signup] Failed to seed demo objectives/tasks:", demoError)
-    }
-
-    // Seed expanded demo data: marketplace listings + activity events
-    try {
-      await supabase.rpc("seed_founder_demo_data_expanded", {
-        p_foundry_id: foundryId,
-        p_user_id: authData.user.id,
-      })
-    } catch (demoError) {
-      // Non-critical — don't fail signup if expanded demo seeding fails
-      console.warn("[Signup] Failed to seed expanded demo data:", demoError)
-    }
-  }
-
-  // 3c. Auto-create provider profile for trial roles (Founder, Executive, Apprentice)
-  // so they can create marketplace listings without the provider-portal application flow.
-  // Founders list themselves to be discoverable; Executives/Apprentices offer their services.
-  if ((role === 'founder' || role === 'executive' || role === 'apprentice') && authData.user) {
-    const roleLabel = role === 'founder' ? 'Founder' : role === 'executive' ? 'Fractional Executive' : 'Apprentice';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error: providerError } = await (supabase as any)
-      .from('provider_profiles')
-      .insert({
-        user_id: authData.user.id,
-        headline: roleLabel,
-        bio: null,
-        tier: 'approved', // Auto-approve for trial — skip application flow
-        is_active: true,
-        is_public: true,
-      });
-
-    if (providerError) {
-      // Non-critical — don't fail signup if provider profile creation fails
-      console.warn('[Signup] Failed to create provider profile:', providerError);
-    }
-  }
-
-  // 3a. For suppliers, store their business info in onboarding_data for later use
-  if (role === 'supplier' && businessName) {
-    await supabase.from("profiles").update({
-      onboarding_data: {
-        business_name: businessName,
-        business_type: businessType,
-        is_supplier_signup: true,
-      } as any,
-    }).eq('id', authData.user.id);
-  }
-
-  // 4. Store booking intent if present
+  // 3. Store booking intent if present
   if (intent && listingId) {
     const { error: intentError } = await supabase.from("signup_intents").insert({
-      user_id: authData.user.id,
+      user_id: userId,
       intent_type: intent,
       listing_id: listingId,
       metadata: { role, email },
@@ -523,63 +270,39 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
 
     if (intentError) {
       console.error("Failed to store booking intent:", intentError);
-      // Don't fail signup over this
     }
   }
 
-  // 5. Auto-confirm email (only needed if user was created via regular signUp,
-  // which sends a confirmation email. Admin-created users are already confirmed.)
+  // 4. Auto-confirm email (only needed if user was created via regular signUp)
   if (!createdViaAdmin) {
     try {
       const adminSupabase = createAdminClient();
-
       const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
-        authData.user.id,
+        userId,
         { email_confirm: true }
       );
-
       if (confirmError) {
-        console.error("[Signup] Failed to auto-confirm email:", {
-          userId: authData.user.id,
-          error: confirmError.message,
-        });
+        console.error("[Signup] Failed to auto-confirm email:", confirmError.message);
       }
     } catch (adminError) {
-      // Admin client unavailable — signInWithPassword will still work if Supabase
-      // has email confirmation disabled, or the user can verify via email.
       console.error("[Signup] Admin auto-confirm unavailable:", {
-        userId: authData.user.id,
         error: adminError instanceof Error ? adminError.message : "Unknown error",
       });
     }
   }
 
-  // Sign the user in with the password they just created.
-  // This works when: (a) email was auto-confirmed above, or
-  // (b) Supabase has email confirmation disabled in project settings.
+  // 5. Sign the user in
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (signInError) {
-    console.error("[Signup] Auto sign-in failed:", {
-      userId: authData.user.id,
-      error: signInError.message,
-    });
-    // Account was created but we can't sign them in automatically.
-    // Send to login — NEVER back to /join (their account already exists).
+    console.error("[Signup] Auto sign-in failed:", signInError.message);
     revalidatePath("/", "layout");
     redirect(`/login?message=${encodeURIComponent("Account created! Sign in with your email and password.")}`);
   }
 
-  // User is now authenticated — mark invite as redeemed and go into the app
-  if (waitlistEntry?.id) {
-    await adminForWaitlist
-      .from("waitlist")
-      .update({ redeemed_at: new Date().toISOString() })
-      .eq("id", waitlistEntry.id);
-  }
   revalidatePath("/", "layout");
 
   // Claim flow: redirect back to the claim page to complete the claim
