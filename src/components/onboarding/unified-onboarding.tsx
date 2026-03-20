@@ -92,14 +92,16 @@ export function UnifiedOnboarding({
       try {
         const lsCompleted = localStorage.getItem('forgeos_onboarding_completed') === 'true'
         if (lsCompleted && !dbCompleted) {
-          // Silently migrate to DB
+          // Silently migrate to DB — only clear localStorage on success
           updateOnboardingData({
             onboarding_modal_completed: true,
             has_completed_onboarding: true,
             onboarding_completed_at: new Date().toISOString(),
-          }).then(() => {
-            localStorage.removeItem('forgeos_onboarding_completed')
-            localStorage.removeItem('forgeos_intent_selected')
+          }).then((result) => {
+            if (result.success) {
+              localStorage.removeItem('forgeos_onboarding_completed')
+              localStorage.removeItem('forgeos_intent_selected')
+            }
           })
           return // Don't show modal — user already onboarded
         }
@@ -114,9 +116,11 @@ export function UnifiedOnboarding({
       }
     }
 
+    let timer: ReturnType<typeof setTimeout> | undefined
     if (!dbCompleted) {
-      setTimeout(() => setOpen(true), 800)
+      timer = setTimeout(() => setOpen(true), 800)
     }
+    return () => { if (timer) clearTimeout(timer) }
   }, [onboardingData])
 
   const goToStep = useCallback(
