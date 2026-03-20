@@ -40,6 +40,14 @@ export interface SubscriptionPlan {
     voiceMinutesPerMonth: number
     /** Minutes of avatar video per month (0 = not available) */
     avatarMinutesPerMonth: number
+    /** Can view investor detail pages */
+    investorDetailAccess: boolean
+    /** Can see partner names, titles, LinkedIn */
+    investorContactsVisible: boolean
+    /** Can see verified emails and deep bios */
+    investorDeepAccess: boolean
+    /** Can see portfolio companies, fund performance, exits */
+    investorIntelligenceAccess: boolean
   }
   stripePriceIdMonthly?: string
   stripePriceIdAnnual?: string
@@ -89,6 +97,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxConversationMode: 'text',
       voiceMinutesPerMonth: 0,
       avatarMinutesPerMonth: 0,
+      investorDetailAccess: false,
+      investorContactsVisible: false,
+      investorDeepAccess: false,
+      investorIntelligenceAccess: false,
     },
   },
   starter: {
@@ -117,6 +129,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxConversationMode: 'text',
       voiceMinutesPerMonth: 0,
       avatarMinutesPerMonth: 0,
+      investorDetailAccess: true,
+      investorContactsVisible: true,
+      investorDeepAccess: false,
+      investorIntelligenceAccess: false,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_STARTER_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_STARTER_ANNUAL,
@@ -149,6 +165,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxConversationMode: 'voice',
       voiceMinutesPerMonth: 120, // 2 hours of real-time voice per month
       avatarMinutesPerMonth: 0,
+      investorDetailAccess: true,
+      investorContactsVisible: true,
+      investorDeepAccess: true,
+      investorIntelligenceAccess: true,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_PROFESSIONAL_ANNUAL,
@@ -182,6 +202,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
       maxConversationMode: 'avatar',
       voiceMinutesPerMonth: 600, // 10 hours of real-time voice per month
       avatarMinutesPerMonth: 60, // 1 hour of avatar video per month
+      investorDetailAccess: true,
+      investorContactsVisible: true,
+      investorDeepAccess: true,
+      investorIntelligenceAccess: true,
     },
     stripePriceIdMonthly: process.env.STRIPE_PRICE_ENTERPRISE_MONTHLY,
     stripePriceIdAnnual: process.env.STRIPE_PRICE_ENTERPRISE_ANNUAL,

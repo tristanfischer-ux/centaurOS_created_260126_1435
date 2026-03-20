@@ -83,7 +83,9 @@ export default async function InvestorDirectoryPage() {
       <div className="space-y-1">
         <h1 className="text-2xl font-bold text-foreground">UK Investor Directory</h1>
         <p className="text-muted-foreground">
-          {stats ? `${stats.total.toLocaleString()} UK venture capital and private equity firms` : 'UK venture capital and private equity firms'}
+          {stats
+            ? `${stats.total.toLocaleString()} firms · ${stats.forgeCapitalCount.toLocaleString()} deep-profiled · ${stats.partnerCount.toLocaleString()} partners`
+            : 'UK venture capital and private equity firms'}
         </p>
       </div>
 

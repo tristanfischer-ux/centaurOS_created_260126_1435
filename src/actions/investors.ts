@@ -6,12 +6,11 @@
  * JSONB attribute fields. Exposes pagination helpers for both the directory listing page
  * and the individual detail page.
  *
- * @security No foundry isolation required — investor data is read-only and public within
- * the platform. The marketplace_listings table is append-only for admins.
+ * Tier-gated access: Free users can browse cards but detail pages require starter+.
+ * Deep intelligence (emails, bios, fund perf) requires professional+.
  *
- * GOTCHA: The database enum marketplace_category does not yet include 'Finance'. We cast
- * the category filter to `string` via a raw `.filter()` call to bypass the TypeScript
- * enum constraint while the schema migration is pending.
+ * @security No foundry isolation required — investor data is read-only and public within
+ * the platform. Tier gating strips sensitive fields before returning to the client.
  */
 
 "use server"
@@ -24,6 +23,9 @@ import {
   deriveRegionFromPostcode,
   deriveRegionFromKeywords,
 } from '@/lib/postcode-utils'
+import { getUserSubscription } from '@/lib/billing/subscriptions'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
+import type { SubscriptionTier } from '@/lib/billing/plans'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,6 +63,29 @@ export type InvestorFirm = {
     location?: string
     data_source?: string
     data_confidence?: string
+    // Forge-Capital enriched fields
+    geo_focus?: string[]
+    cheque_range_gbp?: { min: number | null; max: number | null }
+    hardware_fit_score?: number
+    data_quality_score?: number
+    ideal_company_profile?: string
+    value_add?: string
+    forge_capital_id?: number
+    last_synced?: string
+    // Tier-gated deep fields (professional+)
+    fund_history?: unknown
+    exits?: unknown
+    fund_performance?: unknown
+    fact_check_status?: string
+    // Tier-gated portfolio (starter+)
+    portfolio_companies?: {
+      company_name: string
+      sector?: string | null
+      stage?: string | null
+      amount_usd?: number | null
+      description?: string | null
+      why_appealing?: string | null
+    }[]
   }
 }
 
@@ -75,6 +100,7 @@ export interface InvestorFilters {
   activeOnly?: boolean      // filter is_active_deploying = true
   priority?: string         // 'A' | 'B' | 'C'
   query?: string            // full-text search on title/description
+  minQuality?: number       // minimum data_quality_score
   page?: number
   pageSize?: number
 }
@@ -97,8 +123,21 @@ export interface InvestorStats {
   serviceProviderCount: number
   withWebsiteCount: number
   activeDeployingCount: number
+  forgeCapitalCount: number
+  partnerCount: number
   subcategoryBreakdown: { name: string; count: number }[]
   regionBreakdown: { name: string; count: number }[]
+}
+
+/**
+ * Tier access flags for investor features.
+ */
+export interface InvestorTierAccess {
+  tier: SubscriptionTier
+  detailAccess: boolean
+  contactsVisible: boolean
+  deepAccess: boolean
+  intelligenceAccess: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -107,8 +146,6 @@ export interface InvestorStats {
 
 /**
  * Normalises a JSONB value to a string array.
- * Handles: undefined/null → [], existing array → pass-through,
- * CSV string (from import) → split on comma.
  */
 function toStringArray(val: unknown): string[] {
   if (!val) return []
@@ -119,7 +156,6 @@ function toStringArray(val: unknown): string[] {
 
 /**
  * Casts a raw marketplace_listings row to InvestorFirm.
- * Normalises array fields so consumers never need to handle CSV strings.
  */
 function rowToFirm(row: Record<string, unknown>): InvestorFirm {
   const attrs = (row.attributes as Record<string, unknown>) ?? {}
@@ -137,21 +173,85 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
   }
 }
 
+/**
+ * Strips tier-gated fields from an investor firm based on access level.
+ */
+function stripTierGatedFields(firm: InvestorFirm, access: InvestorTierAccess): InvestorFirm {
+  const stripped = { ...firm, attributes: { ...firm.attributes } }
+
+  if (!access.intelligenceAccess) {
+    // Professional+ only fields
+    delete stripped.attributes.fund_history
+    delete stripped.attributes.exits
+    delete stripped.attributes.fund_performance
+    delete stripped.attributes.fact_check_status
+    delete stripped.attributes.hardware_fit_score
+  }
+
+  if (!access.deepAccess) {
+    // Professional+ only: contact email at firm level
+    delete stripped.attributes.contact_email
+  }
+
+  if (!access.contactsVisible) {
+    // Starter+ only fields
+    delete stripped.attributes.portfolio_companies
+  }
+
+  return stripped
+}
+
+// ---------------------------------------------------------------------------
+// Tier Access
+// ---------------------------------------------------------------------------
+
+/**
+ * Determines investor feature access based on user's subscription tier.
+ */
+export async function getInvestorTierAccess(): Promise<InvestorTierAccess> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return {
+        tier: 'free',
+        detailAccess: false,
+        contactsVisible: false,
+        deepAccess: false,
+        intelligenceAccess: false,
+      }
+    }
+
+    const { subscription } = await getUserSubscription(user.id)
+    // SECURITY: Only active/trialing subscriptions grant tier access
+    const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
+    const tier = (subscription && isActive) ? subscription.tier : 'free'
+    const plan = SUBSCRIPTION_PLANS[tier]
+
+    return {
+      tier,
+      detailAccess: plan.limits.investorDetailAccess,
+      contactsVisible: plan.limits.investorContactsVisible,
+      deepAccess: plan.limits.investorDeepAccess,
+      intelligenceAccess: plan.limits.investorIntelligenceAccess,
+    }
+  } catch (error) {
+    console.error('[getInvestorTierAccess] Error:', error)
+    return {
+      tier: 'free',
+      detailAccess: false,
+      contactsVisible: false,
+      deepAccess: false,
+      intelligenceAccess: false,
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Server Actions
 // ---------------------------------------------------------------------------
 
-/**
- * Searches and filters the UK investor directory.
- *
- * @description Queries marketplace_listings where category = 'Finance'.
- * Applies optional ILIKE search on title/description, JSONB attribute filters,
- * and standard pagination. Stage/sector array filtering is applied in-memory
- * because PostgREST does not support JSONB array containment without a custom RPC.
- *
- * @param filters - Optional filter parameters
- * @returns Paginated list of investor firms with total count and hasMore flag
- */
 // SECURITY: Allowlist of valid firm_type values to prevent PostgREST filter injection.
 const VALID_FIRM_TYPES = new Set([
   'VC', 'PE', 'Growth', 'Growth Equity', 'Family Office', 'CVC',
@@ -162,12 +262,19 @@ const VALID_FIRM_TYPES = new Set([
 
 /**
  * SECURITY: Sanitize a string for use in PostgREST filter expressions.
- * Strips characters that could inject additional filter conditions.
+ * Escapes ilike wildcards (%, _) and strips PostgREST control characters.
  */
 function sanitizeFilterValue(value: string): string {
-  return value.replace(/[,()\."*]/g, '')
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+    .replace(/[,()\."*]/g, '')
 }
 
+/**
+ * Searches and filters the UK investor directory.
+ */
 export async function searchInvestors(
   filters: InvestorFilters = {}
 ): Promise<InvestorSearchResult> {
@@ -179,24 +286,23 @@ export async function searchInvestors(
     activeOnly,
     priority,
     query,
+    minQuality,
     page = 1,
     pageSize = 24,
   } = filters
 
-  // SECURITY: Bound pagination to prevent DoS via oversized page requests
+  // SECURITY: Bound pagination to prevent DoS
   const safePage = Math.max(1, page)
   const safePageSize = Math.min(Math.max(1, pageSize), 100)
 
   const supabase = await createClient()
 
-  // INTENT: Build the query progressively, filtered to Finance category (VC/PE firms).
   let q = supabase
     .from('marketplace_listings')
     .select('id, title, description, subcategory, attributes', { count: 'exact' })
     .eq('category', 'Finance')
 
-  // Full-text search on title and description
-  // SECURITY: Sanitize query to prevent PostgREST filter injection via commas/dots
+  // Full-text search
   if (query && query.trim().length > 0) {
     const sanitized = sanitizeFilterValue(query.trim())
     if (sanitized) {
@@ -206,7 +312,6 @@ export async function searchInvestors(
   }
 
   // JSONB scalar filter: firm_type
-  // SECURITY: Validate against allowlist to prevent filter injection
   if (firmType && firmType.length > 0) {
     const safeFirmTypes = firmType.filter((t: string) => VALID_FIRM_TYPES.has(t))
     if (safeFirmTypes.length > 0) {
@@ -220,7 +325,6 @@ export async function searchInvestors(
   }
 
   // JSONB scalar filter: hq_city
-  // SECURITY: Sanitize to prevent filter grammar injection
   if (hqCity && hqCity.trim().length > 0) {
     const safeCity = sanitizeFilterValue(hqCity.trim())
     if (safeCity) {
@@ -229,7 +333,6 @@ export async function searchInvestors(
   }
 
   // JSONB scalar filter: outreach_priority
-  // SECURITY: Validate against known values
   const VALID_PRIORITIES = new Set(['A', 'B', 'C'])
   if (priority && VALID_PRIORITIES.has(priority)) {
     q = q.filter('attributes->>outreach_priority', 'eq', priority)
@@ -249,9 +352,11 @@ export async function searchInvestors(
 
   let firms = (data ?? []).map((row: Record<string, unknown>) => rowToFirm(row))
 
-  // DECISION: Apply stage/sector client-side after DB fetch because Supabase
-  // PostgREST does not support @> (array containment) on JSONB array fields
-  // without a custom RPC. Dataset is small enough (<1000 rows/page) for this.
+  // SECURITY: Strip tier-gated fields from search results
+  const access = await getInvestorTierAccess()
+  firms = firms.map(f => stripTierGatedFields(f, access))
+
+  // Client-side array filtering
   if (stage && stage.length > 0) {
     firms = firms.filter((f: InvestorFirm) => {
       const stageFocus = f.attributes.stage_focus ?? []
@@ -266,31 +371,37 @@ export async function searchInvestors(
     })
   }
 
+  // Client-side quality filter
+  if (minQuality != null && minQuality > 0) {
+    firms = firms.filter((f: InvestorFirm) => {
+      const score = f.attributes.data_quality_score ?? 0
+      return score >= minQuality
+    })
+  }
+
   const total = count ?? 0
-  // GOTCHA: When stage/sector filters are applied client-side, firms.length
-  // after filtering can be less than pageSize even when more DB rows exist.
-  // Use the raw page size (before filtering) to detect whether the DB has more
-  // pages — if the DB returned a full page, there may be more to fetch.
   const rawPageSize = (data ?? []).length
-  const hasMore = stage?.length || sector?.length
-    ? rawPageSize >= safePageSize  // client-filtered: more pages if DB returned a full page
-    : from + rawPageSize < total  // unfiltered: exact count is reliable
+  const hasMore = stage?.length || sector?.length || minQuality
+    ? rawPageSize >= safePageSize
+    : from + rawPageSize < total
 
   return { firms, total, hasMore }
 }
 
 /**
- * Fetches a single investor firm by ID.
+ * Fetches a single investor firm by ID with tier-gating.
  *
- * @description Returns the full marketplace_listings record for the given ID,
- * restricted to category = 'Finance' for safety.
- *
- * @param id - The marketplace_listings UUID
- * @returns The investor firm or null if not found
+ * @returns The firm (with deep fields stripped based on tier), tier access flags,
+ * or gated:true if user lacks detail access.
  */
-export async function getInvestorById(id: string): Promise<InvestorFirm | null> {
-  const supabase = await createClient()
+export async function getInvestorById(id: string): Promise<{
+  firm: InvestorFirm | null
+  access: InvestorTierAccess
+  gated: boolean
+}> {
+  const access = await getInvestorTierAccess()
 
+  const supabase = await createClient()
   const { data, error } = await supabase
     .from('marketplace_listings')
     .select('id, title, description, subcategory, attributes')
@@ -300,16 +411,36 @@ export async function getInvestorById(id: string): Promise<InvestorFirm | null> 
 
   if (error || !data) {
     console.error('[getInvestorById] Not found or error:', error)
-    return null
+    return { firm: null, access, gated: false }
   }
 
-  return rowToFirm(data as Record<string, unknown>)
+  const firm = rowToFirm(data as Record<string, unknown>)
+
+  // Free tier: return minimal teaser data + gated flag
+  // SECURITY: explicit fields only — no spread to avoid leaking description or other data
+  if (!access.detailAccess) {
+    return {
+      firm: {
+        id: firm.id,
+        title: firm.title,
+        description: null,
+        subcategory: firm.subcategory,
+        attributes: {
+          firm_type: firm.attributes.firm_type,
+          hq_city: firm.attributes.hq_city,
+          is_active_deploying: firm.attributes.is_active_deploying,
+        },
+      },
+      access,
+      gated: true,
+    }
+  }
+
+  // Strip deep fields based on tier
+  return { firm: stripTierGatedFields(firm, access), access, gated: false }
 }
 
-// DECISION: firm_type is the reliable discriminator for investor vs service
-// provider. The is_investor flag was absent from the data (CSV import never
-// set it), so counts were always 0/596. These are the known capital-deployer
-// firm types in the UK Finance directory.
+// DECISION: firm_type is the reliable discriminator for investor vs service provider.
 const INVESTOR_FIRM_TYPES = new Set([
   'VC', 'PE', 'Growth', 'Growth Equity', 'Family Office', 'CVC',
   'Corporate VC', 'Accelerator', 'Angel', 'Angel Network', 'Debt Fund',
@@ -318,23 +449,9 @@ const INVESTOR_FIRM_TYPES = new Set([
 
 /**
  * Fetches aggregated stats for the investor directory insights panel.
- *
- * @description Pulls all Finance listings (subcategory + attributes only),
- * then aggregates counts and breakdowns in JS. Designed for the insights panel
- * header above the directory grid.
- *
- * DECISION: Wrapped with unstable_cache (5 min TTL) to avoid a full-table
- * scan on every ISR revalidation. The page revalidates every 60s but investor
- * data changes infrequently — 5 min is a safe window.
- *
- * @returns Aggregated InvestorStats
  */
 export const getInvestorStats = unstable_cache(
   async (): Promise<InvestorStats> => {
-    // DECISION: Using admin client (service role) instead of cookie-based client
-    // because unstable_cache can revalidate during a different user's request.
-    // cookies() inside unstable_cache() causes a Next.js error. Safe here because
-    // investor data is read-only and public within the platform.
     const supabase = createAdminClient()
 
     const { data, error } = await supabase
@@ -350,6 +467,8 @@ export const getInvestorStats = unstable_cache(
         serviceProviderCount: 0,
         withWebsiteCount: 0,
         activeDeployingCount: 0,
+        forgeCapitalCount: 0,
+        partnerCount: 0,
         subcategoryBreakdown: [],
         regionBreakdown: [],
       }
@@ -362,14 +481,13 @@ export const getInvestorStats = unstable_cache(
     let serviceProviderCount = 0
     let withWebsiteCount = 0
     let activeDeployingCount = 0
+    let forgeCapitalCount = 0
     const subcategoryCounts: Record<string, number> = {}
     const regionCounts: Record<string, number> = {}
 
     for (const row of rows) {
       const attrs = (row.attributes as Record<string, unknown>) ?? {}
 
-      // DECISION: Use firm_type to distinguish capital-deployers from service
-      // providers. is_investor flag was unreliable (never populated from CSV).
       const firmType = (attrs.firm_type as string) ?? ''
       if (INVESTOR_FIRM_TYPES.has(firmType)) {
         investorCount++
@@ -379,13 +497,11 @@ export const getInvestorStats = unstable_cache(
 
       if (attrs.website_url) withWebsiteCount++
       if (attrs.is_active_deploying === true) activeDeployingCount++
+      if (attrs.data_source === 'forge_capital') forgeCapitalCount++
 
       const sub = (row.subcategory as string) || 'Unknown'
       subcategoryCounts[sub] = (subcategoryCounts[sub] ?? 0) + 1
 
-      // DECISION: Derive UK region from hq_city and location fields using the
-      // same postcode/keyword mapping as the marketplace Regional Coverage chart.
-      // Tries postcode extraction first, then city keyword fallback.
       let region: string | null = null
       const hqCity = (attrs.hq_city as string) || ''
       const location = (attrs.location as string) || ''
@@ -400,6 +516,11 @@ export const getInvestorStats = unstable_cache(
       if (region) regionCounts[region] = (regionCounts[region] ?? 0) + 1
     }
 
+    // Count total partners
+    const { count: partnerCount } = await supabase
+      .from('vc_pe_contacts')
+      .select('id', { count: 'exact', head: true })
+
     const subcategoryBreakdown = Object.entries(subcategoryCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
@@ -408,7 +529,7 @@ export const getInvestorStats = unstable_cache(
     const regionBreakdown = Object.entries(regionCounts)
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 11) // UK has 11 regions max
+      .slice(0, 11)
 
     return {
       total,
@@ -416,6 +537,8 @@ export const getInvestorStats = unstable_cache(
       serviceProviderCount,
       withWebsiteCount,
       activeDeployingCount,
+      forgeCapitalCount,
+      partnerCount: partnerCount ?? 0,
       subcategoryBreakdown,
       regionBreakdown,
     }
@@ -437,31 +560,53 @@ export type InvestorContact = {
   title: string | null
   seniority: string | null
   email: string | null
+  email_verified: boolean | null
   linkedin_url: string | null
   is_decision_maker: boolean | null
   outreach_status: string | null
+  notes: string | null
+  deep_bio: string | null
 }
 
 /**
  * Fetches contacts associated with an investor firm listing.
- *
- * @param listingId - The marketplace_listings UUID
- * @returns Array of contacts (may be empty if none seeded)
+ * Tier-gated: strips email and deep_bio for users below professional tier.
  */
-export async function getInvestorContacts(listingId: string): Promise<InvestorContact[]> {
+export async function getInvestorContacts(listingId: string): Promise<{
+  contacts: InvestorContact[]
+  access: InvestorTierAccess
+}> {
+  const access = await getInvestorTierAccess()
+
+  // Free tier: no contacts visible
+  if (!access.contactsVisible) {
+    return { contacts: [], access }
+  }
+
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('vc_pe_contacts')
-    .select('id, full_name, title, seniority, email, linkedin_url, is_decision_maker, outreach_status')
+    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, outreach_status, notes, deep_bio')
     .eq('listing_id', listingId)
     .order('is_decision_maker', { ascending: false })
     .order('full_name', { ascending: true })
 
   if (error) {
     console.error('[getInvestorContacts] Supabase error:', error)
-    return []
+    return { contacts: [], access }
   }
 
-  return (data ?? []) as InvestorContact[]
+  let contacts = (data ?? []) as InvestorContact[]
+
+  // Strip deep fields for users below professional tier
+  if (!access.deepAccess) {
+    contacts = contacts.map(c => ({
+      ...c,
+      email: null,
+      deep_bio: null,
+    }))
+  }
+
+  return { contacts, access }
 }

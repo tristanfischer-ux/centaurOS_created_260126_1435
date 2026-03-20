@@ -122,22 +122,22 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
             <StatCard
               icon={<Building2 className="h-4 w-4 text-international-orange" />}
               value={stats.total}
-              label="Total listings"
+              label="Total firms"
             />
             <StatCard
               icon={<TrendingUp className="h-4 w-4 text-international-orange" />}
-              value={stats.investorCount}
-              label="Investors"
+              value={stats.forgeCapitalCount}
+              label="Deep-profiled"
             />
             <StatCard
-              icon={<Building2 className="h-4 w-4 text-international-orange" />}
-              value={stats.serviceProviderCount}
-              label="Service providers"
+              icon={<CheckCircle2 className="h-4 w-4 text-international-orange" />}
+              value={stats.activeDeployingCount}
+              label="Actively deploying"
             />
             <StatCard
               icon={<Globe className="h-4 w-4 text-international-orange" />}
-              value={stats.withWebsiteCount}
-              label="With website"
+              value={stats.partnerCount}
+              label="Partner contacts"
             />
           </div>
 

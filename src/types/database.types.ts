@@ -16913,6 +16913,7 @@ export type Database = {
       vc_pe_contacts: {
         Row: {
           created_at: string | null
+          deep_bio: string | null
           email: string | null
           email_verified: boolean | null
           full_name: string
@@ -16930,6 +16931,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deep_bio?: string | null
           email?: string | null
           email_verified?: boolean | null
           full_name: string
@@ -16947,6 +16949,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deep_bio?: string | null
           email?: string | null
           email_verified?: boolean | null
           full_name?: string
