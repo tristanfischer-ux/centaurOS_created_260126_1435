@@ -29,7 +29,7 @@ export default async function TodayPage(): Promise<React.ReactNode> {
         getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
         getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
         getUnreadCount().catch(() => ({ count: 0 })),
-        getOnboardingState().catch(() => ({})),
+        getOnboardingState().catch(() => undefined),
     ])
 
     return (
