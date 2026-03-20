@@ -451,20 +451,6 @@ export function OrbitSVG({
       {/* Specialist ring (subtle dashed) */}
       <circle cx={CX} cy={CY} r={SPEC_R} fill="none" stroke="#C4B5FD" strokeWidth="1.2" strokeDasharray="3 4" opacity=".4" />
 
-      {/* Ring labels */}
-      <rect x={CX - 46} y={CY - SPEC_R - 2} width={92} height={14} rx={7} fill="#F3E8FF" opacity=".85" />
-      <text x={CX} y={CY - SPEC_R + 8} textAnchor="middle" fill="#7C3AED" fontSize="8.5" fontWeight="800" letterSpacing="2.5">SPECIALISTS</text>
-
-      <rect x={CX - 42} y={CY - EXEC_R - 2} width={84} height={14} rx={7} fill="white" opacity=".85" />
-      <text x={CX} y={CY - EXEC_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">EXECUTIVES</text>
-
-      <rect x={CX - 46} y={CY - APPR_R - 2} width={92} height={14} rx={7} fill="white" opacity=".85" />
-      <text x={CX} y={CY - APPR_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">APPRENTICES</text>
-
-      <rect x={CX - 46} y={CY - BOUNDARY_R - 18} width={92} height={14} rx={7} fill="#EEF2FF" opacity=".9" />
-      <text x={CX} y={CY - BOUNDARY_R - 8} textAnchor="middle" fill="#4F46E5" fontSize="9" fontWeight="800" letterSpacing="3">MARKETPLACE</text>
-      <text x={CX} y={CY - BOUNDARY_R + 16} textAnchor="middle" fill="#94A3B8" fontSize="7" fontWeight="700" letterSpacing="2">YOUR COMPANY</text>
-
       {/* ── Slices ──────────────────────────────────────────── */}
       {sliceData.map(({ fn, s0, s1, mid, comp, status, mktAll }) => {
         const isSel = selected === fn.id
@@ -619,6 +605,20 @@ export function OrbitSVG({
           onClick={() => onSpecialistClick?.(spec.id)}
         />
       ))}
+
+      {/* ── Ring labels (rendered after nodes so they stay visible) ── */}
+      <rect x={CX - 48} y={CY - SPEC_R - 3} width={96} height={16} rx={8} fill="#F3E8FF" />
+      <text x={CX} y={CY - SPEC_R + 8} textAnchor="middle" fill="#7C3AED" fontSize="8.5" fontWeight="800" letterSpacing="2.5">SPECIALISTS</text>
+
+      <rect x={CX - 44} y={CY - EXEC_R - 3} width={88} height={16} rx={8} fill="white" />
+      <text x={CX} y={CY - EXEC_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">EXECUTIVES</text>
+
+      <rect x={CX - 48} y={CY - APPR_R - 3} width={96} height={16} rx={8} fill="white" />
+      <text x={CX} y={CY - APPR_R + 8} textAnchor="middle" fill="#475569" fontSize="8.5" fontWeight="800" letterSpacing="2.5">APPRENTICES</text>
+
+      <rect x={CX - 48} y={CY - BOUNDARY_R - 19} width={96} height={16} rx={8} fill="#EEF2FF" />
+      <text x={CX} y={CY - BOUNDARY_R - 8} textAnchor="middle" fill="#4F46E5" fontSize="9" fontWeight="800" letterSpacing="3">MARKETPLACE</text>
+      <text x={CX} y={CY - BOUNDARY_R + 16} textAnchor="middle" fill="#94A3B8" fontSize="7" fontWeight="700" letterSpacing="2">YOUR COMPANY</text>
 
       {/* ── Center Hub ──────────────────────────────────────── */}
       <circle cx={CX} cy={CY} r={HUB_R} fill="url(#cg)" stroke="#D1D5DB" strokeWidth="1.5" filter="url(#cs)" />
