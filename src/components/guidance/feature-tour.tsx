@@ -167,16 +167,31 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     }
   }, [active, updateRect])
 
-  // Keyboard handling — Escape closes tour, all other keys suppressed
-  // to prevent shortcuts (e.g. ? for help dialog) firing behind the overlay
+  // Keyboard handling — Escape closes tour, other keys suppressed to prevent
+  // shortcuts (e.g. ? for help dialog) firing behind the overlay.
+  // Uses bubble phase on the overlay's portal root so events on the tooltip's
+  // own buttons (Enter/Space) still reach their targets before we suppress them.
   useEffect(() => {
     if (!active) return
-    const handleKey = (e: KeyboardEvent) => {
-      e.stopPropagation()
-      if (e.key === 'Escape') close()
+    // Escape on window (capture) — works regardless of focus location
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        close()
+      }
     }
-    window.addEventListener('keydown', handleKey, true)
-    return () => window.removeEventListener('keydown', handleKey, true)
+    // Suppress all other keys at the portal root (bubble) — fires after
+    // the tooltip's buttons have already processed Enter/Space
+    const portalRoot = document.querySelector('[data-tour-overlay]')
+    const handleOtherKeys = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') e.stopPropagation()
+    }
+    window.addEventListener('keydown', handleEscape, true)
+    portalRoot?.addEventListener('keydown', handleOtherKeys as EventListener)
+    return () => {
+      window.removeEventListener('keydown', handleEscape, true)
+      portalRoot?.removeEventListener('keydown', handleOtherKeys as EventListener)
+    }
   }, [active, close])
 
   if (!active || !step) return null
@@ -246,7 +261,7 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999]" onClick={close}>
+    <div className="fixed inset-0 z-[9999]" data-tour-overlay onClick={close}>
       {/* SVG overlay with mask cutout */}
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
         <defs>
