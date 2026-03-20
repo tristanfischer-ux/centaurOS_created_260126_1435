@@ -62,6 +62,7 @@ export async function imageToMeshViaMeshy(imageUrl: string): Promise<MeshyResult
       },
       body: JSON.stringify({
         image_url: imageUrl,
+        ai_model: "meshy-6",
         enable_pbr: true,
       }),
     },

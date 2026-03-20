@@ -1,0 +1,319 @@
+/**
+ * @file cad-lab-report.test.ts
+ *
+ * @description Integration tests for the two-phase AI report pipeline
+ * (Opus structures → Gemini writes). Mocks fetchWithTimeout at module level.
+ *
+ * @related
+ * - src/actions/cad-lab-report.ts — the server actions under test
+ * - src/lib/cad-lab/design-report-types.ts — type definitions
+ */
+
+// Suppress expected console.error/warn from retry and error paths
+let consoleErrorSpy: jest.SpyInstance
+let consoleWarnSpy: jest.SpyInstance
+beforeAll(() => {
+  consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+  consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+})
+afterAll(() => {
+  consoleErrorSpy.mockRestore()
+  consoleWarnSpy.mockRestore()
+})
+
+// ─── Mock fetchWithTimeout ────────────────────────────────────────────
+
+const mockFetchWithTimeout = jest.fn()
+
+jest.mock('@/lib/fetch-with-timeout', () => ({
+  fetchWithTimeout: (...args: unknown[]) => mockFetchWithTimeout(...args),
+}))
+
+jest.mock('@/lib/retry', () => ({
+  withRetry: jest.fn((fn: () => Promise<unknown>) => fn()),
+}))
+
+// ─── Import after mocks ──────────────────────────────────────────────
+
+import { structureReportOutline, writeReportSections } from '../cad-lab-report'
+import type { DesignReportData, ReportOutline } from '@/lib/cad-lab/design-report-types'
+
+// ─── Test Fixtures ───────────────────────────────────────────────────
+
+const FIXTURE_DATA: DesignReportData = {
+  projectName: 'Test Widget',
+  generatedAt: '2026-03-13T10:00:00.000Z',
+  heroImageUrl: null,
+  stage: 'specify',
+  productOverview: 'A test widget for testing purposes.',
+  researchReport: 'Research found that widgets are useful.',
+  sources: [{ title: 'Widget Research', url: 'https://example.com' }],
+  designBrief: {
+    useCase: 'Testing',
+    targetProcess: 'CNC Machining',
+    targetMaterial: 'Aluminium 6061',
+    toleranceTarget: '±0.1mm',
+    quantityTarget: '100',
+    complianceNotes: 'ISO 9001',
+  },
+  modules: [
+    {
+      id: 'mod-1',
+      name: 'Housing',
+      purpose: 'Encloses the internal components',
+      description: 'CNC machined aluminium housing',
+      keyParts: ['Top shell', 'Bottom shell'],
+      failureModes: ['Thermal distortion'],
+      estimatedMassKg: 0.5,
+      leadWeeks: 4,
+    } as DesignReportData['modules'][0],
+    {
+      id: 'mod-2',
+      name: 'PCB Assembly',
+      purpose: 'Controls the device logic',
+      description: 'Multi-layer PCB with MCU',
+      keyParts: ['MCU', 'Power regulator'],
+      failureModes: ['Solder joint failure'],
+      estimatedMassKg: 0.05,
+      leadWeeks: 6,
+    } as DesignReportData['modules'][0],
+  ],
+  diagnosticAnswers: {
+    'mod-1': { mfg_process: 'CNC', material: 'Aluminium', tolerance: '±0.1mm', finish: 'Anodised', batch_size: '100' },
+    'mod-2': { mfg_process: 'SMT', material: 'FR4', tolerance: '±0.2mm', finish: 'HASL', batch_size: '100' },
+  },
+  aiCostEstimates: {
+    'mod-1': { moduleId: 'mod-1', totalPerUnit: 45.50, confidence: 'medium', assumptions: ['Standard 6061', 'No complex undercuts'] },
+    'mod-2': { moduleId: 'mod-2', totalPerUnit: 12.30, confidence: 'high', assumptions: ['Standard PCB fab'] },
+  },
+  researchModelUsed: 'gemini-3.1-pro',
+  decompositionModelUsed: 'claude-opus-4-6',
+}
+
+const VALID_OUTLINE: ReportOutline = {
+  executiveSummary: 'This is a test widget specification report.',
+  narrativeThread: 'From concept through specification.',
+  sections: [
+    {
+      id: 'exec-summary',
+      title: 'Executive Summary',
+      sectionType: 'executive-summary',
+      brief: 'Summarise the project.',
+      keyPoints: ['Test widget for testing'],
+      dataHighlights: ['2 modules'],
+      includeTable: false,
+      includeImage: false,
+    },
+    {
+      id: 'module-overview',
+      title: 'Module Overview',
+      sectionType: 'module-overview',
+      brief: 'Overview all modules.',
+      keyPoints: ['Housing', 'PCB Assembly'],
+      dataHighlights: ['0.55kg total mass'],
+      includeTable: true,
+      includeImage: false,
+    },
+  ],
+}
+
+// ─── Helper to build mock API responses ──────────────────────────────
+
+function mockOpusResponse(content: string, inputTokens = 500, outputTokens = 300) {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ content: [{ text: content }] }),
+    json: async () => ({
+      content: [{ text: content }],
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    }),
+  }
+}
+
+function mockGeminiResponse(text: string, promptTokens = 200, candidateTokens = 400) {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ candidates: [{ content: { parts: [{ text }] } }] }),
+    json: async () => ({
+      candidates: [{ content: { parts: [{ text }] } }],
+      usageMetadata: { promptTokenCount: promptTokens, candidatesTokenCount: candidateTokens },
+    }),
+  }
+}
+
+// ─── Tests ──────────────────────────────────────────────────────────
+
+describe('structureReportOutline', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+  })
+
+  afterEach(() => {
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  it('returns a valid outline on happy path', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(
+      mockOpusResponse(JSON.stringify(VALID_OUTLINE)),
+    )
+
+    const result = await structureReportOutline(FIXTURE_DATA)
+
+    expect(result.outline.sections).toHaveLength(2)
+    expect(result.outline.executiveSummary).toBe('This is a test widget specification report.')
+    expect(result.tokensIn).toBe(500)
+    expect(result.tokensOut).toBe(300)
+  })
+
+  it('handles JSON wrapped in code fences', async () => {
+    const fenced = '```json\n' + JSON.stringify(VALID_OUTLINE) + '\n```'
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(fenced))
+
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result.outline.sections).toHaveLength(2)
+  })
+
+  it('throws meaningful error on malformed JSON', async () => {
+    mockFetchWithTimeout.mockResolvedValueOnce(
+      mockOpusResponse('{ this is not valid json }}'),
+    )
+
+    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
+      'Failed to parse report outline',
+    )
+  })
+
+  it('throws when outline has 0 sections', async () => {
+    const emptySections = { ...VALID_OUTLINE, sections: [] }
+    mockFetchWithTimeout.mockResolvedValueOnce(
+      mockOpusResponse(JSON.stringify(emptySections)),
+    )
+
+    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
+      'Report outline has no sections',
+    )
+  })
+
+  it('throws immediately when API key is missing', async () => {
+    delete process.env.ANTHROPIC_API_KEY
+
+    await expect(structureReportOutline(FIXTURE_DATA)).rejects.toThrow(
+      'ANTHROPIC_API_KEY not configured',
+    )
+
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled()
+  })
+
+  it('defaults missing section fields instead of crashing', async () => {
+    const sparse = {
+      sections: [
+        { sectionType: 'conclusions' },
+        { id: 'full', title: 'Full Section', sectionType: 'product-overview', brief: 'Do it', keyPoints: ['a'], dataHighlights: ['b'] },
+      ],
+    }
+    mockFetchWithTimeout.mockResolvedValueOnce(
+      mockOpusResponse(JSON.stringify(sparse)),
+    )
+
+    const result = await structureReportOutline(FIXTURE_DATA)
+    const s0 = result.outline.sections[0]
+    expect(s0.id).toBe('section-0')
+    expect(s0.title).toBe('Section 1')
+    expect(s0.keyPoints).toEqual([])
+    expect(s0.dataHighlights).toEqual([])
+    expect(s0.includeTable).toBe(false)
+    expect(result.outline.executiveSummary).toBe('')
+    expect(result.outline.narrativeThread).toBe('')
+  })
+})
+
+describe('writeReportSections', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.GOOGLE_AI_API_KEY = 'test-google-key'
+  })
+
+  afterEach(() => {
+    delete process.env.GOOGLE_AI_API_KEY
+  })
+
+  it('returns AiReportContent with prose on happy path', async () => {
+    mockFetchWithTimeout
+      .mockResolvedValueOnce(mockGeminiResponse('Executive summary prose.'))
+      .mockResolvedValueOnce(mockGeminiResponse('Module overview prose.'))
+
+    const result = await writeReportSections(
+      VALID_OUTLINE,
+      FIXTURE_DATA,
+      { in: 500, out: 300 },
+    )
+
+    expect(result.sections).toHaveLength(2)
+    expect(result.sections[0].prose).toBe('Executive summary prose.')
+    expect(result.sections[1].prose).toBe('Module overview prose.')
+    expect(result.opusTokens).toEqual({ in: 500, out: 300 })
+    expect(result.geminiTokens.in).toBe(400)
+    expect(result.geminiTokens.out).toBe(800)
+    expect(result.generatedAt).toBeTruthy()
+  })
+
+  it('gives failed sections empty prose, others succeed', async () => {
+    mockFetchWithTimeout
+      .mockRejectedValueOnce(new Error('Gemini API error (500): Internal error'))
+      .mockResolvedValueOnce(mockGeminiResponse('Module overview prose.'))
+
+    const result = await writeReportSections(
+      VALID_OUTLINE,
+      FIXTURE_DATA,
+      { in: 500, out: 300 },
+    )
+
+    expect(result.sections[0].prose).toBe('')
+    expect(result.sections[1].prose).toBe('Module overview prose.')
+  })
+
+  it('throws immediately when API key is missing', async () => {
+    delete process.env.GOOGLE_AI_API_KEY
+
+    await expect(
+      writeReportSections(VALID_OUTLINE, FIXTURE_DATA, { in: 500, out: 300 }),
+    ).rejects.toThrow('GOOGLE_AI_API_KEY not configured')
+
+    expect(mockFetchWithTimeout).not.toHaveBeenCalled()
+  })
+})
+
+describe('extractJson (via structureReportOutline)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+  })
+
+  afterEach(() => {
+    delete process.env.ANTHROPIC_API_KEY
+  })
+
+  it('strips code fences and comments', async () => {
+    const withComments = `\`\`\`json
+// This is a comment
+${JSON.stringify(VALID_OUTLINE)}
+\`\`\``
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(withComments))
+
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result.outline.sections).toHaveLength(2)
+  })
+
+  it('strips trailing commas', async () => {
+    // Manually add trailing commas
+    const withTrailing = JSON.stringify(VALID_OUTLINE)
+      .replace('"includeImage":false}', '"includeImage":false,}')
+    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(withTrailing))
+
+    const result = await structureReportOutline(FIXTURE_DATA)
+    expect(result.outline.sections).toHaveLength(2)
+  })
+})
