@@ -187,7 +187,7 @@ export async function POST(request: Request): Promise<Response> {
 
         if (!fullContent.trim()) {
           emit({ type: "error", message: "Document generation returned empty content" })
-          controller.close()
+          // GOTCHA: Don't close here — finally block handles it. Double close throws TypeError.
           return
         }
 

@@ -193,12 +193,13 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
   const isLast = currentStep === steps.length - 1
   const pad = 8
   const tooltipHeight = 180 // approx tooltip height for vertical clamping
+  // Responsive tooltip width — never wider than viewport minus padding
+  const tooltipWidth = Math.min(320, window.innerWidth - pad * 2)
 
   // Resolve tooltip position with automatic fallback when overflowing viewport
   const resolvePosition = (): 'top' | 'bottom' | 'left' | 'right' => {
     if (!rect) return 'bottom'
     const preferred = step.position ?? 'bottom'
-    const maxWidth = 320
 
     // Check if preferred position overflows, fall back to opposite
     switch (preferred) {
@@ -209,10 +210,10 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
         if (rect.top - pad - 12 - tooltipHeight < 0) return 'bottom'
         return 'top'
       case 'left':
-        if (rect.left - pad - 12 - maxWidth < 0) return 'right'
+        if (rect.left - pad - 12 - tooltipWidth < 0) return 'right'
         return 'left'
       case 'right':
-        if (rect.right + pad + 12 + maxWidth > window.innerWidth) return 'left'
+        if (rect.right + pad + 12 + tooltipWidth > window.innerWidth) return 'left'
         return 'right'
       default:
         return 'bottom'
@@ -224,12 +225,11 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     if (!rect) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
 
     const pos = resolvePosition()
-    const maxWidth = 320
 
     switch (pos) {
       case 'top':
         return {
-          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - maxWidth / 2), window.innerWidth - maxWidth - pad),
+          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - pad),
           top: Math.max(pad, rect.top - pad - 12),
           transform: 'translateY(-100%)',
         }
@@ -241,21 +241,21 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
         }
       case 'right':
         return {
-          left: Math.min(rect.right + pad + 12, window.innerWidth - maxWidth - pad),
+          left: Math.min(rect.right + pad + 12, window.innerWidth - tooltipWidth - pad),
           top: Math.min(Math.max(pad, rect.top + rect.height / 2), window.innerHeight - tooltipHeight - pad),
           transform: 'translateY(-50%)',
         }
       case 'bottom':
       default:
         return {
-          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - maxWidth / 2), window.innerWidth - maxWidth - pad),
+          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - pad),
           top: Math.min(rect.bottom + pad + 12, window.innerHeight - tooltipHeight - pad),
         }
     }
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999]" data-tour-overlay onClick={close}>
+    <div className="fixed inset-0 z-[9999]" onClick={close}>
       {/* SVG overlay with mask cutout */}
       <svg className="absolute inset-0 w-full h-full" style={{ pointerEvents: 'none' }}>
         <defs>
@@ -302,7 +302,7 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
       <div
         key={currentStep}
         className="fixed bg-card border rounded-xl shadow-xl p-5 z-[10000] animate-in fade-in-50 slide-in-from-bottom-2 duration-200"
-        style={{ ...getTooltipStyle(), maxWidth: 320, width: 320 }}
+        style={{ ...getTooltipStyle(), maxWidth: tooltipWidth, width: tooltipWidth }}
         onClick={(e) => e.stopPropagation()}
       >
         <p className="text-sm font-semibold text-foreground mb-1.5">{step.title}</p>
