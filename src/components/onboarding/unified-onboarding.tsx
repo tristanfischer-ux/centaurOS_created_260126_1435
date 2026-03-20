@@ -25,7 +25,6 @@ import { setAccountType, updateOnboardingData, getOnboardingAhaListings } from '
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 
 import type { OnboardingData } from '@/actions/onboarding'
 
@@ -427,13 +426,16 @@ export function UnifiedOnboarding({
                   </Button>
                 </motion.div>
 
-                <Link
-                  href="/marketplace"
-                  onClick={() => handleComplete()}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await handleComplete()
+                    router.push('/marketplace')
+                  }}
                   className="text-xs text-muted-foreground hover:text-international-orange transition-colors"
                 >
                   Browse the full marketplace
-                </Link>
+                </button>
               </div>
             )}
           </motion.div>

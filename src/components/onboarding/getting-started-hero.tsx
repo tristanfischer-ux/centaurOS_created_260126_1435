@@ -8,7 +8,7 @@
  * large progress ring and all 6 checklist items in a 2-column grid.
  */
 
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import {
@@ -41,7 +41,8 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
     [onboardingData],
   )
 
-  const isDismissed = onboardingData.checklist_dismissed === true
+  const [localDismissed, setLocalDismissed] = useState(false)
+  const isDismissed = localDismissed || onboardingData.checklist_dismissed === true
 
   // Sort: for Executives/Apprentices, profile first; otherwise keep original order
   const sortedItems = useMemo(() => {
@@ -54,6 +55,7 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
   }, [userRole])
 
   const handleDismiss = useCallback(() => {
+    setLocalDismissed(true)
     updateOnboardingData({ checklist_dismissed: true })
   }, [])
 
@@ -111,9 +113,9 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
                         {item.label}
                       </span>
                     </div>
-                  ) : (
+                  ) : item.href ? (
                     <Link
-                      href={item.href ?? '#'}
+                      href={item.href}
                       className={cn(
                         'flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg',
                         'hover:bg-muted/50 transition-colors group',
@@ -131,6 +133,15 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
                         Go
                       </span>
                     </Link>
+                  ) : (
+                    <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-international-orange/10">
+                        <Icon className="h-4 w-4 text-international-orange" />
+                      </div>
+                      <span className="text-sm font-medium text-foreground">
+                        {item.label}
+                      </span>
+                    </div>
                   )}
                 </motion.div>
               )
