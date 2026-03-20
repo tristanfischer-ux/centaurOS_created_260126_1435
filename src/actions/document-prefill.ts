@@ -100,7 +100,8 @@ async function buildCompetitiveAnalysisPrefill(
   if (sections.length === 0) return null
 
   // INTENT: Trailing section invites the user to add their own context
-  sections.push('ADDITIONAL CONTEXT:\n[Add recent competitive developments or focus areas here]')
+  // GOTCHA: Use empty line after header — placeholder text in brackets would be sent to the AI verbatim
+  sections.push('ADDITIONAL CONTEXT:\n')
 
   return sections.join('\n\n')
 }

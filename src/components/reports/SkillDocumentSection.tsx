@@ -410,7 +410,7 @@ export function SkillDocumentSection() {
                     placeholder={selectedSkill.inputHint}
                     value={userContext}
                     onChange={e => setUserContext(e.target.value)}
-                    disabled={isPrefilling}
+                    disabled={isPrefilling || isGenerating}
                     maxLength={20000}
                   />
                   {isPrefilling && (
@@ -428,6 +428,7 @@ export function SkillDocumentSection() {
                       id="include-auto-data"
                       checked={includeAutoData}
                       onCheckedChange={(checked) => setIncludeAutoData(checked === true)}
+                      disabled={isGenerating}
                     />
                     <label htmlFor="include-auto-data" className="text-sm text-foreground cursor-pointer">
                       Enrich with company data
@@ -442,11 +443,13 @@ export function SkillDocumentSection() {
                   <button
                     type="button"
                     onClick={() => { setMode('direct'); setQuestions([]); setAnswers({}) }}
+                    disabled={isGenerating}
                     className={cn(
                       'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                       mode === 'direct'
                         ? 'border-international-orange bg-international-orange/5 text-foreground'
-                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20',
+                      isGenerating && 'opacity-50 cursor-not-allowed'
                     )}
                   >
                     <Pen className="h-3 w-3" />
@@ -455,11 +458,13 @@ export function SkillDocumentSection() {
                   <button
                     type="button"
                     onClick={() => setMode('guided')}
+                    disabled={isGenerating}
                     className={cn(
                       'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                       mode === 'guided'
                         ? 'border-international-orange bg-international-orange/5 text-foreground'
-                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                        : 'border-input bg-background text-muted-foreground hover:border-foreground/20',
+                      isGenerating && 'opacity-50 cursor-not-allowed'
                     )}
                   >
                     <HelpCircle className="h-3 w-3" />
@@ -544,11 +549,13 @@ export function SkillDocumentSection() {
                         key={option.value}
                         type="button"
                         onClick={() => setTone(option.value)}
+                        disabled={isGenerating}
                         className={cn(
                           'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                           tone === option.value
                             ? 'border-international-orange bg-international-orange/5 text-foreground'
-                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20',
+                          isGenerating && 'opacity-50 cursor-not-allowed'
                         )}
                       >
                         {option.label}
@@ -568,11 +575,13 @@ export function SkillDocumentSection() {
                         key={option.value}
                         type="button"
                         onClick={() => setLength(option.value)}
+                        disabled={isGenerating}
                         className={cn(
                           'rounded-lg border px-3 py-2 text-sm transition-all',
                           length === option.value
                             ? 'border-international-orange bg-international-orange/5 text-foreground font-medium'
-                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20'
+                            : 'border-input bg-background text-muted-foreground hover:border-foreground/20',
+                          isGenerating && 'opacity-50 cursor-not-allowed'
                         )}
                       >
                         <span className="block">{option.label}</span>
