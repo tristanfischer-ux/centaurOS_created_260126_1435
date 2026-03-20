@@ -60,6 +60,69 @@ export interface ListingUpdateData {
     location?: string
 }
 
+export interface ListingPreview {
+    title: string
+    description: string | null
+    category: string
+    subcategory: string
+    specialties: string[]
+    certifications: string[]
+    industries: string[]
+    city: string | null
+    country: string | null
+    website_url: string | null
+    company_size: string | null
+    employee_count_exact: number | null
+    founded_year: number | null
+    production_capacity: string | null
+    lead_time: string | null
+    quality_systems: string | null
+    contact_name: string | null
+    materials: string[]
+    key_equipment: string[]
+    products: string[]
+    process_capabilities: Record<string, unknown>[]
+    email: string
+    is_valid: boolean
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LISTING PREVIEW (public claim landing page)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * @description Fetch listing preview data for the claim landing page.
+ * Can be called unauthenticated. Side effect: marks token as 'clicked'.
+ */
+export async function getListingPreviewByToken(
+    token: string
+): Promise<{ data?: ListingPreview; error?: string }> {
+    // SECURITY: Rate limit to prevent token enumeration
+    const headersList = await headers()
+    const ip = getClientIP(headersList)
+    const rateLimitError = await checkRateLimit('claimPreview', ip)
+    if (rateLimitError) {
+        return { error: 'Too many requests. Please try again in a moment.' }
+    }
+
+    const supabase = await createClient()
+
+    const { data, error } = await supabase.rpc('get_listing_preview_by_claim_token', {
+        p_token: token,
+    })
+
+    if (error) {
+        console.error('[Claims] Failed to get listing preview:', error)
+        return { error: 'Failed to load listing preview' }
+    }
+
+    if (!data || (data as ListingPreview[]).length === 0) {
+        return { error: 'Invalid claim token' }
+    }
+
+    return { data: (data as ListingPreview[])[0] }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CLAIM TOKEN MANAGEMENT (admin side)
 // ═══════════════════════════════════════════════════════════════════════════════

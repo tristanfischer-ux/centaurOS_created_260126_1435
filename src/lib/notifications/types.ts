@@ -72,6 +72,9 @@ export type EmailTemplate =
     | 'financial_alert'
     | 'finance_digest'
     | 'listing_claim'
+    | 'listing_claim_value'
+    | 'listing_claim_case_study'
+    | 'listing_claim_breakup'
     | 'generic'
 
 export interface PushNotificationOptions {
