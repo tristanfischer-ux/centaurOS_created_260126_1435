@@ -44,6 +44,7 @@ import type { SpecialistContext } from '@/components/specialists/types'
 import { updateTaskDates } from '@/actions/tasks'
 import { updateCanvasItem } from '@/actions/canvas'
 import { toast } from 'sonner'
+import { PageTour } from '@/components/guidance/page-tour'
 import { getStrategyColor } from '../new-objectives/strategy-colors'
 import type { GoalBundle, MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
@@ -406,6 +407,7 @@ export function StrategyDashboard({
       {viewMode === 'dashboard' && (
         <div className="space-y-8">
           {/* Company Purpose Hero */}
+          <div data-tour="strategy-purpose">
           <CompanyPurposeWrapper
             purposeData={purposeData}
             isFounder={isFounder}
@@ -413,6 +415,7 @@ export function StrategyDashboard({
             userId={userId}
             variant="card"
           />
+          </div>
 
           {/* Strategy Health Summary */}
           {pillars.length > 0 && (
@@ -469,6 +472,7 @@ export function StrategyDashboard({
           />
 
           {/* Strategic Pillars */}
+          <div data-tour="strategy-pillars">
           {pillars.length === 0 ? (
             <EmptyState
               icon={<Waypoints className="h-10 w-10" />}
@@ -501,6 +505,7 @@ export function StrategyDashboard({
               ))}
             </div>
           )}
+          </div>
 
           {/* Unlinked Objectives Warning */}
           {unlinkedObjectiveCount > 0 && (
@@ -641,6 +646,8 @@ export function StrategyDashboard({
           onComplete={handleDialogUpdate}
         />
       )}
+
+      <PageTour page="strategy" />
     </div>
   )
 }

@@ -55,6 +55,7 @@ import { InsightFeed } from "@/components/insights/insight-feed"
 import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { GettingStartedHero } from "@/components/onboarding/getting-started-hero"
+import { PageTour } from "@/components/guidance/page-tour"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 import type { OnboardingData } from "@/actions/onboarding"
@@ -357,6 +358,7 @@ export function TodayView({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: EASE_CURVE }}
+                data-tour="today-briefing"
             >
                 <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03] overflow-hidden">
                     <CardContent className="pt-6 pb-5">
@@ -511,6 +513,7 @@ export function TodayView({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1, ease: EASE_CURVE }}
+                data-tour="today-focus"
             >
                 <FocusTasksSection
                     briefing={briefing}
@@ -601,6 +604,7 @@ export function TodayView({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.28, ease: EASE_CURVE }}
+                data-tour="today-insights"
             >
                 <SectionHeader icon={Waypoints} label="Your AI Team" color="text-international-orange" />
                 <p className="text-xs text-muted-foreground -mt-3 mb-4 ml-7">
@@ -710,6 +714,8 @@ export function TodayView({
                     </Link>
                 </Button>
             </motion.div>
+
+            <PageTour page="today" />
         </div>
     )
 }

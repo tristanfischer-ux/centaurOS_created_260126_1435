@@ -45,6 +45,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { getHelpContent, type PageKey } from "@/lib/help-content"
+import { hasSeenTour } from "@/components/guidance/feature-tour"
 import { cn } from "@/lib/utils"
 
 const SECTION_ICONS: Record<string, LucideIcon> = {
@@ -188,6 +189,14 @@ export function PageHelpButton({ pageKey, className }: PageHelpButtonProps) {
                 </div>
               )}
 
+              {/* Tour Replay */}
+              {content.tourId && (
+                <TourReplayButton
+                  tourId={content.tourId}
+                  onReplay={() => setOpen(false)}
+                />
+              )}
+
               {/* Keyboard Shortcuts */}
               {content.shortcuts.length > 0 && (
                 <div className="space-y-3">
@@ -237,5 +246,38 @@ export function PageHelpButton({ pageKey, className }: PageHelpButtonProps) {
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/**
+ * Isolated client component for the tour replay button.
+ * Reads localStorage in useEffect to avoid SSR/client hydration mismatch.
+ */
+function TourReplayButton({ tourId, onReplay }: { tourId: string; onReplay: () => void }) {
+  const [seen, setSeen] = useState(true)
+
+  useEffect(() => {
+    setSeen(hasSeenTour(tourId))
+  }, [tourId])
+
+  return (
+    <div className="pt-2 border-t">
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full gap-2 text-international-orange border-international-orange/30 hover:bg-international-orange/5"
+        onClick={() => {
+          window.dispatchEvent(
+            new CustomEvent('forgeos-start-tour', {
+              detail: { tourId },
+            })
+          )
+          onReplay()
+        }}
+      >
+        <Compass className="h-4 w-4" />
+        {seen ? 'Replay tour' : 'Take the tour'}
+      </Button>
+    </div>
   )
 }

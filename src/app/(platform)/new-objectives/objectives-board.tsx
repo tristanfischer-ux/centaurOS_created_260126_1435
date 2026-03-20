@@ -64,6 +64,7 @@ import type { Database } from '@/types/database.types'
 import type { ObjectiveWithTasks, ObjectiveTask, Member, Team, StrategicObjective, PlaybooksData } from './types'
 import type { TaskWithData } from '../new-tasks/types'
 import { PlaybooksSection } from './playbooks-section'
+import { PageTour } from '@/components/guidance/page-tour'
 
 const LARGE_BREAKPOINT = 1280
 const MEDIUM_BREAKPOINT = 768
@@ -436,7 +437,9 @@ export function ObjectivesBoard({
             </Link>
           )}
           <WeeklyDigestPanel />
-          <CreateObjectiveDialog externalOpen={createDialogOpen} onExternalOpenChange={setCreateDialogOpen} />
+          <div data-tour="objectives-create">
+            <CreateObjectiveDialog externalOpen={createDialogOpen} onExternalOpenChange={setCreateDialogOpen} />
+          </div>
         </div>
       </div>
 
@@ -444,15 +447,17 @@ export function ObjectivesBoard({
       <TeamPulseDashboard />
 
       {/* Strategy Health Bar */}
-      <StrategyHealthBar
-        total={stats.total}
-        onTrack={stats.onTrack}
-        atRisk={stats.atRisk}
-        offTrack={stats.offTrack}
-        completed={stats.completed}
-        activeFilter={healthFilter}
-        onFilterChange={setHealthFilter}
-      />
+      <div data-tour="objectives-health">
+        <StrategyHealthBar
+          total={stats.total}
+          onTrack={stats.onTrack}
+          atRisk={stats.atRisk}
+          offTrack={stats.offTrack}
+          completed={stats.completed}
+          activeFilter={healthFilter}
+          onFilterChange={setHealthFilter}
+        />
+      </div>
 
       {/* Toolbar: View tabs + Strategy Filter + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -526,7 +531,7 @@ export function ObjectivesBoard({
       </div>
 
       {/* Main Content Area */}
-      <div className="flex gap-6">
+      <div className="flex gap-6" data-tour="objectives-board">
         {/* Left: View content */}
         <div className={cn('flex-1 min-w-0', hasDetailPanel && 'max-w-[calc(100%-380px)]')}>
           {viewMode === 'board' && (
@@ -609,6 +614,8 @@ export function ObjectivesBoard({
       {playbooksData && (
         <PlaybooksSection playbooksData={playbooksData} members={members} />
       )}
+
+      <PageTour page="objectives" />
     </div>
   )
 }

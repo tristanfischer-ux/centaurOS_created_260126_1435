@@ -26,6 +26,7 @@ import dynamic from 'next/dynamic'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
+import { PageTour } from '@/components/guidance/page-tour'
 
 const TasksGanttView = dynamic(
   () => import('./gantt-view').then((m) => ({ default: m.TasksGanttView })),
@@ -289,51 +290,57 @@ export function TasksCommandCenter({
               Strategy River
             </Link>
           )}
-          <CreateTaskDialog
-            objectives={objectives}
-            members={members.map(m => ({ ...m, role: m.role || 'Member' }))}
-            teams={teams}
-            currentUserId={currentUserId}
-            externalOpen={createDialogOpen}
-            onExternalOpenChange={setCreateDialogOpen}
-          />
+          <div data-tour="tasks-create">
+            <CreateTaskDialog
+              objectives={objectives}
+              members={members.map(m => ({ ...m, role: m.role || 'Member' }))}
+              teams={teams}
+              currentUserId={currentUserId}
+              externalOpen={createDialogOpen}
+              onExternalOpenChange={setCreateDialogOpen}
+            />
+          </div>
         </div>
       </div>
 
       {/* Smart Summary Pills */}
-      <SmartSummary
-        totalTasks={stats.totalTasks}
-        dueToday={stats.dueToday}
-        overdue={stats.overdue}
-        needsReview={stats.needsReview}
-        myActiveTasks={stats.myActiveTasks}
-        activeFilter={quickFilter}
-        onFilterChange={setQuickFilter}
-      />
+      <div data-tour="tasks-summary">
+        <SmartSummary
+          totalTasks={stats.totalTasks}
+          dueToday={stats.dueToday}
+          overdue={stats.overdue}
+          needsReview={stats.needsReview}
+          myActiveTasks={stats.myActiveTasks}
+          activeFilter={quickFilter}
+          onFilterChange={setQuickFilter}
+        />
+      </div>
 
       {/* Toolbar: View tabs + Search + Group By */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-          <TabsList className="h-9">
-            <TabsTrigger value="focus" className="text-xs gap-1.5 px-3">
-              <Crosshair className="h-3.5 w-3.5" />
-              Focus
-            </TabsTrigger>
-            <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Board
-              <HelpTooltip content="Drag tasks between columns to change their status. Cards are ordered by priority." side="bottom" focusable={false} />
-            </TabsTrigger>
-            <TabsTrigger value="list" className="text-xs gap-1.5 px-3">
-              <List className="h-3.5 w-3.5" />
-              List
-            </TabsTrigger>
-            <TabsTrigger value="timeline" className="text-xs gap-1.5 px-3">
-              <GanttChartSquare className="h-3.5 w-3.5" />
-              Timeline
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div data-tour="tasks-views">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+            <TabsList className="h-9">
+              <TabsTrigger value="focus" className="text-xs gap-1.5 px-3">
+                <Crosshair className="h-3.5 w-3.5" />
+                Focus
+              </TabsTrigger>
+              <TabsTrigger value="board" className="text-xs gap-1.5 px-3">
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Board
+                <HelpTooltip content="Drag tasks between columns to change their status. Cards are ordered by priority." side="bottom" focusable={false} />
+              </TabsTrigger>
+              <TabsTrigger value="list" className="text-xs gap-1.5 px-3">
+                <List className="h-3.5 w-3.5" />
+                List
+              </TabsTrigger>
+              <TabsTrigger value="timeline" className="text-xs gap-1.5 px-3">
+                <GanttChartSquare className="h-3.5 w-3.5" />
+                Timeline
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Strategy filter */}
@@ -525,6 +532,8 @@ export function TasksCommandCenter({
           members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role || 'Member' }))}
         />
       )}
+
+      <PageTour page="tasks" />
     </div>
   )
 }

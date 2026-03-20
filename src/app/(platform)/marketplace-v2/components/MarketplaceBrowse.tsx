@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { PageTour } from '@/components/guidance/page-tour'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { FoundryContext } from '@/actions/foundry-context'
 
@@ -329,7 +330,7 @@ export function MarketplaceBrowse({
             </div>
 
             {/* Tab navigation */}
-            <nav aria-label="Marketplace sections" className="flex items-center gap-1 border-b border-border">
+            <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">
                 {TABS.map((tab) => {
                     const Icon = tab.icon
                     const isActive = activeTab === tab.id || (activeTab === 'compare' && tab.id === 'saved')
@@ -427,6 +428,7 @@ export function MarketplaceBrowse({
                     />
 
                     {/* Unified toolbar: categories + search + sort + filters */}
+                    <div data-tour="marketplace-toolbar">
                     <MarketplaceToolbar
                         activeCategory={state.activeCategory}
                         onCategoryChange={state.handleCategoryChange}
@@ -456,6 +458,7 @@ export function MarketplaceBrowse({
                         onUpdateAdvancedFilter={state.updateAdvancedFilter}
                         onSaveSearch={() => setShowSaveSearchDialog(true)}
                     />
+                    </div>
 
                     {/* Technique filter banner (conditional - when arriving from Techniques Explorer) */}
                     {state.activeTechnique && (
@@ -527,6 +530,7 @@ export function MarketplaceBrowse({
                     )}
 
                     {/* Listing grid */}
+                    <div data-tour="marketplace-grid">
                     <MarketplaceListingGrid
                         listings={state.filteredListings}
                         savedIds={state.savedIds}
@@ -542,6 +546,7 @@ export function MarketplaceBrowse({
                         isLoadingMore={state.isLoadingMore}
                         onLoadMore={state.loadMore}
                     />
+                    </div>
                 </>
             )}
 
@@ -586,6 +591,8 @@ export function MarketplaceBrowse({
                     ...state.advancedFilters,
                 }}
             />
+
+            <PageTour page="marketplace" />
         </div>
     )
 }

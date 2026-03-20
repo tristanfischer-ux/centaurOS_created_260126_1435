@@ -78,6 +78,7 @@ const TeamAnalytics = dynamic(
 
 import { useTeamData } from './hooks/use-team-data'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { PageTour } from '@/components/guidance/page-tour'
 import { RetainerCard } from '@/components/retainers'
 import type { RetainerWithDetails, RetainerStats } from '@/types/retainers'
 import type { TeamViewMode, BusinessFunction } from './types'
@@ -930,7 +931,9 @@ export function TeamPageView({
                             />
                             <RefreshButton />
                         </div>
-                        <InviteMemberDialog />
+                        <div data-tour="team-invite">
+                          <InviteMemberDialog />
+                        </div>
                         <Link href="/team/new">
                             <Button size="sm" className="bg-international-orange hover:bg-international-orange/90 text-white shadow-sm">
                                 <Plus className="h-4 w-4" />
@@ -942,7 +945,7 @@ export function TeamPageView({
 
                 {/* Row 2: Tabs + mobile view toggle */}
                 <div className="flex items-center gap-2">
-                    <div role="tablist" aria-label="Team views" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-none">
+                    <div role="tablist" aria-label="Team views" data-tour="team-members" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-none">
                         <button
                             role="tab"
                             aria-selected={activeTab === 'members'}
@@ -1624,6 +1627,8 @@ export function TeamPageView({
                     foundryId={foundryId}
                 />
             )}
+
+            <PageTour page="team" />
         </div>
     )
 }

@@ -31,6 +31,7 @@ import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
+import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { SampleProjectPreview } from "./sample-project-preview"
 import { ForgeScreenContext } from "./forge-screen-context"
@@ -126,24 +127,30 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       )}
 
       {inProgressProject && <ContinueCard project={inProgressProject} />}
-      <StartingPointsSection />
+      <div data-tour="forge-start">
+        <StartingPointsSection />
+      </div>
 
-      {!hasRecent ? (
-        <div className="space-y-8">
-          <SampleProjectPreview />
-          <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
-              <PenTool className="h-7 w-7 text-international-orange" />
+      <div data-tour="forge-projects">
+        {!hasRecent ? (
+          <div className="space-y-8">
+            <SampleProjectPreview />
+            <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
+                <PenTool className="h-7 w-7 text-international-orange" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Pick a starting point above to create your first engineering package.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No designs yet</h3>
-            <p className="text-sm text-muted-foreground max-w-md">
-              Pick a starting point above to create your first engineering package.
-            </p>
           </div>
-        </div>
-      ) : (
-        <RecentProjectsGrid projects={projects} />
-      )}
+        ) : (
+          <RecentProjectsGrid projects={projects} />
+        )}
+      </div>
+
+      <PageTour page="the-forge" />
     </div>
   )
 }

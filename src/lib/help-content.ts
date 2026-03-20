@@ -25,6 +25,8 @@ export interface PageHelpContent {
   videoUrl?: string
   /** Thumbnail image URL for the video */
   thumbnailUrl?: string
+  /** Tour ID for the interactive walkthrough (matches tour-definitions.ts) */
+  tourId?: string
 }
 
 export type PageKey =
@@ -42,6 +44,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Your Daily Command Center',
     description:
       'Your prioritized view of what matters today. See tasks due today, quick wins, and risks at a glance.',
+    tourId: 'today',
     videoUrl: PAGE_VIDEOS.today?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.today?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.today?.title,
@@ -84,6 +87,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Strategic Objectives',
     description:
       'Set and track OKRs, goals, and strategic initiatives. Connect tasks to objectives for automatic progress tracking.',
+    tourId: 'objectives',
     videoUrl: PAGE_VIDEOS.objectives?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.objectives?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.objectives?.title,
@@ -124,6 +128,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Task Management',
     description:
       'Create, assign, and track tasks across your foundry. Use filters, views, and shortcuts to stay organized.',
+    tourId: 'tasks',
     videoUrl: PAGE_VIDEOS.tasks?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.tasks?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.tasks?.title,
@@ -168,6 +173,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Team & Collaboration',
     description:
       'Manage your foundry members, roles, permissions, and capacity. Invite members and collaborate effectively.',
+    tourId: 'team',
     videoUrl: PAGE_VIDEOS.team?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.team?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.team?.title,
@@ -208,6 +214,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'The Forge',
     description:
       'Product development from concept to manufacturing. Capture ideas, design in CAD Lab, and document everything for production.',
+    tourId: 'the-forge',
     videoUrl: PAGE_VIDEOS['the-forge']?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS['the-forge']?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS['the-forge']?.title,
@@ -248,6 +255,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'The Marketplace',
     description:
       'Find experts, services, and resources. Use Smart Search to describe what you need, then save favorites to your stack.',
+    tourId: 'marketplace',
     videoUrl: PAGE_VIDEOS.marketplace?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.marketplace?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.marketplace?.title,
@@ -288,6 +296,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Strategic Planning',
     description:
       'Define company purpose, strategic pillars, and health metrics. Align objectives and run regular reviews.',
+    tourId: 'strategy',
     videoUrl: PAGE_VIDEOS.strategy?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.strategy?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.strategy?.title,
@@ -328,6 +337,7 @@ const HELP_CONTENT: Record<PageKey, PageHelpContent> = {
     title: 'Messages',
     description:
       'Team messaging with context. Use @mentions, attach tasks and objectives, and leverage slash commands for quick actions.',
+    tourId: 'messages',
     videoUrl: PAGE_VIDEOS.messages?.videoUrl,
     thumbnailUrl: PAGE_VIDEOS.messages?.thumbnailUrl,
     videoTitle: PAGE_VIDEOS.messages?.title,
