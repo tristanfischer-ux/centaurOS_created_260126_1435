@@ -255,6 +255,11 @@ export interface OnboardingData {
   first_marketplace_action_listing_id?: string
   dashboard_tour_completed?: boolean
   guild_tour_completed?: boolean
+  /** Unified onboarding modal fields */
+  onboarding_modal_completed?: boolean
+  account_type_selected?: 'team_builder' | 'supplier'
+  onboarding_completed_at?: string
+  has_completed_onboarding?: boolean
   /** Getting Started Checklist fields */
   checklist_dismissed?: boolean
   checklist_completed_at?: string
@@ -598,6 +603,95 @@ async function ensureMembership(supabase: any, userId: string, foundryId: string
       console.warn('[RepairProfile] Failed to create membership:', { userId, foundryId, error: error.message })
     }
   }
+}
+
+/**
+ * Get the user's onboarding state from the DB.
+ *
+ * @returns Typed OnboardingData object, or empty object if not set
+ *
+ * @security Requires authenticated user, reads only own profile
+ */
+export async function getOnboardingState(): Promise<OnboardingData & { _userRole?: string }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return {}
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('onboarding_data, role')
+    .eq('id', user.id)
+    .single()
+
+  const data = (profile?.onboarding_data as OnboardingData) || {}
+  // Piggyback role on the return to avoid an extra DB call in today page
+  return { ...data, _userRole: profile?.role ?? undefined }
+}
+
+/**
+ * Fetch up to 3 marketplace listings matching the user's foundry industry.
+ *
+ * @description Reads the foundry's industry, then searches marketplace for
+ * matches. Falls back to general listings if no industry match found.
+ *
+ * @returns Array of up to 3 listings for the "aha moment" step
+ *
+ * @security Requires authenticated user
+ */
+export async function getOnboardingAhaListings(): Promise<{ title: string; category: string; id: string }[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) return []
+
+  // Get user's foundry industry
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  let industry: string | null = null
+  if (profile?.foundry_id) {
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('industry')
+      .eq('id', profile.foundry_id)
+      .single()
+    industry = foundry?.industry ?? null
+  }
+
+  // Search marketplace with industry if available
+  let query = supabase
+    .from('marketplace_listings')
+    .select('id, title, category')
+    .eq('status', 'active')
+    .limit(3)
+
+  if (industry) {
+    // SECURITY: Sanitize industry for PostgREST filter DSL — strip commas,
+    // parens, wildcards, and backslashes that could alter filter logic.
+    const safeIndustry = industry.replace(/[,%_\\()]/g, ' ').trim().slice(0, 100)
+    if (safeIndustry) {
+      query = query.or(`category.ilike.%${safeIndustry}%,title.ilike.%${safeIndustry}%,description.ilike.%${safeIndustry}%`)
+    }
+  }
+
+  const { data: listings } = await query
+
+  // If industry search returned nothing, fall back to any active listings
+  if (!listings || listings.length === 0) {
+    const { data: fallback } = await supabase
+      .from('marketplace_listings')
+      .select('id, title, category')
+      .eq('status', 'active')
+      .limit(3)
+
+    return (fallback ?? []).map(l => ({ id: l.id, title: l.title, category: l.category ?? 'General' }))
+  }
+
+  return listings.map(l => ({ id: l.id, title: l.title, category: l.category ?? 'General' }))
 }
 
 /**

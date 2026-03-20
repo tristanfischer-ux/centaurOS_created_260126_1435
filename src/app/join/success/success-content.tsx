@@ -145,7 +145,7 @@ const SESSION_POLL_INTERVAL = 3000
  */
 function getPostSignupRedirect(role: string): string {
   if (role === "supplier") return "/supplier-portal"
-  return "/marketplace-setup?verified=true"
+  return "/today"
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────

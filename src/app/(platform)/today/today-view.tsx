@@ -54,8 +54,10 @@ import { AskSpecialistButton } from "@/components/specialists/ask-specialist-but
 import { InsightFeed } from "@/components/insights/insight-feed"
 import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
+import { GettingStartedHero } from "@/components/onboarding/getting-started-hero"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
+import type { OnboardingData } from "@/actions/onboarding"
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ interface TodayViewProps {
     initialUnreadCount: number
     initialBriefingError: boolean
     initialPulseError: boolean
+    initialOnboardingData?: OnboardingData & { _userRole?: string }
 }
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -112,6 +115,7 @@ export function TodayView({
     initialUnreadCount,
     initialBriefingError,
     initialPulseError,
+    initialOnboardingData,
 }: TodayViewProps): React.ReactElement {
     const [briefing, setBriefing] = useState<MorningBriefing | null>(initialBriefing)
     const [pulse, setPulse] = useState<FormattedReport | null>(initialPulse)
@@ -223,37 +227,100 @@ export function TodayView({
     // ─── Welcome state for new users / full error state ──────────
 
     if (bothFailed) {
+        const userRole = initialOnboardingData?._userRole
         return (
             <div className="max-w-5xl space-y-8">
                 <PageHeader />
+
+                {/* Getting Started Hero — shown for new users even in empty state */}
+                {initialOnboardingData && (
+                    <GettingStartedHero onboardingData={initialOnboardingData} userRole={userRole} />
+                )}
+
                 <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03]">
                     <CardContent className="pt-8 pb-8 flex flex-col items-center gap-5 text-center">
                         <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-international-orange/10">
                             <Sun className="h-7 w-7 text-international-orange" />
                         </div>
-                        <div className="space-y-2 max-w-md">
-                            <p className="text-xl font-bold text-foreground">
-                                Welcome to ForgeOS
-                            </p>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                Your daily briefing will appear here once you start creating objectives and tasks.
-                                Get started by setting up your first goal.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-3 justify-center">
-                            <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
-                                <Link href="/new-objectives">
-                                    <Target className="h-3.5 w-3.5" />
-                                    Create your first objective
-                                </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild className="gap-1.5">
-                                <Link href="/strategy">
-                                    <Waypoints className="h-3.5 w-3.5" />
-                                    Explore strategy
-                                </Link>
-                            </Button>
-                        </div>
+
+                        {userRole === 'Executive' ? (
+                            <>
+                                <div className="space-y-2 max-w-md">
+                                    <p className="text-xl font-bold text-foreground">
+                                        Ventures are looking for executives like you.
+                                    </p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Complete your profile so ventures can find you, then browse what&apos;s available in the marketplace.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-3 justify-center">
+                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                                        <Link href="/my-profile">
+                                            <Target className="h-3.5 w-3.5" />
+                                            Complete your profile
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                        <Link href="/marketplace">
+                                            <Waypoints className="h-3.5 w-3.5" />
+                                            Browse the marketplace
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </>
+                        ) : userRole === 'Apprentice' ? (
+                            <>
+                                <div className="space-y-2 max-w-md">
+                                    <p className="text-xl font-bold text-foreground">
+                                        Your training toolkit is ready.
+                                    </p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Start your first training objective and explore the tools that will make you 10x more productive.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-3 justify-center">
+                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                                        <Link href="/objectives">
+                                            <Target className="h-3.5 w-3.5" />
+                                            Start your training
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                        <Link href="/the-forge">
+                                            <Waypoints className="h-3.5 w-3.5" />
+                                            Explore the toolkit
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="space-y-2 max-w-md">
+                                    <p className="text-xl font-bold text-foreground">
+                                        Welcome to ForgeOS
+                                    </p>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Your daily briefing will appear here once you start creating objectives and tasks.
+                                        Get started by setting up your first goal.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-3 justify-center">
+                                    <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
+                                        <Link href="/new-objectives">
+                                            <Target className="h-3.5 w-3.5" />
+                                            Create your first objective
+                                        </Link>
+                                    </Button>
+                                    <Button variant="outline" size="sm" asChild className="gap-1.5">
+                                        <Link href="/strategy">
+                                            <Waypoints className="h-3.5 w-3.5" />
+                                            Explore strategy
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+
                         <Button onClick={loadData} variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground">
                             <RefreshCw className="h-3 w-3" />
                             Retry loading
@@ -276,6 +343,11 @@ export function TodayView({
     return (
         <div className="max-w-5xl space-y-8">
             <PageHeader />
+
+            {/* Getting Started Hero Checklist — shown for new users */}
+            {initialOnboardingData && (
+                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} />
+            )}
 
             {/* Running Low on AI Tasks — Referral Nudge */}
             <ReferralNudgeBanner />

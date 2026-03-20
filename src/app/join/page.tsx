@@ -25,6 +25,7 @@ import type { SignupState } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
 import { lookupReferrer, getFoundingMemberCount } from "@/actions/referrals";
 import { Gift } from "lucide-react";
+import { PasswordStrength } from "@/components/ui/password-strength";
 
 /** Total founding member spots available */
 const TOTAL_FOUNDING_SPOTS = 100;
@@ -183,6 +184,7 @@ function JoinPageInner() {
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
   const [foundingCount, setFoundingCount] = useState(53); // sensible default
+  const [passwordValue, setPasswordValue] = useState("");
 
   // Set forge_ref cookie when ?ref= param is present
   useEffect(() => {
@@ -326,6 +328,7 @@ function JoinPageInner() {
                   type="password"
                   placeholder="Create a strong password"
                   defaultValue=""
+                  onChange={(e) => setPasswordValue(e.target.value)}
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
@@ -335,6 +338,7 @@ function JoinPageInner() {
                 <p id="password-hint" className="text-xs text-muted-foreground">
                   Min 8 characters, with uppercase, lowercase, and a number
                 </p>
+                <PasswordStrength password={passwordValue} />
               </div>
 
               <motion.div
@@ -697,6 +701,7 @@ function JoinPageInner() {
                       type="password"
                       placeholder="Create a strong password"
                       defaultValue=""
+                      onChange={(e) => setPasswordValue(e.target.value)}
                       className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       required
                       aria-required="true"
@@ -709,6 +714,7 @@ function JoinPageInner() {
                     >
                       Min 8 characters, with uppercase, lowercase, and a number
                     </p>
+                    <PasswordStrength password={passwordValue} />
                   </div>
 
                   {/* Founder-specific fields */}

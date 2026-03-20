@@ -22,9 +22,9 @@ import { cn } from '@/lib/utils'
 import { FORGE_ROUTES } from '@/lib/forge-routes'
 import type { OnboardingData } from '@/actions/onboarding'
 
-const TOTAL_ITEMS = 6
+export const CHECKLIST_TOTAL_ITEMS = 6
 
-const CHECKLIST_ITEMS: Array<{
+export const CHECKLIST_ITEMS: Array<{
   key: keyof OnboardingData
   label: string
   href?: string
@@ -88,8 +88,8 @@ export function GettingStartedChecklist({
     return CHECKLIST_ITEMS.filter((item) => onboardingData[item.key] === true).length
   }, [onboardingData])
 
-  const isFullyComplete = completedCount === TOTAL_ITEMS
-  const showDismissButton = completedCount >= TOTAL_ITEMS / 2
+  const isFullyComplete = completedCount === CHECKLIST_TOTAL_ITEMS
+  const showDismissButton = completedCount >= CHECKLIST_TOTAL_ITEMS / 2
 
   const handleCheckboxClick = useCallback(
     (key: string) => {
@@ -162,11 +162,11 @@ export function GettingStartedChecklist({
               {/* Header */}
               <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <ProgressRing size={32} value={completedCount} total={TOTAL_ITEMS} />
+                  <ProgressRing size={32} value={completedCount} total={CHECKLIST_TOTAL_ITEMS} />
                   <div>
                     <h3 className="text-sm font-semibold text-foreground">Getting Started</h3>
                     <p className="text-xs text-muted-foreground">
-                      {completedCount}/{TOTAL_ITEMS} complete
+                      {completedCount}/{CHECKLIST_TOTAL_ITEMS} complete
                     </p>
                   </div>
                 </div>
@@ -271,12 +271,12 @@ export function GettingStartedChecklist({
               'flex w-full items-center gap-3 rounded-xl border bg-card px-3 py-2.5',
               'text-left transition-colors hover:bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-international-orange focus-visible:ring-offset-1'
             )}
-            aria-label={`Getting Started checklist: ${completedCount} of ${TOTAL_ITEMS} complete. Click to expand.`}
+            aria-label={`Getting Started checklist: ${completedCount} of ${CHECKLIST_TOTAL_ITEMS} complete. Click to expand.`}
           >
-            <ProgressRing size={32} value={completedCount} total={TOTAL_ITEMS} />
+            <ProgressRing size={32} value={completedCount} total={CHECKLIST_TOTAL_ITEMS} />
             <span className="text-sm font-medium text-foreground">Getting Started</span>
             <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-              {completedCount}/{TOTAL_ITEMS}
+              {completedCount}/{CHECKLIST_TOTAL_ITEMS}
             </span>
             <ChevronUp className="h-4 w-4 text-muted-foreground rotate-180" />
           </motion.button>

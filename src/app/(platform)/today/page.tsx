@@ -16,7 +16,7 @@ import { getMyDailyPulse, type DailyPulseResult } from "@/actions/reports"
 import { getStrategyHealthSummary } from "@/actions/canvas"
 import { getUnreadCount } from "@/actions/messaging"
 import { TodayView } from "./today-view"
-import { SetupWizardTrigger } from "@/components/onboarding/setup-wizard-trigger"
+import { getOnboardingState } from "@/actions/onboarding"
 
 export const metadata: Metadata = {
     title: "Today | ForgeOS",
@@ -24,16 +24,16 @@ export const metadata: Metadata = {
 }
 
 export default async function TodayPage(): Promise<React.ReactNode> {
-    const [briefingResult, pulseResult, strategyResult, unreadResult] = await Promise.all([
+    const [briefingResult, pulseResult, strategyResult, unreadResult, onboardingState] = await Promise.all([
         getMorningBriefing().catch(() => ({ data: null, error: "Failed" })),
         getMyDailyPulse().catch(() => ({ success: false, data: undefined, error: "Failed" }) as DailyPulseResult),
         getStrategyHealthSummary().catch(() => ({ error: "Failed" }) as { error: string }),
         getUnreadCount().catch(() => ({ count: 0 })),
+        getOnboardingState().catch(() => ({})),
     ])
 
     return (
         <>
-            <SetupWizardTrigger />
             <TodayView
                 initialBriefing={briefingResult.data ?? null}
                 initialPulse={pulseResult.success && pulseResult.data ? pulseResult.data : null}
@@ -41,6 +41,7 @@ export default async function TodayPage(): Promise<React.ReactNode> {
                 initialUnreadCount={unreadResult?.count ?? 0}
                 initialBriefingError={!briefingResult.data}
                 initialPulseError={!pulseResult.success || !pulseResult.data}
+                initialOnboardingData={onboardingState}
             />
         </>
     )

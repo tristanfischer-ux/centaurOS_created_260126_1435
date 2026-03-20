@@ -8,7 +8,7 @@ import { KeyboardShortcutsDialog } from "@/components/KeyboardShortcutsDialog";
 import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
-import { OnboardingModal } from "@/components/OnboardingModal";
+import { UnifiedOnboarding } from "@/components/onboarding/unified-onboarding";
 import { WelcomeBackBanner } from "@/components/WelcomeBackBanner";
 import { ExecutiveProfilePrompt, VerificationSuccessToast } from "@/components/onboarding";
 import { ActivityTracker } from "@/components/ActivityTracker";
@@ -137,7 +137,7 @@ export default async function PlatformLayout({
                         <ActivityTracker />
                         {!needsProfileRepair && (
                             <>
-                                <OnboardingModal userRole={profile?.role ?? undefined} accountType={profile?.account_type} />
+                                <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} />
                                 <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} />
                             </>
                         )}
