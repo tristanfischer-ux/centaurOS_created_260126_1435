@@ -318,7 +318,7 @@ export function useSpecialistChat({
             modelId,
             modelTier,
             systemPromptSuffix: fullSystemPrompt,
-            voice: "alloy",
+            voice: specialist.voice,
             deepThinkEnabled,
         }).catch((err) => {
             console.error("[useSpecialistChat] Engine connect failed:", err)

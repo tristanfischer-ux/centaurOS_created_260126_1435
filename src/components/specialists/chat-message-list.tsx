@@ -49,6 +49,8 @@ interface ChatMessageListProps {
     messageFeedback: Record<number, 'positive' | 'negative'>
     /** Called when the user clicks thumbs up/down on an assistant message */
     onFeedback: (messageIndex: number, rating: 'positive' | 'negative') => void
+    /** TTS state — controls avatar speaking/idle indicator */
+    tts: { isPlaying: boolean; isLoading: boolean }
     /**
      * compact=true: panel mode — tighter gaps, smaller padding, wider max-width
      * compact=false (default): dialog mode — more spacious
@@ -70,6 +72,7 @@ export function ChatMessageList({
     specialist,
     messageFeedback,
     onFeedback,
+    tts,
     compact = false,
 }: ChatMessageListProps) {
     return (
@@ -108,7 +111,7 @@ export function ChatMessageList({
                                 <div className="flex flex-col items-center gap-1 flex-shrink-0 mt-1">
                                     <SpecialistChatAvatar
                                         specialist={specialist}
-                                        state="idle"
+                                        state={isLastAssistant && (tts.isPlaying || tts.isLoading) ? "speaking" : "idle"}
                                     />
                                 </div>
                             )}

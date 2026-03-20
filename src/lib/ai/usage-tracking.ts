@@ -33,6 +33,7 @@ export type AIFeature =
   | 'coverage_assessment'
   | 'business_plan_analysis'
   | 'talent_match'
+  | 'specialist_tts'
   | 'specialist_stt'
   | 'specialist_voice'    // Tier 2: Real-time voice session
   | 'specialist_avatar'   // Tier 3/4: Avatar video session

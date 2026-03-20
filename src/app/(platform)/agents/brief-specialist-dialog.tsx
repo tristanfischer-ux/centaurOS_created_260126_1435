@@ -24,7 +24,7 @@ import {
 import {
     Loader2, Send, AlertCircle, Copy, Check, Eye, AlertTriangle,
     MessageSquareQuote, ArrowRight, Clock, ChevronDown, ChevronUp,
-    History, Mic, MicOff, Sparkles, Brain, X,
+    History, Mic, MicOff, Volume2, VolumeX, Sparkles, Brain, X,
     HelpCircle,
     Paperclip,
     FileIcon,
@@ -88,6 +88,7 @@ import type { DecisionEntry } from "@/lib/agents/decision-journal"
 import { exportAsPDF } from "@/lib/export-utils"
 import { getSpecialistById, SPECIALISTS } from "./specialists-data"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
+import { useTts } from "@/hooks/use-tts"
 import { useScreenContext } from "@/contexts/screen-context"
 import { useBrowseContext } from "@/contexts/browse-context"
 import { parseSlideDeckFromText } from "@/lib/ai-providers/slide-parser"
@@ -390,6 +391,7 @@ export function BriefSpecialistDialog({
     const { formatForPrompt: formatBrowseContext } = useBrowseContext()
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
+    const tts = useTts()
     const speechRecognition = useSpeechRecognition({
         onResult: (transcript) => {
             setBriefText((prev) => (prev ? prev + " " + transcript : transcript))
@@ -406,6 +408,8 @@ export function BriefSpecialistDialog({
     // ─── Initialize Thread & Cross-Specialist Context on Open ─────────
     useEffect(() => {
         if (!open) {
+            // Stop voice when dialog closes
+            tts.stop()
             if (speechRecognition.isListening) speechRecognition.stop()
             return
         }
@@ -843,6 +847,13 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
                     timestamp: new Date(),
                 }
                 setMessages((prev) => [...prev, greetingMessage])
+
+                // Auto-play greeting via TTS if voice is enabled (chunked for faster start)
+                if (tts.voiceEnabled && specialist.voice) {
+                    tts.playChunked(cleaned, specialist.voice).catch((err) => {
+                        console.warn("[BriefDialog] Greeting TTS failed:", err)
+                    })
+                }
             } catch (err) {
                 if (err instanceof Error && err.name === "AbortError") return
                 // Greeting failed — show static fallback so the user still sees an in-character opening
@@ -866,7 +877,7 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
             controller.abort()
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- messages accessed via messagesSnapshotRef to prevent greeting abort on message changes
-    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, threadId, crossSpecialistContext])
+    }, [isLoadingThread, open, specialist.id, specialist.name, specialist.title, specialist.workingStyle, specialist.voice, threadId, crossSpecialistContext, tts.voiceEnabled, tts.playChunked])
 
     // ─── Handlers ─────────────────────────────────────────────────────────
 
@@ -876,6 +887,9 @@ ${contextParts.length > 0 ? contextParts.join("\n\n") + "\n\n" : ""}{{input}}
             setError("Tell your specialist what you need.")
             return
         }
+
+        // AUDIO: Unlock AudioContext on user gesture (click "Go") so TTS works later
+        tts.warmUp()
 
         // Add user message to chat
         const userMessage: ChatMessage = {
@@ -959,6 +973,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             ? `{{input}}\n\n{{company_context}}`
             : `You are ${specialist.name}, the ${specialist.title} specialist for this company. ${specialist.workingStyle}\n\n{{input}}\n\n{{company_context}}\n\nProvide a thorough, actionable response that demonstrates deep expertise. Use markdown formatting with headers, tables, and bullet points for clarity.`
 
+        // Determine if we should stream TTS (declared before try so catch can stop it)
+        const isTtsStreaming = tts.voiceEnabled && !!specialist.voice
         const isSlideRequest = detectPresentationIntent(userInput)
 
         try {
@@ -1041,6 +1057,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 const reader = res.body?.getReader()
                 if (!reader) throw new Error("No response body")
 
+                // Start streaming TTS so speech begins as sentences arrive
+                if (isTtsStreaming && attempt === 1) {
+                    tts.startStreaming(specialist.voice)
+                }
+
                 const decoder = new TextDecoder()
                 fullResponse = ""
                 let streamError: string | null = null
@@ -1102,6 +1123,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 const visibleFast = stripComplexityTags(stripPartialThinkTags(specFastFull))
                                                 setSpeculativeFastResponse(visibleFast)
                                                 setStreamingResponse(visibleFast)
+                                                if (isTtsStreaming) {
+                                                    tts.feedStreamingText(visibleFast)
+                                                }
                                             }
                                         } else if (parsed.stream === "deep") {
                                             if (parsed.done) {
@@ -1119,6 +1143,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 setSpeculativeDeepResponse(visibleDeep)
                                                 const combinedStreaming = stripComplexityTags(specFastFull) + "\n\n" + visibleDeep
                                                 setStreamingResponse(combinedStreaming.trim())
+                                                if (isTtsStreaming) {
+                                                    tts.feedStreamingText(combinedStreaming.trim())
+                                                }
                                             }
                                         }
                                         continue
@@ -1143,12 +1170,18 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                         fullResponse += parsed.text
                                         const strippedText = stripPartialThinkTags(fullResponse)
                                         setStreamingResponse(strippedText)
+                                        if (isTtsStreaming) {
+                                            tts.feedStreamingText(strippedText)
+                                        }
                                     }
                                 } catch {
                                     if (!useSpeculative) {
                                         fullResponse += data
                                         const strippedText = stripPartialThinkTags(fullResponse)
                                         setStreamingResponse(strippedText)
+                                        if (isTtsStreaming) {
+                                            tts.feedStreamingText(strippedText)
+                                        }
                                     }
                                 }
                             }
@@ -1174,10 +1207,12 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         // Reset streaming state for retry
                         setStreamingResponse("")
                         fullResponse = ""
+                        if (isTtsStreaming) tts.stop()
                         continue // Retry
                     }
 
                     // No more retries — surface the error
+                    if (isTtsStreaming) tts.stop()
                     setError(normalizeSpecialistError(streamError, specialist.name))
                     return
                 }
@@ -1370,6 +1405,11 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                 if (related.length > 0) setDecisionPrompts(related)
             }).catch(() => {})
 
+            // Finish streaming TTS with the cleaned display text (plays any remaining sentence)
+            if (isTtsStreaming) {
+                tts.finishStreaming(displayResponse)
+            }
+
             // Auto-save to deliverables with smart content type detection
             const matchedWorkflow = detectWorkflowTrigger(userMessage.content, specialist.id as SpecialistId)
             const artifactTitle = matchedWorkflow
@@ -1412,6 +1452,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             })
 
         } catch (err) {
+            if (isTtsStreaming) tts.stop()
             if (err instanceof Error && err.name === "AbortError") return
             const message = err instanceof Error ? err.message : "Unknown error"
             console.error("[BriefDialog] Execution failed:", { specialist: specialist.id, error: message })
@@ -1423,7 +1464,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
             setIsUrgentMessage(false)
             setIsSpeculativeMode(false)
         }
-    }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, handoffSourceThreadId, handoffSourceSpecialistId, messages, pendingAttachments, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
+    }, [briefText, specialist, threadId, crossSpecialistContext, handoffContext, handoffSourceThreadId, handoffSourceSpecialistId, messages, pendingAttachments, tts.voiceEnabled, tts.warmUp, tts.startStreaming, tts.feedStreamingText, tts.finishStreaming, tts.stop, deepThinkEnabled, serializeScreenContext, formatBrowseContext])
 
     const handleCopyLast = useCallback(async () => {
         const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
@@ -2056,6 +2097,27 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                         {screenContext.pageTitle}
                     </Badge>
                 ) : null}
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                        const enabling = !tts.voiceEnabled
+                        tts.setVoiceEnabled(enabling)
+                        if (enabling) tts.warmUp()
+                    }}
+                    className={cn(
+                        "h-7 w-7 p-0",
+                        tts.voiceEnabled && "text-international-orange",
+                        tts.isPlaying && "animate-pulse"
+                    )}
+                    aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
+                >
+                    {tts.voiceEnabled ? (
+                        <Volume2 className="h-3.5 w-3.5" />
+                    ) : (
+                        <VolumeX className="h-3.5 w-3.5" />
+                    )}
+                </Button>
                 {threadId && (
                     <Button
                         variant="ghost"
@@ -2232,7 +2294,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     specialist={specialist}
                                     messageFeedback={messageFeedback}
                                     onFeedback={handleFeedback}
-
+                                    tts={tts}
                                     compact
                                 />
 
@@ -2954,6 +3016,29 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     <Maximize2 className="h-3.5 w-3.5" />
                                 )}
                             </Button>
+                            {/* Voice output toggle */}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    const enabling = !tts.voiceEnabled
+                                    tts.setVoiceEnabled(enabling)
+                                    // Unlock AudioContext when enabling voice via this user gesture
+                                    if (enabling) tts.warmUp()
+                                }}
+                                className={cn(
+                                    "h-7 w-7 p-0",
+                                    tts.voiceEnabled && "text-international-orange",
+                                    tts.isPlaying && "animate-pulse"
+                                )}
+                                aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
+                            >
+                                {tts.voiceEnabled ? (
+                                    <Volume2 className="h-4 w-4" />
+                                ) : (
+                                    <VolumeX className="h-4 w-4" />
+                                )}
+                            </Button>
                             {threadId && (
                                 <Button
                                     variant="ghost"
@@ -3118,7 +3203,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     specialist={specialist}
                                     messageFeedback={messageFeedback}
                                     onFeedback={handleFeedback}
-
+                                    tts={tts}
                                 />
 
                                 {/* Decision outcome prompts — surfaces pending decisions matching the last response */}

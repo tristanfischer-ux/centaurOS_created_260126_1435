@@ -84,6 +84,8 @@ export interface Specialist {
     avatarImage?: string
     /** IDs of specialists to suggest after this one completes a brief */
     suggestedNext?: SpecialistId[]
+    /** OpenAI TTS voice ID for spoken output */
+    voice: string
     /** Department grouping for org chart (e.g., "Strategy", "Technology", "Finance") */
     department: string
     /** Specialist ID this person reports to (null = direct CEO report) */
@@ -192,6 +194,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/strategist.png",
         suggestedNext: ["cto", "finance-lead"],
+        voice: "echo",
         department: "Strategy",
         reportsTo: null,
         inspiredBy: "Jeff Bezos",
@@ -289,6 +292,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/cto.png",
         suggestedNext: ["vp-engineering", "product-lead", "vp-manufacturing"],
+        voice: "onyx",
         department: "Technology",
         reportsTo: null,
         inspiredBy: "Elon Musk + Jensen Huang",
@@ -381,6 +385,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/vp-engineering.png",
         suggestedNext: ["cto", "product-lead", "hiring-team"],
+        voice: "ash",
         department: "Technology",
         reportsTo: "cto",
         inspiredBy: "Andy Grove",
@@ -472,6 +477,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/vp-manufacturing.png",
         suggestedNext: ["vp-supply-chain", "cto", "product-lead"],
+        voice: "fable",
         department: "Technology",
         reportsTo: "cto",
         inspiredBy: "Taiichi Ohno + Elon Musk",
@@ -562,6 +568,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/vp-supply-chain.png",
         suggestedNext: ["vp-manufacturing", "cto", "finance-lead"],
+        voice: "sage",
         department: "Technology",
         reportsTo: "cto",
         inspiredBy: "Tim Cook",
@@ -658,6 +665,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/product-lead.png",
         suggestedNext: ["cto", "growth-marketer", "vp-engineering"],
+        voice: "alloy",
         department: "Product",
         reportsTo: "cto",
         inspiredBy: "Steve Jobs",
@@ -762,6 +770,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/growth-marketer.png",
         suggestedNext: ["sales-lead", "product-lead"],
+        voice: "shimmer",
         department: "Growth",
         reportsTo: "strategist",
         inspiredBy: "Seth Godin",
@@ -863,6 +872,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/sales-lead.png",
         suggestedNext: ["growth-marketer", "finance-lead"],
+        voice: "ash",
         department: "Growth",
         reportsTo: "strategist",
         inspiredBy: "Marc Benioff",
@@ -959,6 +969,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/chief-of-staff.png",
         suggestedNext: ["strategist", "finance-lead"],
+        voice: "onyx",
         department: "Operations",
         reportsTo: null,
         inspiredBy: "Sheryl Sandberg",
@@ -1056,6 +1067,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: true,
         avatarImage: "/images/specialists/finance-lead.png",
         suggestedNext: ["fundraising-advisor", "strategist"],
+        voice: "sage",
         department: "Finance",
         reportsTo: "legal-counsel",
         inspiredBy: "Charlie Munger",
@@ -1156,6 +1168,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/fundraising-advisor.png",
         suggestedNext: ["finance-lead", "legal-counsel"],
+        voice: "coral",
         department: "Finance",
         reportsTo: "finance-lead",
         inspiredBy: "Ben Horowitz",
@@ -1251,6 +1264,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/hiring-team.png",
         suggestedNext: ["legal-counsel", "chief-of-staff"],
+        voice: "nova",
         department: "People",
         reportsTo: "legal-counsel",
         inspiredBy: "Patty McCord",
@@ -1348,6 +1362,7 @@ export const SPECIALISTS: Specialist[] = [
         recommended: false,
         avatarImage: "/images/specialists/legal-counsel.png",
         suggestedNext: ["hiring-team", "finance-lead"],
+        voice: "fable",
         department: "Legal",
         reportsTo: null,
         inspiredBy: "David Boies",

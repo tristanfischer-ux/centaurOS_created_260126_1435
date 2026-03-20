@@ -12,6 +12,7 @@
  * @related
  * - src/lib/agents/conversation-engine.ts — Interface definition
  * - src/app/api/agents/execute/route.ts — SSE endpoint this engine calls
+ * - src/hooks/use-tts.ts — TTS playback (managed externally by the UI)
  */
 
 import type {
