@@ -534,7 +534,7 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 
 /** Feature comparison data */
 const COMPARISON_FEATURES = [
-  { name: 'Smart assists per month', free: '20', starter: '100', professional: '500' },
+  { name: 'Smart assists per month', free: '50', starter: '100', professional: '500' },
   { name: 'Team members', free: '1', starter: '3', professional: '10' },
   { name: 'Orders per month', free: '5', starter: '25', professional: 'Unlimited' },
   { name: 'Active retainers', free: false as boolean | string, starter: '1', professional: 'Unlimited' },

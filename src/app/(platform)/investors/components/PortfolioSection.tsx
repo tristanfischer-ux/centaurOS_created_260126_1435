@@ -46,8 +46,8 @@ export function PortfolioSection({ companies }: PortfolioSectionProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {companies.map((company) => (
-            <div key={company.company_name} className="p-3 rounded-lg bg-muted/50">
+          {companies.map((company, i) => (
+            <div key={`${company.company_name}-${i}`} className="p-3 rounded-lg bg-muted/50">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground">{company.company_name}</p>

@@ -185,7 +185,8 @@ function stripTierGatedFields(firm: InvestorFirm, access: InvestorTierAccess): I
     delete stripped.attributes.exits
     delete stripped.attributes.fund_performance
     delete stripped.attributes.fact_check_status
-    delete stripped.attributes.hardware_fit_score
+    // DECISION: Don't strip hardware_fit_score — UI gates display (shows lock for
+    // non-professional, score for professional). The 0-10 value is not sensitive.
   }
 
   if (!access.deepAccess) {

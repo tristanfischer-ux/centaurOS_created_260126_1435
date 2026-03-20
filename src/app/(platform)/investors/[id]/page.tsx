@@ -432,7 +432,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     <p className="text-sm font-semibold text-foreground">{formatFundSize(attrs.fund_size_gbp)}</p>
                   </div>
                 )}
-                {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min || attrs.cheque_range_gbp.max) && (
+                {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cheque Size</p>
                     <p className="text-sm font-semibold text-foreground">
