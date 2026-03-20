@@ -89,6 +89,7 @@ import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommender"
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
+import { GetQuoteButton } from "@/components/cad/get-quote-button"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -163,6 +164,9 @@ export default function SpecifyPage(): React.ReactNode {
     imagesStale,
     isRegeneratingImages,
     progressLines,
+    linkedRfqId,
+    linkRfqToProject,
+    assumptionNotes,
   } = useCadLab()
 
   // INTENT: Compute model audit data from modules for attribution display.
@@ -510,6 +514,20 @@ export default function SpecifyPage(): React.ReactNode {
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Design
           </Button>
+          {diagStats.modulesComplete > 0 && (
+            <GetQuoteButton
+              projectId={activeProjectId}
+              pipelineStage="specify"
+              modules={modules}
+              diagnosticAnswers={diagnosticAnswers}
+              designBrief={designBrief}
+              assumptionNotes={assumptionNotes}
+              projectName={subject}
+              linkedRfqId={linkedRfqId}
+              onRfqLinked={linkRfqToProject}
+              size="sm"
+            />
+          )}
           {canProceedToSource && (
             <Button size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
               Continue to Source

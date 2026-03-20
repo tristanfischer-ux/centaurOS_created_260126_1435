@@ -263,6 +263,34 @@ export interface UpdateRFQResponseParams {
 }
 
 // =============================================
+// MANUFACTURING RFQ SPECS (from CAD Lab)
+// =============================================
+
+/** Structured manufacturing specs extracted from CAD Lab modules + diagnostics */
+export interface ManufacturingRFQSpecs {
+  parts: Array<{
+    name: string
+    process: string | null
+    material: string | null
+    tolerance: string | null
+    finish: string | null
+    quantity: number
+    dimensions?: { xLen?: number; yLen?: number; zLen?: number }
+    mass_kg?: number
+    mass_is_estimated?: boolean
+    step_file_url?: string
+    drawing_url?: string
+  }>
+  total_quantity: number
+  estimated_budget_gbp?: {
+    min: number
+    max: number
+    confidence: 'low' | 'medium' | 'high'
+  }
+  notes?: string
+}
+
+// =============================================
 // FILTER/QUERY TYPES
 // =============================================
 

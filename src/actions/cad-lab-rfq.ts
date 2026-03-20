@@ -16,6 +16,9 @@ import {
   isDiagnosticsComplete,
 } from "@/lib/cad-lab-readiness"
 import { computeCadLabQualityScorecard } from "@/lib/cad-lab-quality-scorecard"
+import { getModuleMassKg } from "@/lib/cad-lab-cost-constants"
+import { estimateAssemblyCost, type CostEstimateInput } from "@/lib/cost-estimate-engine"
+import type { ManufacturingRFQSpecs } from "@/types/rfq"
 
 interface CreateCadLabRfqInput {
   projectName: string
@@ -268,11 +271,79 @@ export async function createCadLabRfqAction(
     "Suppliers should review attached drawing manifests and CAD artifacts before quoting.",
   ]
 
+  // INTENT: Build structured manufacturing specs + cost estimate for downstream consumption.
+  const manufacturingParts: ManufacturingRFQSpecs["parts"] = eligibleModules.map((module) => {
+    const diag = input.diagnosticAnswers[module.id] || {}
+    const moduleText = [module.name, module.purpose, ...(module.keyParts ?? [])].join(" ")
+    const { massKg, isEstimated } = getModuleMassKg(
+      module.result?.massProperties?.massKg,
+      module.result?.massGrams,
+      0.2,
+      moduleText,
+      module.estimatedMassKg,
+    )
+    const drawingFiles = module.result?.drawingPackage?.files ?? []
+    const stepFile = drawingFiles.find((f) => /\.step$/i.test(f.name))
+    const drawingFile = drawingFiles.find((f) => /\.pdf$/i.test(f.name))
+
+    return {
+      name: module.name,
+      process: diag.mfg_process || null,
+      material: diag.material || null,
+      tolerance: diag.tolerance || null,
+      finish: diag.finish || null,
+      quantity: estimatedQuantity ?? 1,
+      dimensions: module.result?.bbox
+        ? { xLen: module.result.bbox.xLen, yLen: module.result.bbox.yLen, zLen: module.result.bbox.zLen }
+        : undefined,
+      mass_kg: massKg,
+      mass_is_estimated: isEstimated,
+      step_file_url: stepFile?.url,
+      drawing_url: drawingFile?.url,
+    }
+  })
+
+  // INTENT: Use index-based lookup — manufacturingParts is built from eligibleModules in the same order.
+  const costInputs: CostEstimateInput[] = manufacturingParts.map((part, idx) => {
+    const moduleId = eligibleModules[idx].id
+    const diag = input.diagnosticAnswers[moduleId] || {}
+    return {
+      name: part.name,
+      process: part.process,
+      material: part.material,
+      tolerance: part.tolerance,
+      finish: part.finish,
+      environment: diag.environment || null,
+      batchSize: diag.batch_size || null,
+      massKg: part.mass_kg ?? 0.2,
+      massIsEstimated: part.mass_is_estimated ?? true,
+    }
+  })
+  const costEstimate = estimateAssemblyCost(costInputs)
+
+  const manufacturingSpecs: ManufacturingRFQSpecs = {
+    parts: manufacturingParts,
+    total_quantity: estimatedQuantity ?? 1,
+    estimated_budget_gbp: {
+      min: costEstimate.totalMinGbp,
+      max: costEstimate.totalMaxGbp,
+      confidence: costEstimate.confidence,
+    },
+    notes: input.assumptionNotes?.trim() || undefined,
+  }
+
+  // DECISION: Single-module standard parts get commodity RFQ type for simpler supplier matching.
+  const rfqType = eligibleModules.length === 1 && !input.designBrief?.complianceNotes?.trim()
+    ? "commodity" as const
+    : "custom" as const
+
   const rfqResult = await createNewRFQ({
     title: `${input.projectName} — Manufacturing RFQ`,
-    rfq_type: "custom",
+    rfq_type: rfqType,
     category: "Custom Manufacturing",
     deadline: input.deadline || null,
+    budget_min: Math.round(costEstimate.totalMinGbp * 100) / 100 || undefined,
+    budget_max: Math.round(costEstimate.totalMaxGbp * 100) / 100 || undefined,
     specifications: {
       description: descriptionLines.join("\n"),
       quantity: estimatedQuantity,
@@ -291,6 +362,7 @@ export async function createCadLabRfqAction(
         module_blockers: moduleBlockers,
         quality_scorecard: qualityScorecard,
         modules: moduleSpecs,
+        manufacturing_specs: manufacturingSpecs,
       },
     },
   })

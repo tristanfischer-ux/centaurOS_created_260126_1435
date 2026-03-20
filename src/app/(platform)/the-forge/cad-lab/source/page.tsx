@@ -47,6 +47,7 @@ import { SupplierIntelligenceTab } from "@/components/cad/supplier-intelligence-
 import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { classifyPart } from "@/lib/part-classification"
+import { GetQuoteButton } from "@/components/cad/get-quote-button"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -84,6 +85,8 @@ export default function SourcePage(): React.ReactNode {
     partCategoryOverrides,
     setPartCategoryOverride,
     clearPartCategoryOverride,
+    linkedRfqId,
+    linkRfqToProject,
   } = useCadLab()
 
   // Gate: redirect to Specify if no specified modules
@@ -578,6 +581,18 @@ export default function SourcePage(): React.ReactNode {
             <ArrowLeft className="h-4 w-4 mr-1.5" />
             Specify
           </Button>
+          <GetQuoteButton
+            projectId={activeProjectId}
+            pipelineStage="source"
+            modules={modules}
+            diagnosticAnswers={diagnosticAnswers}
+            designBrief={designBrief}
+            assumptionNotes={assumptionNotes}
+            projectName={subject}
+            linkedRfqId={linkedRfqId}
+            onRfqLinked={linkRfqToProject}
+            size="sm"
+          />
         </div>
       </div>
 

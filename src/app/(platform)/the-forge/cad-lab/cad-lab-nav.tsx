@@ -34,6 +34,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { useCadLab } from "./cad-lab-context"
+import { GetQuoteButton } from "@/components/cad/get-quote-button"
 
 // ─── Stage Definitions ───────────────────────────────────────────────
 
@@ -253,7 +254,10 @@ export function CadLabBottomNav(): React.ReactNode {
  */
 export function CadLabNav({ className }: { className?: string }): React.ReactNode {
   const pathname = usePathname()
-  const { hasResearch, modules, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete } = useCadLab()
+  const {
+    hasResearch, modules, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete,
+    subject, diagnosticAnswers, designBrief, assumptionNotes, activeProjectId, linkedRfqId, linkRfqToProject,
+  } = useCadLab()
   const [previewStageId, setPreviewStageId] = useState<string | null>(null)
 
   const access = getStageAccess(hasResearch, modules.length, specifiedModuleCount, manufacturingOrderCount, isSpecificationComplete)
@@ -351,6 +355,29 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
             )
           })}
         </div>
+
+        {/* Get Quote — accessible from any pipeline stage when modules are specified */}
+        {specifiedModuleCount > 0 && !linkedRfqId && (
+          <div className="ml-4 flex-shrink-0 self-center">
+            <GetQuoteButton
+              projectId={activeProjectId}
+              pipelineStage={
+                pathname.includes("/source") ? "source"
+                : pathname.includes("/specify") ? "specify"
+                : pathname.includes("/assemble") ? "assemble"
+                : "design"
+              }
+              modules={modules}
+              diagnosticAnswers={diagnosticAnswers as Record<string, Record<string, string>>}
+              designBrief={designBrief}
+              assumptionNotes={assumptionNotes}
+              projectName={subject}
+              linkedRfqId={linkedRfqId}
+              onRfqLinked={linkRfqToProject}
+              size="sm"
+            />
+          </div>
+        )}
       </nav>
 
       {/* Locked-stage preview dialog */}

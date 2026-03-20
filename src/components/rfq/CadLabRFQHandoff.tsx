@@ -22,6 +22,9 @@ import {
 } from 'lucide-react'
 import { createCadLabRfqAction } from '@/actions/cad-lab-rfq'
 import { toast } from 'sonner'
+import { InstantEstimateCard } from '@/components/rfq/instant-estimate-card'
+import { getModuleMassKg } from '@/lib/cad-lab-cost-constants'
+import type { CostEstimateInput } from '@/lib/cost-estimate-engine'
 
 interface CadLabModule {
   name: string
@@ -31,6 +34,14 @@ interface CadLabModule {
   tolerance?: string
   finish?: string
   quantity?: number
+  id?: string
+  purpose?: string
+  keyParts?: string[]
+  result?: {
+    massProperties?: { massKg?: number }
+    massGrams?: number
+  }
+  estimatedMassKg?: number
 }
 
 interface CadLabRFQHandoffProps {
@@ -61,7 +72,7 @@ export function CadLabRFQHandoff({
   const [isPending, startTransition] = useTransition()
   const [deadline, setDeadline] = useState('')
   const [moduleOverrides, setModuleOverrides] = useState<
-    Record<number, { quantity?: number; material?: string; tolerance?: string; finish?: string }>
+    Record<number, { quantity?: number; material?: string; tolerance?: string; finish?: string; process?: string }>
   >({})
 
   // Calculate readiness
@@ -239,6 +250,34 @@ export function CadLabRFQHandoff({
             disabled={isPending}
           />
         </div>
+
+        {/* Instant cost estimate */}
+        <InstantEstimateCard
+          parts={modules.flatMap((mod, idx): CostEstimateInput[] => {
+            if (mod.status !== 'specified' && mod.status !== 'generated') return []
+            const override = moduleOverrides[idx] || {}
+            const diagAnswers = (diagnosticAnswers as Record<string, Record<string, string>>)?.[mod.id ?? ''] ?? {}
+            const moduleText = [mod.name, mod.purpose ?? '', ...(mod.keyParts ?? [])].join(' ')
+            const { massKg, isEstimated } = getModuleMassKg(
+              mod.result?.massProperties?.massKg,
+              mod.result?.massGrams,
+              0.2,
+              moduleText,
+              mod.estimatedMassKg,
+            )
+            return [{
+              name: mod.name,
+              process: override.process ?? mod.process ?? diagAnswers.mfg_process ?? null,
+              material: override.material ?? mod.material ?? diagAnswers.material ?? null,
+              tolerance: override.tolerance ?? mod.tolerance ?? diagAnswers.tolerance ?? null,
+              finish: override.finish ?? mod.finish ?? diagAnswers.finish ?? null,
+              environment: diagAnswers.environment ?? null,
+              batchSize: diagAnswers.batch_size ?? null,
+              massKg,
+              massIsEstimated: isEstimated,
+            }]
+          })}
+        />
       </CardContent>
 
       <CardFooter className="flex gap-3">
