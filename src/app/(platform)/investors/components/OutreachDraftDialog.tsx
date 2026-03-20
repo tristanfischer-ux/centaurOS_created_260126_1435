@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useTransition, useRef } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,17 +34,22 @@ export function OutreachDraftDialog({
   const [draft, setDraft] = useState<OutreachDraft | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const generationRef = useRef(0)
 
   // Reset state when switching firms
   useEffect(() => {
+    generationRef.current++
     setDraft(null)
     setError(null)
   }, [listingId])
 
   const handleGenerate = () => {
     setError(null)
+    const gen = ++generationRef.current
     startTransition(async () => {
       const result = await generateOutreachDraft(listingId)
+      // Discard stale result if listingId changed during generation
+      if (generationRef.current !== gen) return
       if (result.error) {
         setError(result.error)
       } else if (result.draft) {

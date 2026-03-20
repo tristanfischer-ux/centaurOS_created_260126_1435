@@ -50,6 +50,7 @@ export function InvestorExportMenu({
   }
 
   const handlePPTX = async () => {
+    if (exporting) return
     if (!access.intelligenceAccess) {
       toast.error('Upgrade to Professional to export PPTX')
       return

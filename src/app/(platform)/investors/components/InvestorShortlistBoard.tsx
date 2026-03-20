@@ -202,19 +202,13 @@ export function InvestorShortlistBoard() {
     }
     const itemId = active.id as string
 
-    // Read previous stage from current state to avoid stale closure
-    let previousStage: ShortlistStage | null = null
-    setItems(prev => {
-      const item = prev.find(i => i.id === itemId)
-      if (!item || item.shortlistStage === targetStage) {
-        previousStage = null
-        return prev
-      }
-      previousStage = item.shortlistStage
-      return prev.map(i => i.id === itemId ? { ...i, shortlistStage: targetStage } : i)
-    })
+    // Read previous stage from ref (stable, no side-channel from state updater)
+    const currentItem = itemsRef.current.find(i => i.id === itemId)
+    if (!currentItem || currentItem.shortlistStage === targetStage) return
+    const previousStage = currentItem.shortlistStage
 
-    if (previousStage === null) return
+    // Optimistic update
+    setItems(prev => prev.map(i => i.id === itemId ? { ...i, shortlistStage: targetStage } : i))
 
     const { error } = await updateShortlistStage(itemId, targetStage)
     if (error) {

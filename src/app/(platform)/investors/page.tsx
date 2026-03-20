@@ -52,7 +52,14 @@ export default async function InvestorDirectoryPage() {
   let stats: InvestorStats | null = null
   let matchScores: Record<string, number> = {}
   let shortlistIds: Record<string, ShortlistStage> = {}
-  let access: InvestorTierAccess | undefined
+  // Default to free-tier fallback so export menu always renders
+  let access: InvestorTierAccess = {
+    tier: 'free',
+    detailAccess: false,
+    contactsVisible: false,
+    deepAccess: false,
+    intelligenceAccess: false,
+  }
 
   const [searchResult, statsResult, shortlistResult, accessResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),

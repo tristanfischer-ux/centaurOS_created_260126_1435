@@ -1030,6 +1030,7 @@ export async function getInvestorNotes(
 
 /**
  * Toggles alert subscription for an investor.
+ * Uses atomic upsert + SQL toggle to avoid TOCTOU race on rapid double-click.
  */
 export async function toggleInvestorAlert(
   listingId: string
@@ -1040,35 +1041,44 @@ export async function toggleInvestorAlert(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  // Check if alert exists (maybeSingle — no error when 0 rows)
-  const { data: existing } = await supabase
-    .from('investor_alerts')
-    .select('id, active')
-    .eq('user_id', user.id)
-    .eq('listing_id', listingId)
-    .maybeSingle()
+  // Atomic: upsert with toggle via RPC to avoid SELECT+UPDATE TOCTOU race
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)('toggle_investor_alert', {
+    p_user_id: user.id,
+    p_listing_id: listingId,
+  })
 
-  if (existing) {
-    const newActive = !existing.active
-    const { error } = await supabase
+  // Fallback if RPC doesn't exist yet: two-step with upsert for safety
+  if (error?.code === '42883') {
+    const { data: existing } = await supabase
       .from('investor_alerts')
-      .update({ active: newActive })
-      .eq('id', existing.id)
+      .select('id, active')
+      .eq('user_id', user.id)
+      .eq('listing_id', listingId)
+      .maybeSingle()
 
-    if (error) return { error: 'Failed to toggle alert' }
-    return { active: newActive }
+    if (existing) {
+      const newActive = !existing.active
+      const { error: updateErr } = await supabase
+        .from('investor_alerts')
+        .update({ active: newActive })
+        .eq('id', existing.id)
+      if (updateErr) return { error: 'Failed to toggle alert' }
+      return { active: newActive }
+    }
+
+    const { error: insertErr } = await supabase
+      .from('investor_alerts')
+      .upsert(
+        { user_id: user.id, listing_id: listingId, active: true },
+        { onConflict: 'user_id,listing_id' }
+      )
+    if (insertErr) return { error: 'Failed to create alert' }
+    return { active: true }
   }
 
-  // Create new alert — upsert to handle race condition (rapid double-click)
-  const { error } = await supabase
-    .from('investor_alerts')
-    .upsert(
-      { user_id: user.id, listing_id: listingId, active: true },
-      { onConflict: 'user_id,listing_id' }
-    )
-
-  if (error) return { error: 'Failed to create alert' }
-  return { active: true }
+  if (error) return { error: 'Failed to toggle alert' }
+  return { active: Boolean(data) }
 }
 
 /**

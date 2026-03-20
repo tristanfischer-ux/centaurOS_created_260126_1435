@@ -163,6 +163,7 @@ export function InvestorBrowser({
 
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const loadingMoreRef = useRef(false)
 
   // Compare state
   const [compareIds, setCompareIds] = useState<string[]>([])
@@ -240,6 +241,8 @@ export function InvestorBrowser({
         setTotal(result.total)
         setHasMore(result.hasMore)
         setPage(1)
+        // Clear compare selection — old IDs may not be in new results
+        setCompareIds([])
       } catch (err) {
         console.error('[InvestorBrowser] Filter search failed:', err)
       }
@@ -260,6 +263,8 @@ export function InvestorBrowser({
   // ---------------------------------------------------------------------------
 
   const handleLoadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return
+    loadingMoreRef.current = true
     setIsLoadingMore(true)
     try {
       const nextPage = page + 1
@@ -299,6 +304,7 @@ export function InvestorBrowser({
     } catch (err) {
       console.error('[InvestorBrowser] Load more failed:', err)
     } finally {
+      loadingMoreRef.current = false
       setIsLoadingMore(false)
     }
   }, [page, activeFirmType, activeOnly, debouncedQuery, advancedFilters, sortBy])

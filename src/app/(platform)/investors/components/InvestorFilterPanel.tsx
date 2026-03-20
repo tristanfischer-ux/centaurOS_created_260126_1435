@@ -163,7 +163,8 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 min={0}
                 value={filters.chequeMin ?? ''}
                 onChange={e => {
-                  const v = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  const raw = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, chequeMin: v })
                 }}
                 className="h-8 text-sm"
@@ -177,7 +178,8 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 min={0}
                 value={filters.chequeMax ?? ''}
                 onChange={e => {
-                  const v = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  const raw = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, chequeMax: v })
                 }}
                 className="h-8 text-sm"
@@ -193,7 +195,8 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 step={0.5}
                 value={filters.minQuality ?? ''}
                 onChange={e => {
-                  const v = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  const raw = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, minQuality: v })
                 }}
                 className="h-8 text-sm"
@@ -209,7 +212,8 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 step={0.5}
                 value={filters.minHardwareFit ?? ''}
                 onChange={e => {
-                  const v = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  const raw = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, minHardwareFit: v })
                 }}
                 className="h-8 text-sm"
