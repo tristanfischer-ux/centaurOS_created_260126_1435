@@ -60,6 +60,9 @@ export function isRetryableError(rawError: string): boolean {
     if (lower.includes("content_filter") || lower.includes("safety") || lower.includes("blocked") || lower.includes("content_policy")) return false
     if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) return false
 
+    // Retryable: billing/quota exhaustion — the request is fine, the provider account is the problem
+    if (lower.includes("credit balance") || lower.includes("billing") || lower.includes("insufficient_quota") || lower.includes("quota") || lower.includes("payment required") || lower.includes("402")) return true
+
     // Retryable: provider-side problems
     if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) return true
     if (lower.includes("rate_limit") || lower.includes("rate limit") || lower.includes("429") || lower.includes("too many requests")) return true
@@ -95,6 +98,10 @@ export function classifyStreamError(rawError: string): ClassifiedError {
 
     if (lower.includes("authentication") || lower.includes("invalid api key") || lower.includes("unauthorized") || lower.includes("401")) {
         return { message: "AI provider authentication failed. The platform API key may need to be updated.", category: "auth", rawHint }
+    }
+
+    if (lower.includes("credit balance") || lower.includes("billing") || lower.includes("insufficient_quota") || lower.includes("quota") || lower.includes("payment required") || lower.includes("402")) {
+        return { message: "The AI provider's credit balance is low. Trying an alternative provider...", category: "overloaded", rawHint }
     }
 
     if (lower.includes("overloaded") || lower.includes("503") || lower.includes("capacity") || lower.includes("server_error")) {

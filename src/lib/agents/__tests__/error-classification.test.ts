@@ -55,6 +55,10 @@ describe("isRetryableError", () => {
             "Network error: connection reset",
             "fetch failed: ECONNRESET",
             "HTTP 500 Internal Server Error",
+            "Your credit balance is too low to access the Anthropic API",
+            "insufficient_quota: you exceeded your current quota",
+            "billing account suspended",
+            "HTTP 402 Payment Required",
         ]
 
         it.each(cases)("returns true for: %s", (error) => {
@@ -93,6 +97,12 @@ describe("classifyStreamError", () => {
         const result = classifyStreamError("server overloaded")
         expect(result.category).toBe("overloaded")
         expect(result.message).toContain("overloaded")
+    })
+
+    it("classifies billing/credit errors and triggers failover", () => {
+        const result = classifyStreamError("Your credit balance is too low to access the Anthropic API")
+        expect(result.category).toBe("overloaded")
+        expect(result.message).toContain("credit balance")
     })
 
     it("classifies network errors", () => {
