@@ -217,24 +217,30 @@ async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string
   const lines = ['## Competitive Intelligence & Company Context']
 
   // Value proposition & products
+  // GOTCHA: JSONB arrays are cast via `as unknown as Json` — could be non-array or contain null fields
   if (intel?.value_proposition) lines.push(`\n### Value Proposition\n${intel.value_proposition}`)
-  if (intel?.products_services && intel.products_services.length > 0) {
-    lines.push('\n### Products & Services')
-    for (const p of intel.products_services) {
-      lines.push(`- **${p.name}:** ${p.description}`)
+  if (Array.isArray(intel?.products_services) && intel.products_services.length > 0) {
+    const validProducts = intel.products_services.filter((p): p is { name: string; description: string } => !!p?.name)
+    if (validProducts.length > 0) {
+      lines.push('\n### Products & Services')
+      for (const p of validProducts) {
+        lines.push(`- **${p.name}${p.description ? `:** ${p.description}` : '**'}`)
+      }
     }
   }
   if (intel?.target_customers) lines.push(`\n### Target Customers\n${intel.target_customers}`)
 
   // Competitor profiles
-  if (intel?.competitors && intel.competitors.length > 0) {
-    lines.push('\n### Competitor Profiles')
-    for (const c of intel.competitors) {
-      // GOTCHA: JSONB doesn't enforce types — website can be empty/null despite the TS interface
-      const nameLabel = c.website ? `**${c.name}** (${c.website})` : `**${c.name}**`
-      lines.push(`\n${nameLabel}`)
-      if (c.description) lines.push(`- ${c.description}`)
-      if (c.differentiator) lines.push(`- Differentiator: ${c.differentiator}`)
+  if (Array.isArray(intel?.competitors) && intel.competitors.length > 0) {
+    const validCompetitors = intel.competitors.filter((c): c is { name: string; website: string; description: string; differentiator: string } => !!c?.name)
+    if (validCompetitors.length > 0) {
+      lines.push('\n### Competitor Profiles')
+      for (const c of validCompetitors) {
+        const nameLabel = c.website ? `**${c.name}** (${c.website})` : `**${c.name}**`
+        lines.push(`\n${nameLabel}`)
+        if (c.description) lines.push(`- ${c.description}`)
+        if (c.differentiator) lines.push(`- Differentiator: ${c.differentiator}`)
+      }
     }
   }
 

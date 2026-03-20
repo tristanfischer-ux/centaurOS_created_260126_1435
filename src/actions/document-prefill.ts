@@ -56,24 +56,27 @@ async function buildCompetitiveAnalysisPrefill(
   const sections: string[] = []
 
   // Competitors
-  if (intel?.competitors && intel.competitors.length > 0) {
+  // GOTCHA: JSONB arrays are cast via `as unknown as Json` — could be non-array or contain null fields
+  if (Array.isArray(intel?.competitors) && intel.competitors.length > 0) {
     const lines = ['COMPETITORS:']
     for (const c of intel.competitors) {
+      if (!c?.name) continue
       const parts = [c.name]
       if (c.website) parts[0] += ` (${c.website})`
       if (c.description) parts.push(`"${c.description}"`)
       if (c.differentiator) parts.push(`Differentiator: ${c.differentiator}`)
       lines.push(`- ${parts.join(' — ')}`)
     }
-    sections.push(lines.join('\n'))
+    if (lines.length > 1) sections.push(lines.join('\n'))
   }
 
   // Our positioning
   {
     const lines: string[] = []
     if (intel?.value_proposition) lines.push(`- Value proposition: ${intel.value_proposition}`)
-    if (intel?.products_services && intel.products_services.length > 0) {
-      lines.push(`- Products: ${intel.products_services.map(p => p.name).join(', ')}`)
+    if (Array.isArray(intel?.products_services) && intel.products_services.length > 0) {
+      const names = intel.products_services.map(p => p?.name).filter(Boolean)
+      if (names.length > 0) lines.push(`- Products: ${names.join(', ')}`)
     }
     if (intel?.target_customers) lines.push(`- Target customers: ${intel.target_customers}`)
     if (profile?.business_model) lines.push(`- Business model: ${profile.business_model}`)
