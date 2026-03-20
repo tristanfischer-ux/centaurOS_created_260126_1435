@@ -82,6 +82,7 @@ const LENGTH_OPTIONS: { value: DocumentLength; label: string; description: strin
 export function SkillDocumentSection() {
   const documentRef = useRef<HTMLDivElement>(null)
   const latestSkillRef = useRef<string | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Skill selection
   const [selectedSkill, setSelectedSkill] = useState<DocumentSkill | null>(null)
@@ -111,11 +112,19 @@ export function SkillDocumentSection() {
     // GOTCHA: Re-clicking the already-selected skill must not wipe user edits or re-fetch prefill
     if (selectedSkill?.id === skill.id) return
 
+    // GOTCHA: Abort any in-flight generation so old stream doesn't bleed into the new skill
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+
     setSelectedSkill(skill)
     setTone(skill.defaultTone)
     setUserContext('')
     setStreamedContent('')
     setResult(null)
+    setIsGenerating(false)
+    setProgressMessage('')
     setQuestions([])
     setAnswers({})
     setMode('direct')
@@ -181,9 +190,14 @@ export function SkillDocumentSection() {
     setResult(null)
     setProgressMessage('Starting…')
 
+    // INTENT: AbortController lets handleSelectSkill cancel this stream mid-flight
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+
     try {
       const response = await fetch('/api/reports/generate-document', {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
@@ -262,9 +276,12 @@ export function SkillDocumentSection() {
         }
       }
     } catch (err) {
+      // GOTCHA: AbortError is intentional (user switched skills) — don't toast
+      if (err instanceof DOMException && err.name === 'AbortError') return
       const message = err instanceof Error ? err.message : 'Document generation failed'
       toast.error(message)
     } finally {
+      abortControllerRef.current = null
       setIsGenerating(false)
       setProgressMessage('')
     }

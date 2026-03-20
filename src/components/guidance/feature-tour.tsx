@@ -220,36 +220,39 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     }
   }
 
-  // Tooltip position — all coordinates are viewport-relative (inside fixed container)
+  // Tooltip position — all coordinates are viewport-relative (inside fixed container).
+  // Positions are computed as the tooltip's top-left corner (no CSS transforms) so
+  // clamping keeps the tooltip fully within the viewport.
+  const clampH = (v: number) => Math.min(Math.max(pad, v), window.innerWidth - tooltipWidth - pad)
+  const clampV = (v: number) => Math.min(Math.max(pad, v), window.innerHeight - tooltipHeight - pad)
+
   const getTooltipStyle = (): React.CSSProperties => {
     if (!rect) return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }
 
     const pos = resolvePosition()
+    const gap = pad + 12 // space between target edge and tooltip
 
     switch (pos) {
       case 'top':
         return {
-          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - pad),
-          top: Math.max(pad, rect.top - pad - 12),
-          transform: 'translateY(-100%)',
+          left: clampH(rect.left + rect.width / 2 - tooltipWidth / 2),
+          top: clampV(rect.top - gap - tooltipHeight),
         }
       case 'left':
         return {
-          left: Math.max(pad, rect.left - pad - 12),
-          top: Math.min(Math.max(pad, rect.top + rect.height / 2), window.innerHeight - tooltipHeight - pad),
-          transform: 'translate(-100%, -50%)',
+          left: clampH(rect.left - gap - tooltipWidth),
+          top: clampV(rect.top + rect.height / 2 - tooltipHeight / 2),
         }
       case 'right':
         return {
-          left: Math.min(rect.right + pad + 12, window.innerWidth - tooltipWidth - pad),
-          top: Math.min(Math.max(pad, rect.top + rect.height / 2), window.innerHeight - tooltipHeight - pad),
-          transform: 'translateY(-50%)',
+          left: clampH(rect.right + gap),
+          top: clampV(rect.top + rect.height / 2 - tooltipHeight / 2),
         }
       case 'bottom':
       default:
         return {
-          left: Math.min(Math.max(pad, rect.left + rect.width / 2 - tooltipWidth / 2), window.innerWidth - tooltipWidth - pad),
-          top: Math.min(rect.bottom + pad + 12, window.innerHeight - tooltipHeight - pad),
+          left: clampH(rect.left + rect.width / 2 - tooltipWidth / 2),
+          top: clampV(rect.bottom + gap),
         }
     }
   }
