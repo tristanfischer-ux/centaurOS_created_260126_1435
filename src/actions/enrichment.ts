@@ -137,7 +137,7 @@ export async function enrichCompanyWebsite(foundryId: string): Promise<Enrichmen
     const aiSummary = await summarizeWebsiteContent(scrapeResult.pages, companyName)
 
     // Track AI usage (fire-and-forget)
-    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.5' }).catch(() => {})
+    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.7' }).catch(() => {})
 
     // 4. Merge with existing company_intel (preserve competitor data, etc.)
     const existingIntel = foundry.company_intel as CompanyIntelligence | null
@@ -362,7 +362,7 @@ export async function enrichCompetitors(foundryId: string): Promise<EnrichmentAc
     const competitorProfiles = await analyzeCompetitors(competitorInputs, companyContext)
 
     // Track AI usage (fire-and-forget)
-    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.5' }).catch(() => {})
+    trackAIUsage({ foundryId, userId: user.id, feature: 'enrichment', model: 'MiniMax-M2.7' }).catch(() => {})
 
     // 3. Merge into existing company_intel
     const existingIntel = foundry.company_intel as CompanyIntelligence | null

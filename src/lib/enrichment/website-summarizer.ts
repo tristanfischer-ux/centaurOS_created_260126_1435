@@ -22,7 +22,7 @@ import type { CompanyIntelligence } from '@/types/foundry'
 // ─── Constants ──────────────────────────────────────────────────────
 
 /** Model used for summarization (same as sweeps — cost efficient) */
-const SUMMARIZER_MODEL = 'MiniMax-M2.5'
+const SUMMARIZER_MODEL = 'MiniMax-M2.7'
 
 /** Maximum output tokens */
 const MAX_TOKENS = 4096

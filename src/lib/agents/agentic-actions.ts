@@ -71,7 +71,7 @@ export interface ActionResult {
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const ACTION_MODEL = 'MiniMax-M2.5'
+const ACTION_MODEL = 'MiniMax-M2.7'
 const ACTION_MAX_TOKENS = 4096
 
 // ─── Auto-Draft Tasks ───────────────────────────────────────────────

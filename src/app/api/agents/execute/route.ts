@@ -129,11 +129,11 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     ],
     qwen: [
         { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "minimax", modelId: "MiniMax-M2.5" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-4o" },
     ],
     minimax: [
-        { providerId: "minimax", modelId: "MiniMax-M2.5" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "openai", modelId: "gpt-4o" },
     ],

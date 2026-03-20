@@ -147,9 +147,9 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
   'claude-opus-4-6': { input: 15.00, output: 75.00 },
   'claude-haiku-4-5': { input: 0.80, output: 4.00 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
-  // M2.5 (50 TPS): $0.15 input / $1.20 output per 1M tokens
-  // M2.5-lightning (100 TPS): $0.30 input / $2.40 output per 1M tokens
-  // Pricing: https://www.minimax.io/news/minimax-m25
+  // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
+  'MiniMax-M2.7': { input: 0.15, output: 1.20 },
+  // M2.5 (kept for historical tracking)
   'MiniMax-M2.5': { input: 0.15, output: 1.20 },
   'MiniMax-M2.5-lightning': { input: 0.30, output: 2.40 },
   'MiniMax-M2.1': { input: 0.30, output: 1.20 },

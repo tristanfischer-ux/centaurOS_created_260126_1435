@@ -120,7 +120,7 @@ const MAX_CONCURRENT_SWEEPS = 10
 const DEFAULT_MONTHLY_BUDGET_USD = 50.00
 
 /** Model used for all background sweeps */
-const SWEEP_MODEL = 'MiniMax-M2.5'
+const SWEEP_MODEL = 'MiniMax-M2.7'
 
 /** Maximum tokens for sweep output */
 const SWEEP_MAX_TOKENS = 4096

@@ -22,7 +22,7 @@ import type { CompanyIntelCompetitor } from '@/types/foundry'
 // ─── Constants ──────────────────────────────────────────────────────
 
 /** Model used for competitor analysis */
-const ANALYSIS_MODEL = 'MiniMax-M2.5'
+const ANALYSIS_MODEL = 'MiniMax-M2.7'
 
 /** Maximum competitors to analyze in one batch */
 const MAX_COMPETITORS = 5

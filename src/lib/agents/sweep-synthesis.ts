@@ -70,7 +70,7 @@ interface SpecialistInsightSummary {
 // ─── Constants ──────────────────────────────────────────────────────
 
 /** Model used for synthesis (same as sweeps) */
-const SYNTHESIS_MODEL = 'MiniMax-M2.5'
+const SYNTHESIS_MODEL = 'MiniMax-M2.7'
 
 /** Maximum output tokens for executive brief */
 const SYNTHESIS_MAX_TOKENS = 8192

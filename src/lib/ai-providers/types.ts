@@ -226,7 +226,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
     minimax: {
         id: "minimax",
         name: "MiniMax",
-        description: "M2.5 text, Hailuo video, speech, image — high value multi-modal",
+        description: "M2.7 text, Hailuo video, speech, image — high value multi-modal",
         icon: "Zap",
         website: "https://platform.minimax.io",
         capabilities: ["text", "image", "audio", "video"],
@@ -235,7 +235,8 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         bgColor: "bg-violet-50",
         models: [
             // Text models — OpenAI-compatible API at api.minimax.io/v1
-            { id: "MiniMax-M2.5", name: "MiniMax M2.5", modality: "text", description: "Peak performance, ultimate value — newest flagship", maxTokens: 204800, default: true },
+            { id: "MiniMax-M2.7", name: "MiniMax M2.7", modality: "text", description: "SWE-Pro 56.2%, GDPval-AA ELO 1495 — newest flagship", maxTokens: 204800, default: true },
+            { id: "MiniMax-M2.5", name: "MiniMax M2.5", modality: "text", description: "Previous flagship, strong all-round performance", maxTokens: 204800 },
             { id: "MiniMax-M2.1", name: "MiniMax M2.1", modality: "text", description: "Strong coding and reasoning at ~60 tps", maxTokens: 204800 },
             { id: "MiniMax-M2.1-lightning", name: "MiniMax M2.1 Lightning", modality: "text", description: "Faster variant at ~100 tps", maxTokens: 204800 },
             // Video models — Hailuo via native async API

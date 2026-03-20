@@ -69,7 +69,7 @@ export interface UseSpecialistChatOptions {
     preferredMode: ConversationMode
     /** AI provider ID (e.g., "minimax", "anthropic") */
     providerId: string
-    /** Model ID (e.g., "MiniMax-M2.5", "claude-opus-4-6") */
+    /** Model ID (e.g., "MiniMax-M2.7", "claude-opus-4-6") */
     modelId: string
     /** Pre-built system prompt suffix (screen context, handoff, cross-specialist) */
     systemPromptSuffix: string

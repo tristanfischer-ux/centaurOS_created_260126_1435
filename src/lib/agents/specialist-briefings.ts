@@ -26,7 +26,7 @@ import { getFeedsForSpecialist } from './news-feeds'
 import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
 import type { Database } from '@/types/database.types'
 
-const BRIEFING_MODEL = 'MiniMax-M2.5'
+const BRIEFING_MODEL = 'MiniMax-M2.7'
 const BRIEFING_MAX_TOKENS = 1024
 const RSS_FETCH_TIMEOUT_MS = 10_000
 const BATCH_SIZE = 4

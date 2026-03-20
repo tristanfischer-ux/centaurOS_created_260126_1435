@@ -26,7 +26,7 @@ import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { getOpenAIClient } from "@/lib/ai/openai-lazy"
 import { executeToolCall } from "../registry"
 
-const DELEGATION_MODEL = "MiniMax-M2.5"
+const DELEGATION_MODEL = "MiniMax-M2.7"
 const MAX_DELEGATION_TOKENS = 2048
 
 /** Maps specialist IDs to their primary data tool for delegation context. */
