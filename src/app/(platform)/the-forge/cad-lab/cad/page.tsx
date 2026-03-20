@@ -4,7 +4,7 @@
  * @file cad/page.tsx — The Forge: CAD stage (Stage 5).
  *
  * @description Unified CAD generation page. Generates a parametric CAD model
- * via Zoo.dev for the entire product. Module decomposition is shown as
+ * via GenCAD for the entire product. Module decomposition is shown as
  * collapsible context.
  *
  * Pipeline: Design → Specify → Source → Assemble → **CAD**
@@ -25,7 +25,6 @@ import {
   Layers,
   ClipboardList,
   FileDown,
-  GitCompare,
 } from "lucide-react"
 
 import { FORGE_ROUTES } from "@/lib/forge-routes"
@@ -38,7 +37,6 @@ import { ModuleResultsView, type ViewTab } from "../components/module-results-vi
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { ProviderComparison } from "../components/provider-comparison"
-import type { ABProvider } from "@/lib/cad-lab-types"
 
 // ─── Synthetic module ID for unified model ────────────────────────────
 const UNIFIED_MODULE_ID = "__unified__"
@@ -64,7 +62,6 @@ export default function CadStagePage(): React.ReactNode {
     systemIllustrationStatus,
     providerResults,
     isComparingProviders,
-    handleCompareProviders,
   } = useCadLab()
 
   // INTENT: CAD stage gate — mirrors getStageAccess() logic.
@@ -140,6 +137,7 @@ export default function CadStagePage(): React.ReactNode {
           <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
             <Box className="h-5 w-5 text-international-orange" />
             CAD Generation
+            <Badge variant="secondary" className="text-[10px] font-semibold uppercase tracking-wider">Beta</Badge>
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Generate a parametric CAD model for the complete product.
@@ -187,22 +185,6 @@ export default function CadStagePage(): React.ReactNode {
                   Download STEP + STL
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 text-xs"
-                disabled={cadBusy || isComparingProviders}
-                onClick={() => {
-                  const providers: ABProvider[] = ["tripo", "trellis", "meshy", "sf3d"]
-                  handleCompareProviders(providers)
-                }}
-              >
-                {isComparingProviders ? (
-                  <><Loader2 className="h-3 w-3 animate-spin" />Comparing...</>
-                ) : (
-                  <><GitCompare className="h-3 w-3" />Compare Providers</>
-                )}
-              </Button>
               <Button
                 onClick={handleGenerateUnifiedModel}
                 disabled={cadBusy}

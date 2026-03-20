@@ -34,7 +34,6 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { ModelViewer } from "@/components/cad/model-viewer"
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
@@ -72,12 +71,12 @@ export default function CadLabResearchPage(): React.ReactNode {
     researchModelUsed, decompositionModelUsed,
     handleRefreshModuleImages,
     handleReExpandModule, reExpandingModuleIds,
-    trellisPreviewUrl, trellisPreviewStatus, trellisPreviewError,
-    handleGenerateTrellisPreview,
+    tripoPreviewUrl, tripoPreviewStatus, tripoPreviewError,
+    handleGenerateTripoPreview,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
-  const [is3DDialogOpen, setIs3DDialogOpen] = useState(false)
+  const [heroView, setHeroView] = useState<"2d" | "3d">("2d")
 
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)
@@ -90,6 +89,21 @@ export default function CadLabResearchPage(): React.ReactNode {
     const t = setInterval(() => setIllustrationElapsed(s => s + 1), 1000)
     return () => clearInterval(t)
   }, [systemIllustrationStatus])
+
+  // INTENT: Elapsed timer for 3D generation — same UX pattern as illustration elapsed counter.
+  const [tripoElapsed, setTripoElapsed] = useState(0)
+  useEffect(() => {
+    if (tripoPreviewStatus !== "generating") { setTripoElapsed(0); return }
+    const t = setInterval(() => setTripoElapsed(s => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [tripoPreviewStatus])
+
+  // INTENT: Auto-trigger Tripo when user switches to 3D tab and no preview yet.
+  useEffect(() => {
+    if (heroView === "3d" && tripoPreviewStatus === "idle") {
+      handleGenerateTripoPreview()
+    }
+  }, [heroView, tripoPreviewStatus, handleGenerateTripoPreview])
 
   const allModulesRevealed = modules.length > 0 && revealedModuleIds.size >= modules.length
 
@@ -279,50 +293,80 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <>
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
                     <Card className="overflow-hidden">
+                      {/* 2D/3D segmented toggle */}
+                      <div className="flex items-center gap-1 p-2 bg-muted/30">
+                        <button
+                          onClick={() => setHeroView("2d")}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            heroView === "2d"
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <ImageIcon className="h-3.5 w-3.5 inline mr-1" />
+                          2D
+                        </button>
+                        <button
+                          onClick={() => setHeroView("3d")}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                            heroView === "3d"
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Box className="h-3.5 w-3.5 inline mr-1" />
+                          3D
+                          {tripoPreviewStatus === "generating" && (
+                            <Loader2 className="h-3 w-3 inline ml-1 animate-spin" />
+                          )}
+                        </button>
+                      </div>
+
                       <div className="aspect-[16/9] w-full bg-muted">
-                        {heroImgError ? (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                        {heroView === "2d" ? (
+                          heroImgError ? (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <ImageIcon className="h-8 w-8 text-muted-foreground/30" />
+                            </div>
+                          ) : (
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            <img
+                              src={systemIllustrationUrl}
+                              alt={`System overview: ${subject}`}
+                              className="w-full h-full object-cover"
+                              onError={() => setHeroImgError(true)}
+                            />
+                          )
+                        ) : tripoPreviewStatus === "complete" && tripoPreviewUrl ? (
+                          <ModelViewer glbUrl={tripoPreviewUrl} backgroundColor="#f9fafb" className="!border-0 !rounded-none w-full h-full" />
+                        ) : tripoPreviewStatus === "generating" ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
+                            <p className="text-sm text-muted-foreground">Generating 3D preview...</p>
+                            <span className="text-xs tabular-nums text-muted-foreground">{tripoElapsed}s</span>
+                          </div>
+                        ) : tripoPreviewStatus === "failed" ? (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                            <AlertTriangle className="h-6 w-6 text-muted-foreground/30" />
+                            <p className="text-xs text-muted-foreground">{tripoPreviewError ?? "3D preview failed"}</p>
+                            <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={handleGenerateTripoPreview}>
+                              <RotateCcw className="h-3 w-3" />
+                              Retry
+                            </Button>
                           </div>
                         ) : (
-                          /* eslint-disable-next-line @next/next/no-img-element */
-                          <img
-                            src={systemIllustrationUrl}
-                            alt={`System overview: ${subject}`}
-                            className="w-full h-full object-cover"
-                            onError={() => setHeroImgError(true)}
-                          />
+                          <div className="w-full h-full flex items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground/30" />
+                          </div>
                         )}
                       </div>
+
                       <CardContent className="pt-4 pb-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h2 className="text-base font-semibold text-foreground">{subject}</h2>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              System overview — full research report available in the Specify stage.
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0 gap-1.5 text-xs"
-                            disabled={trellisPreviewStatus === "generating"}
-                            onClick={() => {
-                              if (trellisPreviewStatus === "complete" && trellisPreviewUrl) {
-                                setIs3DDialogOpen(true)
-                              } else {
-                                handleGenerateTrellisPreview()
-                                setIs3DDialogOpen(true)
-                              }
-                            }}
-                          >
-                            {trellisPreviewStatus === "generating" ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              <Box className="h-3.5 w-3.5" />
-                            )}
-                            See in 3D
-                          </Button>
+                        <div>
+                          <h2 className="text-base font-semibold text-foreground">{subject}</h2>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            System overview — full research report available in the Specify stage.
+                          </p>
                         </div>
                       </CardContent>
                     </Card>
@@ -632,43 +676,6 @@ export default function CadLabResearchPage(): React.ReactNode {
       )}
 
       <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} stage="concept" />
-
-      {/* TRELLIS 3D preview dialog */}
-      <Dialog open={is3DDialogOpen} onOpenChange={setIs3DDialogOpen}>
-        <DialogContent size="lg" className="p-0 pt-10 overflow-hidden">
-          {trellisPreviewStatus === "complete" && trellisPreviewUrl ? (
-            <div className="w-full aspect-square">
-              <ModelViewer glbUrl={trellisPreviewUrl} backgroundColor="#f9fafb" className="!border-0 !rounded-none" />
-            </div>
-          ) : trellisPreviewStatus === "generating" ? (
-            <div className="w-full aspect-square flex flex-col items-center justify-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-international-orange" />
-              <p className="text-sm text-muted-foreground">Generating 3D preview...</p>
-              <p className="text-xs text-muted-foreground">This usually takes 15–30 seconds</p>
-            </div>
-          ) : trellisPreviewStatus === "failed" ? (
-            <div className="w-full aspect-square flex flex-col items-center justify-center gap-3">
-              <AlertTriangle className="h-8 w-8 text-muted-foreground/30" />
-              <p className="text-sm text-muted-foreground">
-                {trellisPreviewError ?? "3D preview generation failed"}
-              </p>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs gap-1.5"
-                onClick={handleGenerateTrellisPreview}
-              >
-                <RotateCcw className="h-3 w-3" />
-                Retry
-              </Button>
-            </div>
-          ) : (
-            <div className="w-full aspect-square flex items-center justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

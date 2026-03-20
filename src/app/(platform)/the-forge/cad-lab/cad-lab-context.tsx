@@ -331,11 +331,11 @@ export interface CadLabContextValue {
   isComparingProviders: boolean
   handleCompareProviders: (providers: ABProvider[]) => Promise<void>
 
-  // TRELLIS 3D preview (Design tab)
-  trellisPreviewUrl: string | null
-  trellisPreviewStatus: "idle" | "generating" | "complete" | "failed"
-  trellisPreviewError: string | null
-  handleGenerateTrellisPreview: () => void
+  // Tripo 3D preview (Design tab)
+  tripoPreviewUrl: string | null
+  tripoPreviewStatus: "idle" | "generating" | "complete" | "failed"
+  tripoPreviewError: string | null
+  handleGenerateTripoPreview: () => void
 
   // Lazy initialization (provider mounted at platform level, init on first CAD Lab visit)
   initialized: boolean
@@ -547,11 +547,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
   const [isComparingProviders, setIsComparingProviders] = useState(false)
 
-  // ── TRELLIS 3D preview (Design tab) ──
-  const [trellisPreviewUrl, setTrellisPreviewUrl] = useState<string | null>(null)
-  const [trellisPreviewStatus, setTrellisPreviewStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
-  const [trellisPreviewError, setTrellisPreviewError] = useState<string | null>(null)
-  const trellisAbortRef = useRef<AbortController | null>(null)
+  // ── Tripo 3D preview (Design tab) ──
+  const [tripoPreviewUrl, setTripoPreviewUrl] = useState<string | null>(null)
+  const [tripoPreviewStatus, setTripoPreviewStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
+  const [tripoPreviewError, setTripoPreviewError] = useState<string | null>(null)
+  const tripoAbortRef = useRef<AbortController | null>(null)
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -3040,16 +3040,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Restore provider A/B comparison results
       setProviderResults(p.providerResults ?? {})
 
-      // Restore TRELLIS preview from provider results if available
-      const trellisResult = (p.providerResults ?? {})["trellis"]
-      if (trellisResult?.status === "completed" && trellisResult.glbUrl) {
-        setTrellisPreviewUrl(trellisResult.glbUrl)
-        setTrellisPreviewStatus("complete")
-        setTrellisPreviewError(null)
+      // Restore Tripo preview from provider results if available
+      const tripoResult = (p.providerResults ?? {})["tripo"]
+      if (tripoResult?.status === "completed" && tripoResult.glbUrl) {
+        setTripoPreviewUrl(tripoResult.glbUrl)
+        setTripoPreviewStatus("complete")
+        setTripoPreviewError(null)
       } else {
-        setTrellisPreviewUrl(null)
-        setTrellisPreviewStatus("idle")
-        setTrellisPreviewError(null)
+        setTripoPreviewUrl(null)
+        setTripoPreviewStatus("idle")
+        setTripoPreviewError(null)
       }
 
       // Restore design revision state
@@ -3443,7 +3443,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                     interface: "Preparing geometry specification...",
                     codegen: "Generating CadQuery code...",
                     modal: "Executing CAD model...",
-                    zoo: "Generating parametric model via Zoo.dev...",
+                    gencad: "Generating parametric model via GenCAD...",
                     upload: "Uploading assets...",
                   }
                   const label = event.step ? stepLabels[event.step] : undefined
@@ -3498,7 +3498,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Only truly fatal errors (HTTP 4xx, rate limit) skip polling.
       const isFatalError = msg.includes("HTTP 4") || msg.includes("Rate limit") || msg.includes("Invalid")
         || msg.includes("CAD generation failed") || msg.includes("No product illustration")
-        || msg.includes("Zoo requires a textPrompt")
+        || msg.includes("GENCAD_MODAL_URL not configured")
       if (!isFatalError && activeProjectIdRef.current) {
         addProgressLine(`Stream interrupted: ${msg}`)
         startUnifiedResultPolling(activeProjectIdRef.current)
@@ -3647,29 +3647,29 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
   }, [])
 
-  // ── TRELLIS 3D Preview handler (Design tab "See in 3D") ──
-  const handleGenerateTrellisPreview = useCallback(() => {
+  // ── Tripo 3D Preview handler (Design tab 2D/3D toggle) ──
+  const handleGenerateTripoPreview = useCallback(() => {
     const projectId = activeProjectIdRef.current
-    if (!projectId || trellisPreviewStatus === "generating") return
+    if (!projectId || tripoPreviewStatus === "generating") return
 
-    // If TRELLIS was already generated via Compare Providers, reuse it
-    const existing = providerResults["trellis"]
+    // If Tripo was already generated via Compare Providers, reuse it
+    const existing = providerResults["tripo"]
     if (existing?.status === "completed" && existing.glbUrl) {
-      setTrellisPreviewUrl(existing.glbUrl)
-      setTrellisPreviewStatus("complete")
-      setTrellisPreviewError(null)
+      setTripoPreviewUrl(existing.glbUrl)
+      setTripoPreviewStatus("complete")
+      setTripoPreviewError(null)
       return
     }
 
     // Cancel any in-flight preview request
-    if (trellisAbortRef.current) {
-      trellisAbortRef.current.abort()
+    if (tripoAbortRef.current) {
+      tripoAbortRef.current.abort()
     }
     const abortController = new AbortController()
-    trellisAbortRef.current = abortController
+    tripoAbortRef.current = abortController
 
-    setTrellisPreviewStatus("generating")
-    setTrellisPreviewError(null)
+    setTripoPreviewStatus("generating")
+    setTripoPreviewError(null)
 
     // Fire SSE request (async IIFE to keep the callback sync for useCallback)
     ;(async () => {
@@ -3677,7 +3677,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const response = await fetch("/api/cad-lab/generate-provider", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-          body: JSON.stringify({ projectId, provider: "trellis" }),
+          body: JSON.stringify({ projectId, provider: "tripo" }),
           signal: abortController.signal,
         })
 
@@ -3701,7 +3701,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             buffer += decoder.decode(value, { stream: true })
 
             if (buffer.length > 1_000_000) {
-              console.warn("[TRELLIS-PREVIEW] SSE buffer exceeded 1MB, aborting")
+              console.warn("[TRIPO-PREVIEW] SSE buffer exceeded 1MB, aborting")
               await reader.cancel()
               break
             }
@@ -3715,11 +3715,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 try {
                   const event = JSON.parse(line.slice(6))
                   if (event.type === "provider_complete" && event.result?.glbUrl) {
-                    setTrellisPreviewUrl(event.result.glbUrl)
-                    setTrellisPreviewStatus("complete")
+                    setTripoPreviewUrl(event.result.glbUrl)
+                    setTripoPreviewStatus("complete")
                   } else if (event.type === "provider_error") {
-                    setTrellisPreviewStatus("failed")
-                    setTrellisPreviewError(event.error ?? "Generation failed")
+                    setTripoPreviewStatus("failed")
+                    setTripoPreviewError(event.error ?? "Generation failed")
                   }
                 } catch { /* skip malformed SSE */ }
               }
@@ -3729,11 +3729,20 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return
         const msg = err instanceof Error ? err.message : "Unknown error"
-        setTrellisPreviewStatus("failed")
-        setTrellisPreviewError(msg)
+        setTripoPreviewStatus("failed")
+        setTripoPreviewError(msg)
       }
     })()
-  }, [providerResults, trellisPreviewStatus])
+  }, [providerResults, tripoPreviewStatus])
+
+  // INTENT: Auto-trigger Tripo 3D preview after hero illustration completes.
+  // This lets the 3D model start generating while the user views the 2D image,
+  // so it's ready (or nearly ready) when they switch to the 3D tab.
+  useEffect(() => {
+    if (systemIllustrationStatus === "complete" && tripoPreviewStatus === "idle") {
+      handleGenerateTripoPreview()
+    }
+  }, [systemIllustrationStatus, tripoPreviewStatus, handleGenerateTripoPreview])
 
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
   // updates unifiedResult/unifiedCode instead of per-module state.
@@ -3905,10 +3914,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     providerResults,
     isComparingProviders,
     handleCompareProviders,
-    trellisPreviewUrl,
-    trellisPreviewStatus,
-    trellisPreviewError,
-    handleGenerateTrellisPreview,
+    tripoPreviewUrl,
+    tripoPreviewStatus,
+    tripoPreviewError,
+    handleGenerateTripoPreview,
     initialized,
     initializeCadLab,
     handleDownload,

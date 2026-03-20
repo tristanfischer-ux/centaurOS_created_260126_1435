@@ -1,10 +1,9 @@
 /**
  * @file generate-unified/route.ts — Unified CAD model generation endpoint.
  *
- * @description Generates a parametric CAD model via Zoo.dev's text-to-CAD API.
- * Builds an enriched prompt from the product description and hero image prompt,
- * uploads STEP/STL/GLB assets to Supabase Storage, persists unified_result to
- * the project row, and records generation metrics.
+ * @description Generates a parametric CAD model via GenCAD (image-to-CAD on Modal).
+ * Fetches the hero image, sends it to GenCAD, uploads STL/GLB assets to Supabase
+ * Storage, persists unified_result to the project row, and records generation metrics.
  *
  * Streams SSE events for real-time progress feedback.
  *
@@ -18,7 +17,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { detectDomainFromResearchReport } from "@/lib/cad-lab/domain-prompts"
-import { imageToMesh } from "@/lib/cad-lab/image-to-3d"
+import { imageToCADViaGenCAD } from "@/lib/cad-lab/gencad"
 import { glbToStl } from "@/lib/cad-lab/mesh-convert"
 import type {
   CadLabModule,
@@ -29,7 +28,7 @@ import type {
 import type { Json } from "@/types/database.types"
 
 export const runtime = "nodejs"
-export const maxDuration = 300 // 5 min — Zoo text-to-CAD + upload
+export const maxDuration = 300 // 5 min — GenCAD generation + upload
 
 /** Request body shape */
 interface GenerateUnifiedBody {
@@ -132,17 +131,11 @@ export async function POST(request: Request): Promise<Response> {
   const cadGeometryPrompt = visualStyleData?.cadGeometryPrompt ?? null
   const systemIllustrationUrl = (project.system_illustration_url as string | null) ?? null
 
-  // GUARD: Zoo-only — require a design prompt and API token
-  if (!heroImagePrompt && !cadGeometryPrompt) {
+  // GUARD: Require a hero image for GenCAD (image-to-CAD)
+  if (!systemIllustrationUrl) {
     return NextResponse.json(
-      { error: "No design prompt found. Re-run the Design stage." },
+      { error: "No product illustration available. Re-run the Design stage." },
       { status: 400 },
-    )
-  }
-  if (!process.env.ZOO_API_TOKEN) {
-    return NextResponse.json(
-      { error: "Zoo API not configured." },
-      { status: 500 },
     )
   }
 
@@ -181,151 +174,108 @@ export async function POST(request: Request): Promise<Response> {
         } catch { /* domain is enrichment only */ }
       }
 
-      emit({ type: "progress", message: "Preparing Zoo text-to-CAD generation..." })
+      emit({ type: "progress", message: "Preparing CAD generation..." })
 
-      // ── IMAGE-TO-3D PATH ──────────────────────────────────────────────
-      // DECISION: When a hero image exists, use purpose-built image-to-3D AI
-      // models instead of CadQuery code generation. LLMs cannot reliably convert
-      // 2D images into accurate 3D geometry code — purpose-built models can.
-      // The existing STLViewer + orthographic renderer handle everything downstream.
-      if (systemIllustrationUrl) {
-        emit({ type: "progress", message: "Generating parametric CAD model via Zoo.dev..." })
+      // ── IMAGE-TO-CAD PATH (GenCAD on Modal) ────────────────────────────
+      // DECISION: Use GenCAD (image-to-parametric-CAD) to convert the hero
+      // image into an STL model. LLMs cannot reliably convert 2D images into
+      // accurate 3D geometry code — purpose-built models can.
+      emit({ type: "progress", message: "Generating parametric CAD model via GenCAD..." })
+
+      try {
+        // 1. Fetch hero image as base64
+        const imageRes = await fetch(systemIllustrationUrl)
+        if (!imageRes.ok) throw new Error(`Failed to fetch hero image: ${imageRes.status}`)
+        const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
+        const imageBase64 = imageBuffer.toString("base64")
+
+        // 2. Call GenCAD (image-to-CAD on Modal)
+        emit({ type: "status", step: "gencad" })
+
+        const promptSource = cadGeometryPrompt ? "cadGeometryPrompt" : heroImagePrompt ? "heroImagePrompt" : "none"
+        console.info(`[CAD-LAB-UNIFIED] GenCAD generation, prompt context: ${promptSource}`)
+
+        const gencadResult = await imageToCADViaGenCAD(imageBase64)
+        emit({ type: "progress", message: `3D model generated via GenCAD (${Math.round(gencadResult.generationTimeMs / 1000)}s)` })
+
+        // 3. GenCAD returns STL directly — no GLB conversion needed
+        const stlBase64 = gencadResult.stlBuffer.toString("base64")
+
+        // 4. Upload assets to Supabase Storage
+        emit({ type: "status", step: "upload" })
+        emit({ type: "progress", message: "Uploading 3D model files..." })
+
+        let stlUrl: string | undefined
+        let stlSize: number | undefined
 
         try {
-          // 1. Fetch hero image as base64
-          const imageRes = await fetch(systemIllustrationUrl)
-          if (!imageRes.ok) throw new Error(`Failed to fetch hero image: ${imageRes.status}`)
-          const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
-          const imageBase64 = imageBuffer.toString("base64")
-
-          // 2. Call Zoo text-to-CAD API
-          // DECISION: Zoo outputs native parametric STEP files (B-Rep surfaces, editable in any CAD program).
-          emit({ type: "status", step: "zoo" })
-
-          // DECISION: Prefer cadGeometryPrompt (optimized for parametric CAD) over
-          // heroImagePrompt (optimized for image generation with rendering noise).
-          const textPrompt = cadGeometryPrompt ?? heroImagePrompt ?? undefined
-          const promptSource = cadGeometryPrompt ? "cadGeometryPrompt" : heroImagePrompt ? "heroImagePrompt (fallback)" : "none"
-          console.info(`[CAD-LAB-UNIFIED] Zoo prompt source: ${promptSource}, length: ${textPrompt?.length ?? 0}`)
-          emit({ type: "progress", message: cadGeometryPrompt
-            ? "Generating parametric CAD model from CAD geometry prompt (Zoo.dev)..."
-            : "Generating parametric CAD model from design prompt (Zoo.dev)..." })
-
-          const mesh = await imageToMesh(imageBase64, {
-            textPrompt,
-          })
-          emit({ type: "progress", message: `3D model generated via ${mesh.provider} (${Math.round(mesh.generationTimeMs / 1000)}s)` })
-
-          // 3. Convert GLB → STL if provider didn't return STL directly
-          const stlBuffer = mesh.stlBuffer ?? await glbToStl(mesh.glbBuffer)
-          const stlBase64 = stlBuffer.toString("base64")
-          const glbBase64 = mesh.glbBuffer.length > 0 ? mesh.glbBuffer.toString("base64") : undefined
-
-          // 4. Upload assets to Supabase Storage
-          emit({ type: "status", step: "upload" })
-          emit({ type: "progress", message: "Uploading 3D model files..." })
-
-          let stlUrl: string | undefined
-          let stlSize: number | undefined
-          let glbUrl: string | undefined
-          let stepUrl: string | undefined
-
-          try {
-            const uploaded = await uploadCadAsset(projectId, UNIFIED_MODULE_ID, "unified.stl", "model/stl", stlBase64)
-            stlUrl = uploaded.url
-            stlSize = uploaded.sizeKb
-          } catch (err) {
-            console.warn("[CAD-LAB-UNIFIED] STL upload failed:", err instanceof Error ? err.message : err)
-          }
-
-          if (glbBase64) {
-            try {
-              const uploaded = await uploadCadAsset(projectId, UNIFIED_MODULE_ID, "unified.glb", "model/gltf-binary", glbBase64)
-              glbUrl = uploaded.url
-            } catch (err) {
-              console.warn("[CAD-LAB-UNIFIED] GLB upload failed:", err instanceof Error ? err.message : err)
-            }
-          }
-
-          // 5. STEP handling — Zoo returns native parametric STEP
-          if (mesh.stepBuffer) {
-            try {
-              const stepBase64 = mesh.stepBuffer.toString("base64")
-              const uploaded = await uploadCadAsset(projectId, UNIFIED_MODULE_ID, "unified.step", "application/step", stepBase64)
-              stepUrl = uploaded.url
-              console.info(`[CAD-LAB-UNIFIED] Native STEP uploaded: ${Math.round(mesh.stepBuffer.length / 1024)}kb`)
-            } catch (err) {
-              console.warn("[CAD-LAB-UNIFIED] STEP upload failed:", err instanceof Error ? err.message : err)
-            }
-          }
-
-          // 6. Build CadLabResult (no code, no SVGs — client renders from STL)
-          const finalResult: Omit<CadLabResult, "stlData" | "stepData"> = {
-            success: true,
-            stlUrl,
-            stlSize,
-            glbUrl,
-            stepUrl,
-            modelUsed: mesh.provider === "zoo" ? `text-to-3d:zoo` : `image-to-3d:${mesh.provider}`,
-            generationTime: mesh.generationTimeMs,
-          }
-
-          console.info("[CAD-LAB-UNIFIED] Image-to-3D complete:", {
-            projectId,
-            provider: mesh.provider,
-            timeMs: mesh.generationTimeMs,
-            stlSizeKb: stlSize,
-          })
-
-          // 7. Persist to database
-          emit({ type: "progress", message: "Saving to database..." })
-          try {
-            const { error: saveError } = await supabase
-              .from("cad_lab_projects")
-              .update({
-                unified_result: finalResult as unknown as Json,
-                unified_code: null, // No CadQuery code for image-to-3D path
-              })
-              .eq("id", projectId)
-            if (saveError) {
-              console.warn("[CAD-LAB-UNIFIED] DB save failed:", saveError.message)
-            }
-          } catch (err) {
-            console.warn("[CAD-LAB-UNIFIED] DB save error:", err instanceof Error ? err.message : err)
-          }
-
-          // 8. Record metrics
-          const imageCadResult: CadLabResult = { success: true, modelUsed: `image-to-3d:${mesh.provider}`, generationTime: mesh.generationTimeMs }
-          recordGenerationMetrics(projectId, UNIFIED_MODULE_ID, true, imageCadResult, {
-            hasDesignBrief: !!designBrief,
-            domain: detectedDomain,
-          }).catch(() => {})
-
-          guard.trackUsage({ model: 'zoo-text-to-cad' }).catch(() => {})
-
-          const elapsedMs = Date.now() - startTime
-          console.info("[CAD-LAB-UNIFIED] Generation complete:", { projectId, elapsedMs })
-
-          // 9. Emit final event with STL data for immediate 3D viewer display
-          emit({
-            type: "unified_complete",
-            result: { ...finalResult, stlData: stlBase64 } as Omit<CadLabResult, "stepData">,
-            code: "",
-          })
-          controller.close()
-          return
+          const uploaded = await uploadCadAsset(projectId, UNIFIED_MODULE_ID, "unified.stl", "model/stl", stlBase64)
+          stlUrl = uploaded.url
+          stlSize = uploaded.sizeKb
         } catch (err) {
-          const errMsg = err instanceof Error ? err.message : "Unknown error"
-          console.error("[CAD-LAB-UNIFIED] Zoo text-to-CAD failed:", errMsg)
-          emit({ type: "error", message: `CAD generation failed: ${errMsg}` })
-          controller.close()
-          return
+          console.warn("[CAD-LAB-UNIFIED] STL upload failed:", err instanceof Error ? err.message : err)
         }
-      }
 
-      // GUARD: No hero image — should not happen after early guards, but be explicit
-      emit({ type: "error", message: "No product illustration available. Re-run the Design stage." })
-      controller.close()
+        // 5. Build CadLabResult (no code, no SVGs — client renders from STL)
+        const finalResult: Omit<CadLabResult, "stlData" | "stepData"> = {
+          success: true,
+          stlUrl,
+          stlSize,
+          modelUsed: "image-to-3d:gencad",
+          generationTime: gencadResult.generationTimeMs,
+        }
+
+        console.info("[CAD-LAB-UNIFIED] GenCAD complete:", {
+          projectId,
+          provider: "gencad",
+          timeMs: gencadResult.generationTimeMs,
+          stlSizeKb: stlSize,
+        })
+
+        // 6. Persist to database
+        emit({ type: "progress", message: "Saving to database..." })
+        try {
+          const { error: saveError } = await supabase
+            .from("cad_lab_projects")
+            .update({
+              unified_result: finalResult as unknown as Json,
+              unified_code: null, // No CadQuery code for image-to-CAD path
+            })
+            .eq("id", projectId)
+          if (saveError) {
+            console.warn("[CAD-LAB-UNIFIED] DB save failed:", saveError.message)
+          }
+        } catch (err) {
+          console.warn("[CAD-LAB-UNIFIED] DB save error:", err instanceof Error ? err.message : err)
+        }
+
+        // 7. Record metrics
+        const cadResult: CadLabResult = { success: true, modelUsed: "image-to-3d:gencad", generationTime: gencadResult.generationTimeMs }
+        recordGenerationMetrics(projectId, UNIFIED_MODULE_ID, true, cadResult, {
+          hasDesignBrief: !!designBrief,
+          domain: detectedDomain,
+        }).catch(() => {})
+
+        guard.trackUsage({ model: 'gencad-image-to-cad' }).catch(() => {})
+
+        const elapsedMs = Date.now() - startTime
+        console.info("[CAD-LAB-UNIFIED] Generation complete:", { projectId, elapsedMs })
+
+        // 8. Emit final event with STL data for immediate 3D viewer display
+        emit({
+          type: "unified_complete",
+          result: { ...finalResult, stlData: stlBase64 } as Omit<CadLabResult, "stepData">,
+          code: "",
+        })
+        controller.close()
+        return
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "Unknown error"
+        console.error("[CAD-LAB-UNIFIED] GenCAD generation failed:", errMsg)
+        emit({ type: "error", message: `CAD generation failed: ${errMsg}` })
+        controller.close()
+        return
+      }
     },
   })
 

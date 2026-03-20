@@ -39,7 +39,7 @@ interface GenerateProviderBody {
 }
 
 const CAD_LAB_STORAGE_BUCKET = "xray-images"
-const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "trellis", "sf3d"]
+const VALID_PROVIDERS: ABProvider[] = ["meshy", "tripo", "sf3d"]
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024 // 10 MB
 
 // SECURITY: SSRF protection — only allow image fetches from Supabase Storage
@@ -272,7 +272,7 @@ export async function POST(request: Request): Promise<Response> {
           }
         }
 
-        // ── Convert GLB → STL if needed (skip for Zoo — it has native STEP) ──
+        // ── Convert GLB → STL if needed ──
         if (glbBuffer && !stlBuffer && !stepBuffer) {
           try {
             emit({ type: "provider_progress", provider, message: "Converting GLB to STL..." })

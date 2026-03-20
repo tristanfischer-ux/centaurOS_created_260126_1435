@@ -152,7 +152,7 @@ export interface EarlyCostEstimate {
 
 /** SSE event types for streaming module generation progress */
 export type GenerationEvent =
-  | { type: "status"; step: "interface" | "codegen" | "modal" | "zoo" | "upload"; attempt?: number }
+  | { type: "status"; step: "interface" | "codegen" | "modal" | "gencad" | "upload"; attempt?: number }
   | { type: "validation"; findings: PreExecValidationResult[] }
   | { type: "cost_estimate"; estimate: EarlyCostEstimate }
   | { type: "progress"; message: string }
@@ -312,8 +312,8 @@ export interface VisualStyleSpec {
   perModuleImagePrompts?: Record<string, string>
 
   /** Opus-crafted CAD geometry prompt (300-500 words). Describes parametric shape,
-   * dimensional constraints, assembly hierarchy, and interface geometry for text-to-CAD
-   * APIs (Zoo.dev). Unlike heroImagePrompt (optimized for image generation), this focuses
+   * dimensional constraints, assembly hierarchy, and interface geometry for CAD
+   * generation. Unlike heroImagePrompt (optimized for image generation), this focuses
    * on engineering geometry: envelope dimensions, feature relationships, tolerances,
    * and spatial constraints. */
   cadGeometryPrompt?: string
