@@ -25,6 +25,7 @@
 "use server"
 
 import { withAuth } from "@/lib/server-action-utils"
+import { withRetry } from "@/lib/retry"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { scanIdea as scanIdeaService, deriveProcessClassAI, refineScanAI, refineModuleAI } from "@/app/(platform)/the-forge/services/scan"
@@ -2572,31 +2573,42 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
       const anthropicKey = process.env.ANTHROPIC_API_KEY
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
-      const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": anthropicKey,
-          "anthropic-version": "2023-06-01",
+      const claudeData = await withRetry(async () => {
+        const resp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-opus-4-20250514",
+            max_tokens: 8192,
+            system: CONCEPT_RESEARCH_PROMPT,
+            messages: [{
+              role: "user",
+              content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}`,
+            }],
+          }),
+          signal: AbortSignal.timeout(120_000),
+        })
+
+        if (!resp.ok) {
+          const errText = await resp.text()
+          throw new Error(`Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
+        }
+
+        return resp.json()
+      }, {
+        maxRetries: 2,
+        baseDelay: 3000,
+        shouldRetry: (error) => {
+          const msg = error.message.toLowerCase()
+          return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+            msg.includes('network') || msg.includes('timeout') || msg.includes('529')
         },
-        body: JSON.stringify({
-          model: "claude-opus-4-20250514",
-          max_tokens: 8192,
-          system: CONCEPT_RESEARCH_PROMPT,
-          messages: [{
-            role: "user",
-            content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}`,
-          }],
-        }),
-        signal: AbortSignal.timeout(120_000),
       })
 
-      if (!claudeResponse.ok) {
-        const errText = await claudeResponse.text()
-        throw new Error(`Claude API error (${claudeResponse.status}): ${errText.slice(0, 300)}`)
-      }
-
-      const claudeData = await claudeResponse.json()
       const report: string = claudeData.content?.[0]?.text ?? ""
 
       const researchTime = Date.now() - start

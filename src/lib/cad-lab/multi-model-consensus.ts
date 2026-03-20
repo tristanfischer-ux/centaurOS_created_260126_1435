@@ -8,6 +8,8 @@
  * @related src/actions/cad-lab.ts (prefillDiagnostics)
  */
 
+import { withRetry } from '@/lib/retry'
+
 export interface ConsensusResult {
   /** Agreed value when 2+ models match; null when no majority */
   consensus: string | null
@@ -34,27 +36,36 @@ function normalizeMaterial(raw: string): string {
   return raw.trim().slice(0, 80) || "Other"
 }
 
+// INTENT: Retry on transient API errors (rate limit, server errors, network issues)
+const apiShouldRetry = (error: Error) => {
+  const msg = error.message.toLowerCase()
+  return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+    msg.includes('network') || msg.includes('timeout') || msg.includes('529')
+}
+
 async function callClaude(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-6",
-      max_tokens: 256,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!response.ok) throw new Error(`Claude error: ${response.status}`)
-  const data = await response.json()
-  return (data.content?.[0]?.text ?? "").trim()
+  return withRetry(async () => {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-6",
+        max_tokens: 256,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!response.ok) throw new Error(`Claude error: ${response.status}`)
+    const data = await response.json()
+    return (data.content?.[0]?.text ?? "").trim()
+  }, { maxRetries: 2, baseDelay: 2000, shouldRetry: apiShouldRetry })
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
@@ -78,19 +89,21 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   if (!apiKey) throw new Error("Gemini API key not configured")
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-      generationConfig: { maxOutputTokens: 256 },
-    }),
-    signal: AbortSignal.timeout(30_000),
-  })
-  if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
-  const data = await response.json()
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-  return text.trim()
+  return withRetry(async () => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+        generationConfig: { maxOutputTokens: 256 },
+      }),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
+    const data = await response.json()
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+    return text.trim()
+  }, { maxRetries: 2, baseDelay: 2000, shouldRetry: apiShouldRetry })
 }
 
 /**

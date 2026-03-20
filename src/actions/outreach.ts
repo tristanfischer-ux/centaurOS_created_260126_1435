@@ -18,6 +18,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
+import { withRetry } from '@/lib/retry'
 import { buildOutreachPrompt, parseSequenceResponse, buildResearchPrompt, parseResearchResponse } from '@/lib/outreach/prompt-builder'
 import type {
     Campaign,
@@ -534,29 +535,39 @@ async function callClaude(
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
+    return withRetry(async () => {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+            },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-6",
+                max_tokens: 4096,
+                system: systemPrompt,
+                messages: [{ role: "user", content: userPrompt }],
+            }),
+            signal: AbortSignal.timeout(120_000),
+        })
+
+        if (!response.ok) {
+            const errText = await response.text()
+            throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+        }
+
+        const data = await response.json()
+        return { text: data.content?.[0]?.text ?? "" }
+    }, {
+        maxRetries: 2,
+        baseDelay: 2000,
+        shouldRetry: (error) => {
+            const msg = error.message.toLowerCase()
+            return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+                msg.includes('network') || msg.includes('timeout') || msg.includes('529')
         },
-        body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: [{ role: "user", content: userPrompt }],
-        }),
-        signal: AbortSignal.timeout(120_000),
     })
-
-    if (!response.ok) {
-        const errText = await response.text()
-        throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
-    }
-
-    const data = await response.json()
-    return { text: data.content?.[0]?.text ?? "" }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -11,6 +11,8 @@
  * @security Uses ANTHROPIC_API_KEY server-side only. Never exposes to client.
  */
 
+import { withRetry } from '@/lib/retry'
+
 export interface VisionScoreResult {
   score: number // 1-10
   issues: string[] // Missing/wrong features
@@ -100,32 +102,47 @@ Do not include any text outside the JSON.`
 
     contentBlocks.push({ type: "text", text: textPrompt })
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const data = await withRetry(async () => {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6-20250514",
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: contentBlocks,
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(30_000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Vision scorer API error: ${response.status} ${response.statusText}`)
+      }
+
+      return response.json()
+    }, {
+      maxRetries: 2,
+      baseDelay: 2000,
+      shouldRetry: (error) => {
+        const msg = error.message.toLowerCase()
+        return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
+          msg.includes('network') || msg.includes('timeout') || msg.includes('529')
       },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6-20250514",
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: contentBlocks,
-          },
-        ],
-      }),
+    }).catch((err) => {
+      console.warn(`[VISION-SCORER] ${err.message}`)
+      return null
     })
 
-    if (!response.ok) {
-      console.warn(`[VISION-SCORER] API returned ${response.status}: ${response.statusText}`)
-      return null
-    }
-
-    const data = await response.json()
+    if (!data) return null
     const text = data?.content?.[0]?.text
     if (!text) return null
 
