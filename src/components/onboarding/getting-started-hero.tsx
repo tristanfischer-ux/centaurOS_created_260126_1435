@@ -56,7 +56,9 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
 
   const handleDismiss = useCallback(() => {
     setLocalDismissed(true)
-    updateOnboardingData({ checklist_dismissed: true })
+    updateOnboardingData({ checklist_dismissed: true }).catch(() => {
+      // Best-effort — hero is already hidden via local state
+    })
   }, [])
 
   // Hide if dismissed or 3+ items complete

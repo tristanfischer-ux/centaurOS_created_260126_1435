@@ -102,6 +102,8 @@ export function UnifiedOnboarding({
               localStorage.removeItem('forgeos_onboarding_completed')
               localStorage.removeItem('forgeos_intent_selected')
             }
+          }).catch(() => {
+            // Best-effort — localStorage keys remain for retry on next visit
           })
           return // Don't show modal — user already onboarded
         }
