@@ -129,6 +129,9 @@ export function InvestorBrowser({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // INTENT: Track whether we've ever client-fetched. Without this, clearing filters
+  // back to defaults hits the guard (firms.length > 0 with stale data) and skips refetch.
+  const hasEverFetched = useRef(hasUrlFilters)
 
   // ---------------------------------------------------------------------------
   // Debounce search query
@@ -163,11 +166,12 @@ export function InvestorBrowser({
 
   useEffect(() => {
     // INTENT: Skip redundant refetch when at default filters and SSR data is loaded.
-    // Value-based check — immune to React Strict Mode double-effect execution
-    // (refs get mutated on the first run, then the guard is stale on the second).
-    if (activeFirmType === 'All' && !activeOnly && !debouncedQuery && firms.length > 0) {
+    // Once we've fetched at least once (filters were applied), always refetch on change
+    // — even back to defaults — so clearing filters reloads the full unfiltered set.
+    if (activeFirmType === 'All' && !activeOnly && !debouncedQuery && !hasEverFetched.current) {
       return
     }
+    hasEverFetched.current = true
     startTransition(async () => {
       try {
         const result = await searchInvestors({

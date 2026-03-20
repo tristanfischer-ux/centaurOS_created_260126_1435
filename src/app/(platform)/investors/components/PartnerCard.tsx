@@ -18,6 +18,11 @@ function formatSeniority(s: string): string {
   return s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
+function ensureProtocol(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url
+  return `https://${url}`
+}
+
 export function PartnerCard({ contact, access }: PartnerCardProps) {
   return (
     <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
@@ -46,7 +51,7 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
         <div className="flex items-center gap-3 mt-1.5">
           {contact.linkedin_url && (
             <a
-              href={contact.linkedin_url}
+              href={ensureProtocol(contact.linkedin_url)}
               target="_blank"
               rel="noopener noreferrer"
               className="text-international-orange hover:underline text-xs flex items-center gap-1"
