@@ -122,8 +122,8 @@ export async function updateProfileDetails(
     }
     
     // VALIDATION: Role must be valid enum value
-    if (updates.role && !['Founder', 'Executive', 'Apprentice', 'AI_Agent'].includes(updates.role)) {
-        return { success: false, error: 'Invalid role. Must be Founder, Executive, Apprentice, or AI_Agent' }
+    if (updates.role && !['Founder', 'Executive', 'Apprentice', 'Supplier', 'AI_Agent'].includes(updates.role)) {
+        return { success: false, error: 'Invalid role. Must be Founder, Executive, Apprentice, Supplier, or AI_Agent' }
     }
 
     // SECURITY: Only Founders can change roles, and cannot change their own role.

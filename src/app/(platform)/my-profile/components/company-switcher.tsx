@@ -45,6 +45,8 @@ function getRoleBadgeClasses(role: string): string {
       return 'bg-international-orange-light/50 text-international-orange border-international-orange/10'
     case 'Apprentice':
       return 'bg-muted text-muted-foreground border-border'
+    case 'Supplier':
+      return 'bg-info/10 text-info border-info/20'
     default:
       return 'bg-muted text-muted-foreground border-border'
   }

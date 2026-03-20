@@ -93,6 +93,7 @@ export const RATE_LIMIT_CONFIGS = {
     // Public endpoints
     health: { limit: 60, window: 60 * 1000 },            // 60 requests per minute
     preview: { limit: 30, window: 60 * 1000 },           // 30 requests per minute
+    claimPreview: { limit: 30, window: 60 * 1000 },      // 30 claim previews per minute
     
     // AI server actions — prevent cost abuse
     aiAdvisory: { limit: 10, window: 60 * 1000 },        // 10 advisory answers per minute
