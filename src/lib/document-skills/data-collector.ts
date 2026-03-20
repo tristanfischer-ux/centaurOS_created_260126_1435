@@ -44,82 +44,89 @@ export async function collectAutoData(
     end: now.toISOString().split('T')[0],
   }
 
-  const blocks: string[] = []
-  const promises: Promise<void>[] = []
+  // INTENT: Ordered fetcher list ensures deterministic block ordering in the AI prompt.
+  // Each entry resolves to a string (or empty string on failure) so Promise.all preserves order.
+  const orderedFetchers: Promise<string>[] = []
 
   if (sources.includes('company-profile')) {
-    promises.push(
-      fetchCompanyProfile(supabase, foundryId).then(text => {
-        if (text) blocks.push(text)
+    orderedFetchers.push(
+      fetchCompanyProfile(supabase, foundryId).catch(err => {
+        console.warn('[DataCollector] Company profile fetch failed:', err)
+        return ''
       })
     )
   }
 
   if (sources.includes('objectives')) {
-    promises.push(
-      fetchObjectives(supabase, foundryId).then(text => {
-        if (text) blocks.push(text)
+    orderedFetchers.push(
+      fetchObjectives(supabase, foundryId).catch(err => {
+        console.warn('[DataCollector] Objectives fetch failed:', err)
+        return ''
       })
     )
   }
 
   if (sources.includes('financials')) {
-    promises.push(
-      fetchFinancialSnapshotData(supabase, foundryId, dateRange).then(data => {
-        blocks.push(formatFinancials(data))
-      }).catch(err => {
-        console.warn('[DataCollector] Financials fetch failed:', err)
-      })
+    orderedFetchers.push(
+      fetchFinancialSnapshotData(supabase, foundryId, dateRange)
+        .then(data => formatFinancials(data))
+        .catch(err => {
+          console.warn('[DataCollector] Financials fetch failed:', err)
+          return ''
+        })
     )
   }
 
   if (sources.includes('team')) {
-    promises.push(
-      fetchTeam(supabase, foundryId).then(text => {
-        if (text) blocks.push(text)
+    orderedFetchers.push(
+      fetchTeam(supabase, foundryId).catch(err => {
+        console.warn('[DataCollector] Team fetch failed:', err)
+        return ''
       })
     )
   }
 
   if (sources.includes('sales-pipeline')) {
-    promises.push(
-      fetchSalesPipelineData(supabase, foundryId, dateRange).then(data => {
-        blocks.push(formatSalesPipeline(data))
-      }).catch(err => {
-        console.warn('[DataCollector] Sales pipeline fetch failed:', err)
-      })
+    orderedFetchers.push(
+      fetchSalesPipelineData(supabase, foundryId, dateRange)
+        .then(data => formatSalesPipeline(data))
+        .catch(err => {
+          console.warn('[DataCollector] Sales pipeline fetch failed:', err)
+          return ''
+        })
     )
   }
 
   if (sources.includes('engineering')) {
-    promises.push(
-      fetchEngineeringActivityData(supabase, foundryId, dateRange).then(data => {
-        blocks.push(formatEngineering(data))
-      }).catch(err => {
-        console.warn('[DataCollector] Engineering fetch failed:', err)
-      })
+    orderedFetchers.push(
+      fetchEngineeringActivityData(supabase, foundryId, dateRange)
+        .then(data => formatEngineering(data))
+        .catch(err => {
+          console.warn('[DataCollector] Engineering fetch failed:', err)
+          return ''
+        })
     )
   }
 
   if (sources.includes('blockers')) {
-    promises.push(
-      fetchBlockers(supabase, foundryId).then(text => {
-        if (text) blocks.push(text)
+    orderedFetchers.push(
+      fetchBlockers(supabase, foundryId).catch(err => {
+        console.warn('[DataCollector] Blockers fetch failed:', err)
+        return ''
       })
     )
   }
 
   if (sources.includes('competitive-intel')) {
-    promises.push(
-      fetchCompetitiveIntel(supabase, foundryId).then(text => {
-        if (text) blocks.push(text)
-      }).catch(err => {
+    orderedFetchers.push(
+      fetchCompetitiveIntel(supabase, foundryId).catch(err => {
         console.warn('[DataCollector] Competitive intel fetch failed:', err)
+        return ''
       })
     )
   }
 
-  await Promise.all(promises)
+  const blocks = await Promise.all(orderedFetchers)
   return blocks.filter(Boolean).join('\n\n')
 }
 

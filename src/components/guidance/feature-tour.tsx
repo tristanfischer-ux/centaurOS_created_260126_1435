@@ -58,6 +58,7 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
   const [rect, setRect] = useState<DOMRect | null>(null)
   const rafRef = useRef<number>(0)
   const prevOverflowRef = useRef<string>('')
+  const shownAnyStepRef = useRef(false)
 
   const step = steps[currentStep]
 
@@ -65,7 +66,13 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     setActive(false)
     setCurrentStep(0)
     setRect(null)
-    markSeen(tourId)
+    // Only mark seen if the user actually saw at least one step.
+    // If all targets were missing (e.g. wrong view mode, page not loaded),
+    // don't burn the tour — let it auto-start again next time.
+    if (shownAnyStepRef.current) {
+      markSeen(tourId)
+    }
+    shownAnyStepRef.current = false
   }, [tourId])
 
   // Auto-start on mount if not seen
@@ -88,19 +95,20 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     return () => window.removeEventListener('forgeos-start-tour', handler)
   }, [tourId])
 
-  // Lock scroll on the real scroll container (ZoomableContent), not body
+  // Lock vertical scroll on the real scroll container (ZoomableContent), not body.
+  // Uses overflowY (not shorthand overflow) to preserve horizontal overflow behavior.
   useEffect(() => {
     const container = getScrollContainer()
     if (!container) return
 
     if (active) {
-      prevOverflowRef.current = container.style.overflow
-      container.style.overflow = 'hidden'
+      prevOverflowRef.current = container.style.overflowY
+      container.style.overflowY = 'hidden'
     } else {
-      container.style.overflow = prevOverflowRef.current
+      container.style.overflowY = prevOverflowRef.current
     }
     return () => {
-      container.style.overflow = prevOverflowRef.current
+      container.style.overflowY = prevOverflowRef.current
     }
   }, [active])
 
@@ -120,19 +128,20 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     if (!active || !step) return
     const el = document.querySelector(`[data-tour="${step.target}"]`)
     if (el) {
-      // Temporarily unlock scroll so scrollIntoView works
+      shownAnyStepRef.current = true
+      // Temporarily unlock vertical scroll so scrollIntoView works
       const container = getScrollContainer()
-      const prevOv = container?.style.overflow ?? ''
-      if (container) container.style.overflow = prevOverflowRef.current
+      const prevOv = container?.style.overflowY ?? ''
+      if (container) container.style.overflowY = prevOverflowRef.current
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       // Re-lock after scroll animation settles + recalc rect
       const timer = setTimeout(() => {
-        if (container) container.style.overflow = 'hidden'
+        if (container) container.style.overflowY = 'hidden'
         updateRect()
       }, 400)
       return () => {
         clearTimeout(timer)
-        if (container) container.style.overflow = prevOv
+        if (container) container.style.overflowY = prevOv
       }
     } else {
       // Target not in DOM — auto-advance or close if last step
