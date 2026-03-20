@@ -225,7 +225,7 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           View profile →
         </Link>
         <div className="flex items-center gap-2">
-          {attrs.website_url && (
+          {attrs.website_url && ensureProtocol(attrs.website_url) && (
             <a
               href={ensureProtocol(attrs.website_url)}
               target="_blank"
@@ -236,7 +236,7 @@ export function InvestorCard({ firm }: InvestorCardProps) {
               <Globe className="h-3.5 w-3.5" />
             </a>
           )}
-          {attrs.linkedin_company_url && (
+          {attrs.linkedin_company_url && ensureProtocol(attrs.linkedin_company_url) && (
             <a
               href={ensureProtocol(attrs.linkedin_company_url)}
               target="_blank"

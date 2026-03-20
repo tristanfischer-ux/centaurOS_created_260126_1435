@@ -554,7 +554,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   <h2 className="text-base font-semibold text-foreground">Links</h2>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {attrs.website_url && (
+                  {attrs.website_url && ensureProtocol(attrs.website_url) && (
                     <a
                       href={ensureProtocol(attrs.website_url)}
                       target="_blank"
@@ -565,7 +565,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                       Website
                     </a>
                   )}
-                  {attrs.linkedin_company_url && (
+                  {attrs.linkedin_company_url && ensureProtocol(attrs.linkedin_company_url) && (
                     <a
                       href={ensureProtocol(attrs.linkedin_company_url)}
                       target="_blank"

@@ -149,7 +149,7 @@ export interface InvestorTierAccess {
  */
 function toStringArray(val: unknown): string[] {
   if (!val) return []
-  if (Array.isArray(val)) return val as string[]
+  if (Array.isArray(val)) return val.filter((v): v is string => typeof v === 'string')
   if (typeof val === 'string') return val.split(',').map(s => s.trim()).filter(Boolean)
   return []
 }
@@ -270,7 +270,7 @@ function sanitizeFilterValue(value: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/%/g, '\\%')
     .replace(/_/g, '\\_')
-    .replace(/[,()\."*]/g, '')
+    .replace(/[,()\."*:!]/g, '')
 }
 
 /**

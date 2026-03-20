@@ -51,7 +51,7 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
         )}
 
         <div className="flex items-center gap-3 mt-1.5">
-          {contact.linkedin_url && (
+          {contact.linkedin_url && ensureProtocol(contact.linkedin_url) && (
             <a
               href={ensureProtocol(contact.linkedin_url)}
               target="_blank"

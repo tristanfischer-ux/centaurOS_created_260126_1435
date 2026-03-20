@@ -240,6 +240,7 @@ export function InvestorBrowser({
             <button
               key={type}
               onClick={() => setActiveFirmType(type)}
+              aria-pressed={activeFirmType === type}
               className={cn(
                 'px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200',
                 activeFirmType === type
