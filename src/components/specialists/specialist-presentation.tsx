@@ -18,7 +18,7 @@
 
 import { useState } from "react"
 import Image from "next/image"
-import { AlertCircle, Loader2, Volume2, Brain } from "lucide-react"
+import { AlertCircle, Loader2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ConversationMode, SpecialistState } from "@/lib/agents/conversation-engine"
 import type { Specialist } from "@/app/(platform)/agents/specialists-data"
@@ -72,10 +72,6 @@ export function SpecialistPresentation({
                 <AvatarImage specialist={specialist} size={imageSizes[size]} />
             </div>
 
-            {/* Small indicator for TTS playback in text mode */}
-            {(state === "speaking") && (
-                <Volume2 className="absolute -bottom-1 -right-1 h-3 w-3 text-international-orange animate-pulse" />
-            )}
         </div>
     )
 }
@@ -139,11 +135,7 @@ function StateIndicator({
             label: "Thinking",
             className: "text-international-orange animate-pulse",
         },
-        speaking: {
-            icon: Volume2,
-            label: "Speaking",
-            className: "text-international-orange",
-        },
+        speaking: null,
         error: {
             icon: AlertCircle,
             label: "Error",

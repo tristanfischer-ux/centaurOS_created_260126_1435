@@ -44,8 +44,6 @@ import {
     X,
     Mic,
     MicOff,
-    Volume2,
-    VolumeX,
     Sparkles,
     ChevronDown,
     ChevronUp,
@@ -58,7 +56,6 @@ import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
 import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "./specialists-data"
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
-import { useTts } from "@/hooks/use-tts"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
 import { MeetingOutputs } from "./meeting-outputs"
 import { HuddleReport } from "./huddle-report"
@@ -767,7 +764,6 @@ export function TeamMeetingDialog({
     const [isAutoSaved, setIsAutoSaved] = useState(false)
     const [isGeneratingOutputs, setIsGeneratingOutputs] = useState(false)
     const [showReportDialog, setShowReportDialog] = useState(false)
-    const [speakingEntryIdx, setSpeakingEntryIdx] = useState<number | null>(null)
     const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
     const [wantsToSpeak, setWantsToSpeak] = useState<Set<string>>(new Set())
     const [debateCancelRequested, setDebateCancelRequested] = useState(false)
@@ -776,7 +772,6 @@ export function TeamMeetingDialog({
     const debateCancelRef = useRef(false)
 
     // ─── Voice Hooks ──────────────────────────────────────────────────────
-    const tts = useTts()
     const topicSpeechRecognition = useSpeechRecognition({
         onResult: (transcript) => {
             setTopic((prev) => (prev ? prev + " " + transcript : transcript))
@@ -801,10 +796,8 @@ export function TeamMeetingDialog({
     // ─── Reset on close ───────────────────────────────────────────────────
     useEffect(() => {
         if (!open) {
-            tts.stop()
             if (topicSpeechRecognition.isListening) topicSpeechRecognition.stop()
             if (thoughtsSpeechRecognition.isListening) thoughtsSpeechRecognition.stop()
-            setSpeakingEntryIdx(null)
 
             const timer = setTimeout(() => {
                 setPhase("setup")
@@ -1068,13 +1061,6 @@ export function TeamMeetingDialog({
                 const wants = getWantsToSpeak(response, remainingIds, specialist.id)
                 setWantsToSpeak(wants)
 
-                // TTS: play the response if voice is enabled
-                if (tts.voiceEnabled && specialist.voice) {
-                    const globalIdx = entriesRef.current.length // will be the new entry's index
-                    setSpeakingEntryIdx(globalIdx)
-                    await tts.play(response, specialist.voice)
-                    setSpeakingEntryIdx(null)
-                }
             } catch (err) {
                 const message = err instanceof Error ? err.message : "Unknown error"
                 console.error(`[TeamMeeting] ${specialist.name} failed:`, message)
@@ -1094,7 +1080,7 @@ export function TeamMeetingDialog({
             setCurrentRound(round)
             setPhase("awaiting-input")
         },
-        [selectedSpecialists, topic, executeSpecialist, tts]
+        [selectedSpecialists, topic, executeSpecialist]
     )
 
     // ─── Start Meeting ────────────────────────────────────────────────────
@@ -1113,9 +1099,6 @@ export function TeamMeetingDialog({
         }
         setError(null)
         setIsStarting(true)
-
-        // Unlock AudioContext on this user gesture so TTS works after async work
-        tts.warmUp()
 
         try {
             const threads = await initializeThreads()
@@ -1137,7 +1120,7 @@ export function TeamMeetingDialog({
         } finally {
             setIsStarting(false)
         }
-    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, tts, selectedSpecialists])
+    }, [selectedIds, topic, initializeThreads, runSingleSpecialist, selectedSpecialists])
 
     // ─── Ask a Specific Specialist ────────────────────────────────────────
 
@@ -1150,16 +1133,13 @@ export function TeamMeetingDialog({
             const thoughts = userThoughts.trim() || undefined
             setUserThoughts("")
 
-            // Unlock AudioContext on this user gesture so TTS works after async work
-            tts.warmUp()
-
             const idx = selectedSpecialists.findIndex((s) => s.id === specialist.id)
             if (idx === -1) return
 
             const nextRound = currentRound + 1
             await runSingleSpecialist(idx, nextRound, threadIds, thoughts)
         },
-        [selectedSpecialists, currentRound, threadIds, userThoughts, runSingleSpecialist, tts]
+        [selectedSpecialists, currentRound, threadIds, userThoughts, runSingleSpecialist]
     )
 
     // ─── Autonomous Debate: Specialists discuss among themselves ──────────
@@ -1178,9 +1158,6 @@ export function TeamMeetingDialog({
         setError(null)
         setDebateCancelRequested(false)
         debateCancelRef.current = false
-
-        // Unlock AudioContext on this user gesture so TTS works after async work
-        tts.warmUp()
 
         const debateAccumulator: MeetingEntry[] = [...entriesRef.current]
         let roundCounter = currentRound
@@ -1270,7 +1247,7 @@ export function TeamMeetingDialog({
         }
 
         setPhase("awaiting-input")
-    }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist, tts])
+    }, [currentRound, selectedSpecialists, topic, threadIds, executeSpecialist])
 
     // ─── Wrap Up (Generate Outputs) ───────────────────────────────────────
     const handleWrapUp = useCallback(async () => {
@@ -1494,28 +1471,6 @@ export function TeamMeetingDialog({
                             <span className="text-xs text-muted-foreground flex-1 truncate">
                                 {selectedSpecialists.map((s) => `${s.name} (${s.title})`).join(", ")}
                             </span>
-                            {/* Voice mute toggle */}
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    const enabling = !tts.voiceEnabled
-                                    tts.setVoiceEnabled(enabling)
-                                    if (enabling) tts.warmUp()
-                                }}
-                                className={cn(
-                                    "h-7 w-7 p-0 flex-shrink-0",
-                                    tts.voiceEnabled && "text-international-orange",
-                                    tts.isPlaying && "animate-pulse"
-                                )}
-                                aria-label={tts.voiceEnabled ? "Mute voice output" : "Enable voice output"}
-                            >
-                                {tts.voiceEnabled ? (
-                                    <Volume2 className="h-4 w-4" />
-                                ) : (
-                                    <VolumeX className="h-4 w-4" />
-                                )}
-                            </Button>
                         </div>
                     )}
                 </DialogHeader>
@@ -1867,17 +1822,11 @@ export function TeamMeetingDialog({
                             {entries.slice(0, -1).map((entry, i) => {
                                 const specialist = getSpecialistById(entry.specialistId)
                                 const isExpanded = expandedEntries.has(i)
-                                const isSpeaking = speakingEntryIdx === i
                                 return (
                                     <div key={i}>
                                         <button
                                             onClick={() => toggleEntry(i)}
-                                            className={cn(
-                                                "flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors",
-                                                isSpeaking
-                                                    ? "bg-international-orange/5"
-                                                    : "hover:bg-muted/30"
-                                            )}
+                                            className="flex items-start gap-2 w-full text-left py-2 px-3 rounded-lg transition-colors hover:bg-muted/30"
                                         >
                                             <div className="relative h-6 w-6 rounded-full overflow-hidden bg-muted flex-shrink-0 mt-0.5">
                                                 {specialist?.avatarImage ? (
@@ -1900,9 +1849,6 @@ export function TeamMeetingDialog({
                                                     <span className="text-sm font-semibold text-foreground">
                                                         {entry.specialistName}
                                                     </span>
-                                                    {isSpeaking && (
-                                                        <Volume2 className="h-3 w-3 text-international-orange animate-pulse" />
-                                                    )}
                                                     {isExpanded ? (
                                                         <ChevronUp className="h-3 w-3 text-muted-foreground ml-auto" />
                                                     ) : (
@@ -1941,7 +1887,6 @@ export function TeamMeetingDialog({
                             {entries.length > 0 && (() => {
                                 const lastEntry = entries[entries.length - 1]
                                 const specialist = getSpecialistById(lastEntry.specialistId)
-                                const isSpeaking = speakingEntryIdx === entries.length - 1
                                 return (
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-2">
@@ -1967,16 +1912,8 @@ export function TeamMeetingDialog({
                                             <Badge variant="secondary" className="text-[10px]">
                                                 Round {lastEntry.round}
                                             </Badge>
-                                            {isSpeaking && (
-                                                <Volume2 className="h-3.5 w-3.5 text-international-orange animate-pulse" />
-                                            )}
                                         </div>
-                                        <div className={cn(
-                                            "ml-9 rounded-lg border p-4",
-                                            isSpeaking
-                                                ? "border-international-orange/30 bg-international-orange/5"
-                                                : "border-muted bg-muted/30"
-                                        )}>
+                                        <div className="ml-9 rounded-lg border p-4 border-muted bg-muted/30">
                                             <Markdown content={lastEntry.content} className="text-sm" />
                                         </div>
                                         {lastEntry.proposals && lastEntry.proposals.length > 0 && specialist && (
