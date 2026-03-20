@@ -162,20 +162,30 @@ export function UnifiedOnboarding({
   }
 
   const handleComplete = async () => {
-    await updateOnboardingData({
-      onboarding_modal_completed: true,
-      has_completed_onboarding: true,
-      onboarding_completed_at: new Date().toISOString(),
-    })
+    // INTENT: Always close the modal. The DB write is best-effort — trapping
+    // the user on a full-screen overlay is worse than re-showing it once.
+    try {
+      await updateOnboardingData({
+        onboarding_modal_completed: true,
+        has_completed_onboarding: true,
+        onboarding_completed_at: new Date().toISOString(),
+      })
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to persist completion:', error)
+    }
     setOpen(false)
   }
 
   const handleSkip = useCallback(() => {
+    setOpen(false)
+    // Fire-and-forget — modal is already closed
     updateOnboardingData({
       onboarding_modal_completed: true,
       has_completed_onboarding: true,
       onboarding_completed_at: new Date().toISOString(),
-    }).then(() => setOpen(false))
+    }).catch((error) => {
+      console.error('[UnifiedOnboarding] Failed to persist skip:', error)
+    })
   }, [])
 
   // Escape key to dismiss
