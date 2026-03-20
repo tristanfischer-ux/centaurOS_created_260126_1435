@@ -19,6 +19,7 @@ export function MainContentArea({ children, className }: MainContentAreaProps): 
         "flex-1 min-w-0 overflow-y-auto bg-background",
         className,
       )}
+      data-tour-scroll
     >
       {children}
     </ZoomableContent>

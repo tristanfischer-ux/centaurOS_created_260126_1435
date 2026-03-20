@@ -19,8 +19,8 @@ interface FeatureTourProps {
 
 const STORAGE_PREFIX = 'forgeos-tour-seen-'
 
-/** Selector for the platform's scrollable content container (ZoomableContent) */
-const SCROLL_CONTAINER_SELECTOR = '.overflow-y-auto'
+/** Selector for the platform's scrollable content container (MainContentArea) */
+const SCROLL_CONTAINER_SELECTOR = '[data-tour-scroll]'
 
 export function hasSeenTour(tourId: string): boolean {
   if (typeof window === 'undefined') return true
@@ -158,14 +158,16 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     }
   }, [active, updateRect])
 
-  // Escape key
+  // Keyboard handling — Escape closes tour, all other keys suppressed
+  // to prevent shortcuts (e.g. ? for help dialog) firing behind the overlay
   useEffect(() => {
     if (!active) return
     const handleKey = (e: KeyboardEvent) => {
+      e.stopPropagation()
       if (e.key === 'Escape') close()
     }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
   }, [active, close])
 
   if (!active || !step) return null

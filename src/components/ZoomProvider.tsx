@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useState, useEffect, ReactNode, CSSProperties } from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode, type CSSProperties, type HTMLAttributes } from "react"
 // NOTE: MobileZoomControl intentionally has no mounted guard — zoom defaults
 // to 100 on both server and client, so SSR output matches first client render.
 import { ZoomControl } from "./ZoomControl"
@@ -76,12 +76,11 @@ export function MobileZoomControl() {
 }
 
 // Wrapper for zoomable content
-interface ZoomableContentProps {
+interface ZoomableContentProps extends HTMLAttributes<HTMLDivElement> {
     children: ReactNode
-    className?: string
 }
 
-export function ZoomableContent({ children, className }: ZoomableContentProps) {
+export function ZoomableContent({ children, className, style: styleProp, ...rest }: ZoomableContentProps) {
     const { zoom } = useZoomContext()
     const [mounted, setMounted] = useState(false)
 
@@ -92,13 +91,13 @@ export function ZoomableContent({ children, className }: ZoomableContentProps) {
     // Only apply zoom style when actually zoomed (not at 100%).
     // Setting zoom: 1 explicitly can cause subpixel layout gaps in
     // flex containers, especially in Safari/WebKit.
-    const style: CSSProperties = mounted && zoom !== DEFAULT_ZOOM ? {
+    const zoomStyle: CSSProperties = mounted && zoom !== DEFAULT_ZOOM ? {
         zoom: zoom / 100,
         WebkitTextSizeAdjust: "100%" as const,
     } : {}
 
     return (
-        <div style={style} className={className}>
+        <div style={{ ...zoomStyle, ...styleProp }} className={className} {...rest}>
             {children}
         </div>
     )
