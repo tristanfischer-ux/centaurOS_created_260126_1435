@@ -389,10 +389,11 @@ export function SkillDocumentSection() {
               <CardContent className="p-6 space-y-4">
                 <div className="relative">
                   <textarea
-                    className="w-full min-h-[160px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
+                    className="w-full min-h-[160px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder={selectedSkill.inputHint}
                     value={userContext}
                     onChange={e => setUserContext(e.target.value)}
+                    disabled={isPrefilling}
                     maxLength={20000}
                   />
                   {isPrefilling && (

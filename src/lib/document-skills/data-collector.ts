@@ -148,7 +148,7 @@ async function fetchCompanyProfile(supabase: SupabaseClient, foundryId: string):
   if (data.industry) lines.push(`- **Industry:** ${data.industry}`)
   if (data.sector) lines.push(`- **Sector:** ${data.sector}`)
   if (data.stage) lines.push(`- **Stage:** ${data.stage}`)
-  return lines.join('\n')
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 
 async function fetchObjectives(supabase: SupabaseClient, foundryId: string): Promise<string> {
@@ -164,9 +164,10 @@ async function fetchObjectives(supabase: SupabaseClient, foundryId: string): Pro
 
   const lines = ['## Active Objectives']
   for (const obj of data) {
+    if (!obj.title) continue
     lines.push(`- **${obj.title}** — ${obj.progress ?? 0}% complete, status: ${obj.status ?? 'unknown'}`)
   }
-  return lines.join('\n')
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 
 async function fetchTeam(supabase: SupabaseClient, foundryId: string): Promise<string> {
@@ -184,6 +185,7 @@ async function fetchTeam(supabase: SupabaseClient, foundryId: string): Promise<s
   for (const member of data) {
     lines.push(`- ${member.full_name ?? 'Unknown'}${member.role ? ` (${member.role})` : ''}`)
   }
+  // GOTCHA: Always has content (team size line) so no header-only guard needed
   return lines.join('\n')
 }
 
@@ -202,10 +204,11 @@ async function fetchBlockers(supabase: SupabaseClient, foundryId: string): Promi
 
   const lines = ['## Current Blockers']
   for (const standup of data) {
+    if (!standup.blockers) continue
     const severity = standup.blocker_severity ?? 'unknown'
     lines.push(`- [${severity}] ${standup.blockers}`)
   }
-  return lines.join('\n')
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 
 async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string): Promise<string> {

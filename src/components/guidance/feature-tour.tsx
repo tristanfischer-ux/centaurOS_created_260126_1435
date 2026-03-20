@@ -167,31 +167,25 @@ export function FeatureTour({ tourId, steps }: FeatureTourProps) {
     }
   }, [active, updateRect])
 
-  // Keyboard handling — Escape closes tour, other keys suppressed to prevent
-  // shortcuts (e.g. ? for help dialog) firing behind the overlay.
-  // Uses bubble phase on the overlay's portal root so events on the tooltip's
-  // own buttons (Enter/Space) still reach their targets before we suppress them.
+  // Keyboard handling — Escape closes tour, most keys suppressed to prevent
+  // shortcuts (e.g. ? for help dialog, N for quick-add) firing behind the overlay.
+  // Capture-phase on window so it intercepts keys regardless of focus location.
+  // Enter/Space/Tab are whitelisted so tour buttons remain keyboard-accessible
+  // (stopPropagation doesn't affect Tab's native focus behaviour).
   useEffect(() => {
     if (!active) return
-    // Escape on window (capture) — works regardless of focus location
-    const handleEscape = (e: KeyboardEvent) => {
+    const PASSTHROUGH_KEYS = new Set(['Enter', ' ', 'Tab'])
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.stopPropagation()
         close()
+        return
       }
+      if (PASSTHROUGH_KEYS.has(e.key)) return
+      e.stopPropagation()
     }
-    // Suppress all other keys at the portal root (bubble) — fires after
-    // the tooltip's buttons have already processed Enter/Space
-    const portalRoot = document.querySelector('[data-tour-overlay]')
-    const handleOtherKeys = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') e.stopPropagation()
-    }
-    window.addEventListener('keydown', handleEscape, true)
-    portalRoot?.addEventListener('keydown', handleOtherKeys as EventListener)
-    return () => {
-      window.removeEventListener('keydown', handleEscape, true)
-      portalRoot?.removeEventListener('keydown', handleOtherKeys as EventListener)
-    }
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
   }, [active, close])
 
   if (!active || !step) return null
