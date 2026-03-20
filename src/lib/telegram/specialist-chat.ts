@@ -812,10 +812,6 @@ export async function handleSpecialistVoiceMessage(
             })
         }
 
-        // Optionally generate TTS response (fire-and-forget)
-        generateAndSendTTS(chatId, response, specialist.voice).catch((err) => {
-            console.warn('[Telegram/TTS] Voice response failed (non-critical):', err)
-        })
     } catch (error) {
         console.error('[Telegram/SpecialistChat] Specialist voice message error:', error)
         await sendMessage({
@@ -825,77 +821,6 @@ export async function handleSpecialistVoiceMessage(
     }
 
     return true
-}
-
-/**
- * Generates a TTS audio response and sends it as a voice message.
- * Uses OpenAI TTS with the specialist's configured voice.
- *
- * @description Only generates TTS for shorter responses (< 2000 chars)
- * since longer responses are better consumed as text. Strips markdown
- * for cleaner speech output. Non-critical — text response is already sent.
- *
- * @param chatId - Telegram chat ID
- * @param text - Text to convert to speech
- * @param voiceId - OpenAI TTS voice ID
- */
-async function generateAndSendTTS(
-    chatId: number,
-    text: string,
-    voiceId: string,
-): Promise<void> {
-    // Only generate TTS for shorter responses (< 2000 chars)
-    // Longer responses are better read as text
-    if (text.length > 2000) return
-
-    // Strip markdown for cleaner TTS
-    const cleanText = text
-        .replace(/\*\*(.+?)\*\*/g, '$1')
-        .replace(/\*(.+?)\*/g, '$1')
-        .replace(/```[\s\S]*?```/g, '')
-        .replace(/`(.+?)`/g, '$1')
-        .replace(/#{1,3}\s+/g, '')
-        .replace(/\[(.+?)\]\(.+?\)/g, '$1')
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .trim()
-
-    if (!cleanText) return
-
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) return
-
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: 'tts-1',
-            input: cleanText.slice(0, 4096), // TTS input limit
-            voice: voiceId,
-            response_format: 'opus', // Best for Telegram voice messages
-        }),
-    })
-
-    if (!response.ok) {
-        console.warn('[Telegram/TTS] Failed to generate speech:', response.status)
-        return
-    }
-
-    const ttsBuffer = await response.arrayBuffer()
-    const botToken = process.env.TELEGRAM_BOT_TOKEN
-    if (!botToken) return
-
-    // Send as voice message via Telegram API
-    const formData = new FormData()
-    formData.append('chat_id', String(chatId))
-    formData.append('voice', new Blob([ttsBuffer], { type: 'audio/ogg' }), 'response.ogg')
-
-    await fetch(`https://api.telegram.org/bot${botToken}/sendVoice`, {
-        method: 'POST',
-        body: formData,
-    })
 }
 
 // ─── Utilities ──────────────────────────────────────────────────────

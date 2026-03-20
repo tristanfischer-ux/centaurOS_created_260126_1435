@@ -304,15 +304,6 @@ describe('OpenAI key hardening regressions', () => {
     }
   })
 
-  it('validates selected TTS provider config and rate limits specialist TTS endpoint', async () => {
-    const ttsRoutePath = path.join(process.cwd(), 'src/app/api/agents/tts/route.ts')
-    const source = await readFile(ttsRoutePath, 'utf-8')
-
-    expect(source).toContain("let activeProvider: \"openai\" | \"minimax\"")
-    expect(source).toContain('if (activeProvider === "minimax" && !getMiniMaxKey())')
-    expect(source).toContain('if (activeProvider === "openai" && !getOpenAI())')
-    expect(source).toContain("await rateLimit(\"api\", `tts:${guard.userId}`")
-  })
 })
 
 describe('agent objective action security regressions', () => {
