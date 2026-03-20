@@ -51,6 +51,12 @@ export const TOUR_DEFINITIONS: Record<string, { tourId: string; steps: TourStep[
     tourId: 'tasks',
     steps: [
       {
+        target: 'tasks-create',
+        title: 'Create Tasks',
+        body: 'Add new tasks with assignees, due dates, and linked objectives. Press N anywhere for quick add.',
+        position: 'bottom',
+      },
+      {
         target: 'tasks-summary',
         title: 'Smart Summary',
         body: 'Quick filters for due today, overdue, and needs-review tasks. One click to focus on what matters.',
@@ -61,12 +67,6 @@ export const TOUR_DEFINITIONS: Record<string, { tourId: string; steps: TourStep[
         title: 'Multiple Views',
         body: 'Switch between Focus, Board, List, and Timeline views. Board view supports drag-and-drop status changes.',
         position: 'bottom',
-      },
-      {
-        target: 'tasks-create',
-        title: 'Create Tasks',
-        body: 'Add new tasks with assignees, due dates, and linked objectives. Press N anywhere for quick add.',
-        position: 'left',
       },
     ],
   },
@@ -108,6 +108,12 @@ export const TOUR_DEFINITIONS: Record<string, { tourId: string; steps: TourStep[
     tourId: 'marketplace',
     steps: [
       {
+        target: 'marketplace-tabs',
+        title: 'Browse & Saved',
+        body: 'Switch between Browse to discover listings and Saved to see your bookmarked favourites.',
+        position: 'bottom',
+      },
+      {
         target: 'marketplace-toolbar',
         title: 'Search & Filter',
         body: 'Use the toolbar to search, filter by category, and sort listings. Try the AI search for natural-language queries.',
@@ -118,12 +124,6 @@ export const TOUR_DEFINITIONS: Record<string, { tourId: string; steps: TourStep[
         title: 'Browse Listings',
         body: 'Explore suppliers, products, and services. Save favourites and compare up to four listings side by side.',
         position: 'top',
-      },
-      {
-        target: 'marketplace-tabs',
-        title: 'Saved & Compare',
-        body: 'Switch to Saved to see your bookmarked listings, or Compare to evaluate them side by side.',
-        position: 'bottom',
       },
     ],
   },
