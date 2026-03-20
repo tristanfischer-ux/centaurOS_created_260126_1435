@@ -34,7 +34,7 @@ Guidelines:
 - If no competitors are named, create a framework for the user's industry`,
     inputLabel: 'Competitive context',
     inputHint: 'Name your key competitors, describe your market position, mention any recent competitive developments...',
-    autoDataSources: ['company-profile', 'sales-pipeline'],
+    autoDataSources: ['company-profile', 'sales-pipeline', 'competitive-intel'],
     wordRange: { min: 3000, max: 5000 },
     defaultTone: 'professional',
     tags: ['strategy', 'competition', 'market', 'SWOT'],

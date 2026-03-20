@@ -45,6 +45,7 @@ import { SkillDocumentRenderer } from '@/components/reports/SkillDocumentRendere
 import { DOCUMENT_SKILLS } from '@/lib/document-skills'
 import { SKILL_CATEGORY_META } from '@/lib/document-skills/types'
 import { generateDocumentQuestions } from '@/actions/document-questions'
+import { getSkillPrefill } from '@/actions/document-prefill'
 
 import type { DocumentSkill, DocumentTone, DocumentLength, DocumentQuestion, SkillDocumentResult, SkillCategory } from '@/lib/document-skills/types'
 
@@ -80,9 +81,11 @@ const LENGTH_OPTIONS: { value: DocumentLength; label: string; description: strin
 
 export function SkillDocumentSection() {
   const documentRef = useRef<HTMLDivElement>(null)
+  const latestSkillRef = useRef<string | null>(null)
 
   // Skill selection
   const [selectedSkill, setSelectedSkill] = useState<DocumentSkill | null>(null)
+  const [isPrefilling, setIsPrefilling] = useState(false)
 
   // Input
   const [userContext, setUserContext] = useState('')
@@ -105,14 +108,37 @@ export function SkillDocumentSection() {
   const [result, setResult] = useState<SkillDocumentResult | null>(null)
 
   const handleSelectSkill = useCallback((skill: DocumentSkill) => {
+    // GOTCHA: Re-clicking the already-selected skill must not wipe user edits or re-fetch prefill
+    if (selectedSkill?.id === skill.id) return
+
     setSelectedSkill(skill)
     setTone(skill.defaultTone)
+    setUserContext('')
     setStreamedContent('')
     setResult(null)
     setQuestions([])
     setAnswers({})
     setMode('direct')
-  }, [])
+
+    // INTENT: Pre-fill textarea with existing company data so user edits rather than starts from zero
+    latestSkillRef.current = skill.id
+    setIsPrefilling(true)
+    getSkillPrefill(skill.id)
+      .then(({ text }) => {
+        // GOTCHA: Race guard — only apply if user hasn't switched skills during the fetch
+        if (latestSkillRef.current === skill.id && text) {
+          setUserContext(text)
+        }
+      })
+      .catch(() => {
+        // Silent degradation — textarea stays empty (current behavior)
+      })
+      .finally(() => {
+        if (latestSkillRef.current === skill.id) {
+          setIsPrefilling(false)
+        }
+      })
+  }, [selectedSkill?.id])
 
   const handleGenerateQuestions = useCallback(async () => {
     if (!selectedSkill || !userContext.trim()) {
@@ -361,13 +387,23 @@ export function SkillDocumentSection() {
             <h2 className={typography.h3}>{selectedSkill.inputLabel}</h2>
             <Card>
               <CardContent className="p-6 space-y-4">
-                <textarea
-                  className="w-full min-h-[160px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
-                  placeholder={selectedSkill.inputHint}
-                  value={userContext}
-                  onChange={e => setUserContext(e.target.value)}
-                  maxLength={20000}
-                />
+                <div className="relative">
+                  <textarea
+                    className="w-full min-h-[160px] rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 focus:border-international-orange resize-y"
+                    placeholder={selectedSkill.inputHint}
+                    value={userContext}
+                    onChange={e => setUserContext(e.target.value)}
+                    maxLength={20000}
+                  />
+                  {isPrefilling && (
+                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-muted">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        Loading company data…
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <Checkbox

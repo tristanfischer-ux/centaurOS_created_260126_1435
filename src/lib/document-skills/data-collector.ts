@@ -21,6 +21,7 @@ import type {
   SalesPipelineSectionData,
   EngineeringActivitySectionData,
 } from '@/lib/reports/report-document-types'
+import type { CompanyIntelligence, FoundryPurposeData, CompanyProfile } from '@/types/foundry'
 
 /**
  * Collect auto-data from Supabase for the given sources and format as text.
@@ -108,6 +109,16 @@ export async function collectAutoData(
     )
   }
 
+  if (sources.includes('competitive-intel')) {
+    promises.push(
+      fetchCompetitiveIntel(supabase, foundryId).then(text => {
+        if (text) blocks.push(text)
+      }).catch(err => {
+        console.warn('[DataCollector] Competitive intel fetch failed:', err)
+      })
+    )
+  }
+
   await Promise.all(promises)
   return blocks.filter(Boolean).join('\n\n')
 }
@@ -188,6 +199,58 @@ async function fetchBlockers(supabase: SupabaseClient, foundryId: string): Promi
     lines.push(`- [${severity}] ${standup.blockers}`)
   }
   return lines.join('\n')
+}
+
+async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string): Promise<string> {
+  const { data } = await supabase
+    .from('foundries')
+    .select('company_intel, purpose_data, company_profile')
+    .eq('id', foundryId)
+    .single()
+
+  if (!data) return ''
+
+  const intel = data.company_intel as CompanyIntelligence | null
+  const purpose = data.purpose_data as FoundryPurposeData | null
+  const profile = data.company_profile as CompanyProfile | null
+
+  const lines = ['## Competitive Intelligence & Company Context']
+
+  // Value proposition & products
+  if (intel?.value_proposition) lines.push(`\n### Value Proposition\n${intel.value_proposition}`)
+  if (intel?.products_services && intel.products_services.length > 0) {
+    lines.push('\n### Products & Services')
+    for (const p of intel.products_services) {
+      lines.push(`- **${p.name}:** ${p.description}`)
+    }
+  }
+  if (intel?.target_customers) lines.push(`\n### Target Customers\n${intel.target_customers}`)
+
+  // Competitor profiles
+  if (intel?.competitors && intel.competitors.length > 0) {
+    lines.push('\n### Competitor Profiles')
+    for (const c of intel.competitors) {
+      lines.push(`\n**${c.name}** (${c.website})`)
+      if (c.description) lines.push(`- ${c.description}`)
+      if (c.differentiator) lines.push(`- Differentiator: ${c.differentiator}`)
+    }
+  }
+
+  // Purpose / mission / vision
+  if (purpose?.purpose || purpose?.mission || purpose?.vision) {
+    lines.push('\n### Strategic Direction')
+    if (purpose.purpose) lines.push(`- **Purpose:** ${purpose.purpose}`)
+    if (purpose.mission) lines.push(`- **Mission:** ${purpose.mission}`)
+    if (purpose.vision) lines.push(`- **Vision:** ${purpose.vision}`)
+  }
+
+  // Company overview
+  if (intel?.website_summary) lines.push(`\n### Company Overview\n${intel.website_summary}`)
+  if (profile?.business_model) lines.push(`- **Business Model:** ${profile.business_model}`)
+  if (intel?.pricing_model) lines.push(`- **Pricing Model:** ${intel.pricing_model}`)
+
+  // Only return if we have more than just the header
+  return lines.length > 1 ? lines.join('\n') : ''
 }
 
 // ─── Formatters ─────────────────────────────────────────────────────

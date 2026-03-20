@@ -24,6 +24,7 @@ export type AutoDataSource =
   | 'sales-pipeline'
   | 'engineering'
   | 'blockers'
+  | 'competitive-intel'
 
 // ========================
 // Tone & Length
