@@ -11,8 +11,8 @@
 
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds } from '@/actions/investors'
-import type { InvestorStats, ShortlistStage } from '@/actions/investors'
+import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
+import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 
@@ -52,11 +52,13 @@ export default async function InvestorDirectoryPage() {
   let stats: InvestorStats | null = null
   let matchScores: Record<string, number> = {}
   let shortlistIds: Record<string, ShortlistStage> = {}
+  let access: InvestorTierAccess | undefined
 
-  const [searchResult, statsResult, shortlistResult] = await Promise.allSettled([
+  const [searchResult, statsResult, shortlistResult, accessResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),
     getInvestorStats(),
     getShortlistIds(),
+    getInvestorTierAccess(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -77,6 +79,10 @@ export default async function InvestorDirectoryPage() {
     shortlistIds = shortlistResult.value
   } else {
     console.error('[InvestorDirectoryPage] Failed to fetch shortlist:', shortlistResult.reason)
+  }
+
+  if (accessResult.status === 'fulfilled') {
+    access = accessResult.value
   }
 
   // Compute match scores for initial firms
@@ -132,6 +138,7 @@ export default async function InvestorDirectoryPage() {
           initialHasMore={initialHasMore}
           initialMatchScores={matchScores}
           initialShortlistIds={shortlistIds}
+          access={access}
         />
       </Suspense>
     </div>

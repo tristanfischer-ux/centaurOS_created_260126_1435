@@ -43,8 +43,9 @@ export function exportInvestorsCSV(
     ].join(',')
   })
 
-  const csv = [headers.join(','), ...rows].join('\n')
-  downloadBlob(csv, 'investor-directory.csv', 'text/csv')
+  // GOTCHA: UTF-8 BOM (\uFEFF) needed for Windows Excel to correctly detect encoding
+  const csv = '\uFEFF' + [headers.join(','), ...rows].join('\n')
+  downloadBlob(csv, 'investor-directory.csv', 'text/csv;charset=utf-8')
 }
 
 function escapeCsv(value: string): string {

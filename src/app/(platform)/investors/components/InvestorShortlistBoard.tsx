@@ -47,6 +47,10 @@ const STAGES: { id: ShortlistStage; label: string; color: string }[] = [
   { id: 'closed_lost', label: 'Closed Lost', color: 'bg-destructive/10' },
 ]
 
+// GOTCHA: closestCorners collision detection can resolve over.id to a draggable card UUID
+// (not just a droppable column stage ID). Must validate before casting.
+const VALID_STAGE_IDS = new Set<string>(STAGES.map(s => s.id))
+
 // ---------------------------------------------------------------------------
 // Droppable Column
 // ---------------------------------------------------------------------------
@@ -184,7 +188,17 @@ export function InvestorShortlistBoard() {
     const { active, over } = event
     if (!over) return
 
-    const targetStage = over.id as ShortlistStage
+    // GOTCHA: closestCorners can resolve over.id to another draggable card's UUID,
+    // not just a droppable column stage ID. Validate before using.
+    let targetStage: ShortlistStage
+    if (VALID_STAGE_IDS.has(over.id as string)) {
+      targetStage = over.id as ShortlistStage
+    } else {
+      // over.id is a card UUID — find which stage column it belongs to
+      const overItem = itemsRef.current.find(i => i.id === over.id)
+      if (!overItem) return
+      targetStage = overItem.shortlistStage
+    }
     const itemId = active.id as string
 
     // Read previous stage from current state to avoid stale closure

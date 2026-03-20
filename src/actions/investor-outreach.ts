@@ -109,21 +109,32 @@ Output ONLY this exact JSON format with no other text:
       return { error: 'AI service not configured' }
     }
 
-    // Call Claude Haiku
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      }),
-    })
+    // Call Claude Haiku with 30s timeout
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    let response: Response
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        signal: controller.signal,
+      })
+    } catch (err) {
+      clearTimeout(timeout)
+      console.error('[generateOutreachDraft] Fetch failed:', err)
+      return { error: 'Request timed out — please try again' }
+    }
+    clearTimeout(timeout)
 
     if (!response.ok) {
       console.error('[generateOutreachDraft] API error:', response.status)

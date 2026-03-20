@@ -24,11 +24,12 @@ import { InvestorCompareBar } from './InvestorCompareBar'
 import { InvestorCompareDialog } from './InvestorCompareDialog'
 import { InvestorShortlistBoard } from './InvestorShortlistBoard'
 import { InvestorMapView } from './InvestorMapView'
-import { searchInvestors, addToShortlist, removeFromShortlist } from '@/actions/investors'
+import { InvestorExportMenu } from './InvestorExportMenu'
+import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores } from '@/actions/investors'
 import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { InvestorFirm, ShortlistStage } from '@/actions/investors'
+import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import type { SortOption } from './InvestorSortSelect'
 import type { AdvancedFilters } from './InvestorFilterPanel'
 
@@ -98,6 +99,7 @@ interface InvestorBrowserProps {
   initialHasMore: boolean
   initialMatchScores?: Record<string, number>
   initialShortlistIds?: Record<string, ShortlistStage>
+  access?: InvestorTierAccess
 }
 
 export function InvestorBrowser({
@@ -106,6 +108,7 @@ export function InvestorBrowser({
   initialHasMore,
   initialMatchScores = {},
   initialShortlistIds = {},
+  access,
 }: InvestorBrowserProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -126,14 +129,30 @@ export function InvestorBrowser({
     const s = searchParams.get('sort') as SortOption
     return ['match', 'fund_size', 'quality', 'hardware_fit', 'priority', 'name'].includes(s) ? s : 'name'
   })
-  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(EMPTY_ADVANCED)
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(() => {
+    const stages = searchParams.get('stages')?.split(',').filter(Boolean) ?? []
+    const sectors = searchParams.get('sectors')?.split(',').filter(Boolean) ?? []
+    const geoFocus = searchParams.get('geo')?.split(',').filter(Boolean) ?? []
+    const chequeMin = searchParams.get('chequeMin') ? Number(searchParams.get('chequeMin')) : undefined
+    const chequeMax = searchParams.get('chequeMax') ? Number(searchParams.get('chequeMax')) : undefined
+    const minQuality = searchParams.get('minQuality') ? Number(searchParams.get('minQuality')) : undefined
+    const minHardwareFit = searchParams.get('minHwFit') ? Number(searchParams.get('minHwFit')) : undefined
+    const bvcaOnly = searchParams.get('bvca') === '1'
+    if (stages.length || sectors.length || geoFocus.length || chequeMin != null || chequeMax != null || minQuality != null || minHardwareFit != null || bvcaOnly) {
+      return { stages, sectors, geoFocus, chequeMin, chequeMax, minQuality, minHardwareFit, bvcaOnly }
+    }
+    return EMPTY_ADVANCED
+  })
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const v = searchParams.get('view') as ViewMode
     return ['grid', 'board', 'map'].includes(v) ? v : 'grid'
   })
 
   // Data state
-  const hasUrlFilters = !!(searchParams.get('type') || searchParams.get('active') || searchParams.get('q'))
+  const hasUrlFilters = !!(searchParams.get('type') || searchParams.get('active') || searchParams.get('q')
+    || searchParams.get('stages') || searchParams.get('sectors') || searchParams.get('geo')
+    || searchParams.get('chequeMin') || searchParams.get('chequeMax') || searchParams.get('minQuality')
+    || searchParams.get('minHwFit') || searchParams.get('bvca'))
 
   const [firms, setFirms] = useState<InvestorFirm[]>(hasUrlFilters ? [] : initialFirms)
   const [total, setTotal] = useState(hasUrlFilters ? 0 : initialTotal)
@@ -177,9 +196,18 @@ export function InvestorBrowser({
     if (debouncedQuery) params.set('q', debouncedQuery)
     if (sortBy !== 'name') params.set('sort', sortBy)
     if (viewMode !== 'grid') params.set('view', viewMode)
+    // Advanced filters
+    if (advancedFilters.stages.length > 0) params.set('stages', advancedFilters.stages.join(','))
+    if (advancedFilters.sectors.length > 0) params.set('sectors', advancedFilters.sectors.join(','))
+    if (advancedFilters.geoFocus.length > 0) params.set('geo', advancedFilters.geoFocus.join(','))
+    if (advancedFilters.chequeMin != null) params.set('chequeMin', String(advancedFilters.chequeMin))
+    if (advancedFilters.chequeMax != null) params.set('chequeMax', String(advancedFilters.chequeMax))
+    if (advancedFilters.minQuality != null) params.set('minQuality', String(advancedFilters.minQuality))
+    if (advancedFilters.minHardwareFit != null) params.set('minHwFit', String(advancedFilters.minHardwareFit))
+    if (advancedFilters.bvcaOnly) params.set('bvca', '1')
     const qs = params.toString()
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
-  }, [activeFirmType, activeOnly, debouncedQuery, sortBy, viewMode, router, pathname])
+  }, [activeFirmType, activeOnly, debouncedQuery, sortBy, viewMode, advancedFilters, router, pathname])
 
   // ---------------------------------------------------------------------------
   // Refetch when filters change
@@ -251,13 +279,23 @@ export function InvestorBrowser({
         page: nextPage,
         pageSize: PAGE_SIZE,
       })
+      // Use functional setState to dedup — avoids stale firms closure
+      let newFirmIds: string[] = []
       setFirms(prev => {
         const existingIds = new Set(prev.map(f => f.id))
         const newFirms = result.firms.filter(f => !existingIds.has(f.id))
+        newFirmIds = newFirms.map(f => f.id)
         return [...prev, ...newFirms]
       })
       setHasMore(result.hasMore)
       setPage(nextPage)
+
+      // Compute match scores for new firms
+      if (newFirmIds.length > 0) {
+        computeMatchScores(newFirmIds)
+          .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+          .catch(() => { /* non-critical */ })
+      }
     } catch (err) {
       console.error('[InvestorBrowser] Load more failed:', err)
     } finally {
@@ -347,7 +385,7 @@ export function InvestorBrowser({
     .filter((f): f is InvestorFirm => f != null)
 
   return (
-    <div className="space-y-6">
+    <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}
@@ -404,8 +442,9 @@ export function InvestorBrowser({
           )}
         </div>
 
-        {/* Sort + View toggle */}
+        {/* Sort + Export + View toggle */}
         <div className="flex items-center gap-3 ml-auto">
+          {access && <InvestorExportMenu firms={displayFirms} matchScores={matchScores} access={access} />}
           <InvestorSortSelect value={sortBy} onChange={setSortBy} />
           <div className="flex items-center border border-border rounded-lg overflow-hidden">
             {([

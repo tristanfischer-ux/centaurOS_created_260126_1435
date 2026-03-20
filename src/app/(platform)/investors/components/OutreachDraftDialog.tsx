@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,6 +34,12 @@ export function OutreachDraftDialog({
   const [draft, setDraft] = useState<OutreachDraft | null>(null)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+
+  // Reset state when switching firms
+  useEffect(() => {
+    setDraft(null)
+    setError(null)
+  }, [listingId])
 
   const handleGenerate = () => {
     setError(null)

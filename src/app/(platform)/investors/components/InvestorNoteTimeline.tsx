@@ -88,8 +88,12 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
       toast.success('Note added')
       setContent('')
       // Refresh notes
-      const { notes: fresh } = await getInvestorNotes(listingId)
-      setNotes(fresh)
+      try {
+        const { notes: fresh } = await getInvestorNotes(listingId)
+        setNotes(fresh)
+      } catch (err) {
+        console.error('[InvestorNoteTimeline] Failed to refresh notes:', err)
+      }
     })
   }, [listingId, content, noteType])
 

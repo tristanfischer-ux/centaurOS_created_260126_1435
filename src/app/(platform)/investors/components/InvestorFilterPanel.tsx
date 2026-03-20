@@ -154,7 +154,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
           </div>
 
           {/* Cheque range + Quality + Hardware fit */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Min Cheque (£)</Label>
               <Input
@@ -195,6 +195,22 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 onChange={e => {
                   const v = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
                   onChange({ ...filters, minQuality: v })
+                }}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Min Hardware Fit (0-10)</Label>
+              <Input
+                type="number"
+                placeholder="e.g. 5"
+                min={0}
+                max={10}
+                step={0.5}
+                value={filters.minHardwareFit ?? ''}
+                onChange={e => {
+                  const v = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  onChange({ ...filters, minHardwareFit: v })
                 }}
                 className="h-8 text-sm"
               />

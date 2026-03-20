@@ -176,6 +176,7 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
       ...(attrs as InvestorFirm['attributes']),
       stage_focus: toStringArray(attrs.stage_focus),
       sectors: toStringArray(attrs.sectors),
+      geo_focus: toStringArray(attrs.geo_focus),
       notable_portfolio: toStringArray(attrs.notable_portfolio),
     },
   }
@@ -1039,13 +1040,13 @@ export async function toggleInvestorAlert(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
 
-  // Check if alert exists
+  // Check if alert exists (maybeSingle — no error when 0 rows)
   const { data: existing } = await supabase
     .from('investor_alerts')
     .select('id, active')
     .eq('user_id', user.id)
     .eq('listing_id', listingId)
-    .single()
+    .maybeSingle()
 
   if (existing) {
     const newActive = !existing.active
