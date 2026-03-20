@@ -8,8 +8,8 @@
  * existing WizardStepper + Dialog components.
  */
 
-import { useState, useTransition } from 'react'
-import { Sparkles, Compass, Users, Target, PartyPopper } from 'lucide-react'
+import { useState, useTransition, useEffect } from 'react'
+import { Sparkles, Compass, Users, Target, PartyPopper, Copy, Check, Link2 } from 'lucide-react'
 import Link from 'next/link'
 
 import {
@@ -27,11 +27,19 @@ import { WizardStepper, useWizardSteps } from '@/components/ui/wizard-stepper'
 import { DatePickerWithShortcuts } from '@/components/ui/date-picker-with-shortcuts'
 import { ConfettiCelebration } from '@/components/onboarding/ConfettiCelebration'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   completeSetupWizard,
   saveWizardMission,
   createWizardTeam,
   createWizardObjective,
 } from '@/actions/setup-wizard'
+import { getMyReferralInfo } from '@/actions/referrals'
 
 import type { WizardStep } from '@/components/ui/wizard-stepper'
 
@@ -65,7 +73,13 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
 
   // Step 3: Team
   const [teamName, setTeamName] = useState('')
-  const [inviteEmail, setInviteEmail] = useState('')
+  const [invites, setInvites] = useState<Array<{ email: string; role: 'Executive' | 'Apprentice' }>>([
+    { email: '', role: 'Executive' },
+    { email: '', role: 'Executive' },
+    { email: '', role: 'Apprentice' },
+  ])
+  const [referralLink, setReferralLink] = useState('')
+  const [linkCopied, setLinkCopied] = useState(false)
 
   // Step 4: Objective
   const [objectiveTitle, setObjectiveTitle] = useState('')
@@ -73,6 +87,34 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
 
   // Step 5: Show confetti
   const [showConfetti, setShowConfetti] = useState(false)
+
+  // Fetch referral link when team step becomes active
+  useEffect(() => {
+    if (wizard.currentStep === 'team' && !referralLink) {
+      getMyReferralInfo().then((info) => {
+        if ('referralLink' in info) {
+          setReferralLink(info.referralLink)
+        }
+      })
+    }
+  }, [wizard.currentStep, referralLink])
+
+  const handleCopyReferralLink = async () => {
+    if (!referralLink) return
+    try {
+      await navigator.clipboard.writeText(referralLink)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable (e.g. non-HTTPS context)
+    }
+  }
+
+  const updateInvite = (index: number, field: 'email' | 'role', value: string) => {
+    setInvites(prev => prev.map((inv, i) =>
+      i === index ? { ...inv, [field]: value } : inv
+    ))
+  }
 
   const handleClose = () => {
     // GOTCHA: On the Done step, completeSetupWizard was already called by
@@ -113,7 +155,11 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
       return
     }
     startTransition(async () => {
-      const result = await createWizardTeam(teamName, inviteEmail || undefined)
+      // Collect non-empty invite emails with roles
+      const validInvites = invites
+        .filter(inv => inv.email.trim())
+        .map(inv => ({ email: inv.email.trim(), role: inv.role }))
+      const result = await createWizardTeam(teamName, undefined, validInvites.length > 0 ? validInvites : undefined)
       if ('error' in result) {
         console.error('[SetupWizard]', result.error)
       }
@@ -235,7 +281,7 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
                 Create your first team
               </DialogTitle>
               <DialogDescription>
-                Teams organise your people around shared objectives. You can add more members later.
+                ForgeOS works best with a team. Most founders invite 3 people.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
@@ -250,18 +296,72 @@ export function SetupWizard({ userName, onComplete }: SetupWizardProps) {
                   autoFocus
                 />
               </div>
+
+              {/* 3 email invite rows */}
               <div className="space-y-2">
-                <Label htmlFor="wizard-invite-email">
-                  Invite a teammate <span className="text-muted-foreground font-normal">(optional)</span>
+                <Label>
+                  Invite teammates <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
-                <Input
-                  id="wizard-invite-email"
-                  type="email"
-                  placeholder="colleague@company.com"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                />
+                {invites.map((invite, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder={`teammate${i + 1}@company.com`}
+                      value={invite.email}
+                      onChange={(e) => updateInvite(i, 'email', e.target.value)}
+                      className="flex-1"
+                    />
+                    <Select
+                      value={invite.role}
+                      onValueChange={(val) => updateInvite(i, 'role', val)}
+                    >
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Executive">Executive</SelectItem>
+                        <SelectItem value="Apprentice">Apprentice</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
               </div>
+
+              {/* Referral link sharing */}
+              {referralLink && (
+                <div className="pt-2 border-t space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Link2 className="h-4 w-4 text-muted-foreground" />
+                    <p className="text-sm font-medium text-foreground">
+                      Or share your invite link
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={referralLink}
+                      className="text-xs bg-muted/50"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyReferralLink}
+                      className="shrink-0"
+                    >
+                      {linkCopied ? (
+                        <><Check className="h-3.5 w-3.5 mr-1" /> Copied</>
+                      ) : (
+                        <><Copy className="h-3.5 w-3.5 mr-1" /> Copy</>
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    You both get <span className="font-semibold text-international-orange">+10 AI tasks</span> when they join.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex justify-between pt-2">
               <Button variant="ghost" onClick={handleSkip} disabled={isPending}>

@@ -219,11 +219,13 @@ export async function saveWizardMission(
  * current user — a team of one is valid for onboarding.
  *
  * @param name - Team name
- * @param inviteEmail - Optional email to invite a teammate
+ * @param inviteEmail - Optional single email (legacy compat)
+ * @param invites - Optional batch of email+role pairs from the 3-input form
  */
 export async function createWizardTeam(
   name: string,
-  inviteEmail?: string
+  inviteEmail?: string,
+  invites?: Array<{ email: string; role: 'Executive' | 'Apprentice' }>
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
     const trimmedName = name.trim()
@@ -263,9 +265,15 @@ export async function createWizardTeam(
       return { error: 'Failed to add you to the team' }
     }
 
-    // Optionally invite another team member
-    if (inviteEmail?.trim()) {
-      // FLOW: createInvitation handles rate-limiting, duplicate checks, and email sending
+    // Batch invite from 3-email form (non-blocking)
+    if (invites && invites.length > 0) {
+      for (const inv of invites) {
+        await createInvitation(inv.email, inv.role).catch((err) => {
+          console.error('[SetupWizard] Invitation failed (non-blocking):', err)
+        })
+      }
+    } else if (inviteEmail?.trim()) {
+      // Legacy single-email fallback
       await createInvitation(inviteEmail.trim(), 'Executive').catch((err) => {
         console.error('[SetupWizard] Invitation failed (non-blocking):', err)
       })

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail, escapeHtml, sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { setupNewUser, capitalizeRole } from "@/lib/auth/setup-new-user";
@@ -245,6 +245,10 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     userId = authData.user.id;
   }
 
+  // Read referral code from cookie (set via ?ref= on join page)
+  const cookieStore = await cookies();
+  const referralCode = cookieStore.get('forge_ref')?.value || null;
+
   // 2. Set up profile, foundry, memberships, demo data via shared helper
   await setupNewUser({
     supabase,
@@ -257,6 +261,7 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     stage,
     businessName,
     businessType,
+    referralCode,
   });
 
   // 3. Store booking intent if present

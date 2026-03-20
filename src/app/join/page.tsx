@@ -23,11 +23,11 @@ import { createClient } from "@/lib/supabase/client";
 import { signup } from "@/actions/signup";
 import type { SignupState } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
+import { lookupReferrer, getFoundingMemberCount } from "@/actions/referrals";
+import { Gift } from "lucide-react";
 
 /** Total founding member spots available */
 const TOTAL_FOUNDING_SPOTS = 100;
-/** Spots already claimed */
-const SPOTS_CLAIMED = 53;
 
 type UserPath = "founder" | "joining";
 type JoiningRole = "executive" | "apprentice";
@@ -35,9 +35,10 @@ type JoiningRole = "executive" | "apprentice";
 /**
  * FoundingMemberCounter -- Animated progress bar showing remaining spots.
  */
-function FoundingMemberCounter() {
-  const spotsRemaining = TOTAL_FOUNDING_SPOTS - SPOTS_CLAIMED;
-  const percentClaimed = (SPOTS_CLAIMED / TOTAL_FOUNDING_SPOTS) * 100;
+function FoundingMemberCounter({ spotsClaimed }: { spotsClaimed: number }) {
+  const clampedClaimed = Math.min(spotsClaimed, TOTAL_FOUNDING_SPOTS);
+  const spotsRemaining = TOTAL_FOUNDING_SPOTS - clampedClaimed;
+  const percentClaimed = (clampedClaimed / TOTAL_FOUNDING_SPOTS) * 100;
 
   return (
     <div className="p-4 rounded-xl bg-muted/50 border">
@@ -160,6 +161,7 @@ function JoinPageInner() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
   const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectParam);
+  const refCode = searchParams.get("ref");
 
   // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)
   const roleParam = searchParams.get("role");
@@ -179,6 +181,24 @@ function JoinPageInner() {
   const [joiningRole, setJoiningRole] = useState<JoiningRole>(initialJoiningRole);
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
+  const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
+  const [foundingCount, setFoundingCount] = useState(53); // sensible default
+
+  // Set forge_ref cookie when ?ref= param is present
+  useEffect(() => {
+    if (refCode) {
+      document.cookie = `forge_ref=${encodeURIComponent(refCode)}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax`;
+      // Look up referrer for warm banner
+      lookupReferrer(refCode).then((info) => {
+        if (info) setReferrerInfo(info);
+      });
+    }
+  }, [refCode]);
+
+  // Fetch dynamic founding member count
+  useEffect(() => {
+    getFoundingMemberCount().then(setFoundingCount);
+  }, []);
 
   useEffect(() => {
     if (isDemoMode && selectedPath) {
@@ -415,6 +435,26 @@ function JoinPageInner() {
                 aria-hidden="true"
               />
               {state.error}
+            </motion.div>
+          )}
+
+          {/* Referrer Banner — shown when ?ref= param is present */}
+          {referrerInfo && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-lg bg-international-orange/5 border border-international-orange/20 flex items-start gap-3"
+            >
+              <Gift className="h-5 w-5 text-international-orange mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {referrerInfo.name}
+                  {referrerInfo.company ? ` from ${referrerInfo.company}` : ''} invited you
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  You&apos;ll both get <span className="font-semibold text-international-orange">10 bonus AI tasks</span> when you join.
+                </p>
+              </div>
             </motion.div>
           )}
 
@@ -773,7 +813,7 @@ function JoinPageInner() {
 
                 {/* Founding member counter */}
                 <div className="mt-6">
-                  <FoundingMemberCounter />
+                  <FoundingMemberCounter spotsClaimed={foundingCount} />
                 </div>
 
                 <p className="text-xs text-center text-muted-foreground mt-6">

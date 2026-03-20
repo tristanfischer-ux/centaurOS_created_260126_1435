@@ -105,6 +105,9 @@ export async function GET(request: Request) {
         const sanitizedIndustry = signupIndustry ? escapeHtml(String(signupIndustry).trim().slice(0, 100)) : undefined
         const sanitizedStage = signupStage ? escapeHtml(String(signupStage).trim().slice(0, 100)) : undefined
 
+        // Read referral code from cookie (set via ?ref= on join page)
+        const referralCode = cookieStore.get('forge_ref')?.value || null
+
         const { redirectPath } = await setupNewUser({
           supabase,
           userId: user.id,
@@ -114,14 +117,16 @@ export async function GET(request: Request) {
           companyName: sanitizedCompany,
           industry: sanitizedIndustry,
           stage: sanitizedStage,
+          referralCode,
         })
 
         // Honor `next` param for claim flow — user needs to land on /claim/<token>
         const finalRedirect = (next !== '/today' && next.startsWith('/')) ? next : redirectPath
 
-        // Clear the signup context cookie
+        // Clear signup cookies
         const response = NextResponse.redirect(new URL(finalRedirect, requestUrl.origin))
         response.cookies.set('forge_signup_context', '', { path: '/', maxAge: 0 })
+        response.cookies.set('forge_ref', '', { path: '/', maxAge: 0 })
         return response
       }
 

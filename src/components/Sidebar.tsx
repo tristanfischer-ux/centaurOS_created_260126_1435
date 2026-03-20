@@ -75,6 +75,7 @@ import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
+import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
@@ -468,6 +469,11 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                         Sign Out
                     </button>
                 </form>
+
+                {/* AI Credits Bar */}
+                <div className="border-t border-slate-100 pt-2">
+                    <AICreditsBarLoader />
+                </div>
 
                 {/* Getting Started Checklist */}
                 {onboardingData && !(onboardingData as OnboardingData).checklist_dismissed && !(onboardingData as OnboardingData).checklist_completed_at && (

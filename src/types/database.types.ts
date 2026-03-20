@@ -12218,12 +12218,14 @@ export type Database = {
           email: string
           executive_onboarding_completed: boolean | null
           expertise_areas: string[] | null
+          founding_member_number: number | null
           foundry_id: string
           full_name: string | null
           headline: string | null
           id: string
           industries: string[] | null
           is_active: boolean
+          is_founding_member: boolean | null
           linkedin_url: string | null
           looking_for: string[] | null
           onboarding_data: Json
@@ -12232,6 +12234,9 @@ export type Database = {
           preferred_currency: string | null
           primary_function_id: string | null
           professional_background: Json | null
+          referral_code: string | null
+          referral_count: number | null
+          referred_by: string | null
           role: Database["public"]["Enums"]["member_role"]
           skills: string[] | null
           stripe_account_id: string | null
@@ -12252,12 +12257,14 @@ export type Database = {
           email: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
+          founding_member_number?: number | null
           foundry_id: string
           full_name?: string | null
           headline?: string | null
           id: string
           industries?: string[] | null
           is_active?: boolean
+          is_founding_member?: boolean | null
           linkedin_url?: string | null
           looking_for?: string[] | null
           onboarding_data?: Json
@@ -12266,6 +12273,9 @@ export type Database = {
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -12286,12 +12296,14 @@ export type Database = {
           email?: string
           executive_onboarding_completed?: boolean | null
           expertise_areas?: string[] | null
+          founding_member_number?: number | null
           foundry_id?: string
           full_name?: string | null
           headline?: string | null
           id?: string
           industries?: string[] | null
           is_active?: boolean
+          is_founding_member?: boolean | null
           linkedin_url?: string | null
           looking_for?: string[] | null
           onboarding_data?: Json
@@ -12300,6 +12312,9 @@ export type Database = {
           preferred_currency?: string | null
           primary_function_id?: string | null
           professional_background?: Json | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           role?: Database["public"]["Enums"]["member_role"]
           skills?: string[] | null
           stripe_account_id?: string | null
@@ -13289,6 +13304,50 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      referral_credits: {
+        Row: {
+          amount: number
+          consumed: number
+          created_at: string
+          expires_at: string
+          foundry_id: string
+          granted_by: string | null
+          granted_to: string
+          id: string
+          reason: string
+        }
+        Insert: {
+          amount?: number
+          consumed?: number
+          created_at?: string
+          expires_at?: string
+          foundry_id: string
+          granted_by?: string | null
+          granted_to: string
+          id?: string
+          reason: string
+        }
+        Update: {
+          amount?: number
+          consumed?: number
+          created_at?: string
+          expires_at?: string
+          foundry_id?: string
+          granted_by?: string | null
+          granted_to?: string
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_credits_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_preferences: {
         Row: {
@@ -17552,6 +17611,7 @@ export type Database = {
         }
         Returns: number
       }
+      consume_bonus_credit: { Args: { p_foundry_id: string }; Returns: boolean }
       count_active_founders: {
         Args: { target_foundry_id: string }
         Returns: number
@@ -17861,6 +17921,7 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_bonus_credits: { Args: { p_foundry_id: string }; Returns: number }
       get_buyer_spend: {
         Args: { p_buyer_id: string; p_end_date: string; p_start_date: string }
         Returns: {
@@ -18042,6 +18103,7 @@ export type Database = {
           total_released: number
         }[]
       }
+      get_founding_member_count: { Args: never; Returns: number }
       get_investor_stats: { Args: never; Returns: Json }
       get_invitation_by_token: {
         Args: { invitation_token: string }
@@ -18299,6 +18361,10 @@ export type Database = {
       }
       increment_question_views: {
         Args: { p_question_id: string }
+        Returns: undefined
+      }
+      increment_referral_count: {
+        Args: { p_user_id: string }
         Returns: undefined
       }
       increment_search_count: {

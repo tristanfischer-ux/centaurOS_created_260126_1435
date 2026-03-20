@@ -48,6 +48,7 @@ import { getStrategyHealthSummary, type StrategyHealthItem } from "@/actions/can
 import { getUnreadCount } from "@/actions/messaging"
 import { typography } from "@/lib/design-system"
 import { StreakBadge } from "@/components/celebrations/StreakBadge"
+import { ReferralNudgeBanner } from "@/components/ui/referral-nudge-banner"
 import { useCelebration } from "@/hooks/useCelebration"
 import { AskSpecialistButton } from "@/components/specialists/ask-specialist-button"
 import { InsightFeed } from "@/components/insights/insight-feed"
@@ -275,6 +276,9 @@ export function TodayView({
     return (
         <div className="max-w-5xl space-y-8">
             <PageHeader />
+
+            {/* Running Low on AI Tasks — Referral Nudge */}
+            <ReferralNudgeBanner />
 
             {/* Hero Narrative Card */}
             <motion.div

@@ -26,6 +26,10 @@ export interface AILimitCheckResult {
   remaining: number
   tier: SubscriptionTier
   message?: string
+  /** True if this request was allowed via bonus referral credits */
+  bonusUsed?: boolean
+  /** Remaining bonus credits after this check */
+  bonusRemaining?: number
 }
 
 /**
@@ -62,13 +66,42 @@ export async function checkAILimit(
     const remaining = Math.max(0, limit - currentUsage)
 
     if (currentUsage >= limit) {
+      // FLOW: Before denying, check if the foundry has bonus referral credits
+      try {
+        const supabase = await createClient()
+        const { data: bonus } = await supabase.rpc('get_bonus_credits', {
+          p_foundry_id: foundryId,
+        })
+
+        if (bonus && bonus > 0) {
+          const { data: consumed } = await supabase.rpc('consume_bonus_credit', {
+            p_foundry_id: foundryId,
+          })
+
+          if (consumed) {
+            return {
+              allowed: true,
+              currentUsage,
+              limit,
+              remaining: 0,
+              tier,
+              bonusUsed: true,
+              bonusRemaining: bonus - 1,
+            }
+          }
+        }
+      } catch (bonusError) {
+        // Non-critical — fall through to deny
+        console.warn('[AILimitCheck] Bonus credit check failed:', bonusError)
+      }
+
       return {
         allowed: false,
         currentUsage,
         limit,
         remaining: 0,
         tier,
-        message: `You've reached your monthly AI limit of ${limit} tasks. Upgrade your plan for more.`,
+        message: `You've reached your monthly AI limit of ${limit} tasks. Invite a friend to get 10 more, or upgrade your plan.`,
       }
     }
 

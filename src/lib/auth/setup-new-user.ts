@@ -20,6 +20,8 @@ export interface SetupNewUserParams {
   stage?: string | null;
   businessName?: string | null;
   businessType?: string | null;
+  /** Referral code from the forge_ref cookie (set via ?ref= on join page) */
+  referralCode?: string | null;
 }
 
 export interface SetupNewUserResult {
@@ -63,6 +65,7 @@ export async function setupNewUser({
   stage,
   businessName,
   businessType,
+  referralCode,
 }: SetupNewUserParams): Promise<SetupNewUserResult> {
   const memberRole = capitalizeRole(role);
   let foundryId: string;
@@ -233,6 +236,15 @@ export async function setupNewUser({
         } as any,
       })
       .eq("id", userId);
+  }
+
+  // --- Referral tracking + founding member check ---
+  // FLOW: Non-blocking — referral/founding errors shouldn't break signup
+  try {
+    const { processSignupReferral } = await import('@/lib/referrals/process-signup')
+    await processSignupReferral(referralCode, userId, foundryId)
+  } catch (e) {
+    console.warn('[setupNewUser] Referral/founding member processing failed (non-blocking):', e)
   }
 
   // --- Determine redirect ---
