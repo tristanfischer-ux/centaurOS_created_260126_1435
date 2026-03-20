@@ -160,11 +160,12 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
               <Input
                 type="number"
                 placeholder="e.g. 500000"
+                min={0}
                 value={filters.chequeMin ?? ''}
-                onChange={e => onChange({
-                  ...filters,
-                  chequeMin: e.target.value ? Number(e.target.value) : undefined,
-                })}
+                onChange={e => {
+                  const v = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  onChange({ ...filters, chequeMin: v })
+                }}
                 className="h-8 text-sm"
               />
             </div>
@@ -173,11 +174,12 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
               <Input
                 type="number"
                 placeholder="e.g. 5000000"
+                min={0}
                 value={filters.chequeMax ?? ''}
-                onChange={e => onChange({
-                  ...filters,
-                  chequeMax: e.target.value ? Number(e.target.value) : undefined,
-                })}
+                onChange={e => {
+                  const v = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
+                  onChange({ ...filters, chequeMax: v })
+                }}
                 className="h-8 text-sm"
               />
             </div>
@@ -190,10 +192,10 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 max={10}
                 step={0.5}
                 value={filters.minQuality ?? ''}
-                onChange={e => onChange({
-                  ...filters,
-                  minQuality: e.target.value ? Number(e.target.value) : undefined,
-                })}
+                onChange={e => {
+                  const v = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
+                  onChange({ ...filters, minQuality: v })
+                }}
                 className="h-8 text-sm"
               />
             </div>

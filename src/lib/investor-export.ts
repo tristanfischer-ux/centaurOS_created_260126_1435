@@ -29,16 +29,16 @@ export function exportInvestorsCSV(
     return [
       escapeCsv(f.title),
       escapeCsv(a.firm_type ?? ''),
-      a.fund_size_gbp?.toString() ?? '',
-      a.cheque_range_gbp?.min?.toString() ?? '',
-      a.cheque_range_gbp?.max?.toString() ?? '',
+      escapeCsv(a.fund_size_gbp?.toString() ?? ''),
+      escapeCsv(a.cheque_range_gbp?.min?.toString() ?? ''),
+      escapeCsv(a.cheque_range_gbp?.max?.toString() ?? ''),
       escapeCsv((a.stage_focus ?? []).join('; ')),
       escapeCsv((a.sectors ?? []).join('; ')),
       escapeCsv(a.hq_city ?? ''),
       a.is_active_deploying ? 'Yes' : 'No',
-      a.data_quality_score?.toFixed(1) ?? '',
-      matchScores?.[f.id]?.toString() ?? '',
-      a.outreach_priority ?? '',
+      escapeCsv(a.data_quality_score?.toFixed(1) ?? ''),
+      escapeCsv(matchScores?.[f.id]?.toString() ?? ''),
+      escapeCsv(a.outreach_priority ?? ''),
       a.bvca_member ? 'Yes' : 'No',
     ].join(',')
   })
@@ -48,7 +48,11 @@ export function exportInvestorsCSV(
 }
 
 function escapeCsv(value: string): string {
-  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+  // SECURITY: Neutralize formula injection (=, +, -, @, \t, \r can trigger formulas in Excel/Sheets)
+  if (/^[=+\-@\t\r]/.test(value)) {
+    value = "'" + value
+  }
+  if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes("'")) {
     return `"${value.replace(/"/g, '""')}"`
   }
   return value
@@ -190,5 +194,6 @@ export async function exportInvestorsPPTX(
     })
   }
 
-  await pptx.writeFile({ fileName: `investor-list-${companyName.toLowerCase().replace(/\s+/g, '-')}.pptx` })
+  const safeName = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50)
+  await pptx.writeFile({ fileName: `investor-list-${safeName || 'export'}.pptx` })
 }

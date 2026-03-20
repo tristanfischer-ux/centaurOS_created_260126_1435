@@ -66,10 +66,15 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
   const [isPending, startTransition] = useTransition()
 
   useEffect(() => {
-    getInvestorNotes(listingId).then(({ notes: data }) => {
-      setNotes(data)
-      setLoading(false)
-    })
+    getInvestorNotes(listingId)
+      .then(({ notes: data }) => {
+        setNotes(data)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('[InvestorNoteTimeline] Failed to load notes:', err)
+        setLoading(false)
+      })
   }, [listingId])
 
   const handleAdd = useCallback(() => {

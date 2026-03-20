@@ -705,8 +705,9 @@ export async function getInvestorContacts(listingId: string): Promise<{
     }))
   }
 
-  // Strip warm intro path for non-starter users
-  if (!access.contactsVisible) {
+  // Strip warm intro path for users below starter tier
+  // GOTCHA: contactsVisible is already checked above (line 670) — use detailAccess for this gate
+  if (!access.detailAccess) {
     contacts = contacts.map(c => ({ ...c, warm_intro_path: null }))
   }
 
@@ -1131,12 +1132,24 @@ export async function getSimilarInvestors(
 // Fundraise Dashboard
 // ---------------------------------------------------------------------------
 
+/** Slim firm data for the dashboard — avoids React Flight serialization limit */
+export interface DashboardFirmSummary {
+  id: string
+  title: string
+  attributes: {
+    firm_type?: string
+    stage_focus?: string[]
+    sectors?: string[]
+  }
+  shortlistStage: ShortlistStage
+}
+
 export interface FundraiseDashboardStats {
   pipelineCounts: Record<ShortlistStage, number>
   totalTracked: number
   recentNotes: (InvestorNote & { firmName: string })[]
   coverageGaps: string[]
-  shortlistedFirms: (InvestorFirm & { shortlistStage: ShortlistStage })[]
+  shortlistedFirms: DashboardFirmSummary[]
 }
 
 /**
@@ -1185,11 +1198,22 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
     firmMap.set(firm.id, firm)
   }
 
-  const shortlistedFirms = shortlistRows
+  // DECISION: Only send fields the dashboard actually uses (firm_type, stage_focus, sectors)
+  // to avoid React Flight "Maximum array nesting exceeded" on large attribute objects.
+  const shortlistedFirms: DashboardFirmSummary[] = shortlistRows
     .map(sl => {
       const firm = firmMap.get(sl.listing_id)
       if (!firm) return null
-      return { ...firm, shortlistStage: sl.stage as ShortlistStage }
+      return {
+        id: firm.id,
+        title: firm.title,
+        attributes: {
+          firm_type: firm.attributes.firm_type,
+          stage_focus: firm.attributes.stage_focus,
+          sectors: firm.attributes.sectors,
+        },
+        shortlistStage: sl.stage as ShortlistStage,
+      }
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
 

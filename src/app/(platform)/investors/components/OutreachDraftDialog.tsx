@@ -48,9 +48,9 @@ export function OutreachDraftDialog({
   }
 
   const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      toast.success(`${label} copied`)
-    })
+    navigator.clipboard.writeText(text)
+      .then(() => toast.success(`${label} copied`))
+      .catch(() => toast.error('Failed to copy — try selecting the text manually'))
   }
 
   return (

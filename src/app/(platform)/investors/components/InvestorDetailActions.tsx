@@ -33,24 +33,25 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
   const [isShortlisted, setIsShortlisted] = useState(false)
   const [isAlerted, setIsAlerted] = useState(false)
   const [showOutreach, setShowOutreach] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [shortlistPending, startShortlistTransition] = useTransition()
+  const [alertPending, startAlertTransition] = useTransition()
 
   // Load initial state
   useEffect(() => {
-    getShortlistIds().then(ids => {
-      if (listingId in ids) setIsShortlisted(true)
-    })
+    getShortlistIds()
+      .then(ids => { if (listingId in ids) setIsShortlisted(true) })
+      .catch(err => console.error('[InvestorDetailActions] Failed to load shortlist:', err))
     if (access.detailAccess) {
-      getAlertedListingIds().then(ids => {
-        if (ids.includes(listingId)) setIsAlerted(true)
-      })
+      getAlertedListingIds()
+        .then(ids => { if (ids.includes(listingId)) setIsAlerted(true) })
+        .catch(err => console.error('[InvestorDetailActions] Failed to load alerts:', err))
     }
   }, [listingId, access.detailAccess])
 
   const handleToggleShortlist = useCallback(() => {
     const wasShortlisted = isShortlisted
     setIsShortlisted(!wasShortlisted)
-    startTransition(async () => {
+    startShortlistTransition(async () => {
       const { error } = wasShortlisted
         ? await removeFromShortlist(listingId)
         : await addToShortlist(listingId)
@@ -67,7 +68,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
     if (!access.detailAccess) return
     const wasAlerted = isAlerted
     setIsAlerted(!wasAlerted)
-    startTransition(async () => {
+    startAlertTransition(async () => {
       const result = await toggleInvestorAlert(listingId)
       if (result.error) {
         setIsAlerted(wasAlerted)
@@ -85,7 +86,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
         variant="ghost"
         size="sm"
         onClick={handleToggleShortlist}
-        disabled={isPending}
+        disabled={shortlistPending}
         className="h-8 w-8 p-0"
         aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
       >
@@ -101,7 +102,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
           variant="ghost"
           size="sm"
           onClick={handleToggleAlert}
-          disabled={isPending}
+          disabled={alertPending}
           className="h-8 w-8 p-0"
           aria-label={isAlerted ? 'Disable alerts' : 'Enable alerts'}
         >

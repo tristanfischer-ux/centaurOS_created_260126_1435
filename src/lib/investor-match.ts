@@ -112,9 +112,10 @@ export function calculateMatchScore(
     }
   }
 
-  // 3. Hardware fit (15 pts) — 0-10 scaled to 0-15
+  // 3. Hardware fit (15 pts) — 0-10 scaled to 0-15, clamped to prevent overflow
   const hwRaw = attrs.hardware_fit_score
-  const hardwareScore = hwRaw != null ? Math.round((hwRaw / 10) * 15) : 7 // Null = neutral (7.5 rounded)
+  const hwClamped = hwRaw != null ? Math.min(10, Math.max(0, hwRaw)) : null
+  const hardwareScore = hwClamped != null ? Math.round((hwClamped / 10) * 15) : 7 // Null = neutral (7.5 rounded)
 
   // 4. Cheque range (15 pts)
   let chequeScore = 0

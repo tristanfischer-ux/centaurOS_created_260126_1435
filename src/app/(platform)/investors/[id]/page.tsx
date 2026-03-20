@@ -200,9 +200,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
-  const [contactResult, similarResult] = await Promise.allSettled([
+  const [contactResult, similarResult, userSectorResult] = await Promise.allSettled([
     getInvestorContacts(id),
     getSimilarInvestors(id, 5),
+    access.intelligenceAccess ? getUserSector() : Promise.resolve(null),
   ])
 
   const { contacts, access: contactAccess } = contactResult.status === 'fulfilled'
@@ -211,6 +212,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   const similarFirms = similarResult.status === 'fulfilled'
     ? similarResult.value.firms
     : []
+  const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
 
   // Compute match scores for similar investors
   let similarScores: Record<string, number> = {}
@@ -410,7 +412,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             {attrs.portfolio_companies && attrs.portfolio_companies.length > 0 ? (
               <PortfolioSection
                 companies={attrs.portfolio_companies}
-                userSector={access.intelligenceAccess ? (await getUserSector()) ?? undefined : undefined}
+                userSector={userSector ?? undefined}
               />
             ) : !access.contactsVisible ? (
               <LockedSection

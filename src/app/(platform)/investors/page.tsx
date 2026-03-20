@@ -75,6 +75,8 @@ export default async function InvestorDirectoryPage() {
 
   if (shortlistResult.status === 'fulfilled') {
     shortlistIds = shortlistResult.value
+  } else {
+    console.error('[InvestorDirectoryPage] Failed to fetch shortlist:', shortlistResult.reason)
   }
 
   // Compute match scores for initial firms

@@ -155,16 +155,16 @@ export function InvestorMapView({ firms }: InvestorMapViewProps) {
                   <p className="font-semibold text-sm capitalize">{city} ({cityFirms.length})</p>
                   {cityFirms.slice(0, 5).map(f => (
                     <p key={f.id}>
-                      <a href={`/investors/${f.id}`} className="text-blue-600 hover:underline">
+                      <a href={`/investors/${f.id}`} className="text-international-orange hover:underline">
                         {f.title}
                       </a>
                       {f.attributes.fund_size_gbp != null && (
-                        <span className="text-gray-500"> — £{(f.attributes.fund_size_gbp / 1e6).toFixed(0)}M</span>
+                        <span className="text-muted-foreground"> — £{(f.attributes.fund_size_gbp / 1e6).toFixed(0)}M</span>
                       )}
                     </p>
                   ))}
                   {cityFirms.length > 5 && (
-                    <p className="text-gray-500">+{cityFirms.length - 5} more</p>
+                    <p className="text-muted-foreground">+{cityFirms.length - 5} more</p>
                   )}
                 </div>
               </Popup>

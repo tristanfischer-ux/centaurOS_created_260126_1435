@@ -61,7 +61,11 @@ const ROWS: CompareRow[] = [
 ]
 
 export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }: InvestorCompareDialogProps) {
-  if (firms.length < 2) return null
+  // GOTCHA: Don't return null when open — it breaks controlled Dialog state.
+  // Instead, render the Dialog but keep it closed when data is insufficient.
+  if (firms.length < 2) {
+    return <Dialog open={false} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Compare</DialogTitle></DialogHeader></DialogContent></Dialog>
+  }
 
   // Compute best values for numeric rows
   const bestValues: Record<string, string> = {}
@@ -126,7 +130,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
                       bestMatchId === firm.id && 'text-success font-semibold'
                     )}
                   >
-                    {matchScores[firm.id] ?? '—'}/100
+                    {matchScores[firm.id] != null ? `${matchScores[firm.id]}/100` : '—'}
                   </td>
                 ))}
               </tr>

@@ -241,6 +241,12 @@ export function InvestorBrowser({
         query: debouncedQuery || undefined,
         stage: advancedFilters.stages.length > 0 ? advancedFilters.stages : undefined,
         sector: advancedFilters.sectors.length > 0 ? advancedFilters.sectors : undefined,
+        geoFocus: advancedFilters.geoFocus.length > 0 ? advancedFilters.geoFocus : undefined,
+        chequeMin: advancedFilters.chequeMin,
+        chequeMax: advancedFilters.chequeMax,
+        minQuality: advancedFilters.minQuality,
+        minHardwareFit: advancedFilters.minHardwareFit,
+        bvcaOnly: advancedFilters.bvcaOnly || undefined,
         sortBy: sortBy !== 'match' ? sortBy : 'name',
         page: nextPage,
         pageSize: PAGE_SIZE,
@@ -263,9 +269,14 @@ export function InvestorBrowser({
   // Shortlist handlers
   // ---------------------------------------------------------------------------
 
+  const shortlistRef = useRef(shortlistIds)
+  shortlistRef.current = shortlistIds
+
   const handleToggleShortlist = useCallback(async (firmId: string) => {
-    const isShortlisted = firmId in shortlistIds
-    // Optimistic update
+    const currentIds = shortlistRef.current
+    const isShortlisted = firmId in currentIds
+    const previousStage = currentIds[firmId]
+
     if (isShortlisted) {
       setShortlistIds(prev => {
         const next = { ...prev }
@@ -274,7 +285,8 @@ export function InvestorBrowser({
       })
       const { error } = await removeFromShortlist(firmId)
       if (error) {
-        setShortlistIds(prev => ({ ...prev, [firmId]: 'researching' }))
+        // Restore the actual previous stage, not a hardcoded default
+        setShortlistIds(prev => ({ ...prev, [firmId]: previousStage }))
         toast.error('Failed to remove from shortlist')
       } else {
         toast.success('Removed from shortlist')
@@ -293,7 +305,7 @@ export function InvestorBrowser({
         toast.success('Added to shortlist')
       }
     }
-  }, [shortlistIds])
+  }, [])
 
   // ---------------------------------------------------------------------------
   // Compare handlers
@@ -325,6 +337,9 @@ export function InvestorBrowser({
 
   const hasActiveFilters = activeFirmType !== 'All' || activeOnly || searchQuery.length > 0
     || advancedFilters.stages.length > 0 || advancedFilters.sectors.length > 0
+    || advancedFilters.geoFocus.length > 0 || advancedFilters.chequeMin != null
+    || advancedFilters.chequeMax != null || advancedFilters.minQuality != null
+    || advancedFilters.minHardwareFit != null || advancedFilters.bvcaOnly
 
   // Get firms for compare
   const compareFirms = compareIds

@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -15,10 +15,11 @@ import {
   useSensor,
   useSensors,
   PointerSensor,
+  useDroppable,
+  useDraggable,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { useDroppable } from '@dnd-kit/core'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Building2, MapPin, Heart } from 'lucide-react'
@@ -94,11 +95,14 @@ function BoardColumn({
 // ---------------------------------------------------------------------------
 
 function DraggableCard({ item }: { item: ShortlistItem }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
+
   return (
     <div
-      id={item.id}
-      className="cursor-grab active:cursor-grabbing"
-      // INTENT: Using native drag via DndContext sensors, no useDraggable needed on card
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={cn('cursor-grab active:cursor-grabbing', isDragging && 'opacity-30')}
     >
       <CompactInvestorCard item={item} />
     </div>
@@ -156,16 +160,24 @@ export function InvestorShortlistBoard() {
 
   // Load shortlist on mount
   useEffect(() => {
-    getShortlist().then(({ items: data }) => {
-      setItems(data)
-      setLoading(false)
-    })
+    getShortlist()
+      .then(({ items: data }) => {
+        setItems(data)
+        setLoading(false)
+      })
+      .catch(err => {
+        console.error('[InvestorShortlistBoard] Failed to load shortlist:', err)
+        setLoading(false)
+      })
   }, [])
 
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
-    const item = items.find(i => i.id === event.active.id)
+    const item = itemsRef.current.find(i => i.id === event.active.id)
     if (item) setActiveItem(item)
-  }, [items])
+  }, [])
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     setActiveItem(null)
@@ -173,23 +185,32 @@ export function InvestorShortlistBoard() {
     if (!over) return
 
     const targetStage = over.id as ShortlistStage
-    const item = items.find(i => i.id === active.id)
-    if (!item || item.shortlistStage === targetStage) return
+    const itemId = active.id as string
 
-    // Optimistic update
-    setItems(prev => prev.map(i =>
-      i.id === item.id ? { ...i, shortlistStage: targetStage } : i
-    ))
+    // Read previous stage from current state to avoid stale closure
+    let previousStage: ShortlistStage | null = null
+    setItems(prev => {
+      const item = prev.find(i => i.id === itemId)
+      if (!item || item.shortlistStage === targetStage) {
+        previousStage = null
+        return prev
+      }
+      previousStage = item.shortlistStage
+      return prev.map(i => i.id === itemId ? { ...i, shortlistStage: targetStage } : i)
+    })
 
-    const { error } = await updateShortlistStage(item.id, targetStage)
+    if (previousStage === null) return
+
+    const { error } = await updateShortlistStage(itemId, targetStage)
     if (error) {
-      // Revert
+      // Revert using captured previousStage (not closure)
+      const revertStage = previousStage
       setItems(prev => prev.map(i =>
-        i.id === item.id ? { ...i, shortlistStage: item.shortlistStage } : i
+        i.id === itemId ? { ...i, shortlistStage: revertStage } : i
       ))
       toast.error('Failed to move investor')
     }
-  }, [items])
+  }, [])
 
   if (loading) {
     return (
