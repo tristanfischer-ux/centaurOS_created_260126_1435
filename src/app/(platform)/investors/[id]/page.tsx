@@ -66,7 +66,10 @@ function priorityVariant(priority: string | undefined): 'destructive' | 'warning
 }
 
 function ensureProtocol(url: string): string {
-  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+  if (/^https?:\/\//i.test(url)) return url
+  // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''
+  return `https://${url}`
 }
 
 const PRIORITY_DESCRIPTIONS: Record<string, string> = {

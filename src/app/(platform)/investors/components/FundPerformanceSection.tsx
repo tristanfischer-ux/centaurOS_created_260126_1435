@@ -76,10 +76,12 @@ export function FundPerformanceSection({
         {/* Fund performance metrics */}
         {fundPerformance != null && typeof fundPerformance === 'object' && (
           <div className="space-y-2">
-            {Object.entries(fundPerformance as Record<string, unknown>).map(([key, value]) => (
+            {Object.entries(fundPerformance as Record<string, unknown>)
+              .filter(([, v]) => v != null && typeof v !== 'object')
+              .map(([key, value]) => (
               <div key={key} className="flex justify-between text-sm">
                 <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
-                <span className="font-medium text-foreground">{String(value ?? '')}</span>
+                <span className="font-medium text-foreground">{String(value)}</span>
               </div>
             ))}
           </div>

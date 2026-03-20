@@ -402,6 +402,11 @@ export async function getInvestorById(id: string): Promise<{
 }> {
   const access = await getInvestorTierAccess()
 
+  // SECURITY: Validate UUID format before hitting Supabase (reject bot/scanner probes early)
+  if (!UUID_RE.test(id)) {
+    return { firm: null, access, gated: false }
+  }
+
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('marketplace_listings')
@@ -567,7 +572,14 @@ export type InvestorContact = {
   outreach_status: string | null
   notes: string | null
   deep_bio: string | null
+  /** Set when deepAccess is false — indicates whether the contact actually has a deep bio */
+  has_deep_bio?: boolean
+  /** Set when deepAccess is false — indicates whether the contact actually has an email */
+  has_email?: boolean
 }
+
+// SECURITY: UUID format validator to avoid unnecessary Supabase round-trips on bogus IDs
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Fetches contacts associated with an investor firm listing.
@@ -581,6 +593,11 @@ export async function getInvestorContacts(listingId: string): Promise<{
 
   // Free tier: no contacts visible
   if (!access.contactsVisible) {
+    return { contacts: [], access }
+  }
+
+  // SECURITY: Validate UUID format
+  if (!UUID_RE.test(listingId)) {
     return { contacts: [], access }
   }
 
@@ -601,9 +618,13 @@ export async function getInvestorContacts(listingId: string): Promise<{
   let contacts = (data ?? []) as InvestorContact[]
 
   // Strip deep fields for users below professional tier
+  // DECISION: Expose has_deep_bio/has_email flags so the UI can show lock indicators
+  // only when there is actually data behind the lock (avoids misleading upgrade prompts).
   if (!access.deepAccess) {
     contacts = contacts.map(c => ({
       ...c,
+      has_deep_bio: !!c.deep_bio,
+      has_email: !!c.email,
       email: null,
       deep_bio: null,
     }))

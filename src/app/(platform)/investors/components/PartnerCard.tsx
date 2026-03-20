@@ -20,6 +20,8 @@ function formatSeniority(s: string): string {
 
 function ensureProtocol(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
+  // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''
   return `https://${url}`
 }
 
@@ -61,7 +63,7 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
             </a>
           )}
 
-          {/* Email — visible or locked */}
+          {/* Email — visible or locked (only show lock if contact actually has an email) */}
           {access.deepAccess && contact.email ? (
             <a
               href={`mailto:${contact.email}`}
@@ -73,7 +75,7 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
                 <Badge variant="outline" className="text-[10px] ml-1 py-0">Verified</Badge>
               )}
             </a>
-          ) : !access.deepAccess ? (
+          ) : !access.deepAccess && contact.has_email ? (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Mail className="h-3 w-3" />
               <Lock className="h-2.5 w-2.5" />
@@ -82,12 +84,12 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
           ) : null}
         </div>
 
-        {/* Deep bio — visible or locked indicator */}
+        {/* Deep bio — visible or locked indicator (only show lock if bio actually exists) */}
         {access.deepAccess && contact.deep_bio ? (
           <p className="text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-3">
             {contact.deep_bio}
           </p>
-        ) : !access.deepAccess && contact.full_name ? (
+        ) : !access.deepAccess && contact.has_deep_bio ? (
           <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
             <Lock className="h-2.5 w-2.5" />
             Deep bio available on Professional plan

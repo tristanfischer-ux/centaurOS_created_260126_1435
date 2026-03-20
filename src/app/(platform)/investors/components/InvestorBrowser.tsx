@@ -207,7 +207,11 @@ export function InvestorBrowser({
         page: nextPage,
         pageSize: PAGE_SIZE,
       })
-      setFirms(prev => [...prev, ...result.firms])
+      setFirms(prev => {
+        const existingIds = new Set(prev.map(f => f.id))
+        const newFirms = result.firms.filter(f => !existingIds.has(f.id))
+        return [...prev, ...newFirms]
+      })
       setHasMore(result.hasMore)
       setPage(nextPage)
     } catch (err) {
@@ -251,6 +255,7 @@ export function InvestorBrowser({
         {/* Active deploying toggle */}
         <button
           onClick={() => setActiveOnly(prev => !prev)}
+          aria-pressed={activeOnly}
           className={cn(
             'px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200',
             activeOnly

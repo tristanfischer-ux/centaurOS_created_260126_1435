@@ -90,7 +90,7 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
 
   const activeDeployingData = [
     { name: 'Active', value: stats.activeDeployingCount },
-    { name: 'Other', value: stats.total - stats.activeDeployingCount },
+    { name: 'Other', value: Math.max(0, stats.total - stats.activeDeployingCount) },
   ]
 
   return (
@@ -210,7 +210,7 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="inline-block h-2 w-2 rounded-full bg-muted-foreground/20" />
-                    Other ({stats.total - stats.activeDeployingCount})
+                    Other ({Math.max(0, stats.total - stats.activeDeployingCount)})
                   </span>
                 </div>
               </div>
