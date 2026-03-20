@@ -26,6 +26,8 @@ import {
 import { getUserSubscription } from '@/lib/billing/subscriptions'
 import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 import type { SubscriptionTier } from '@/lib/billing/plans'
+import { calculateMatchScore, findSimilarInvestors } from '@/lib/investor-match'
+import type { FoundryProfile } from '@/lib/investor-match'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -101,6 +103,12 @@ export interface InvestorFilters {
   priority?: string         // 'A' | 'B' | 'C'
   query?: string            // full-text search on title/description
   minQuality?: number       // minimum data_quality_score
+  geoFocus?: string[]       // filter by geo_focus array values
+  chequeMin?: number        // minimum cheque range (GBP)
+  chequeMax?: number        // maximum cheque range (GBP)
+  minHardwareFit?: number   // minimum hardware_fit_score (0-10)
+  bvcaOnly?: boolean        // filter bvca_member = true
+  sortBy?: 'match' | 'fund_size' | 'quality' | 'hardware_fit' | 'cheque' | 'priority' | 'name'
   page?: number
   pageSize?: number
 }
@@ -288,6 +296,12 @@ export async function searchInvestors(
     priority,
     query,
     minQuality,
+    geoFocus,
+    chequeMin,
+    chequeMax,
+    minHardwareFit,
+    bvcaOnly,
+    sortBy = 'name',
     page = 1,
     pageSize = 24,
   } = filters
@@ -380,9 +394,69 @@ export async function searchInvestors(
     })
   }
 
+  // Client-side geo_focus filter
+  if (geoFocus && geoFocus.length > 0) {
+    const geoLower = geoFocus.map(g => g.toLowerCase())
+    firms = firms.filter((f: InvestorFirm) => {
+      const fGeo = (f.attributes.geo_focus ?? []).map(g => g.toLowerCase())
+      return geoLower.some(g => fGeo.some(fg => fg.includes(g)))
+    })
+  }
+
+  // Client-side cheque range filter
+  if (chequeMin != null || chequeMax != null) {
+    firms = firms.filter((f: InvestorFirm) => {
+      const range = f.attributes.cheque_range_gbp
+      if (!range) return false
+      if (chequeMin != null && range.max != null && range.max < chequeMin) return false
+      if (chequeMax != null && range.min != null && range.min > chequeMax) return false
+      return true
+    })
+  }
+
+  // Client-side hardware fit filter
+  if (minHardwareFit != null && minHardwareFit > 0) {
+    firms = firms.filter((f: InvestorFirm) => {
+      return (f.attributes.hardware_fit_score ?? 0) >= minHardwareFit
+    })
+  }
+
+  // Client-side BVCA filter
+  if (bvcaOnly) {
+    firms = firms.filter((f: InvestorFirm) => f.attributes.bvca_member === true)
+  }
+
+  // Client-side sorting for JSONB attributes
+  const PRIORITY_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 }
+  if (sortBy && sortBy !== 'name') {
+    firms.sort((a: InvestorFirm, b: InvestorFirm) => {
+      switch (sortBy) {
+        case 'fund_size':
+          return (b.attributes.fund_size_gbp ?? 0) - (a.attributes.fund_size_gbp ?? 0)
+        case 'quality':
+          return (b.attributes.data_quality_score ?? 0) - (a.attributes.data_quality_score ?? 0)
+        case 'hardware_fit':
+          return (b.attributes.hardware_fit_score ?? 0) - (a.attributes.hardware_fit_score ?? 0)
+        case 'cheque': {
+          const aMin = a.attributes.cheque_range_gbp?.min ?? 0
+          const bMin = b.attributes.cheque_range_gbp?.min ?? 0
+          return bMin - aMin
+        }
+        case 'priority': {
+          const aP = PRIORITY_ORDER[a.attributes.outreach_priority ?? ''] ?? 99
+          const bP = PRIORITY_ORDER[b.attributes.outreach_priority ?? ''] ?? 99
+          return aP - bP
+        }
+        default:
+          return 0
+      }
+    })
+  }
+
   const total = count ?? 0
   const rawPageSize = (data ?? []).length
-  const hasMore = stage?.length || sector?.length || minQuality
+  const clientFiltered = !!(stage?.length || sector?.length || minQuality || geoFocus?.length || chequeMin != null || chequeMax != null || minHardwareFit || bvcaOnly)
+  const hasMore = clientFiltered
     ? rawPageSize >= safePageSize
     : from + rawPageSize < total
 
@@ -572,6 +646,7 @@ export type InvestorContact = {
   outreach_status: string | null
   notes: string | null
   deep_bio: string | null
+  warm_intro_path: string | null
   /** Set when deepAccess is false — indicates whether the contact actually has a deep bio */
   has_deep_bio?: boolean
   /** Set when deepAccess is false — indicates whether the contact actually has an email */
@@ -605,7 +680,7 @@ export async function getInvestorContacts(listingId: string): Promise<{
 
   const { data, error } = await supabase
     .from('vc_pe_contacts')
-    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, outreach_status, notes, deep_bio')
+    .select('id, full_name, title, seniority, email, email_verified, linkedin_url, is_decision_maker, outreach_status, notes, deep_bio, warm_intro_path')
     .eq('listing_id', listingId)
     .order('is_decision_maker', { ascending: false })
     .order('full_name', { ascending: true })
@@ -630,5 +705,564 @@ export async function getInvestorContacts(listingId: string): Promise<{
     }))
   }
 
+  // Strip warm intro path for non-starter users
+  if (!access.contactsVisible) {
+    contacts = contacts.map(c => ({ ...c, warm_intro_path: null }))
+  }
+
   return { contacts, access }
+}
+
+// ---------------------------------------------------------------------------
+// Shortlist types
+// ---------------------------------------------------------------------------
+
+export type ShortlistStage = 'researching' | 'contacted' | 'meeting' | 'in_discussion' | 'closed_won' | 'closed_lost'
+
+const VALID_SHORTLIST_STAGES = new Set<ShortlistStage>([
+  'researching', 'contacted', 'meeting', 'in_discussion', 'closed_won', 'closed_lost',
+])
+
+export type InvestorNote = {
+  id: string
+  listing_id: string
+  note_type: 'note' | 'meeting' | 'email' | 'call' | 'milestone'
+  content: string
+  created_at: string
+}
+
+const VALID_NOTE_TYPES = new Set(['note', 'meeting', 'email', 'call', 'milestone'])
+
+// ---------------------------------------------------------------------------
+// Match Scores
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches the current user's foundry profile for match scoring.
+ */
+async function getFoundryProfile(): Promise<FoundryProfile | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('foundry_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile?.foundry_id) return null
+
+  const { data: foundry } = await supabase
+    .from('foundries')
+    .select('stage, sector, industry')
+    .eq('id', profile.foundry_id)
+    .single()
+
+  if (!foundry) return null
+  return { stage: foundry.stage, sector: foundry.sector, industry: foundry.industry }
+}
+
+/**
+ * Computes match scores for a set of investor firms against the current user's profile.
+ *
+ * @param firmIds - Array of listing IDs to score. Max 200 per call.
+ * @returns Record mapping listing ID to 0–100 match score.
+ */
+export async function computeMatchScores(
+  firmIds: string[]
+): Promise<Record<string, number>> {
+  const profile = await getFoundryProfile()
+  if (!profile) return {}
+
+  // Validate UUIDs
+  const safeIds = firmIds.filter(id => UUID_RE.test(id)).slice(0, 200)
+  if (safeIds.length === 0) return {}
+
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('category', 'Finance')
+    .in('id', safeIds)
+
+  if (error || !data) return {}
+
+  const result: Record<string, number> = {}
+  for (const row of data) {
+    const firm = rowToFirm(row as Record<string, unknown>)
+    const breakdown = calculateMatchScore(firm, profile)
+    result[firm.id] = breakdown.total
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Shortlist CRUD
+// ---------------------------------------------------------------------------
+
+/**
+ * Adds an investor to the user's shortlist (upsert).
+ */
+export async function addToShortlist(
+  listingId: string,
+  stage: ShortlistStage = 'researching'
+): Promise<{ error?: string }> {
+  if (!UUID_RE.test(listingId)) return { error: 'Invalid listing ID' }
+  if (!VALID_SHORTLIST_STAGES.has(stage)) return { error: 'Invalid stage' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('investor_shortlist')
+    .upsert(
+      { user_id: user.id, listing_id: listingId, stage },
+      { onConflict: 'user_id,listing_id' }
+    )
+
+  if (error) {
+    console.error('[addToShortlist] Error:', error)
+    return { error: 'Failed to add to shortlist' }
+  }
+  return {}
+}
+
+/**
+ * Updates the pipeline stage of a shortlisted investor.
+ */
+export async function updateShortlistStage(
+  listingId: string,
+  stage: ShortlistStage
+): Promise<{ error?: string }> {
+  if (!UUID_RE.test(listingId)) return { error: 'Invalid listing ID' }
+  if (!VALID_SHORTLIST_STAGES.has(stage)) return { error: 'Invalid stage' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('investor_shortlist')
+    .update({ stage })
+    .eq('user_id', user.id)
+    .eq('listing_id', listingId)
+
+  if (error) {
+    console.error('[updateShortlistStage] Error:', error)
+    return { error: 'Failed to update stage' }
+  }
+  return {}
+}
+
+/**
+ * Removes an investor from the user's shortlist.
+ */
+export async function removeFromShortlist(
+  listingId: string
+): Promise<{ error?: string }> {
+  if (!UUID_RE.test(listingId)) return { error: 'Invalid listing ID' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('investor_shortlist')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('listing_id', listingId)
+
+  if (error) {
+    console.error('[removeFromShortlist] Error:', error)
+    return { error: 'Failed to remove from shortlist' }
+  }
+  return {}
+}
+
+/**
+ * Returns a map of listing IDs to shortlist stages for the current user.
+ */
+export async function getShortlistIds(): Promise<Record<string, ShortlistStage>> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return {}
+
+  const { data, error } = await supabase
+    .from('investor_shortlist')
+    .select('listing_id, stage')
+    .eq('user_id', user.id)
+
+  if (error) {
+    console.error('[getShortlistIds] Error:', error)
+    return {}
+  }
+
+  const result: Record<string, ShortlistStage> = {}
+  for (const row of data ?? []) {
+    result[row.listing_id] = row.stage as ShortlistStage
+  }
+  return result
+}
+
+/**
+ * Returns full shortlisted firms joined with shortlist metadata.
+ */
+export async function getShortlist(): Promise<{
+  items: (InvestorFirm & { shortlistStage: ShortlistStage; shortlistUpdatedAt: string })[]
+}> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { items: [] }
+
+  const { data: shortlistRows, error: slError } = await supabase
+    .from('investor_shortlist')
+    .select('listing_id, stage, updated_at')
+    .eq('user_id', user.id)
+    .order('updated_at', { ascending: false })
+
+  if (slError || !shortlistRows || shortlistRows.length === 0) return { items: [] }
+
+  const listingIds = shortlistRows.map(r => r.listing_id)
+  const { data: listings, error: lError } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('category', 'Finance')
+    .in('id', listingIds)
+
+  if (lError || !listings) return { items: [] }
+
+  const access = await getInvestorTierAccess()
+  const firmMap = new Map<string, InvestorFirm>()
+  for (const row of listings) {
+    const firm = stripTierGatedFields(rowToFirm(row as Record<string, unknown>), access)
+    firmMap.set(firm.id, firm)
+  }
+
+  const items = shortlistRows
+    .map(sl => {
+      const firm = firmMap.get(sl.listing_id)
+      if (!firm) return null
+      return {
+        ...firm,
+        shortlistStage: sl.stage as ShortlistStage,
+        shortlistUpdatedAt: sl.updated_at,
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+
+  return { items }
+}
+
+// ---------------------------------------------------------------------------
+// Notes
+// ---------------------------------------------------------------------------
+
+/**
+ * Adds a note to an investor's activity log.
+ */
+export async function addInvestorNote(
+  listingId: string,
+  content: string,
+  noteType: string = 'note'
+): Promise<{ error?: string }> {
+  if (!UUID_RE.test(listingId)) return { error: 'Invalid listing ID' }
+  if (!content.trim()) return { error: 'Note content is required' }
+  if (!VALID_NOTE_TYPES.has(noteType)) return { error: 'Invalid note type' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // SECURITY: Truncate content to prevent abuse (max 5000 chars)
+  const safeContent = content.trim().slice(0, 5000)
+
+  const { error } = await supabase
+    .from('investor_notes')
+    .insert({
+      user_id: user.id,
+      listing_id: listingId,
+      note_type: noteType,
+      content: safeContent,
+    })
+
+  if (error) {
+    console.error('[addInvestorNote] Error:', error)
+    return { error: 'Failed to add note' }
+  }
+  return {}
+}
+
+/**
+ * Fetches notes for a specific investor, ordered by most recent first.
+ */
+export async function getInvestorNotes(
+  listingId: string
+): Promise<{ notes: InvestorNote[] }> {
+  if (!UUID_RE.test(listingId)) return { notes: [] }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { notes: [] }
+
+  const { data, error } = await supabase
+    .from('investor_notes')
+    .select('id, listing_id, note_type, content, created_at')
+    .eq('user_id', user.id)
+    .eq('listing_id', listingId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) {
+    console.error('[getInvestorNotes] Error:', error)
+    return { notes: [] }
+  }
+
+  return { notes: (data ?? []) as InvestorNote[] }
+}
+
+// ---------------------------------------------------------------------------
+// Alerts
+// ---------------------------------------------------------------------------
+
+/**
+ * Toggles alert subscription for an investor.
+ */
+export async function toggleInvestorAlert(
+  listingId: string
+): Promise<{ active?: boolean; error?: string }> {
+  if (!UUID_RE.test(listingId)) return { error: 'Invalid listing ID' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Check if alert exists
+  const { data: existing } = await supabase
+    .from('investor_alerts')
+    .select('id, active')
+    .eq('user_id', user.id)
+    .eq('listing_id', listingId)
+    .single()
+
+  if (existing) {
+    const newActive = !existing.active
+    const { error } = await supabase
+      .from('investor_alerts')
+      .update({ active: newActive })
+      .eq('id', existing.id)
+
+    if (error) return { error: 'Failed to toggle alert' }
+    return { active: newActive }
+  }
+
+  // Create new alert
+  const { error } = await supabase
+    .from('investor_alerts')
+    .insert({ user_id: user.id, listing_id: listingId, active: true })
+
+  if (error) return { error: 'Failed to create alert' }
+  return { active: true }
+}
+
+/**
+ * Returns listing IDs with active alerts for the current user.
+ */
+export async function getAlertedListingIds(): Promise<string[]> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await supabase
+    .from('investor_alerts')
+    .select('listing_id')
+    .eq('user_id', user.id)
+    .eq('active', true)
+
+  if (error) return []
+  return (data ?? []).map(r => r.listing_id)
+}
+
+// ---------------------------------------------------------------------------
+// Similar Investors
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds investors similar to the given firm using Jaccard similarity.
+ */
+export async function getSimilarInvestors(
+  listingId: string,
+  limit = 5
+): Promise<{ firms: InvestorFirm[] }> {
+  if (!UUID_RE.test(listingId)) return { firms: [] }
+
+  const supabase = await createClient()
+
+  // Fetch target firm
+  const { data: targetRow } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('id', listingId)
+    .eq('category', 'Finance')
+    .single()
+
+  if (!targetRow) return { firms: [] }
+  const target = rowToFirm(targetRow as Record<string, unknown>)
+
+  // Fetch top 50 firms by quality for candidate pool
+  const { data: candidateRows } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('category', 'Finance')
+    .order('data_quality_score', { ascending: false })
+    .limit(50)
+
+  if (!candidateRows) return { firms: [] }
+
+  const candidates = candidateRows.map(r => rowToFirm(r as Record<string, unknown>))
+  const similar = findSimilarInvestors(target, candidates, limit)
+
+  const access = await getInvestorTierAccess()
+  return { firms: similar.map(f => stripTierGatedFields(f, access)) }
+}
+
+// ---------------------------------------------------------------------------
+// Fundraise Dashboard
+// ---------------------------------------------------------------------------
+
+export interface FundraiseDashboardStats {
+  pipelineCounts: Record<ShortlistStage, number>
+  totalTracked: number
+  recentNotes: (InvestorNote & { firmName: string })[]
+  coverageGaps: string[]
+  shortlistedFirms: (InvestorFirm & { shortlistStage: ShortlistStage })[]
+}
+
+/**
+ * Fetches all data needed for the fundraise dashboard.
+ */
+export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardStats> {
+  const empty: FundraiseDashboardStats = {
+    pipelineCounts: { researching: 0, contacted: 0, meeting: 0, in_discussion: 0, closed_won: 0, closed_lost: 0 },
+    totalTracked: 0,
+    recentNotes: [],
+    coverageGaps: [],
+    shortlistedFirms: [],
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return empty
+
+  // Fetch shortlist
+  const { data: shortlistRows } = await supabase
+    .from('investor_shortlist')
+    .select('listing_id, stage')
+    .eq('user_id', user.id)
+
+  if (!shortlistRows || shortlistRows.length === 0) return empty
+
+  // Pipeline counts
+  const pipelineCounts = { ...empty.pipelineCounts }
+  for (const row of shortlistRows) {
+    const stage = row.stage as ShortlistStage
+    if (stage in pipelineCounts) pipelineCounts[stage]++
+  }
+
+  // Fetch firm details for shortlisted investors
+  const listingIds = shortlistRows.map(r => r.listing_id)
+  const { data: listings } = await supabase
+    .from('marketplace_listings')
+    .select('id, title, description, subcategory, attributes')
+    .eq('category', 'Finance')
+    .in('id', listingIds)
+
+  const access = await getInvestorTierAccess()
+  const firmMap = new Map<string, InvestorFirm>()
+  for (const row of listings ?? []) {
+    const firm = stripTierGatedFields(rowToFirm(row as Record<string, unknown>), access)
+    firmMap.set(firm.id, firm)
+  }
+
+  const shortlistedFirms = shortlistRows
+    .map(sl => {
+      const firm = firmMap.get(sl.listing_id)
+      if (!firm) return null
+      return { ...firm, shortlistStage: sl.stage as ShortlistStage }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+
+  // Recent notes across all shortlisted investors
+  const { data: noteRows } = await supabase
+    .from('investor_notes')
+    .select('id, listing_id, note_type, content, created_at')
+    .eq('user_id', user.id)
+    .in('listing_id', listingIds)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  const recentNotes = (noteRows ?? []).map(n => ({
+    ...(n as InvestorNote),
+    firmName: firmMap.get(n.listing_id)?.title ?? 'Unknown',
+  }))
+
+  // Coverage analysis — identify gaps
+  const coverageGaps: string[] = []
+  const profile = await getFoundryProfile()
+
+  if (profile) {
+    // Check stage coverage
+    const stageConfig = profile.stage
+      ? STAGE_MAP_DASHBOARD[profile.stage.toLowerCase().replace(/\s+/g, '_')]
+      : null
+    if (stageConfig) {
+      const hasMatchingStage = shortlistedFirms.some(f =>
+        (f.attributes.stage_focus ?? []).some(s =>
+          stageConfig.includes(s)
+        )
+      )
+      if (!hasMatchingStage) {
+        coverageGaps.push(`No investors matching your stage (${profile.stage})`)
+      }
+    }
+
+    // Check sector coverage
+    if (profile.sector) {
+      const sectorLower = profile.sector.toLowerCase()
+      const hasSector = shortlistedFirms.some(f =>
+        (f.attributes.sectors ?? []).some(s => s.toLowerCase().includes(sectorLower))
+      )
+      if (!hasSector) {
+        coverageGaps.push(`No investors covering your sector (${profile.sector})`)
+      }
+    }
+
+    // Check firm type diversity
+    const firmTypes = new Set(shortlistedFirms.map(f => f.attributes.firm_type).filter(Boolean))
+    if (!firmTypes.has('PE') && shortlistedFirms.length >= 3) {
+      coverageGaps.push('No PE firms on your list')
+    }
+    if (!firmTypes.has('VC') && shortlistedFirms.length >= 3) {
+      coverageGaps.push('No VC firms on your list')
+    }
+  }
+
+  return {
+    pipelineCounts,
+    totalTracked: shortlistRows.length,
+    recentNotes,
+    coverageGaps,
+    shortlistedFirms,
+  }
+}
+
+// Stage map for dashboard coverage analysis (slightly broader than match scoring)
+const STAGE_MAP_DASHBOARD: Record<string, string[]> = {
+  pre_seed: ['Pre-Seed', 'Seed', 'Angel'],
+  seed: ['Seed', 'Pre-Seed', 'Series A'],
+  series_a: ['Series A', 'Seed', 'Growth'],
+  series_b: ['Series B', 'Growth', 'Late Stage'],
+  growth: ['Growth', 'Late Stage', 'Series B'],
+  late_stage: ['Late Stage', 'Growth'],
 }

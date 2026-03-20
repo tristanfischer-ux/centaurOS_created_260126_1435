@@ -1,0 +1,141 @@
+/**
+ * @file investor-outreach.ts
+ *
+ * @description Server action for generating AI-powered outreach drafts for investors.
+ * Professional+ only. Uses Claude Haiku via withAIGate for usage tracking.
+ */
+
+"use server"
+
+import { withAIGate } from '@/lib/ai/with-ai-gate'
+import { getInvestorById } from '@/actions/investors'
+import { createClient } from '@/lib/supabase/server'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface OutreachDraft {
+  subject: string
+  body: string
+  linkedinMessage: string
+}
+
+// ---------------------------------------------------------------------------
+// Server Action
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a personalized cold email and LinkedIn message for an investor.
+ * Professional+ only — uses AI gate for tier check and usage tracking.
+ *
+ * @param listingId - The investor listing ID to generate outreach for
+ * @returns The draft outreach content or an error
+ */
+export async function generateOutreachDraft(
+  listingId: string
+): Promise<{ draft?: OutreachDraft; error?: string }> {
+  return withAIGate('investor_outreach', async ({ supabase, user, foundryId, trackUsage }) => {
+    // Fetch investor data
+    const { firm, access } = await getInvestorById(listingId)
+    if (!firm) return { error: 'Investor not found' }
+    if (!access.intelligenceAccess) return { error: 'Professional plan required' }
+
+    const attrs = firm.attributes
+
+    // Fetch user's company profile
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('name, sector, industry, stage, company_profile')
+      .eq('id', foundryId)
+      .single()
+
+    if (!foundry) return { error: 'Company profile not found' }
+
+    // Build the prompt
+    const investorContext = [
+      `Investor: ${firm.title}`,
+      attrs.firm_type ? `Type: ${attrs.firm_type}` : '',
+      attrs.investment_thesis ? `Thesis: ${attrs.investment_thesis}` : '',
+      attrs.stage_focus?.length ? `Stage focus: ${attrs.stage_focus.join(', ')}` : '',
+      attrs.sectors?.length ? `Sectors: ${attrs.sectors.join(', ')}` : '',
+      attrs.recent_deals_summary ? `Recent activity: ${attrs.recent_deals_summary}` : '',
+      attrs.portfolio_companies?.length ? `Portfolio: ${attrs.portfolio_companies.slice(0, 5).map(p => p.company_name).join(', ')}` : '',
+      attrs.ideal_company_profile ? `Ideal company: ${attrs.ideal_company_profile}` : '',
+      attrs.value_add ? `Value-add: ${attrs.value_add}` : '',
+    ].filter(Boolean).join('\n')
+
+    const companyProfile = typeof foundry.company_profile === 'object' && foundry.company_profile
+      ? JSON.stringify(foundry.company_profile).slice(0, 2000)
+      : ''
+
+    const userContext = [
+      `Company: ${foundry.name}`,
+      foundry.sector ? `Sector: ${foundry.sector}` : '',
+      foundry.industry ? `Industry: ${foundry.industry}` : '',
+      foundry.stage ? `Stage: ${foundry.stage}` : '',
+      companyProfile ? `Profile: ${companyProfile}` : '',
+    ].filter(Boolean).join('\n')
+
+    const systemPrompt = `You are a fundraising advisor for a hardware startup. Write personalized investor outreach.
+Be concise, specific, and reference the investor's thesis/portfolio when possible.
+Avoid generic phrases like "I came across your firm" or "I'd love to connect".
+Instead, lead with specific thesis alignment or portfolio parallels.`
+
+    const userPrompt = `Write a cold email and LinkedIn connection message for this investor.
+
+INVESTOR:
+${investorContext}
+
+OUR COMPANY:
+${userContext}
+
+Output in this exact JSON format:
+{
+  "subject": "Email subject line (max 60 chars)",
+  "body": "Email body (3 paragraphs max, concise)",
+  "linkedinMessage": "LinkedIn connection note (2 sentences max, under 300 chars)"
+}`
+
+    // Call Claude Haiku
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY ?? '',
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('[generateOutreachDraft] API error:', response.status)
+      return { error: 'Failed to generate outreach draft' }
+    }
+
+    const data = await response.json()
+    const text = data.content?.[0]?.text ?? ''
+
+    // Track usage
+    await trackUsage({
+      model: 'claude-haiku-4-5-20251001',
+      promptTokens: data.usage?.input_tokens ?? 0,
+      completionTokens: data.usage?.output_tokens ?? 0,
+    })
+
+    // Parse JSON from response
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) return { error: 'Invalid response format' }
+      const draft = JSON.parse(jsonMatch[0]) as OutreachDraft
+      return { draft }
+    } catch {
+      return { error: 'Failed to parse outreach draft' }
+    }
+  }) as Promise<{ draft?: OutreachDraft; error?: string }>
+}

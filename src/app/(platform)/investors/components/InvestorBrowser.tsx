@@ -3,11 +3,11 @@
  *
  * @description Client component for the UK Investor Directory. Accepts server-fetched
  * initial data and handles all interactive filter state: firm type tabs, search input
- * (300ms debounce), active-deploying toggle, and pagination. Re-fetches from the
- * searchInvestors server action when filters change.
+ * (300ms debounce), active-deploying toggle, advanced filters, sort, view switching,
+ * and pagination.
  *
- * URL sync: filters are reflected in the query string (?type=VC&active=1&q=sequoia)
- * so users can share/bookmark filtered views. Initialises state from URL params on mount.
+ * URL sync: filters are reflected in the query string (?type=VC&active=1&q=sequoia&sort=match&view=grid)
+ * so users can share/bookmark filtered views.
  */
 
 'use client'
@@ -18,10 +18,19 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InvestorCard } from './InvestorCard'
-import { searchInvestors } from '@/actions/investors'
-import { Search, X, RefreshCw, Building2 } from 'lucide-react'
+import { InvestorSortSelect } from './InvestorSortSelect'
+import { InvestorFilterPanel } from './InvestorFilterPanel'
+import { InvestorCompareBar } from './InvestorCompareBar'
+import { InvestorCompareDialog } from './InvestorCompareDialog'
+import { InvestorShortlistBoard } from './InvestorShortlistBoard'
+import { InvestorMapView } from './InvestorMapView'
+import { searchInvestors, addToShortlist, removeFromShortlist } from '@/actions/investors'
+import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { InvestorFirm } from '@/actions/investors'
+import { toast } from 'sonner'
+import type { InvestorFirm, ShortlistStage } from '@/actions/investors'
+import type { SortOption } from './InvestorSortSelect'
+import type { AdvancedFilters } from './InvestorFilterPanel'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,13 +41,23 @@ type FirmTypeFilter = typeof FIRM_TYPES[number]
 
 const PAGE_SIZE = 24
 
+type ViewMode = 'grid' | 'board' | 'map'
+
+const EMPTY_ADVANCED: AdvancedFilters = {
+  stages: [],
+  sectors: [],
+  geoFocus: [],
+  chequeMin: undefined,
+  chequeMax: undefined,
+  minQuality: undefined,
+  minHardwareFit: undefined,
+  bvcaOnly: false,
+}
+
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/**
- * Skeleton grid shown while fetching.
- */
 function InvestorGridSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -49,9 +68,6 @@ function InvestorGridSkeleton() {
   )
 }
 
-/**
- * Empty state shown when no results match current filters.
- */
 function EmptyState({ onClear }: { onClear: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
@@ -80,31 +96,23 @@ interface InvestorBrowserProps {
   initialFirms: InvestorFirm[]
   initialTotal: number
   initialHasMore: boolean
+  initialMatchScores?: Record<string, number>
+  initialShortlistIds?: Record<string, ShortlistStage>
 }
 
-/**
- * Interactive investor directory browser with filtering, search, and URL-synced state.
- *
- * @description Wraps the InvestorCard grid with client-side filter controls.
- * Debounces the search input at 300ms. Firm type tabs and active-only toggle trigger
- * immediate refetches. Filter state is synced to the URL query string so filtered
- * views can be shared or bookmarked.
- *
- * @param initialFirms - Server-side pre-fetched first page
- * @param initialTotal - Total count from server (for stats row)
- * @param initialHasMore - Whether more pages exist
- */
 export function InvestorBrowser({
   initialFirms,
   initialTotal,
   initialHasMore,
+  initialMatchScores = {},
+  initialShortlistIds = {},
 }: InvestorBrowserProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
   // ---------------------------------------------------------------------------
-  // Filter state — initialised from URL params so shared links restore state
+  // Filter state
   // ---------------------------------------------------------------------------
 
   const [activeFirmType, setActiveFirmType] = useState<FirmTypeFilter>(() => {
@@ -114,23 +122,34 @@ export function InvestorBrowser({
   const [activeOnly, setActiveOnly] = useState(() => searchParams.get('active') === '1')
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '')
   const [debouncedQuery, setDebouncedQuery] = useState(() => searchParams.get('q') ?? '')
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    const s = searchParams.get('sort') as SortOption
+    return ['match', 'fund_size', 'quality', 'hardware_fit', 'priority', 'name'].includes(s) ? s : 'name'
+  })
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(EMPTY_ADVANCED)
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const v = searchParams.get('view') as ViewMode
+    return ['grid', 'board', 'map'].includes(v) ? v : 'grid'
+  })
 
-  // DECISION: When URL has filters on mount, start with empty data so the skeleton
-  // shows while fetching the filtered set. When no URL filters, use SSR data directly
-  // and skip the initial refetch to avoid a redundant round-trip.
+  // Data state
   const hasUrlFilters = !!(searchParams.get('type') || searchParams.get('active') || searchParams.get('q'))
 
   const [firms, setFirms] = useState<InvestorFirm[]>(hasUrlFilters ? [] : initialFirms)
   const [total, setTotal] = useState(hasUrlFilters ? 0 : initialTotal)
   const [hasMore, setHasMore] = useState(hasUrlFilters ? false : initialHasMore)
   const [page, setPage] = useState(1)
+  const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores)
+  const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
 
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
 
+  // Compare state
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [showCompare, setShowCompare] = useState(false)
+
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // INTENT: Track whether we've ever client-fetched. Without this, clearing filters
-  // back to defaults hits the guard (firms.length > 0 with stale data) and skips refetch.
   const hasEverFetched = useRef(hasUrlFilters)
 
   // ---------------------------------------------------------------------------
@@ -148,7 +167,7 @@ export function InvestorBrowser({
   }, [searchQuery])
 
   // ---------------------------------------------------------------------------
-  // Sync filters → URL (replace, not push, to avoid polluting browser history)
+  // URL sync
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
@@ -156,18 +175,17 @@ export function InvestorBrowser({
     if (activeFirmType !== 'All') params.set('type', activeFirmType)
     if (activeOnly) params.set('active', '1')
     if (debouncedQuery) params.set('q', debouncedQuery)
+    if (sortBy !== 'name') params.set('sort', sortBy)
+    if (viewMode !== 'grid') params.set('view', viewMode)
     const qs = params.toString()
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
-  }, [activeFirmType, activeOnly, debouncedQuery, router, pathname])
+  }, [activeFirmType, activeOnly, debouncedQuery, sortBy, viewMode, router, pathname])
 
   // ---------------------------------------------------------------------------
-  // Refetch when filters change (always back to page 1)
+  // Refetch when filters change
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    // INTENT: Skip redundant refetch when at default filters and SSR data is loaded.
-    // Once we've fetched at least once (filters were applied), always refetch on change
-    // — even back to defaults — so clearing filters reloads the full unfiltered set.
     if (activeFirmType === 'All' && !activeOnly && !debouncedQuery && !hasEverFetched.current) {
       return
     }
@@ -178,6 +196,15 @@ export function InvestorBrowser({
           firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
           activeOnly,
           query: debouncedQuery || undefined,
+          stage: advancedFilters.stages.length > 0 ? advancedFilters.stages : undefined,
+          sector: advancedFilters.sectors.length > 0 ? advancedFilters.sectors : undefined,
+          geoFocus: advancedFilters.geoFocus.length > 0 ? advancedFilters.geoFocus : undefined,
+          chequeMin: advancedFilters.chequeMin,
+          chequeMax: advancedFilters.chequeMax,
+          minQuality: advancedFilters.minQuality,
+          minHardwareFit: advancedFilters.minHardwareFit,
+          bvcaOnly: advancedFilters.bvcaOnly || undefined,
+          sortBy: sortBy !== 'match' ? sortBy : 'name', // match sort is client-side
           page: 1,
           pageSize: PAGE_SIZE,
         })
@@ -190,10 +217,18 @@ export function InvestorBrowser({
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFirmType, activeOnly, debouncedQuery])
+  }, [activeFirmType, activeOnly, debouncedQuery, advancedFilters, sortBy])
 
   // ---------------------------------------------------------------------------
-  // Load more (append next page)
+  // Client-side match score sorting
+  // ---------------------------------------------------------------------------
+
+  const displayFirms = sortBy === 'match' && Object.keys(matchScores).length > 0
+    ? [...firms].sort((a, b) => (matchScores[b.id] ?? 0) - (matchScores[a.id] ?? 0))
+    : firms
+
+  // ---------------------------------------------------------------------------
+  // Load more
   // ---------------------------------------------------------------------------
 
   const handleLoadMore = useCallback(async () => {
@@ -204,6 +239,9 @@ export function InvestorBrowser({
         firmType: activeFirmType === 'All' ? undefined : [activeFirmType],
         activeOnly,
         query: debouncedQuery || undefined,
+        stage: advancedFilters.stages.length > 0 ? advancedFilters.stages : undefined,
+        sector: advancedFilters.sectors.length > 0 ? advancedFilters.sectors : undefined,
+        sortBy: sortBy !== 'match' ? sortBy : 'name',
         page: nextPage,
         pageSize: PAGE_SIZE,
       })
@@ -219,16 +257,79 @@ export function InvestorBrowser({
     } finally {
       setIsLoadingMore(false)
     }
-  }, [page, activeFirmType, activeOnly, debouncedQuery])
+  }, [page, activeFirmType, activeOnly, debouncedQuery, advancedFilters, sortBy])
+
+  // ---------------------------------------------------------------------------
+  // Shortlist handlers
+  // ---------------------------------------------------------------------------
+
+  const handleToggleShortlist = useCallback(async (firmId: string) => {
+    const isShortlisted = firmId in shortlistIds
+    // Optimistic update
+    if (isShortlisted) {
+      setShortlistIds(prev => {
+        const next = { ...prev }
+        delete next[firmId]
+        return next
+      })
+      const { error } = await removeFromShortlist(firmId)
+      if (error) {
+        setShortlistIds(prev => ({ ...prev, [firmId]: 'researching' }))
+        toast.error('Failed to remove from shortlist')
+      } else {
+        toast.success('Removed from shortlist')
+      }
+    } else {
+      setShortlistIds(prev => ({ ...prev, [firmId]: 'researching' }))
+      const { error } = await addToShortlist(firmId)
+      if (error) {
+        setShortlistIds(prev => {
+          const next = { ...prev }
+          delete next[firmId]
+          return next
+        })
+        toast.error('Failed to add to shortlist')
+      } else {
+        toast.success('Added to shortlist')
+      }
+    }
+  }, [shortlistIds])
+
+  // ---------------------------------------------------------------------------
+  // Compare handlers
+  // ---------------------------------------------------------------------------
+
+  const handleToggleCompare = useCallback((firmId: string) => {
+    setCompareIds(prev => {
+      if (prev.includes(firmId)) return prev.filter(id => id !== firmId)
+      if (prev.length >= 3) {
+        toast.error('Compare up to 3 firms')
+        return prev
+      }
+      return [...prev, firmId]
+    })
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Clear filters
+  // ---------------------------------------------------------------------------
 
   const handleClearFilters = useCallback(() => {
     setActiveFirmType('All')
     setActiveOnly(false)
     setSearchQuery('')
     setDebouncedQuery('')
+    setAdvancedFilters(EMPTY_ADVANCED)
+    setSortBy('name')
   }, [])
 
   const hasActiveFilters = activeFirmType !== 'All' || activeOnly || searchQuery.length > 0
+    || advancedFilters.stages.length > 0 || advancedFilters.sectors.length > 0
+
+  // Get firms for compare
+  const compareFirms = compareIds
+    .map(id => firms.find(f => f.id === id))
+    .filter((f): f is InvestorFirm => f != null)
 
   return (
     <div className="space-y-6">
@@ -287,7 +388,41 @@ export function InvestorBrowser({
             </button>
           )}
         </div>
+
+        {/* Sort + View toggle */}
+        <div className="flex items-center gap-3 ml-auto">
+          <InvestorSortSelect value={sortBy} onChange={setSortBy} />
+          <div className="flex items-center border border-border rounded-lg overflow-hidden">
+            {([
+              { mode: 'grid' as const, icon: LayoutGrid, label: 'Grid view' },
+              { mode: 'board' as const, icon: Kanban, label: 'Board view' },
+              { mode: 'map' as const, icon: MapPin, label: 'Map view' },
+            ]).map(({ mode, icon: Icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => setViewMode(mode)}
+                aria-label={label}
+                aria-pressed={viewMode === mode}
+                className={cn(
+                  'p-1.5 transition-colors',
+                  viewMode === mode
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
+
+      {/* Advanced filters */}
+      <InvestorFilterPanel
+        filters={advancedFilters}
+        onChange={setAdvancedFilters}
+        onClear={() => setAdvancedFilters(EMPTY_ADVANCED)}
+      />
 
       {/* Stats row */}
       <div className="flex items-center justify-between">
@@ -301,7 +436,7 @@ export function InvestorBrowser({
             ) : (
               <>
                 Showing{' '}
-                <span className="font-semibold text-foreground">{firms.length}</span>
+                <span className="font-semibold text-foreground">{displayFirms.length}</span>
                 {' '}of{' '}
                 <span className="font-semibold text-foreground">{total}</span>
                 {' '}firms
@@ -317,48 +452,86 @@ export function InvestorBrowser({
         )}
       </div>
 
-      {/* Grid / states */}
-      {isPending && firms.length === 0 ? (
-        <InvestorGridSkeleton />
-      ) : firms.length === 0 && !isPending ? (
-        <EmptyState onClear={handleClearFilters} />
-      ) : (
+      {/* Grid / Board / Map views */}
+      {viewMode === 'grid' && (
         <>
-          <div className={cn(
-            "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
-            isPending && "opacity-60 pointer-events-none transition-opacity"
-          )}>
-            {firms.map(firm => (
-              <InvestorCard key={firm.id} firm={firm} />
-            ))}
-          </div>
+          {isPending && displayFirms.length === 0 ? (
+            <InvestorGridSkeleton />
+          ) : displayFirms.length === 0 && !isPending ? (
+            <EmptyState onClear={handleClearFilters} />
+          ) : (
+            <>
+              <div className={cn(
+                "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6",
+                isPending && "opacity-60 pointer-events-none transition-opacity"
+              )}>
+                {displayFirms.map(firm => (
+                  <InvestorCard
+                    key={firm.id}
+                    firm={firm}
+                    matchScore={matchScores[firm.id]}
+                    isShortlisted={firm.id in shortlistIds}
+                    onToggleShortlist={() => handleToggleShortlist(firm.id)}
+                    isCompareSelected={compareIds.includes(firm.id)}
+                    onToggleCompare={() => handleToggleCompare(firm.id)}
+                  />
+                ))}
+              </div>
 
-          {/* Load more */}
-          {hasMore && (
-            <div className="flex flex-col items-center gap-2 pt-6">
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={handleLoadMore}
-                disabled={isLoadingMore || isPending}
-                className="min-w-[200px]"
-              >
-                {isLoadingMore ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Loading…
-                  </>
-                ) : (
-                  `Load more (${total - firms.length} remaining)`
-                )}
-              </Button>
-              <p className="text-xs text-muted-foreground">
-                Showing {firms.length} of {total}
-              </p>
-            </div>
+              {hasMore && (
+                <div className="flex flex-col items-center gap-2 pt-6">
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore || isPending}
+                    className="min-w-[200px]"
+                  >
+                    {isLoadingMore ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Loading…
+                      </>
+                    ) : (
+                      `Load more (${total - displayFirms.length} remaining)`
+                    )}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Showing {displayFirms.length} of {total}
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
+
+      {viewMode === 'board' && (
+        <InvestorShortlistBoard />
+      )}
+
+      {viewMode === 'map' && (
+        <InvestorMapView firms={displayFirms} />
+      )}
+
+      {/* Compare bar */}
+      {compareIds.length > 0 && (
+        <InvestorCompareBar
+          firms={compareFirms}
+          matchScores={matchScores}
+          onRemove={(id) => setCompareIds(prev => prev.filter(x => x !== id))}
+          onClear={() => setCompareIds([])}
+          onCompare={() => setShowCompare(true)}
+        />
+      )}
+
+      {/* Compare dialog */}
+      <InvestorCompareDialog
+        open={showCompare}
+        onOpenChange={setShowCompare}
+        firms={compareFirms}
+        matchScores={matchScores}
+      />
     </div>
   )
 }

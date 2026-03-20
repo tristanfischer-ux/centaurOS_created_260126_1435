@@ -7976,6 +7976,135 @@ export type Database = {
           },
         ]
       }
+      investor_alerts: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          last_notified_at: string | null
+          listing_id: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_notified_at?: string | null
+          listing_id: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          last_notified_at?: string | null
+          listing_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_alerts_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_alerts_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      investor_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          listing_id: string
+          note_type: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          listing_id: string
+          note_type?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          listing_id?: string
+          note_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_notes_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_notes_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
+      investor_shortlist: {
+        Row: {
+          created_at: string
+          id: string
+          listing_id: string
+          notes: string | null
+          stage: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          listing_id: string
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          listing_id?: string
+          notes?: string | null
+          stage?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_shortlist_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investor_shortlist_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       knowledge_domains: {
         Row: {
           ai_summary: string | null

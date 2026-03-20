@@ -4,14 +4,15 @@
  * @description UK Investor Directory — server component entry point.
  * Fetches the initial page of Finance-category marketplace listings server-side
  * and passes them to InvestorBrowser for client-side interactive filtering.
+ * Also pre-computes match scores and shortlist state.
  *
  * Revalidates every 60 seconds (ISR) since investor data changes infrequently.
  */
 
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { searchInvestors, getInvestorStats } from '@/actions/investors'
-import type { InvestorStats } from '@/actions/investors'
+import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds } from '@/actions/investors'
+import type { InvestorStats, ShortlistStage } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 
@@ -44,23 +45,18 @@ function InvestorDirectoryLoading() {
 // Page
 // ---------------------------------------------------------------------------
 
-/**
- * UK Investor Directory page.
- *
- * @description Server component that pre-fetches the first 24 Finance listings
- * and renders the InvestorBrowser client component with the data hydrated.
- * Errors are caught gracefully — the page renders with an empty initial state
- * rather than crashing.
- */
 export default async function InvestorDirectoryPage() {
   let initialFirms: Awaited<ReturnType<typeof searchInvestors>>['firms'] = []
   let initialTotal = 0
   let initialHasMore = false
   let stats: InvestorStats | null = null
+  let matchScores: Record<string, number> = {}
+  let shortlistIds: Record<string, ShortlistStage> = {}
 
-  const [searchResult, statsResult] = await Promise.allSettled([
+  const [searchResult, statsResult, shortlistResult] = await Promise.allSettled([
     searchInvestors({ page: 1, pageSize: 24 }),
     getInvestorStats(),
+    getShortlistIds(),
   ])
 
   if (searchResult.status === 'fulfilled') {
@@ -75,6 +71,19 @@ export default async function InvestorDirectoryPage() {
     stats = statsResult.value
   } else {
     console.error('[InvestorDirectoryPage] Failed to fetch stats:', statsResult.reason)
+  }
+
+  if (shortlistResult.status === 'fulfilled') {
+    shortlistIds = shortlistResult.value
+  }
+
+  // Compute match scores for initial firms
+  if (initialFirms.length > 0) {
+    try {
+      matchScores = await computeMatchScores(initialFirms.map(f => f.id))
+    } catch {
+      // Non-critical — scores just won't show
+    }
   }
 
   return (
@@ -119,6 +128,8 @@ export default async function InvestorDirectoryPage() {
           initialFirms={initialFirms}
           initialTotal={initialTotal}
           initialHasMore={initialHasMore}
+          initialMatchScores={matchScores}
+          initialShortlistIds={shortlistIds}
         />
       </Suspense>
     </div>

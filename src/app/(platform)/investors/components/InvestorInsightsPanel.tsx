@@ -24,6 +24,9 @@ import type { InvestorStats } from '@/actions/investors'
 
 interface InvestorInsightsPanelProps {
   stats: InvestorStats
+  /** When provided, shows "Filtered: X of Y" and computes stats from this subset */
+  filteredFirms?: { attributes: Record<string, unknown> }[]
+  filteredCount?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +69,7 @@ function truncate(s: string, max: number): string {
 /**
  * Collapsible panel showing investor directory statistics and charts.
  */
-export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
+export function InvestorInsightsPanel({ stats, filteredFirms, filteredCount }: InvestorInsightsPanelProps) {
   // DECISION: Persist collapse state to localStorage so the user's preference
   // survives navigation and page refreshes.
   // GOTCHA: Read localStorage in useEffect (not useState initialiser) to avoid
@@ -100,6 +103,11 @@ export function InvestorInsightsPanel({ stats }: InvestorInsightsPanelProps) {
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-international-orange" />
           <h2 className="text-sm font-semibold text-foreground">Investor Insights</h2>
+          {filteredCount != null && filteredCount < stats.total && (
+            <span className="text-xs text-muted-foreground ml-2">
+              Filtered: {filteredCount} of {stats.total}
+            </span>
+          )}
         </div>
         <Button
           variant="ghost"

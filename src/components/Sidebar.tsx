@@ -148,6 +148,7 @@ const cashBurnNavigation = [
     { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp, tooltip: "Revenue, loans, equity, and grants" },
     { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3, tooltip: "Projected Income Statement and Balance Sheet" },
     { name: "Investors", href: "/investors", icon: Building2, tooltip: "Browse 600 UK VC and PE firms — search, filter, and track outreach" },
+    { name: "Fundraise", href: "/fundraise", icon: Sprout, tooltip: "Track your fundraise pipeline — shortlisted investors, outreach, and coverage" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────

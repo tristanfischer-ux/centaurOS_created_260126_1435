@@ -6,7 +6,7 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import { Lock, Linkedin, Mail, User } from 'lucide-react'
+import { Lock, Linkedin, Link2, Mail, User } from 'lucide-react'
 import type { InvestorContact, InvestorTierAccess } from '@/actions/investors'
 
 interface PartnerCardProps {
@@ -61,6 +61,14 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
               <Linkedin className="h-3 w-3" />
               LinkedIn
             </a>
+          )}
+
+          {/* Warm intro path (starter+) */}
+          {contact.warm_intro_path && access.contactsVisible && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Link2 className="h-3 w-3 text-success" />
+              Warm intro: {contact.warm_intro_path}
+            </span>
           )}
 
           {/* Email — visible or locked (only show lock if contact actually has an email) */}

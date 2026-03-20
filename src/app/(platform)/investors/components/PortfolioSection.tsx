@@ -3,11 +3,12 @@
  *
  * @description Grid of portfolio companies with sector, stage, and amount.
  * Renders as a card section within the investor detail page.
+ * Optionally highlights portfolio companies matching the user's sector.
  */
 
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
-import { Briefcase } from 'lucide-react'
+import { Briefcase, Sparkles } from 'lucide-react'
 
 interface PortfolioCompany {
   company_name: string
@@ -20,6 +21,8 @@ interface PortfolioCompany {
 
 interface PortfolioSectionProps {
   companies: PortfolioCompany[]
+  /** User's sector for portfolio overlap highlighting (professional+) */
+  userSector?: string
 }
 
 function formatAmount(usd: number): string {
@@ -33,47 +36,88 @@ function formatAmount(usd: number): string {
   return `$${usd.toLocaleString()}`
 }
 
-export function PortfolioSection({ companies }: PortfolioSectionProps) {
+function isSectorMatch(companySector: string | null | undefined, userSector: string): boolean {
+  if (!companySector) return false
+  const lower = companySector.toLowerCase()
+  const userLower = userSector.toLowerCase()
+  return lower.includes(userLower) || userLower.includes(lower)
+}
+
+export function PortfolioSection({ companies, userSector }: PortfolioSectionProps) {
   if (companies.length === 0) return null
+
+  // Sort matching companies to top when userSector is provided
+  const sorted = userSector
+    ? [...companies].sort((a, b) => {
+        const aMatch = isSectorMatch(a.sector, userSector) ? 1 : 0
+        const bMatch = isSectorMatch(b.sector, userSector) ? 1 : 0
+        return bMatch - aMatch
+      })
+    : companies
+
+  const matchCount = userSector
+    ? sorted.filter(c => isSectorMatch(c.sector, userSector)).length
+    : 0
 
   return (
     <Card>
       <CardHeader>
-        <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-          <Briefcase className="h-4 w-4 text-muted-foreground" />
-          Portfolio ({companies.length})
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            Portfolio ({companies.length})
+          </h2>
+          {matchCount > 0 && (
+            <span className="text-xs text-success flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              {matchCount} of {companies.length} in your sector
+            </span>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {companies.map((company, i) => (
-            <div key={`${company.company_name}-${i}`} className="p-3 rounded-lg bg-muted/50">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{company.company_name}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    {company.sector && (
-                      <Badge variant="secondary" className="text-xs">{company.sector}</Badge>
-                    )}
-                    {company.stage && (
-                      <Badge variant="outline" className="text-xs">{company.stage}</Badge>
-                    )}
+          {sorted.map((company, i) => {
+            const isMatch = userSector && isSectorMatch(company.sector, userSector)
+            return (
+              <div
+                key={`${company.company_name}-${i}`}
+                className={`p-3 rounded-lg ${isMatch ? 'bg-success/5 border border-success/20' : 'bg-muted/50'}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">{company.company_name}</p>
+                      {isMatch && (
+                        <Badge variant="outline" className="text-[10px] py-0 text-success border-success/30">
+                          Match
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {company.sector && (
+                        <Badge variant="secondary" className="text-xs">{company.sector}</Badge>
+                      )}
+                      {company.stage && (
+                        <Badge variant="outline" className="text-xs">{company.stage}</Badge>
+                      )}
+                    </div>
                   </div>
+                  {company.amount_usd != null && company.amount_usd > 0 && (
+                    <span className="text-sm font-semibold text-foreground shrink-0">
+                      {formatAmount(company.amount_usd)}
+                    </span>
+                  )}
                 </div>
-                {company.amount_usd != null && company.amount_usd > 0 && (
-                  <span className="text-sm font-semibold text-foreground shrink-0">
-                    {formatAmount(company.amount_usd)}
-                  </span>
+                {company.description && (
+                  <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{company.description}</p>
+                )}
+                {company.why_appealing && (
+                  <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{company.why_appealing}</p>
                 )}
               </div>
-              {company.description && (
-                <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{company.description}</p>
-              )}
-              {company.why_appealing && (
-                <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{company.why_appealing}</p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </Card>

@@ -3,14 +3,16 @@
  *
  * @description Card component for a single investor firm in the directory grid.
  * Displays firm name, subcategory badge, location, fund size, stage focus,
- * sectors, quality indicator, partner/portfolio counts, and links.
+ * sectors, quality indicator, match score badge, shortlist heart, and compare checkbox.
  */
 
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Circle, Users, Briefcase } from 'lucide-react'
+import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Circle, Briefcase, Heart, GitCompare } from 'lucide-react'
+import { MatchScoreBadge } from './MatchScoreBadge'
+import { cn } from '@/lib/utils'
 import type { InvestorFirm } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
@@ -53,10 +55,6 @@ function formatStatus(raw: string): string {
   return raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
-/**
- * Returns a CSS class for the quality indicator dot.
- * green: 9+, amber: 7-8.9, no dot for lower (shouldn't be pushed).
- */
 function qualityDotClass(score: number | undefined): string | null {
   if (score == null) return null
   if (score >= 9) return 'bg-success'
@@ -70,9 +68,21 @@ function qualityDotClass(score: number | undefined): string | null {
 
 interface InvestorCardProps {
   firm: InvestorFirm
+  matchScore?: number
+  isShortlisted?: boolean
+  onToggleShortlist?: () => void
+  isCompareSelected?: boolean
+  onToggleCompare?: () => void
 }
 
-export function InvestorCard({ firm }: InvestorCardProps) {
+export function InvestorCard({
+  firm,
+  matchScore,
+  isShortlisted,
+  onToggleShortlist,
+  isCompareSelected,
+  onToggleCompare,
+}: InvestorCardProps) {
   const attrs = firm.attributes
   const stageFocus = (attrs.stage_focus ?? []).slice(0, 2)
   const sectors = (attrs.sectors ?? []).slice(0, 3)
@@ -80,12 +90,27 @@ export function InvestorCard({ firm }: InvestorCardProps) {
   const portfolioCount = attrs.portfolio_companies?.length ?? 0
 
   return (
-    <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all">
+    <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative">
+      {/* Compare checkbox — shown on hover */}
+      {onToggleCompare && (
+        <button
+          onClick={(e) => { e.preventDefault(); onToggleCompare() }}
+          className={cn(
+            'absolute top-3 left-3 z-10 h-5 w-5 rounded border flex items-center justify-center transition-all',
+            isCompareSelected
+              ? 'bg-foreground border-foreground text-background'
+              : 'border-border bg-background opacity-0 group-hover:opacity-100'
+          )}
+          aria-label={isCompareSelected ? 'Remove from compare' : 'Add to compare'}
+        >
+          {isCompareSelected && <GitCompare className="h-3 w-3" />}
+        </button>
+      )}
+
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              {/* Quality indicator dot */}
               {qualityClass && (
                 <TooltipProvider>
                   <Tooltip>
@@ -132,9 +157,24 @@ export function InvestorCard({ firm }: InvestorCardProps) {
               )}
             </div>
           </div>
-          {/* Active deploying indicator */}
-          <div className="shrink-0 mt-0.5">
-            {attrs.is_active_deploying != null && (attrs.is_active_deploying ? (
+          {/* Match score + shortlist + active deploying */}
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
+            {matchScore != null && <MatchScoreBadge score={matchScore} />}
+            {onToggleShortlist && (
+              <button
+                onClick={(e) => { e.preventDefault(); onToggleShortlist() }}
+                className={cn(
+                  'p-1 rounded-full transition-colors',
+                  isShortlisted
+                    ? 'text-international-orange'
+                    : 'text-muted-foreground hover:text-international-orange'
+                )}
+                aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
+              >
+                <Heart className={cn('h-4 w-4', isShortlisted && 'fill-current')} />
+              </button>
+            )}
+            {attrs.is_active_deploying != null && !matchScore && (attrs.is_active_deploying ? (
               <span className="flex items-center gap-1 text-success">
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide">Active</span>
@@ -147,7 +187,6 @@ export function InvestorCard({ firm }: InvestorCardProps) {
       </CardHeader>
 
       <CardContent className="flex-1 space-y-3 pb-3">
-        {/* Location + Fund Size */}
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           {attrs.hq_city && (
             <span className="flex items-center gap-1">
@@ -163,12 +202,10 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           )}
         </div>
 
-        {/* Description snippet */}
         {firm.description && (
           <p className="text-sm text-muted-foreground line-clamp-2">{firm.description}</p>
         )}
 
-        {/* Stage focus */}
         {stageFocus.length > 0 && (
           <div className="flex items-center gap-1.5 flex-wrap">
             <TrendingUp className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -185,7 +222,6 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           </div>
         )}
 
-        {/* Sectors */}
         {sectors.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {sectors.map(s => (
@@ -201,7 +237,6 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           </div>
         )}
 
-        {/* Portfolio + partner counts */}
         {portfolioCount > 0 && (
           <p className="text-xs text-muted-foreground flex items-center gap-1">
             <Briefcase className="h-3 w-3" />
@@ -209,7 +244,6 @@ export function InvestorCard({ firm }: InvestorCardProps) {
           </p>
         )}
 
-        {/* Outreach status */}
         {attrs.outreach_status && attrs.outreach_status !== 'not_started' && (
           <p className="text-xs text-muted-foreground">
             Status: <span className="text-foreground font-medium">{formatStatus(attrs.outreach_status)}</span>

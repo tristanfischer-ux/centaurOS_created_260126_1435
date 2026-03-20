@@ -53,6 +53,8 @@ export type AIFeature =
   | 'canvas'
   | 'transcript_to_strategy'
   | 'strategic_briefing'
+  // Investor features
+  | 'investor_outreach'
   // Reports & documents
   | 'report_generation'
   | 'progress_report'

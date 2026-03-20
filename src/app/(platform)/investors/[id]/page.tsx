@@ -16,12 +16,21 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { getInvestorById, getInvestorContacts } from '@/actions/investors'
+import {
+  getInvestorById,
+  getInvestorContacts,
+  getSimilarInvestors,
+  computeMatchScores,
+} from '@/actions/investors'
+import { createClient } from '@/lib/supabase/server'
 import type { InvestorTierAccess } from '@/actions/investors'
 import { PartnerCard } from '../components/PartnerCard'
 import { PortfolioSection } from '../components/PortfolioSection'
 import { FundPerformanceSection } from '../components/FundPerformanceSection'
 import { LockedSection } from '../components/LockedSection'
+import { InvestorNoteTimeline } from '../components/InvestorNoteTimeline'
+import { SimilarInvestorsSection } from '../components/SimilarInvestorsSection'
+import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import {
   ArrowLeft,
   Building2,
@@ -45,6 +54,28 @@ export const revalidate = 60
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+async function getUserSector(): Promise<string | null> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('foundry_id')
+      .eq('id', user.id)
+      .single()
+    if (!profile?.foundry_id) return null
+    const { data: foundry } = await supabase
+      .from('foundries')
+      .select('sector')
+      .eq('id', profile.foundry_id)
+      .single()
+    return foundry?.sector ?? null
+  } catch {
+    return null
+  }
+}
 
 function formatFundSize(gbp: number): string {
   if (gbp >= 1_000_000_000) {
@@ -169,7 +200,25 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   }
 
   const attrs = firm.attributes
-  const { contacts, access: contactAccess } = await getInvestorContacts(id)
+  const [contactResult, similarResult] = await Promise.allSettled([
+    getInvestorContacts(id),
+    getSimilarInvestors(id, 5),
+  ])
+
+  const { contacts, access: contactAccess } = contactResult.status === 'fulfilled'
+    ? contactResult.value
+    : { contacts: [], access }
+  const similarFirms = similarResult.status === 'fulfilled'
+    ? similarResult.value.firms
+    : []
+
+  // Compute match scores for similar investors
+  let similarScores: Record<string, number> = {}
+  if (similarFirms.length > 0) {
+    try {
+      similarScores = await computeMatchScores(similarFirms.map(f => f.id))
+    } catch { /* Non-critical */ }
+  }
 
   return (
     <TooltipProvider>
@@ -222,18 +271,22 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 )}
               </div>
             </div>
-            {attrs.outreach_priority && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Badge variant={priorityVariant(attrs.outreach_priority)} className="shrink-0 cursor-help">
-                    Priority {attrs.outreach_priority}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{PRIORITY_DESCRIPTIONS[attrs.outreach_priority] ?? 'Outreach priority level'}</p>
-                </TooltipContent>
-              </Tooltip>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              {attrs.outreach_priority && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant={priorityVariant(attrs.outreach_priority)} className="cursor-help">
+                      Priority {attrs.outreach_priority}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{PRIORITY_DESCRIPTIONS[attrs.outreach_priority] ?? 'Outreach priority level'}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {/* Alert, shortlist, and outreach action buttons */}
+              <InvestorDetailActions listingId={id} access={access} firmName={firm.title} />
+            </div>
           </div>
         </div>
 
@@ -353,9 +406,12 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </LockedSection>
             )}
 
-            {/* Portfolio companies (starter+) */}
+            {/* Portfolio companies (starter+, overlap highlights for professional+) */}
             {attrs.portfolio_companies && attrs.portfolio_companies.length > 0 ? (
-              <PortfolioSection companies={attrs.portfolio_companies} />
+              <PortfolioSection
+                companies={attrs.portfolio_companies}
+                userSector={access.intelligenceAccess ? (await getUserSector()) ?? undefined : undefined}
+              />
             ) : !access.contactsVisible ? (
               <LockedSection
                 title="Portfolio"
@@ -415,6 +471,14 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Notes & Activity (starter+) */}
+            {access.detailAccess && <InvestorNoteTimeline listingId={id} />}
+
+            {/* Similar Investors */}
+            {similarFirms.length > 0 && (
+              <SimilarInvestorsSection firms={similarFirms} matchScores={similarScores} />
             )}
           </div>
 

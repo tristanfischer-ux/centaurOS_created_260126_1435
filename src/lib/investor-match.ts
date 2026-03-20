@@ -1,0 +1,221 @@
+/**
+ * @file investor-match.ts
+ *
+ * @description Deterministic 0–100 match scoring for investor firms against a user's
+ * foundry profile. Pure functions — no "use server", no DB calls. All data passed in.
+ *
+ * Scoring factors:
+ *   Stage alignment (30pts) — user's stage vs investor stage_focus
+ *   Sector overlap  (25pts) — user's sector+industry vs investor sectors
+ *   Hardware fit     (15pts) — investor hardware_fit_score (0-10 scaled to 0-15)
+ *   Cheque range     (15pts) — typical raise for stage vs investor cheque range
+ *   Geo focus        (10pts) — UK presence in investor geo_focus
+ *   Active deploying  (5pts) — is_active_deploying flag
+ */
+
+import type { InvestorFirm } from '@/actions/investors'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface FoundryProfile {
+  stage: string | null
+  sector: string | null
+  industry: string | null
+}
+
+export interface MatchBreakdown {
+  total: number
+  stageScore: number
+  sectorScore: number
+  hardwareScore: number
+  chequeScore: number
+  geoScore: number
+  activeScore: number
+  topFactors: string[]
+}
+
+// ---------------------------------------------------------------------------
+// Stage mapping
+// ---------------------------------------------------------------------------
+
+// DECISION: Map user stage slugs to investor stage labels they'd consider.
+// Adjacent stages included at half weight (investors often look ±1 stage).
+const STAGE_MAP: Record<string, { exact: string[]; adjacent: string[] }> = {
+  pre_seed: { exact: ['Pre-Seed', 'Seed'], adjacent: ['Angel'] },
+  seed: { exact: ['Seed', 'Pre-Seed'], adjacent: ['Series A'] },
+  series_a: { exact: ['Series A'], adjacent: ['Seed', 'Growth'] },
+  series_b: { exact: ['Series B', 'Growth'], adjacent: ['Series A', 'Late Stage'] },
+  growth: { exact: ['Growth', 'Late Stage'], adjacent: ['Series B'] },
+  late_stage: { exact: ['Late Stage', 'Growth'], adjacent: ['Series B'] },
+}
+
+// Typical raise ranges by stage (GBP) — used for cheque range scoring
+const TYPICAL_RAISE: Record<string, { min: number; max: number }> = {
+  pre_seed: { min: 100_000, max: 500_000 },
+  seed: { min: 500_000, max: 2_000_000 },
+  series_a: { min: 2_000_000, max: 10_000_000 },
+  series_b: { min: 10_000_000, max: 50_000_000 },
+  growth: { min: 20_000_000, max: 100_000_000 },
+  late_stage: { min: 50_000_000, max: 200_000_000 },
+}
+
+// ---------------------------------------------------------------------------
+// Core scoring
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates a deterministic 0–100 match score for an investor against a user profile.
+ */
+export function calculateMatchScore(
+  firm: InvestorFirm,
+  profile: FoundryProfile
+): MatchBreakdown {
+  const attrs = firm.attributes
+  const topFactors: string[] = []
+
+  // 1. Stage alignment (30 pts)
+  let stageScore = 0
+  const userStage = profile.stage?.toLowerCase().replace(/\s+/g, '_') ?? ''
+  const stageConfig = STAGE_MAP[userStage]
+  if (stageConfig && attrs.stage_focus && attrs.stage_focus.length > 0) {
+    const hasExact = stageConfig.exact.some(s =>
+      attrs.stage_focus!.some(sf => sf.toLowerCase() === s.toLowerCase())
+    )
+    const hasAdjacent = stageConfig.adjacent.some(s =>
+      attrs.stage_focus!.some(sf => sf.toLowerCase() === s.toLowerCase())
+    )
+    if (hasExact) {
+      stageScore = 30
+      topFactors.push('Stage match')
+    } else if (hasAdjacent) {
+      stageScore = 15
+    }
+  }
+
+  // 2. Sector overlap (25 pts)
+  let sectorScore = 0
+  const userTerms: string[] = []
+  if (profile.sector) userTerms.push(profile.sector.toLowerCase())
+  if (profile.industry) userTerms.push(profile.industry.toLowerCase())
+  if (userTerms.length > 0 && attrs.sectors && attrs.sectors.length > 0) {
+    const matches = userTerms.filter(ut =>
+      attrs.sectors!.some(s => s.toLowerCase().includes(ut) || ut.includes(s.toLowerCase()))
+    ).length
+    if (matches >= 2) {
+      sectorScore = 25
+      topFactors.push('Strong sector fit')
+    } else if (matches >= 1) {
+      sectorScore = 15
+      topFactors.push('Sector overlap')
+    }
+  }
+
+  // 3. Hardware fit (15 pts) — 0-10 scaled to 0-15
+  const hwRaw = attrs.hardware_fit_score
+  const hardwareScore = hwRaw != null ? Math.round((hwRaw / 10) * 15) : 7 // Null = neutral (7.5 rounded)
+
+  // 4. Cheque range (15 pts)
+  let chequeScore = 0
+  const typicalRaise = TYPICAL_RAISE[userStage]
+  if (typicalRaise && attrs.cheque_range_gbp) {
+    const { min, max } = attrs.cheque_range_gbp
+    const raiseMid = (typicalRaise.min + typicalRaise.max) / 2
+    if (min != null && max != null) {
+      if (raiseMid >= min && raiseMid <= max) {
+        chequeScore = 15
+        topFactors.push('Cheque size match')
+      } else if (raiseMid >= min / 2 && raiseMid <= max * 2) {
+        chequeScore = 10
+      }
+    } else if (min != null && raiseMid >= min / 2) {
+      chequeScore = 10
+    } else if (max != null && raiseMid <= max * 2) {
+      chequeScore = 10
+    }
+  }
+
+  // 5. Geo focus (10 pts)
+  let geoScore = 5 // Default: neutral (no data)
+  if (attrs.geo_focus && attrs.geo_focus.length > 0) {
+    const hasUK = attrs.geo_focus.some(g =>
+      g.toLowerCase().includes('uk') || g.toLowerCase().includes('united kingdom')
+    )
+    geoScore = hasUK ? 10 : 0
+    if (hasUK) topFactors.push('UK focus')
+  }
+
+  // 6. Active deploying (5 pts)
+  const activeScore = attrs.is_active_deploying ? 5 : 0
+  if (attrs.is_active_deploying) topFactors.push('Actively deploying')
+
+  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore)
+
+  return {
+    total,
+    stageScore,
+    sectorScore,
+    hardwareScore,
+    chequeScore,
+    geoScore,
+    activeScore,
+    topFactors: topFactors.slice(0, 3),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Similar investors (Jaccard + fund size proximity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Finds investors similar to a target firm using Jaccard similarity on
+ * sectors + stages + geo_focus, plus fund size proximity.
+ */
+export function findSimilarInvestors(
+  target: InvestorFirm,
+  candidates: InvestorFirm[],
+  limit = 5
+): InvestorFirm[] {
+  const targetSectors = new Set((target.attributes.sectors ?? []).map(s => s.toLowerCase()))
+  const targetStages = new Set((target.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
+  const targetGeo = new Set((target.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
+  const targetFundSize = target.attributes.fund_size_gbp ?? 0
+
+  const scored = candidates
+    .filter(c => c.id !== target.id)
+    .map(c => {
+      const cSectors = new Set((c.attributes.sectors ?? []).map(s => s.toLowerCase()))
+      const cStages = new Set((c.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
+      const cGeo = new Set((c.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
+
+      // Jaccard similarity per dimension
+      const sectorSim = jaccard(targetSectors, cSectors)
+      const stageSim = jaccard(targetStages, cStages)
+      const geoSim = jaccard(targetGeo, cGeo)
+
+      // Fund size proximity (0-1, 1 = identical)
+      const cFundSize = c.attributes.fund_size_gbp ?? 0
+      const fundProximity = targetFundSize > 0 && cFundSize > 0
+        ? 1 - Math.min(1, Math.abs(targetFundSize - cFundSize) / Math.max(targetFundSize, cFundSize))
+        : 0.5
+
+      // Weighted score
+      const score = sectorSim * 0.35 + stageSim * 0.3 + geoSim * 0.15 + fundProximity * 0.2
+      return { firm: c, score }
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+
+  return scored.map(s => s.firm)
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 && b.size === 0) return 0
+  let intersection = 0
+  for (const v of a) {
+    if (b.has(v)) intersection++
+  }
+  const union = a.size + b.size - intersection
+  return union > 0 ? intersection / union : 0
+}
