@@ -72,7 +72,8 @@ async function getUserSector(): Promise<string | null> {
       .eq('id', profile.foundry_id)
       .single()
     return foundry?.sector ?? null
-  } catch {
+  } catch (err) {
+    console.error('[getUserSector] Failed:', err)
     return null
   }
 }

@@ -1059,10 +1059,13 @@ export async function toggleInvestorAlert(
     return { active: newActive }
   }
 
-  // Create new alert
+  // Create new alert — upsert to handle race condition (rapid double-click)
   const { error } = await supabase
     .from('investor_alerts')
-    .insert({ user_id: user.id, listing_id: listingId, active: true })
+    .upsert(
+      { user_id: user.id, listing_id: listingId, active: true },
+      { onConflict: 'user_id,listing_id' }
+    )
 
   if (error) return { error: 'Failed to create alert' }
   return { active: true }

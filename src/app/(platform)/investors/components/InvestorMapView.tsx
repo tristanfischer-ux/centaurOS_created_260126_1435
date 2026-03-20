@@ -14,9 +14,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { InvestorFirm } from '@/actions/investors'
 
 // Dynamic import to avoid SSR issues with Leaflet
+// GOTCHA: Must provide loading fallback — if mounted=true but chunk hasn't loaded yet, renders null
 const MapContainer = dynamic(
   () => import('react-leaflet').then(m => m.MapContainer),
-  { ssr: false }
+  { ssr: false, loading: () => <Skeleton className="h-[500px] w-full rounded-xl" /> }
 )
 const TileLayer = dynamic(
   () => import('react-leaflet').then(m => m.TileLayer),

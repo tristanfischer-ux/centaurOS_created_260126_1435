@@ -73,6 +73,7 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
       })
       .catch(err => {
         console.error('[InvestorNoteTimeline] Failed to load notes:', err)
+        toast.error('Failed to load notes')
         setLoading(false)
       })
   }, [listingId])

@@ -40,8 +40,13 @@ export function InvestorExportMenu({
       toast.error('Upgrade to Starter to export CSV')
       return
     }
-    exportInvestorsCSV(firms, matchScores)
-    toast.success('CSV downloaded')
+    try {
+      exportInvestorsCSV(firms, matchScores)
+      toast.success('CSV downloaded')
+    } catch (err) {
+      console.error('[InvestorExportMenu] CSV export failed:', err)
+      toast.error('Export failed')
+    }
   }
 
   const handlePPTX = async () => {

@@ -171,6 +171,7 @@ export function InvestorShortlistBoard() {
       })
       .catch(err => {
         console.error('[InvestorShortlistBoard] Failed to load shortlist:', err)
+        toast.error('Failed to load pipeline')
         setLoading(false)
       })
   }, [])

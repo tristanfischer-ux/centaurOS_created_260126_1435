@@ -15,7 +15,7 @@ interface PartnerCardProps {
 }
 
 function formatSeniority(s: string): string {
-  return s.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  return s.trim().split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
 function ensureProtocol(url: string): string {
@@ -47,7 +47,7 @@ export function PartnerCard({ contact, access }: PartnerCardProps) {
 
         {/* Focus areas from notes */}
         {contact.notes && (
-          <p className="text-xs text-muted-foreground mt-1 italic">{contact.notes}</p>
+          <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">{contact.notes}</p>
         )}
 
         <div className="flex items-center gap-3 mt-1.5">

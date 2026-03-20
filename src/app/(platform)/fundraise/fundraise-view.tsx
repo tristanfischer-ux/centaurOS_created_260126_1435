@@ -160,7 +160,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Investor Types</p>
               <div className="flex flex-wrap gap-1.5">
-                {Array.from(new Set(stats.shortlistedFirms.map(f => f.attributes.firm_type).filter(Boolean))).map(type => (
+                {Array.from(new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))).map(type => (
                   <Badge key={type} variant="secondary" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 mr-1 text-success" />
                     {type}
@@ -173,7 +173,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
             <div>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Stage Coverage</p>
               <div className="flex flex-wrap gap-1.5">
-                {Array.from(new Set(stats.shortlistedFirms.flatMap(f => f.attributes.stage_focus ?? []))).slice(0, 8).map(stage => (
+                {Array.from(new Set(stats.shortlistedFirms.flatMap(f => f.attributes?.stage_focus ?? []))).slice(0, 8).map(stage => (
                   <Badge key={stage} variant="outline" className="text-xs">
                     <CheckCircle2 className="h-3 w-3 mr-1 text-success" />
                     {stage}
