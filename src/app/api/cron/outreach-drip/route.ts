@@ -57,11 +57,11 @@ export async function GET(request: Request) {
       .select(`
         id, token, email, status, created_at,
         listing:marketplace_listings!listing_claim_tokens_listing_id_fkey (
-          id, title, description, outreach_status, contact_name, contact_email,
+          id, title, description, outreach_status, outreach_notes, contact_name, contact_email,
           category, subcategory
         )
       `)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'clicked'])
       .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: true })
       .limit(100)

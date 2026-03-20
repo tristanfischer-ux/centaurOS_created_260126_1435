@@ -65,9 +65,9 @@ export interface ListingPreview {
     description: string | null
     category: string
     subcategory: string
-    specialties: string[]
-    certifications: string[]
-    industries: string[]
+    specialties: unknown
+    certifications: unknown
+    industries: unknown
     city: string | null
     country: string | null
     website_url: string | null
@@ -78,10 +78,10 @@ export interface ListingPreview {
     lead_time: string | null
     quality_systems: string | null
     contact_name: string | null
-    materials: string[]
-    key_equipment: string[]
-    products: string[]
-    process_capabilities: Record<string, unknown>[]
+    materials: unknown
+    key_equipment: unknown
+    products: unknown
+    process_capabilities: unknown
     email: string
     is_valid: boolean
 }
