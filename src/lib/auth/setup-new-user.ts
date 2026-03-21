@@ -209,7 +209,9 @@ export async function setupNewUser({
   // Executives/Apprentices share forge-guild — seeding per-user demo concepts into
   // a shared foundry causes data pollution (N signups = 3N demo entries visible to
   // everyone). The guided tour still shows them what The Forge looks like.
-  if (role === "founder" && foundryId) {
+  // GOTCHA: Founders without companyName (OAuth edge case) fall through to
+  // forge-guild. Guard against seeding into shared foundries (RT2-04).
+  if (role === "founder" && foundryId && foundryId !== "forge-guild") {
     // Demo forge concepts — 3 products showing breadth of The Forge
     const conceptRpcs = [
       "seed_demo_forge_concept",

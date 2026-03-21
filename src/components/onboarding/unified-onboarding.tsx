@@ -203,11 +203,15 @@ export function UnifiedOnboarding({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, showGuidedTour, handleSkip])
 
+  // GOTCHA: Stable callback ref prevents GuidedTour's useCallback chain from
+  // re-registering keyboard handlers on every parent render (RT2-06).
+  const handleTourComplete = useCallback(() => setOpen(false), [])
+
   if (!open) return null
 
   // FLOW: When team_builder is selected, hand off to Cal's guided tour
   if (showGuidedTour) {
-    return <GuidedTour onComplete={() => setOpen(false)} />
+    return <GuidedTour onComplete={handleTourComplete} />
   }
 
   return (
@@ -243,7 +247,7 @@ export function UnifiedOnboarding({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         onClick={handleSkip}
-        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
+        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest min-h-[44px] min-w-[44px] flex items-center justify-center"
       >
         Skip tour
       </motion.button>

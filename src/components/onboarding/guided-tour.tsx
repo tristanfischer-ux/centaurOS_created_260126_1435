@@ -19,7 +19,7 @@ import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
   Users,
-  Bot,
+  Crown,
   TrendingUp,
   Hammer,
   Store,
@@ -55,11 +55,11 @@ const TOUR_STOPS: TourStop[] = [
   },
   {
     id: 'specialists',
-    title: 'Your AI Team',
-    subtitle: '9 specialists, ready now',
+    title: 'Your Specialists',
+    subtitle: '9 experts, ready now',
     calMessage:
-      "This is your AI team — nine specialists covering strategy, finance, legal, sales, marketing, hiring, operations, and engineering. We work around the clock. I'm Cal, your Chief of Staff, and I coordinate the lot of us.",
-    icon: <Bot className="w-6 h-6" />,
+      "Meet your specialist team — nine experts covering strategy, finance, legal, sales, marketing, hiring, operations, and engineering. We work around the clock. I'm Cal, your Chief of Staff, and I coordinate the lot of us.",
+    icon: <Crown className="w-6 h-6" />,
     route: '/agents',
     accentColor: 'text-info',
     accentBg: 'bg-info/10',
@@ -321,16 +321,20 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
               setDirection(index > currentStop ? 1 : -1)
               setCurrentStop(index)
             }}
-            className={cn(
-              'h-1.5 rounded-full transition-all duration-500',
-              index === currentStop
-                ? 'w-8 bg-international-orange'
-                : index < currentStop
-                  ? 'w-2 bg-international-orange/40'
-                  : 'w-2 bg-muted-foreground/20',
-            )}
+            className="py-3"
             aria-label={`Go to ${s.title}`}
-          />
+          >
+            <div
+              className={cn(
+                'h-1.5 rounded-full transition-all duration-500',
+                index === currentStop
+                  ? 'w-8 bg-international-orange'
+                  : index < currentStop
+                    ? 'w-2 bg-international-orange/40'
+                    : 'w-2 bg-muted-foreground/20',
+              )}
+            />
+          </button>
         ))}
       </div>
     </motion.div>
