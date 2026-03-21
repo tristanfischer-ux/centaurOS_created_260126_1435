@@ -222,7 +222,7 @@ export function ProductOverviewCard({
         {((standardCodes && standardCodes.length > 0) || (engineeringData && engineeringData.totalDataPoints > 0)) && (
           <div className="border-t border-border mt-4 pt-3">
             <Collapsible open={engExpanded} onOpenChange={setEngExpanded}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full group">
+              <CollapsibleTrigger className="flex items-center justify-between w-full group" aria-label="Toggle engineering intelligence details">
                 <div className="flex items-center gap-1.5">
                   <ShieldCheck className="h-3.5 w-3.5 text-success" />
                   <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
@@ -246,7 +246,7 @@ export function ProductOverviewCard({
                       <p className="text-xs font-medium text-foreground">Design Standards</p>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {standardCodes.slice(0, 5).map((code) => (
-                          <span key={code} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                          <span key={code} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
                             {code}
                           </span>
                         ))}
