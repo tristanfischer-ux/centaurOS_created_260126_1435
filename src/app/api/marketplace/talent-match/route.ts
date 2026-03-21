@@ -282,15 +282,15 @@ async function notifyHighScoreMatches(
             const allowed = await canCreateAlert(expertUserId, 'talent_search', 5)
             if (!allowed) continue
 
-            // SECURITY: Don't leak the founder's search query to the executive (H-4).
-            // Only share the score and matching reasons.
+            // SECURITY: Don't leak the founder's search query or match reasons to the
+            // executive — reasons reveal search criteria (H-4).
             await createMatchAlert(
                 expertUserId,
                 'talent_search',
                 'You appeared in a talent search',
-                `A founder searched for talent and you scored ${match.score}/100.`,
+                'A founder searched for talent and your profile was a strong match.',
                 match.id,
-                { score: match.score, reasons: match.reasons }
+                { score: match.score }
             )
         } catch (e) {
             // M-7: Per-match resilience — one failure doesn't block others

@@ -13,14 +13,16 @@
 
 import { withUser } from "@/lib/server-action-utils"
 import { clearFoundryCache } from "@/lib/supabase/foundry-context"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
 
 function generateSlug(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 50)
+  return slug || "company"
 }
 
 export async function createCompanyFoundry(params: {
@@ -36,9 +38,13 @@ export async function createCompanyFoundry(params: {
       return { success: false as const, error: "Company name must be at least 2 characters" }
     }
 
-    // SECURITY: Sanitize inputs — strip HTML tags but don't entity-encode
+    // SECURITY: Sanitize inputs — strip HTML tags, control chars, zero-width chars
     // (parameterized queries prevent SQL injection, React escapes on render)
-    const companyName = rawName.trim().slice(0, 100).replace(/<[^>]*>/g, '')
+    const companyName = rawName.trim()
+      .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, '')
+      .replace(/[\x00-\x1F\x7F]/g, '')
+      .slice(0, 100)
+      .replace(/<[^>]*>/g, '')
     const sanitizedIndustry = industry ? industry.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null
     const sanitizedStage = stage ? stage.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null
 
@@ -54,11 +60,17 @@ export async function createCompanyFoundry(params: {
     }
 
     // RATE LIMIT: Max 3 foundry creations per user
+    // SECURITY: Treat query failure as error (not as "count is 0")
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { count: existingCount } = await (supabase as any)
+    const { count: existingCount, error: countError } = await (supabase as any)
       .from("foundries")
       .select("id", { count: "exact", head: true })
       .eq("owner_id", user.id)
+
+    if (countError) {
+      console.error("[createCompanyFoundry] Rate limit check failed:", countError)
+      return { success: false as const, error: "Unable to verify workspace limit" }
+    }
 
     if (existingCount != null && existingCount >= 3) {
       return { success: false as const, error: "You can create a maximum of 3 company workspaces" }
@@ -116,16 +128,19 @@ export async function createCompanyFoundry(params: {
     })
 
     if (membershipError) {
-      // Rollback: delete the orphaned foundry
+      // Rollback: delete the orphaned foundry using admin client
+      // SECURITY: User's RLS client may not have DELETE policy on foundries
       console.error("[createCompanyFoundry] Membership creation failed:", membershipError)
+      const adminClient = createAdminClient()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("foundries").delete().eq("id", foundryId)
+      await (adminClient as any).from("foundries").delete().eq("id", foundryId)
       return { success: false as const, error: "Failed to set up workspace membership" }
     }
 
     // DECISION: Upgrade profile role to Founder if currently Executive.
     // One-way upgrade — Founder has all Executive privileges plus owns a workspace.
-    if (profile.role === "Executive" || profile.role === "Apprentice") {
+    // SECURITY: Only upgrade Executive→Founder, not Apprentice (prevents privilege escalation)
+    if (profile.role === "Executive") {
       await supabase
         .from("profiles")
         .update({ role: "Founder" })
@@ -148,25 +163,22 @@ export async function createCompanyFoundry(params: {
       "seed_demo_drone_motor_mount",
     ] as const
 
+    // GOTCHA: Supabase JS client returns { data, error } — it does NOT throw.
+    // Must check .error, not use try/catch.
     for (const rpc of demoRpcs) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).rpc(rpc, { p_foundry_id: foundryId, p_user_id: user.id })
-      } catch (e) {
-        console.warn(`[createCompanyFoundry] ${rpc} failed:`, e)
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: rpcError } = await (supabase as any).rpc(rpc, { p_foundry_id: foundryId, p_user_id: user.id })
+      if (rpcError) console.warn(`[createCompanyFoundry] ${rpc} failed:`, rpcError.message)
     }
 
-    try {
-      await supabase.rpc("seed_founder_demo_data", { p_foundry_id: foundryId, p_user_id: user.id })
-    } catch (e) {
-      console.warn("[createCompanyFoundry] seed_founder_demo_data failed:", e)
+    {
+      const { error: e } = await supabase.rpc("seed_founder_demo_data", { p_foundry_id: foundryId, p_user_id: user.id })
+      if (e) console.warn("[createCompanyFoundry] seed_founder_demo_data failed:", e.message)
     }
 
-    try {
-      await supabase.rpc("seed_founder_demo_data_expanded", { p_foundry_id: foundryId, p_user_id: user.id })
-    } catch (e) {
-      console.warn("[createCompanyFoundry] seed_founder_demo_data_expanded failed:", e)
+    {
+      const { error: e } = await supabase.rpc("seed_founder_demo_data_expanded", { p_foundry_id: foundryId, p_user_id: user.id })
+      if (e) console.warn("[createCompanyFoundry] seed_founder_demo_data_expanded failed:", e.message)
     }
 
     revalidatePath("/", "layout")

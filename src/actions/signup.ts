@@ -40,6 +40,10 @@ function validatePassword(password: string): { valid: boolean; error?: string } 
   if (!password || password.length < 8) {
     return { valid: false, error: "Password must be at least 8 characters long" };
   }
+  // SECURITY: Cap password length to prevent bcrypt/hashing DoS (bcrypt truncates at 72 bytes anyway)
+  if (password.length > 128) {
+    return { valid: false, error: "Password must be 128 characters or fewer" };
+  }
   if (!/[A-Z]/.test(password)) {
     return { valid: false, error: "Password must contain at least one uppercase letter" };
   }
@@ -147,8 +151,9 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
 
   // Founder-specific fields (used later for foundry creation)
-  const industry = rawIndustry || null;
-  const stage = rawStage || null;
+  // SECURITY: Sanitize industry/stage same as other fields
+  const industry = rawIndustry ? rawIndustry.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
+  const stage = rawStage ? rawStage.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null;
 
   if (!fullName || !role) {
     return errorWithValues("All fields are required");
@@ -330,10 +335,18 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
  * Creates an application record for review
  */
 export async function submitApplication(formData: FormData) {
+  // SECURITY: Rate limit application submissions (same as signup)
+  const headersList = await headers();
+  const clientIP = getClientIP(headersList);
+  const rateLimitResult = await rateLimit("signup", clientIP);
+  if (!rateLimitResult.success) {
+    return redirect("/join?error=Too+many+attempts.+Please+try+again+later.");
+  }
+
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
-  const fullName = formData.get("name") as string;
+  const rawEmail = formData.get("email") as string;
+  const rawFullName = formData.get("name") as string;
   const role = formData.get("role") as ApplicationRole;
   const intent = formData.get("intent") as string | null;
   const listingId = formData.get("listing_id") as string | null;
@@ -344,8 +357,21 @@ export async function submitApplication(formData: FormData) {
     return redirect("/join?error=Invalid+role");
   }
 
-  if (!email || !fullName) {
+  if (!rawEmail || !rawFullName) {
     return redirect(`/join/${role}?error=All+fields+are+required`);
+  }
+
+  // SECURITY: Sanitize all inputs
+  const email = sanitizeEmail(rawEmail);
+  if (!email) {
+    return redirect(`/join/${role}?error=Invalid+email+address`);
+  }
+  const fullName = escapeHtml(rawFullName.trim().slice(0, 100));
+
+  // SECURITY: Sanitize role-specific fields
+  const sanitizeField = (key: string) => {
+    const val = formData.get(key) as string | null;
+    return val ? val.trim().slice(0, 200).replace(/<[^>]*>/g, '') : null;
   }
 
   // Build application data based on role
@@ -356,29 +382,29 @@ export async function submitApplication(formData: FormData) {
 
   // Add role-specific fields
   if (role === "vc") {
-    applicationData.firm_name = formData.get("firm");
-    applicationData.aum_range = formData.get("aum");
+    applicationData.firm_name = sanitizeField("firm");
+    applicationData.aum_range = sanitizeField("aum");
   } else if (role === "factory") {
-    applicationData.facility_name = formData.get("facility");
-    applicationData.capabilities = formData.get("capabilities");
+    applicationData.facility_name = sanitizeField("facility");
+    applicationData.capabilities = sanitizeField("capabilities");
   } else if (role === "university") {
-    applicationData.institution = formData.get("institution");
-    applicationData.department = formData.get("department");
+    applicationData.institution = sanitizeField("institution");
+    applicationData.department = sanitizeField("department");
   }
 
   // Add booking intent if present
   if (intent && listingId) {
-    applicationData.booking_intent = intent;
-    applicationData.listing_id = listingId;
+    applicationData.booking_intent = intent.trim().slice(0, 100);
+    applicationData.listing_id = listingId.trim().slice(0, 100);
   }
 
   // Insert application (user_id will be null for unauthenticated applications)
   const { error } = await supabase.from("provider_applications").insert({
     category: role,
     company_name:
-      (formData.get("firm") as string) ||
-      (formData.get("facility") as string) ||
-      (formData.get("institution") as string) ||
+      sanitizeField("firm") ||
+      sanitizeField("facility") ||
+      sanitizeField("institution") ||
       null,
     application_data: applicationData as any,
     status: "pending",

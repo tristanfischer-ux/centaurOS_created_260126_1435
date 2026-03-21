@@ -702,29 +702,35 @@ export async function contactExpert(
 
       // FLOW: Notify the executive that someone wants to connect.
       // Fire-and-forget — notification failure shouldn't break the conversation.
+      // SECURITY: Only notify on NEW conversations to prevent spam on re-contact.
+      // SECURITY: Check dedup limit (max 10 contact_enquiry alerts per executive per 24h).
       try {
-        const { createMatchAlert } = await import('@/lib/notifications/match-alert-helpers')
+        const { createMatchAlert, canCreateAlert } = await import('@/lib/notifications/match-alert-helpers')
         const { sendNotification } = await import('@/lib/notifications')
-        const alertTitle = listingTitle
-          ? `New enquiry about ${listingTitle}`
-          : 'Someone wants to connect'
 
-        await createMatchAlert(
-          expertUserId,
-          'contact_enquiry',
-          alertTitle,
-          'A founder reached out to you via the marketplace.',
-          listingId,
-          { conversationId: conversation.id, senderId: user.id }
-        )
+        const allowed = await canCreateAlert(expertUserId, 'contact_enquiry', 10)
+        if (allowed) {
+          const alertTitle = listingTitle
+            ? `New enquiry about ${listingTitle}`
+            : 'Someone wants to connect'
 
-        await sendNotification({
-          userId: expertUserId,
-          priority: 'high',
-          title: alertTitle,
-          body: 'A founder reached out to you via the marketplace.',
-          actionUrl: '/updates',
-        })
+          await createMatchAlert(
+            expertUserId,
+            'contact_enquiry',
+            alertTitle,
+            'A founder reached out to you via the marketplace.',
+            listingId,
+            { conversationId: conversation.id }
+          )
+
+          await sendNotification({
+            userId: expertUserId,
+            priority: 'high',
+            title: alertTitle,
+            body: 'A founder reached out to you via the marketplace.',
+            actionUrl: '/updates',
+          })
+        }
       } catch (notifyError) {
         console.warn('[contactExpert] Notification failed (non-blocking):', notifyError)
       }
