@@ -6,7 +6,7 @@
  */
 
 import { useRouter } from 'next/navigation'
-import { useTransition } from 'react'
+import { useRef, useTransition } from 'react'
 import { Loader2, LogIn } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -29,9 +29,10 @@ export function ClaimCta({
 }: ClaimCtaProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
+    const mountedRef = useRef(true)
 
-    // SECURITY: Validate token format before embedding in URLs
-    const safeToken = /^[a-f0-9]+$/.test(token) ? token : ''
+    // SECURITY: Validate token format + max length before embedding in URLs
+    const safeToken = /^[a-f0-9]{16,128}$/.test(token) ? token : ''
 
     const handleClaim = () => {
         startTransition(async () => {
@@ -41,7 +42,8 @@ export function ClaimCta({
             } else {
                 toast.success('Listing claimed successfully!')
                 onClaimed?.()
-                setTimeout(() => router.push('/my-listing'), 1500)
+                // GOTCHA: Guard redirect against unmount to prevent navigation after component cleanup
+                setTimeout(() => { if (mountedRef.current) router.push('/my-listing') }, 1500)
             }
         })
     }

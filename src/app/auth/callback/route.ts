@@ -130,11 +130,16 @@ export async function GET(request: Request) {
         return response
       }
 
-      // EXISTING USER — redirect based on account type and role
-      let redirectPath = next
+      // EXISTING USER — honor `next` param for claim flow, otherwise route by role
+      // DECISION: If `next` is a claim path, always honor it regardless of account type.
+      // This lets existing suppliers complete the claim flow instead of getting trapped
+      // in /supplier-portal. For all other paths, use role-based routing.
+      const hasExplicitNext = next !== '/today' && next.startsWith('/')
+      let redirectPath: string
 
-      // Suppliers go to supplier portal
-      if (profile.account_type === 'supplier') {
+      if (hasExplicitNext) {
+        redirectPath = next
+      } else if (profile.account_type === 'supplier') {
         redirectPath = '/supplier-portal'
       } else if (profile.role === 'Founder' || profile.role === 'Executive' || profile.role === 'Apprentice') {
         redirectPath = '/today'

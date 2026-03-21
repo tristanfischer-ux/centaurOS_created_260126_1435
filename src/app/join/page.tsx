@@ -161,7 +161,7 @@ function OAuthDivider() {
 function JoinPageInner() {
   const searchParams = useSearchParams();
   const redirectParam = searchParams.get("redirect");
-  const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectParam);
+  const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,128}$/.test(redirectParam);
   const refCode = searchParams.get("ref");
 
   // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)

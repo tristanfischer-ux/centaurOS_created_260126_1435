@@ -95,8 +95,8 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
 
   // Claim flow detection (still needed for supplier listing claims)
   const redirectTo = (formData.get("redirect") as string)?.trim() || null;
-  // SECURITY: Strict claim flow detection — must be exactly /claim/{hex_token}
-  const isClaimFlow = redirectTo != null && /^\/claim\/[a-f0-9]{16,}$/.test(redirectTo);
+  // SECURITY: Strict claim flow detection — must be exactly /claim/{16-128 hex chars}
+  const isClaimFlow = redirectTo != null && /^\/claim\/[a-f0-9]{16,128}$/.test(redirectTo);
 
   // SECURITY: Validate claim token against the database to prevent abuse
   if (isClaimFlow) {
@@ -311,8 +311,8 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
   revalidatePath("/", "layout");
 
   // Claim flow: redirect back to the claim page to complete the claim
-  // SECURITY: Strict regex — only /claim/{hex}, no traversal/query/encoded chars
-  if (isClaimFlow && redirectTo && /^\/claim\/[a-f0-9]+$/.test(redirectTo)) {
+  // SECURITY: Strict regex — only /claim/{16-128 hex chars}, no traversal/query/encoded chars
+  if (isClaimFlow && redirectTo && /^\/claim\/[a-f0-9]{16,128}$/.test(redirectTo)) {
     redirect(redirectTo);
   }
 

@@ -97,6 +97,11 @@ export interface ListingPreview {
 export async function getListingPreviewByToken(
     token: string
 ): Promise<{ data?: ListingPreview; error?: string }> {
+    // SECURITY: Validate token format + length before hitting DB
+    if (!token || !/^[a-f0-9]{16,128}$/.test(token)) {
+        return { error: 'Invalid claim token' }
+    }
+
     // SECURITY: Rate limit to prevent token enumeration
     const headersList = await headers()
     const ip = getClientIP(headersList)
@@ -182,6 +187,11 @@ export async function generateClaimToken(
 export async function validateClaimToken(
     token: string
 ): Promise<{ data?: ClaimValidation; error?: string }> {
+    // SECURITY: Validate token format + length before hitting DB
+    if (!token || !/^[a-f0-9]{16,128}$/.test(token)) {
+        return { error: 'Invalid claim token' }
+    }
+
     // SECURITY: Rate limit claim token validation to prevent token enumeration
     const headersList = await headers()
     const ip = getClientIP(headersList)
@@ -225,7 +235,12 @@ export async function redeemClaim(
         return { error: 'This claim link is invalid or has expired' }
     }
     if (user.email?.toLowerCase() !== validation.data.email?.toLowerCase()) {
-        return { error: 'This claim was sent to a different email address. Please sign in with the email that received the claim link.' }
+        // INTENT: Mask the expected email to prevent enumeration while still being helpful.
+        const expected = validation.data.email
+        const masked = expected
+            ? `${expected[0]}***@${expected.split('@')[1] ?? '...'}`
+            : 'a different address'
+        return { error: `This claim was sent to ${masked}. Please sign in with that email address, or contact us to transfer the claim.` }
     }
 
     const { data, error } = await supabase.rpc('redeem_listing_claim', { p_token: token })
