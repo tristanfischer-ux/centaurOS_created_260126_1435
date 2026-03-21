@@ -166,9 +166,11 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return errorWithValues(passwordValidation.error || "Invalid password");
   }
 
-  // Founders must provide a company name
+  // Founders must provide a company name (only required via ?role=founder deep-link)
+  // DECISION: Simplified signup defaults to executive — founders created post-signup.
+  // Keep validation for deep-link backward compat where form includes company_name field.
   if (role === "founder" && !companyName) {
-    return errorWithValues("Company name is required");
+    return errorWithValues("Company name is required for founder signup");
   }
 
   // Suppliers must provide a business name (unless claiming a listing — it already has one)

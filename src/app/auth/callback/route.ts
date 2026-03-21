@@ -76,7 +76,8 @@ export async function GET(request: Request) {
         // Read signup context from cookie (set by GoogleOAuthButton before redirect)
         const cookieStore = await cookies()
         const contextCookie = cookieStore.get('forge_signup_context')
-        let signupRole: 'founder' | 'executive' | 'apprentice' | 'supplier' = 'apprentice'
+        // DECISION: Default to executive for new OAuth users (simplified signup)
+        let signupRole: 'founder' | 'executive' | 'apprentice' | 'supplier' = 'executive'
         let companyName: string | undefined
         let signupIndustry: string | undefined
         let signupStage: string | undefined

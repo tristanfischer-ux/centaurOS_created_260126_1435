@@ -9,12 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   ArrowLeft,
-  Rocket,
-  Users,
   Sparkles,
   Building2,
-  Briefcase,
-  GraduationCap,
   Factory,
   TestTube2,
   Loader2,
@@ -31,7 +27,6 @@ import { PasswordStrength } from "@/components/ui/password-strength";
 const TOTAL_FOUNDING_SPOTS = 100;
 
 type UserPath = "founder" | "joining";
-type JoiningRole = "executive" | "apprentice";
 
 /**
  * FoundingMemberCounter -- Animated progress bar showing remaining spots.
@@ -164,27 +159,21 @@ function JoinPageInner() {
   const isClaimFlow = redirectParam != null && /^\/claim\/[a-f0-9]{16,128}$/.test(redirectParam);
   const refCode = searchParams.get("ref");
 
-  // Pre-select path from URL (e.g. /join?role=founder or /join?role=executive)
+  // Deep-link support: ?role=founder shows founder fields for backward compat
   const roleParam = searchParams.get("role");
   const isDemoMode = searchParams.get("demo") === "true";
   const isFactorySignup = roleParam === "factory" || roleParam === "supplier" || isClaimFlow;
+  const isFounderDeepLink = roleParam === "founder";
 
-  const initialPath: UserPath | null = roleParam === "founder"
-    ? "founder"
-    : roleParam === "executive" || roleParam === "apprentice"
-      ? "joining"
-      : null;
-
-  const initialJoiningRole: JoiningRole =
-    roleParam === "apprentice" ? "apprentice" : "executive";
-
-  const [selectedPath, setSelectedPath] = useState<UserPath | null>(initialPath);
-  const [joiningRole, setJoiningRole] = useState<JoiningRole>(initialJoiningRole);
+  const [selectedPath] = useState<UserPath | null>(isFounderDeepLink ? "founder" : null);
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
   const [foundingCount, setFoundingCount] = useState(53); // sensible default
   const [passwordValue, setPasswordValue] = useState("");
+
+  // INTENT: Default role is executive. Founder deep-link still works for backward compat.
+  const effectiveRole = isFounderDeepLink ? "founder" : "executive";
 
   // Set forge_ref cookie when ?ref= param is present
   useEffect(() => {
@@ -203,21 +192,15 @@ function JoinPageInner() {
   }, []);
 
   useEffect(() => {
-    if (isDemoMode && selectedPath) {
-      const role = selectedPath === "founder" ? "founder" : joiningRole;
-      getDemoAccountData(role).then(setDemoData);
+    if (isDemoMode) {
+      getDemoAccountData(effectiveRole).then(setDemoData);
     }
-  }, [isDemoMode, selectedPath, joiningRole]);
-
-  // Determine the actual role to submit
-  const effectiveRole = selectedPath === "founder" ? "founder" : joiningRole;
+  }, [isDemoMode, effectiveRole]);
 
   // Build signup context for Google OAuth cookie.
   // For Founders we also need companyName/industry/stage — these are read
   // from the live form fields at click time (see GoogleOAuthButton).
-  const signupContext = selectedPath
-    ? { role: effectiveRole }
-    : null;
+  const signupContext = { role: effectiveRole };
 
   // Factory/supplier claim flow — simplified single-path signup
   if (isFactorySignup) {
@@ -429,8 +412,7 @@ function JoinPageInner() {
               Join ForgeOS
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg max-w-lg mx-auto">
-              The operating system for building physical products.
-              Pick your path and create your account.
+              Create your account and start building.
             </p>
           </div>
 
@@ -490,366 +472,214 @@ function JoinPageInner() {
             </div>
           )}
 
-          {/* Path Selection */}
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-foreground">
-              What brings you to ForgeOS?
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Founder Path */}
-              <button
-                type="button"
-                onClick={() => setSelectedPath("founder")}
-                className={`group relative text-left p-5 rounded-xl border-2 transition-all duration-200 ${
-                  selectedPath === "founder"
-                    ? "border-international-orange bg-international-orange/5 shadow-md"
-                    : "border-muted hover:border-international-orange/40 hover:shadow-sm bg-card"
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-lg shrink-0 transition-colors ${
-                      selectedPath === "founder"
-                        ? "bg-international-orange text-white"
-                        : "bg-muted text-muted-foreground group-hover:bg-international-orange/10 group-hover:text-international-orange"
-                    }`}
-                  >
-                    <Rocket className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-foreground">
-                      I&apos;m founding a company
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Create your venture and build your fractional team
-                    </p>
-                  </div>
-                </div>
-                {selectedPath === "founder" && (
-                  <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-international-orange" />
-                )}
-              </button>
+          {/* Google OAuth */}
+          <GoogleOAuthButton redirect={redirectParam} signupContext={signupContext} />
+          <OAuthDivider />
 
-              {/* Joining Path */}
-              <button
-                type="button"
-                onClick={() => setSelectedPath("joining")}
-                className={`group relative text-left p-5 rounded-xl border-2 transition-all duration-200 ${
-                  selectedPath === "joining"
-                    ? "border-international-orange bg-international-orange/5 shadow-md"
-                    : "border-muted hover:border-international-orange/40 hover:shadow-sm bg-card"
-                }`}
+          <form action={formAction} className="space-y-5">
+            <input type="hidden" name="role" value={effectiveRole} />
+            {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
+
+            {/* Common Fields */}
+            <div className="space-y-2">
+              <Label
+                htmlFor="name"
+                className="text-sm font-medium text-foreground"
               >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-lg shrink-0 transition-colors ${
-                      selectedPath === "joining"
-                        ? "bg-international-orange text-white"
-                        : "bg-muted text-muted-foreground group-hover:bg-international-orange/10 group-hover:text-international-orange"
-                    }`}
-                  >
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-foreground">
-                      I&apos;m joining the marketplace
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Join as an Executive or Apprentice and find a team
-                    </p>
-                  </div>
-                </div>
-                {selectedPath === "joining" && (
-                  <div className="absolute top-3 right-3 w-2.5 h-2.5 rounded-full bg-international-orange" />
-                )}
-              </button>
+                Full Name
+                <span className="text-destructive ml-1" aria-label="required">
+                  *
+                </span>
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                placeholder="Jane Smith"
+                key={`name-${state.values?.name ?? ""}`}
+                defaultValue={state.values?.name || demoData?.fullName || ""}
+                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                required
+                aria-required="true"
+              />
             </div>
-          </div>
 
-          {/* Form — appears once a path is selected */}
-          <AnimatePresence mode="wait">
-            {selectedPath && (
-              <motion.div
-                key={selectedPath}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
+            <div className="space-y-2">
+              <Label
+                htmlFor="email"
+                className="text-sm font-medium text-foreground"
               >
-                {/* Google OAuth — shown after role selection so context cookie is set */}
-                <div className="space-y-4 mb-5">
-                  <GoogleOAuthButton redirect={redirectParam} signupContext={signupContext} />
-                  <OAuthDivider />
-                </div>
+                Email
+                <span className="text-destructive ml-1" aria-label="required">
+                  *
+                </span>
+              </Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                key={`email-${state.values?.email ?? ""}`}
+                defaultValue={state.values?.email || demoData?.email || ""}
+                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                required
+                aria-required="true"
+              />
+            </div>
 
-                <form action={formAction} className="space-y-5">
-                  <input type="hidden" name="role" value={effectiveRole} />
-                  {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
+            <div className="space-y-2">
+              <Label
+                htmlFor="password"
+                className="text-sm font-medium text-foreground"
+              >
+                Password
+                <span className="text-destructive ml-1" aria-label="required">
+                  *
+                </span>
+              </Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                placeholder="Create a strong password"
+                defaultValue=""
+                onChange={(e) => setPasswordValue(e.target.value)}
+                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                required
+                aria-required="true"
+                minLength={8}
+                aria-describedby="password-hint"
+              />
+              <p
+                id="password-hint"
+                className="text-xs text-muted-foreground"
+              >
+                Min 8 characters, with uppercase, lowercase, and a number
+              </p>
+              <PasswordStrength password={passwordValue} />
+            </div>
 
-                  {/* Role sub-selection for Joining path */}
-                  {selectedPath === "joining" && (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-foreground">
-                        Which best describes you?
-                      </p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setJoiningRole("executive")}
-                          className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all duration-200 text-left ${
-                            joiningRole === "executive"
-                              ? "border-international-orange bg-international-orange/5"
-                              : "border-muted hover:border-international-orange/40 bg-card"
-                          }`}
-                        >
-                          <Briefcase
-                            className={`w-5 h-5 shrink-0 ${
-                              joiningRole === "executive"
-                                ? "text-international-orange"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <div>
-                            <p className="font-semibold text-sm text-foreground">
-                              Executive
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Experienced professional
-                            </p>
-                          </div>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setJoiningRole("apprentice")}
-                          className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all duration-200 text-left ${
-                            joiningRole === "apprentice"
-                              ? "border-international-orange bg-international-orange/5"
-                              : "border-muted hover:border-international-orange/40 bg-card"
-                          }`}
-                        >
-                          <GraduationCap
-                            className={`w-5 h-5 shrink-0 ${
-                              joiningRole === "apprentice"
-                                ? "text-international-orange"
-                                : "text-muted-foreground"
-                            }`}
-                          />
-                          <div>
-                            <p className="font-semibold text-sm text-foreground">
-                              Apprentice
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Early career / student
-                            </p>
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Common Fields */}
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="name"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      Full Name
-                      <span className="text-destructive ml-1" aria-label="required">
-                        *
-                      </span>
-                    </Label>
-                    <Input
-                      id="name"
-                      name="name"
-                      placeholder="Jane Smith"
-                      key={`name-${state.values?.name ?? ""}`}
-                      defaultValue={state.values?.name || demoData?.fullName || ""}
-                      className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                      required
-                      aria-required="true"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="email"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      Email
-                      <span className="text-destructive ml-1" aria-label="required">
-                        *
-                      </span>
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="you@example.com"
-                      key={`email-${state.values?.email ?? ""}`}
-                      defaultValue={state.values?.email || demoData?.email || ""}
-                      className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                      required
-                      aria-required="true"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="password"
-                      className="text-sm font-medium text-foreground"
-                    >
-                      Password
-                      <span className="text-destructive ml-1" aria-label="required">
-                        *
-                      </span>
-                    </Label>
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="Create a strong password"
-                      defaultValue=""
-                      onChange={(e) => setPasswordValue(e.target.value)}
-                      className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                      required
-                      aria-required="true"
-                      minLength={8}
-                      aria-describedby="password-hint"
-                    />
-                    <p
-                      id="password-hint"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Min 8 characters, with uppercase, lowercase, and a number
+            {/* Founder-specific fields — only shown via ?role=founder deep-link */}
+            <AnimatePresence>
+              {isFounderDeepLink && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4 pt-2 border-t"
+                >
+                  <div className="flex items-center gap-2 pt-3">
+                    <Building2 className="w-4 h-4 text-international-orange" />
+                    <p className="text-sm font-medium text-foreground">
+                      About your company
                     </p>
-                    <PasswordStrength password={passwordValue} />
                   </div>
 
-                  {/* Founder-specific fields */}
-                  {selectedPath === "founder" && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      transition={{ duration: 0.3 }}
-                      className="space-y-4 pt-2 border-t"
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company_name"
+                      className="text-sm font-medium text-foreground"
                     >
-                      <div className="flex items-center gap-2 pt-3">
-                        <Building2 className="w-4 h-4 text-international-orange" />
-                        <p className="text-sm font-medium text-foreground">
-                          About your company
-                        </p>
-                      </div>
+                      Company Name
+                      <span
+                        className="text-destructive ml-1"
+                        aria-label="required"
+                      >
+                        *
+                      </span>
+                    </Label>
+                    <Input
+                      id="company_name"
+                      name="company_name"
+                      placeholder="Your startup name"
+                      key={`company-${state.values?.company_name ?? ""}`}
+                      defaultValue={state.values?.company_name || demoData?.companyName || ""}
+                      className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                      required
+                      aria-required="true"
+                    />
+                  </div>
 
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="company_name"
-                          className="text-sm font-medium text-foreground"
-                        >
-                          Company Name
-                          <span
-                            className="text-destructive ml-1"
-                            aria-label="required"
-                          >
-                            *
-                          </span>
-                        </Label>
-                        <Input
-                          id="company_name"
-                          name="company_name"
-                          placeholder="Your startup name"
-                          key={`company-${state.values?.company_name ?? ""}`}
-                          defaultValue={state.values?.company_name || demoData?.companyName || ""}
-                          className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                          required
-                          aria-required="true"
-                        />
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="industry"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        Industry
+                      </Label>
+                      <Input
+                        id="industry"
+                        name="industry"
+                        placeholder="Hardware, DeepTech..."
+                        key={`industry-${state.values?.industry ?? ""}`}
+                        defaultValue={state.values?.industry || demoData?.industry || ""}
+                        className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="stage"
+                        className="text-sm font-medium text-foreground"
+                      >
+                        Stage
+                      </Label>
+                      <Input
+                        id="stage"
+                        name="stage"
+                        placeholder="Pre-seed, Seed..."
+                        key={`stage-${state.values?.stage ?? ""}`}
+                        defaultValue={state.values?.stage || demoData?.stage || ""}
+                        className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="industry"
-                            className="text-sm font-medium text-foreground"
-                          >
-                            Industry
-                          </Label>
-                          <Input
-                            id="industry"
-                            name="industry"
-                            placeholder="Hardware, DeepTech..."
-                            key={`industry-${state.values?.industry ?? ""}`}
-                            defaultValue={state.values?.industry || demoData?.industry || ""}
-                            className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="stage"
-                            className="text-sm font-medium text-foreground"
-                          >
-                            Stage
-                          </Label>
-                          <Input
-                            id="stage"
-                            name="stage"
-                            placeholder="Pre-seed, Seed..."
-                            key={`stage-${state.values?.stage ?? ""}`}
-                            defaultValue={state.values?.stage || demoData?.stage || ""}
-                            className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
-                          />
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
+            {/* Submit */}
+            <motion.div
+              whileHover={isPending ? {} : { scale: 1.01 }}
+              whileTap={isPending ? {} : { scale: 0.98 }}
+              className="pt-2"
+            >
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Creating Account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
+              </Button>
+            </motion.div>
+          </form>
 
-                  {/* Submit */}
-                  <motion.div
-                    whileHover={isPending ? {} : { scale: 1.01 }}
-                    whileTap={isPending ? {} : { scale: 0.98 }}
-                    className="pt-2"
-                  >
-                    <Button
-                      type="submit"
-                      disabled={isPending}
-                      className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
-                    >
-                      {isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Creating Account...
-                        </>
-                      ) : (
-                        "Create Account"
-                      )}
-                    </Button>
-                  </motion.div>
-                </form>
+          {/* Founding member counter */}
+          <FoundingMemberCounter spotsClaimed={foundingCount} />
 
-                {/* Founding member counter */}
-                <div className="mt-6">
-                  <FoundingMemberCounter spotsClaimed={foundingCount} />
-                </div>
-
-                <p className="text-xs text-center text-muted-foreground mt-6">
-                  By joining, you agree to our{" "}
-                  <Link
-                    href="/terms"
-                    className="underline hover:text-foreground transition-colors"
-                  >
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    href="/privacy"
-                    className="underline hover:text-foreground transition-colors"
-                  >
-                    Privacy Policy
-                  </Link>
-                  .
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <p className="text-xs text-center text-muted-foreground">
+            By joining, you agree to our{" "}
+            <Link
+              href="/terms"
+              className="underline hover:text-foreground transition-colors"
+            >
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/privacy"
+              className="underline hover:text-foreground transition-colors"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
         </motion.div>
       </div>
     </div>
