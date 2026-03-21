@@ -79,6 +79,7 @@ export function InvestorCard({
   const sectors = (attrs.sectors ?? []).slice(0, 3)
   const qualityClass = qualityDotClass(attrs.data_quality_score)
   const portfolioCount = attrs.portfolio_companies?.length ?? 0
+  const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
 
   return (
     <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative">
@@ -185,10 +186,10 @@ export function InvestorCard({
               {attrs.hq_city}
             </span>
           )}
-          {formatFundSize(attrs.fund_size_gbp) && (
+          {fundSizeLabel && (
             <span className="flex items-center gap-1">
               <Building2 className="h-3.5 w-3.5 shrink-0" />
-              {formatFundSize(attrs.fund_size_gbp)}
+              {fundSizeLabel}
             </span>
           )}
         </div>

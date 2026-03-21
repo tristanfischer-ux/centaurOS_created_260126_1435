@@ -116,6 +116,7 @@ function DraggableCard({ item }: { item: ShortlistItem }) {
 
 function CompactInvestorCard({ item, isDragOverlay }: { item: ShortlistItem; isDragOverlay?: boolean }) {
   const attrs = item.attributes
+  const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
   return (
     <Card className={cn(
       'transition-all',
@@ -140,9 +141,9 @@ function CompactInvestorCard({ item, isDragOverlay }: { item: ShortlistItem; isD
             </span>
           )}
         </div>
-        {formatFundSize(attrs.fund_size_gbp) && (
+        {fundSizeLabel && (
           <p className="text-[10px] text-muted-foreground">
-            Fund: {formatFundSize(attrs.fund_size_gbp)}
+            Fund: {fundSizeLabel}
           </p>
         )}
       </CardContent>

@@ -290,7 +290,7 @@ async function callClaude(
  */
 async function callGeminiWithSearch(
   prompt: string,
-  modelId: string = "gemini-3.1-flash-lite-preview",
+  modelId: string = "gemini-3.1-flash-lite",
 ): Promise<{
   text: string
   sources: Array<{ uri: string; title: string }>
@@ -364,7 +364,7 @@ async function callGeminiWithSearch(
 async function callGemini(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "gemini-3.1-pro-preview",
+  modelId: string = "gemini-3.1-pro",
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
@@ -2730,7 +2730,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     })
 
     const geminiPromise: Promise<RaceResult> = callGemini(
-      modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 150_000,
+      modulePrompt, userPrompt, "gemini-3.1-pro", 8192, 150_000,
     ).then(r => {
       dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - raceStart}ms`)
       return { ...r, model: "Gemini" }

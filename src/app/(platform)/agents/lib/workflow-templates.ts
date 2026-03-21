@@ -20,7 +20,7 @@ const NODE_SPACING_Y = 160
 const DEFAULT_PROVIDER = "anthropic"
 const DEFAULT_MODEL = "claude-sonnet-4-6"
 const IMAGE_PROVIDER = "google"
-const IMAGE_MODEL = "gemini-3.1-pro-preview"
+const IMAGE_MODEL = "gemini-3.1-pro"
 const VIDEO_PROVIDER = "minimax"
 const VIDEO_MODEL = "MiniMax-Hailuo-2.3"
 

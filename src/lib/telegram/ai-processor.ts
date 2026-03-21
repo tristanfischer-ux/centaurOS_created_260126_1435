@@ -181,7 +181,7 @@ export async function generateHelpResponse(text: string): Promise<string> {
     }
 
     const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.3-instant',
         messages: [
             {
                 role: 'system',

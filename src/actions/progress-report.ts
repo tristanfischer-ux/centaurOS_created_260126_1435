@@ -286,7 +286,7 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
 
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-flash-lite-preview',
+        model: 'gemini-3.1-flash-lite',
         generationConfig: {
           temperature: 0.6,
           maxOutputTokens: 1000,

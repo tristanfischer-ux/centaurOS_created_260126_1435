@@ -88,7 +88,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
   const apiKey = process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY
   if (!apiKey) throw new Error("Gemini API key not configured")
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`
   return withRetry(async () => {
     const response = await fetch(url, {
       method: "POST",

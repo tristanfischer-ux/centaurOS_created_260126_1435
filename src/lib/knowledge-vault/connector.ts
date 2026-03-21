@@ -256,7 +256,7 @@ async function evaluateWithLLM(
     .join('\n')
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'gpt-5.3-instant',
     temperature: 0,
     max_tokens: 1000,
     messages: [

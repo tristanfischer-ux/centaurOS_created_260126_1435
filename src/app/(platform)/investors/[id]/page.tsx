@@ -206,6 +206,9 @@ export default async function InvestorDetailPage({ params }: PageProps) {
     : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
 
+  const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
+  const aumLabel = formatFundSize(attrs.aum_gbp)
+
   return (
     <TooltipProvider>
       <div className="space-y-8 max-w-5xl">
@@ -479,10 +482,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </h2>
               </CardHeader>
               <CardContent className="space-y-3">
-                {formatFundSize(attrs.fund_size_gbp) && (
+                {fundSizeLabel && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Fund Size</p>
-                    <p className="text-sm font-semibold text-foreground">{formatFundSize(attrs.fund_size_gbp)}</p>
+                    <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
                   </div>
                 )}
                 {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
@@ -495,10 +498,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                     </p>
                   </div>
                 )}
-                {formatFundSize(attrs.aum_gbp) && (
+                {aumLabel && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">AUM</p>
-                    <p className="text-sm font-semibold text-foreground">{formatFundSize(attrs.aum_gbp)}</p>
+                    <p className="text-sm font-semibold text-foreground">{aumLabel}</p>
                   </div>
                 )}
                 {attrs.geo_focus && attrs.geo_focus.length > 0 && (

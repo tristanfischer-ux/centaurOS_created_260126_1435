@@ -381,7 +381,7 @@ async function callOpus(
   console.info("[XRayCadGen] All Anthropic models refused — falling back to Gemini")
 
   // SECURITY: Use x-goog-api-key header instead of URL query param (F6)
-  const geminiModel = "gemini-3.1-pro-preview"
+  const geminiModel = "gemini-3.1-pro"
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent`
 
   const geminiResponse = await fetch(url, {
@@ -435,7 +435,7 @@ async function callGemini(
 
   const { GoogleGenerativeAI } = await import("@google/generative-ai")
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" })
+  const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro" })
 
   const result = await model.generateContent({
     contents: [

@@ -532,7 +532,7 @@ ${(section.dataHighlights ?? []).map((d) => `- ${d}`).join("\n")}
 Raw data for this section:
 ${dataSlice}`
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro:generateContent?key=${apiKey}`
 
   const response = await fetchWithTimeout(
     url,

@@ -65,7 +65,7 @@ No other text. Example: {"relevance":0.9,"completeness":0.8,"actionability":0.85
 
   try {
     const res = await client.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.3-instant',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },

@@ -55,11 +55,8 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         models: [
             { id: "gpt-5.3-instant", name: "GPT-5.3 Instant", modality: "text", description: "Fast, capable — replaces GPT-4o", maxTokens: 128000, default: true },
             { id: "gpt-5.4-thinking", name: "GPT-5.4 Thinking", modality: "text", description: "Flagship with reasoning", maxTokens: 200000 },
-            { id: "gpt-4o", name: "GPT-4o (legacy)", modality: "text", description: "Retired March 2026", maxTokens: 128000 },
-            { id: "gpt-4o-mini", name: "GPT-4o Mini (legacy)", modality: "text", description: "Retired — use 5.3 Instant", maxTokens: 128000 },
             { id: "dall-e-3", name: "DALL-E 3", modality: "image", description: "Image generation", default: true },
-            { id: "tts-1", name: "TTS-1", modality: "audio", description: "Text to speech" },
-            { id: "tts-1-hd", name: "TTS-1 HD", modality: "audio", description: "High-quality text to speech", default: true },
+            { id: "gpt-4o-mini-tts", name: "GPT TTS", modality: "audio", description: "Text to speech — 13 voices, low error rate", default: true },
         ],
     },
     anthropic: {
@@ -190,8 +187,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#a855f7",
         bgColor: "bg-purple-50",
         models: [
-            { id: "stable-diffusion-xl-1024-v1-0", name: "SDXL 1.0", modality: "image", description: "High-quality image generation", default: true },
-            { id: "stable-image-core", name: "Stable Image Core", modality: "image", description: "Fast image generation" },
+            { id: "stable-image-ultra", name: "Stable Image Ultra", modality: "image", description: "Flagship image generation (SD 3.5)", default: true },
         ],
     },
     elevenlabs: {
@@ -205,8 +201,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#000000",
         bgColor: "bg-slate-50",
         models: [
-            { id: "eleven_multilingual_v2", name: "Multilingual v2", modality: "audio", description: "Best quality, multilingual", default: true },
-            { id: "eleven_turbo_v2_5", name: "Turbo v2.5", modality: "audio", description: "Low latency" },
+            { id: "eleven_v3", name: "Eleven v3", modality: "audio", description: "70+ languages, audio tags, multi-speaker", default: true },
         ],
     },
     replicate: {
@@ -220,7 +215,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#0081F1",
         bgColor: "bg-sky-50",
         models: [
-            { id: "black-forest-labs/flux-1.1-pro", name: "Flux 1.1 Pro", modality: "image", description: "High quality image generation", default: true },
+            { id: "black-forest-labs/flux-2-pro", name: "Flux 2 Pro", modality: "image", description: "High quality image generation with typography", default: true },
             { id: "minimax/video-01", name: "MiniMax Video-01", modality: "video", description: "Text-to-video generation", default: true },
         ],
     },

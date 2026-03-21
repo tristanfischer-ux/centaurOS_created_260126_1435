@@ -143,9 +143,8 @@ export interface MonthlyUsage {
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
   'gpt-5.3-instant': { input: 1.50, output: 6.00 },
   'gpt-5.4-thinking': { input: 5.00, output: 20.00 },
-  'gpt-4o': { input: 2.50, output: 10.00 },
-  'gpt-4o-mini': { input: 0.15, output: 0.60 },
-  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gemini-3.1-pro': { input: 1.25, output: 5.00 },
+  'gemini-3.1-flash-lite': { input: 0.075, output: 0.30 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-6': { input: 15.00, output: 75.00 },
@@ -171,7 +170,7 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
 const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
   // OpenAI Realtime API (audio input + output combined)
   'gpt-4o-realtime-preview': 0.30,       // ~$0.06 input + $0.24 output
-  'gpt-4o-mini-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
+  'gpt-5.3-instant-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
   // Avatar providers
   'heygen-streaming': 0.07,
   'simli-streaming': 0.03,
@@ -188,7 +187,7 @@ const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
  */
 export function estimateRealtimeCost(
   durationSeconds: number,
-  voiceModel: string = 'gpt-4o-mini-realtime-preview',
+  voiceModel: string = 'gpt-5.3-instant-realtime-preview',
   avatarProvider?: string
 ): number {
   const minutes = durationSeconds / 60
