@@ -529,6 +529,15 @@ export interface CadLabResearchResult {
   industryDomain?: string
   /** Number of standards matched before budget trimming */
   totalStandardsMatched?: number
+  /** Engineering data applied during research/generation */
+  engineeringData?: {
+    materialsApplied: string[]
+    materialFamilies: string[]
+    hardwareItemCount: number
+    processesApplied: string[]
+    supplierTechniques: number
+    totalDataPoints: number
+  }
 }
 
 // ─── Mashup Types ─────────────────────────────────────────────────────

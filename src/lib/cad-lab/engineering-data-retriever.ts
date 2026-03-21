@@ -13,6 +13,12 @@ export interface EngineeringDataPromptResult {
   materialsCount: number
   hardwareCount: number
   processesCount: number
+  /** Material codes applied (e.g. ["6061-T6", "GRP"]) — for UI display */
+  materialCodes: string[]
+  /** Material family names detected (e.g. ["aluminum", "composite"]) */
+  materialFamilies: string[]
+  /** Process display names applied (e.g. ["CNC Milling", "FDM"]) */
+  processNames: string[]
 }
 
 /**
@@ -32,6 +38,10 @@ export async function retrieveEngineeringDataForPrompt(
   const lower = description.toLowerCase()
   const sections: string[] = []
 
+  // Track metadata for UI display
+  let appliedMaterialCodes: string[] = []
+  let appliedProcessNames: string[] = []
+
   // 1. Material Properties — fetch matching materials
   const materialFamilies = detectMaterialFamilies(lower, materials)
   let materialsCount = 0
@@ -45,6 +55,7 @@ export async function retrieveEngineeringDataForPrompt(
 
     if (matData && matData.length > 0) {
       materialsCount = matData.length
+      appliedMaterialCodes = matData.map(m => m.material_code as string)
       const fmt = (v: unknown, unit: string) => v != null ? `${v} ${unit}` : "N/A"
       const matSection = matData.map(m =>
         `- **${m.material_code}** (${m.material_name}): ` +
@@ -105,6 +116,7 @@ export async function retrieveEngineeringDataForPrompt(
 
     if (procData && procData.length > 0) {
       processesCount = procData.length
+      appliedProcessNames = procData.map(p => p.display_name as string)
       const procSection = procData.map(p => {
         let line = `- **${p.display_name}**: tolerance ±${p.tolerance_typical_mm}mm (best: ±${p.tolerance_min_mm}mm), ` +
           `min wall: ${p.min_wall_thickness_mm ?? "N/A"}mm`
@@ -129,7 +141,7 @@ export async function retrieveEngineeringDataForPrompt(
   }
 
   if (sections.length === 0) {
-    return { content: "", materialsCount: 0, hardwareCount: 0, processesCount: 0 }
+    return { content: "", materialsCount: 0, hardwareCount: 0, processesCount: 0, materialCodes: [], materialFamilies: [], processNames: [] }
   }
 
   return {
@@ -137,6 +149,9 @@ export async function retrieveEngineeringDataForPrompt(
     materialsCount,
     hardwareCount,
     processesCount,
+    materialCodes: appliedMaterialCodes,
+    materialFamilies,
+    processNames: appliedProcessNames,
   }
 }
 

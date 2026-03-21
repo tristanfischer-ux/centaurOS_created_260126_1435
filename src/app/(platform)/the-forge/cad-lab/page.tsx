@@ -288,6 +288,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                   standardCodes={researchResult?.standardCodes}
                   industryDomain={researchResult?.industryDomain}
                   totalStandardsMatched={researchResult?.totalStandardsMatched}
+                  engineeringData={researchResult?.engineeringData}
                 />
               )}
 
