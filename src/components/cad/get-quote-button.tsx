@@ -15,7 +15,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { FileText, ExternalLink } from 'lucide-react'
-import { toast } from 'sonner'
 import { CadLabRFQHandoff } from '@/components/rfq/CadLabRFQHandoff'
 import { cn } from '@/lib/utils'
 import type { CadLabDesignBrief, CadLabModule } from '@/lib/cad-lab-types'
@@ -120,9 +119,8 @@ export function GetQuoteButton({
             onRfqLinked={onRfqLinked}
             onSuccess={() => {
               setIsOpen(false)
-              toast.success('RFQ created and sent to suppliers')
-              // INTENT: onRfqLinked is NOT called here — CadLabRFQHandoff already
-              // calls it in handleSubmit. Calling it twice would double-write.
+              // INTENT: No toast here — CadLabRFQHandoff already shows one in handleSubmit.
+              // No onRfqLinked call either — CadLabRFQHandoff handles that too.
             }}
             onCancel={() => setIsOpen(false)}
             className="border-0 shadow-none"
