@@ -125,6 +125,7 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
         { providerId: "anthropic", modelId: "claude-opus-4-6" },
         { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "google", modelId: "gemini-3.1-flash-lite-preview" },
     ],
     qwen: [
