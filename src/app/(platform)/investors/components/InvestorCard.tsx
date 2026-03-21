@@ -53,6 +53,25 @@ function qualityDotClass(score: number | undefined): string | null {
   return 'bg-muted-foreground'
 }
 
+/** Count how many key data dimensions are populated (max 5). */
+function computeDataDepth(firm: InvestorFirm): number {
+  const a = firm.attributes
+  let depth = 0
+  // 1. Basics: location + fund size
+  if (a.hq_city && formatFundSize(a.fund_size_gbp)) depth++
+  // 2. Strategy: stage focus or sectors
+  if ((a.stage_focus ?? []).length > 0 || (a.sectors ?? []).length > 0) depth++
+  // 3. Track record: portfolio companies
+  if ((a.portfolio_companies?.length ?? 0) > 0) depth++
+  // 4. Intelligence: thesis, geo focus, or cheque range
+  if (a.investment_thesis || (a.geo_focus ?? []).length > 0 || a.cheque_range_gbp) depth++
+  // 5. Deep data: fund history, exits, or performance
+  if (a.fund_history || a.exits || a.fund_performance) depth++
+  return depth
+}
+
+const DEPTH_LABELS = ['Minimal', 'Basic', 'Good', 'Detailed', 'Rich', 'Comprehensive']
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -80,6 +99,7 @@ export function InvestorCard({
   const qualityClass = qualityDotClass(attrs.data_quality_score)
   const portfolioCount = attrs.portfolio_companies?.length ?? 0
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
+  const dataDepth = computeDataDepth(firm)
 
   return (
     <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative">
@@ -248,7 +268,28 @@ export function InvestorCard({
         >
           View profile →
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {/* Data depth indicator */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1" aria-label={`Data depth: ${DEPTH_LABELS[dataDepth]}`}>
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        'h-1.5 w-2.5 rounded-sm transition-colors',
+                        i < dataDepth ? 'bg-international-orange' : 'bg-border'
+                      )}
+                    />
+                  ))}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{DEPTH_LABELS[dataDepth]} profile — {dataDepth}/5 data dimensions</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           {attrs.website_url && ensureProtocol(attrs.website_url) && (
             <a
               href={ensureProtocol(attrs.website_url)}

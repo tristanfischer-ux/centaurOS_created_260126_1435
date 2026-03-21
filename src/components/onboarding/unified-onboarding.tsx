@@ -25,6 +25,7 @@ import { setAccountType, updateOnboardingData, getOnboardingAhaListings } from '
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import { GuidedTour } from './guided-tour'
 
 import type { OnboardingData } from '@/actions/onboarding'
 
@@ -74,6 +75,7 @@ export function UnifiedOnboarding({
   const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
   const [ahaListings, setAhaListings] = useState<{ title: string; category: string; id: string }[]>([])
   const [loadingListings, setLoadingListings] = useState(false)
+  const [showGuidedTour, setShowGuidedTour] = useState(false)
   const migrationRanRef = useRef(false)
   const router = useRouter()
 
@@ -149,13 +151,9 @@ export function UnifiedOnboarding({
           return
         }
 
-        // Load marketplace listings for "aha moment"
-        setLoadingListings(true)
-        const listings = await getOnboardingAhaListings()
-        setAhaListings(listings)
-        setLoadingListings(false)
-
-        goToStep('firstlook')
+        // DECISION: Launch Cal's guided tour instead of marketplace aha moment.
+        // The tour walks users through the 5 most compelling features.
+        setShowGuidedTour(true)
       } else {
         toast.error('Failed to save your selection. Please try again.')
       }
@@ -205,6 +203,11 @@ export function UnifiedOnboarding({
   }, [open, handleSkip])
 
   if (!open) return null
+
+  // FLOW: When team_builder is selected, hand off to Cal's guided tour
+  if (showGuidedTour) {
+    return <GuidedTour onComplete={() => setOpen(false)} />
+  }
 
   return (
     <motion.div

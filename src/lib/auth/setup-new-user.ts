@@ -204,33 +204,48 @@ export async function setupNewUser({
     joined_at: new Date().toISOString(),
   });
 
-  // --- Demo data for founders ---
-  if (role === "founder" && foundryId) {
-    try {
-      await supabase.rpc("seed_demo_forge_concept", {
-        p_foundry_id: foundryId,
-        p_user_id: userId,
-      });
-    } catch (e) {
-      console.warn("[setupNewUser] seed_demo_forge_concept failed:", e);
+  // --- Demo data for all non-supplier roles ---
+  // INTENT: Every user should see populated content on first login. Founders get
+  // demo concepts + objectives. Executives/Apprentices get demo concepts so The
+  // Forge isn't empty when they explore it during the guided tour.
+  if (role !== "supplier" && foundryId) {
+    // Demo forge concepts — 3 products showing breadth of The Forge
+    const conceptRpcs = [
+      "seed_demo_forge_concept",
+      "seed_demo_air_quality_sensor",
+      "seed_demo_drone_motor_mount",
+    ] as const;
+
+    for (const rpc of conceptRpcs) {
+      try {
+        await supabase.rpc(rpc, {
+          p_foundry_id: foundryId,
+          p_user_id: userId,
+        });
+      } catch (e) {
+        console.warn(`[setupNewUser] ${rpc} failed:`, e);
+      }
     }
 
-    try {
-      await supabase.rpc("seed_founder_demo_data", {
-        p_foundry_id: foundryId,
-        p_user_id: userId,
-      });
-    } catch (e) {
-      console.warn("[setupNewUser] seed_founder_demo_data failed:", e);
-    }
+    // Founder-only: demo objectives and tasks
+    if (role === "founder") {
+      try {
+        await supabase.rpc("seed_founder_demo_data", {
+          p_foundry_id: foundryId,
+          p_user_id: userId,
+        });
+      } catch (e) {
+        console.warn("[setupNewUser] seed_founder_demo_data failed:", e);
+      }
 
-    try {
-      await supabase.rpc("seed_founder_demo_data_expanded", {
-        p_foundry_id: foundryId,
-        p_user_id: userId,
-      });
-    } catch (e) {
-      console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", e);
+      try {
+        await supabase.rpc("seed_founder_demo_data_expanded", {
+          p_foundry_id: foundryId,
+          p_user_id: userId,
+        });
+      } catch (e) {
+        console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", e);
+      }
     }
   }
 
