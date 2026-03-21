@@ -715,7 +715,9 @@ export function TodayView({
                 </Button>
             </motion.div>
 
-            <PageTour page="today" />
+            {/* Tour only starts after onboarding is complete — new users see the
+                Getting Started checklist first, and tour targets are empty/meaningless */}
+            {!initialOnboardingData && <PageTour page="today" />}
         </div>
     )
 }
