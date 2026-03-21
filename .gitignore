@@ -68,3 +68,4 @@ settings-verification/
 *.html
 !public/**/*.html
 !src/**/*.html
+.ai-model-audit.md
