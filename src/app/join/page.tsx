@@ -26,8 +26,6 @@ import { PasswordStrength } from "@/components/ui/password-strength";
 /** Total founding member spots available */
 const TOTAL_FOUNDING_SPOTS = 100;
 
-type UserPath = "founder" | "joining";
-
 /**
  * FoundingMemberCounter -- Animated progress bar showing remaining spots.
  */
@@ -165,7 +163,6 @@ function JoinPageInner() {
   const isFactorySignup = roleParam === "factory" || roleParam === "supplier" || isClaimFlow;
   const isFounderDeepLink = roleParam === "founder";
 
-  const [selectedPath] = useState<UserPath | null>(isFounderDeepLink ? "founder" : null);
   const [demoData, setDemoData] = useState<Omit<DemoAccountData, 'password'> | null>(null);
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);

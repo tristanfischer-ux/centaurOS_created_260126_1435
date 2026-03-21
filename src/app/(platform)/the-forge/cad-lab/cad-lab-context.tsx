@@ -1848,6 +1848,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // Register background op so progress survives navigation
     const bgOpId = startOp("Generating illustrations", "/the-forge/cad-lab")
 
+    // Hoisted so the finally block can clean up leaked timers on unexpected throw
+    const moduleTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
     try {
     // Immediately set all modules to "generating" image status in local state
     setModules((prev) =>
@@ -1881,7 +1884,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     }
 
     // Per-module safety timeout (30s) — reveal module even if image hasn't resolved
-    const moduleTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
     for (const mod of modulesToProcess) {
       const timeout = setTimeout(() => {
         setRevealedModuleIds((prev) => {
@@ -2045,11 +2047,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         )
         completedCount++
         setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
-        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 100), stepLabel: `${mod.name} (mirrored)` })
+        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel: `${mod.name} (mirrored)` })
         revealModule(mod.id)
       } else {
         await generateOne(mod)
-        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 100), stepLabel: mod.name })
+        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 89), stepLabel: mod.name })
         // If this is a primary, capture its URL for mirror reuse
         if (primaryIds.has(mod.id)) {
           let snap: CadLabModule[] = []
@@ -2065,12 +2067,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         await new Promise(resolve => setTimeout(resolve, 500))
       }
     }
-
-    // Clear any remaining safety timeouts
-    for (const timeout of moduleTimeouts.values()) {
-      clearTimeout(timeout)
-    }
-    moduleTimeouts.clear()
 
     // INTENT: Auto-retry failed modules once with backoff. Skip if ALL failed
     // (systemic issue like missing API key — retrying won't help).
@@ -2131,6 +2127,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } catch (unexpectedErr) {
       console.error("[CAD-LAB] Unexpected error in image generation pipeline:", unexpectedErr)
       failOp(bgOpId, "Illustration generation failed unexpectedly")
+    } finally {
+      // INTENT: Clear any leaked safety timeouts — if the try body threw before
+      // the normal cleanup, these timers would fire on a potentially stale context.
+      for (const timeout of moduleTimeouts.values()) {
+        clearTimeout(timeout)
+      }
+      moduleTimeouts.clear()
     }
     setIsGeneratingImages(false)
     setImageGenProgress(null)
