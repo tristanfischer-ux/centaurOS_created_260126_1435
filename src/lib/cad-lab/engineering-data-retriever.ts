@@ -76,7 +76,8 @@ export async function retrieveEngineeringDataForPrompt(
   // 2. Standard Hardware — inject bolt/nut clearance holes when fasteners are likely relevant
   const FASTENER_SIGNALS = /\b(bolt|screw|nut|washer|fastener|mount|bracket|flange|clamp|assembly|enclosure|frame|chassis)\b/i
   let hardwareCount = 0
-  const needsFasteners = FASTENER_SIGNALS.test(lower)
+  const combinedForFasteners = lower + " " + materials.join(" ").toLowerCase() + " " + processes.join(" ").toLowerCase()
+  const needsFasteners = FASTENER_SIGNALS.test(combinedForFasteners)
 
   const { data: hwData } = needsFasteners ? await supabase
     .from("standard_hardware")

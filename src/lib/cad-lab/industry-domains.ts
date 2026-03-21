@@ -161,6 +161,9 @@ const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
   general: [],
 }
 
+// Cache sorted keywords per domain (avoids re-sorting on every call)
+const SORTED_KEYWORDS_CACHE: Partial<Record<IndustryDomain, string[]>> = {}
+
 /**
  * Detects the most likely industry domain from a product description.
  *
@@ -184,16 +187,15 @@ export function detectIndustryDomain(text: string): IndustryDomain {
   for (const domain of DOMAIN_PRIORITY) {
     // Sort keywords longest-first so "multirotor" matches before "rotor",
     // preventing substring double-counting ("rotor" is substring of "multirotor")
-    const keywords = [...INDUSTRY_KEYWORDS[domain]].sort((a, b) => b.length - a.length)
+    const sorted = SORTED_KEYWORDS_CACHE[domain] ??= [...INDUSTRY_KEYWORDS[domain]].sort((a, b) => b.length - a.length)
     let score = 0
-    const matched = new Set<string>()
-    for (const kw of keywords) {
+    const matchedArr: string[] = []
+    for (const kw of sorted) {
       if (!lower.includes(kw)) continue
-      // Skip if a longer keyword already matched this substring
-      const isSubstringOfMatched = [...matched].some(m => m.includes(kw))
-      if (!isSubstringOfMatched) {
+      // Skip if a longer keyword already matched this substring (O(N) check on small array)
+      if (!matchedArr.some(m => m.includes(kw))) {
         score++
-        matched.add(kw)
+        matchedArr.push(kw)
       }
     }
     if (score > bestScore) {
