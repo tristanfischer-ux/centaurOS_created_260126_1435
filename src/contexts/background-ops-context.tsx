@@ -169,7 +169,7 @@ export function BackgroundOpsProvider({ children }: { children: ReactNode }): Re
         const isOnSourcePage = window.location.pathname.startsWith(op.sourceRoute)
         toast.success(successMessage ?? `${op.label} complete`, {
           duration: isOnSourcePage ? 4000 : 10000,
-          ...(!isOnSourcePage && op.sourceRoute ? {
+          ...(!isOnSourcePage ? {
             action: {
               label: "View",
               onClick: () => { routerRef.current.push(op.sourceRoute) },

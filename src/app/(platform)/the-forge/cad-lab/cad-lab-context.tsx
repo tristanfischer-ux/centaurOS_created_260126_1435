@@ -1848,6 +1848,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     // Register background op so progress survives navigation
     const bgOpId = startOp("Generating illustrations", "/the-forge/cad-lab")
 
+    try {
     // Immediately set all modules to "generating" image status in local state
     setModules((prev) =>
       prev.map((m) => {
@@ -2080,9 +2081,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     )
     if (failedModules.length > 0 && failedModules.length < modulesToProcess.length) {
       setImageGenProgress({ completed: 0, total: failedModules.length, failed: 0, phase: "retrying" })
+      updateOp(bgOpId, { progress: 90, stepLabel: "Retrying failed modules…" })
       await new Promise(resolve => setTimeout(resolve, 2000))
-      for (const mod of failedModules) {
-        await generateOne(mod)
+      for (let ri = 0; ri < failedModules.length; ri++) {
+        await generateOne(failedModules[ri])
+        updateOp(bgOpId, { progress: 90 + Math.round(((ri + 1) / failedModules.length) * 10), stepLabel: `Retry: ${failedModules[ri].name}` })
       }
     }
 
@@ -2124,6 +2127,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       }
     } else if (modulesToProcess.length > 0) {
       failOp(bgOpId, "All illustrations failed — check API key or retry")
+    }
+    } catch (unexpectedErr) {
+      console.error("[CAD-LAB] Unexpected error in image generation pipeline:", unexpectedErr)
+      failOp(bgOpId, "Illustration generation failed unexpectedly")
     }
     setIsGeneratingImages(false)
     setImageGenProgress(null)
