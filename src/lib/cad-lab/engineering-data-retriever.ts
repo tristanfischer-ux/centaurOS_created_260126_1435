@@ -62,13 +62,16 @@ export async function retrieveEngineeringDataForPrompt(
     }
   }
 
-  // 2. Standard Hardware — always inject bolt/nut clearance holes
+  // 2. Standard Hardware — inject bolt/nut clearance holes when fasteners are likely relevant
+  const FASTENER_SIGNALS = /\b(bolt|screw|nut|washer|fastener|mount|bracket|flange|clamp|assembly|enclosure|frame|chassis)\b/i
   let hardwareCount = 0
-  const { data: hwData } = await supabase
+  const needsFasteners = FASTENER_SIGNALS.test(lower)
+
+  const { data: hwData } = needsFasteners ? await supabase
     .from("standard_hardware")
     .select("*")
     .in("hardware_type", ["bolt", "nut", "washer"])
-    .order("designation")
+    .order("designation") : { data: null }
 
   if (hwData && hwData.length > 0) {
     hardwareCount = hwData.length

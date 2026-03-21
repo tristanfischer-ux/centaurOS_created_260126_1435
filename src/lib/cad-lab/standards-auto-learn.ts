@@ -108,7 +108,9 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
       .map(block => block.type === "text" ? block.text : "")
       .join("")
 
-    // Parse JSON from response — find the outermost balanced braces
+    // Parse JSON from response — find the outermost balanced braces,
+    // tracking whether we're inside a JSON string to ignore braces in values
+    // like {"rule": "use { brackets } for grouping"}
     const jsonStart = text.indexOf("{")
     if (jsonStart === -1) {
       console.error("[standards-auto-learn] No JSON found in response")
@@ -116,9 +118,13 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
     }
     let depth = 0
     let jsonEnd = -1
+    let inString = false
     for (let i = jsonStart; i < text.length; i++) {
-      if (text[i] === "{") depth++
-      else if (text[i] === "}") { depth--; if (depth === 0) { jsonEnd = i + 1; break } }
+      const ch = text[i]
+      if (ch === '"' && text[i - 1] !== "\\") { inString = !inString; continue }
+      if (inString) continue
+      if (ch === "{") depth++
+      else if (ch === "}") { depth--; if (depth === 0) { jsonEnd = i + 1; break } }
     }
     if (jsonEnd === -1) {
       console.error("[standards-auto-learn] Unbalanced braces in response")

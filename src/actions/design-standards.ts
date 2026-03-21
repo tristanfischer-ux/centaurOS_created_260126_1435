@@ -55,8 +55,12 @@ export async function searchStandards(
   limit: number = 20,
 ): Promise<{ data: DesignStandard[] | null; error: string | null }> {
   const supabase = await createClient()
+  if (!query || query.trim().length === 0) {
+    return { data: [], error: null }
+  }
+
   // SECURITY: Escape LIKE wildcards to prevent injection via % and _
-  const escaped = query.replace(/[%_\\]/g, (c) => `\\${c}`)
+  const escaped = query.trim().replace(/[%_\\]/g, (c) => `\\${c}`)
   const { data, error } = await supabase
     .from("design_standards")
     .select("*")

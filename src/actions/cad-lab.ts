@@ -940,6 +940,9 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       researchTime: Date.now() - start,
       designBrief: options?.designBrief,
       assumptionNotes: options?.assumptionNotes,
+      standardCodes: [],
+      industryDomain: undefined,
+      totalStandardsMatched: 0,
     }
   }
 }

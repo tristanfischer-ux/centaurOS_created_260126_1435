@@ -182,10 +182,19 @@ export function detectIndustryDomain(text: string): IndustryDomain {
   ]
 
   for (const domain of DOMAIN_PRIORITY) {
-    const keywords = INDUSTRY_KEYWORDS[domain]
+    // Sort keywords longest-first so "multirotor" matches before "rotor",
+    // preventing substring double-counting ("rotor" is substring of "multirotor")
+    const keywords = [...INDUSTRY_KEYWORDS[domain]].sort((a, b) => b.length - a.length)
     let score = 0
+    const matched = new Set<string>()
     for (const kw of keywords) {
-      if (lower.includes(kw)) score++
+      if (!lower.includes(kw)) continue
+      // Skip if a longer keyword already matched this substring
+      const isSubstringOfMatched = [...matched].some(m => m.includes(kw))
+      if (!isSubstringOfMatched) {
+        score++
+        matched.add(kw)
+      }
     }
     if (score > bestScore) {
       bestScore = score
