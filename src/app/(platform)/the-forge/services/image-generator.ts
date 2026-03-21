@@ -1149,8 +1149,15 @@ export async function generateResearchIllustration(
 
   if (customPrompt) {
     // INTENT: When Opus design synthesis provides a hero prompt, use it directly.
-    // Prepend no-text enforcement and append cohesive rendering rules.
-    prompt = enforceNoText(customPrompt) + COHESIVE_STYLE_SUFFIX
+    // Prepend white-background + color + no-text enforcement (image models weight
+    // the start of the prompt most heavily — putting these rules at the end caused
+    // dark/monochrome renders).
+    prompt = `MANDATORY RENDERING RULES (override any conflicting instructions below):
+1. Background MUST be pure white (#FFFFFF) — no dark backgrounds, no black, no gray, no gradients.
+2. Use FULL COLOR rendering — realistic material colors, not grayscale or monochrome.
+3. This image must contain ZERO text — no labels, annotations, words, letters, numbers, or callouts.
+
+` + enforceNoText(customPrompt) + COHESIVE_STYLE_SUFFIX
   } else {
     // Existing programmatic prompt construction
     const hasModules = moduleNames.length > 0
