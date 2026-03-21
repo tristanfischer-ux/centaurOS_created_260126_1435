@@ -4,8 +4,8 @@
  * @file guided-tour.tsx
  *
  * @description Cal-narrated 5-stop guided tour for new users. Shows the most
- * compelling ForgeOS features: Team Orbit, AI Specialists, Investor Database,
- * The Forge, and Marketplace. Cal (Chief-of-Staff AI) provides contextual
+ * compelling ForgeOS features: Team Orbit, Specialists, Investor Database,
+ * The Forge, and Marketplace. Cal (Chief of Staff) provides contextual
  * commentary at each stop.
  *
  * FLOW: Launched from UnifiedOnboarding after the welcome step. Each stop
@@ -168,10 +168,15 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
     router.push(stop.route)
   }, [handleComplete, router, stop.route])
 
-  // Keyboard navigation
+  // Keyboard navigation — ArrowRight/Left + Escape only.
+  // GOTCHA: Do NOT listen for Enter — when a Button is focused, Enter fires
+  // both the button's click handler AND this keydown handler, causing
+  // handleNext to run twice. On the last stop this double-fires handleComplete
+  // → two updateOnboardingData writes (RT3-01). Enter on a focused Back button
+  // would fire handleBack (click) + handleNext (keyboard) simultaneously (RT3-02).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent): void => {
-      if (e.key === 'ArrowRight' || e.key === 'Enter') handleNext()
+      if (e.key === 'ArrowRight') handleNext()
       else if (e.key === 'ArrowLeft') handleBack()
       else if (e.key === 'Escape') handleSkip()
     }
@@ -299,7 +304,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
                 type="button"
                 onClick={handleGoToFeature}
                 className={cn(
-                  'text-xs transition-colors',
+                  'text-xs transition-colors py-2 px-3 min-h-[44px] flex items-center',
                   stop.accentColor,
                   'hover:underline',
                 )}

@@ -18,10 +18,9 @@ import {
   Package,
   Building2,
   Sparkles,
-  Store,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { setAccountType, updateOnboardingData, getOnboardingAhaListings } from '@/actions/onboarding'
+import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -30,9 +29,11 @@ import { GuidedTour } from './guided-tour'
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
-type OnboardingStep = 'welcome' | 'intent' | 'firstlook'
+// DECISION: Removed 'firstlook' step — team_builders go to guided tour,
+// suppliers redirect to /supplier-portal. Nobody reaches a third step (RT3-03).
+type OnboardingStep = 'welcome' | 'intent'
 
-const STEPS: OnboardingStep[] = ['welcome', 'intent', 'firstlook']
+const STEPS: OnboardingStep[] = ['welcome', 'intent']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -73,8 +74,6 @@ export function UnifiedOnboarding({
   const [direction, setDirection] = useState(1)
   const [isSavingIntent, setIsSavingIntent] = useState(false)
   const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
-  const [ahaListings, setAhaListings] = useState<{ title: string; category: string; id: string }[]>([])
-  const [loadingListings, setLoadingListings] = useState(false)
   const [showGuidedTour, setShowGuidedTour] = useState(false)
   const migrationRanRef = useRef(false)
   const router = useRouter()
@@ -252,8 +251,8 @@ export function UnifiedOnboarding({
         Skip tour
       </motion.button>
 
-      {/* Step content */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8">
+      {/* Step content — overflow-y-auto prevents clipping on short viewports (landscape, iPad split) */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStep}
@@ -386,82 +385,6 @@ export function UnifiedOnboarding({
               </div>
             )}
 
-            {/* STEP 3: First Look — marketplace "aha moment" */}
-            {currentStep === 'firstlook' && (
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
-                    Here&apos;s what&apos;s waiting for you
-                  </h2>
-                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                    Real resources from the marketplace, matched to your industry.
-                  </p>
-                </div>
-
-                {loadingListings ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-pulse text-sm text-muted-foreground">
-                      Finding relevant listings...
-                    </div>
-                  </div>
-                ) : ahaListings.length > 0 ? (
-                  <div className="grid gap-3 max-w-lg mx-auto">
-                    {ahaListings.map((listing, i) => (
-                      <motion.div
-                        key={listing.id}
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2 + i * 0.1 }}
-                        className="flex items-center gap-4 p-4 rounded-xl bg-card border text-left"
-                      >
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-international-orange/10 shrink-0">
-                          <Store className="w-5 h-5 text-international-orange" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-foreground truncate">
-                            {listing.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{listing.category}</p>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="py-6">
-                    <p className="text-sm text-muted-foreground">
-                      The marketplace is growing daily. Explore it once you&apos;re inside.
-                    </p>
-                  </div>
-                )}
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    onClick={handleComplete}
-                    className="bg-international-orange hover:bg-international-orange/90 text-white px-12 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
-                  >
-                    Enter the Forge
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </motion.div>
-
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await handleComplete()
-                    router.push('/marketplace')
-                  }}
-                  className="text-xs text-muted-foreground hover:text-international-orange transition-colors"
-                >
-                  Browse the full marketplace
-                </button>
-              </div>
-            )}
           </motion.div>
         </AnimatePresence>
       </div>
