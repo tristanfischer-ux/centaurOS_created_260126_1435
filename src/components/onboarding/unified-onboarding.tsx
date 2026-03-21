@@ -192,15 +192,16 @@ export function UnifiedOnboarding({
     })
   }, [])
 
-  // Escape key to dismiss
+  // Escape key to dismiss — disabled when guided tour is active (it has its
+  // own Escape handler). Without this guard, both fire and double-write to DB (RT-02).
   useEffect(() => {
-    if (!open) return
+    if (!open || showGuidedTour) return
     const handleKeyDown = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') handleSkip()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [open, handleSkip])
+  }, [open, showGuidedTour, handleSkip])
 
   if (!open) return null
 

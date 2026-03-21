@@ -12,7 +12,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardContent, CardFooter } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Circle, Briefcase, Heart, GitCompare } from 'lucide-react'
+import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Briefcase, Heart, GitCompare } from 'lucide-react'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
@@ -53,24 +53,39 @@ function qualityDotClass(score: number | undefined): string | null {
   return 'bg-muted-foreground'
 }
 
+/** True if value is a non-empty string, non-empty array, or non-null/zero number. */
+function hasData(v: unknown): boolean {
+  if (v == null) return false
+  if (typeof v === 'string') return v.trim().length > 0
+  if (Array.isArray(v)) return v.length > 0
+  if (typeof v === 'number') return v !== 0
+  if (typeof v === 'object') return Object.keys(v).length > 0
+  return Boolean(v)
+}
+
+/** True if cheque range has at least one non-null bound. */
+function hasChequeRange(cr: { min: number | null; max: number | null } | undefined): boolean {
+  return cr != null && (cr.min != null || cr.max != null)
+}
+
 /** Count how many key data dimensions are populated (max 5). */
 function computeDataDepth(firm: InvestorFirm): number {
   const a = firm.attributes
   let depth = 0
-  // 1. Basics: location + fund size
-  if (a.hq_city && formatFundSize(a.fund_size_gbp)) depth++
+  // 1. Basics: location OR fund size (DD-02: OR not AND — either is valuable)
+  if (a.hq_city || (a.fund_size_gbp != null && a.fund_size_gbp !== 0)) depth++
   // 2. Strategy: stage focus or sectors
   if ((a.stage_focus ?? []).length > 0 || (a.sectors ?? []).length > 0) depth++
   // 3. Track record: portfolio companies
   if ((a.portfolio_companies?.length ?? 0) > 0) depth++
-  // 4. Intelligence: thesis, geo focus, or cheque range
-  if (a.investment_thesis || (a.geo_focus ?? []).length > 0 || a.cheque_range_gbp) depth++
-  // 5. Deep data: fund history, exits, or performance
-  if (a.fund_history || a.exits || a.fund_performance) depth++
+  // 4. Intelligence: thesis, geo focus, or cheque range (DD-01: check bounds not just truthy)
+  if (a.investment_thesis || (a.geo_focus ?? []).length > 0 || hasChequeRange(a.cheque_range_gbp)) depth++
+  // 5. Deep data: fund history, exits, or performance (DD-04: guard against empty objects)
+  if (hasData(a.fund_history) || hasData(a.exits) || hasData(a.fund_performance)) depth++
   return depth
 }
 
-const DEPTH_LABELS = ['Minimal', 'Basic', 'Good', 'Detailed', 'Rich', 'Comprehensive']
+const DEPTH_LABELS = ['Minimal', 'Basic', 'Good', 'Detailed', 'Rich', 'Comprehensive'] as const
 
 // ---------------------------------------------------------------------------
 // Component
@@ -100,6 +115,9 @@ export function InvestorCard({
   const portfolioCount = attrs.portfolio_companies?.length ?? 0
   const fundSizeLabel = formatFundSize(attrs.fund_size_gbp)
   const dataDepth = computeDataDepth(firm)
+  // DD-10: Compute URLs once instead of calling ensureProtocol twice per URL
+  const websiteHref = attrs.website_url ? ensureProtocol(attrs.website_url) : ''
+  const linkedinHref = attrs.linkedin_company_url ? ensureProtocol(attrs.linkedin_company_url) : ''
 
   return (
     <Card className="flex flex-col h-full hover:-translate-y-0.5 active:scale-[0.99] duration-200 transition-all group relative">
@@ -269,30 +287,42 @@ export function InvestorCard({
           View profile →
         </Link>
         <div className="flex items-center gap-3">
-          {/* Data depth indicator */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1" aria-label={`Data depth: ${DEPTH_LABELS[dataDepth]}`}>
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <span
-                      key={i}
-                      className={cn(
-                        'h-1.5 w-2.5 rounded-sm transition-colors',
-                        i < dataDepth ? 'bg-international-orange' : 'bg-border'
-                      )}
-                    />
-                  ))}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{DEPTH_LABELS[dataDepth]} profile — {dataDepth}/5 data dimensions</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {attrs.website_url && ensureProtocol(attrs.website_url) && (
+          {/* Data depth indicator — DD-09: hidden when depth is 0 */}
+          {dataDepth > 0 && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* DD-06: role="meter" for screen readers; DD-07: tabIndex for keyboard focus */}
+                  <div
+                    className="flex items-center gap-1"
+                    role="meter"
+                    aria-label="Profile data depth"
+                    aria-valuenow={dataDepth}
+                    aria-valuemin={0}
+                    aria-valuemax={5}
+                    aria-valuetext={`${DEPTH_LABELS[dataDepth] ?? 'Unknown'} — ${dataDepth} of 5 data dimensions`}
+                    tabIndex={0}
+                  >
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          'h-1.5 w-2.5 rounded-sm transition-colors',
+                          i < dataDepth ? 'bg-international-orange' : 'bg-border'
+                        )}
+                      />
+                    ))}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{DEPTH_LABELS[dataDepth] ?? 'Unknown'} profile — {dataDepth}/5 data dimensions</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {websiteHref && (
             <a
-              href={ensureProtocol(attrs.website_url)}
+              href={websiteHref}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"
@@ -301,9 +331,9 @@ export function InvestorCard({
               <Globe className="h-3.5 w-3.5" />
             </a>
           )}
-          {attrs.linkedin_company_url && ensureProtocol(attrs.linkedin_company_url) && (
+          {linkedinHref && (
             <a
-              href={ensureProtocol(attrs.linkedin_company_url)}
+              href={linkedinHref}
               target="_blank"
               rel="noopener noreferrer"
               className="text-muted-foreground hover:text-foreground transition-colors"

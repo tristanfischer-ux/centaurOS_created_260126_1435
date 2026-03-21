@@ -61,8 +61,8 @@ const TOUR_STOPS: TourStop[] = [
       "This is your AI team — nine specialists covering strategy, finance, legal, sales, marketing, hiring, operations, and engineering. We work around the clock. I'm Cal, your Chief of Staff, and I coordinate the lot of us.",
     icon: <Bot className="w-6 h-6" />,
     route: '/agents',
-    accentColor: 'text-purple-600',
-    accentBg: 'bg-purple-600/10',
+    accentColor: 'text-info',
+    accentBg: 'bg-info/10',
   },
   {
     id: 'investors',
@@ -119,22 +119,6 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
   const isLastStop = currentStop === TOUR_STOPS.length - 1
   const progressPercent = ((currentStop + 1) / TOUR_STOPS.length) * 100
 
-  const handleNext = useCallback(() => {
-    if (isLastStop) {
-      handleComplete()
-    } else {
-      setDirection(1)
-      setCurrentStop(prev => prev + 1)
-    }
-  }, [isLastStop])
-
-  const handleBack = useCallback(() => {
-    if (currentStop > 0) {
-      setDirection(-1)
-      setCurrentStop(prev => prev - 1)
-    }
-  }, [currentStop])
-
   const handleComplete = useCallback(async () => {
     // INTENT: Close immediately, persist completion best-effort
     onComplete()
@@ -160,6 +144,25 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
     })
   }, [onComplete])
 
+  // GOTCHA: handleComplete must be defined before handleNext — forward reference
+  // causes TDZ error. handleComplete must also be in deps to avoid stale closure
+  // on last-stop click (RT-01).
+  const handleNext = useCallback(() => {
+    if (isLastStop) {
+      handleComplete()
+    } else {
+      setDirection(1)
+      setCurrentStop(prev => prev + 1)
+    }
+  }, [isLastStop, handleComplete])
+
+  const handleBack = useCallback(() => {
+    if (currentStop > 0) {
+      setDirection(-1)
+      setCurrentStop(prev => prev - 1)
+    }
+  }, [currentStop])
+
   const handleGoToFeature = useCallback(async () => {
     await handleComplete()
     router.push(stop.route)
@@ -181,7 +184,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-background"
+      className="fixed inset-0 z-50 bg-background"
     >
       {/* Progress bar */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-muted z-10">
@@ -197,7 +200,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         onClick={handleSkip}
-        className="absolute top-6 right-8 z-20 text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Skip tour"
       >
         <X className="w-5 h-5" />
@@ -309,7 +312,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
       </div>
 
       {/* Stop dots */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2 z-10">
+      <div className="absolute bottom-8 pb-safe left-0 right-0 flex justify-center gap-2 z-10">
         {TOUR_STOPS.map((s, index) => (
           <button
             key={s.id}

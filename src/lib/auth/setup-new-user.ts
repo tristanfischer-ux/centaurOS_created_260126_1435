@@ -204,11 +204,12 @@ export async function setupNewUser({
     joined_at: new Date().toISOString(),
   });
 
-  // --- Demo data for all non-supplier roles ---
-  // INTENT: Every user should see populated content on first login. Founders get
-  // demo concepts + objectives. Executives/Apprentices get demo concepts so The
-  // Forge isn't empty when they explore it during the guided tour.
-  if (role !== "supplier" && foundryId) {
+  // --- Demo data for founders (own isolated foundry) ---
+  // DECISION: Only seed demo data for founders who get their own foundry (RT-03).
+  // Executives/Apprentices share forge-guild — seeding per-user demo concepts into
+  // a shared foundry causes data pollution (N signups = 3N demo entries visible to
+  // everyone). The guided tour still shows them what The Forge looks like.
+  if (role === "founder" && foundryId) {
     // Demo forge concepts — 3 products showing breadth of The Forge
     const conceptRpcs = [
       "seed_demo_forge_concept",
@@ -228,24 +229,22 @@ export async function setupNewUser({
     }
 
     // Founder-only: demo objectives and tasks
-    if (role === "founder") {
-      try {
-        await supabase.rpc("seed_founder_demo_data", {
-          p_foundry_id: foundryId,
-          p_user_id: userId,
-        });
-      } catch (e) {
-        console.warn("[setupNewUser] seed_founder_demo_data failed:", e);
-      }
+    try {
+      await supabase.rpc("seed_founder_demo_data", {
+        p_foundry_id: foundryId,
+        p_user_id: userId,
+      });
+    } catch (e) {
+      console.warn("[setupNewUser] seed_founder_demo_data failed:", e);
+    }
 
-      try {
-        await supabase.rpc("seed_founder_demo_data_expanded", {
-          p_foundry_id: foundryId,
-          p_user_id: userId,
-        });
-      } catch (e) {
-        console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", e);
-      }
+    try {
+      await supabase.rpc("seed_founder_demo_data_expanded", {
+        p_foundry_id: foundryId,
+        p_user_id: userId,
+      });
+    } catch (e) {
+      console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", e);
     }
   }
 
