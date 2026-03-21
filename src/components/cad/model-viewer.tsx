@@ -263,6 +263,11 @@ export function ModelViewer({
         shadows
         style={{ background: backgroundColor }}
         gl={{ antialias: true, alpha: false }}
+        onCreated={({ gl }) => {
+          gl.outputColorSpace = THREE.SRGBColorSpace
+          gl.toneMapping = THREE.ACESFilmicToneMapping
+          gl.toneMappingExposure = 1.0
+        }}
       >
         <Suspense fallback={null}>
           <ambientLight intensity={0.6} />
