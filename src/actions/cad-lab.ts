@@ -878,7 +878,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         } else if (industryDomain !== "general") {
           // Auto-learn: no standards found for this domain — generate them
           console.info(`[THE-FORGE] Step 1: No standards for domain ${industryDomain} — auto-learning...`)
-          const newStandards = await generateAndStoreStandards(industryDomain, description, [])
+          const newStandards = await generateAndStoreStandards(industryDomain, description, matchedStandardCodes)
           if (newStandards.length > 0) {
             const retryResult = await retrieveStandardsForPrompt(
               industryDomain, description, [], [], 20_000, "summary",

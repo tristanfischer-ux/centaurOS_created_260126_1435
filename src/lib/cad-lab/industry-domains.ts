@@ -171,8 +171,17 @@ export function detectIndustryDomain(text: string): IndustryDomain {
   let bestDomain: IndustryDomain = "general"
   let bestScore = 0
 
-  for (const [domain, keywords] of Object.entries(INDUSTRY_KEYWORDS) as [IndustryDomain, string[]][]) {
-    if (domain === "general") continue
+  // DECISION: Fixed iteration order for deterministic tie-breaking.
+  // More specific domains checked first so "drone for mining" → mining (not aerospace).
+  const DOMAIN_PRIORITY: IndustryDomain[] = [
+    "medical", "aerospace", "marine", "automotive", "defense",
+    "oil_gas", "mining", "water_treatment", "processing", "rail",
+    "robotics", "energy", "construction", "agriculture",
+    "industrial", "consumer", "furniture", "sporting", "packaging",
+  ]
+
+  for (const domain of DOMAIN_PRIORITY) {
+    const keywords = INDUSTRY_KEYWORDS[domain]
     let score = 0
     for (const kw of keywords) {
       if (lower.includes(kw)) score++

@@ -47,11 +47,12 @@ export function scoreStandard(
     reasons.push(`Domain match: ${industryDomain}`)
   }
 
-  // 2. Product tag match (25pts) — proportional to overlap
+  // 2. Product tag match (25pts) — proportional to overlap (case-insensitive)
   if (standard.product_tags.length > 0 && productKeywords.length > 0) {
-    const overlap = standard.product_tags.filter(tag =>
-      productKeywords.some(kw => kw.includes(tag) || tag.includes(kw))
-    )
+    const overlap = standard.product_tags.filter(tag => {
+      const lTag = tag.toLowerCase()
+      return productKeywords.some(kw => kw.toLowerCase().includes(lTag) || lTag.includes(kw.toLowerCase()))
+    })
     if (overlap.length > 0) {
       const ratio = Math.min(overlap.length / Math.max(standard.product_tags.length, 1), 1)
       const pts = Math.round(ratio * WEIGHTS.productTagMatch)
@@ -60,11 +61,12 @@ export function scoreStandard(
     }
   }
 
-  // 3. Engineering tag match (20pts) — proportional to overlap
+  // 3. Engineering tag match (20pts) — proportional to overlap (case-insensitive)
   if (standard.engineering_tags.length > 0 && engineeringKeywords.length > 0) {
-    const overlap = standard.engineering_tags.filter(tag =>
-      engineeringKeywords.some(kw => kw.includes(tag) || tag.includes(kw))
-    )
+    const overlap = standard.engineering_tags.filter(tag => {
+      const lTag = tag.toLowerCase()
+      return engineeringKeywords.some(kw => kw.toLowerCase().includes(lTag) || lTag.includes(kw.toLowerCase()))
+    })
     if (overlap.length > 0) {
       const ratio = Math.min(overlap.length / Math.max(standard.engineering_tags.length, 1), 1)
       const pts = Math.round(ratio * WEIGHTS.engineeringTagMatch)

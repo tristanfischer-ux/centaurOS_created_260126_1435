@@ -230,7 +230,7 @@ export function ProductOverviewCard({
               {industryDomain && (
                 <>{formatDomainLabel(industryDomain)} domain</>
               )}
-              {totalStandardsMatched != null && totalStandardsMatched > standardCodes.length && (
+              {totalStandardsMatched != null && standardCodes && totalStandardsMatched > standardCodes.length && (
                 <> — {totalStandardsMatched} standards matched, top {standardCodes.length} applied</>
               )}
             </p>

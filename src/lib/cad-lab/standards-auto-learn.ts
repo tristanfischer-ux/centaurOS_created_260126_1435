@@ -151,9 +151,11 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
       verified: false,
     }))
 
+    // DECISION: ignoreDuplicates: false so concurrent auto-learn calls merge cleanly
+    // (second caller overwrites with same data, no race condition)
     const { data, error } = await supabase
       .from("design_standards")
-      .upsert(toInsert, { onConflict: "standard_code", ignoreDuplicates: true })
+      .upsert(toInsert, { onConflict: "standard_code", ignoreDuplicates: false })
       .select()
 
     if (error) {

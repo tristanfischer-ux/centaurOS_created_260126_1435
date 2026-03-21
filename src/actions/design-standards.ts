@@ -55,10 +55,12 @@ export async function searchStandards(
   limit: number = 20,
 ): Promise<{ data: DesignStandard[] | null; error: string | null }> {
   const supabase = await createClient()
+  // SECURITY: Escape LIKE wildcards to prevent injection via % and _
+  const escaped = query.replace(/[%_\\]/g, (c) => `\\${c}`)
   const { data, error } = await supabase
     .from("design_standards")
     .select("*")
-    .or(`standard_code.ilike.%${query}%,standard_name.ilike.%${query}%,summary.ilike.%${query}%`)
+    .or(`standard_code.ilike.%${escaped}%,standard_name.ilike.%${escaped}%,summary.ilike.%${escaped}%`)
     .is("superseded_by", null)
     .limit(limit)
 

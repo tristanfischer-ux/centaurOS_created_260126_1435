@@ -159,11 +159,6 @@ function detectMaterialFamilies(text: string, materials: string[]): string[] {
     }
   }
 
-  // If nothing detected, return the most common families as a baseline
-  if (families.length === 0) {
-    return ["aluminum", "steel", "polymer"]
-  }
-
   return families
 }
 
@@ -192,11 +187,6 @@ function detectProcesses(text: string, processes: string[]): string[] {
     if (keywords.some(kw => combined.includes(kw))) {
       detected.push(process)
     }
-  }
-
-  // Default processes if nothing detected
-  if (detected.length === 0) {
-    return ["cnc_milling", "fdm"]
   }
 
   return detected

@@ -78,6 +78,7 @@ export async function retrieveStandardsForPrompt(
   }
 
   // Budget-pack: greedily add standards until budget exhausted
+  // Always include at least the top-1 standard even if over budget
   const selected: StandardsRecommendation[] = []
   let tokensUsed = 0
 
@@ -86,7 +87,7 @@ export async function retrieveStandardsForPrompt(
       ? Math.ceil(rec.summary.length / 4)
       : rec.tokenEstimate || Math.ceil(rec.requirementsMarkdown.length / 4)
 
-    if (tokensUsed + tokenCost > maxTokenBudget) break
+    if (selected.length > 0 && tokensUsed + tokenCost > maxTokenBudget) break
     selected.push(rec)
     tokensUsed += tokenCost
   }
