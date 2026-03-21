@@ -11,14 +11,15 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { MapPin } from 'lucide-react'
+import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm } from '@/actions/investors'
 
 interface SimilarInvestorsSectionProps {
   firms: InvestorFirm[]
-  matchScores?: Record<string, number>
+  similarityScores?: Record<string, number>
 }
 
-export function SimilarInvestorsSection({ firms, matchScores }: SimilarInvestorsSectionProps) {
+export function SimilarInvestorsSection({ firms, similarityScores }: SimilarInvestorsSectionProps) {
   if (firms.length === 0) return null
 
   return (
@@ -26,7 +27,8 @@ export function SimilarInvestorsSection({ firms, matchScores }: SimilarInvestors
       <h3 className="text-sm font-semibold text-foreground">Investors Like This</h3>
       <div className="flex gap-3 overflow-x-auto pb-2">
         {firms.map(firm => {
-          const score = matchScores?.[firm.id]
+          const score = similarityScores?.[firm.id]
+          const fundSize = formatFundSize(firm.attributes.fund_size_gbp)
           return (
             <Link key={firm.id} href={`/investors/${firm.id}`} className="shrink-0">
               <Card className="w-[200px] hover:-translate-y-0.5 transition-all duration-200">
@@ -41,7 +43,7 @@ export function SimilarInvestorsSection({ firms, matchScores }: SimilarInvestors
                         variant="secondary"
                         className={`text-[10px] py-0 ${score >= 70 ? 'text-success' : score >= 40 ? 'text-warning' : ''}`}
                       >
-                        {score}%
+                        {score}% similar
                       </Badge>
                     )}
                   </div>
@@ -51,9 +53,9 @@ export function SimilarInvestorsSection({ firms, matchScores }: SimilarInvestors
                       {firm.attributes.hq_city}
                     </p>
                   )}
-                  {firm.attributes.fund_size_gbp != null && (
+                  {fundSize && (
                     <p className="text-[10px] text-muted-foreground">
-                      Fund: £{(firm.attributes.fund_size_gbp / 1_000_000).toFixed(0)}M
+                      Fund: {fundSize}
                     </p>
                   )}
                 </CardContent>

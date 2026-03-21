@@ -1109,8 +1109,8 @@ export async function getAlertedListingIds(): Promise<string[]> {
 export async function getSimilarInvestors(
   listingId: string,
   limit = 5
-): Promise<{ firms: InvestorFirm[] }> {
-  if (!UUID_RE.test(listingId)) return { firms: [] }
+): Promise<{ firms: InvestorFirm[]; similarityScores: Record<string, number> }> {
+  if (!UUID_RE.test(listingId)) return { firms: [], similarityScores: {} }
 
   const supabase = await createClient()
 
@@ -1122,7 +1122,7 @@ export async function getSimilarInvestors(
     .eq('category', 'Finance')
     .single()
 
-  if (!targetRow) return { firms: [] }
+  if (!targetRow) return { firms: [], similarityScores: {} }
   const target = rowToFirm(targetRow as Record<string, unknown>)
 
   // Fetch top 50 firms by quality for candidate pool
@@ -1133,13 +1133,15 @@ export async function getSimilarInvestors(
     .order('data_quality_score', { ascending: false })
     .limit(50)
 
-  if (!candidateRows) return { firms: [] }
+  if (!candidateRows) return { firms: [], similarityScores: {} }
 
   const candidates = candidateRows.map(r => rowToFirm(r as Record<string, unknown>))
   const similar = findSimilarInvestors(target, candidates, limit)
 
   const access = await getInvestorTierAccess()
-  return { firms: similar.map(f => stripTierGatedFields(f, access)) }
+  const similarityScores: Record<string, number> = {}
+  for (const s of similar) similarityScores[s.firm.id] = s.similarity
+  return { firms: similar.map(s => stripTierGatedFields(s.firm, access)), similarityScores }
 }
 
 // ---------------------------------------------------------------------------

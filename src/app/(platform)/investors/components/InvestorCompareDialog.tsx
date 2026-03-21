@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm } from '@/actions/investors'
 
 interface InvestorCompareDialogProps {
@@ -20,23 +21,10 @@ interface InvestorCompareDialogProps {
   matchScores: Record<string, number>
 }
 
-function formatFundSize(gbp: number | undefined): string {
-  if (gbp == null) return '—'
-  if (gbp >= 1_000_000_000) {
-    const b = gbp / 1_000_000_000
-    return `£${b % 1 === 0 ? b : b.toFixed(1)}B`
-  }
-  if (gbp >= 1_000_000) {
-    const m = gbp / 1_000_000
-    return `£${m % 1 === 0 ? m : m.toFixed(0)}M`
-  }
-  return `£${gbp.toLocaleString()}`
-}
-
 function formatCheque(range: { min: number | null; max: number | null } | undefined): string {
   if (!range) return '—'
-  const min = range.min != null ? formatFundSize(range.min) : '?'
-  const max = range.max != null ? formatFundSize(range.max) : '?'
+  const min = formatFundSize(range.min) ?? '?'
+  const max = formatFundSize(range.max) ?? '?'
   return `${min} – ${max}`
 }
 
@@ -48,7 +36,7 @@ type CompareRow = {
 }
 
 const ROWS: CompareRow[] = [
-  { label: 'Fund Size', getValue: f => formatFundSize(f.attributes.fund_size_gbp), getNumeric: f => f.attributes.fund_size_gbp ?? null, higherIsBetter: true },
+  { label: 'Fund Size', getValue: f => formatFundSize(f.attributes.fund_size_gbp) ?? '—', getNumeric: f => f.attributes.fund_size_gbp ?? null, higherIsBetter: true },
   { label: 'Cheque Range', getValue: f => formatCheque(f.attributes.cheque_range_gbp) },
   { label: 'Stage Focus', getValue: f => (f.attributes.stage_focus ?? []).join(', ') || '—' },
   { label: 'Sectors', getValue: f => (f.attributes.sectors ?? []).slice(0, 4).join(', ') || '—' },

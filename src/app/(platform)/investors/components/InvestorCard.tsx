@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Building2, Globe, Linkedin, MapPin, TrendingUp, CheckCircle2, Circle, Briefcase, Heart, GitCompare } from 'lucide-react'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { cn } from '@/lib/utils'
+import { formatFundSize } from '@/lib/format'
 import type { InvestorFirm } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
@@ -26,18 +27,6 @@ function ensureProtocol(url: string): string {
   // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
   if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''
   return `https://${url}`
-}
-
-function formatFundSize(gbp: number): string {
-  if (gbp >= 1_000_000_000) {
-    const b = gbp / 1_000_000_000
-    return `£${b % 1 === 0 ? b : b.toFixed(1)}B`
-  }
-  if (gbp >= 1_000_000) {
-    const m = gbp / 1_000_000
-    return `£${m % 1 === 0 ? m : m.toFixed(0)}M`
-  }
-  return `£${gbp.toLocaleString()}`
 }
 
 function priorityVariant(priority: string | undefined): 'destructive' | 'warning' | 'secondary' | 'outline' {
@@ -196,7 +185,7 @@ export function InvestorCard({
               {attrs.hq_city}
             </span>
           )}
-          {attrs.fund_size_gbp != null && (
+          {formatFundSize(attrs.fund_size_gbp) && (
             <span className="flex items-center gap-1">
               <Building2 className="h-3.5 w-3.5 shrink-0" />
               {formatFundSize(attrs.fund_size_gbp)}

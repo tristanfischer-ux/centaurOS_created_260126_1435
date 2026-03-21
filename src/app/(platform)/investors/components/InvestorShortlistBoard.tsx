@@ -7,6 +7,7 @@
 
 'use client'
 
+import { formatFundSize } from '@/lib/format'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
@@ -139,9 +140,9 @@ function CompactInvestorCard({ item, isDragOverlay }: { item: ShortlistItem; isD
             </span>
           )}
         </div>
-        {attrs.fund_size_gbp != null && (
+        {formatFundSize(attrs.fund_size_gbp) && (
           <p className="text-[10px] text-muted-foreground">
-            Fund: £{(attrs.fund_size_gbp / 1_000_000).toFixed(0)}M
+            Fund: {formatFundSize(attrs.fund_size_gbp)}
           </p>
         )}
       </CardContent>

@@ -6,6 +6,7 @@
  */
 
 import type { InvestorFirm } from '@/actions/investors'
+import { formatFundSize } from '@/lib/format'
 
 // ---------------------------------------------------------------------------
 // CSV Export
@@ -179,7 +180,7 @@ export async function exportInvestorsPPTX(
         return [
           { text: f.title, options: { fontSize: 8 } },
           { text: a.firm_type ?? '', options: { fontSize: 8 } },
-          { text: a.fund_size_gbp ? `£${(a.fund_size_gbp / 1e6).toFixed(0)}M` : '', options: { fontSize: 8 } },
+          { text: formatFundSize(a.fund_size_gbp) ?? '', options: { fontSize: 8 } },
           { text: (a.stage_focus ?? []).slice(0, 2).join(', '), options: { fontSize: 8 } },
           { text: matchScores?.[f.id]?.toString() ?? '', options: { fontSize: 8 } },
         ]

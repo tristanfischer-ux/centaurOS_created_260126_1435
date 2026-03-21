@@ -177,7 +177,7 @@ export function findSimilarInvestors(
   target: InvestorFirm,
   candidates: InvestorFirm[],
   limit = 5
-): InvestorFirm[] {
+): { firm: InvestorFirm; similarity: number }[] {
   const targetSectors = new Set((target.attributes.sectors ?? []).map(s => s.toLowerCase()))
   const targetStages = new Set((target.attributes.stage_focus ?? []).map(s => s.toLowerCase()))
   const targetGeo = new Set((target.attributes.geo_focus ?? []).map(g => g.toLowerCase()))
@@ -208,7 +208,7 @@ export function findSimilarInvestors(
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
 
-  return scored.map(s => s.firm)
+  return scored.map(s => ({ firm: s.firm, similarity: Math.round(s.score * 100) }))
 }
 
 function jaccard(a: Set<string>, b: Set<string>): number {

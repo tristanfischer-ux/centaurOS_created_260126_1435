@@ -8,6 +8,7 @@
 
 'use client'
 
+import { formatFundSize } from '@/lib/format'
 import { useMemo, useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -159,8 +160,8 @@ export function InvestorMapView({ firms }: InvestorMapViewProps) {
                       <a href={`/investors/${f.id}`} className="text-international-orange hover:underline">
                         {f.title}
                       </a>
-                      {f.attributes.fund_size_gbp != null && (
-                        <span className="text-muted-foreground"> — £{(f.attributes.fund_size_gbp / 1e6).toFixed(0)}M</span>
+                      {formatFundSize(f.attributes.fund_size_gbp) && (
+                        <span className="text-muted-foreground"> — {formatFundSize(f.attributes.fund_size_gbp)}</span>
                       )}
                     </p>
                   ))}

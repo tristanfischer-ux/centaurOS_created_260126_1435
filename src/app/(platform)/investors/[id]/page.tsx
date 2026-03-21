@@ -20,9 +20,9 @@ import {
   getInvestorById,
   getInvestorContacts,
   getSimilarInvestors,
-  computeMatchScores,
 } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
+import { formatFundSize } from '@/lib/format'
 import type { InvestorTierAccess } from '@/actions/investors'
 import { PartnerCard } from '../components/PartnerCard'
 import { PortfolioSection } from '../components/PortfolioSection'
@@ -76,18 +76,6 @@ async function getUserSector(): Promise<string | null> {
     console.error('[getUserSector] Failed:', err)
     return null
   }
-}
-
-function formatFundSize(gbp: number): string {
-  if (gbp >= 1_000_000_000) {
-    const b = gbp / 1_000_000_000
-    return `£${b % 1 === 0 ? b : b.toFixed(1)}B`
-  }
-  if (gbp >= 1_000_000) {
-    const m = gbp / 1_000_000
-    return `£${m % 1 === 0 ? m : m.toFixed(0)}M`
-  }
-  return `£${gbp.toLocaleString()}`
 }
 
 function priorityVariant(priority: string | undefined): 'destructive' | 'warning' | 'secondary' | 'outline' {
@@ -213,15 +201,10 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   const similarFirms = similarResult.status === 'fulfilled'
     ? similarResult.value.firms
     : []
+  const similarScores = similarResult.status === 'fulfilled'
+    ? similarResult.value.similarityScores
+    : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
-
-  // Compute match scores for similar investors
-  let similarScores: Record<string, number> = {}
-  if (similarFirms.length > 0) {
-    try {
-      similarScores = await computeMatchScores(similarFirms.map(f => f.id))
-    } catch { /* Non-critical */ }
-  }
 
   return (
     <TooltipProvider>
@@ -481,7 +464,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
 
             {/* Similar Investors */}
             {similarFirms.length > 0 && (
-              <SimilarInvestorsSection firms={similarFirms} matchScores={similarScores} />
+              <SimilarInvestorsSection firms={similarFirms} similarityScores={similarScores} />
             )}
           </div>
 
@@ -496,7 +479,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </h2>
               </CardHeader>
               <CardContent className="space-y-3">
-                {attrs.fund_size_gbp != null && (
+                {formatFundSize(attrs.fund_size_gbp) && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Fund Size</p>
                     <p className="text-sm font-semibold text-foreground">{formatFundSize(attrs.fund_size_gbp)}</p>
@@ -506,13 +489,13 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cheque Size</p>
                     <p className="text-sm font-semibold text-foreground">
-                      {attrs.cheque_range_gbp.min ? formatFundSize(attrs.cheque_range_gbp.min) : '?'}
+                      {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'}
                       {' – '}
-                      {attrs.cheque_range_gbp.max ? formatFundSize(attrs.cheque_range_gbp.max) : '?'}
+                      {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
                     </p>
                   </div>
                 )}
-                {attrs.aum_gbp != null && (
+                {formatFundSize(attrs.aum_gbp) && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">AUM</p>
                     <p className="text-sm font-semibold text-foreground">{formatFundSize(attrs.aum_gbp)}</p>

@@ -68,3 +68,25 @@ export function formatCurrencyFromMinorUnits(
 ): string {
   return formatCurrency(amountInMinorUnits / 100, currency, locale)
 }
+
+/**
+ * Formats a fund size in GBP as a compact string (e.g. "£25M", "£1.2B").
+ *
+ * @description Returns null for zero or missing values (unknown fund size stored as 0).
+ * Handles billions, millions, and sub-million amounts.
+ *
+ * @param gbp - Fund size in GBP (major units)
+ * @returns Formatted string or null if the value is zero/missing
+ */
+export function formatFundSize(gbp: number | null | undefined): string | null {
+  if (gbp == null || gbp === 0) return null
+  if (gbp >= 1_000_000_000) {
+    const b = gbp / 1_000_000_000
+    return `£${b % 1 === 0 ? b : b.toFixed(1)}B`
+  }
+  if (gbp >= 1_000_000) {
+    const m = gbp / 1_000_000
+    return `£${m % 1 === 0 ? m : m.toFixed(0)}M`
+  }
+  return `£${gbp.toLocaleString()}`
+}
