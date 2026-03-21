@@ -60,12 +60,15 @@ function disposeScene(scene: THREE.Object3D) {
 function GLBModel({ url }: { url: string }) {
   const gltf = useLoader(GLTFLoader, url)
 
-  // SECURITY: Dispose GPU resources on unmount or URL change
+  // INTENT: Clear useLoader cache on unmount so remounting triggers a fresh load.
+  // GOTCHA: Must clear cache BEFORE disposing — otherwise useLoader returns the
+  // cached-but-disposed scene on remount, rendering invisible/broken geometry.
   useEffect(() => {
     return () => {
+      useLoader.clear(GLTFLoader, url)
       disposeScene(gltf.scene)
     }
-  }, [gltf.scene])
+  }, [gltf.scene, url])
 
   // GOTCHA: Some providers (TRELLIS) export meshes rotated 90° around X axis
   // (Z-up convention vs Y-up). Detect by checking if the bounding box is
@@ -310,7 +313,7 @@ export function ModelViewer({
     <ViewerErrorBoundary className={className}>
       <div className={`relative w-full h-full min-h-[300px] rounded-lg overflow-hidden border border-border ${className ?? ""}`}>
         {providerLabel && (
-          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-background/90 text-xs font-medium text-foreground border border-border">
+          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-background text-xs font-medium text-foreground border border-border">
             {providerLabel}
           </div>
         )}
