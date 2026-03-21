@@ -9334,6 +9334,102 @@ export type Database = {
           },
         ]
       }
+      material_properties: {
+        Row: {
+          coefficient_of_thermal_expansion: number | null
+          common_forms: string[] | null
+          common_processes: string[] | null
+          corrosion_resistance: string | null
+          cost_per_kg_usd: number | null
+          created_at: string | null
+          density_kg_m3: number | null
+          elastic_modulus_gpa: number | null
+          electrical_resistivity_ohm_m: number | null
+          elongation_percent: number | null
+          fatigue_strength_mpa: number | null
+          hardness_scale: string | null
+          hardness_value: number | null
+          id: string
+          machinability_rating: number | null
+          material_code: string
+          material_family: string
+          material_name: string
+          max_service_temp_c: number | null
+          melting_point_c: number | null
+          poisson_ratio: number | null
+          source: string | null
+          specific_heat_j_kgk: number | null
+          thermal_conductivity_w_mk: number | null
+          ultimate_strength_mpa: number | null
+          updated_at: string | null
+          verified: boolean | null
+          weldability: string | null
+          yield_strength_mpa: number | null
+        }
+        Insert: {
+          coefficient_of_thermal_expansion?: number | null
+          common_forms?: string[] | null
+          common_processes?: string[] | null
+          corrosion_resistance?: string | null
+          cost_per_kg_usd?: number | null
+          created_at?: string | null
+          density_kg_m3?: number | null
+          elastic_modulus_gpa?: number | null
+          electrical_resistivity_ohm_m?: number | null
+          elongation_percent?: number | null
+          fatigue_strength_mpa?: number | null
+          hardness_scale?: string | null
+          hardness_value?: number | null
+          id?: string
+          machinability_rating?: number | null
+          material_code: string
+          material_family: string
+          material_name: string
+          max_service_temp_c?: number | null
+          melting_point_c?: number | null
+          poisson_ratio?: number | null
+          source?: string | null
+          specific_heat_j_kgk?: number | null
+          thermal_conductivity_w_mk?: number | null
+          ultimate_strength_mpa?: number | null
+          updated_at?: string | null
+          verified?: boolean | null
+          weldability?: string | null
+          yield_strength_mpa?: number | null
+        }
+        Update: {
+          coefficient_of_thermal_expansion?: number | null
+          common_forms?: string[] | null
+          common_processes?: string[] | null
+          corrosion_resistance?: string | null
+          cost_per_kg_usd?: number | null
+          created_at?: string | null
+          density_kg_m3?: number | null
+          elastic_modulus_gpa?: number | null
+          electrical_resistivity_ohm_m?: number | null
+          elongation_percent?: number | null
+          fatigue_strength_mpa?: number | null
+          hardness_scale?: string | null
+          hardness_value?: number | null
+          id?: string
+          machinability_rating?: number | null
+          material_code?: string
+          material_family?: string
+          material_name?: string
+          max_service_temp_c?: number | null
+          melting_point_c?: number | null
+          poisson_ratio?: number | null
+          source?: string | null
+          specific_heat_j_kgk?: number | null
+          thermal_conductivity_w_mk?: number | null
+          ultimate_strength_mpa?: number | null
+          updated_at?: string | null
+          verified?: boolean | null
+          weldability?: string | null
+          yield_strength_mpa?: number | null
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -12327,6 +12423,90 @@ export type Database = {
           },
         ]
       }
+      process_capabilities: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          id: string
+          max_part_size_x_mm: number | null
+          max_part_size_y_mm: number | null
+          max_part_size_z_mm: number | null
+          min_feature_size_mm: number | null
+          min_hole_diameter_mm: number | null
+          min_internal_radius_mm: number | null
+          min_wall_thickness_mm: number | null
+          per_part_cost_multiplier: number | null
+          process_name: string
+          process_rules: Json | null
+          setup_cost_usd_typical: number | null
+          source: string | null
+          suitable_batch_sizes: string[] | null
+          suitable_materials: string[] | null
+          surface_finish_ra_min_um: number | null
+          surface_finish_ra_typical_um: number | null
+          tolerance_max_mm: number | null
+          tolerance_min_mm: number | null
+          tolerance_typical_mm: number | null
+          typical_lead_time_days: number | null
+          unsuitable_materials: string[] | null
+          verified: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          id?: string
+          max_part_size_x_mm?: number | null
+          max_part_size_y_mm?: number | null
+          max_part_size_z_mm?: number | null
+          min_feature_size_mm?: number | null
+          min_hole_diameter_mm?: number | null
+          min_internal_radius_mm?: number | null
+          min_wall_thickness_mm?: number | null
+          per_part_cost_multiplier?: number | null
+          process_name: string
+          process_rules?: Json | null
+          setup_cost_usd_typical?: number | null
+          source?: string | null
+          suitable_batch_sizes?: string[] | null
+          suitable_materials?: string[] | null
+          surface_finish_ra_min_um?: number | null
+          surface_finish_ra_typical_um?: number | null
+          tolerance_max_mm?: number | null
+          tolerance_min_mm?: number | null
+          tolerance_typical_mm?: number | null
+          typical_lead_time_days?: number | null
+          unsuitable_materials?: string[] | null
+          verified?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          id?: string
+          max_part_size_x_mm?: number | null
+          max_part_size_y_mm?: number | null
+          max_part_size_z_mm?: number | null
+          min_feature_size_mm?: number | null
+          min_hole_diameter_mm?: number | null
+          min_internal_radius_mm?: number | null
+          min_wall_thickness_mm?: number | null
+          per_part_cost_multiplier?: number | null
+          process_name?: string
+          process_rules?: Json | null
+          setup_cost_usd_typical?: number | null
+          source?: string | null
+          suitable_batch_sizes?: string[] | null
+          suitable_materials?: string[] | null
+          surface_finish_ra_min_um?: number | null
+          surface_finish_ra_typical_um?: number | null
+          tolerance_max_mm?: number | null
+          tolerance_min_mm?: number | null
+          tolerance_typical_mm?: number | null
+          typical_lead_time_days?: number | null
+          unsuitable_materials?: string[] | null
+          verified?: boolean | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           category: string
@@ -15087,6 +15267,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      standard_hardware: {
+        Row: {
+          created_at: string | null
+          designation: string
+          dimensions: Json
+          hardware_type: string
+          id: string
+          material_options: string[] | null
+          source: string | null
+          standard: string
+          strength_grades: string[] | null
+          torque_specs: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          designation: string
+          dimensions?: Json
+          hardware_type: string
+          id?: string
+          material_options?: string[] | null
+          source?: string | null
+          standard: string
+          strength_grades?: string[] | null
+          torque_specs?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          designation?: string
+          dimensions?: Json
+          hardware_type?: string
+          id?: string
+          material_options?: string[] | null
+          source?: string | null
+          standard?: string
+          strength_grades?: string[] | null
+          torque_specs?: Json | null
+        }
+        Relationships: []
       }
       standup_summaries: {
         Row: {
