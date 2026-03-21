@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 import { Loader2, LogIn } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { redeemClaim } from '@/actions/listing-claims'
@@ -93,6 +94,12 @@ export function ClaimCta({
                                     Already have an account? Sign in
                                 </Button>
                             </div>
+                            <p className="text-xs text-muted-foreground">
+                                Not a supplier?{' '}
+                                <Link href="/join?role=founder" className="text-international-orange hover:underline font-medium">
+                                    Register as a founder
+                                </Link>
+                            </p>
                         </div>
                     )}
                 </CardContent>

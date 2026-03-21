@@ -374,6 +374,16 @@ function JoinPageInner() {
             </p>
 
             <p className="text-xs text-center text-muted-foreground">
+              Not a supplier?{" "}
+              <Link
+                href="/join?role=founder"
+                className="text-international-orange hover:underline font-medium"
+              >
+                Register as a founder instead
+              </Link>
+            </p>
+
+            <p className="text-xs text-center text-muted-foreground">
               By creating an account, you agree to our{" "}
               <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>
               {" "}and{" "}
