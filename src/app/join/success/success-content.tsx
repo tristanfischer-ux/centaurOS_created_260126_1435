@@ -189,8 +189,9 @@ export function SuccessContent({ type, role }: SuccessContentProps): React.React
     const supabase = createClient()
 
     async function checkSessionAndRedirect(): Promise<void> {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
+      // SECURITY: getUser() validates JWT server-side; getSession() only reads local cache (RT2-07)
+      const { data: { user: confirmedUser } } = await supabase.auth.getUser()
+      if (confirmedUser) {
         setIsRedirecting(true)
         if (pollRef.current) clearInterval(pollRef.current)
         router.push(getPostSignupRedirect(role))

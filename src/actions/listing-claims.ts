@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logAudit } from '@/actions/audit'
 import { checkRateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { escapeHtml, sanitizeEmail } from '@/lib/security/sanitize'
 import { headers } from 'next/headers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -224,21 +225,43 @@ export async function validateClaimToken(
 export async function redeemClaim(
     token: string
 ): Promise<{ success?: boolean; error?: string }> {
+    // SECURITY: Validate token format before any processing
+    if (!token || !/^[a-f0-9]{16,128}$/.test(token)) {
+        return { error: 'Invalid claim token' }
+    }
+
+    // SECURITY: Dedicated rate limit for claim redemption (RT2-03)
+    const headersList = await headers()
+    const ip = getClientIP(headersList)
+    const rateLimitError = await checkRateLimit('claimPreview', ip)
+    if (rateLimitError) {
+        return { error: 'Too many requests. Please try again in a moment.' }
+    }
+
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Please sign in to claim this listing' }
 
-    // SECURITY: Verify the authenticated user's email matches the claim token's
-    // intended recipient. Prevents claim hijacking if a token URL is leaked.
-    const validation = await validateClaimToken(token)
-    if (!validation.data?.is_valid) {
+    // DECISION: Do a lightweight email check directly instead of calling validateClaimToken()
+    // which has its own rate limiter — avoids double-consuming rate limit tokens (RT2-01).
+    const { data: tokenData, error: tokenError } = await supabase.rpc('validate_listing_claim', {
+        p_token: token,
+    })
+
+    if (tokenError || !tokenData || (tokenData as ClaimValidation[]).length === 0) {
         return { error: 'This claim link is invalid or has expired' }
     }
-    if (user.email?.toLowerCase() !== validation.data.email?.toLowerCase()) {
-        // INTENT: Mask the expected email to prevent enumeration while still being helpful.
-        const expected = validation.data.email
-        const masked = expected
-            ? `${expected[0]}***@${expected.split('@')[1] ?? '...'}`
+
+    const claim = (tokenData as ClaimValidation[])[0]
+    if (!claim.is_valid) {
+        return { error: 'This claim link is invalid or has expired' }
+    }
+
+    // SECURITY: Verify the authenticated user's email matches the claim token's
+    // intended recipient. Prevents claim hijacking if a token URL is leaked.
+    if (user.email?.toLowerCase() !== claim.email?.toLowerCase()) {
+        const masked = claim.email
+            ? `${claim.email[0]}***@${claim.email.split('@')[1] ?? '...'}`
             : 'a different address'
         return { error: `This claim was sent to ${masked}. Please sign in with that email address, or contact us to transfer the claim.` }
     }
@@ -254,12 +277,12 @@ export async function redeemClaim(
         return { error: 'Claim token is invalid or expired' }
     }
 
-    // AUDIT: Log listing claim (foundryId resolved inside logAudit; may skip if no foundry)
+    // AUDIT: Log listing claim
     logAudit({
         action: 'listing.claimed',
         entityType: 'listing',
-        entityId: validation.data.listing_id,
-        metadata: { companyName: validation.data.company_name },
+        entityId: claim.listing_id,
+        metadata: { companyName: claim.company_name },
         userId: user.id,
     })
 
@@ -304,6 +327,24 @@ export async function updateClaimedListing(
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
+    // SECURITY: Sanitize all user-provided text fields before DB write (RT2-08)
+    const sanitize = (v: string | undefined, maxLen = 500) =>
+        v ? escapeHtml(v.trim().slice(0, maxLen)) : undefined
+    const sanitizeUrl = (v: string | undefined) => {
+        if (!v) return undefined
+        const trimmed = v.trim().slice(0, 500)
+        // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
+        if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) && !/^https?:\/\//i.test(trimmed)) return undefined
+        return trimmed
+    }
+
+    const safeDescription = sanitize(updates.description, 2000)
+    const safeContactName = sanitize(updates.contact_name, 100)
+    const safeContactEmail = updates.contact_email ? sanitizeEmail(updates.contact_email) || undefined : undefined
+    const safeContactTitle = sanitize(updates.contact_title, 100)
+    const safeContactLinkedin = sanitizeUrl(updates.contact_linkedin)
+    const safeContactPhone = sanitize(updates.contact_phone, 30)
+
     // INTENT: Merge structured fields into attributes JSONB
     // Use !== undefined so that empty arrays/strings clear the field (set to null)
     // while undefined means "not touched" and preserves the old value.
@@ -322,19 +363,24 @@ export async function updateClaimedListing(
                 const val = updates[field]
                 // Empty array or empty string → null (clear); otherwise set the value
                 const isEmpty = Array.isArray(val) ? val.length === 0 : val === ''
-                attributes[field] = isEmpty ? null : val
+                // SECURITY: Sanitize array string entries + scalar values
+                if (Array.isArray(val) && !isEmpty) {
+                    attributes[field] = val.map(v => typeof v === 'string' ? escapeHtml(v.trim().slice(0, 200)) : v)
+                } else {
+                    attributes[field] = isEmpty ? null : (typeof val === 'string' ? escapeHtml(val.trim().slice(0, 200)) : val)
+                }
             }
         }
     }
 
     const { data, error } = await supabase.rpc('update_claimed_listing', {
         p_listing_id: listingId,
-        p_description: updates.description || undefined,
-        p_contact_name: updates.contact_name || undefined,
-        p_contact_email: updates.contact_email || undefined,
-        p_contact_title: updates.contact_title || undefined,
-        p_contact_linkedin: updates.contact_linkedin || undefined,
-        p_contact_phone: updates.contact_phone || undefined,
+        p_description: safeDescription,
+        p_contact_name: safeContactName,
+        p_contact_email: safeContactEmail,
+        p_contact_linkedin: safeContactLinkedin,
+        p_contact_title: safeContactTitle,
+        p_contact_phone: safeContactPhone,
         p_attributes: attributes ? (attributes as unknown as Record<string, never>) : undefined,
     })
 

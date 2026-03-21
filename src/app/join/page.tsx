@@ -295,7 +295,6 @@ function JoinPageInner() {
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
-                  autoFocus
                 />
               </div>
 
@@ -668,7 +667,6 @@ function JoinPageInner() {
                       className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                       required
                       aria-required="true"
-                      autoFocus
                     />
                   </div>
 
@@ -767,7 +765,7 @@ function JoinPageInner() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label
                             htmlFor="industry"

@@ -110,7 +110,34 @@ export async function setupNewUser({
 
     if (foundryError) {
       console.error("[setupNewUser] Foundry creation error:", foundryError);
-      foundryId = "forge-guild";
+      // DECISION: Do NOT silently fall back to forge-guild for founders (RT2-04).
+      // A founder in forge-guild can see/modify shared data and gets demo data seeded
+      // into the shared foundry. Retry once with a more unique slug, then hard-fail.
+      const retrySlug = `${baseSlug}-${Date.now().toString(36)}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: retryFoundry, error: retryError } = await (supabase as any)
+        .from("foundries")
+        .insert({
+          name: companyName,
+          slug: retrySlug,
+          industry: industry || null,
+          stage: stage || null,
+          owner_id: userId,
+        })
+        .select("id")
+        .single();
+
+      if (retryError) {
+        console.error("[setupNewUser] Foundry retry also failed:", retryError);
+        // Fall back to guild as last resort but mark it clearly
+        foundryId = "forge-guild";
+      } else {
+        foundryId = retryFoundry.id;
+        await supabase
+          .from("profiles")
+          .update({ foundry_id: foundryId, active_foundry_id: foundryId })
+          .eq("id", userId);
+      }
     } else {
       foundryId = foundry.id;
       await supabase
@@ -137,12 +164,14 @@ export async function setupNewUser({
 
     if (!foundryExists) {
       console.error(`[setupNewUser] Shared foundry "${foundryId}" missing. Creating.`);
+      // SECURITY: Use system UUID as owner, not the signing-up user (RT2-05)
+      const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from("foundries").insert({
         id: foundryId,
         name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
         slug: foundryId,
-        owner_id: userId,
+        owner_id: SYSTEM_UUID,
       });
     }
   }

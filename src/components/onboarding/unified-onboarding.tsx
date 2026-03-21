@@ -239,7 +239,7 @@ export function UnifiedOnboarding({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         onClick={handleSkip}
-        className="absolute top-6 right-8 z-20 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
+        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 text-xs text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest"
       >
         Skip tour
       </motion.button>
@@ -459,7 +459,7 @@ export function UnifiedOnboarding({
       </div>
 
       {/* Step dots */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-2 z-10">
+      <div className="absolute bottom-8 pb-safe left-0 right-0 flex justify-center gap-2 z-10">
         {STEPS.map((step, index) => (
           <div
             key={step}
