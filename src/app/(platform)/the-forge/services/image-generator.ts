@@ -50,6 +50,16 @@ interface NanoBananaResponse {
 
 const NO_TEXT_SUFFIX = "\n\nCRITICAL: This image must contain ZERO text, letters, words, numbers, labels, annotations, dimensions, or writing of any kind. The image should be purely visual with no readable characters anywhere."
 
+// INTENT: Prepended to all AI-crafted prompts (heroImagePrompt, moduleImagePrompt,
+// brief.imagePrompt) to enforce white background + full colour. Image models weight
+// the start of the prompt most heavily — rules buried at the end get ignored.
+const MANDATORY_RENDERING_PREAMBLE = `MANDATORY RENDERING RULES (override any conflicting instructions below):
+1. Background MUST be pure white (#FFFFFF) — no dark backgrounds, no black, no gray, no gradients.
+2. Use FULL COLOR rendering — realistic material colors, not grayscale or monochrome.
+3. This image must contain ZERO text — no labels, annotations, words, letters, numbers, or callouts.
+
+`
+
 /**
  * Appends a strong no-text instruction to any image prompt.
  * Applied as the last step before sending to the image API, ensuring
@@ -248,18 +258,20 @@ ${prompt}`
  * @returns A narrative prompt for the system P&ID diagram
  */
 function buildSystemPrompt(spec: XRaySpec, brief?: SystemStructuralBrief): string {
-  // If we have an Opus structural brief, use its image prompt for consistency
+  // If we have an Opus structural brief, use its image prompt for consistency.
+  // Apply same guardrails as heroImagePrompt — raw AI prompts without the
+  // preamble + suffix produce dark/monochrome renders.
   if (brief?.imagePrompt) {
-    return brief.imagePrompt
+    return MANDATORY_RENDERING_PREAMBLE + enforceNoText(brief.imagePrompt) + COHESIVE_STYLE_SUFFIX
   }
 
   // DECISION: Don't list module names or IO chains — image models render
   // them as garbled text labels on the diagram.  Use count-based description.
-  return `Create a professional engineering process flow diagram for a system that performs: ${spec.function}.
+  return MANDATORY_RENDERING_PREAMBLE + `Create a professional engineering process flow diagram for a system that performs: ${spec.function}.
 
 This system is composed of ${spec.modules.length} connected subsystems arranged in a processing chain.
 
-Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. No borders or frames around the diagram. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, title blocks, document IDs, revision numbers, dates, or writing of any kind anywhere in the image.`
+Style: Clean, modern process flow diagram on a pure white background. Each subsystem shown as a distinct, softly color-coded rounded block with clear flow arrows showing material and signal paths between them. Differentiate each subsystem block using distinct colors and shapes. Use a minimal, contemporary design style with generous whitespace. The overall composition should read left-to-right. With ${spec.modules.length} modules, use a multi-row layout if needed to fit all blocks clearly without crowding — maintain clear spacing between blocks. No borders or frames around the diagram. ZERO TEXT: Do not render any text, labels, words, annotations, callouts, title blocks, document IDs, revision numbers, dates, or writing of any kind anywhere in the image.` + COHESIVE_STYLE_SUFFIX
 }
 
 // ─── Nano Banana 2 API Caller ────────────────────────────────────────
@@ -1022,12 +1034,7 @@ export async function generateModuleImage(
   // DECISION: Same white-background + full-colour prepend as the hero path.
   // Without this, Opus-crafted module prompts produce dark/monochrome renders.
   const prompt = module.moduleImagePrompt
-    ? `MANDATORY RENDERING RULES (override any conflicting instructions below):
-1. Background MUST be pure white (#FFFFFF) — no dark backgrounds, no black, no gray, no gradients.
-2. Use FULL COLOR rendering — realistic material colors, not grayscale or monochrome.
-3. This image must contain ZERO text — no labels, annotations, words, letters, numbers, or callouts.
-
-` + enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
+    ? MANDATORY_RENDERING_PREAMBLE + enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
     : referenceBase64
       ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
       : buildModulePrompt(module, brief, visualStyle)
@@ -1159,12 +1166,7 @@ export async function generateResearchIllustration(
     // Prepend white-background + color + no-text enforcement (image models weight
     // the start of the prompt most heavily — putting these rules at the end caused
     // dark/monochrome renders).
-    prompt = `MANDATORY RENDERING RULES (override any conflicting instructions below):
-1. Background MUST be pure white (#FFFFFF) — no dark backgrounds, no black, no gray, no gradients.
-2. Use FULL COLOR rendering — realistic material colors, not grayscale or monochrome.
-3. This image must contain ZERO text — no labels, annotations, words, letters, numbers, or callouts.
-
-` + enforceNoText(customPrompt) + COHESIVE_STYLE_SUFFIX
+    prompt = MANDATORY_RENDERING_PREAMBLE + enforceNoText(customPrompt) + COHESIVE_STYLE_SUFFIX
   } else {
     // Existing programmatic prompt construction
     const hasModules = moduleNames.length > 0

@@ -232,10 +232,10 @@ function STLModel({ stlData, stlUrl }: { stlData?: string; stlUrl?: string }) {
   )
 }
 
-// ─── Error Boundary ─────────────────────────────────────────────────
+// ─── Error Boundaries ───────────────────────────────────────────────
 
-// INTENT: Catch failures from Environment HDR fetch (CDN down) or GLB
-// load errors so the viewer degrades gracefully instead of crashing.
+// INTENT: Catch GLB/STL load failures so the viewer shows a fallback
+// instead of crashing the page.
 class ViewerErrorBoundary extends Component<
   { children: ReactNode; className?: string },
   { hasError: boolean }
@@ -258,6 +258,29 @@ class ViewerErrorBoundary extends Component<
         </div>
       )
     }
+    return this.props.children
+  }
+}
+
+// INTENT: Silently swallow Environment HDR fetch failures. The model
+// still renders with direct lights — just without PBR reflections.
+// Without this, a CDN outage for the HDR kills the entire viewer.
+class SilentErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: Error) {
+    console.warn("[ModelViewer] Environment HDR failed, using direct lights:", error.message)
+  }
+  render() {
+    if (this.state.hasError) return null
     return this.props.children
   }
 }
@@ -304,9 +327,11 @@ export function ModelViewer({
               direct lights while the HDR loads asynchronously from CDN. Once the
               HDR arrives, PBR reflections appear — progressive enhancement. */}
           {isGlb && (
-            <Suspense fallback={null}>
-              <Environment preset="studio" />
-            </Suspense>
+            <SilentErrorBoundary>
+              <Suspense fallback={null}>
+                <Environment preset="studio" />
+              </Suspense>
+            </SilentErrorBoundary>
           )}
 
           {/* DECISION: GLB lighting is lower because Environment provides most of
