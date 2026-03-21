@@ -51,7 +51,8 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
         <div className="text-center space-y-0.5">
           <span className="text-xs font-medium text-muted-foreground/60">Illustration queued</span>
           <p className="text-[11px] text-muted-foreground/40 leading-tight">
-            Blueprints begin after all modules are expanded and the hero image is created
+            Blueprints begin after all modules are expanded and the hero image is created.
+            This usually takes 5–10 minutes.
           </p>
         </div>
       </div>

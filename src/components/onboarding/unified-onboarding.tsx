@@ -214,7 +214,7 @@ export function UnifiedOnboarding({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] bg-background"
+      className="fixed inset-0 z-50 bg-background"
     >
       {/* Background image */}
       <div className="absolute inset-0">

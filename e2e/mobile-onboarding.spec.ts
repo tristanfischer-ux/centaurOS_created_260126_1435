@@ -28,8 +28,8 @@ async function checkNoHorizontalOverflow(page: Page, tolerance = 2): Promise<voi
 }
 
 async function checkNoAutoFocus(page: Page): Promise<void> {
-  // Wait for any animations to settle
-  await page.waitForTimeout(1000)
+  // Wait for page to fully load (not a hardcoded timeout)
+  await page.waitForLoadState('networkidle')
   const focusedTag = await page.evaluate(() => document.activeElement?.tagName?.toLowerCase())
   // activeElement should be body or null — NOT an input/textarea
   expect(
@@ -57,8 +57,10 @@ test.describe('Mobile Onboarding — iPhone SE (320px)', () => {
     await expect(founderCard).toBeVisible()
     await expect(joiningCard).toBeVisible()
 
-    // Verify cards have reasonable height (touch target)
-    const founderBox = await founderCard.locator('..').locator('..').boundingBox()
+    // Verify the path selection button (ancestor with role or button-like element) is tappable
+    // Use the actual button element that wraps each card
+    const founderButton = page.locator('button', { hasText: "I'm founding a company" })
+    const founderBox = await founderButton.boundingBox()
     expect(founderBox?.height).toBeGreaterThanOrEqual(44)
   })
 
@@ -215,27 +217,32 @@ test.describe('Onboarding Modal — Mobile Layout', () => {
   // without requiring authentication. We inspect the component's CSS classes
   // by mounting the page and checking the source.
 
-  test('onboarding modal HTML has safe-area classes', async ({ page }) => {
-    // Fetch the deployed JS bundle and verify our CSS classes are present
-    // We can't trigger the modal without auth, so we check the source
-    const response = await page.goto(`${TEST_URL}/join?role=founder`)
-
-    // Check the page source for our safe-area classes in the bundled JS
-    // The unified-onboarding component should have pb-safe and pt-safe
-    const pageContent = await page.content()
-
-    // These checks verify the component was compiled with our fixes
-    // Note: In production builds, class names may be in JS chunks, not inline HTML
-    // So we also test the join page directly for our grid fix
+  test('Industry/Stage grid has responsive breakpoint class', async ({ page }) => {
+    await page.goto(`${TEST_URL}/join?role=founder`)
 
     // Verify Industry/Stage grid has our responsive breakpoint
-    const industryGrid = await page.locator('.grid').filter({ has: page.getByLabel(/industry/i) }).first()
+    const industryGrid = page.locator('.grid').filter({ has: page.getByLabel(/industry/i) }).first()
     const gridClasses = await industryGrid.getAttribute('class')
 
-    // Should contain grid-cols-1 (our fix) not just grid-cols-2
+    // Should contain grid-cols-1 (stacks on mobile) not just grid-cols-2
     expect(
       gridClasses,
       'Industry/Stage grid should have grid-cols-1 sm:grid-cols-2'
+    ).toContain('grid-cols-1')
+  })
+
+  test('Executive/Apprentice grid has responsive breakpoint class', async ({ page }) => {
+    await page.goto(`${TEST_URL}/join`)
+    await page.getByText("I'm joining the marketplace").click()
+    await page.waitForLoadState('networkidle')
+
+    // Find the role sub-selection grid
+    const roleGrid = page.locator('.grid').filter({ hasText: /Executive/ }).first()
+    const gridClasses = await roleGrid.getAttribute('class')
+
+    expect(
+      gridClasses,
+      'Executive/Apprentice grid should have grid-cols-1 sm:grid-cols-2'
     ).toContain('grid-cols-1')
   })
 })
