@@ -105,7 +105,11 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                     'cursor-pointer transition-colors',
                     filters.stages.includes(s) && 'bg-foreground text-background'
                   )}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={filters.stages.includes(s)}
                   onClick={() => toggleArrayItem('stages', s)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArrayItem('stages', s) } }}
                 >
                   {s}
                 </Badge>
@@ -125,7 +129,11 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                     'cursor-pointer transition-colors',
                     filters.sectors.includes(s) && 'bg-foreground text-background'
                   )}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={filters.sectors.includes(s)}
                   onClick={() => toggleArrayItem('sectors', s)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArrayItem('sectors', s) } }}
                 >
                   {s}
                 </Badge>
@@ -145,7 +153,11 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                     'cursor-pointer transition-colors',
                     filters.geoFocus.includes(g) && 'bg-foreground text-background'
                   )}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={filters.geoFocus.includes(g)}
                   onClick={() => toggleArrayItem('geoFocus', g)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleArrayItem('geoFocus', g) } }}
                 >
                   {g}
                 </Badge>
@@ -167,7 +179,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                   const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, chequeMin: v })
                 }}
-                className="h-8 text-sm"
+                className="text-sm"
               />
             </div>
             <div className="space-y-2">
@@ -182,7 +194,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                   const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, chequeMax: v })
                 }}
-                className="h-8 text-sm"
+                className="text-sm"
               />
             </div>
             <div className="space-y-2">
@@ -199,7 +211,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                   const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, minQuality: v })
                 }}
-                className="h-8 text-sm"
+                className="text-sm"
               />
             </div>
             <div className="space-y-2">
@@ -216,7 +228,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                   const v = raw != null && isNaN(raw) ? undefined : raw
                   onChange({ ...filters, minHardwareFit: v })
                 }}
-                className="h-8 text-sm"
+                className="text-sm"
               />
             </div>
           </div>

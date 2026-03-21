@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect, useTransition } from 'react'
+import { useState, useCallback, useEffect, useTransition, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Heart, Bell, BellOff, Mail, Lock, Loader2 } from 'lucide-react'
 import {
@@ -35,6 +35,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
   const [showOutreach, setShowOutreach] = useState(false)
   const [shortlistPending, startShortlistTransition] = useTransition()
   const [alertPending, startAlertTransition] = useTransition()
+  const shortlistBusyRef = useRef(false)
 
   // Load initial state
   useEffect(() => {
@@ -49,17 +50,24 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
   }, [listingId, access.detailAccess])
 
   const handleToggleShortlist = useCallback(() => {
+    // SECURITY: Guard against rapid double-clicks corrupting shortlist state
+    if (shortlistBusyRef.current) return
+    shortlistBusyRef.current = true
     const wasShortlisted = isShortlisted
     setIsShortlisted(!wasShortlisted)
     startShortlistTransition(async () => {
-      const { error } = wasShortlisted
-        ? await removeFromShortlist(listingId)
-        : await addToShortlist(listingId)
-      if (error) {
-        setIsShortlisted(wasShortlisted)
-        toast.error(error)
-      } else {
-        toast.success(wasShortlisted ? 'Removed from shortlist' : 'Added to shortlist')
+      try {
+        const { error } = wasShortlisted
+          ? await removeFromShortlist(listingId)
+          : await addToShortlist(listingId)
+        if (error) {
+          setIsShortlisted(wasShortlisted)
+          toast.error(error)
+        } else {
+          toast.success(wasShortlisted ? 'Removed from shortlist' : 'Added to shortlist')
+        }
+      } finally {
+        shortlistBusyRef.current = false
       }
     })
   }, [isShortlisted, listingId])

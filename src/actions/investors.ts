@@ -165,6 +165,8 @@ function toStringArray(val: unknown): string[] {
 /**
  * Casts a raw marketplace_listings row to InvestorFirm.
  */
+// SECURITY: Allowlist of attribute keys to prevent prototype pollution and payload bloat
+// from unexpected JSONB fields flowing through to the client.
 function rowToFirm(row: Record<string, unknown>): InvestorFirm {
   const attrs = (row.attributes as Record<string, unknown>) ?? {}
   return {
@@ -173,11 +175,42 @@ function rowToFirm(row: Record<string, unknown>): InvestorFirm {
     description: (row.description as string | null) ?? null,
     subcategory: (row.subcategory as string) ?? '',
     attributes: {
-      ...(attrs as InvestorFirm['attributes']),
+      firm_type: attrs.firm_type as string | undefined,
+      fund_size_gbp: attrs.fund_size_gbp as number | undefined,
+      fund_tier: attrs.fund_tier as string | undefined,
       stage_focus: toStringArray(attrs.stage_focus),
       sectors: toStringArray(attrs.sectors),
-      geo_focus: toStringArray(attrs.geo_focus),
+      is_active_deploying: attrs.is_active_deploying as boolean | undefined,
+      hq_city: attrs.hq_city as string | undefined,
+      outreach_priority: attrs.outreach_priority as string | undefined,
+      outreach_status: attrs.outreach_status as string | undefined,
+      website_url: attrs.website_url as string | undefined,
+      linkedin_company_url: attrs.linkedin_company_url as string | undefined,
+      investment_thesis: attrs.investment_thesis as string | undefined,
       notable_portfolio: toStringArray(attrs.notable_portfolio),
+      last_verified: attrs.last_verified as string | undefined,
+      aum_gbp: attrs.aum_gbp as number | undefined,
+      founding_year: attrs.founding_year as number | undefined,
+      bvca_member: attrs.bvca_member as boolean | undefined,
+      recent_deals_summary: attrs.recent_deals_summary as string | undefined,
+      last_fund_close_date: attrs.last_fund_close_date as string | undefined,
+      contact_email: attrs.contact_email as string | undefined,
+      location: attrs.location as string | undefined,
+      data_source: attrs.data_source as string | undefined,
+      data_confidence: attrs.data_confidence as string | undefined,
+      geo_focus: toStringArray(attrs.geo_focus),
+      cheque_range_gbp: attrs.cheque_range_gbp as { min: number | null; max: number | null } | undefined,
+      hardware_fit_score: attrs.hardware_fit_score as number | undefined,
+      data_quality_score: attrs.data_quality_score as number | undefined,
+      ideal_company_profile: attrs.ideal_company_profile as string | undefined,
+      value_add: attrs.value_add as string | undefined,
+      forge_capital_id: attrs.forge_capital_id as number | undefined,
+      last_synced: attrs.last_synced as string | undefined,
+      fund_history: attrs.fund_history,
+      exits: attrs.exits,
+      fund_performance: attrs.fund_performance,
+      fact_check_status: attrs.fact_check_status as string | undefined,
+      portfolio_companies: attrs.portfolio_companies as InvestorFirm['attributes']['portfolio_companies'],
     },
   }
 }
@@ -354,6 +387,53 @@ export async function searchInvestors(
     q = q.filter('attributes->>outreach_priority', 'eq', priority)
   }
 
+  // JSONB array filter: stage_focus (push to DB via containment)
+  // DECISION: Use cs (contains) operator — firm must contain at least one of the requested stages.
+  // PostgREST cs requires exact array match, so we use OR for each value.
+  if (stage && stage.length > 0) {
+    const stageFilters = stage.map((s: string) => `attributes->stage_focus.cs.["${sanitizeFilterValue(s)}"]`)
+    q = q.or(stageFilters.join(','))
+  }
+
+  // JSONB array filter: sectors
+  if (sector && sector.length > 0) {
+    const sectorFilters = sector.map((s: string) => `attributes->sectors.cs.["${sanitizeFilterValue(s)}"]`)
+    q = q.or(sectorFilters.join(','))
+  }
+
+  // JSONB array filter: geo_focus
+  if (geoFocus && geoFocus.length > 0) {
+    const geoFilters = geoFocus.map((g: string) => `attributes->geo_focus.cs.["${sanitizeFilterValue(g)}"]`)
+    q = q.or(geoFilters.join(','))
+  }
+
+  // JSONB scalar filter: data_quality_score
+  // GOTCHA: Use -> (JSONB) not ->> (TEXT) for numeric comparisons — ->> returns text,
+  // which causes lexicographic comparison ("9" > "10" would be true).
+  if (minQuality != null && minQuality > 0) {
+    q = q.filter('attributes->data_quality_score', 'gte', minQuality)
+  }
+
+  // JSONB scalar filter: hardware_fit_score
+  if (minHardwareFit != null && minHardwareFit > 0) {
+    q = q.filter('attributes->hardware_fit_score', 'gte', minHardwareFit)
+  }
+
+  // JSONB scalar filter: bvca_member
+  if (bvcaOnly) {
+    q = q.filter('attributes->bvca_member', 'eq', 'true')
+  }
+
+  // JSONB scalar filter: cheque range (numeric — use -> not ->>)
+  if (chequeMin != null) {
+    // Exclude firms whose max cheque is below our min
+    q = q.filter('attributes->cheque_range_gbp->max', 'gte', chequeMin)
+  }
+  if (chequeMax != null) {
+    // Exclude firms whose min cheque is above our max
+    q = q.filter('attributes->cheque_range_gbp->min', 'lte', chequeMax)
+  }
+
   // Pagination
   const from = (safePage - 1) * safePageSize
   const to = from + safePageSize - 1
@@ -372,62 +452,7 @@ export async function searchInvestors(
   const access = await getInvestorTierAccess()
   firms = firms.map(f => stripTierGatedFields(f, access))
 
-  // Client-side array filtering
-  if (stage && stage.length > 0) {
-    firms = firms.filter((f: InvestorFirm) => {
-      const stageFocus = f.attributes.stage_focus ?? []
-      return stage.some((s: string) => stageFocus.includes(s))
-    })
-  }
-
-  if (sector && sector.length > 0) {
-    firms = firms.filter((f: InvestorFirm) => {
-      const sectors = f.attributes.sectors ?? []
-      return sector.some((s: string) => sectors.includes(s))
-    })
-  }
-
-  // Client-side quality filter
-  if (minQuality != null && minQuality > 0) {
-    firms = firms.filter((f: InvestorFirm) => {
-      const score = f.attributes.data_quality_score ?? 0
-      return score >= minQuality
-    })
-  }
-
-  // Client-side geo_focus filter
-  if (geoFocus && geoFocus.length > 0) {
-    const geoLower = geoFocus.map(g => g.toLowerCase())
-    firms = firms.filter((f: InvestorFirm) => {
-      const fGeo = (f.attributes.geo_focus ?? []).map(g => g.toLowerCase())
-      return geoLower.some(g => fGeo.some(fg => fg.includes(g)))
-    })
-  }
-
-  // Client-side cheque range filter
-  if (chequeMin != null || chequeMax != null) {
-    firms = firms.filter((f: InvestorFirm) => {
-      const range = f.attributes.cheque_range_gbp
-      if (!range) return false
-      if (chequeMin != null && range.max != null && range.max < chequeMin) return false
-      if (chequeMax != null && range.min != null && range.min > chequeMax) return false
-      return true
-    })
-  }
-
-  // Client-side hardware fit filter
-  if (minHardwareFit != null && minHardwareFit > 0) {
-    firms = firms.filter((f: InvestorFirm) => {
-      return (f.attributes.hardware_fit_score ?? 0) >= minHardwareFit
-    })
-  }
-
-  // Client-side BVCA filter
-  if (bvcaOnly) {
-    firms = firms.filter((f: InvestorFirm) => f.attributes.bvca_member === true)
-  }
-
-  // Client-side sorting for JSONB attributes
+  // Client-side sorting for JSONB attributes (DB sorts by title; re-sort if needed)
   const PRIORITY_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 }
   if (sortBy && sortBy !== 'name') {
     firms.sort((a: InvestorFirm, b: InvestorFirm) => {
@@ -455,11 +480,7 @@ export async function searchInvestors(
   }
 
   const total = count ?? 0
-  const rawPageSize = (data ?? []).length
-  const clientFiltered = !!(stage?.length || sector?.length || minQuality || geoFocus?.length || chequeMin != null || chequeMax != null || minHardwareFit || bvcaOnly)
-  const hasMore = clientFiltered
-    ? rawPageSize >= safePageSize
-    : from + rawPageSize < total
+  const hasMore = from + (data ?? []).length < total
 
   return { firms, total, hasMore }
 }
@@ -535,10 +556,12 @@ export const getInvestorStats = unstable_cache(
   async (): Promise<InvestorStats> => {
     const supabase = createAdminClient()
 
+    // DECISION: Cap at 2000 rows to prevent OOM on Vercel. Stats are approximate at scale.
     const { data, error } = await supabase
       .from('marketplace_listings')
       .select('subcategory, attributes')
       .eq('category', 'Finance')
+      .limit(2000)
 
     if (error) {
       console.error('[getInvestorStats] Supabase error:', error)
@@ -625,7 +648,7 @@ export const getInvestorStats = unstable_cache(
     }
   },
   ['investor-stats'],
-  { revalidate: 300 }
+  { revalidate: 60 }
 )
 
 // ---------------------------------------------------------------------------
@@ -661,11 +684,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Fetches contacts associated with an investor firm listing.
  * Tier-gated: strips email and deep_bio for users below professional tier.
  */
-export async function getInvestorContacts(listingId: string): Promise<{
+export async function getInvestorContacts(listingId: string, precomputedAccess?: InvestorTierAccess): Promise<{
   contacts: InvestorContact[]
   access: InvestorTierAccess
 }> {
-  const access = await getInvestorTierAccess()
+  const access = precomputedAccess ?? await getInvestorTierAccess()
 
   // Free tier: no contacts visible
   if (!access.contactsVisible) {
@@ -1108,7 +1131,8 @@ export async function getAlertedListingIds(): Promise<string[]> {
  */
 export async function getSimilarInvestors(
   listingId: string,
-  limit = 5
+  limit = 5,
+  precomputedAccess?: InvestorTierAccess
 ): Promise<{ firms: InvestorFirm[]; similarityScores: Record<string, number> }> {
   if (!UUID_RE.test(listingId)) return { firms: [], similarityScores: {} }
 
@@ -1125,20 +1149,21 @@ export async function getSimilarInvestors(
   if (!targetRow) return { firms: [], similarityScores: {} }
   const target = rowToFirm(targetRow as Record<string, unknown>)
 
-  // Fetch top 50 firms by quality for candidate pool
+  // Fetch candidate pool (larger pool lets Jaccard ranking find better matches)
+  // DECISION: Order by title for deterministic results across page loads
   const { data: candidateRows } = await supabase
     .from('marketplace_listings')
     .select('id, title, description, subcategory, attributes')
     .eq('category', 'Finance')
-    .order('data_quality_score', { ascending: false })
-    .limit(50)
+    .order('title', { ascending: true })
+    .limit(200)
 
   if (!candidateRows) return { firms: [], similarityScores: {} }
 
   const candidates = candidateRows.map(r => rowToFirm(r as Record<string, unknown>))
   const similar = findSimilarInvestors(target, candidates, limit)
 
-  const access = await getInvestorTierAccess()
+  const access = precomputedAccess ?? await getInvestorTierAccess()
   const similarityScores: Record<string, number> = {}
   for (const s of similar) similarityScores[s.firm.id] = s.similarity
   return { firms: similar.map(s => stripTierGatedFields(s.firm, access)), similarityScores }

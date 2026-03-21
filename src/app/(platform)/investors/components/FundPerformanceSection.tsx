@@ -10,6 +10,13 @@ import { Badge } from '@/components/ui/badge'
 import { TrendingUp } from 'lucide-react'
 import { LockedSection } from './LockedSection'
 
+// SECURITY: Allowlist of fund_performance JSONB keys to display.
+// Prevents arbitrary internal fields from leaking to the UI.
+const PERFORMANCE_DISPLAY_KEYS = new Set([
+  'net_irr', 'gross_irr', 'moic', 'tvpi', 'dpi', 'rvpi',
+  'vintage_year', 'fund_size', 'deployed_pct', 'follow_on_ratio',
+])
+
 interface FundPerformanceSectionProps {
   fundHistory: unknown
   exits: unknown
@@ -37,19 +44,19 @@ export function FundPerformanceSection({
         requiredTier="professional"
         featureDescription="Access IRR, MOIC, exit history, and fund vintage data."
       >
-        {/* Placeholder rows for blur effect */}
+        {/* Placeholder rows — generic labels only, no fake numbers */}
         <div className="space-y-3">
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Net IRR</span>
-            <span className="text-sm font-semibold">24.5%</span>
+            <span className="text-sm font-semibold text-muted-foreground">—</span>
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">MOIC</span>
-            <span className="text-sm font-semibold">3.2x</span>
+            <span className="text-sm font-semibold text-muted-foreground">—</span>
           </div>
           <div className="flex justify-between">
             <span className="text-sm text-muted-foreground">Notable Exits</span>
-            <span className="text-sm font-semibold">4 exits</span>
+            <span className="text-sm font-semibold text-muted-foreground">—</span>
           </div>
         </div>
       </LockedSection>
@@ -73,11 +80,11 @@ export function FundPerformanceSection({
         </h2>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Fund performance metrics */}
-        {fundPerformance != null && typeof fundPerformance === 'object' && (
+        {/* Fund performance metrics — allowlisted keys only */}
+        {fundPerformance != null && typeof fundPerformance === 'object' && !Array.isArray(fundPerformance) && (
           <div className="space-y-2">
             {Object.entries(fundPerformance as Record<string, unknown>)
-              .filter(([, v]) => v != null && typeof v !== 'object')
+              .filter(([key, v]) => PERFORMANCE_DISPLAY_KEYS.has(key) && v != null && typeof v !== 'object')
               .map(([key, value]) => (
               <div key={key} className="flex justify-between text-sm">
                 <span className="text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>

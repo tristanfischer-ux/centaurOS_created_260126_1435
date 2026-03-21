@@ -25,15 +25,17 @@ interface PortfolioSectionProps {
   userSector?: string
 }
 
+// INTENT: Portfolio amounts are stored in USD (amount_usd) — source data currency.
+// Display with explicit "USD" suffix so users don't confuse with GBP fund sizes elsewhere.
 function formatAmount(usd: number): string {
   if (usd >= 1_000_000) {
     const m = usd / 1_000_000
-    return `$${m % 1 === 0 ? m : m.toFixed(1)}M`
+    return `$${m % 1 === 0 ? m : m.toFixed(1)}M USD`
   }
   if (usd >= 1_000) {
-    return `$${Math.round(usd / 1_000)}K`
+    return `$${Math.round(usd / 1_000)}K USD`
   }
-  return `$${usd.toLocaleString()}`
+  return `$${usd.toLocaleString()} USD`
 }
 
 function isSectorMatch(companySector: string | null | undefined, userSector: string): boolean {

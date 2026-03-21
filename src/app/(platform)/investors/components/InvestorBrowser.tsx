@@ -553,7 +553,7 @@ export function InvestorBrowser({
                         Loading…
                       </>
                     ) : (
-                      `Load more (${total - displayFirms.length} remaining)`
+                      `Load more (${Math.max(0, total - displayFirms.length)} remaining)`
                     )}
                   </Button>
                   <p className="text-xs text-muted-foreground">

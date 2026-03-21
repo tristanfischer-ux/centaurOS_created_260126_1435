@@ -190,8 +190,8 @@ export default async function InvestorDetailPage({ params }: PageProps) {
 
   const attrs = firm.attributes
   const [contactResult, similarResult, userSectorResult] = await Promise.allSettled([
-    getInvestorContacts(id),
-    getSimilarInvestors(id, 5),
+    getInvestorContacts(id, access),
+    getSimilarInvestors(id, 5, access),
     access.intelligenceAccess ? getUserSector() : Promise.resolve(null),
   ])
 
