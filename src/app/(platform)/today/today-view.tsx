@@ -715,19 +715,10 @@ export function TodayView({
                 </Button>
             </motion.div>
 
-            {/* Tour only starts after onboarding hero is hidden — new users see the
-                Getting Started checklist first, and tour targets are empty/meaningless.
-                Hero hides when 3+ checklist items complete OR user dismissed it. */}
-            {(() => {
-                const d = initialOnboardingData
-                if (!d) return <PageTour page="today" />
-                const completed = ['checklist_profile_completed', 'checklist_video_watched',
-                    'checklist_objective_created', 'checklist_team_member_added',
-                    'checklist_marketplace_explored', 'checklist_forge_project_created',
-                ].filter((k) => d[k as keyof typeof d] === true).length
-                if (d.checklist_dismissed === true || completed >= 3) return <PageTour page="today" />
-                return null
-            })()}
+            {/* Tour only starts when the page has real content to highlight.
+                Skip when: briefing is empty (new user / no data yet) OR
+                onboarding hero is still visible (< 3 items, not dismissed). */}
+            {briefing && briefing.topTasks.length > 0 && <PageTour page="today" />}
         </div>
     )
 }
