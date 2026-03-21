@@ -187,6 +187,15 @@ ${JSON.stringify(listingSummaries, null, 1)}`
             explanation: string
         }
 
+        // FLOW: Fire-and-forget notifications for high-scoring executives.
+        // Don't block the response — notify in the background.
+        const highScoreMatches = (parsed.matches || []).filter(m => m.score >= 70)
+        if (highScoreMatches.length > 0) {
+            notifyHighScoreMatches(supabase, guard.userId, query, highScoreMatches).catch(e => {
+                console.warn('[TalentMatch] Background notification failed:', e)
+            })
+        }
+
         return NextResponse.json({
             success: true,
             matches: parsed.matches || [],
@@ -208,6 +217,75 @@ ${JSON.stringify(listingSummaries, null, 1)}`
         return NextResponse.json(
             { success: false, error: "Internal server error" },
             { status: 500 }
+        )
+    }
+}
+
+/**
+ * Fire-and-forget: notify executives who scored 70+ in a talent search.
+ * Deduplication: max 5 talent_search alerts per executive per 24 hours.
+ * Skips if the searcher is the executive themselves.
+ */
+async function notifyHighScoreMatches(
+    supabase: Awaited<ReturnType<typeof createClient>>,
+    searcherUserId: string,
+    query: string,
+    matches: MatchResult[]
+): Promise<void> {
+    const { createMatchAlert, canCreateAlert } = await import('@/actions/match-alerts')
+
+    // Resolve listing IDs → user IDs via marketplace_listings → provider_profiles
+    const listingIds = matches.map(m => m.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: listings } = await (supabase as any)
+        .from('marketplace_listings')
+        .select('id, created_by_provider_id')
+        .in('id', listingIds)
+
+    if (!listings || listings.length === 0) return
+
+    // Get user_ids from provider_profiles
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const providerIds = (listings as any[]).map((l: any) => l.created_by_provider_id).filter(Boolean)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: providers } = await (supabase as any)
+        .from('provider_profiles')
+        .select('id, user_id')
+        .in('id', providerIds)
+
+    if (!providers || providers.length === 0) return
+
+    const providerToUser = new Map<string, string>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const p of providers as any[]) {
+        providerToUser.set(p.id, p.user_id)
+    }
+
+    const listingToUser = new Map<string, string>()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of listings as any[]) {
+        const userId = providerToUser.get(l.created_by_provider_id)
+        if (userId) listingToUser.set(l.id, userId)
+    }
+
+    const truncatedQuery = query.length > 60 ? query.slice(0, 57) + '...' : query
+
+    for (const match of matches) {
+        const expertUserId = listingToUser.get(match.id)
+        if (!expertUserId) continue
+        // Don't notify the searcher about themselves
+        if (expertUserId === searcherUserId) continue
+
+        const allowed = await canCreateAlert(expertUserId, 'talent_search', 5)
+        if (!allowed) continue
+
+        await createMatchAlert(
+            expertUserId,
+            'talent_search',
+            `You appeared in a talent search`,
+            `A founder searched for "${truncatedQuery}" and you scored ${match.score}/100.`,
+            match.id,
+            { query, score: match.score, reasons: match.reasons }
         )
     }
 }

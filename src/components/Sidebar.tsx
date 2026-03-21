@@ -82,6 +82,7 @@ import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
+import { getUnreadAlertCount } from "@/actions/match-alerts"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { VIDEOS } from "@/lib/video-urls"
@@ -215,6 +216,9 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false)
 
+    // Unread alert count for sidebar badge
+    const [unreadAlertCount, setUnreadAlertCount] = React.useState(0)
+
     // INTENT: Prefetch the most-visited routes immediately after the sidebar
     // mounts so the first click to any of these pages is near-instant. Combined
     // with staleTimes (30s dynamic cache), this means the RSC payload is already
@@ -223,6 +227,11 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
         const topRoutes = ['/today', '/new-tasks', '/new-objectives', '/team', '/the-forge', '/strategy', '/my-profile', '/updates', '/knowledge', '/reports', '/cash-burn']
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
+
+    // Fetch unread alert count on mount and on route change
+    React.useEffect(() => {
+        getUnreadAlertCount().then(setUnreadAlertCount).catch(() => {})
+    }, [pathname])
 
     const openFeedback = (featureName?: string) => {
         setFeedbackFeatureName(featureName)
@@ -242,7 +251,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     /**
      * Renders a single navigation item with optional tooltip.
      */
-    const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string; indent?: boolean }) => {
+    const renderNavItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }>; tooltip?: string; indent?: boolean; badge?: number }) => {
         const isActive = isRouteActive(pathname, item.href)
         const isAlpha = isRouteAlpha(item.href)
         const isBeta = isRouteBeta(item.href)
@@ -269,6 +278,11 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                         aria-hidden="true"
                     />
                     {item.name}
+                    {item.badge != null && item.badge > 0 && (
+                        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-international-orange text-white text-[10px] font-bold leading-none">
+                            {item.badge > 99 ? '99+' : item.badge}
+                        </span>
+                    )}
                 </span>
                 {isAlpha && (
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
@@ -354,7 +368,9 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 <Collapsible open={openSections.me}>
                     <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
                         {renderNavItem(todayNavItem)}
-                        {meNavigation.map(renderNavItem)}
+                        {meNavigation.map(item =>
+                            renderNavItem(item.href === '/updates' ? { ...item, badge: unreadAlertCount } : item)
+                        )}
 
                         {/* Unread messages indicator */}
                         <div className="px-0 pb-1">

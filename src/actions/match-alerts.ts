@@ -25,7 +25,7 @@ function untypedFrom(supabase: SupabaseClient, table: string): any {
  * see their own alerts.
  */
 
-export type AlertType = 'new_match' | 'saved_update' | 'industry_join' | 'weekly_digest' | 'endorsement'
+export type AlertType = 'new_match' | 'saved_update' | 'industry_join' | 'weekly_digest' | 'endorsement' | 'talent_search' | 'contact_enquiry'
 
 export interface MatchAlert {
     id: string
@@ -249,4 +249,39 @@ export async function createMatchAlert(
     }
 
     return { success: true, error: null }
+}
+
+/**
+ * Check if a new alert can be created for a user (dedup/cooldown).
+ *
+ * @description Prevents alert spam by checking how many alerts of a given
+ * type were created for a user in the last `cooldownMs` period. Returns
+ * true if under the `maxCount` threshold.
+ *
+ * @param userId - The user to check
+ * @param type - Alert type
+ * @param maxCount - Max alerts allowed in the window (default 5)
+ * @param cooldownMs - Time window in ms (default 24 hours)
+ */
+export async function canCreateAlert(
+    userId: string,
+    type: AlertType,
+    maxCount: number = 5,
+    cooldownMs: number = 24 * 60 * 60 * 1000
+): Promise<boolean> {
+    const supabase = await createClient()
+    const since = new Date(Date.now() - cooldownMs).toISOString()
+
+    const { count, error } = await untypedFrom(supabase, 'match_alerts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('type', type)
+        .gte('created_at', since)
+
+    if (error) {
+        console.error('[MatchAlerts] Dedup check error:', error)
+        return false // Fail closed — don't spam
+    }
+
+    return (count || 0) < maxCount
 }

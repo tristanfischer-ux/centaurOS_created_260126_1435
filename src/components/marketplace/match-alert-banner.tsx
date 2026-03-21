@@ -14,6 +14,8 @@ import {
     TrendingUp,
     Award,
     CheckCheck,
+    Search,
+    MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { markAlertRead, markAllAlertsRead, dismissAlert } from '@/actions/match-alerts'
@@ -45,6 +47,8 @@ const ALERT_ICONS: Record<AlertType, typeof Bell> = {
     industry_join: TrendingUp,
     weekly_digest: Bell,
     endorsement: Award,
+    talent_search: Search,
+    contact_enquiry: MessageSquare,
 }
 
 const ALERT_COLORS: Record<AlertType, string> = {
@@ -53,6 +57,8 @@ const ALERT_COLORS: Record<AlertType, string> = {
     industry_join: 'bg-electric-blue/10 text-electric-blue',
     weekly_digest: 'bg-muted text-muted-foreground',
     endorsement: 'bg-status-success-light text-status-success',
+    talent_search: 'bg-electric-blue/10 text-electric-blue',
+    contact_enquiry: 'bg-international-orange/10 text-international-orange',
 }
 
 export function MatchAlertBanner({

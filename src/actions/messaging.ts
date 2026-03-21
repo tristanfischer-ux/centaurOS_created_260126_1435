@@ -700,11 +700,40 @@ export async function contactExpert(
         })
       }
 
+      // FLOW: Notify the executive that someone wants to connect.
+      // Fire-and-forget — notification failure shouldn't break the conversation.
+      try {
+        const { createMatchAlert } = await import('@/actions/match-alerts')
+        const { sendNotification } = await import('@/lib/notifications')
+        const alertTitle = listingTitle
+          ? `New enquiry about ${listingTitle}`
+          : 'Someone wants to connect'
+
+        await createMatchAlert(
+          expertUserId,
+          'contact_enquiry',
+          alertTitle,
+          'A founder reached out to you via the marketplace.',
+          listingId,
+          { conversationId: conversation.id, senderId: user.id }
+        )
+
+        await sendNotification({
+          userId: expertUserId,
+          priority: 'high',
+          title: alertTitle,
+          body: 'A founder reached out to you via the marketplace.',
+          actionUrl: '/updates',
+        })
+      } catch (notifyError) {
+        console.warn('[contactExpert] Notification failed (non-blocking):', notifyError)
+      }
+
       const fullConversation = await getConversation(supabase, conversation.id)
 
       revalidatePath('/marketplace')
       revalidatePath('/updates')
-      
+
       return { success: true as const, data: fullConversation || undefined }
     } catch (error) {
       console.error('Failed to contact expert:', error)
