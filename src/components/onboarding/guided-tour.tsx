@@ -212,8 +212,11 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
       </motion.button>
 
       {/* Main content */}
-      {/* overflow-y-auto prevents clipping on short viewports (landscape, iPad split) */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8 overflow-y-auto">
+      {/* overflow-y-auto prevents clipping on short viewports (landscape, iPad split).
+          GOTCHA: Do NOT use justify-center here — it pushes top off-screen when
+          content overflows, making it unreachable by scrolling. Use my-auto on the
+          child instead (centers when space allows, scrolls naturally when not) (RT5-01). */}
+      <div className="relative z-10 h-full flex flex-col items-center px-6 sm:px-8 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStop}
@@ -222,7 +225,7 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: direction < 0 ? 300 : -300, opacity: 0 }}
             transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="w-full max-w-2xl"
+            className="w-full max-w-2xl my-auto"
           >
             {/* Feature icon and title */}
             <div className="text-center space-y-6 mb-10">

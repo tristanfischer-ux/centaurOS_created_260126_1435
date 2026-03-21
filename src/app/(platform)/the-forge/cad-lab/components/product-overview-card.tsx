@@ -219,7 +219,7 @@ export function ProductOverviewCard({
           </div>
         )}
         {/* ── Engineering Intelligence Panel ── */}
-        {(standardCodes?.length || engineeringData) && (
+        {((standardCodes && standardCodes.length > 0) || (engineeringData && engineeringData.totalDataPoints > 0)) && (
           <div className="border-t border-border mt-4 pt-3">
             <Collapsible open={engExpanded} onOpenChange={setEngExpanded}>
               <CollapsibleTrigger className="flex items-center justify-between w-full group">
@@ -281,7 +281,9 @@ export function ProductOverviewCard({
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {engineeringData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data
+                        {engineeringData.materialFamilies.length > 0
+                          ? `${engineeringData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data`
+                          : "Verified handbook data"}
                       </p>
                     </div>
                   </div>

@@ -903,13 +903,14 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       // Retrieve engineering data metadata for UI transparency
       try {
         const engPreview = await retrieveEngineeringDataForPrompt(description)
+        const appliedDataPoints = matchedStandardCodes.length + engPreview.materialsCount + engPreview.hardwareCount + engPreview.processesCount
         engineeringDataMeta = {
           materialsApplied: engPreview.materialCodes,
           materialFamilies: engPreview.materialFamilies,
           hardwareItemCount: engPreview.hardwareCount,
           processesApplied: engPreview.processNames,
-          supplierTechniques: 27, // Nightshift enrichment count
-          totalDataPoints: 238 + 31 + 44 + 16, // standards + materials + hardware + processes
+          supplierTechniques: 27,
+          totalDataPoints: appliedDataPoints,
         }
         console.info(`[THE-FORGE] Step 1: Engineering data preview — ${engPreview.materialCodes.length} materials, ${engPreview.processNames.length} processes`)
       } catch (engErr) {
@@ -965,6 +966,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       standardCodes: [],
       industryDomain: undefined,
       totalStandardsMatched: 0,
+      engineeringData: undefined,
     }
   }
 }
