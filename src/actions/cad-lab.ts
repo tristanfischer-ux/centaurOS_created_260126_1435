@@ -82,6 +82,9 @@ import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCove
 import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
+import { detectIndustryDomain, extractProductKeywords } from "@/lib/cad-lab/industry-domains"
+import { retrieveStandardsForPrompt } from "@/lib/cad-lab/standards-retriever"
+import { generateAndStoreStandards } from "@/lib/cad-lab/standards-auto-learn"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -854,11 +857,40 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
     let synthesisSucceeded = true
     try {
       const domain = await detectDomainFromProductDescription(description)
+
+      // Retrieve relevant design standards (summaries only at research stage)
+      const industryDomain = detectIndustryDomain(description)
+      let standardsSection = ""
+      try {
+        const standardsResult = await retrieveStandardsForPrompt(
+          industryDomain, description, [], [], 20_000, "summary",
+        )
+        if (standardsResult.content) {
+          standardsSection = `\n\n${standardsResult.content}`
+          console.info(`[THE-FORGE] Step 1: Injected ${standardsResult.standardCodes.length} standard summaries (${standardsResult.tokensUsed} tokens, domain: ${industryDomain})`)
+        } else if (industryDomain !== "general") {
+          // Auto-learn: no standards found for this domain — generate them
+          console.info(`[THE-FORGE] Step 1: No standards for domain ${industryDomain} — auto-learning...`)
+          const newStandards = await generateAndStoreStandards(industryDomain, description, [])
+          if (newStandards.length > 0) {
+            const retryResult = await retrieveStandardsForPrompt(
+              industryDomain, description, [], [], 20_000, "summary",
+            )
+            if (retryResult.content) {
+              standardsSection = `\n\n${retryResult.content}`
+              console.info(`[THE-FORGE] Step 1: Auto-learned ${newStandards.length} standards, injected ${retryResult.standardCodes.length}`)
+            }
+          }
+        }
+      } catch (stdErr) {
+        console.warn("[THE-FORGE] Step 1: Standards retrieval failed (non-fatal):", stdErr instanceof Error ? stdErr.message : stdErr)
+      }
+
       const synthesisPrompt = getResearchSynthesisPrompt(domain)
       console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
       const claudeResult = await callClaude(
         synthesisPrompt,
-        `Product to research: ${description}\n\n${rawContext}`,
+        `Product to research: ${description}\n\n${rawContext}${standardsSection}`,
       )
       report = claudeResult.text
     } catch (synthesisError) {
@@ -1124,7 +1156,7 @@ Generate the complete interface definition following the exact 4-section format.
 // DECISION: When a hero image is provided, use a compact system prompt that keeps the vision
 // signal dominant. The full 500-line CAD_INSTRUCTIONS contains methodology examples (Nespresso
 // capsules, brine systems, drones) that prime Claude to think in those shapes, not the image.
-function buildImageFocusedSystemPrompt(libraryPromptSection: string, domainHints?: string): string {
+function buildImageFocusedSystemPrompt(libraryPromptSection: string, domainHints?: string, standardsSection?: string): string {
   return `SHAPE FIDELITY IS YOUR #1 PRIORITY:
 - The attached product image is your PRIMARY reference — study it before writing ANY code
 - Your model MUST match the overall silhouette, proportions, and every major visible feature
@@ -1155,10 +1187,10 @@ ASSEMBLY STRATEGY FOR COMPLEX MODELS:
 - For models with 20+ components, use cq.Assembly() at the top level instead of chaining .union() calls.
 - .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
 - The final line should be: result = assy.toCompound()
-- For simpler models (<15 components), .union() chain is fine.${domainHints ? `\n\n${domainHints}` : ""}`
+- For simpler models (<15 components), .union() chain is fine.${domainHints ? `\n\n${domainHints}` : ""}${standardsSection ? `\n\n${standardsSection}` : ""}`
 }
 
-function buildFullSystemPrompt(libraryPromptSection: string, domainHints?: string): string {
+function buildFullSystemPrompt(libraryPromptSection: string, domainHints?: string, standardsSection?: string): string {
   return `SHAPE FIDELITY IS YOUR #1 PRIORITY:
 - Study the provided product image carefully before writing any code
 - Your model MUST match the overall silhouette, proportions, and major features visible in the image
@@ -1208,7 +1240,7 @@ ASSEMBLY STRATEGY FOR COMPLEX MODELS:
 - .union() chains on large models are O(n²) and WILL timeout. Use .union() only within small sub-groups (max 10 unions per sub-group).
 - Add each sub-group to the Assembly using .add() with a cq.Location for spatial placement.
 - The final line should be: result = assy.toCompound()
-- For simpler models (<15 components), the .union() chain pattern is fine.${domainHints ? `\n\n${domainHints}` : ""}`
+- For simpler models (<15 components), the .union() chain pattern is fine.${domainHints ? `\n\n${domainHints}` : ""}${standardsSection ? `\n\n${standardsSection}` : ""}`
 }
 
 export async function generateCadLabModel(
@@ -1378,13 +1410,28 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
       }
     }
 
+    // Retrieve full design standards for code generation (up to 200K tokens)
+    let codeGenStandardsSection = ""
+    try {
+      const codeGenIndustryDomain = detectIndustryDomain(description)
+      const codeGenStandards = await retrieveStandardsForPrompt(
+        codeGenIndustryDomain, description, [], [], 200_000, "full",
+      )
+      if (codeGenStandards.content) {
+        codeGenStandardsSection = codeGenStandards.content
+        console.info(`[THE-FORGE] Step 3: Injected ${codeGenStandards.standardCodes.length} full standards (${codeGenStandards.tokensUsed} tokens)`)
+      }
+    } catch (stdErr) {
+      console.warn("[THE-FORGE] Step 3: Standards retrieval failed (non-fatal):", stdErr instanceof Error ? stdErr.message : stdErr)
+    }
+
     // DECISION: Two system prompts — image-focused (compact, ~60 lines) vs full (with CAD_INSTRUCTIONS methodology).
     // When a hero image exists, the image IS the spec. The 500-line methodology examples (Nespresso capsules,
     // brine systems, drones) prime Claude to think in those shapes instead of the image. Stripping them lets
     // the vision signal dominate.
     const systemPrompt = blueprintImageBase64
-      ? buildImageFocusedSystemPrompt(libraryPromptSection, domainHints)
-      : buildFullSystemPrompt(libraryPromptSection, domainHints)
+      ? buildImageFocusedSystemPrompt(libraryPromptSection, domainHints, codeGenStandardsSection)
+      : buildFullSystemPrompt(libraryPromptSection, domainHints, codeGenStandardsSection)
 
     // INTENT: Diagnostic logging to verify prompt sizes and image-based path selection
     console.info("[THE-FORGE] Prompt stats:", {

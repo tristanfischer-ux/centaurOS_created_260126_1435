@@ -1,0 +1,181 @@
+/**
+ * @file industry-domains.ts — Second-tier domain detection for standards retrieval.
+ *
+ * INTENT: The existing CadLabDomain (electronics/mechanical/electromechanical/fluid)
+ * controls prompt templates and code gen hints. IndustryDomain is a finer-grained
+ * classification used to retrieve the right engineering standards from Supabase.
+ * Both run in parallel — this does NOT replace the existing domain system.
+ */
+
+export type IndustryDomain =
+  | "marine"
+  | "automotive"
+  | "aerospace"
+  | "medical"
+  | "consumer"
+  | "industrial"
+  | "energy"
+  | "construction"
+  | "rail"
+  | "defense"
+  | "robotics"
+  | "oil_gas"
+  | "mining"
+  | "water_treatment"
+  | "processing"
+  | "agriculture"
+  | "furniture"
+  | "sporting"
+  | "packaging"
+  | "general"
+
+const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
+  marine: [
+    "boat", "ship", "vessel", "hull", "keel", "rudder", "sailing", "yacht",
+    "dinghy", "catamaran", "outboard", "marine", "watercraft", "pontoon",
+    "kayak", "canoe", "submarine", "propeller shaft", "bilge", "deck",
+    "mooring", "anchor", "mast", "rigging", "navigation buoy", "liferaft",
+  ],
+  automotive: [
+    "car", "vehicle", "truck", "suv", "sedan", "bumper", "chassis",
+    "dashboard", "windshield", "airbag", "seatbelt", "brake", "suspension",
+    "transmission", "exhaust", "headlight", "fender", "motorcycle",
+    "ev charging", "steering wheel", "axle", "differential", "catalytic",
+    "crumple zone", "roll cage",
+  ],
+  aerospace: [
+    "aircraft", "airplane", "wing", "fuselage", "landing gear", "propeller",
+    "avionics", "satellite", "rocket", "turbine", "airfoil", "drone",
+    "uav", "glider", "helicopter", "rotor", "nacelle", "empennage",
+    "radome", "flight control",
+  ],
+  medical: [
+    "medical device", "implant", "prosthetic", "surgical", "diagnostic",
+    "biocompatible", "steriliz", "catheter", "stent", "syringe",
+    "ventilator", "defibrillator", "patient", "clinical", "endoscope",
+    "insulin pump", "heart rate", "blood pressure", "orthopedic",
+    "dental", "hearing aid", "wheelchair",
+  ],
+  consumer: [
+    "consumer electronics", "phone case", "headphones", "speaker",
+    "smart home", "appliance", "toaster", "blender", "vacuum",
+    "remote control", "charger", "power bank", "led lamp", "fan",
+    "wearable", "smartwatch", "fitness tracker", "earbuds",
+  ],
+  industrial: [
+    "factory", "conveyor", "robotic arm", "tooling", "jig", "fixture",
+    "cnc", "lathe", "press", "stamping die", "injection mold",
+    "assembly line", "material handling", "forklift", "hoist",
+    "compressor", "pump station", "industrial control",
+  ],
+  robotics: [
+    "robot", "actuator", "gripper", "servo", "stepper motor",
+    "collaborative robot", "cobot", "autonomous", "lidar mount",
+    "end effector", "robotic arm", "mobile robot", "agv",
+  ],
+  energy: [
+    "solar panel", "wind turbine", "battery pack", "generator",
+    "transformer", "inverter", "photovoltaic", "energy storage",
+    "fuel cell", "power converter", "charge controller", "turbine blade",
+    "nacelle", "solar tracker",
+  ],
+  construction: [
+    "building", "bridge", "beam", "column", "truss", "foundation",
+    "concrete", "rebar", "structural steel", "scaffolding", "formwork",
+    "hvac duct", "plumbing", "railing", "staircase",
+  ],
+  rail: [
+    "train", "railway", "locomotive", "rail car", "bogie", "pantograph",
+    "signaling", "track", "sleeper", "coupling", "buffer",
+  ],
+  defense: [
+    "military", "armor", "ballistic", "weapon", "munition", "tactical",
+    "mil-spec", "camouflage", "helmet", "body armor", "vehicle armor",
+    "radar housing",
+  ],
+  oil_gas: [
+    "pipeline", "wellhead", "drill", "refinery", "offshore platform",
+    "subsea", "valve tree", "christmas tree", "flare stack", "separator",
+    "storage tank", "lng", "petrochemical", "oil rig", "blowout preventer",
+  ],
+  mining: [
+    "mining", "excavator", "crusher", "conveyor belt", "ore",
+    "underground", "ventilation shaft", "drilling rig", "haul truck",
+    "screening", "tailings", "mineral processing",
+  ],
+  water_treatment: [
+    "water treatment", "sewage", "wastewater", "filtration", "desalination",
+    "chlorination", "settling tank", "aeration", "sludge", "membrane",
+    "reverse osmosis", "drinking water", "pipe network", "reservoir",
+  ],
+  processing: [
+    "chemical plant", "reactor", "distillation", "heat exchanger",
+    "pressure vessel", "piping", "process equipment", "mixing tank",
+    "centrifuge", "evaporator", "autoclave", "fermentation",
+    "pharmaceutical", "cleanroom",
+  ],
+  agriculture: [
+    "tractor", "harvester", "irrigation", "plough", "seeder", "sprayer",
+    "greenhouse", "farm equipment", "silo", "grain", "livestock",
+    "milking machine", "food processing",
+  ],
+  furniture: [
+    "chair", "table", "desk", "shelf", "cabinet", "bookcase", "bed frame",
+    "sofa", "bench", "stool", "wardrobe", "drawer", "crib", "high chair",
+  ],
+  sporting: [
+    "bicycle", "surfboard", "ski", "snowboard", "climbing", "helmet",
+    "kayak paddle", "golf club", "tennis racket", "skateboard",
+    "paraglider", "hang glider", "scuba", "wetsuit",
+  ],
+  packaging: [
+    "container", "box", "bottle", "can", "carton", "crate", "pallet",
+    "blister pack", "shrink wrap", "label", "shipping container",
+  ],
+  general: [],
+}
+
+/**
+ * Detects the most likely industry domain from a product description.
+ *
+ * @param text - Product description, research report, or combined context
+ * @returns Top-scoring IndustryDomain (falls back to "general")
+ */
+export function detectIndustryDomain(text: string): IndustryDomain {
+  const lower = text.toLowerCase()
+  let bestDomain: IndustryDomain = "general"
+  let bestScore = 0
+
+  for (const [domain, keywords] of Object.entries(INDUSTRY_KEYWORDS) as [IndustryDomain, string[]][]) {
+    if (domain === "general") continue
+    let score = 0
+    for (const kw of keywords) {
+      if (lower.includes(kw)) score++
+    }
+    if (score > bestScore) {
+      bestScore = score
+      bestDomain = domain
+    }
+  }
+
+  return bestDomain
+}
+
+/**
+ * Extracts product-level keywords from text for standards tag matching.
+ *
+ * @param text - Product description
+ * @returns Array of lowercase keywords found in the text
+ */
+export function extractProductKeywords(text: string): string[] {
+  const lower = text.toLowerCase()
+  const found: string[] = []
+  for (const keywords of Object.values(INDUSTRY_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (lower.includes(kw) && !found.includes(kw)) {
+        found.push(kw)
+      }
+    }
+  }
+  return found
+}

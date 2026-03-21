@@ -5263,6 +5263,84 @@ export type Database = {
           },
         ]
       }
+      design_standards: {
+        Row: {
+          applicable_to: string[] | null
+          created_at: string | null
+          design_rules: Json
+          dimensional_constraints: Json | null
+          engineering_tags: string[]
+          id: string
+          industry_domain: string
+          issuing_body: string
+          material_specs: Json | null
+          product_tags: string[]
+          region: string[] | null
+          requirements_markdown: string
+          source: string | null
+          source_notes: string | null
+          standard_code: string
+          standard_name: string
+          summary: string
+          superseded_by: string | null
+          test_procedures: string | null
+          token_estimate: number
+          updated_at: string | null
+          verified: boolean | null
+          version: string | null
+        }
+        Insert: {
+          applicable_to?: string[] | null
+          created_at?: string | null
+          design_rules?: Json
+          dimensional_constraints?: Json | null
+          engineering_tags?: string[]
+          id?: string
+          industry_domain: string
+          issuing_body: string
+          material_specs?: Json | null
+          product_tags?: string[]
+          region?: string[] | null
+          requirements_markdown: string
+          source?: string | null
+          source_notes?: string | null
+          standard_code: string
+          standard_name: string
+          summary: string
+          superseded_by?: string | null
+          test_procedures?: string | null
+          token_estimate?: number
+          updated_at?: string | null
+          verified?: boolean | null
+          version?: string | null
+        }
+        Update: {
+          applicable_to?: string[] | null
+          created_at?: string | null
+          design_rules?: Json
+          dimensional_constraints?: Json | null
+          engineering_tags?: string[]
+          id?: string
+          industry_domain?: string
+          issuing_body?: string
+          material_specs?: Json | null
+          product_tags?: string[]
+          region?: string[] | null
+          requirements_markdown?: string
+          source?: string | null
+          source_notes?: string | null
+          standard_code?: string
+          standard_name?: string
+          summary?: string
+          superseded_by?: string | null
+          test_procedures?: string | null
+          token_estimate?: number
+          updated_at?: string | null
+          verified?: boolean | null
+          version?: string | null
+        }
+        Relationships: []
+      }
       discovery_call_settings: {
         Row: {
           buffer_minutes: number | null
@@ -19458,6 +19536,10 @@ export type Database = {
       }
       toggle_conversation_mute: {
         Args: { p_conversation_id: string; p_profile_id: string }
+        Returns: boolean
+      }
+      toggle_investor_alert: {
+        Args: { p_listing_id: string; p_user_id: string }
         Returns: boolean
       }
       unlockrows: { Args: { "": string }; Returns: number }
