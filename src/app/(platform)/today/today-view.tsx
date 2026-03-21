@@ -715,9 +715,19 @@ export function TodayView({
                 </Button>
             </motion.div>
 
-            {/* Tour only starts after onboarding is complete — new users see the
-                Getting Started checklist first, and tour targets are empty/meaningless */}
-            {!initialOnboardingData && <PageTour page="today" />}
+            {/* Tour only starts after onboarding hero is hidden — new users see the
+                Getting Started checklist first, and tour targets are empty/meaningless.
+                Hero hides when 3+ checklist items complete OR user dismissed it. */}
+            {(() => {
+                const d = initialOnboardingData
+                if (!d) return <PageTour page="today" />
+                const completed = ['checklist_profile_completed', 'checklist_video_watched',
+                    'checklist_objective_created', 'checklist_team_member_added',
+                    'checklist_marketplace_explored', 'checklist_forge_project_created',
+                ].filter((k) => d[k as keyof typeof d] === true).length
+                if (d.checklist_dismissed === true || completed >= 3) return <PageTour page="today" />
+                return null
+            })()}
         </div>
     )
 }
