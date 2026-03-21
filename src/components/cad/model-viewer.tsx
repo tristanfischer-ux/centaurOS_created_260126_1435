@@ -12,7 +12,7 @@
 
 import { Suspense, useMemo, useState, useEffect } from "react"
 import { Canvas, useLoader } from "@react-three/fiber"
-import { OrbitControls, Grid, PerspectiveCamera } from "@react-three/drei"
+import { OrbitControls, Grid, PerspectiveCamera, Environment } from "@react-three/drei"
 import * as THREE from "three"
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
@@ -263,24 +263,23 @@ export function ModelViewer({
         shadows
         style={{ background: backgroundColor }}
         gl={{ antialias: true, alpha: false }}
-        onCreated={({ gl }) => {
-          gl.outputColorSpace = THREE.SRGBColorSpace
-          gl.toneMapping = THREE.ACESFilmicToneMapping
-          gl.toneMappingExposure = 1.0
-        }}
       >
         <Suspense fallback={null}>
-          <ambientLight intensity={0.6} />
+          {/* INTENT: PBR metallic surfaces reflect their environment — without an
+              environment map they reflect black/nothing, appearing grey. "studio"
+              provides neutral product-photography lighting without a visible background. */}
+          <Environment preset="studio" />
+          <ambientLight intensity={1.5} />
           <directionalLight
             position={[10, 10, 5]}
-            intensity={0.8}
+            intensity={2.5}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
           />
-          <directionalLight position={[-10, -10, -5]} intensity={0.3} />
-          <directionalLight position={[0, -5, 5]} intensity={0.15} />
-          <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#d0d0d0" />
+          <directionalLight position={[-10, -10, -5]} intensity={1.0} />
+          <directionalLight position={[0, -5, 5]} intensity={0.5} />
+          <hemisphereLight intensity={1.5} color="#ffffff" groundColor="#d0d0d0" />
 
           {glbUrl ? (
             <GLBModel url={glbUrl} />
