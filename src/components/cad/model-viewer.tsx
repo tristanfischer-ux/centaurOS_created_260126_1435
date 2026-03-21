@@ -10,7 +10,7 @@
  * Props accept either a remote URL (glbUrl/stlUrl) or inline base64 (stlData).
  */
 
-import { Suspense, useMemo, useState, useEffect } from "react"
+import { Suspense, useMemo, useState, useEffect, Component, type ReactNode } from "react"
 import { Canvas, useLoader } from "@react-three/fiber"
 import { OrbitControls, Grid, PerspectiveCamera, Environment } from "@react-three/drei"
 import * as THREE from "three"
@@ -232,6 +232,36 @@ function STLModel({ stlData, stlUrl }: { stlData?: string; stlUrl?: string }) {
   )
 }
 
+// ─── Error Boundary ─────────────────────────────────────────────────
+
+// INTENT: Catch failures from Environment HDR fetch (CDN down) or GLB
+// load errors so the viewer degrades gracefully instead of crashing.
+class ViewerErrorBoundary extends Component<
+  { children: ReactNode; className?: string },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; className?: string }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: Error) {
+    console.error("[ModelViewer] Render error:", error.message)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className={`w-full h-full min-h-[300px] rounded-lg border border-border flex items-center justify-center bg-muted ${this.props.className ?? ""}`}>
+          <p className="text-sm text-muted-foreground">3D viewer failed to load</p>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 // ─── Main Component ──────────────────────────────────────────────────
 
 export function ModelViewer({
@@ -243,6 +273,7 @@ export function ModelViewer({
   className,
 }: ModelViewerProps) {
   const hasContent = !!(glbUrl || stlData || stlUrl)
+  const isGlb = !!glbUrl
 
   if (!hasContent) {
     return (
@@ -253,49 +284,57 @@ export function ModelViewer({
   }
 
   return (
-    <div className={`relative w-full h-full min-h-[300px] rounded-lg overflow-hidden border border-border ${className ?? ""}`}>
-      {providerLabel && (
-        <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-background/90 text-xs font-medium text-foreground border border-border">
-          {providerLabel}
-        </div>
-      )}
-      <Canvas
-        shadows
-        style={{ background: backgroundColor }}
-        gl={{ antialias: true, alpha: false }}
-      >
-        <Suspense fallback={null}>
-          {/* INTENT: PBR metallic surfaces reflect their environment — without an
-              environment map they reflect black/nothing, appearing grey. "studio"
-              provides neutral product-photography lighting without a visible background. */}
-          <Environment preset="studio" />
-          <ambientLight intensity={1.5} />
-          <directionalLight
-            position={[10, 10, 5]}
-            intensity={2.5}
-            castShadow
-            shadow-mapSize-width={2048}
-            shadow-mapSize-height={2048}
-          />
-          <directionalLight position={[-10, -10, -5]} intensity={1.0} />
-          <directionalLight position={[0, -5, 5]} intensity={0.5} />
-          <hemisphereLight intensity={1.5} color="#ffffff" groundColor="#d0d0d0" />
+    <ViewerErrorBoundary className={className}>
+      <div className={`relative w-full h-full min-h-[300px] rounded-lg overflow-hidden border border-border ${className ?? ""}`}>
+        {providerLabel && (
+          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-background/90 text-xs font-medium text-foreground border border-border">
+            {providerLabel}
+          </div>
+        )}
+        <Canvas
+          shadows
+          style={{ background: backgroundColor }}
+          gl={{ antialias: true, alpha: false }}
+        >
+          <Suspense fallback={null}>
+            {/* INTENT: PBR metallic surfaces reflect their environment — without an
+                environment map they reflect black/nothing, appearing grey. "studio"
+                provides neutral product-photography lighting. Only needed for GLB
+                (STL uses a fixed material colour, not PBR textures). */}
+            {isGlb && <Environment preset="studio" />}
 
-          {glbUrl ? (
-            <GLBModel url={glbUrl} />
-          ) : (
-            <STLModel stlData={stlData} stlUrl={stlUrl} />
-          )}
+            {/* DECISION: GLB lighting is lower because Environment provides most of
+                the illumination via HDR reflections. STL has no env map so needs
+                stronger direct lights. All values scaled for Three.js r182
+                physically-correct mode (old 1.0 ≈ Math.PI). */}
+            <ambientLight intensity={isGlb ? 0.8 : 1.5} />
+            <directionalLight
+              position={[10, 10, 5]}
+              intensity={isGlb ? 1.5 : 2.5}
+              castShadow
+              shadow-mapSize-width={2048}
+              shadow-mapSize-height={2048}
+            />
+            <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.5 : 1.0} />
+            <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.3 : 0.5} />
+            <hemisphereLight intensity={isGlb ? 0.6 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
 
-          <OrbitControls
-            enableDamping
-            dampingFactor={0.05}
-            minDistance={1}
-            maxDistance={50000}
-            makeDefault
-          />
-        </Suspense>
-      </Canvas>
-    </div>
+            {isGlb ? (
+              <GLBModel url={glbUrl} />
+            ) : (
+              <STLModel stlData={stlData} stlUrl={stlUrl} />
+            )}
+
+            <OrbitControls
+              enableDamping
+              dampingFactor={0.05}
+              minDistance={1}
+              maxDistance={50000}
+              makeDefault
+            />
+          </Suspense>
+        </Canvas>
+      </div>
+    </ViewerErrorBoundary>
   )
 }

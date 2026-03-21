@@ -211,12 +211,13 @@ function ModuleDetailDialog({
               <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-48 flex flex-col items-center justify-center gap-2">
                 <Loader2 className="h-5 w-5 animate-spin text-international-orange/60" />
                 <p className="text-xs text-muted-foreground">Generating illustration…</p>
+                <p className="text-[11px] text-muted-foreground/40">Safe to navigate away</p>
               </div>
             )}
             {(!module.imageStatus || module.imageStatus === "pending") && !isEditing && (
               <div className="rounded-lg overflow-hidden border bg-muted/5 p-3 h-32 flex flex-col items-center justify-center gap-1.5">
                 <Sparkles className="h-5 w-5 text-muted-foreground/40" />
-                <p className="text-xs text-muted-foreground">Illustration will be generated shortly</p>
+                <p className="text-xs text-muted-foreground">Illustration will be generated shortly — safe to navigate away</p>
               </div>
             )}
 

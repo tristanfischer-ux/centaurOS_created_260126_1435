@@ -1845,6 +1845,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setIsGeneratingImages(true)
     setImageGenProgress({ completed: 0, total: modulesToProcess.length, failed: 0, phase: "generating" })
 
+    // Register background op so progress survives navigation
+    const bgOpId = startOp("Generating illustrations", "/the-forge/cad-lab")
+
     // Immediately set all modules to "generating" image status in local state
     setModules((prev) =>
       prev.map((m) => {
@@ -1852,8 +1855,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         return isTarget ? { ...m, imageStatus: "generating" as const } : m
       }),
     )
-
-    toast.info(`Generating ${modulesToProcess.length} blueprint illustrations...`)
 
     // INTENT: Upload shared assets (reference PNG ~500-800KB, visual style ~1-3KB) to
     // Supabase Storage ONCE so each module call fetches them server-side (~10ms) instead
@@ -2043,9 +2044,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         )
         completedCount++
         setImageGenProgress(p => p ? { ...p, completed: p.completed + 1 } : p)
+        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 100), stepLabel: `${mod.name} (mirrored)` })
         revealModule(mod.id)
       } else {
         await generateOne(mod)
+        updateOp(bgOpId, { progress: Math.round(((i + 1) / orderedModules.length) * 100), stepLabel: mod.name })
         // If this is a primary, capture its URL for mirror reuse
         if (primaryIds.has(mod.id)) {
           let snap: CadLabModule[] = []
@@ -2110,7 +2113,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       modulesToProcess.some(t => t.id === m.id) && m.imageStatus === "complete"
     ).length
     if (finalCompleted > 0) {
-      toast.success(`Generated ${finalCompleted}/${modulesToProcess.length} blueprint illustrations`)
+      completeOp(bgOpId, `${finalCompleted}/${modulesToProcess.length} illustrations ready`)
       // INTENT: Mark images as current at the design revision when generation completed.
       // This covers both initial pipeline and regeneration flows.
       const currentRev = designRevisionRef.current
@@ -2120,11 +2123,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           .catch(err => console.error("[CAD-LAB] Failed to save images-at-revision:", err))
       }
     } else if (modulesToProcess.length > 0) {
-      toast.error("All blueprint illustrations failed to generate. Check your API key or try again.")
+      failOp(bgOpId, "All illustrations failed — check API key or retry")
     }
     setIsGeneratingImages(false)
     setImageGenProgress(null)
-  }, [activeProjectId])
+  }, [activeProjectId, startOp, updateOp, completeOp, failOp])
 
   // ── Refresh module images using current diagnostic specs ──
   // INTENT: Called from the Specify finalize card. Regenerates blueprint illustrations

@@ -3,11 +3,9 @@
 /**
  * @file unified-onboarding.tsx
  *
- * @description 3-step unified onboarding modal replacing the old 5-step
- * OnboardingModal + SetupWizard + MarketplaceOnboarding trio.
- *
- * Steps: Welcome → Intent → First Look (marketplace "aha moment")
- * Supplier intent redirects to /supplier-portal after step 2.
+ * @description 2-step unified onboarding modal (Welcome → Intent) that hands
+ * off to Cal's guided tour for team_builders or redirects suppliers to
+ * /supplier-portal.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -57,12 +55,12 @@ interface UnifiedOnboardingProps {
 }
 
 /**
- * UnifiedOnboarding — 3-step full-screen onboarding.
+ * UnifiedOnboarding — 2-step full-screen onboarding (Welcome → Intent).
  *
- * @description Replaces the previous 5-step OnboardingModal with a streamlined
- * 3-step flow: Welcome → Intent → First Look (marketplace "aha moment").
- * Persists state to Supabase onboarding_data JSONB. Migrates existing
- * localStorage flags on first mount.
+ * @description Team builders are handed off to Cal's guided tour after intent
+ * selection. Suppliers redirect to /supplier-portal. Persists state to
+ * Supabase onboarding_data JSONB. Migrates existing localStorage flags on
+ * first mount.
  */
 export function UnifiedOnboarding({
   userRole,
@@ -251,8 +249,8 @@ export function UnifiedOnboarding({
         Skip tour
       </motion.button>
 
-      {/* Step content — overflow-y-auto prevents clipping on short viewports (landscape, iPad split) */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8 overflow-y-auto">
+      {/* Step content — m-auto on child centers when space allows, scrolls naturally when it doesn't */}
+      <div className="relative z-10 h-full flex flex-col items-center px-6 sm:px-8 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStep}
@@ -262,7 +260,7 @@ export function UnifiedOnboarding({
             animate="center"
             exit="exit"
             transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="w-full max-w-2xl text-center"
+            className="w-full max-w-2xl text-center my-auto"
           >
             {/* STEP 1: Welcome */}
             {currentStep === 'welcome' && (

@@ -205,14 +205,15 @@ export function GuidedTour({ onComplete }: GuidedTourProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         onClick={handleSkip}
-        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 text-muted-foreground hover:text-foreground transition-colors"
+        className="absolute top-6 right-4 sm:right-8 pt-safe z-20 min-h-[44px] min-w-[44px] flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Skip tour"
       >
         <X className="w-5 h-5" />
       </motion.button>
 
       {/* Main content */}
-      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8">
+      {/* overflow-y-auto prevents clipping on short viewports (landscape, iPad split) */}
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-6 sm:px-8 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentStop}

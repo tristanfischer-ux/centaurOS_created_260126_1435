@@ -51,8 +51,7 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
         <div className="text-center space-y-0.5">
           <span className="text-xs font-medium text-muted-foreground/60">Illustration queued</span>
           <p className="text-[11px] text-muted-foreground/40 leading-tight">
-            Blueprints begin after all modules are expanded and the hero image is created.
-            This usually takes 5–10 minutes.
+            This usually takes 5–10 min — you can navigate away and come back.
           </p>
         </div>
       </div>
@@ -65,6 +64,7 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
       <div className="aspect-[3/2] w-full rounded-t-xl bg-muted/50 animate-pulse flex flex-col items-center justify-center gap-2">
         <Loader2 className="h-6 w-6 animate-spin text-international-orange/60" />
         <span className="text-xs text-muted-foreground">Generating illustration…</span>
+        <span className="text-[11px] text-muted-foreground/40">Safe to navigate away</span>
       </div>
     )
   }

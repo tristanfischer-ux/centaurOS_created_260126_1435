@@ -28,6 +28,7 @@ import {
   useEffect,
   type ReactNode,
 } from "react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -102,6 +103,9 @@ let nextOpId = 1
  */
 export function BackgroundOpsProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [ops, setOps] = useState<BackgroundOp[]>([])
+  const router = useRouter()
+  const routerRef = useRef(router)
+  routerRef.current = router
   const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
 
   // Clean up timers on unmount
@@ -157,10 +161,22 @@ export function BackgroundOpsProvider({ children }: { children: ReactNode }): Re
           : op,
       ),
     )
-    // INTENT: Find the op label for a meaningful toast message
+    // INTENT: Find the op to show a meaningful toast with optional "View" link
+    // when the user has navigated away from the source page.
     setOps((prev) => {
       const op = prev.find((o) => o.id === id)
-      if (op) toast.success(successMessage ?? `${op.label} complete`)
+      if (op) {
+        const isOnSourcePage = window.location.pathname.startsWith(op.sourceRoute)
+        toast.success(successMessage ?? `${op.label} complete`, {
+          duration: isOnSourcePage ? 4000 : 10000,
+          ...(!isOnSourcePage && op.sourceRoute ? {
+            action: {
+              label: "View",
+              onClick: () => { routerRef.current.push(op.sourceRoute) },
+            },
+          } : {}),
+        })
+      }
       return prev
     })
     scheduleDismiss(id)
