@@ -81,8 +81,8 @@ const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
   ],
   robotics: [
     "robot", "actuator", "gripper", "servo", "stepper motor",
-    "collaborative robot", "cobot", "autonomous", "lidar mount",
-    "end effector", "robotic arm", "mobile robot", "agv",
+    "collaborative robot", "cobot", "lidar mount",
+    "end effector", "mobile robot",
   ],
   energy: [
     "solar panel", "wind turbine", "battery pack", "generator",
@@ -90,9 +90,9 @@ const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
     "fuel cell", "power converter", "charge controller", "turbine blade",
     "lithium ion", "lithium battery", "battery cell", "battery module",
     "bms", "battery management", "thermal runaway", "cell balancing",
-    "heat sink", "thermal management", "heat exchanger", "cooling system",
+    "heat sink", "thermal management", "cooling system",
     "thermal interface", "heat pipe", "thermoelectric",
-    "nacelle", "solar tracker",
+    "solar tracker",
   ],
   construction: [
     "building", "bridge", "beam", "column", "truss", "foundation",
@@ -100,7 +100,7 @@ const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
     "hvac duct", "plumbing", "railing", "staircase",
     "house", "apartment", "roof", "wall framing", "insulation",
     "window frame", "door frame", "floor joist", "timber frame",
-    "cladding", "damp proof", "waterproofing", "membrane",
+    "cladding", "damp proof", "waterproofing",
     "flashing", "weatherproofing", "sealant", "vapor barrier",
     "tanking", "flat roof", "pitched roof", "guttering", "downpipe",
   ],
@@ -149,7 +149,8 @@ const INDUSTRY_KEYWORDS: Record<IndustryDomain, string[]> = {
     "sofa", "bench", "stool", "wardrobe", "drawer", "crib", "high chair",
   ],
   sporting: [
-    "bicycle", "surfboard", "ski", "snowboard", "climbing", "helmet",
+    "bicycle", "surfboard", "ski", "snowboard", "climbing",
+    "sports helmet", "bike helmet", "cycling helmet",
     "kayak paddle", "golf club", "tennis racket", "skateboard",
     "paraglider", "hang glider", "scuba", "wetsuit",
   ],
@@ -203,13 +204,11 @@ export function detectIndustryDomain(text: string): IndustryDomain {
  */
 export function extractProductKeywords(text: string): string[] {
   const lower = text.toLowerCase()
-  const found: string[] = []
+  const found = new Set<string>()
   for (const keywords of Object.values(INDUSTRY_KEYWORDS)) {
     for (const kw of keywords) {
-      if (lower.includes(kw) && !found.includes(kw)) {
-        found.push(kw)
-      }
+      if (lower.includes(kw)) found.add(kw)
     }
   }
-  return found
+  return [...found]
 }

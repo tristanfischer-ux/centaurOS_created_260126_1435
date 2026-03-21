@@ -75,10 +75,11 @@ export async function retrieveEngineeringDataForPrompt(
     const boltSection = hwData
       .filter(h => h.hardware_type === "bolt")
       .map(h => {
-        const d = h.dimensions as Record<string, number>
-        return `- ${h.designation}: pitch=${d.thread_pitch_mm}mm, head_ø=${d.head_diameter_mm}mm, ` +
-          `clearance_hole=${d.clearance_hole_mm}mm, tapping_drill=${d.tapping_drill_mm}mm, ` +
-          `key=${d.key_size_mm}mm`
+        const d = h.dimensions as Record<string, unknown>
+        const n = (key: string) => typeof d[key] === "number" ? d[key] : Number(d[key]) || 0
+        return `- ${h.designation}: pitch=${n("thread_pitch_mm")}mm, head_ø=${n("head_diameter_mm")}mm, ` +
+          `clearance_hole=${n("clearance_hole_mm")}mm, tapping_drill=${n("tapping_drill_mm")}mm, ` +
+          `key=${n("key_size_mm")}mm`
       }).join("\n")
 
     sections.push(

@@ -15,11 +15,12 @@ import {
 } from '@/components/ui/select'
 import { ArrowUpDown } from 'lucide-react'
 
-export type SortOption = 'match' | 'fund_size' | 'quality' | 'hardware_fit' | 'priority' | 'name'
+export type SortOption = 'match' | 'fund_size' | 'quality' | 'hardware_fit' | 'cheque' | 'priority' | 'name'
 
 const SORT_LABELS: Record<SortOption, string> = {
   match: 'Best match',
   fund_size: 'Fund size',
+  cheque: 'Cheque size',
   quality: 'Quality score',
   hardware_fit: 'Hardware fit',
   priority: 'Priority',

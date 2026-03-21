@@ -208,7 +208,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 value={filters.minQuality ?? ''}
                 onChange={e => {
                   const raw = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
-                  const v = raw != null && isNaN(raw) ? undefined : raw
+                  const v = raw != null && !isNaN(raw) && raw > 0 ? raw : undefined
                   onChange({ ...filters, minQuality: v })
                 }}
                 className="text-sm"
@@ -225,7 +225,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 value={filters.minHardwareFit ?? ''}
                 onChange={e => {
                   const raw = e.target.value ? Math.min(10, Math.max(0, Number(e.target.value))) : undefined
-                  const v = raw != null && isNaN(raw) ? undefined : raw
+                  const v = raw != null && !isNaN(raw) && raw > 0 ? raw : undefined
                   onChange({ ...filters, minHardwareFit: v })
                 }}
                 className="text-sm"

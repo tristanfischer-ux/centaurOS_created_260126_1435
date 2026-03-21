@@ -34,7 +34,8 @@ export function FundPerformanceSection({
 }: FundPerformanceSectionProps) {
   const hasAnyData = fundHistory || exits || fundPerformance
 
-  if (!hasAnyData && hasAccess) return null
+  // Don't show anything (including lock) when there's no data behind it
+  if (!hasAnyData) return null
 
   // Show locked placeholder for non-professional users
   if (!hasAccess) {

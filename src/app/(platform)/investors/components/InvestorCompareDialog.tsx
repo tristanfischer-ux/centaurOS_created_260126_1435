@@ -76,7 +76,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
   let bestMatch = -1
   for (const firm of firms) {
     const score = matchScores[firm.id] ?? 0
-    if (score > bestMatch) {
+    if (score > 0 && score > bestMatch) {
       bestMatch = score
       bestMatchId = firm.id
     }

@@ -36,6 +36,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
   const [shortlistPending, startShortlistTransition] = useTransition()
   const [alertPending, startAlertTransition] = useTransition()
   const shortlistBusyRef = useRef(false)
+  const alertBusyRef = useRef(false)
 
   // Load initial state
   useEffect(() => {
@@ -77,20 +78,28 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
     })
   }, [listingId])
 
+  const alertStateRef = useRef(false)
+  alertStateRef.current = isAlerted
+
   const handleToggleAlert = useCallback(() => {
-    if (!access.detailAccess) return
-    const wasAlerted = isAlerted
+    if (!access.detailAccess || alertBusyRef.current) return
+    alertBusyRef.current = true
+    const wasAlerted = alertStateRef.current
     setIsAlerted(!wasAlerted)
     startAlertTransition(async () => {
-      const result = await toggleInvestorAlert(listingId)
-      if (result.error) {
-        setIsAlerted(wasAlerted)
-        toast.error(result.error)
-      } else {
-        toast.success(result.active ? 'Alert enabled' : 'Alert disabled')
+      try {
+        const result = await toggleInvestorAlert(listingId)
+        if (result.error) {
+          setIsAlerted(wasAlerted)
+          toast.error(result.error)
+        } else {
+          toast.success(result.active ? 'Alert enabled' : 'Alert disabled')
+        }
+      } finally {
+        alertBusyRef.current = false
       }
     })
-  }, [isAlerted, listingId, access.detailAccess])
+  }, [listingId, access.detailAccess])
 
   return (
     <div className="flex items-center gap-1.5">

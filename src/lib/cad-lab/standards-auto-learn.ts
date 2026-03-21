@@ -139,13 +139,20 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
 
     // SECURITY: Sanitize AI-generated content to mitigate prompt injection.
     // Strip obvious instruction markers that could hijack downstream prompts.
-    const INJECTION_PATTERNS = /(?:ignore|disregard|forget|override)\s+(?:above|previous|prior|all)\b|(?:you are now|act as|pretend to be|your new role)/gi
+    // DECISION: "override" alone is legitimate engineering text ("override the default tolerance").
+    // Only flag it when followed by instruction-context words (above/previous/instructions/prompt).
+    const INJECTION_PATTERNS = /(?:ignore|disregard|forget)\s+(?:above|previous|prior|all|the above|instructions|prompt)\b|(?:override)\s+(?:above|previous|prior|instructions|prompt)\b|(?:you are now|act as|pretend to be|your new role|system prompt|<\/?system>)/gi
     for (const s of parsed.standards) {
+      // GOTCHA: Global regex is stateful — reset lastIndex before each test/replace pair
+      INJECTION_PATTERNS.lastIndex = 0
       if (s.requirements_markdown && INJECTION_PATTERNS.test(s.requirements_markdown)) {
         console.warn(`[standards-auto-learn] Stripped potential prompt injection from ${s.standard_code}`)
+        INJECTION_PATTERNS.lastIndex = 0
         s.requirements_markdown = s.requirements_markdown.replace(INJECTION_PATTERNS, "[REDACTED]")
       }
+      INJECTION_PATTERNS.lastIndex = 0
       if (s.summary && INJECTION_PATTERNS.test(s.summary)) {
+        INJECTION_PATTERNS.lastIndex = 0
         s.summary = s.summary.replace(INJECTION_PATTERNS, "[REDACTED]")
       }
     }
