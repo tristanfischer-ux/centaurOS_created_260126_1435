@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Copy, Loader2, RefreshCw, Mail, Linkedin } from 'lucide-react'
 import { generateOutreachDraft } from '@/actions/investor-outreach'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import type { OutreachDraft } from '@/actions/investor-outreach'
 
 interface OutreachDraftDialogProps {
@@ -183,8 +184,8 @@ export function OutreachDraftDialog({
             </Tabs>
 
             <div className="flex justify-end">
-              <Button variant="secondary" size="sm" onClick={handleGenerate} className="text-xs gap-1.5">
-                <RefreshCw className="h-3.5 w-3.5" />
+              <Button variant="secondary" size="sm" onClick={handleGenerate} disabled={isPending} className="text-xs gap-1.5">
+                <RefreshCw className={cn('h-3.5 w-3.5', isPending && 'animate-spin')} />
                 Regenerate
               </Button>
             </div>

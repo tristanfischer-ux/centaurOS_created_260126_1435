@@ -127,12 +127,13 @@ export function InvestorBrowser({
   const [debouncedQuery, setDebouncedQuery] = useState(() => searchParams.get('q') ?? '')
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     const s = searchParams.get('sort') as SortOption
-    return ['match', 'fund_size', 'quality', 'hardware_fit', 'priority', 'name'].includes(s) ? s : 'name'
+    return ['match', 'fund_size', 'quality', 'hardware_fit', 'cheque', 'priority', 'name'].includes(s) ? s : 'name'
   })
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilters>(() => {
-    const stages = searchParams.get('stages')?.split(',').filter(Boolean) ?? []
-    const sectors = searchParams.get('sectors')?.split(',').filter(Boolean) ?? []
-    const geoFocus = searchParams.get('geo')?.split(',').filter(Boolean) ?? []
+    // SECURITY: Cap filter array lengths to prevent DoS via crafted URLs with hundreds of values
+    const stages = (searchParams.get('stages')?.split(',').filter(Boolean) ?? []).slice(0, 20)
+    const sectors = (searchParams.get('sectors')?.split(',').filter(Boolean) ?? []).slice(0, 20)
+    const geoFocus = (searchParams.get('geo')?.split(',').filter(Boolean) ?? []).slice(0, 10)
     const chequeMinRaw = searchParams.get('chequeMin') ? Number(searchParams.get('chequeMin')) : undefined
     const chequeMaxRaw = searchParams.get('chequeMax') ? Number(searchParams.get('chequeMax')) : undefined
     const minQualityRaw = searchParams.get('minQuality') ? Number(searchParams.get('minQuality')) : undefined
@@ -155,13 +156,16 @@ export function InvestorBrowser({
 
   // Data state
   const hasUrlFilters = !!(searchParams.get('type') || searchParams.get('active') || searchParams.get('q')
-    || searchParams.get('stages') || searchParams.get('sectors') || searchParams.get('geo')
-    || searchParams.get('chequeMin') || searchParams.get('chequeMax') || searchParams.get('minQuality')
-    || searchParams.get('minHwFit') || searchParams.get('bvca'))
+    || searchParams.get('sort') || searchParams.get('stages') || searchParams.get('sectors')
+    || searchParams.get('geo') || searchParams.get('chequeMin') || searchParams.get('chequeMax')
+    || searchParams.get('minQuality') || searchParams.get('minHwFit') || searchParams.get('bvca'))
 
   const [firms, setFirms] = useState<InvestorFirm[]>(hasUrlFilters ? [] : initialFirms)
   const [total, setTotal] = useState(hasUrlFilters ? 0 : initialTotal)
   const [hasMore, setHasMore] = useState(hasUrlFilters ? false : initialHasMore)
+  // GOTCHA: When URL has filters, initial data is empty and first refetch is pending.
+  // Track whether the initial URL-driven fetch has completed to show skeleton instead of empty state.
+  const [initialUrlFetchDone, setInitialUrlFetchDone] = useState(!hasUrlFilters)
   const [page, setPage] = useState(1)
   const [matchScores, setMatchScores] = useState<Record<string, number>>(initialMatchScores)
   const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
@@ -259,8 +263,16 @@ export function InvestorBrowser({
         setPage(1)
         // Clear compare selection — old IDs may not be in new results
         setCompareIds([])
+        // Compute match scores for new firms so match sort works after refetch
+        if (result.firms.length > 0) {
+          computeMatchScores(result.firms.map(f => f.id))
+            .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
+            .catch(() => { /* non-critical */ })
+        }
+        if (!initialUrlFetchDone) setInitialUrlFetchDone(true)
       } catch (err) {
         console.error('[InvestorBrowser] Filter search failed:', err)
+        if (!initialUrlFetchDone) setInitialUrlFetchDone(true)
       }
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,8 +282,9 @@ export function InvestorBrowser({
   // Client-side match score sorting
   // ---------------------------------------------------------------------------
 
+  // GOTCHA: Add title tiebreaker for stable ordering when match scores are equal
   const displayFirms = sortBy === 'match' && Object.keys(matchScores).length > 0
-    ? [...firms].sort((a, b) => (matchScores[b.id] ?? 0) - (matchScores[a.id] ?? 0))
+    ? [...firms].sort((a, b) => (matchScores[b.id] ?? 0) - (matchScores[a.id] ?? 0) || a.title.localeCompare(b.title))
     : firms
 
   // ---------------------------------------------------------------------------
@@ -399,7 +412,8 @@ export function InvestorBrowser({
     setSortBy('name')
   }, [])
 
-  const hasActiveFilters = activeFirmType !== 'All' || activeOnly || searchQuery.length > 0
+  // GOTCHA: Use debouncedQuery (not searchQuery) to match what's actually filtering results
+  const hasActiveFilters = activeFirmType !== 'All' || activeOnly || debouncedQuery.length > 0
     || advancedFilters.stages.length > 0 || advancedFilters.sectors.length > 0
     || advancedFilters.geoFocus.length > 0 || advancedFilters.chequeMin != null
     || advancedFilters.chequeMax != null || advancedFilters.minQuality != null
@@ -535,7 +549,7 @@ export function InvestorBrowser({
       {/* Grid / Board / Map views */}
       {viewMode === 'grid' && (
         <>
-          {isPending && displayFirms.length === 0 ? (
+          {(isPending && displayFirms.length === 0) || !initialUrlFetchDone ? (
             <InvestorGridSkeleton />
           ) : displayFirms.length === 0 && !isPending ? (
             <EmptyState onClear={handleClearFilters} />

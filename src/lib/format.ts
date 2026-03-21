@@ -80,6 +80,10 @@ export function formatCurrencyFromMinorUnits(
  */
 export function formatFundSize(gbp: number | null | undefined): string | null {
   if (gbp == null || gbp === 0) return null
+  // SECURITY: Guard against non-numeric JSONB values (stored as strings) producing "£NaN"
+  const n = Number(gbp)
+  if (isNaN(n) || n === 0) return null
+  gbp = n
   if (gbp >= 1_000_000_000) {
     const b = gbp / 1_000_000_000
     return `£${b % 1 === 0 ? b : b.toFixed(1)}B`

@@ -166,14 +166,12 @@ export function InvestorCard({
                 <Heart className={cn('h-4 w-4', isShortlisted && 'fill-current')} />
               </button>
             )}
-            {attrs.is_active_deploying != null && !matchScore && (attrs.is_active_deploying ? (
+            {attrs.is_active_deploying && (
               <span className="flex items-center gap-1 text-success">
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide">Active</span>
               </span>
-            ) : (
-              <Circle className="h-4 w-4 text-muted-foreground" aria-label="Not currently deploying" />
-            ))}
+            )}
           </div>
         </div>
       </CardHeader>

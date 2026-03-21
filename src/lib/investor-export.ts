@@ -50,8 +50,8 @@ export function exportInvestorsCSV(
 }
 
 function escapeCsv(value: string): string {
-  // SECURITY: Neutralize formula injection (=, +, -, @, \t, \r can trigger formulas in Excel/Sheets)
-  if (/^[=+\-@\t\r]/.test(value)) {
+  // SECURITY: Neutralize formula injection (=, +, -, @, \t, \r, \n can trigger formulas in Excel/Sheets)
+  if (/^[=+\-@\t\r\n]/.test(value)) {
     value = "'" + value
   }
   if (value.includes(',') || value.includes('"') || value.includes('\n') || value.includes("'")) {

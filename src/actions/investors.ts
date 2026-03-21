@@ -440,7 +440,9 @@ export async function searchInvestors(
   // order by nested JSONB paths. We fetch all matching rows (capped at 2000), sort server-side,
   // then manually paginate. For name sort, DB handles ordering + pagination directly.
   const from = (safePage - 1) * safePageSize
-  const needsServerSort = sortBy != null && sortBy !== 'name'
+  // GOTCHA: 'match' sort is handled client-side — exclude from server-sort path
+  // to avoid fetching 2000 rows for a no-op sort (the switch has no 'match' case).
+  const needsServerSort = sortBy != null && sortBy !== 'name' && sortBy !== 'match'
 
   if (needsServerSort) {
     // Fetch all matching rows for correct cross-page ordering
@@ -1241,11 +1243,12 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return empty
 
-  // Fetch shortlist
+  // Fetch shortlist (capped to prevent unbounded IN() queries)
   const { data: shortlistRows } = await supabase
     .from('investor_shortlist')
     .select('listing_id, stage')
     .eq('user_id', user.id)
+    .limit(200)
 
   if (!shortlistRows || shortlistRows.length === 0) return empty
 
@@ -1256,13 +1259,20 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
     if (stage in pipelineCounts) pipelineCounts[stage]++
   }
 
-  // Fetch firm details for shortlisted investors
+  // Fetch firm details for shortlisted investors (batched to stay within PostgREST URL limits)
   const listingIds = shortlistRows.map(r => r.listing_id)
-  const { data: listings } = await supabase
-    .from('marketplace_listings')
-    .select('id, title, description, subcategory, attributes')
-    .eq('category', 'Finance')
-    .in('id', listingIds)
+  const BATCH_SIZE = 50
+  const allListings: Record<string, unknown>[] = []
+  for (let i = 0; i < listingIds.length; i += BATCH_SIZE) {
+    const batch = listingIds.slice(i, i + BATCH_SIZE)
+    const { data } = await supabase
+      .from('marketplace_listings')
+      .select('id, title, description, subcategory, attributes')
+      .eq('category', 'Finance')
+      .in('id', batch)
+    if (data) allListings.push(...data)
+  }
+  const listings = allListings
 
   const access = await getInvestorTierAccess()
   const firmMap = new Map<string, InvestorFirm>()
@@ -1291,18 +1301,35 @@ export async function getFundraiseDashboardStats(): Promise<FundraiseDashboardSt
     .filter((x): x is NonNullable<typeof x> => x !== null)
 
   // Recent notes across all shortlisted investors
-  const { data: noteRows } = await supabase
-    .from('investor_notes')
-    .select('id, listing_id, note_type, content, created_at')
-    .eq('user_id', user.id)
-    .in('listing_id', listingIds)
-    .order('created_at', { ascending: false })
-    .limit(10)
+  // SECURITY: Batch IN() to stay within PostgREST URL limits (same pattern as firm details above)
+  const allNoteRows: Record<string, unknown>[] = []
+  const NOTE_BATCH_SIZE = 50
+  for (let i = 0; i < listingIds.length; i += NOTE_BATCH_SIZE) {
+    const batch = listingIds.slice(i, i + NOTE_BATCH_SIZE)
+    const { data: batchNotes } = await supabase
+      .from('investor_notes')
+      .select('id, listing_id, note_type, content, created_at')
+      .eq('user_id', user.id)
+      .in('listing_id', batch)
+      .order('created_at', { ascending: false })
+      .limit(10)
+    if (batchNotes) allNoteRows.push(...batchNotes)
+  }
+  // Re-sort merged batches and take top 10
+  allNoteRows.sort((a, b) => {
+    const aTime = new Date(a.created_at as string).getTime()
+    const bTime = new Date(b.created_at as string).getTime()
+    return bTime - aTime
+  })
+  const noteRows = allNoteRows.slice(0, 10)
 
-  const recentNotes = (noteRows ?? []).map(n => ({
-    ...(n as InvestorNote),
-    firmName: firmMap.get(n.listing_id)?.title ?? 'Unknown',
-  }))
+  const recentNotes = (noteRows ?? []).map(n => {
+    const note = n as unknown as InvestorNote
+    return {
+      ...note,
+      firmName: firmMap.get(note.listing_id)?.title ?? 'Unknown',
+    }
+  })
 
   // Coverage analysis — identify gaps
   const coverageGaps: string[] = []

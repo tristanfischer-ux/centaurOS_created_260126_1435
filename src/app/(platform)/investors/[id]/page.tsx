@@ -558,7 +558,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                       <p className="text-sm text-foreground capitalize">{attrs.data_source.replace(/_/g, ' ')}</p>
                     </div>
                   )}
-                  {attrs.last_synced && (
+                  {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
                     <div>
                       <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Last Synced</p>
                       <p className="text-xs text-muted-foreground">

@@ -180,6 +180,8 @@ export function InvestorShortlistBoard() {
 
   const itemsRef = useRef(items)
   itemsRef.current = items
+  // SECURITY: Prevent rapid drag operations from creating race conditions
+  const dragBusyRef = useRef(false)
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const item = itemsRef.current.find(i => i.id === event.active.id)
@@ -190,6 +192,8 @@ export function InvestorShortlistBoard() {
     setActiveItem(null)
     const { active, over } = event
     if (!over) return
+    if (dragBusyRef.current) return
+    dragBusyRef.current = true
 
     // GOTCHA: closestCorners can resolve over.id to another draggable card's UUID,
     // not just a droppable column stage ID. Validate before using.
@@ -212,14 +216,18 @@ export function InvestorShortlistBoard() {
     // Optimistic update
     setItems(prev => prev.map(i => i.id === itemId ? { ...i, shortlistStage: targetStage } : i))
 
-    const { error } = await updateShortlistStage(itemId, targetStage)
-    if (error) {
-      // Revert using captured previousStage (not closure)
-      const revertStage = previousStage
-      setItems(prev => prev.map(i =>
-        i.id === itemId ? { ...i, shortlistStage: revertStage } : i
-      ))
-      toast.error('Failed to move investor')
+    try {
+      const { error } = await updateShortlistStage(itemId, targetStage)
+      if (error) {
+        // Revert using captured previousStage (not closure)
+        const revertStage = previousStage
+        setItems(prev => prev.map(i =>
+          i.id === itemId ? { ...i, shortlistStage: revertStage } : i
+        ))
+        toast.error('Failed to move investor')
+      }
+    } finally {
+      dragBusyRef.current = false
     }
   }, [])
 

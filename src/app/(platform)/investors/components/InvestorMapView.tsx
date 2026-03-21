@@ -139,13 +139,22 @@ export function InvestorMapView({ firms }: InvestorMapViewProps) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Load Leaflet CSS with SRI
+    // Load Leaflet CSS with SRI — fall back without SRI if CDN hash changes
     if (typeof window !== 'undefined' && !document.querySelector('link[href*="leaflet"]')) {
       const link = document.createElement('link')
       link.rel = 'stylesheet'
       link.href = LEAFLET_CSS_URL
       link.integrity = LEAFLET_CSS_INTEGRITY
       link.crossOrigin = 'anonymous'
+      link.onerror = () => {
+        // SRI hash mismatch — retry without integrity check
+        console.warn('[InvestorMapView] Leaflet CSS SRI failed, retrying without integrity')
+        link.remove()
+        const fallback = document.createElement('link')
+        fallback.rel = 'stylesheet'
+        fallback.href = LEAFLET_CSS_URL
+        document.head.appendChild(fallback)
+      }
       document.head.appendChild(link)
     }
     setMounted(true)
