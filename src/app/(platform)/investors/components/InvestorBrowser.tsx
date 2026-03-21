@@ -171,6 +171,9 @@ export function InvestorBrowser({
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasEverFetched = useRef(hasUrlFilters)
+  // SECURITY: Generation counter prevents stale load-more results from appending
+  // when filters change mid-flight
+  const filterGeneration = useRef(0)
 
   // ---------------------------------------------------------------------------
   // Debounce search query
@@ -219,6 +222,7 @@ export function InvestorBrowser({
       return
     }
     hasEverFetched.current = true
+    filterGeneration.current += 1
     startTransition(async () => {
       try {
         const result = await searchInvestors({
@@ -266,6 +270,8 @@ export function InvestorBrowser({
     if (loadingMoreRef.current) return
     loadingMoreRef.current = true
     setIsLoadingMore(true)
+    // Capture generation so we can discard stale results if filters changed mid-flight
+    const gen = filterGeneration.current
     try {
       const nextPage = page + 1
       const result = await searchInvestors({
@@ -284,6 +290,8 @@ export function InvestorBrowser({
         page: nextPage,
         pageSize: PAGE_SIZE,
       })
+      // Discard results if filters changed while load-more was in flight
+      if (gen !== filterGeneration.current) return
       // Use functional setState to dedup — avoids stale firms closure
       let newFirmIds: string[] = []
       setFirms(prev => {

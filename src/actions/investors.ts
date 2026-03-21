@@ -312,7 +312,7 @@ function sanitizeFilterValue(value: string): string {
     .replace(/\\/g, '\\\\')
     .replace(/%/g, '\\%')
     .replace(/_/g, '\\_')
-    .replace(/[,()\."*:!]/g, '')
+    .replace(/[,()\."*:!'[\]{}]/g, '')
 }
 
 /**
@@ -352,8 +352,9 @@ export async function searchInvestors(
     .eq('category', 'Finance')
 
   // Full-text search
+  // SECURITY: Cap query length to prevent DoS via huge ilike patterns
   if (query && query.trim().length > 0) {
-    const sanitized = sanitizeFilterValue(query.trim())
+    const sanitized = sanitizeFilterValue(query.trim().slice(0, 200))
     if (sanitized) {
       const term = `%${sanitized}%`
       q = q.or(`title.ilike.${term},description.ilike.${term}`)
@@ -434,10 +435,20 @@ export async function searchInvestors(
     q = q.filter('attributes->cheque_range_gbp->min', 'lte', chequeMax)
   }
 
-  // Pagination
+  // Pagination + sorting
+  // DECISION: For JSONB attribute sorts (fund_size, quality, etc.), PostgREST can't natively
+  // order by nested JSONB paths. We fetch all matching rows (capped at 2000), sort server-side,
+  // then manually paginate. For name sort, DB handles ordering + pagination directly.
   const from = (safePage - 1) * safePageSize
-  const to = from + safePageSize - 1
-  q = q.range(from, to).order('title', { ascending: true })
+  const needsServerSort = sortBy != null && sortBy !== 'name'
+
+  if (needsServerSort) {
+    // Fetch all matching rows for correct cross-page ordering
+    q = q.order('title', { ascending: true }).limit(2000)
+  } else {
+    const to = from + safePageSize - 1
+    q = q.range(from, to).order('title', { ascending: true })
+  }
 
   const { data, count, error } = await q
 
@@ -452,9 +463,9 @@ export async function searchInvestors(
   const access = await getInvestorTierAccess()
   firms = firms.map(f => stripTierGatedFields(f, access))
 
-  // Client-side sorting for JSONB attributes (DB sorts by title; re-sort if needed)
+  // Server-side sort for JSONB attributes — applied BEFORE pagination
   const PRIORITY_ORDER: Record<string, number> = { A: 0, B: 1, C: 2 }
-  if (sortBy && sortBy !== 'name') {
+  if (needsServerSort) {
     firms.sort((a: InvestorFirm, b: InvestorFirm) => {
       switch (sortBy) {
         case 'fund_size':
@@ -477,6 +488,14 @@ export async function searchInvestors(
           return 0
       }
     })
+  }
+
+  if (needsServerSort) {
+    // Manual pagination after sorting
+    const total = firms.length
+    const paginatedFirms = firms.slice(from, from + safePageSize)
+    const hasMore = from + paginatedFirms.length < total
+    return { firms: paginatedFirms, total, hasMore }
   }
 
   const total = count ?? 0

@@ -524,7 +524,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 {attrs.hardware_fit_score != null && access.intelligenceAccess && (
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Hardware Fit</p>
-                    <p className="text-sm font-semibold text-foreground">{attrs.hardware_fit_score.toFixed(1)}/10</p>
+                    <p className="text-sm font-semibold text-foreground">{Number(attrs.hardware_fit_score).toFixed(1)}/10</p>
                   </div>
                 )}
                 {attrs.hardware_fit_score != null && !access.intelligenceAccess && (
@@ -550,7 +550,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 <CardContent className="space-y-3">
                   <div>
                     <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Score</p>
-                    <p className="text-sm font-semibold text-foreground">{attrs.data_quality_score.toFixed(1)}/10</p>
+                    <p className="text-sm font-semibold text-foreground">{Number(attrs.data_quality_score).toFixed(1)}/10</p>
                   </div>
                   {attrs.data_source && (
                     <div>

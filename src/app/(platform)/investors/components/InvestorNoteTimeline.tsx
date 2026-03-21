@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useCallback, useEffect, useTransition } from 'react'
+import { useState, useCallback, useEffect, useTransition, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
@@ -65,6 +65,7 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
   const [noteType, setNoteType] = useState('note')
   const [content, setContent] = useState('')
   const [isPending, startTransition] = useTransition()
+  const submitBusyRef = useRef(false)
 
   useEffect(() => {
     getInvestorNotes(listingId)
@@ -80,21 +81,26 @@ export function InvestorNoteTimeline({ listingId }: InvestorNoteTimelineProps) {
   }, [listingId])
 
   const handleAdd = useCallback(() => {
-    if (!content.trim()) return
+    if (!content.trim() || submitBusyRef.current) return
+    submitBusyRef.current = true
     startTransition(async () => {
-      const { error } = await addInvestorNote(listingId, content.trim(), noteType)
-      if (error) {
-        toast.error(error)
-        return
-      }
-      toast.success('Note added')
-      setContent('')
-      // Refresh notes
       try {
-        const { notes: fresh } = await getInvestorNotes(listingId)
-        setNotes(fresh)
-      } catch (err) {
-        console.error('[InvestorNoteTimeline] Failed to refresh notes:', err)
+        const { error } = await addInvestorNote(listingId, content.trim(), noteType)
+        if (error) {
+          toast.error(error)
+          return
+        }
+        toast.success('Note added')
+        setContent('')
+        // Refresh notes
+        try {
+          const { notes: fresh } = await getInvestorNotes(listingId)
+          setNotes(fresh)
+        } catch (err) {
+          console.error('[InvestorNoteTimeline] Failed to refresh notes:', err)
+        }
+      } finally {
+        submitBusyRef.current = false
       }
     })
   }, [listingId, content, noteType])
