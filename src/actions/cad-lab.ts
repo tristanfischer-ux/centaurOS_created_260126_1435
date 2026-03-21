@@ -85,6 +85,7 @@ import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-
 import { detectIndustryDomain, extractProductKeywords } from "@/lib/cad-lab/industry-domains"
 import { retrieveStandardsForPrompt } from "@/lib/cad-lab/standards-retriever"
 import { generateAndStoreStandards } from "@/lib/cad-lab/standards-auto-learn"
+import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -1434,6 +1435,17 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
       }
     } catch (stdErr) {
       console.warn("[THE-FORGE] Step 3: Standards retrieval failed (non-fatal):", stdErr instanceof Error ? stdErr.message : stdErr)
+    }
+
+    // Retrieve material properties, hardware specs, and process capabilities
+    try {
+      const engData = await retrieveEngineeringDataForPrompt(description)
+      if (engData.content) {
+        codeGenStandardsSection += (codeGenStandardsSection ? "\n\n" : "") + engData.content
+        console.info(`[THE-FORGE] Step 3: Injected engineering data (${engData.materialsCount} materials, ${engData.hardwareCount} hardware, ${engData.processesCount} processes)`)
+      }
+    } catch (engErr) {
+      console.warn("[THE-FORGE] Step 3: Engineering data retrieval failed (non-fatal):", engErr instanceof Error ? engErr.message : engErr)
     }
 
     // DECISION: Two system prompts — image-focused (compact, ~60 lines) vs full (with CAD_INSTRUCTIONS methodology).
