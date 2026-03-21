@@ -2,15 +2,12 @@
  * @file mobile-onboarding.spec.ts
  *
  * @description Mobile-specific tests for the onboarding flow on iPhone-class
- * viewports. Validates the mobile UX fixes:
- * 1. Industry/Stage grid stacks on mobile (grid-cols-1 sm:grid-cols-2)
- * 2. Executive/Apprentice grid stacks on mobile
- * 3. Onboarding step dots clear the iPhone home indicator (pb-safe)
- * 4. "Skip tour" button doesn't overlap notch (pt-safe + right-4)
- * 5. No autoFocus on name fields (keyboard doesn't hijack on load)
+ * viewports. The join page is a single-step form (no path selection):
+ * - Default: Name, Email, Password, Google OAuth, founding member counter
+ * - ?role=founder deep-link: adds Company Name, Industry, Stage fields
+ * - ?role=supplier: simplified supplier claim flow
  *
- * Also covers general mobile UX: no horizontal overflow, touch targets,
- * and form usability at 320px and 390px widths.
+ * Tests validate responsive layout, touch targets, no autoFocus, and no overflow.
  */
 
 import { test, expect, type Page } from '@playwright/test'
@@ -37,10 +34,6 @@ async function checkNoAutoFocus(page: Page): Promise<void> {
   ).not.toBe('input')
 }
 
-/**
- * Assert boundingBox is non-null before accessing properties.
- * Returns the box for further assertions.
- */
 async function getBoundingBoxOrFail(
   locator: ReturnType<Page['locator']>,
   label: string,
@@ -60,21 +53,20 @@ test.describe('Mobile Onboarding — iPhone SE (320px)', () => {
     await checkNoHorizontalOverflow(page)
   })
 
-  test('join page: path cards are visible and tappable', async ({ page }) => {
+  test('join page: form fields visible immediately', async ({ page }) => {
     await page.goto(`${TEST_URL}/join`)
 
-    const founderCard = page.getByText("I'm founding a company")
-    const joiningCard = page.getByText("I'm joining the marketplace")
-
-    await expect(founderCard).toBeVisible()
-    await expect(joiningCard).toBeVisible()
-
-    const founderButton = page.locator('button', { hasText: "I'm founding a company" })
-    const founderBox = await getBoundingBoxOrFail(founderButton, 'Founder path button')
-    expect(founderBox.height).toBeGreaterThanOrEqual(44)
+    await expect(page.getByLabel(/full name/i)).toBeVisible()
+    await expect(page.getByLabel(/email/i)).toBeVisible()
+    await expect(page.getByLabel(/password/i)).toBeVisible()
   })
 
-  test('founder form: Industry/Stage fields stack vertically on 320px', async ({ page }) => {
+  test('join page: no autoFocus steals keyboard', async ({ page }) => {
+    await page.goto(`${TEST_URL}/join`)
+    await checkNoAutoFocus(page)
+  })
+
+  test('founder deep-link: Industry/Stage stack vertically on 320px', async ({ page }) => {
     await page.goto(`${TEST_URL}/join?role=founder`)
 
     const industryInput = page.getByLabel(/industry/i)
@@ -92,38 +84,21 @@ test.describe('Mobile Onboarding — iPhone SE (320px)', () => {
       `Industry/Stage should stack on 320px: industry ends at y=${industryBox.y + industryBox.height}, stage starts at y=${stageBox.y}`
     ).toBeGreaterThan(industryBox.y + industryBox.height - 5)
 
-    // Each input should be full-width (minus padding)
+    // Each input should be near full-width
     expect(industryBox.width).toBeGreaterThan(250)
   })
 
-  test('founder form: no autoFocus steals keyboard', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join?role=founder`)
-    await checkNoAutoFocus(page)
-  })
-
-  test('founder form: no horizontal overflow with all fields', async ({ page }) => {
+  test('founder deep-link: no horizontal overflow', async ({ page }) => {
     await page.goto(`${TEST_URL}/join?role=founder`)
     await checkNoHorizontalOverflow(page)
   })
 
-  test('joining form: Executive/Apprentice cards have adequate touch targets', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join`)
-    await page.getByText("I'm joining the marketplace").click()
-
-    const execButton = page.getByRole('button', { name: /Executive.*Experienced/i })
-    await expect(execButton).toBeVisible()
-
-    const apprenticeButton = page.getByRole('button', { name: /Apprentice.*Early career/i })
-    await expect(apprenticeButton).toBeVisible()
-
-    const execBox = await getBoundingBoxOrFail(execButton, 'Executive button')
-    const apprenticeBox = await getBoundingBoxOrFail(apprenticeButton, 'Apprentice button')
-
-    expect(execBox.height).toBeGreaterThanOrEqual(44)
-    expect(apprenticeBox.height).toBeGreaterThanOrEqual(44)
+  test('founder deep-link: no autoFocus', async ({ page }) => {
+    await page.goto(`${TEST_URL}/join?role=founder`)
+    await checkNoAutoFocus(page)
   })
 
-  test('supplier form: no autoFocus on name field', async ({ page }) => {
+  test('supplier form: no autoFocus', async ({ page }) => {
     await page.goto(`${TEST_URL}/join?role=supplier`)
     await checkNoAutoFocus(page)
   })
@@ -139,23 +114,16 @@ test.describe('Mobile Onboarding — iPhone SE (320px)', () => {
 test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 
-  test('join page: full flow renders without overflow', async ({ page }) => {
+  test('join page: form renders without overflow', async ({ page }) => {
     await page.goto(`${TEST_URL}/join`)
     await checkNoHorizontalOverflow(page)
 
-    // Select founder
-    await page.getByText("I'm founding a company").click()
-
-    // Wait for form to appear (animation-driven, wait for actual element)
     await expect(page.getByLabel(/full name/i)).toBeVisible()
     await expect(page.getByLabel(/email/i)).toBeVisible()
     await expect(page.getByLabel(/password/i)).toBeVisible()
-    await expect(page.getByLabel(/company name/i)).toBeVisible()
-
-    await checkNoHorizontalOverflow(page)
   })
 
-  test('founder form: Industry/Stage stack vertically', async ({ page }) => {
+  test('founder deep-link: Industry/Stage stack vertically', async ({ page }) => {
     await page.goto(`${TEST_URL}/join?role=founder`)
 
     const industryBox = await getBoundingBoxOrFail(page.getByLabel(/industry/i), 'Industry input')
@@ -165,7 +133,7 @@ test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
   })
 
   test('submit button is large enough for thumb tap', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join?role=founder`)
+    await page.goto(`${TEST_URL}/join`)
 
     const submitButton = page.getByRole('button', { name: /create account/i })
     await submitButton.scrollIntoViewIfNeeded()
@@ -176,7 +144,7 @@ test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
   })
 
   test('Google OAuth button meets touch target size', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join?role=founder`)
+    await page.goto(`${TEST_URL}/join`)
 
     const googleButton = page.getByRole('button', { name: /continue with google/i })
     await expect(googleButton).toBeVisible()
@@ -194,7 +162,7 @@ test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
   })
 
   test('password strength indicator is visible', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join?role=founder`)
+    await page.goto(`${TEST_URL}/join`)
 
     const passwordField = page.getByLabel(/password/i)
     await passwordField.fill('TestPass1')
@@ -217,23 +185,6 @@ test.describe('Join Page — Responsive Grid Classes', () => {
     expect(
       gridClasses,
       'Industry/Stage grid should have grid-cols-1 sm:grid-cols-2'
-    ).toContain('grid-cols-1')
-  })
-
-  test('Executive/Apprentice grid has responsive breakpoint class', async ({ page }) => {
-    await page.goto(`${TEST_URL}/join`)
-    await page.getByText("I'm joining the marketplace").click()
-
-    // Wait for the actual element to appear (not a timeout)
-    const execButton = page.getByRole('button', { name: /Executive.*Experienced/i })
-    await expect(execButton).toBeVisible()
-
-    const roleGrid = page.locator('.grid').filter({ hasText: /Executive/ }).first()
-    const gridClasses = await roleGrid.getAttribute('class')
-
-    expect(
-      gridClasses,
-      'Executive/Apprentice grid should have grid-cols-1 sm:grid-cols-2'
     ).toContain('grid-cols-1')
   })
 })
@@ -260,7 +211,6 @@ test.describe('Mobile Onboarding — Landscape', () => {
     const industryBox = await getBoundingBoxOrFail(page.getByLabel(/industry/i), 'Industry input')
     const stageBox = await getBoundingBoxOrFail(page.getByLabel(/stage/i), 'Stage input')
 
-    // At 844px (>640px sm breakpoint), they should be side-by-side
     expect(
       Math.abs(stageBox.y - industryBox.y),
       'In landscape (844px), Industry/Stage should be side-by-side'
