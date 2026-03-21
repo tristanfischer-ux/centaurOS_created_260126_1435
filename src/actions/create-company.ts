@@ -14,7 +14,6 @@
 import { withUser } from "@/lib/server-action-utils"
 import { clearFoundryCache } from "@/lib/supabase/foundry-context"
 import { revalidatePath } from "next/cache"
-import { escapeHtml } from "@/lib/security/sanitize"
 
 function generateSlug(name: string): string {
   return name
@@ -37,10 +36,11 @@ export async function createCompanyFoundry(params: {
       return { success: false as const, error: "Company name must be at least 2 characters" }
     }
 
-    // SECURITY: Sanitize inputs
-    const companyName = escapeHtml(rawName.trim().slice(0, 100))
-    const sanitizedIndustry = industry ? escapeHtml(industry.trim().slice(0, 100)) : null
-    const sanitizedStage = stage ? escapeHtml(stage.trim().slice(0, 100)) : null
+    // SECURITY: Sanitize inputs — strip HTML tags but don't entity-encode
+    // (parameterized queries prevent SQL injection, React escapes on render)
+    const companyName = rawName.trim().slice(0, 100).replace(/<[^>]*>/g, '')
+    const sanitizedIndustry = industry ? industry.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null
+    const sanitizedStage = stage ? stage.trim().slice(0, 100).replace(/<[^>]*>/g, '') : null
 
     // VALIDATION: Check account type
     const { data: profile } = await supabase
@@ -107,13 +107,21 @@ export async function createCompanyFoundry(params: {
 
     // Create foundry membership with Founder role
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from("foundry_memberships").insert({
+    const { error: membershipError } = await (supabase as any).from("foundry_memberships").insert({
       user_id: user.id,
       foundry_id: foundryId,
       role: "Founder",
       is_primary: false,
       joined_at: new Date().toISOString(),
     })
+
+    if (membershipError) {
+      // Rollback: delete the orphaned foundry
+      console.error("[createCompanyFoundry] Membership creation failed:", membershipError)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).from("foundries").delete().eq("id", foundryId)
+      return { success: false as const, error: "Failed to set up workspace membership" }
+    }
 
     // DECISION: Upgrade profile role to Founder if currently Executive.
     // One-way upgrade — Founder has all Executive privileges plus owns a workspace.

@@ -10,8 +10,20 @@
  * Rollback: Re-create the CHECK with the old values only (manual — ALTER + ADD).
  */
 
--- Drop the existing CHECK constraint and re-create with new values
-ALTER TABLE match_alerts DROP CONSTRAINT IF EXISTS match_alerts_type_check;
+-- Drop the existing CHECK constraint and re-create with new values.
+-- L-1: Handle both user-named and auto-generated constraint names.
+DO $$ DECLARE
+    _con_name text;
+BEGIN
+    FOR _con_name IN
+        SELECT conname FROM pg_constraint
+        WHERE conrelid = 'match_alerts'::regclass
+          AND contype = 'c'
+          AND pg_get_constraintdef(oid) ILIKE '%type%IN%'
+    LOOP
+        EXECUTE format('ALTER TABLE match_alerts DROP CONSTRAINT %I', _con_name);
+    END LOOP;
+END $$;
 
 ALTER TABLE match_alerts ADD CONSTRAINT match_alerts_type_check CHECK (type IN (
     'new_match',

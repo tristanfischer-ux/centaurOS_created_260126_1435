@@ -296,43 +296,50 @@ export function ModelViewer({
           style={{ background: backgroundColor }}
           gl={{ antialias: true, alpha: false }}
         >
+          {/* INTENT: PBR metallic surfaces reflect their environment — without an
+              environment map they reflect black/nothing, appearing grey. "studio"
+              provides neutral product-photography lighting. Only needed for GLB
+              (STL uses a fixed material colour, not PBR textures).
+              DECISION: Separate Suspense so the GLB model renders immediately with
+              direct lights while the HDR loads asynchronously from CDN. Once the
+              HDR arrives, PBR reflections appear — progressive enhancement. */}
+          {isGlb && (
+            <Suspense fallback={null}>
+              <Environment preset="studio" />
+            </Suspense>
+          )}
+
+          {/* DECISION: GLB lighting is lower because Environment provides most of
+              the illumination via HDR reflections. STL has no env map so needs
+              stronger direct lights. All values scaled for Three.js r182
+              physically-correct mode (old 1.0 ≈ Math.PI). */}
+          <ambientLight intensity={isGlb ? 0.8 : 1.5} />
+          <directionalLight
+            position={[10, 10, 5]}
+            intensity={isGlb ? 1.5 : 2.5}
+            castShadow
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+          />
+          <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.5 : 1.0} />
+          <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.3 : 0.5} />
+          <hemisphereLight intensity={isGlb ? 0.6 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
+
           <Suspense fallback={null}>
-            {/* INTENT: PBR metallic surfaces reflect their environment — without an
-                environment map they reflect black/nothing, appearing grey. "studio"
-                provides neutral product-photography lighting. Only needed for GLB
-                (STL uses a fixed material colour, not PBR textures). */}
-            {isGlb && <Environment preset="studio" />}
-
-            {/* DECISION: GLB lighting is lower because Environment provides most of
-                the illumination via HDR reflections. STL has no env map so needs
-                stronger direct lights. All values scaled for Three.js r182
-                physically-correct mode (old 1.0 ≈ Math.PI). */}
-            <ambientLight intensity={isGlb ? 0.8 : 1.5} />
-            <directionalLight
-              position={[10, 10, 5]}
-              intensity={isGlb ? 1.5 : 2.5}
-              castShadow
-              shadow-mapSize-width={2048}
-              shadow-mapSize-height={2048}
-            />
-            <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.5 : 1.0} />
-            <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.3 : 0.5} />
-            <hemisphereLight intensity={isGlb ? 0.6 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
-
             {isGlb ? (
               <GLBModel url={glbUrl} />
             ) : (
               <STLModel stlData={stlData} stlUrl={stlUrl} />
             )}
-
-            <OrbitControls
-              enableDamping
-              dampingFactor={0.05}
-              minDistance={1}
-              maxDistance={50000}
-              makeDefault
-            />
           </Suspense>
+
+          <OrbitControls
+            enableDamping
+            dampingFactor={0.05}
+            minDistance={1}
+            maxDistance={50000}
+            makeDefault
+          />
         </Canvas>
       </div>
     </ViewerErrorBoundary>

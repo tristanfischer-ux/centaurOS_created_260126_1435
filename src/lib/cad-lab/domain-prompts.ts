@@ -580,7 +580,7 @@ Output STRICTLY as JSON with exactly these 3 top-level fields:
     "spatialPrinciples": ["Spatial arrangement principles"]
   },
   "perModuleImagePrompts": {
-    "module-id": "150-200 words. Zoomed-in detail view of this module. Reference the same product context and visual language as the hero. Describe the module's geometry, materials, key visible components, and spatial relationship to adjacent modules. Use consistent color coding from visualStyle. Specify: isometric perspective, white background, engineering aesthetic, ZERO text/labels/annotations."
+    "module-id": "150-200 words. START with: 'On a pure white background, create a full-color zoomed-in detail view...'. Reference the same product context and visual language as the hero. Describe the module's geometry, materials, key visible components, and spatial relationship to adjacent modules. Use VIVID, REALISTIC material colors from colorPalette (NOT grayscale, NOT monochrome). Use consistent color coding from visualStyle. Specify: isometric perspective, pure white background (#FFFFFF), full color, engineering aesthetic, ZERO text/labels/annotations. CRITICAL: NEVER dark backgrounds or grayscale."
   }
 }
 

@@ -228,9 +228,12 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
         topRoutes.forEach(route => router.prefetch(route))
     }, [router])
 
-    // Fetch unread alert count on mount and on route change
+    // Fetch unread alert count on mount and on route change (debounced)
     React.useEffect(() => {
-        getUnreadAlertCount().then(setUnreadAlertCount).catch(() => {})
+        const timeout = setTimeout(() => {
+            getUnreadAlertCount().then(setUnreadAlertCount).catch(() => {})
+        }, 500)
+        return () => clearTimeout(timeout)
     }, [pathname])
 
     const openFeedback = (featureName?: string) => {

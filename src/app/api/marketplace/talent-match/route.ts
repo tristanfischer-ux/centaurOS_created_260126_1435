@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { aiGuard } from "@/lib/ai/guard"
 
@@ -191,7 +192,7 @@ ${JSON.stringify(listingSummaries, null, 1)}`
         // Don't block the response — notify in the background.
         const highScoreMatches = (parsed.matches || []).filter(m => m.score >= 70)
         if (highScoreMatches.length > 0) {
-            notifyHighScoreMatches(supabase, guard.userId, query, highScoreMatches).catch(e => {
+            notifyHighScoreMatches(guard.userId, query, highScoreMatches).catch(e => {
                 console.warn('[TalentMatch] Background notification failed:', e)
             })
         }
@@ -227,17 +228,20 @@ ${JSON.stringify(listingSummaries, null, 1)}`
  * Skips if the searcher is the executive themselves.
  */
 async function notifyHighScoreMatches(
-    supabase: Awaited<ReturnType<typeof createClient>>,
     searcherUserId: string,
     query: string,
     matches: MatchResult[]
 ): Promise<void> {
-    const { createMatchAlert, canCreateAlert } = await import('@/actions/match-alerts')
+    const { createMatchAlert, canCreateAlert } = await import('@/lib/notifications/match-alert-helpers')
+
+    // SECURITY: Use admin client for system-level lookups (H-5).
+    // The user's scoped client may not have access to all listings/providers.
+    const adminSupabase = createAdminClient()
 
     // Resolve listing IDs → user IDs via marketplace_listings → provider_profiles
     const listingIds = matches.map(m => m.id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: listings } = await (supabase as any)
+    const { data: listings } = await (adminSupabase as any)
         .from('marketplace_listings')
         .select('id, created_by_provider_id')
         .in('id', listingIds)
@@ -248,7 +252,7 @@ async function notifyHighScoreMatches(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const providerIds = (listings as any[]).map((l: any) => l.created_by_provider_id).filter(Boolean)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: providers } = await (supabase as any)
+    const { data: providers } = await (adminSupabase as any)
         .from('provider_profiles')
         .select('id, user_id')
         .in('id', providerIds)
@@ -268,24 +272,29 @@ async function notifyHighScoreMatches(
         if (userId) listingToUser.set(l.id, userId)
     }
 
-    const truncatedQuery = query.length > 60 ? query.slice(0, 57) + '...' : query
-
     for (const match of matches) {
-        const expertUserId = listingToUser.get(match.id)
-        if (!expertUserId) continue
-        // Don't notify the searcher about themselves
-        if (expertUserId === searcherUserId) continue
+        try {
+            const expertUserId = listingToUser.get(match.id)
+            if (!expertUserId) continue
+            // Don't notify the searcher about themselves
+            if (expertUserId === searcherUserId) continue
 
-        const allowed = await canCreateAlert(expertUserId, 'talent_search', 5)
-        if (!allowed) continue
+            const allowed = await canCreateAlert(expertUserId, 'talent_search', 5)
+            if (!allowed) continue
 
-        await createMatchAlert(
-            expertUserId,
-            'talent_search',
-            `You appeared in a talent search`,
-            `A founder searched for "${truncatedQuery}" and you scored ${match.score}/100.`,
-            match.id,
-            { query, score: match.score, reasons: match.reasons }
-        )
+            // SECURITY: Don't leak the founder's search query to the executive (H-4).
+            // Only share the score and matching reasons.
+            await createMatchAlert(
+                expertUserId,
+                'talent_search',
+                'You appeared in a talent search',
+                `A founder searched for talent and you scored ${match.score}/100.`,
+                match.id,
+                { score: match.score, reasons: match.reasons }
+            )
+        } catch (e) {
+            // M-7: Per-match resilience — one failure doesn't block others
+            console.warn(`[notifyHighScoreMatches] Failed for match ${match.id}:`, e)
+        }
     }
 }

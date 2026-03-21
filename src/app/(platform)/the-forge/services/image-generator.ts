@@ -1019,8 +1019,15 @@ export async function generateModuleImage(
   // DECISION: Prefer AI-crafted prompt from reconciliation when available — these are
   // crafted together across all modules for visual consistency. Fall through to
   // existing programmatic prompts (reference-aware or text-only) when unset.
+  // DECISION: Same white-background + full-colour prepend as the hero path.
+  // Without this, Opus-crafted module prompts produce dark/monochrome renders.
   const prompt = module.moduleImagePrompt
-    ? enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
+    ? `MANDATORY RENDERING RULES (override any conflicting instructions below):
+1. Background MUST be pure white (#FFFFFF) — no dark backgrounds, no black, no gray, no gradients.
+2. Use FULL COLOR rendering — realistic material colors, not grayscale or monochrome.
+3. This image must contain ZERO text — no labels, annotations, words, letters, numbers, or callouts.
+
+` + enforceNoText(module.moduleImagePrompt) + COHESIVE_STYLE_SUFFIX
     : referenceBase64
       ? buildReferenceAwareModulePrompt(module, visualStyle, !!moduleCropBase64)
       : buildModulePrompt(module, brief, visualStyle)

@@ -703,7 +703,7 @@ export async function contactExpert(
       // FLOW: Notify the executive that someone wants to connect.
       // Fire-and-forget — notification failure shouldn't break the conversation.
       try {
-        const { createMatchAlert } = await import('@/actions/match-alerts')
+        const { createMatchAlert } = await import('@/lib/notifications/match-alert-helpers')
         const { sendNotification } = await import('@/lib/notifications')
         const alertTitle = listingTitle
           ? `New enquiry about ${listingTitle}`

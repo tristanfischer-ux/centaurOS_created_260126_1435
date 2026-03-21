@@ -126,6 +126,7 @@ export function CreateCompanyDialog({ open, onOpenChange }: CreateCompanyDialogP
                   placeholder="Hardware, DeepTech..."
                   maxLength={100}
                   autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter" && !isPending) handleSubmit() }}
                 />
               </div>
               <div className="space-y-2">
@@ -138,6 +139,7 @@ export function CreateCompanyDialog({ open, onOpenChange }: CreateCompanyDialogP
                   onChange={(e) => setStage(e.target.value)}
                   placeholder="Pre-seed, Seed..."
                   maxLength={100}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !isPending) handleSubmit() }}
                 />
               </div>
             </div>
