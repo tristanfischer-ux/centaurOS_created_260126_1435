@@ -87,7 +87,8 @@ export function scoreStandard(
     }
   }
 
-  // 5. Region match (10pts)
+  // 5. Region match (10pts) — currently all standards include "global", so this
+  // always awards 10pts. Will differentiate when foundry region is passed.
   const regions = standard.region ?? ["global"]
   if (regions.includes("global") || regions.includes(userRegion)) {
     score += WEIGHTS.regionMatch
