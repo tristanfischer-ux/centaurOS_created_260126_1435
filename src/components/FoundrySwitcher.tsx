@@ -16,7 +16,7 @@
 import { useState, useTransition } from 'react'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
-import { ChevronsUpDown, Check, Building2 } from 'lucide-react'
+import { ChevronsUpDown, Check, Building2, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   DropdownMenu,
@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { switchFoundry } from '@/actions/foundry-switching'
 import { useRouter } from 'next/navigation'
+import { CreateCompanyDialog } from '@/components/create-company-dialog'
 
 interface Foundry {
   foundryId: string
@@ -97,14 +98,14 @@ export function FoundrySwitcher({
   const [open, setOpen] = useState(false)
   const router = useRouter()
 
-  const hasMultipleFoundries = foundries.length > 1
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
 
   function handleSwitch(foundryId: string): void {
     if (foundryId === currentFoundryId) {
       setOpen(false)
       return
     }
-    
+
     startTransition(async () => {
       const result = await switchFoundry(foundryId)
       if (result.success) {
@@ -116,29 +117,9 @@ export function FoundrySwitcher({
     })
   }
 
-  // Single foundry — static display with logo
-  if (!hasMultipleFoundries) {
-    const logoUrl = foundries[0]?.logoUrl || currentFoundryLogoUrl
-    const displayName = currentFoundryName || 'My Foundry'
-
-    return (
-      <div className="px-1 pb-1">
-        <div className="flex items-center gap-3">
-          <FoundryLogo logoUrl={logoUrl} name={displayName} />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-foreground uppercase tracking-wider truncate">
-              {displayName}
-            </div>
-            <div className="text-[10px] text-muted-foreground font-mono mt-0.5 tracking-wide">
-              {currentFoundryId || 'Loading...'}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Multiple foundries — switcher dropdown with logos
+  // DECISION: Always show the dropdown — even for single-foundry users.
+  // This surfaces the "Create a Company" CTA for executives who haven't
+  // created a company workspace yet.
   const activeFoundry = foundries.find(f => f.isActive) || foundries[0]
   const activeName = activeFoundry?.foundryName || currentFoundryName || 'My Foundry'
   const activeLogo = activeFoundry?.logoUrl || currentFoundryLogoUrl
@@ -196,8 +177,20 @@ export function FoundrySwitcher({
               )}
             </DropdownMenuItem>
           ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => { setOpen(false); setIsCreateOpen(true) }}
+            className="flex items-center gap-3 py-3 cursor-pointer text-international-orange"
+          >
+            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-international-orange/10 flex-shrink-0">
+              <Plus className="h-3.5 w-3.5" />
+            </div>
+            <span className="text-sm font-medium">Create a Company</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <CreateCompanyDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
     </div>
   )
 }
