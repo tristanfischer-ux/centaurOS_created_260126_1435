@@ -124,19 +124,19 @@ interface ProviderTarget {
 const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "google", modelId: "gemini-3.1-pro" },
+        { providerId: "openai", modelId: "gpt-5.3-instant" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     qwen: [
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "openai", modelId: "gpt-5.3-instant" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "openai", modelId: "gpt-5.3-instant" },
     ],
     "qwen-local": [
         { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },

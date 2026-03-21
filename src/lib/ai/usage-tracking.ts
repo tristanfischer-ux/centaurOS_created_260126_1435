@@ -141,6 +141,8 @@ export interface MonthlyUsage {
  * Updated Feb 2026. Check OpenAI pricing page for current rates.
  */
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
+  'gpt-5.3-instant': { input: 1.50, output: 6.00 },
+  'gpt-5.4-thinking': { input: 5.00, output: 20.00 },
   'gpt-4o': { input: 2.50, output: 10.00 },
   'gpt-4o-mini': { input: 0.15, output: 0.60 },
   'gpt-4-turbo': { input: 10.00, output: 30.00 },
