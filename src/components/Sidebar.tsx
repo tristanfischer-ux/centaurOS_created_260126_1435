@@ -177,7 +177,6 @@ const marketplacePeopleNavigation = [
 // "Inspiration". This mirrors the Team page pattern (your stuff + marketplace).
 const marketplaceSuppliesNavigation = [
     { name: "Marketplace", href: "/marketplace", icon: Store, tooltip: "Find experts, suppliers, products, and services" },
-    { name: "Crop Advisor", href: "/crop-advisor", icon: Sprout, tooltip: "Data-driven crop recommendations and buyer demand signals" },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag, tooltip: "View and manage your marketplace orders" },
 ]
 
