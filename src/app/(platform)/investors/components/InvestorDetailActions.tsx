@@ -49,11 +49,16 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
     }
   }, [listingId, access.detailAccess])
 
+  // GOTCHA: Use a ref to track authoritative shortlist state to avoid stale closure.
+  // The callback no longer depends on `isShortlisted` state — reads from ref instead.
+  const shortlistStateRef = useRef(false)
+  shortlistStateRef.current = isShortlisted
+
   const handleToggleShortlist = useCallback(() => {
     // SECURITY: Guard against rapid double-clicks corrupting shortlist state
     if (shortlistBusyRef.current) return
     shortlistBusyRef.current = true
-    const wasShortlisted = isShortlisted
+    const wasShortlisted = shortlistStateRef.current
     setIsShortlisted(!wasShortlisted)
     startShortlistTransition(async () => {
       try {
@@ -70,7 +75,7 @@ export function InvestorDetailActions({ listingId, access, firmName }: InvestorD
         shortlistBusyRef.current = false
       }
     })
-  }, [isShortlisted, listingId])
+  }, [listingId])
 
   const handleToggleAlert = useCallback(() => {
     if (!access.detailAccess) return

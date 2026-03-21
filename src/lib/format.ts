@@ -86,7 +86,7 @@ export function formatFundSize(gbp: number | null | undefined): string | null {
   }
   if (gbp >= 1_000_000) {
     const m = gbp / 1_000_000
-    return `£${m % 1 === 0 ? m : m.toFixed(0)}M`
+    return `£${m % 1 === 0 ? m : m.toFixed(1)}M`
   }
   return `£${gbp.toLocaleString()}`
 }

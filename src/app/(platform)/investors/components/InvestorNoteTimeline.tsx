@@ -37,8 +37,9 @@ const NOTE_TYPE_CONFIG: Record<string, { icon: typeof StickyNote; label: string 
 }
 
 function relativeTime(dateStr: string): string {
-  const now = Date.now()
   const date = new Date(dateStr).getTime()
+  if (isNaN(date)) return '—'
+  const now = Date.now()
   const diff = now - date
   if (diff < 0) return 'just now'
   const minutes = Math.floor(diff / 60000)

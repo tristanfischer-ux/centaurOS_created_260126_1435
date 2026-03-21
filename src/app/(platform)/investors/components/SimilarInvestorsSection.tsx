@@ -41,7 +41,7 @@ export function SimilarInvestorsSection({ firms, similarityScores }: SimilarInve
                     {score != null && (
                       <Badge
                         variant="secondary"
-                        className={`text-[10px] py-0 ${score >= 70 ? 'text-success' : score >= 40 ? 'text-warning' : ''}`}
+                        className={`text-[10px] py-0 ${score >= 70 ? 'text-success' : score >= 40 ? 'text-warning' : 'text-muted-foreground'}`}
                       >
                         {score}% similar
                       </Badge>

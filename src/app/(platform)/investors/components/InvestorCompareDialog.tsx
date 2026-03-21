@@ -63,7 +63,7 @@ export function InvestorCompareDialog({ open, onOpenChange, firms, matchScores }
     let bestVal = -Infinity
     for (const firm of firms) {
       const val = row.getNumeric(firm)
-      if (val != null && val > bestVal) {
+      if (val != null && val > 0 && val > bestVal) {
         bestVal = val
         bestId = firm.id
       }

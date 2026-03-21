@@ -133,10 +133,15 @@ export function InvestorBrowser({
     const stages = searchParams.get('stages')?.split(',').filter(Boolean) ?? []
     const sectors = searchParams.get('sectors')?.split(',').filter(Boolean) ?? []
     const geoFocus = searchParams.get('geo')?.split(',').filter(Boolean) ?? []
-    const chequeMin = searchParams.get('chequeMin') ? Number(searchParams.get('chequeMin')) : undefined
-    const chequeMax = searchParams.get('chequeMax') ? Number(searchParams.get('chequeMax')) : undefined
-    const minQuality = searchParams.get('minQuality') ? Number(searchParams.get('minQuality')) : undefined
-    const minHardwareFit = searchParams.get('minHwFit') ? Number(searchParams.get('minHwFit')) : undefined
+    const chequeMinRaw = searchParams.get('chequeMin') ? Number(searchParams.get('chequeMin')) : undefined
+    const chequeMaxRaw = searchParams.get('chequeMax') ? Number(searchParams.get('chequeMax')) : undefined
+    const minQualityRaw = searchParams.get('minQuality') ? Number(searchParams.get('minQuality')) : undefined
+    const minHardwareFitRaw = searchParams.get('minHwFit') ? Number(searchParams.get('minHwFit')) : undefined
+    // Guard against NaN from tampered URL params (e.g. ?chequeMin=abc)
+    const chequeMin = chequeMinRaw != null && !isNaN(chequeMinRaw) && chequeMinRaw > 0 ? chequeMinRaw : undefined
+    const chequeMax = chequeMaxRaw != null && !isNaN(chequeMaxRaw) && chequeMaxRaw > 0 ? chequeMaxRaw : undefined
+    const minQuality = minQualityRaw != null && !isNaN(minQualityRaw) && minQualityRaw > 0 ? minQualityRaw : undefined
+    const minHardwareFit = minHardwareFitRaw != null && !isNaN(minHardwareFitRaw) && minHardwareFitRaw > 0 ? minHardwareFitRaw : undefined
     const bvcaOnly = searchParams.get('bvca') === '1'
     if (stages.length || sectors.length || geoFocus.length || chequeMin != null || chequeMax != null || minQuality != null || minHardwareFit != null || bvcaOnly) {
       return { stages, sectors, geoFocus, chequeMin, chequeMax, minQuality, minHardwareFit, bvcaOnly }
@@ -174,6 +179,8 @@ export function InvestorBrowser({
   // SECURITY: Generation counter prevents stale load-more results from appending
   // when filters change mid-flight
   const filterGeneration = useRef(0)
+  // Skip URL sync on initial mount to preserve UTM/ref params
+  const urlSyncMounted = useRef(false)
 
   // ---------------------------------------------------------------------------
   // Debounce search query
@@ -194,6 +201,11 @@ export function InvestorBrowser({
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    // Skip initial mount to preserve unrecognized URL params (UTM, ref codes, etc.)
+    if (!urlSyncMounted.current) {
+      urlSyncMounted.current = true
+      return
+    }
     const params = new URLSearchParams()
     if (activeFirmType !== 'All') params.set('type', activeFirmType)
     if (activeOnly) params.set('active', '1')

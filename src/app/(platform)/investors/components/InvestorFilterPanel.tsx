@@ -176,7 +176,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 value={filters.chequeMin ?? ''}
                 onChange={e => {
                   const raw = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
-                  const v = raw != null && isNaN(raw) ? undefined : raw
+                  const v = raw != null && !isNaN(raw) && raw > 0 ? raw : undefined
                   onChange({ ...filters, chequeMin: v })
                 }}
                 className="text-sm"
@@ -191,7 +191,7 @@ export function InvestorFilterPanel({ filters, onChange, onClear }: InvestorFilt
                 value={filters.chequeMax ?? ''}
                 onChange={e => {
                   const raw = e.target.value ? Math.max(0, Number(e.target.value)) : undefined
-                  const v = raw != null && isNaN(raw) ? undefined : raw
+                  const v = raw != null && !isNaN(raw) && raw > 0 ? raw : undefined
                   onChange({ ...filters, chequeMax: v })
                 }}
                 className="text-sm"

@@ -492,7 +492,8 @@ export async function searchInvestors(
 
   if (needsServerSort) {
     // Manual pagination after sorting
-    const total = firms.length
+    // GOTCHA: Use DB exact count (may exceed 2000-row fetch cap), not array length
+    const total = count ?? firms.length
     const paginatedFirms = firms.slice(from, from + safePageSize)
     const hasMore = from + paginatedFirms.length < total
     return { firms: paginatedFirms, total, hasMore }
@@ -960,20 +961,31 @@ export async function getShortlist(): Promise<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { items: [] }
 
+  // SECURITY: Cap shortlist size to prevent unbounded IN() query exceeding PostgREST URL limits
   const { data: shortlistRows, error: slError } = await supabase
     .from('investor_shortlist')
     .select('listing_id, stage, updated_at')
     .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
+    .limit(200)
 
   if (slError || !shortlistRows || shortlistRows.length === 0) return { items: [] }
 
+  // Batch listing IDs into chunks of 50 to stay well within PostgREST URL limits
   const listingIds = shortlistRows.map(r => r.listing_id)
-  const { data: listings, error: lError } = await supabase
-    .from('marketplace_listings')
-    .select('id, title, description, subcategory, attributes')
-    .eq('category', 'Finance')
-    .in('id', listingIds)
+  const BATCH_SIZE = 50
+  const allListings: Record<string, unknown>[] = []
+  for (let i = 0; i < listingIds.length; i += BATCH_SIZE) {
+    const batch = listingIds.slice(i, i + BATCH_SIZE)
+    const { data, error } = await supabase
+      .from('marketplace_listings')
+      .select('id, title, description, subcategory, attributes')
+      .eq('category', 'Finance')
+      .in('id', batch)
+    if (!error && data) allListings.push(...data)
+  }
+  const listings = allListings
+  const lError = null
 
   if (lError || !listings) return { items: [] }
 
@@ -1168,14 +1180,15 @@ export async function getSimilarInvestors(
   if (!targetRow) return { firms: [], similarityScores: {} }
   const target = rowToFirm(targetRow as Record<string, unknown>)
 
-  // Fetch candidate pool (larger pool lets Jaccard ranking find better matches)
-  // DECISION: Order by title for deterministic results across page loads
+  // Fetch full candidate pool for unbiased Jaccard similarity ranking
+  // DECISION: Previous limit(200) + ORDER BY title created alphabetical bias.
+  // Investor directory is typically < 2000 firms, and we only select 5 columns,
+  // so fetching all is manageable. Limit at 2000 as safety cap.
   const { data: candidateRows } = await supabase
     .from('marketplace_listings')
     .select('id, title, description, subcategory, attributes')
     .eq('category', 'Finance')
-    .order('title', { ascending: true })
-    .limit(200)
+    .limit(2000)
 
   if (!candidateRows) return { firms: [], similarityScores: {} }
 
