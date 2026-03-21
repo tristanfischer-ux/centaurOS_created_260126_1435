@@ -684,11 +684,11 @@ function JoinPageInner() {
 }
 
 /**
- * JoinPage — Unified signup page. One form, pick your path.
+ * JoinPage — Unified signup page.
  *
- * @description Open signup — no invite token required. Users select whether
- * they're founding a company or joining the marketplace, fill in their
- * details, and are signed into the app immediately.
+ * @description Open signup — no invite token required. Single form with
+ * Name, Email, Password, and Google OAuth. Founder deep-link (?role=founder)
+ * adds company fields. Supplier/claim flow gets a simplified variant.
  */
 export default function JoinPage() {
   return (

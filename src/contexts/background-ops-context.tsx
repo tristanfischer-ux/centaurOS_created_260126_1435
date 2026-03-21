@@ -192,7 +192,18 @@ export function BackgroundOpsProvider({ children }: { children: ReactNode }): Re
     )
     setOps((prev) => {
       const op = prev.find((o) => o.id === id)
-      if (op) toast.error(errorMessage ?? `${op.label} failed`)
+      if (op) {
+        const isOnSourcePage = window.location.pathname.startsWith(op.sourceRoute)
+        toast.error(errorMessage ?? `${op.label} failed`, {
+          duration: isOnSourcePage ? 4000 : 10000,
+          ...(!isOnSourcePage ? {
+            action: {
+              label: "View",
+              onClick: () => { routerRef.current.push(op.sourceRoute) },
+            },
+          } : {}),
+        })
+      }
       return prev
     })
     scheduleDismiss(id)

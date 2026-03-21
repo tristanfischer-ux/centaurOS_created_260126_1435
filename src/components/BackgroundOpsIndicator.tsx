@@ -15,6 +15,7 @@
  */
 
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { useBackgroundOps } from "@/contexts/background-ops-context"
 import type { BackgroundOp } from "@/contexts/background-ops-context"
 import { Progress } from "@/components/ui/progress"
@@ -56,6 +57,7 @@ function formatElapsed(startedAt: number, finishedAt?: number): string {
 
 export function BackgroundOpsIndicator(): React.ReactElement | null {
   const { ops, activeCount, dismissOp } = useBackgroundOps()
+  const pathname = usePathname()
   const [isExpanded, setIsExpanded] = useState(false)
 
   if (ops.length === 0) return null
@@ -79,7 +81,7 @@ export function BackgroundOpsIndicator(): React.ReactElement | null {
           </div>
           <div className="max-h-64 overflow-y-auto">
             {ops.map((op) => (
-              <OpRow key={op.id} op={op} onDismiss={dismissOp} />
+              <OpRow key={op.id} op={op} onDismiss={dismissOp} pathname={pathname} />
             ))}
           </div>
         </div>
@@ -121,7 +123,7 @@ export function BackgroundOpsIndicator(): React.ReactElement | null {
 
 // ─── Row ────────────────────────────────────────────────────────────────────
 
-function OpRow({ op, onDismiss }: { op: BackgroundOp; onDismiss: (id: string) => void }) {
+function OpRow({ op, onDismiss, pathname }: { op: BackgroundOp; onDismiss: (id: string) => void; pathname: string }) {
   return (
     <div className="px-3 py-2.5 border-b border-border last:border-b-0 space-y-1.5">
       <div className="flex items-start justify-between gap-2">
@@ -168,8 +170,8 @@ function OpRow({ op, onDismiss }: { op: BackgroundOp; onDismiss: (id: string) =>
         </div>
       )}
 
-      {/* Go to source route */}
-      {op.sourceRoute && (
+      {/* Go to source route — hidden when already on the source page */}
+      {op.sourceRoute && !pathname.startsWith(op.sourceRoute) && (
         <Link
           href={op.sourceRoute}
           className="flex items-center gap-1 text-xs text-international-orange hover:underline pl-6"
