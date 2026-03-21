@@ -1448,6 +1448,10 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
       console.warn("[THE-FORGE] Step 3: Engineering data retrieval failed (non-fatal):", engErr instanceof Error ? engErr.message : engErr)
     }
 
+    if (!codeGenStandardsSection) {
+      console.error("[THE-FORGE] Step 3: WARNING — no standards or engineering data available for this design")
+    }
+
     // DECISION: Two system prompts — image-focused (compact, ~60 lines) vs full (with CAD_INSTRUCTIONS methodology).
     // When a hero image exists, the image IS the spec. The 500-line methodology examples (Nespresso capsules,
     // brine systems, drones) prime Claude to think in those shapes instead of the image. Stripping them lets

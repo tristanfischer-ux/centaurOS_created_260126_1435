@@ -108,17 +108,46 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
       .map(block => block.type === "text" ? block.text : "")
       .join("")
 
-    // Parse JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
+    // Parse JSON from response — find the outermost balanced braces
+    const jsonStart = text.indexOf("{")
+    if (jsonStart === -1) {
       console.error("[standards-auto-learn] No JSON found in response")
       return []
     }
+    let depth = 0
+    let jsonEnd = -1
+    for (let i = jsonStart; i < text.length; i++) {
+      if (text[i] === "{") depth++
+      else if (text[i] === "}") { depth--; if (depth === 0) { jsonEnd = i + 1; break } }
+    }
+    if (jsonEnd === -1) {
+      console.error("[standards-auto-learn] Unbalanced braces in response")
+      return []
+    }
 
-    const parsed = JSON.parse(jsonMatch[0]) as { standards: GeneratedStandard[] }
+    let parsed: { standards: GeneratedStandard[] }
+    try {
+      parsed = JSON.parse(text.slice(jsonStart, jsonEnd))
+    } catch {
+      console.error("[standards-auto-learn] JSON parse failed")
+      return []
+    }
     if (!parsed.standards || !Array.isArray(parsed.standards)) {
       console.error("[standards-auto-learn] Invalid response structure")
       return []
+    }
+
+    // SECURITY: Sanitize AI-generated content to mitigate prompt injection.
+    // Strip obvious instruction markers that could hijack downstream prompts.
+    const INJECTION_PATTERNS = /(?:ignore|disregard|forget|override)\s+(?:above|previous|prior|all)\b|(?:you are now|act as|pretend to be|your new role)/gi
+    for (const s of parsed.standards) {
+      if (s.requirements_markdown && INJECTION_PATTERNS.test(s.requirements_markdown)) {
+        console.warn(`[standards-auto-learn] Stripped potential prompt injection from ${s.standard_code}`)
+        s.requirements_markdown = s.requirements_markdown.replace(INJECTION_PATTERNS, "[REDACTED]")
+      }
+      if (s.summary && INJECTION_PATTERNS.test(s.summary)) {
+        s.summary = s.summary.replace(INJECTION_PATTERNS, "[REDACTED]")
+      }
     }
 
     // Dedup against existing

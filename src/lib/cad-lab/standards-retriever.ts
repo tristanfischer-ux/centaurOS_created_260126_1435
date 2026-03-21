@@ -44,12 +44,14 @@ export async function retrieveStandardsForPrompt(
 ): Promise<StandardsPromptResult> {
   const supabase = createAdminClient()
 
-  // Query standards for this domain (GIN index on product_tags handles fast matching)
+  // Fetch standards for this domain, then score in JS (tag matching via GIN would
+  // require raw SQL; JS scoring is fine for <500 rows per domain)
   const { data: standards, error } = await supabase
     .from("design_standards")
     .select("*")
     .eq("industry_domain", industryDomain)
     .is("superseded_by", null)
+    .limit(500)
 
   if (error || !standards || standards.length === 0) {
     return { content: "", tokensUsed: 0, standardCodes: [], totalMatched: 0 }

@@ -45,12 +45,13 @@ export async function retrieveEngineeringDataForPrompt(
 
     if (matData && matData.length > 0) {
       materialsCount = matData.length
+      const fmt = (v: unknown, unit: string) => v != null ? `${v} ${unit}` : "N/A"
       const matSection = matData.map(m =>
         `- **${m.material_code}** (${m.material_name}): ` +
-        `ρ=${m.density_kg_m3} kg/m³, σy=${m.yield_strength_mpa ?? "N/A"} MPa, ` +
-        `σu=${m.ultimate_strength_mpa ?? "N/A"} MPa, E=${m.elastic_modulus_gpa ?? "N/A"} GPa, ` +
-        `k=${m.thermal_conductivity_w_mk ?? "N/A"} W/(m·K), ` +
-        `Tm=${m.melting_point_c ?? "N/A"}°C, CTE=${m.coefficient_of_thermal_expansion ?? "N/A"} µm/(m·K), ` +
+        `ρ=${fmt(m.density_kg_m3, "kg/m³")}, σy=${fmt(m.yield_strength_mpa, "MPa")}, ` +
+        `σu=${fmt(m.ultimate_strength_mpa, "MPa")}, E=${fmt(m.elastic_modulus_gpa, "GPa")}, ` +
+        `k=${fmt(m.thermal_conductivity_w_mk, "W/(m·K)")}, ` +
+        `Tm=${fmt(m.melting_point_c, "°C")}, CTE=${fmt(m.coefficient_of_thermal_expansion, "µm/(m·K)")}, ` +
         `~$${m.cost_per_kg_usd ?? "?"}/kg` +
         (m.common_processes?.length ? `, processes: ${(m.common_processes as string[]).join(", ")}` : "")
       ).join("\n")
@@ -140,21 +141,24 @@ export async function retrieveEngineeringDataForPrompt(
 function detectMaterialFamilies(text: string, materials: string[]): string[] {
   const combined = text + " " + materials.join(" ").toLowerCase()
   const families: string[] = []
-  const MATERIAL_KEYWORDS: Record<string, string[]> = {
-    aluminum: ["aluminum", "aluminium", "6061", "7075", "5083", "2024", "alu"],
-    steel: ["steel", "1018", "4140", "a36", "carbon steel", "mild steel"],
-    stainless_steel: ["stainless", "304", "316", "17-4", "inox"],
-    titanium: ["titanium", "ti-6al", "ti64", "grade 5"],
-    copper: ["copper", "brass", "bronze", "c110", "c360"],
-    polymer: ["plastic", "abs", "pla", "petg", "nylon", "polycarbonate", "pc", "peek", "hdpe", "pp", "pom", "delrin", "acetal", "polymer"],
-    elastomer: ["rubber", "silicone", "tpu", "nbr", "elastomer", "gasket", "seal", "o-ring"],
-    composite: ["carbon fiber", "cfrp", "fiberglass", "gfrp", "composite", "kevlar", "aramid", "laminate"],
-    ceramic: ["ceramic", "alumina", "zirconia"],
-    wood: ["wood", "plywood", "timber", "mdf", "birch"],
+
+  // DECISION: Use word-boundary regex to prevent "car"→"carbon", "pp"→"copper" false positives.
+  // Multi-word keywords use includes() (no boundary issue). Short keywords (<4 chars) use \b.
+  const MATERIAL_KEYWORDS: Record<string, RegExp[]> = {
+    aluminum: [/\baluminu?m\b/i, /\b6061\b/, /\b7075\b/, /\b5083\b/, /\b2024\b/],
+    steel: [/\bsteel\b/i, /\b1018\b/, /\b4140\b/, /\ba36\b/i, /\bcarbon steel\b/i, /\bmild steel\b/i],
+    stainless_steel: [/\bstainless\b/i, /\b304\b/, /\b316\b/, /\b17-4\b/, /\binox\b/i],
+    titanium: [/\btitanium\b/i, /\bti-6al\b/i, /\bti64\b/i],
+    copper: [/\bcopper\b/i, /\bbrass\b/i, /\bbronze\b/i],
+    polymer: [/\bplastic\b/i, /\babs\b/i, /\bpla\b/i, /\bpetg\b/i, /\bnylon\b/i, /\bpolycarbonate\b/i, /\bpeek\b/i, /\bhdpe\b/i, /\bdelrin\b/i, /\bacetal\b/i, /\bpolymer\b/i, /\bpolypropylene\b/i],
+    elastomer: [/\brubber\b/i, /\bsilicone\b/i, /\btpu\b/i, /\belastomer\b/i, /\bgasket\b/i, /\bo-ring\b/i],
+    composite: [/\bcarbon fiber\b/i, /\bcfrp\b/i, /\bfiberglass\b/i, /\bgfrp\b/i, /\bcomposite\b/i, /\bkevlar\b/i, /\baramid\b/i, /\blaminate\b/i],
+    ceramic: [/\bceramic\b/i, /\balumina\b/i, /\bzirconia\b/i],
+    wood: [/\bwood\b/i, /\bplywood\b/i, /\btimber\b/i, /\bmdf\b/i, /\bbirch\b/i],
   }
 
-  for (const [family, keywords] of Object.entries(MATERIAL_KEYWORDS)) {
-    if (keywords.some(kw => combined.includes(kw))) {
+  for (const [family, regexes] of Object.entries(MATERIAL_KEYWORDS)) {
+    if (regexes.some(r => r.test(combined))) {
       families.push(family)
     }
   }
@@ -165,26 +169,29 @@ function detectMaterialFamilies(text: string, materials: string[]): string[] {
 function detectProcesses(text: string, processes: string[]): string[] {
   const combined = text + " " + processes.join(" ").toLowerCase()
   const detected: string[] = []
-  const PROCESS_KEYWORDS: Record<string, string[]> = {
-    cnc_milling: ["cnc", "milling", "machined", "machining"],
-    cnc_turning: ["turning", "lathe", "turned"],
-    sheet_metal_bending: ["sheet metal", "bent", "bending", "folded", "bracket"],
-    laser_cutting: ["laser cut", "laser cutting"],
-    waterjet_cutting: ["waterjet", "water jet"],
-    fdm: ["fdm", "3d print", "3d-print", "filament", "fff"],
-    sla: ["sla", "resin print", "stereolithography"],
-    sls: ["sls", "powder bed", "nylon print"],
-    dmls: ["dmls", "slm", "metal print", "metal 3d"],
-    injection_molding: ["injection mold", "injection mould", "molded", "moulded"],
-    die_casting: ["die cast", "diecast"],
-    investment_casting: ["investment cast", "lost wax"],
-    sand_casting: ["sand cast"],
-    mig_welding: ["mig weld", "gmaw"],
-    tig_welding: ["tig weld", "gtaw"],
+
+  // Multi-word keywords use includes() (safe from false positives).
+  // Short keywords use word-boundary regex.
+  const PROCESS_KEYWORDS: Record<string, RegExp[]> = {
+    cnc_milling: [/\bcnc\b/i, /\bmilling\b/i, /\bmachined\b/i, /\bmachining\b/i],
+    cnc_turning: [/\bturning\b/i, /\blathe\b/i, /\bturned\b/i],
+    sheet_metal_bending: [/\bsheet metal\b/i, /\bbending\b/i, /\bbracket\b/i],
+    laser_cutting: [/\blaser cut/i, /\blaser cutting\b/i],
+    waterjet_cutting: [/\bwaterjet\b/i, /\bwater jet\b/i],
+    fdm: [/\bfdm\b/i, /\b3d print/i, /\bfilament\b/i, /\bfff\b/i],
+    sla: [/\bsla\b/i, /\bresin print/i, /\bstereolithography\b/i],
+    sls: [/\bsls\b/i, /\bpowder bed\b/i],
+    dmls: [/\bdmls\b/i, /\bslm\b/i, /\bmetal print/i, /\bmetal 3d/i],
+    injection_molding: [/\binjection mold/i, /\binjection mould/i, /\bmolded\b/i, /\bmoulded\b/i],
+    die_casting: [/\bdie cast/i, /\bdiecast/i],
+    investment_casting: [/\binvestment cast/i, /\blost wax\b/i],
+    sand_casting: [/\bsand cast/i],
+    mig_welding: [/\bmig weld/i, /\bgmaw\b/i],
+    tig_welding: [/\btig weld/i, /\bgtaw\b/i],
   }
 
-  for (const [process, keywords] of Object.entries(PROCESS_KEYWORDS)) {
-    if (keywords.some(kw => combined.includes(kw))) {
+  for (const [process, regexes] of Object.entries(PROCESS_KEYWORDS)) {
+    if (regexes.some(r => r.test(combined))) {
       detected.push(process)
     }
   }
