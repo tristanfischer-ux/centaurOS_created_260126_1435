@@ -153,7 +153,7 @@ const ENGINEERING_WEIGHTS = {
   toleranceStackUp: 0.15,
 }
 
-const ENGINEERING_EVAL_MODEL = 'gpt-4o'
+const ENGINEERING_EVAL_MODEL = 'gpt-5.3-instant'
 
 /**
  * Scores an engineering recommendation (research report, module decomposition,

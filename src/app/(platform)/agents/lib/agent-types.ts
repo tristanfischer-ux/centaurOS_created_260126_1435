@@ -251,7 +251,7 @@ export interface PromptNodeData {
     attachedFiles?: AttachedFile[]
     // Multi-provider support
     providerId?: string   // e.g. "openai", "anthropic", "google"
-    modelId?: string      // e.g. "claude-opus-4-6", "gemini-3-pro-image-preview", "gpt-4o"
+    modelId?: string      // e.g. "claude-opus-4-6", "gemini-3-pro-image-preview", "gpt-5.3-instant"
     outputModality?: string // "text" | "image" | "audio" | "video" | "slides"
     imageUrl?: string     // for image outputs
     audioUrl?: string     // for audio outputs

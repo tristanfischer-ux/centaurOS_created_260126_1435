@@ -45,7 +45,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
     openai: {
         id: "openai",
         name: "OpenAI",
-        description: "GPT-4o, DALL-E, Whisper, TTS",
+        description: "GPT-5.3, GPT Image 1.5, Whisper, TTS",
         icon: "Sparkles",
         website: "https://platform.openai.com",
         capabilities: ["text", "image", "audio"],
@@ -55,7 +55,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         models: [
             { id: "gpt-5.3-instant", name: "GPT-5.3 Instant", modality: "text", description: "Fast, capable — replaces GPT-4o", maxTokens: 128000, default: true },
             { id: "gpt-5.4-thinking", name: "GPT-5.4 Thinking", modality: "text", description: "Flagship with reasoning", maxTokens: 200000 },
-            { id: "dall-e-3", name: "DALL-E 3", modality: "image", description: "Image generation", default: true },
+            { id: "gpt-image-1.5", name: "GPT Image 1.5", modality: "image", description: "Flagship image generation with text rendering", default: true },
             { id: "gpt-4o-mini-tts", name: "GPT TTS", modality: "audio", description: "Text to speech — 13 voices, low error rate", default: true },
         ],
     },

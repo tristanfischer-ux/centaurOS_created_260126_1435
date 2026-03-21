@@ -319,7 +319,7 @@ export async function parseTranscriptToStrategy(text: string): Promise<{ plan?: 
     let parsedPlan: z.infer<typeof StrategicPlanSchema>
     try {
       const completion = await openai.chat.completions.parse({
-        model: 'gpt-4o-2024-08-06',
+        model: 'gpt-5.3-instant',
         messages: [
           {
             role: 'system',

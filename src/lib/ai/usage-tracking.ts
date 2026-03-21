@@ -215,7 +215,7 @@ export function estimateWebSearchCost(webSearchRequests: number): number {
 /**
  * Estimate the cost of an AI API call based on token counts and model.
  *
- * @param model - The AI model used (e.g. 'gpt-4o')
+ * @param model - The AI model used (e.g. 'gpt-5.3-instant')
  * @param promptTokens - Number of input/prompt tokens
  * @param completionTokens - Number of output/completion tokens
  * @returns Estimated cost in USD
@@ -225,7 +225,7 @@ export function estimateAICost(
   promptTokens: number,
   completionTokens: number
 ): number {
-  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-4o']
+  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-5.3-instant']
   const inputCost = (promptTokens / 1_000_000) * costs.input
   const outputCost = (completionTokens / 1_000_000) * costs.output
   return Number((inputCost + outputCost).toFixed(6))

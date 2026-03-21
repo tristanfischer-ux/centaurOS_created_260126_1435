@@ -409,7 +409,7 @@ async function callGemini(
 async function callOpenAI(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "gpt-4o",
+  modelId: string = "gpt-5.3-instant",
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
@@ -2751,8 +2751,8 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       dlog(">>> ATTEMPTING OPENAI (timeout=120s) — final fallback")
       const openaiStart = Date.now()
       try {
-        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 120_000))
-        winnerModel = "GPT-4o"
+        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.3-instant", 8192, 120_000))
+        winnerModel = "GPT-5.3-Instant"
         dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
       } catch (openaiErr) {
         const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)

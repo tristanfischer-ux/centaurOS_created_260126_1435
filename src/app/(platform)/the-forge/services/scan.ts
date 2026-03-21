@@ -110,7 +110,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   }
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-4o-2024-08-06",
+    model: "gpt-5.3-instant",
     messages: [
       { role: "system", content: SCAN_SYSTEM_PROMPT },
       { role: "user", content: userMessage },
@@ -215,7 +215,7 @@ export async function deriveProcessClassAI(
     .join("\n\n")
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-4o-2024-08-06",
+    model: "gpt-5.3-instant",
     messages: [
       {
         role: "system",
@@ -323,7 +323,7 @@ export async function refineScanAI(
   }
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-4o-2024-08-06",
+    model: "gpt-5.3-instant",
     messages: [
       { role: "system", content: REFINE_SCAN_SYSTEM_PROMPT },
       { role: "user", content: userContent },
@@ -512,7 +512,7 @@ export async function refineModuleAI(
   })
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-4o-2024-08-06",
+    model: "gpt-5.3-instant",
     messages: [
       { role: "system", content: REFINE_MODULE_SYSTEM_PROMPT },
       {

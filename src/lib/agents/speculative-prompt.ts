@@ -19,7 +19,7 @@
 import type { AIProviderId } from "@/lib/ai-providers/types"
 
 // INTENT: Gemini Flash is the ideal fast model — sub-300ms TTFB, very cheap,
-// already configured as a fallback in the provider registry. gpt-4o-mini is
+// already configured as a fallback in the provider registry. gpt-5.3-instant is
 // the backup if Gemini is unavailable.
 export const FAST_MODEL_CHAIN: Array<{ providerId: AIProviderId; modelId: string }> = [
     { providerId: "google", modelId: "gemini-3.1-flash-lite" },

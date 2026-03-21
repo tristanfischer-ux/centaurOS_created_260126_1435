@@ -153,12 +153,12 @@ export async function POST(req: NextRequest) {
                 foundryId: profileForRollout.foundry_id,
                 userId: user.id,
                 agentId: 'voice_to_task',
-                metadata: { model: 'gpt-4o-2024-08-06' },
+                metadata: { model: 'gpt-5.3-instant' },
             });
         }
 
         const completion = await openai.chat.completions.parse({
-            model: "gpt-4o-2024-08-06",
+            model: "gpt-5.3-instant",
             messages: [
                 {
                     role: "system",
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
         });
 
         await guard.trackUsage({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-instant',
             promptTokens: completion.usage?.prompt_tokens || 500,
             completionTokens: completion.usage?.completion_tokens || 200,
         })
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
                 responseSnapshot,
                 promptTokens: completion.usage?.prompt_tokens ?? null,
                 completionTokens: completion.usage?.completion_tokens ?? null,
-                metadata: { model: 'gpt-4o-2024-08-06' },
+                metadata: { model: 'gpt-5.3-instant' },
             });
             await finishRollout(rolloutId, 'finished');
         }

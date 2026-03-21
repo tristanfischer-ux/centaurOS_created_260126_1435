@@ -390,23 +390,20 @@ async function generateOpenAIImage(opts: ImageGenerationOptions): Promise<ImageG
 }
 
 async function generateStabilityImage(opts: ImageGenerationOptions): Promise<ImageGenerationResult> {
+    // Stable Image Ultra uses the v2beta multipart/form-data API
+    const formData = new FormData()
+    formData.append("prompt", opts.prompt)
+    formData.append("output_format", "png")
+
     const response = await fetch(
-        `https://api.stability.ai/v1/generation/${opts.modelId}/text-to-image`,
+        "https://api.stability.ai/v2beta/stable-image/generate/ultra",
         {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
                 Authorization: `Bearer ${opts.apiKey}`,
-                Accept: "application/json",
+                Accept: "image/*",
             },
-            body: JSON.stringify({
-                text_prompts: [{ text: opts.prompt, weight: 1 }],
-                cfg_scale: 7,
-                height: 1024,
-                width: 1024,
-                steps: 30,
-                samples: 1,
-            }),
+            body: formData,
             signal: opts.signal,
         }
     )
@@ -416,9 +413,8 @@ async function generateStabilityImage(opts: ImageGenerationOptions): Promise<Ima
         throw new Error(`Stability AI error: ${err}`)
     }
 
-    const data = await response.json()
-    const base64 = data.artifacts?.[0]?.base64
-    if (!base64) throw new Error("No image data returned")
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString("base64")
     return { imageUrl: `data:image/png;base64,${base64}` }
 }
 

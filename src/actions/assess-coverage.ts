@@ -114,7 +114,7 @@ Business Functions to Assess:
 ${JSON.stringify(functionsList, null, 2)}`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4o",
+                model: "gpt-5.3-instant",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -221,7 +221,7 @@ export async function assessSingleFunction(
 Return JSON only: { "status": "...", "priority": "critical|high|medium|low", "reasoning": "..." }`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4o",
+                model: "gpt-5.3-instant",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Business: ${foundryContext}\n\nFunction: ${functionName} (${functionCategory})` }
