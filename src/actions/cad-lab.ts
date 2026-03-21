@@ -855,11 +855,15 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
     // INTENT: Claude synthesis is wrapped separately so Gemini results are preserved on failure
     let report: string
     let synthesisSucceeded = true
+    let matchedStandardCodes: string[] = []
+    let detectedIndustryDomain: string | undefined
+    let totalStandardsMatched = 0
     try {
       const domain = await detectDomainFromProductDescription(description)
 
       // Retrieve relevant design standards (summaries only at research stage)
       const industryDomain = detectIndustryDomain(description)
+      detectedIndustryDomain = industryDomain
       let standardsSection = ""
       try {
         const standardsResult = await retrieveStandardsForPrompt(
@@ -867,6 +871,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         )
         if (standardsResult.content) {
           standardsSection = `\n\n${standardsResult.content}`
+          matchedStandardCodes = standardsResult.standardCodes
+          totalStandardsMatched = standardsResult.totalMatched
           console.info(`[THE-FORGE] Step 1: Injected ${standardsResult.standardCodes.length} standard summaries (${standardsResult.tokensUsed} tokens, domain: ${industryDomain})`)
         } else if (industryDomain !== "general") {
           // Auto-learn: no standards found for this domain — generate them
@@ -878,6 +884,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
             )
             if (retryResult.content) {
               standardsSection = `\n\n${retryResult.content}`
+              matchedStandardCodes = retryResult.standardCodes
+              totalStandardsMatched = retryResult.totalMatched
               console.info(`[THE-FORGE] Step 1: Auto-learned ${newStandards.length} standards, injected ${retryResult.standardCodes.length}`)
             }
           }
@@ -916,6 +924,9 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       designBrief: options?.designBrief,
       assumptionNotes: options?.assumptionNotes,
       modelUsed: "claude-opus-4-6",
+      standardCodes: matchedStandardCodes,
+      industryDomain: detectedIndustryDomain,
+      totalStandardsMatched,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)

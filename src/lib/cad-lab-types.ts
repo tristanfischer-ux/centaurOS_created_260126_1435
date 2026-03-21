@@ -523,6 +523,12 @@ export interface CadLabResearchResult {
   assumptionNotes?: string
   /** Which model synthesized the research report */
   modelUsed?: string
+  /** Design standard codes referenced during research (e.g. ["ISO 12215-5", "ABYC E-11"]) */
+  standardCodes?: string[]
+  /** Industry domain detected for standards matching (e.g. "marine", "automotive") */
+  industryDomain?: string
+  /** Number of standards matched before budget trimming */
+  totalStandardsMatched?: number
 }
 
 // ─── Mashup Types ─────────────────────────────────────────────────────

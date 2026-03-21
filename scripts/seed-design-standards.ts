@@ -343,7 +343,7 @@ Return ONLY valid JSON (no markdown fences) in this format:
       "standard_name": "Hull construction — scantlings for single-skin craft",
       "issuing_body": "ISO",
       "summary": "200-500 word summary of what the standard covers and why it matters for CAD design",
-      "requirements_markdown": "2000-8000 word detailed engineering guidance including specific dimensions, tolerances, material requirements, safety factors, formulas, and test procedures. Use markdown headers and bullet points for readability.",
+      "requirements_markdown": "1000-3000 word engineering guidance with specific dimensions, tolerances, material requirements, safety factors, and key formulas. Use bullet points. Be concise but include real numerical values.",
       "design_rules": [
         {"rule": "Minimum single-skin GRP panel thickness for vessels <8m LOA is 4mm", "section": "5.2.3", "criticality": "mandatory"},
         {"rule": "Stiffener spacing shall not exceed 300mm for unsupported panels", "section": "6.1", "criticality": "mandatory"}
@@ -362,46 +362,59 @@ Return ONLY valid JSON (no markdown fences) in this format:
 }`
 
 async function generateStandardsForDomain(domainSeed: DomainSeed): Promise<number> {
-  const userPrompt = `Domain: ${domainSeed.domain} (${domainSeed.description})
-
-Generate engineering guidance for these ${domainSeed.standards.length} standards:
-${domainSeed.standards.map((s, i) => `${i + 1}. ${s}`).join("\n")}
-
-For each standard, provide detailed, practical engineering guidance that a CAD engineer needs. Include specific numerical values (dimensions, tolerances, safety factors) wherever possible.`
-
   console.log(`\n[${"=".repeat(60)}]`)
   console.log(`[SEED] Generating ${domainSeed.standards.length} standards for domain: ${domainSeed.domain}`)
   console.log(`[${"=".repeat(60)}]`)
 
+  // Split into batches of 2 to keep JSON within output token limit
+  const BATCH_SIZE = 2
+  let totalInserted = 0
+
+  for (let i = 0; i < domainSeed.standards.length; i += BATCH_SIZE) {
+    const batch = domainSeed.standards.slice(i, i + BATCH_SIZE)
+    const batchNum = Math.floor(i / BATCH_SIZE) + 1
+    const totalBatches = Math.ceil(domainSeed.standards.length / BATCH_SIZE)
+
+    console.log(`[SEED] Batch ${batchNum}/${totalBatches}: ${batch.length} standards`)
+
+    const count = await generateBatch(domainSeed.domain, domainSeed.description, batch)
+    totalInserted += count
+
+    // Pause between batches
+    if (i + BATCH_SIZE < domainSeed.standards.length) {
+      await new Promise(r => setTimeout(r, 1000))
+    }
+  }
+
+  console.log(`[SEED] ✓ Domain ${domainSeed.domain}: ${totalInserted} standards total`)
+  return totalInserted
+}
+
+async function generateBatch(domain: string, description: string, standards: string[]): Promise<number> {
+  const userPrompt = `Domain: ${domain} (${description})
+
+Generate engineering guidance for these ${standards.length} standards:
+${standards.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+
+For each standard, provide detailed, practical engineering guidance that a CAD engineer needs. Include specific numerical values (dimensions, tolerances, safety factors) wherever possible.`
+
   const startTime = Date.now()
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-opus-4-6",
-        max_tokens: 16384,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY, timeout: 300_000 })
+
+    const response = await client.messages.create({
+      model: "claude-opus-4-6",
+      max_tokens: 16384,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: userPrompt }],
     })
 
-    if (!response.ok) {
-      const err = await response.text()
-      console.error(`[SEED] API error for ${domainSeed.domain}: ${response.status} ${err.slice(0, 200)}`)
-      return 0
-    }
-
-    const data = await response.json()
-    const text = data.content
-      ?.filter((b: { type: string }) => b.type === "text")
-      ?.map((b: { type: string; text?: string }) => b.text || "")
-      ?.join("") ?? ""
+    const text = response.content
+      .filter(b => b.type === "text")
+      .map(b => b.type === "text" ? b.text : "")
+      .join("")
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1)
     console.log(`[SEED] Claude responded in ${elapsed}s (${text.length} chars)`)
@@ -409,20 +422,35 @@ For each standard, provide detailed, practical engineering guidance that a CAD e
     // Parse JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      console.error(`[SEED] No JSON found for ${domainSeed.domain}`)
+      console.error(`[SEED] No JSON found for ${domain}`)
       return 0
     }
 
     let parsed: { standards: Array<Record<string, unknown>> }
     try {
       parsed = JSON.parse(jsonMatch[0])
-    } catch (parseErr) {
-      console.error(`[SEED] JSON parse error for ${domainSeed.domain}:`, parseErr)
-      return 0
+    } catch {
+      // Attempt JSON repair: truncated arrays/objects at the end
+      let repaired = jsonMatch[0]
+      // Remove trailing incomplete object
+      const lastComplete = repaired.lastIndexOf('},')
+      if (lastComplete > 0) {
+        repaired = repaired.slice(0, lastComplete + 1) + ']}'
+        try {
+          parsed = JSON.parse(repaired)
+          console.log(`[SEED] JSON repaired for ${domain} (truncated at char ${lastComplete})`)
+        } catch {
+          console.error(`[SEED] JSON repair also failed for ${domain}`)
+          return 0
+        }
+      } else {
+        console.error(`[SEED] JSON parse error for ${domain} — no repairable point found`)
+        return 0
+      }
     }
 
     if (!parsed.standards || !Array.isArray(parsed.standards)) {
-      console.error(`[SEED] Invalid structure for ${domainSeed.domain}`)
+      console.error(`[SEED] Invalid structure for ${domain}`)
       return 0
     }
 
@@ -431,7 +459,7 @@ For each standard, provide detailed, practical engineering guidance that a CAD e
       standard_code: String(s.standard_code || ""),
       standard_name: String(s.standard_name || ""),
       issuing_body: String(s.issuing_body || ""),
-      industry_domain: domainSeed.domain,
+      industry_domain: domain,
       product_tags: Array.isArray(s.product_tags) ? s.product_tags : [],
       engineering_tags: Array.isArray(s.engineering_tags) ? s.engineering_tags : [],
       summary: String(s.summary || ""),
@@ -456,15 +484,15 @@ For each standard, provide detailed, practical engineering guidance that a CAD e
       .select("standard_code")
 
     if (error) {
-      console.error(`[SEED] Supabase error for ${domainSeed.domain}:`, error.message)
+      console.error(`[SEED] Supabase error for ${domain}:`, error.message)
       return 0
     }
 
     const count = inserted?.length ?? 0
-    console.log(`[SEED] ✓ Inserted ${count} standards for ${domainSeed.domain}`)
+    console.log(`[SEED] ✓ Inserted ${count} standards for ${domain}`)
     return count
   } catch (err) {
-    console.error(`[SEED] Error for ${domainSeed.domain}:`, err instanceof Error ? err.message : err)
+    console.error(`[SEED] Error for ${domain}:`, err instanceof Error ? err.message : err)
     return 0
   }
 }
@@ -485,6 +513,18 @@ async function main() {
   const startTime = Date.now()
 
   for (const domain of DOMAINS) {
+    // Skip domains that already have data
+    const { count: existing } = await supabase
+      .from("design_standards")
+      .select("id", { count: "exact", head: true })
+      .eq("industry_domain", domain.domain)
+
+    if (existing && existing >= domain.standards.length * 0.8) {
+      console.log(`[SEED] Skipping ${domain.domain} — already has ${existing} standards`)
+      totalInserted += existing
+      continue
+    }
+
     const count = await generateStandardsForDomain(domain)
     totalInserted += count
 

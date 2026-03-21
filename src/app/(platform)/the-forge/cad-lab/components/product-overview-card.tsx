@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react"
-import { Pencil, Check, X } from "lucide-react"
+import { Pencil, Check, X, ShieldCheck } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -63,6 +63,13 @@ interface ProductOverviewCardProps {
   overview: string
   onSave: (text: string) => void
   modelAudit?: ModelAudit
+  standardCodes?: string[]
+  industryDomain?: string
+  totalStandardsMatched?: number
+}
+
+function formatDomainLabel(domain: string): string {
+  return domain.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -71,6 +78,9 @@ export function ProductOverviewCard({
   overview,
   onSave,
   modelAudit,
+  standardCodes,
+  industryDomain,
+  totalStandardsMatched,
 }: ProductOverviewCardProps): React.ReactNode {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(overview)
@@ -195,6 +205,35 @@ export function ProductOverviewCard({
                 </div>
               )}
             </div>
+          </div>
+        )}
+        {/* ── Standards Referenced ── */}
+        {standardCodes && standardCodes.length > 0 && (
+          <div className="border-t border-border mt-4 pt-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <ShieldCheck className="h-3.5 w-3.5 text-success" />
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Design Standards Referenced
+              </h4>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {standardCodes.map((code) => (
+                <span
+                  key={code}
+                  className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-muted text-foreground"
+                >
+                  {code}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {industryDomain && (
+                <>{formatDomainLabel(industryDomain)} domain</>
+              )}
+              {totalStandardsMatched != null && totalStandardsMatched > standardCodes.length && (
+                <> — {totalStandardsMatched} standards matched, top {standardCodes.length} applied</>
+              )}
+            </p>
           </div>
         )}
       </CardContent>

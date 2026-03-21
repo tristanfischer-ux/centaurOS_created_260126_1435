@@ -68,7 +68,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
     productOverview, setProductOverview,
     handleUpdateModule,
-    researchModelUsed, decompositionModelUsed,
+    researchModelUsed, decompositionModelUsed, researchResult,
     handleRefreshModuleImages,
     handleReExpandModule, reExpandingModuleIds,
     tripoPreviewUrl, tripoPreviewStatus, tripoPreviewError,
@@ -285,6 +285,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                   overview={productOverview}
                   onSave={setProductOverview}
                   modelAudit={modelAudit}
+                  standardCodes={researchResult?.standardCodes}
+                  industryDomain={researchResult?.industryDomain}
+                  totalStandardsMatched={researchResult?.totalStandardsMatched}
                 />
               )}
 
