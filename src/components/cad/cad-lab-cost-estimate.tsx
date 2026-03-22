@@ -485,7 +485,7 @@ export function CadLabCostEstimate({
               </div>
 
               {/* Column headers */}
-              <div className="grid grid-cols-2 gap-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0">
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Categories</p>
                 <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider" style={{ paddingLeft: ((COL_SUPS_X / VB_W) * 100) + "%" }}>Suppliers · Cost</p>
               </div>

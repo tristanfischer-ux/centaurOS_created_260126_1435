@@ -143,7 +143,7 @@ export function SupplierDetailDialog({
             )}
 
             {/* Key info grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(detail.city || detail.country) && (
                 <InfoItem icon={MapPin} label="Location" value={[detail.city, detail.country].filter(Boolean).join(", ")} />
               )}

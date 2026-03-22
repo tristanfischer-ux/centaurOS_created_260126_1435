@@ -462,7 +462,7 @@ export function InvestorBrowser({
         </button>
 
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
@@ -498,7 +498,7 @@ export function InvestorBrowser({
                 aria-label={label}
                 aria-pressed={viewMode === mode}
                 className={cn(
-                  'p-1.5 transition-colors',
+                  'p-1.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors',
                   viewMode === mode
                     ? 'bg-foreground text-background'
                     : 'text-muted-foreground hover:text-foreground'

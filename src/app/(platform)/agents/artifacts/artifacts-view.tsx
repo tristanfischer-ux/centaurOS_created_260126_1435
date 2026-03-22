@@ -608,7 +608,7 @@ export function ArtifactsView({ artifacts: initialArtifacts }: ArtifactsViewProp
                               <button
                                 type="button"
                                 onClick={(e) => e.stopPropagation()}
-                                className="shrink-0 p-1 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                className="shrink-0 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md hover:bg-muted transition-colors sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100"
                                 aria-label="More actions"
                               >
                                 <MoreVertical className="h-4 w-4 text-muted-foreground" />

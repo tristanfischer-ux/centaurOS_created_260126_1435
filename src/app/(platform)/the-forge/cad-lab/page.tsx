@@ -30,6 +30,7 @@ import {
   Info,
   FileDown,
   Box,
+  Download,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -83,6 +84,27 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [heroView, setHeroView] = useState<"2d" | "3d">("2d")
+
+  // INTENT: Cross-origin URLs ignore the <a download> attribute.
+  // Fetch as blob and create an object URL to force a real download.
+  const handleDownloadFile = useCallback(async (url: string, filename: string) => {
+    try {
+      const res = await fetch(url)
+      const blob = await res.blob()
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = objUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(objUrl)
+    } catch (e) {
+      console.error("[Download] Failed:", e)
+      // Fallback: open in new tab
+      window.open(url, "_blank")
+    }
+  }, [])
 
   // INTENT: Fetch engineering intelligence independently of research result.
   // This way the panel shows real data even when research synthesis failed.
@@ -335,7 +357,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                 <>
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
                     <Card className="overflow-hidden">
-                      {/* 2D/3D segmented toggle */}
+                      {/* 2D/3D segmented toggle + download */}
                       <div className="flex items-center gap-1 p-2 bg-muted/30">
                         <button
                           onClick={() => setHeroView("2d")}
@@ -362,6 +384,25 @@ export default function CadLabResearchPage(): React.ReactNode {
                             <Loader2 className="h-3 w-3 inline ml-1 animate-spin" />
                           )}
                         </button>
+                        <div className="flex-1" />
+                        {heroView === "2d" && systemIllustrationUrl && (
+                          <button
+                            onClick={() => handleDownloadFile(systemIllustrationUrl, `${subject || "concept"}-illustration.png`)}
+                            className="px-2 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Download</span>
+                          </button>
+                        )}
+                        {heroView === "3d" && tripoPreviewStatus === "complete" && tripoPreviewUrl && (
+                          <button
+                            onClick={() => handleDownloadFile(tripoPreviewUrl, `${subject || "concept"}-3d-model.glb`)}
+                            className="px-2 py-1.5 text-xs font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex items-center gap-1"
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                            <span className="hidden sm:inline">Download GLB</span>
+                          </button>
+                        )}
                       </div>
 
                       <div className="aspect-[16/9] w-full bg-muted">

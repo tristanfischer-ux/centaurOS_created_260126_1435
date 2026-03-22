@@ -426,7 +426,7 @@ export function TasksCommandCenter({
                 placeholder="Search tasks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="h-8 w-48 text-sm"
+                className="h-8 w-full sm:w-48 text-sm"
               />
               <Button
                 variant="ghost"
@@ -502,7 +502,7 @@ export function TasksCommandCenter({
 
         {/* Right: Detail panel */}
         {showDetailPanel && (
-          <div className="w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-340px)] sticky top-8">
+          <div className="hidden lg:block w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-340px)] sticky top-8">
             <TaskDetailPanel
               task={selectedTask}
               onClose={() => setSelectedId(null)}

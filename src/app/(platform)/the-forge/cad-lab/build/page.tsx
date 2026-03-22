@@ -1383,7 +1383,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                                 onClick={() => {
                                   setEditingSpecModuleId(mod.id)
                                   setSpecDraft(mod.interfaceDefinition ?? "")
@@ -1405,7 +1405,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  className="h-7 px-2 text-xs"
+                                  className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 px-2 text-xs"
                                   onClick={() => setEditingSpecModuleId(null)}
                                 >
                                   <X className="h-3 w-3 mr-1" /> Cancel
@@ -1413,7 +1413,7 @@ export default function CadLabBuildPage(): React.ReactNode {
                                 <Button
                                   size="sm"
                                   variant="default"
-                                  className="h-7 px-3 text-xs"
+                                  className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 px-3 text-xs"
                                   onClick={() => {
                                     handleUpdateModule({ ...mod, interfaceDefinition: specDraft })
                                     setEditingSpecModuleId(null)

@@ -94,7 +94,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-background hover:bg-muted"
+            className="h-7 w-7 min-h-[44px] min-w-[44px] bg-background hover:bg-muted"
             onClick={(e) => {
               e.stopPropagation()
               onEdit(objective)
@@ -108,7 +108,7 @@ export function ObjectiveCard({ objective, strategicObjectives = [], isSelected,
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 bg-background hover:bg-destructive/10 hover:text-destructive"
+            className="h-7 w-7 min-h-[44px] min-w-[44px] bg-background hover:bg-destructive/10 hover:text-destructive"
             onClick={(e) => {
               e.stopPropagation()
               onDelete(objective.id)
