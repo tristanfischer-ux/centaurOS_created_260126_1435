@@ -75,7 +75,7 @@ export function EarningsCard({
                 </div>
 
                 {/* Pending and Total */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="p-4 rounded-lg bg-status-warning-light border border-status-warning">
                         <div className="flex items-center gap-2 text-status-warning-dark">
                             <Clock className="h-4 w-4" />

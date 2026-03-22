@@ -122,7 +122,7 @@ export const PortfolioGallery = memo(function PortfolioGallery({
                                 {/* Images Grid */}
                                 {/* SECURITY: Sanitize user-provided image URLs */}
                                 {selectedItem.image_urls && selectedItem.image_urls.length > 0 && (
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         {selectedItem.image_urls.map((url, index) => {
                                             const sanitizedUrl = sanitizeImageSrc(url)
                                             if (!sanitizedUrl) return null

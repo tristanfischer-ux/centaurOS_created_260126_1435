@@ -19,12 +19,12 @@ function FundraiseDashboardLoading() {
   return (
     <div className="space-y-6">
       <Skeleton className="h-9 w-48" />
-      <div className="grid grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[1, 2, 3, 4, 5, 6].map(i => (
           <Skeleton key={i} className="h-20 rounded-xl" />
         ))}
       </div>
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Skeleton className="h-64 rounded-xl" />
         <Skeleton className="h-64 rounded-xl" />
       </div>

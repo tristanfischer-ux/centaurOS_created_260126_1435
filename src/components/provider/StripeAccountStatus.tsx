@@ -161,7 +161,7 @@ export function StripeAccountStatus({
             <CardContent className="space-y-4">
                 {/* Status indicators for connected accounts */}
                 {hasAccount && (
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="text-center p-3 rounded-lg bg-muted">
                             <div className={cn(
                                 "text-sm font-medium",
