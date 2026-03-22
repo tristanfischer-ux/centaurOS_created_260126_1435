@@ -124,17 +124,20 @@ interface ProviderTarget {
 const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
         { providerId: "openai", modelId: "gpt-5.3-instant" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     qwen: [
         { providerId: "qwen", modelId: "qwen3.5-plus" },
+        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-5.3-instant" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
+        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "openai", modelId: "gpt-5.3-instant" },
     ],
@@ -167,6 +170,7 @@ function resolveApiKeyForProvider(pid: AIProviderId): string | null {
         elevenlabs: process.env.ELEVENLABS_API_KEY?.trim() ?? "",
         replicate: process.env.REPLICATE_API_TOKEN ?? "",
         minimax: process.env.MINIMAX_API_KEY?.trim() ?? "",
+        together: process.env.TOGETHER_API_KEY?.trim() ?? "",
     }
     const key = envMap[pid]
     return key || null

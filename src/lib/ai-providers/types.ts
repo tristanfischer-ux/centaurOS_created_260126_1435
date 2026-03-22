@@ -13,6 +13,7 @@ export const AI_PROVIDERS = [
     "elevenlabs",
     "replicate",
     "minimax",
+    "together",
 ] as const
 export type AIProviderId = (typeof AI_PROVIDERS)[number]
 
@@ -244,6 +245,20 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
             { id: "speech-2.6-turbo", name: "Speech 2.6 Turbo", modality: "audio", description: "Fastest voice agent TTS — sub-250ms, powers ChatGPT voice mode" },
             // Image model
             { id: "image-01", name: "Image-01", modality: "image", description: "Text-to-image, multiple aspect ratios ($0.0035/image)", default: true },
+        ],
+    },
+    together: {
+        id: "together",
+        name: "Together AI",
+        description: "Open-source models hosted on Together infrastructure (Qwen 3.5, Llama)",
+        icon: "Layers",
+        website: "https://together.ai",
+        capabilities: ["text"],
+        requiresKey: true,
+        color: "#0ea5e9",
+        bgColor: "bg-sky-50",
+        models: [
+            { id: "Qwen/Qwen3.5-397B-A17B", name: "Qwen 3.5 (397B MoE)", modality: "text", description: "Frontier MoE — 397B total, 17B active per token", maxTokens: 8192, default: true },
         ],
     },
 }

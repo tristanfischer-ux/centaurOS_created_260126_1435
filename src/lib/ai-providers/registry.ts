@@ -575,6 +575,37 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
     opts.onDone()
 }
 
+// ─── Together AI Text Streaming (OpenAI-compatible) ──────────────────
+
+/**
+ * Streams text from Together AI via their OpenAI-compatible endpoint.
+ * Uses Qwen 3.5 (397B MoE) as default — same model as DashScope but
+ * hosted on Together's infrastructure with better global availability.
+ */
+async function streamTogether(opts: StreamingTextOptions): Promise<void> {
+    const OpenAI = (await import("openai")).default
+    const client = new OpenAI({
+        apiKey: opts.apiKey,
+        baseURL: "https://api.together.xyz/v1",
+    })
+
+    const messages = buildMessages(opts)
+
+    const stream = await client.chat.completions.create({
+        model: opts.modelId,
+        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
+        stream: true,
+        max_tokens: opts.maxTokens ?? 4096,
+    })
+
+    for await (const chunk of stream) {
+        if (opts.signal?.aborted) break
+        const text = chunk.choices[0]?.delta?.content ?? ""
+        if (text) opts.onChunk(text)
+    }
+    opts.onDone()
+}
+
 // ─── Qwen Text Streaming (DashScope / OpenAI-compatible) ─────────────
 
 /**
@@ -965,6 +996,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     qwen: streamQwen,
     "qwen-local": streamQwenLocal,
     minimax: streamMiniMax,
+    together: streamTogether,
 }
 
 const IMAGE_PROVIDERS: Partial<Record<AIProviderId, ImageGenFn>> = {
