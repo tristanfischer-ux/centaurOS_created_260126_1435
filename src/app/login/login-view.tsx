@@ -202,14 +202,13 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                 </motion.div>
             </motion.div>
 
-            {/* Google OAuth — disabled until redirect URI is registered in Google Cloud Console */}
-            {/* <motion.div variants={formItemVariants}>
+            <motion.div variants={formItemVariants}>
                 <GoogleOAuthButton redirect={redirect} />
             </motion.div>
 
             <motion.div variants={formItemVariants}>
                 <OAuthDivider />
-            </motion.div> */}
+            </motion.div>
 
             <form className="space-y-6">
                 <Suspense fallback={null}>
