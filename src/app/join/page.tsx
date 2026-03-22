@@ -251,7 +251,7 @@ function JoinPageInner() {
                 animate={{ opacity: 1, y: 0 }}
                 role="alert"
                 aria-live="polite"
-                className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
+                className="p-3 sm:p-4 text-xs sm:text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-2 sm:gap-3"
               >
                 <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" aria-hidden="true" />
                 {state.error}
@@ -273,6 +273,7 @@ function JoinPageInner() {
                   placeholder="Jane Smith"
                   key={`name-${state.values?.name ?? ""}`}
                   defaultValue={state.values?.name || ""}
+                  autoComplete="name"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
@@ -291,6 +292,7 @@ function JoinPageInner() {
                   placeholder="you@example.com"
                   key={`email-${state.values?.email ?? ""}`}
                   defaultValue={state.values?.email || ""}
+                  autoComplete="email"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
@@ -309,6 +311,8 @@ function JoinPageInner() {
                   placeholder="Create a strong password"
                   defaultValue=""
                   onChange={(e) => setPasswordValue(e.target.value)}
+                  autoComplete="new-password"
+                  enterKeyHint="go"
                   className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                   required
                   aria-required="true"
@@ -329,7 +333,7 @@ function JoinPageInner() {
                 <Button
                   type="submit"
                   disabled={isPending}
-                  className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+                  className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
                   {isPending ? (
                     <>
@@ -421,7 +425,7 @@ function JoinPageInner() {
               animate={{ opacity: 1, y: 0 }}
               role="alert"
               aria-live="polite"
-              className="p-4 text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-3"
+              className="p-3 sm:p-4 text-xs sm:text-sm text-destructive bg-status-error-light border border-destructive rounded-lg flex items-center gap-2 sm:gap-3"
             >
               <span
                 className="h-2 w-2 rounded-full bg-destructive animate-pulse"
@@ -495,6 +499,7 @@ function JoinPageInner() {
                 placeholder="Jane Smith"
                 key={`name-${state.values?.name ?? ""}`}
                 defaultValue={state.values?.name || demoData?.fullName || ""}
+                autoComplete="name"
                 className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                 required
                 aria-required="true"
@@ -518,6 +523,7 @@ function JoinPageInner() {
                 placeholder="you@example.com"
                 key={`email-${state.values?.email ?? ""}`}
                 defaultValue={state.values?.email || demoData?.email || ""}
+                autoComplete="email"
                 className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                 required
                 aria-required="true"
@@ -541,6 +547,8 @@ function JoinPageInner() {
                 placeholder="Create a strong password"
                 defaultValue=""
                 onChange={(e) => setPasswordValue(e.target.value)}
+                autoComplete="new-password"
+                enterKeyHint="go"
                 className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
                 required
                 aria-required="true"
@@ -644,7 +652,7 @@ function JoinPageInner() {
               <Button
                 type="submit"
                 disabled={isPending}
-                className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase py-5 sm:py-6 h-auto text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
+                className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
               >
                 {isPending ? (
                   <>
