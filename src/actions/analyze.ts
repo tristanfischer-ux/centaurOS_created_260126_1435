@@ -133,7 +133,7 @@ export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
   return withAIGate('analyze', async ({ user }) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) return { error: 'AI analysis service is not configured' }
 
     // SECURITY: Rate limit AI calls to prevent cost abuse

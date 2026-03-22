@@ -127,7 +127,7 @@ Return ONLY valid JSON. No markdown fences.`
  * @throws Error if AI call fails
  */
 export async function generateLoadCases(module: ModuleSpec): Promise<LoadCaseSet> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayFEA] OPENAI_API_KEY is not configured")
   }

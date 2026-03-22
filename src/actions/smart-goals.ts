@@ -21,11 +21,11 @@ let openaiClient: OpenAI | null = null
 
 /** Whether AI features are available (API key is set). */
 function isAIEnabled(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY)
+  return Boolean(process.env.OPENAI_API_KEY?.trim())
 }
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return null
   }

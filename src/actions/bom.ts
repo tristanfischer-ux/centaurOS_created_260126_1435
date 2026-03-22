@@ -198,7 +198,7 @@ Respond with ONLY valid JSON:
 
     const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       return { success: false, error: "Anthropic API key not configured", parts: [], bomLines: [] }
     }
@@ -346,7 +346,7 @@ ${moduleContext}${briefContext}
 
 Add material, specs, dimensions, mass, cost, and confidence for every part.`
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       return { success: false, error: "Anthropic API key not configured", expansions: {} }
     }
@@ -556,7 +556,7 @@ Create structured parts and hierarchical BOM lines. Deduplicate common fasteners
 
     // ── Call Claude ──
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       return { success: false, error: "Anthropic API key not configured" }
     }

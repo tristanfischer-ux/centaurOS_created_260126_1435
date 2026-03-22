@@ -233,7 +233,7 @@ const STAGE_CONTEXT: Record<string, string> = {
 export async function structureReportOutline(
   rawData: DesignReportData,
 ): Promise<{ outline: ReportOutline; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   const data = stripForServer(rawData)
@@ -586,7 +586,7 @@ export async function writeReportSections(
   rawData: DesignReportData,
   opusTokens: { in: number; out: number },
 ): Promise<AiReportContent> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
   const data = stripForServer(rawData)

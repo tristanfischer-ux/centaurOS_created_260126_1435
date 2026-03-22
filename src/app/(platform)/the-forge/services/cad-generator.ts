@@ -319,7 +319,7 @@ async function callOpus(
   temperature: number = 0.3,
   maxTokens: number = 16384,
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayCadGen] ANTHROPIC_API_KEY is not configured")
   }
@@ -327,7 +327,7 @@ async function callOpus(
   const Anthropic = (await import("@anthropic-ai/sdk")).default
   const client = new Anthropic({ apiKey })
 
-  const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"] as const
+  const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-6"] as const
 
   for (const model of ANTHROPIC_MODELS) {
     try {
@@ -373,7 +373,7 @@ async function callOpus(
   }
 
   // ── Gemini fallback (different safety characteristics) ──
-  const geminiKey = process.env.GOOGLE_AI_API_KEY
+  const geminiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!geminiKey) {
     throw new Error("[XRayCadGen] All Anthropic models refused and GOOGLE_AI_API_KEY is missing")
   }
@@ -428,7 +428,7 @@ async function callGemini(
   userPrompt: string,
   maxTokens: number = 16384,
 ): Promise<string> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayCadGen] GOOGLE_AI_API_KEY is not configured")
   }

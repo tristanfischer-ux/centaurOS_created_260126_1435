@@ -95,7 +95,7 @@ Rules:
     ].join('')
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',

@@ -259,7 +259,7 @@ async function generateDesignChanges(
   failingModules: Array<{ module: ModuleSpec; failedCriteria: string[] }>,
   config: ConvergenceConfig,
 ): Promise<ProposedChange[]> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return []
 
   const openai = new OpenAI({ apiKey })

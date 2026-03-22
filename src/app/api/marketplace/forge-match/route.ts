@@ -36,7 +36,7 @@ interface ErrorResponse {
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
@@ -59,7 +59,7 @@ export async function POST(
         const user = { id: guard.userId }
 
         // SECURITY: Fail closed when OpenAI key is not configured.
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
             return NextResponse.json(
                 { error: 'Forge matching service is not configured' },

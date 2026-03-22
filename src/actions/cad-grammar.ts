@@ -140,7 +140,7 @@ async function callClaude(
   tokensIn: number
   tokensOut: number
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   return withRetry(async () => {
@@ -152,7 +152,7 @@ async function callClaude(
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-4-6",
         max_tokens: maxTokens,
         system: systemPrompt,
         messages: [{ role: "user", content: userPrompt }],

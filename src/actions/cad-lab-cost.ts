@@ -59,7 +59,7 @@ export async function estimateModuleCostsAi(
   techniqueInsights?: Record<string, ProcessInsights>,
 ): Promise<EstimateResult | EstimateError> {
   return withAIGate('cad_lab_cost', async () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     return { success: false, error: "ANTHROPIC_API_KEY not configured" }
   }

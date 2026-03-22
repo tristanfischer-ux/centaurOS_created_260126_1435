@@ -303,7 +303,7 @@ function splitIntoWindows(text: string): string[] {
 async function callDocumentExtractionLLM(
   windowText: string
 ): Promise<ExtractedNote[]> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[KnowledgeVault/DocExtractor] OPENAI_API_KEY not set, skipping extraction')
     return []

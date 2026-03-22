@@ -17,7 +17,7 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { logInsights } from '@/lib/intelligence/insight-logger'
 import type { InsightEntry } from '@/lib/intelligence/insight-logger'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 

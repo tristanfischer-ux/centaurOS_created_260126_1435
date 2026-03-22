@@ -38,7 +38,7 @@ export async function evaluateOutput(
   userPrompt: string,
   assistantOutput: string
 ): Promise<EvaluationResult> {
-  const openaiKey = process.env.OPENAI_API_KEY
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
   if (!openaiKey) {
     return {
       relevance: 0,
@@ -170,7 +170,7 @@ export async function evaluateEngineeringOutput(
   assistantOutput: string,
   context?: string
 ): Promise<EngineeringEvaluationResult> {
-  const openaiKey = process.env.OPENAI_API_KEY
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
   if (!openaiKey) {
     return {
       dimensionalConsistency: 0,

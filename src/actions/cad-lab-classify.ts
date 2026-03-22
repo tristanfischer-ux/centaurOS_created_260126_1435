@@ -73,7 +73,7 @@ export async function classifyPartsAi(
   parts: PartToClassify[],
 ): Promise<ClassifySuccess | ClassifyError> {
   return withAIGate('cad_lab_classify', async () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     return { success: false, error: "ANTHROPIC_API_KEY not configured" }
   }

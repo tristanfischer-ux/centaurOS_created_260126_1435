@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const { systemPrompt, userPrompt } = buildOutreachPrompt({ campaign, contact, knowledgeBase })
 
     // 6. Stream from Claude
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
         return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 })
     }

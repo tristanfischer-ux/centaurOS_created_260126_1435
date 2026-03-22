@@ -490,7 +490,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
     ].join('\n')
 
     // 3. Call MiniMax M2.5 (non-streaming for background work)
-    const apiKey = process.env.MINIMAX_API_KEY
+    const apiKey = process.env.MINIMAX_API_KEY?.trim()
     if (!apiKey) {
       throw new Error('MINIMAX_API_KEY not configured')
     }

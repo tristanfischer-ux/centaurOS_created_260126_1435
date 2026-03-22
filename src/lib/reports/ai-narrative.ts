@@ -115,7 +115,7 @@ export async function generateExecutiveNarrative(
   context: NarrativeContext,
   options: NarrativeOptions,
 ): Promise<NarrativeResult> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
     console.warn('[ReportNarrative] ANTHROPIC_API_KEY not set — using template fallback')
     return buildFallbackNarrative(context, options)
   }
@@ -125,7 +125,7 @@ export async function generateExecutiveNarrative(
     const userPrompt = buildExecutiveUserPrompt(context)
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     try {
@@ -170,7 +170,7 @@ export async function generateSectionNarrative(
   sectionData: Record<string, unknown>,
   options: NarrativeOptions,
 ): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
     return buildSectionFallback(sectionType)
   }
 
@@ -188,7 +188,7 @@ export async function generateSectionNarrative(
     const userPrompt = `Section data:\n${JSON.stringify(sectionData, null, 2)}`
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     try {

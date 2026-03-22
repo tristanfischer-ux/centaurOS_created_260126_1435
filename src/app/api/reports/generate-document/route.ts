@@ -156,7 +156,7 @@ export async function POST(request: Request): Promise<Response> {
         emit({ type: "progress", message: "Generating document…", percent: 30 })
 
         const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
 
         let fullContent = ""
         let tokensUsed = 0

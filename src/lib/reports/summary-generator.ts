@@ -13,7 +13,7 @@ let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI {
     if (!openaiClient) {
-        const apiKey = process.env.OPENAI_API_KEY
+        const apiKey = process.env.OPENAI_API_KEY?.trim()
         if (!apiKey) {
             throw new Error('OPENAI_API_KEY environment variable is not set')
         }
@@ -36,7 +36,7 @@ export async function generateDailySummary(context: SummaryContext): Promise<str
     const { data, userName, userRole, insights } = context
     
     // Check if we should use AI or fallback to template
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY?.trim()) {
         return generateTemplateSummary(context)
     }
     

@@ -34,7 +34,7 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
         if (!task) return
 
         // 3. Generate Content
-        const apiKey = process.env.OPENAI_API_KEY
+        const apiKey = process.env.OPENAI_API_KEY?.trim()
         if (!apiKey) {
             throw new Error('Missing OPENAI_API_KEY environment variable')
         }

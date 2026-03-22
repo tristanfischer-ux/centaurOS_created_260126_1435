@@ -188,7 +188,7 @@ async function generateDraftTask(
   companyContext: string,
   _foundryId: string,
 ): Promise<DraftTask | null> {
-  const apiKey = process.env.MINIMAX_API_KEY
+  const apiKey = process.env.MINIMAX_API_KEY?.trim()
   if (!apiKey) return null
 
   const specialist = SPECIALISTS.find(s => s.id === insight.specialist_id)
@@ -313,7 +313,7 @@ export async function autoGenerateReport(
       return `- ${specialist?.name ?? 'Specialist'} [${i.urgency}]: ${i.title}`
     }).join('\n')
 
-    const apiKey = process.env.MINIMAX_API_KEY
+    const apiKey = process.env.MINIMAX_API_KEY?.trim()
     if (!apiKey) return null
 
     const OpenAI = await getOpenAIClient()

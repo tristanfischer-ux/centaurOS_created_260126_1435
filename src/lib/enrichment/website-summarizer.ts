@@ -53,7 +53,7 @@ export async function summarizeWebsiteContent(
     return { website_summary: null }
   }
 
-  const apiKey = process.env.MINIMAX_API_KEY
+  const apiKey = process.env.MINIMAX_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('MINIMAX_API_KEY not configured — cannot summarize website')
   }

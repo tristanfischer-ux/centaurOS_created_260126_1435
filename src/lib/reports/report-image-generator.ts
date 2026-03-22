@@ -71,7 +71,7 @@ async function callNanoBananaImage(
   aspectRatio: string = "16:9",
   model: string = NANO_BANANA_MODEL,
 ): Promise<string | null> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) return null
 
   const url = `${GOOGLE_AI_API_BASE}/${model}:generateContent`
@@ -128,7 +128,7 @@ async function callOpenAIImage(
   prompt: string,
   size: "1024x1024" | "1536x1024" | "1024x1536" = "1536x1024",
 ): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return null
 
   try {
@@ -368,7 +368,7 @@ export async function generateAllReportImages(
 ): Promise<Map<string, string>> {
   const results = new Map<string, string>()
 
-  if (!process.env.GOOGLE_AI_API_KEY) {
+  if (!process.env.GOOGLE_AI_API_KEY?.trim()) {
     console.info("[ReportImageGen] No GOOGLE_AI_API_KEY — skipping image generation")
     return results
   }

@@ -162,7 +162,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no extra text):
 
   const userPrompt = `Here are headlines relevant to your domain:\n${headlinesText}\n\nProduce a concise ${typeContext} briefing. Output only the JSON object.`
 
-  const apiKey = process.env.MINIMAX_API_KEY
+  const apiKey = process.env.MINIMAX_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('MINIMAX_API_KEY not configured')
   }

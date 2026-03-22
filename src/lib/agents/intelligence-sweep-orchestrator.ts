@@ -304,7 +304,7 @@ async function analyzeSource(
     companyContext: string,
 ): Promise<IntelligenceReport | null> {
     try {
-        const apiKey = process.env.OPENAI_API_KEY
+        const apiKey = process.env.OPENAI_API_KEY?.trim()
         if (!apiKey) {
             console.error('[IntelligenceSweep] OPENAI_API_KEY not configured')
             return null

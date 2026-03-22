@@ -244,7 +244,7 @@ async function evaluateWithLLM(
   noteContent: string,
   candidates: KnowledgeNoteSummary[]
 ): Promise<LLMConnection[]> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return []
   }

@@ -158,7 +158,7 @@ export async function runPreSearch(
   specialistDomain: string,
   maxSearches: number = PRE_SEARCH_MAX_USES,
 ): Promise<WebSearchResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     return { summary: '', sources: [], searchCount: 0, estimatedCostUsd: 0 }
   }

@@ -158,15 +158,15 @@ import { isRetryableError } from "@/lib/agents/error-classification"
  */
 function resolveApiKeyForProvider(pid: AIProviderId): string | null {
     const envMap: Partial<Record<AIProviderId, string>> = {
-        openai: process.env.OPENAI_API_KEY ?? "",
-        anthropic: process.env.ANTHROPIC_API_KEY ?? "",
-        google: process.env.GOOGLE_AI_API_KEY ?? "",
-        qwen: process.env.DASHSCOPE_API_KEY ?? "",
+        openai: process.env.OPENAI_API_KEY?.trim() ?? "",
+        anthropic: process.env.ANTHROPIC_API_KEY?.trim() ?? "",
+        google: process.env.GOOGLE_AI_API_KEY?.trim() ?? "",
+        qwen: process.env.DASHSCOPE_API_KEY?.trim() ?? "",
         "qwen-local": "ollama",
-        stability: process.env.STABILITY_API_KEY ?? "",
-        elevenlabs: process.env.ELEVENLABS_API_KEY ?? "",
+        stability: process.env.STABILITY_API_KEY?.trim() ?? "",
+        elevenlabs: process.env.ELEVENLABS_API_KEY?.trim() ?? "",
         replicate: process.env.REPLICATE_API_TOKEN ?? "",
-        minimax: process.env.MINIMAX_API_KEY ?? "",
+        minimax: process.env.MINIMAX_API_KEY?.trim() ?? "",
     }
     const key = envMap[pid]
     return key || null

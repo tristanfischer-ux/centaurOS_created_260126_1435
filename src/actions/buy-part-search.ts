@@ -655,7 +655,7 @@ async function searchViaWebSearch(
 
       for (let turn = 0; turn < maxTurns; turn++) {
         const response = await client.messages.create({
-          model: "claude-sonnet-4-5-20250514",
+          model: "claude-sonnet-4-6",
           max_tokens: 4096,
           system: "You are a procurement assistant. Find real products from UK electronic/mechanical component suppliers. Always search for actual products with real prices. Return only valid JSON.",
           tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
@@ -750,7 +750,7 @@ export async function searchBuyPartProducts(
     return partNames.map((name) => ({ partName: name, products: [] }))
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     console.error("[BUY-SEARCH] ANTHROPIC_API_KEY not set")
     return partNames.map((name) => ({ partName: name, products: [] }))

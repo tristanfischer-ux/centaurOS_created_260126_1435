@@ -87,7 +87,7 @@ export interface RetrieveForEngineeringOptions {
  * @returns Array of 1536 floats, or null if API is unavailable
  */
 export async function embedText(text: string): Promise<number[] | null> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return null
 
   const trimmed = text.trim().slice(0, 8000)

@@ -15,7 +15,7 @@ import {
 let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) return null;
   if (!openaiClient) openaiClient = new OpenAI({ apiKey });
   return openaiClient;
@@ -24,7 +24,7 @@ function getOpenAIClient(): OpenAI | null {
 let anthropicClient: InstanceType<typeof import("@anthropic-ai/sdk").default> | null = null;
 
 async function getAnthropicClient(): Promise<InstanceType<typeof import("@anthropic-ai/sdk").default> | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) return null;
   if (!anthropicClient) {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
@@ -438,7 +438,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     // Fallback: OpenAI extraction only (no web search)
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY?.trim()) {
       return NextResponse.json(
         { success: false, error: "AI search service is not configured" },
         { status: 503 }

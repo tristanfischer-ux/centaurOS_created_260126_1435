@@ -364,7 +364,7 @@ export async function generateVisualStyleAction(
   researchExcerpt?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping visual style generation")
       return { error: "ANTHROPIC_API_KEY not configured" }
@@ -492,7 +492,7 @@ export async function generateProductIdentityAction(
   researchReport: string,
 ): Promise<{ visualStyle: Partial<VisualStyleSpec> } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping product identity")
       return { error: "ANTHROPIC_API_KEY not configured" }
@@ -573,7 +573,7 @@ export async function generateDesignSynthesisAction(
   researchExcerpt?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping design synthesis")
       return { error: "ANTHROPIC_API_KEY not configured" }
@@ -678,7 +678,7 @@ export async function reconcileDesignAction(
   productIdentity?: Partial<VisualStyleSpec>,
 ): Promise<ReconciliationResult | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping reconciliation")
       return { error: "ANTHROPIC_API_KEY not configured" }

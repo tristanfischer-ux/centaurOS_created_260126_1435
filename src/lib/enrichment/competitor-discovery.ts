@@ -50,7 +50,7 @@ export async function analyzeCompetitors(
   competitorInputs: string[],
   companyContext: string,
 ): Promise<CompanyIntelCompetitor[]> {
-  const apiKey = process.env.MINIMAX_API_KEY
+  const apiKey = process.env.MINIMAX_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[CompetitorDiscovery] MINIMAX_API_KEY not configured — skipping analysis')
     return []

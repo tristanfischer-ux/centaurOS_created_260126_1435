@@ -22,7 +22,7 @@ import { aiGuard } from "@/lib/ai/guard"
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
@@ -70,7 +70,7 @@ function mimeToExtension(mime: string): string {
 export async function POST(req: NextRequest): Promise<Response> {
     try {
         // SECURITY: Check if OpenAI is configured
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             console.error("[STT] OpenAI API key not configured")
             return NextResponse.json(
                 { error: "Service temporarily unavailable" },

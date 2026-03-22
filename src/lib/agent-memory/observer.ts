@@ -107,7 +107,7 @@ export async function runObserver(
 ): Promise<string> {
   if (messages.length === 0) return ''
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('[AgentMemory/Observer] Missing OPENAI_API_KEY')
   }

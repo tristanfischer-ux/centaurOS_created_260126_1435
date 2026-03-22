@@ -81,7 +81,7 @@ export async function runReflector(
 ): Promise<string> {
   if (!observations.trim()) return ''
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('[AgentMemory/Reflector] Missing OPENAI_API_KEY')
   }

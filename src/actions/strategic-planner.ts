@@ -34,7 +34,7 @@ import type { Json } from '@/types/database.types'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return null
   }

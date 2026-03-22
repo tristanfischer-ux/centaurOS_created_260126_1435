@@ -170,12 +170,12 @@ async function callOpus(
   maxTokens: number = 6144,
 ): Promise<string> {
   // ── Stage 1: Try Anthropic models (Opus → Sonnet) ──
-  const anthropicKey = process.env.ANTHROPIC_API_KEY
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (anthropicKey) {
     const Anthropic = (await import("@anthropic-ai/sdk")).default
     const client = new Anthropic({ apiKey: anthropicKey })
 
-    const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5"] as const
+    const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-6"] as const
 
     for (const model of ANTHROPIC_MODELS) {
       try {
@@ -221,7 +221,7 @@ async function callOpus(
   }
 
   // ── Stage 2: Gemini fallback (different safety characteristics) ──
-  const geminiKey = process.env.GOOGLE_AI_API_KEY
+  const geminiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!geminiKey) {
     throw new Error("[StructuralBrief] Both ANTHROPIC_API_KEY and GOOGLE_AI_API_KEY are missing")
   }

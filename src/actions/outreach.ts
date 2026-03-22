@@ -532,7 +532,7 @@ async function callClaude(
     systemPrompt: string,
     userPrompt: string,
 ): Promise<{ text: string }> {
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
     return withRetry(async () => {

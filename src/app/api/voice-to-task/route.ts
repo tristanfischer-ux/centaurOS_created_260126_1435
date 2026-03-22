@@ -27,7 +27,7 @@ import { createRollout, addSpan, finishRollout } from "@/lib/agent-spans";
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) return null
     if (!openaiClient) {
         openaiClient = new OpenAI({ apiKey })
@@ -112,7 +112,7 @@ async function extractTranscript(
 export async function POST(req: NextRequest) {
     let rolloutId: string | null = null;
     try {
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             console.error('[VOICE-TO-TASK] OpenAI API key not configured')
             return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
         }

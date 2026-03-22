@@ -74,7 +74,7 @@ Available slide types (use a variety for visual interest):
 export async function generateStrategicBriefing(
   request: GenerateBriefingRequest,
 ): Promise<GenerateBriefingResponse> {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
     console.warn('[SlideGenerator] ANTHROPIC_API_KEY not set — using fallback')
     return {
       success: true,
@@ -88,7 +88,7 @@ export async function generateStrategicBriefing(
     const genStart = Date.now()
 
     const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
 
     const t = timeoutWithCleanup(API_TIMEOUT_MS)
     let result: Awaited<ReturnType<InstanceType<typeof Anthropic>['messages']['create']>>

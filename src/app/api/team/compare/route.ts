@@ -51,7 +51,7 @@ const CompareRequestSchema = z.object({
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
@@ -83,7 +83,7 @@ export interface CompareResponse {
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         // SECURITY: Validate API key is present
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             console.error('[TeamCompareAPI] OPENAI_API_KEY is not configured');
             return NextResponse.json(
                 { error: "AI comparison service is not configured" },

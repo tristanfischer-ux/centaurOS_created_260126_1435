@@ -92,7 +92,7 @@ export const handleAskSpecialist: ToolHandler = async (args, ctx) => {
     }
 
     // Make a single cheap LLM call
-    const apiKey = process.env.MINIMAX_API_KEY
+    const apiKey = process.env.MINIMAX_API_KEY?.trim()
     if (!apiKey) {
         return `Error: Delegation service unavailable (no API key configured).`
     }

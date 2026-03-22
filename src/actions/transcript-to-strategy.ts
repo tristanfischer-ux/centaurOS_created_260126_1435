@@ -42,7 +42,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return null
   if (!openaiClient) {
     openaiClient = new OpenAI({ apiKey })

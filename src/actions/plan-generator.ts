@@ -19,7 +19,7 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import type { Json } from '@/types/database.types'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 

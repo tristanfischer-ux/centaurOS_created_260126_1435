@@ -185,11 +185,11 @@ export async function sendToSpecialist(
 
     // Resolve API key from environment
     const envMap: Partial<Record<AIProviderId, string>> = {
-        anthropic: process.env.ANTHROPIC_API_KEY ?? '',
-        qwen: process.env.DASHSCOPE_API_KEY ?? '',
+        anthropic: process.env.ANTHROPIC_API_KEY?.trim() ?? '',
+        qwen: process.env.DASHSCOPE_API_KEY?.trim() ?? '',
         'qwen-local': 'ollama',
-        minimax: process.env.MINIMAX_API_KEY ?? '',
-        openai: process.env.OPENAI_API_KEY ?? '',
+        minimax: process.env.MINIMAX_API_KEY?.trim() ?? '',
+        openai: process.env.OPENAI_API_KEY?.trim() ?? '',
     }
     const apiKey = envMap[providerId]
     if (!apiKey) {

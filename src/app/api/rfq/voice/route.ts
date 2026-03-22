@@ -9,7 +9,7 @@ import { aiGuard } from "@/lib/ai/guard";
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
@@ -31,7 +31,7 @@ const RFQSchema = z.object({
 export async function POST(req: NextRequest) {
     try {
         // SECURITY: Fail closed when OpenAI key is not configured.
-        if (!process.env.OPENAI_API_KEY) {
+        if (!process.env.OPENAI_API_KEY?.trim()) {
             console.error('[VoiceToRFQAPI] OPENAI_API_KEY is not configured')
             return NextResponse.json(
                 { error: 'Voice RFQ service is not configured' },

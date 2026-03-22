@@ -90,7 +90,7 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
  * @throws Error if AI call fails or response doesn't match schema
  */
 async function callScanAI(idea: string, researchReport?: string): Promise<AIScanOutput> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
   }
@@ -201,7 +201,7 @@ export async function deriveProcessClassAI(
   modulePurpose: string,
   answeredQuestions: Array<{ question: string; answer: string }>,
 ): Promise<{ derivedProcessClass: string; derivedRisks: string[] }> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
   }
@@ -300,7 +300,7 @@ export async function refineScanAI(
     return mockScanIdea(updatedIdea)
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
   }
@@ -445,7 +445,7 @@ export async function refineModuleAI(
     return editedModule
   }
 
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
   }

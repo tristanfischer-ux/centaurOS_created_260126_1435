@@ -185,7 +185,7 @@ ${reviewContext}`
         }))
 
         // ── Call Anthropic with tool loop ──
-        const apiKey = process.env.ANTHROPIC_API_KEY
+        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             return { error: "Anthropic API key not configured" }
         }
@@ -414,7 +414,7 @@ ${reviewContext}
 VERDICT: PASS | WARN | FAIL
 SUMMARY: <one sentence explaining the verdict>`
 
-        const apiKey = process.env.ANTHROPIC_API_KEY
+        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             return { error: "Anthropic API key not configured" }
         }
@@ -613,7 +613,7 @@ export async function requestDecompositionCheckpoints(
             return { error: "No modules to checkpoint" }
         }
 
-        const apiKey = process.env.ANTHROPIC_API_KEY
+        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             return { error: "Anthropic API key not configured" }
         }
@@ -846,7 +846,7 @@ export async function reviseModulesFromCheckpoints(
 ): Promise<Record<string, RevisedModuleFields>> {
     // SECURITY: Authenticate caller to prevent unauthenticated API credit burn
     return withAIGate('cad_lab_review', async () => {
-        const apiKey = process.env.ANTHROPIC_API_KEY
+        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             console.error("[CAD-REVIEWS] No API key for module revision")
             return {}
@@ -985,7 +985,7 @@ export async function reviseModulesFromReviews(
     req: ReviewRevisionRequest,
 ): Promise<Record<string, RevisedModuleFields>> {
     return withAIGate('cad_lab_review', async () => {
-        const apiKey = process.env.ANTHROPIC_API_KEY
+        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
         if (!apiKey) {
             console.error("[CAD-REVIEWS] No API key for review-based revision")
             return {}

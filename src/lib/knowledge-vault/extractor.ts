@@ -227,7 +227,7 @@ export async function extractKnowledge(
 async function callExtractionLLM(
   messages: Array<{ role: string; content: string }>
 ): Promise<ExtractedNote[]> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[KnowledgeVault/Extractor] OPENAI_API_KEY not set, skipping extraction')
     return []

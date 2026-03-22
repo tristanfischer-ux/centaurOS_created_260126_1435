@@ -15,7 +15,7 @@ import { withAuth } from '@/lib/server-action-utils'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || '')
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 

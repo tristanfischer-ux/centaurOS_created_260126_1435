@@ -226,7 +226,7 @@ export async function generateWeeklyBrief(foundryId: string): Promise<SynthesisR
     const userPrompt = buildSynthesisUserPrompt(specialistSummaries, weekInsights.length)
 
     // 6. Call MiniMax M2.5
-    const apiKey = process.env.MINIMAX_API_KEY
+    const apiKey = process.env.MINIMAX_API_KEY?.trim()
     if (!apiKey) {
       throw new Error('MINIMAX_API_KEY not configured')
     }
@@ -466,7 +466,7 @@ export async function generateDecisionSupportPackage(
       '```',
     ].join('\n')
 
-    const apiKey = process.env.MINIMAX_API_KEY
+    const apiKey = process.env.MINIMAX_API_KEY?.trim()
     if (!apiKey) return null
 
     const OpenAI = await getOpenAIClient()

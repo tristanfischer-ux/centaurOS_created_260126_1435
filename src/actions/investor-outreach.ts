@@ -103,7 +103,7 @@ Output ONLY this exact JSON format with no other text:
 }`
 
     // Fast-fail if API key is missing
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
     if (!apiKey) {
       console.error('[generateOutreachDraft] ANTHROPIC_API_KEY not configured')
       return { error: 'AI service not configured' }

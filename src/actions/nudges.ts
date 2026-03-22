@@ -287,7 +287,7 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
     let narrative = greeting // Fallback to template greeting if AI call fails
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY
+      const apiKey = process.env.GEMINI_API_KEY?.trim()
       if (apiKey) {
         const genAI = new GoogleGenerativeAI(apiKey)
         const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
