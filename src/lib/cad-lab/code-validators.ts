@@ -658,3 +658,87 @@ function isPrimaryParam(name: string): boolean {
   ]
   return primaryPatterns.some((p) => p.test(name))
 }
+
+// ─── Physics Validation ─────────────────────────────────────────────
+
+/**
+ * Checks generated CadQuery code for physically implausible dimensions.
+ * Uses simple engineering formulas — no AI, just math.
+ *
+ * @param pythonCode - Generated CadQuery code
+ * @param description - Product description (used for context)
+ * @returns Validation warnings for implausible physics
+ */
+export function checkPhysicsPlausibility(
+  pythonCode: string,
+  description?: string,
+): PreExecValidationResult[] {
+  const results: PreExecValidationResult[] = []
+
+  // Extract numeric variable assignments: name = number
+  const assignments = new Map<string, number>()
+  const assignRegex = /^(\w+)\s*=\s*(\d+(?:\.\d+)?)\s*(?:#.*)?$/gm
+  let match
+  while ((match = assignRegex.exec(pythonCode)) !== null) {
+    assignments.set(match[1], parseFloat(match[2]))
+  }
+
+  // Check 1: Wall thickness too thin for any manufacturing process
+  for (const [name, value] of assignments) {
+    if (/wall.*thick|thickness|shell_t/i.test(name) && value > 0 && value < 0.3) {
+      results.push({
+        ruleId: "physics-thin-wall",
+        severity: "warning",
+        message: `Wall thickness ${name}=${value}mm is below minimum for any manufacturing process (CNC: 0.5mm, FDM: 0.8mm, injection: 0.8mm)`,
+        repairHint: `Increase ${name} to at least 0.8mm for 3D printing or 1.0mm for injection molding`,
+      })
+    }
+  }
+
+  // Check 2: Unreasonably large dimensions (>5m for consumer products)
+  const isLargeProduct = description && /building|house|bridge|ship|aircraft|vehicle|truck/i.test(description)
+  if (!isLargeProduct) {
+    for (const [name, value] of assignments) {
+      if (/length|width|height|depth|diameter|radius/i.test(name) && value > 5000) {
+        results.push({
+          ruleId: "physics-oversize",
+          severity: "warning",
+          message: `Dimension ${name}=${value}mm (${(value / 1000).toFixed(1)}m) seems unreasonably large for this product`,
+          repairHint: `Check if ${name} should be in mm not m. Most consumer products are under 2000mm`,
+        })
+      }
+    }
+  }
+
+  // Check 3: Negative or zero dimensions
+  for (const [name, value] of assignments) {
+    if (/length|width|height|depth|diameter|radius|thickness/i.test(name) && value <= 0) {
+      results.push({
+        ruleId: "physics-zero-dim",
+        severity: "critical",
+        message: `Dimension ${name}=${value}mm is zero or negative — will crash CadQuery`,
+        repairHint: `Set ${name} to a positive value`,
+      })
+    }
+  }
+
+  // Check 4: Radius larger than parent dimension (e.g., fillet > wall)
+  for (const [name, value] of assignments) {
+    if (/fillet|chamfer|radius|corner_r/i.test(name)) {
+      // Check against related thickness/width
+      for (const [dimName, dimValue] of assignments) {
+        if (/thickness|wall_t|width/i.test(dimName) && value >= dimValue && dimValue > 0) {
+          results.push({
+            ruleId: "physics-fillet-oversize",
+            severity: "warning",
+            message: `Fillet/chamfer ${name}=${value}mm >= ${dimName}=${dimValue}mm — fillet must be smaller than the edge it rounds`,
+            repairHint: `Reduce ${name} to less than ${(dimValue * 0.4).toFixed(1)}mm`,
+          })
+          break
+        }
+      }
+    }
+  }
+
+  return results
+}

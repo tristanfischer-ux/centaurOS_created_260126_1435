@@ -79,7 +79,7 @@ import { matchTemplatesForModule, sanitiseForPrompt, isAllowedStepUrl } from "@/
 import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template-matching"
 import type { ModuleConnection, PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
-import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode } from "@/lib/cad-lab/code-validators"
+import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode, checkPhysicsPlausibility } from "@/lib/cad-lab/code-validators"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
 import { detectIndustryDomain, extractProductKeywords } from "@/lib/cad-lab/industry-domains"
@@ -1660,6 +1660,7 @@ ${finalCode}
         ...checkFunctionInvocations(finalCode),
         ...validateInterfaceStructure(interfaceDefinition),
         ...checkLibraryUsage(finalCode, librarySlugs),
+        ...checkPhysicsPlausibility(finalCode, description),
       ]
 
       // #8: Dimension estimation
