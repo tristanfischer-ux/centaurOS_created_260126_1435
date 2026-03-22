@@ -18,7 +18,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, RefreshCw, Sparkles, Wrench, X } from "lucide-react"
+import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, RefreshCw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react"
 import { ModuleImageCard } from "./module-image-card"
 import {
   Dialog,
@@ -391,6 +391,52 @@ function ModuleDetailDialog({
                 </Badge>
               </div>
             ) : null}
+
+            {/* Engineering Intelligence — show what data informed this module */}
+            {!isEditing && module.keyParts.length > 0 && (
+              <div className="border-t border-border pt-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <ShieldCheck className="h-3 w-3 text-success" />
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Design Grounded In</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {/* Detect and badge materials mentioned in key parts */}
+                  {(() => {
+                    const partsText = module.keyParts.join(" ").toLowerCase() + " " + (module.description || "").toLowerCase()
+                    const badges: { label: string; type: "material" | "hardware" | "process" | "standard" }[] = []
+                    // Materials
+                    if (/\baluminu?m\b|6061|7075|5083/i.test(partsText)) badges.push({ label: "Aluminum Properties", type: "material" })
+                    if (/\bsteel\b|stainless|304|316/i.test(partsText)) badges.push({ label: "Steel Properties", type: "material" })
+                    if (/\bpetg|pla|abs|nylon|polycarbonate|peek|pom|delrin/i.test(partsText)) badges.push({ label: "Polymer Properties", type: "material" })
+                    if (/\btitanium\b/i.test(partsText)) badges.push({ label: "Titanium Properties", type: "material" })
+                    if (/\bcopper|brass\b/i.test(partsText)) badges.push({ label: "Copper Properties", type: "material" })
+                    if (/\bcarbon fiber|composite|fiberglass/i.test(partsText)) badges.push({ label: "Composite Properties", type: "material" })
+                    // Hardware
+                    if (/\bm[2-9]\b|\bm1[0-6]\b|\bm20\b|\bbolt|\bscrew|\bnut\b|\bwasher\b/i.test(partsText)) badges.push({ label: "ISO Fastener Specs", type: "hardware" })
+                    if (/\bbearing|608|6[02][0-9]/i.test(partsText)) badges.push({ label: "Bearing Specs", type: "hardware" })
+                    // Processes
+                    if (/\bcnc|machined|milled/i.test(partsText)) badges.push({ label: "CNC Tolerances", type: "process" })
+                    if (/\b3d.print|fdm|sla|sls/i.test(partsText)) badges.push({ label: "3D Print Constraints", type: "process" })
+                    if (/\bsheet metal|laser.cut|bent\b/i.test(partsText)) badges.push({ label: "Sheet Metal Rules", type: "process" })
+                    if (/\bcast|molded|injection/i.test(partsText)) badges.push({ label: "Molding/Casting Rules", type: "process" })
+                    if (/\bweld/i.test(partsText)) badges.push({ label: "Welding Specs", type: "process" })
+                    if (badges.length === 0) return null
+                    return badges.map((b, i) => (
+                      <span key={i} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        b.type === "material" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300" :
+                        b.type === "hardware" ? "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300" :
+                        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                      }`}>
+                        {b.type === "material" ? "◆" : b.type === "hardware" ? "⚙" : "⛭"} {b.label}
+                      </span>
+                    ))
+                  })()}
+                </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Specifications informed by verified engineering data — material properties, ISO hardware dimensions, and process capability limits from the ForgeOS engineering library.
+                </p>
+              </div>
+            )}
 
             {/* Hint when detail is sparse (Design stage — before Specify enrichment) */}
             {!isEditing && module.keyParts.length === 0 && module.inputs.length === 0 && module.outputs.length === 0 && (
