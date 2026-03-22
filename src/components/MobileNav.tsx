@@ -1,7 +1,7 @@
 /**
  * @file MobileNav.tsx — Bottom navigation bar for mobile devices.
  *
- * @description Shows My Profile, Updates, Tasks in the main bar.
+ * @description Shows Today, Comms, Tasks in the main bar.
  * "More" dropdown groups remaining items into four sections matching
  * the sidebar: Plan, Workshop, Marketplace, and Account.
  *
@@ -32,6 +32,7 @@ import {
     BookOpen,
     ShoppingBag,
     Flame,
+    Hammer,
     CalendarDays,
     AppWindow,
     FileOutput,
@@ -43,6 +44,7 @@ import {
     TrendingDown,
     TrendingUp,
     Building2,
+    ScrollText,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -98,7 +100,7 @@ const cashBurnNavigation = [
 
 // "More" dropdown — Workshop section
 const workshopMoreNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Flame },
+    { name: "The Forge", href: "/the-forge", icon: Hammer },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
     { name: "Specialists", href: "/agents", icon: UsersRound },
@@ -111,7 +113,7 @@ const workshopMoreNavigation = [
 const marketplaceMoreNavigation = [
     { name: "Recruits", href: "/recruits", icon: UserSearch },
     { name: "Guild", href: "/guild", icon: GraduationCap },
-    { name: "Apprenticeship", href: "/apprenticeship", icon: BookOpen },
+    { name: "Apprenticeship", href: "/apprenticeship", icon: ScrollText },
     { name: "Marketplace", href: "/marketplace", icon: Store },
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
