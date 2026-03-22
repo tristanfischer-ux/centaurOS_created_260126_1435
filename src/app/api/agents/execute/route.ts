@@ -105,7 +105,7 @@ Create 6-12 slides. Make content concise, professional, and actionable. Every bu
  * Model tier type matching specialists-data.ts modelTier field.
  * Used to look up the fallback chain when a primary provider fails.
  */
-type ModelTier = "claude" | "qwen" | "qwen-local" | "minimax"
+type ModelTier = "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax"
 
 interface ProviderTarget {
     providerId: AIProviderId
@@ -123,10 +123,16 @@ interface ProviderTarget {
  */
 const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     claude: [
+        { providerId: "anthropic", modelId: "claude-opus-4-6" },
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "openai", modelId: "gpt-4o" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
+    ],
+    sonnet: [
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
+        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     qwen: [

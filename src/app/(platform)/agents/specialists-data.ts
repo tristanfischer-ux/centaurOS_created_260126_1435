@@ -202,8 +202,7 @@ export const SPECIALISTS: Specialist[] = [
             "Narrowing to what matters...",
             "Almost there — one strong recommendation coming.",
         ],
-        modelTier: "claude",
-        speculativeEnabled: true,
+        modelTier: "sonnet",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // TECHNOLOGY — The foundation of making things
@@ -299,8 +298,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stripping away the unnecessary...",
             "Found the simplest path — writing it up.",
         ],
-        modelTier: "claude",
-        speculativeEnabled: true,
+        modelTier: "sonnet",
     },
     {
         id: "vp-engineering",
@@ -390,7 +388,7 @@ export const SPECIALISTS: Specialist[] = [
             "Estimating velocity and timeline...",
             "Sprint plan taking shape — almost ready.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     {
@@ -481,7 +479,7 @@ export const SPECIALISTS: Specialist[] = [
             "Checking yields and tolerances...",
             "Path from prototype to volume is clear — writing it up.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     {
@@ -571,7 +569,7 @@ export const SPECIALISTS: Specialist[] = [
             "Evaluating contingency options...",
             "Supply strategy locked in — finalizing recommendations.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -667,7 +665,7 @@ export const SPECIALISTS: Specialist[] = [
             "Defining acceptance criteria...",
             "Scope is tight — writing the recommendation.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -772,7 +770,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting creative to conversion...",
             "Strategy and tactics aligned — here it comes.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     {
@@ -873,7 +871,7 @@ export const SPECIALISTS: Specialist[] = [
             "Building the playbook...",
             "Scripts and numbers ready — let's close this.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -969,7 +967,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting dots between teams...",
             "Priority stack is clear — here's what matters most.",
         ],
-        modelTier: "claude",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1165,7 +1163,7 @@ export const SPECIALISTS: Specialist[] = [
             "Pressure-testing the weak spots...",
             "The story is coming together — almost there.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1261,7 +1259,7 @@ export const SPECIALISTS: Specialist[] = [
             "Considering team dynamics and culture fit...",
             "Practical plan ready — no corporate fluff.",
         ],
-        modelTier: "minimax",
+        modelTier: "sonnet",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════

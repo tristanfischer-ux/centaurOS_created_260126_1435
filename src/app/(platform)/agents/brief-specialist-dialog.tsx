@@ -119,13 +119,17 @@ function detectPresentationIntent(message: string): boolean {
 }
 
 // ─── Specialist Model Configuration ───────────────────────────────────────────
-// Per-specialist model tiers: "claude" for high-stakes reasoning (strategy,
-// finance, legal, CTO, chief of staff) and "minimax" for high-volume work
-// (marketing, sales, HR, engineering, manufacturing, supply chain, etc.).
+// Per-specialist model tiers:
+// - "claude" (Opus 4.6): Finance + Legal only — highest precision, highest cost
+// - "sonnet" (Sonnet 4.6): Most specialists — 90% of Opus quality at 1/5 cost
+// - "qwen": Frontier cloud MoE via DashScope
+// - "qwen-local": Self-hosted Ollama
+// - "minimax": High-volume batch work
 // Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
 const MODEL_TIERS = {
     claude: { providerId: "anthropic", modelId: "claude-opus-4-6" },
+    sonnet: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
     qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.7" },
