@@ -417,7 +417,96 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
     })
   }
 
-  // ── 8. Stage-specific slides ──
+  // ── 8. Engineering Intelligence ──
+  if (data.engineeringIntelligence) {
+    const ei = data.engineeringIntelligence
+
+    if (ei.standards.length > 0) {
+      const stdSlide = pres.addSlide()
+      addSectionTitle(stdSlide, 'Referenced Design Standards')
+      if (ei.industryDomain) {
+        stdSlide.addText(
+          `${ei.industryDomain.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} domain — ${ei.standards.length} standards applied`,
+          { x: 0.5, y: 0.8, w: 9, h: 0.35, fontSize: 11, color: '666666', fontFace: 'Helvetica Neue' },
+        )
+      }
+      const stdTableRows = [
+        [
+          { text: 'Code', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
+          { text: 'Standard', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
+          { text: 'Issuing Body', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
+        ],
+        ...ei.standards.slice(0, 8).map(s => [
+          { text: s.code, options: { fontSize: 8 } },
+          { text: s.name, options: { fontSize: 8 } },
+          { text: s.issuingBody, options: { fontSize: 8 } },
+        ]),
+      ]
+      stdSlide.addTable(stdTableRows, {
+        x: 0.5, y: 1.2, w: 9, colW: [2.5, 4.5, 2],
+        border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
+        rowH: 0.3,
+        fontFace: 'Helvetica Neue',
+      })
+    }
+
+    if (ei.materials.length > 0 || ei.processes.length > 0) {
+      const engSlide = pres.addSlide()
+      addSectionTitle(engSlide, 'Material & Process Specifications')
+
+      if (ei.materials.length > 0) {
+        engSlide.addText('Verified Material Properties', {
+          x: 0.5, y: 0.8, w: 4.5, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
+        })
+        const matRows = [
+          [
+            { text: 'Material', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+            { text: 'ρ (kg/m³)', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+            { text: 'σy (MPa)', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+            { text: '$/kg', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+          ],
+          ...ei.materials.slice(0, 8).map(m => [
+            { text: m.code, options: { fontSize: 7 } },
+            { text: m.density != null ? String(m.density) : '—', options: { fontSize: 7 } },
+            { text: m.yieldStrength != null ? String(m.yieldStrength) : '—', options: { fontSize: 7 } },
+            { text: m.costPerKg != null ? `$${m.costPerKg.toFixed(2)}` : '—', options: { fontSize: 7 } },
+          ]),
+        ]
+        engSlide.addTable(matRows, {
+          x: 0.5, y: 1.15, w: 4.5, colW: [1.5, 1, 1, 1],
+          border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
+          rowH: 0.25,
+          fontFace: 'Helvetica Neue',
+        })
+      }
+
+      if (ei.processes.length > 0) {
+        engSlide.addText('Process Constraints', {
+          x: 5.2, y: 0.8, w: 4.5, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
+        })
+        const procRows = [
+          [
+            { text: 'Process', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+            { text: 'Tolerance', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+            { text: 'Min Wall', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
+          ],
+          ...ei.processes.slice(0, 8).map(p => [
+            { text: p.displayName, options: { fontSize: 7 } },
+            { text: p.toleranceTypical != null ? `±${p.toleranceTypical}mm` : '—', options: { fontSize: 7 } },
+            { text: p.minWall != null ? `${p.minWall}mm` : '—', options: { fontSize: 7 } },
+          ]),
+        ]
+        engSlide.addTable(procRows, {
+          x: 5.2, y: 1.15, w: 4.3, colW: [2, 1.15, 1.15],
+          border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
+          rowH: 0.25,
+          fontFace: 'Helvetica Neue',
+        })
+      }
+    }
+  }
+
+  // ── 9. Stage-specific slides ──
 
   // Specify: Reviews Summary
   if (data.stage === 'specify' && data.moduleReviews) {

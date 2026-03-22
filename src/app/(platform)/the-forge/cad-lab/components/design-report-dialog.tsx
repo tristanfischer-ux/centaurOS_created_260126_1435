@@ -110,7 +110,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     decompositionModelUsed,
   } = useCadLab()
 
-  const assembleData = useCallback((): DesignReportData => {
+  const assembleData = useCallback(async (): Promise<DesignReportData> => {
     const sources = (researchResult?.sources ?? []).map((s) => ({
       title: s.title,
       url: s.uri,
@@ -120,6 +120,23 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     const hasBrief = designBrief.useCase || designBrief.targetProcess ||
       designBrief.targetMaterial || designBrief.toleranceTarget ||
       designBrief.quantityTarget || designBrief.complianceNotes
+
+    // Fetch engineering intelligence data for report inclusion
+    let engineeringIntelligence: DesignReportData["engineeringIntelligence"]
+    try {
+      const { getEngineeringIntelligenceForReport } = await import("@/actions/design-standards")
+      const engData = await getEngineeringIntelligenceForReport(
+        researchResult?.standardCodes ?? [],
+        researchResult?.industryDomain ?? null,
+        subject || "",
+      )
+      engineeringIntelligence = {
+        ...engData,
+        industryDomain: researchResult?.industryDomain ?? null,
+      }
+    } catch (engErr) {
+      console.warn("[DesignReport] Engineering data fetch failed (non-fatal):", engErr)
+    }
 
     return {
       projectName: subject || "Untitled Project",
@@ -135,6 +152,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       aiCostEstimates,
       researchModelUsed: researchModelUsed ?? null,
       decompositionModelUsed: decompositionModelUsed ?? null,
+      engineeringIntelligence,
       ...stageData,
     }
   }, [
@@ -153,7 +171,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     let aiFailed = false
 
     try {
-      const data = assembleData()
+      const data = await assembleData()
 
       // INTENT: AI narration pipeline — Opus structures, Gemini writes, then format
       if (aiEnabled && selectedFormat !== "pdf") {

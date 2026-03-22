@@ -193,6 +193,33 @@ function buildDataSummary(data: DesignReportData): string {
     if (r.modelUsed) lines.push(`  Model: ${r.modelUsed}`)
   }
 
+  // Engineering Intelligence
+  if (data.engineeringIntelligence) {
+    const ei = data.engineeringIntelligence
+    if (ei.standards.length > 0) {
+      lines.push(`\nENGINEERING STANDARDS REFERENCED (${ei.standards.length}):`)
+      if (ei.industryDomain) lines.push(`  Industry domain: ${ei.industryDomain.replace(/_/g, " ")}`)
+      for (const s of ei.standards.slice(0, 10)) {
+        lines.push(`  - ${s.code} (${s.issuingBody}): ${s.name}`)
+      }
+    }
+    if (ei.materials.length > 0) {
+      lines.push(`\nMATERIAL PROPERTIES (${ei.materials.length} verified):`)
+      for (const m of ei.materials.slice(0, 8)) {
+        lines.push(`  - ${m.code}: ρ=${m.density ?? "?"}kg/m³, σy=${m.yieldStrength ?? "?"}MPa, k=${m.thermalConductivity ?? "?"}W/(m·K), $${m.costPerKg ?? "?"}/kg`)
+      }
+    }
+    if (ei.processes.length > 0) {
+      lines.push(`\nPROCESS CAPABILITIES (${ei.processes.length}):`)
+      for (const p of ei.processes) {
+        lines.push(`  - ${p.displayName}: tolerance ±${p.toleranceTypical ?? "?"}mm, min wall ${p.minWall ?? "?"}mm`)
+      }
+    }
+    if (ei.hardwareCount > 0) {
+      lines.push(`  ${ei.hardwareCount} ISO metric fastener specs referenced`)
+    }
+  }
+
   return lines.join("\n")
 }
 
@@ -264,7 +291,7 @@ Rules:
     {
       "id": "unique-section-id",
       "title": "Section Title",
-      "sectionType": "one of: executive-summary, product-overview, research-findings, module-overview, module-detail, specifications, cost-analysis, specialist-reviews, part-classification, supplier-analysis, assembly-logistics, cad-output, conclusions",
+      "sectionType": "one of: executive-summary, product-overview, research-findings, module-overview, module-detail, specifications, cost-analysis, engineering-standards, specialist-reviews, part-classification, supplier-analysis, assembly-logistics, cad-output, conclusions",
       "brief": "2-4 sentence instruction for the writer about what to emphasise in this section",
       "keyPoints": ["key point 1", "key point 2"],
       "dataHighlights": ["specific number or fact to reference"],

@@ -71,6 +71,15 @@ export interface DesignReportData {
   // CAD-stage extras
   unifiedCadResult?: CadLabResult | null
 
+  // Engineering Intelligence — standards, materials, processes referenced during design
+  engineeringIntelligence?: {
+    standards: { code: string; name: string; issuingBody: string; summary: string }[]
+    materials: { code: string; name: string; density: number | null; yieldStrength: number | null; thermalConductivity: number | null; costPerKg: number | null }[]
+    processes: { name: string; displayName: string; toleranceTypical: number | null; minWall: number | null }[]
+    hardwareCount: number
+    industryDomain: string | null
+  }
+
   // AI-generated narration (optional — when populated, exporters use prose instead of raw data)
   aiContent?: AiReportContent
 }
@@ -81,7 +90,7 @@ export type ReportSectionType =
   | 'executive-summary' | 'product-overview' | 'research-findings'
   | 'module-overview' | 'module-detail' | 'specifications'
   | 'cost-analysis' | 'specialist-reviews' | 'part-classification'
-  | 'supplier-analysis' | 'assembly-logistics' | 'cad-output' | 'conclusions'
+  | 'supplier-analysis' | 'assembly-logistics' | 'cad-output' | 'engineering-standards' | 'conclusions'
 
 /** Phase 1 output: Opus structures the report outline */
 export interface ReportOutline {

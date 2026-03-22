@@ -379,7 +379,108 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     )
   }
 
-  // ── 7. Stage-specific sections ──
+  // ── 7. Engineering Intelligence ──
+  if (data.engineeringIntelligence) {
+    const ei = data.engineeringIntelligence
+
+    if (ei.standards.length > 0) {
+      children.push(sectionHeading('Referenced Design Standards'))
+      if (ei.industryDomain) {
+        children.push(textParagraph(
+          `Industry domain: ${ei.industryDomain.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}. The following engineering standards were referenced during design generation.`,
+          { after: 120, color: MID_TEXT },
+        ))
+      }
+      const stdRows: TableRow[] = [
+        new TableRow({
+          children: [
+            headerCell('Code', 20),
+            headerCell('Standard', 30),
+            headerCell('Issuing Body', 15),
+            headerCell('Summary', 35),
+          ],
+        }),
+      ]
+      for (const std of ei.standards.slice(0, 15)) {
+        stdRows.push(new TableRow({
+          children: [
+            dataCell(std.code, 20),
+            dataCell(std.name, 30),
+            dataCell(std.issuingBody, 15),
+            dataCell(std.summary.slice(0, 200) + (std.summary.length > 200 ? '...' : ''), 35),
+          ],
+        }))
+      }
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: stdRows }))
+    }
+
+    if (ei.materials.length > 0) {
+      children.push(sectionHeading('Material Specifications'))
+      children.push(textParagraph(
+        'Verified material properties from engineering handbooks — used to ensure accurate mass, thermal, and structural calculations.',
+        { after: 120, color: MID_TEXT },
+      ))
+      const matRows: TableRow[] = [
+        new TableRow({
+          children: [
+            headerCell('Material', 25),
+            headerCell('Density (kg/m³)', 15),
+            headerCell('Yield (MPa)', 15),
+            headerCell('Thermal (W/m·K)', 15),
+            headerCell('Cost ($/kg)', 15),
+          ],
+        }),
+      ]
+      for (const mat of ei.materials.slice(0, 15)) {
+        matRows.push(new TableRow({
+          children: [
+            dataCell(`${mat.code} — ${mat.name}`, 25),
+            dataCell(mat.density != null ? String(mat.density) : '—', 15),
+            dataCell(mat.yieldStrength != null ? String(mat.yieldStrength) : '—', 15),
+            dataCell(mat.thermalConductivity != null ? String(mat.thermalConductivity) : '—', 15),
+            dataCell(mat.costPerKg != null ? `$${mat.costPerKg.toFixed(2)}` : '—', 15),
+          ],
+        }))
+      }
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: matRows }))
+    }
+
+    if (ei.processes.length > 0) {
+      children.push(sectionHeading('Manufacturing Process Constraints'))
+      children.push(textParagraph(
+        'Achievable tolerances and minimum wall thicknesses per manufacturing process — used to ensure designs are manufacturable.',
+        { after: 120, color: MID_TEXT },
+      ))
+      const procRows: TableRow[] = [
+        new TableRow({
+          children: [
+            headerCell('Process', 35),
+            headerCell('Typical Tolerance', 25),
+            headerCell('Min Wall Thickness', 25),
+          ],
+        }),
+      ]
+      for (const proc of ei.processes) {
+        procRows.push(new TableRow({
+          children: [
+            dataCell(proc.displayName, 35),
+            dataCell(proc.toleranceTypical != null ? `±${proc.toleranceTypical}mm` : '—', 25),
+            dataCell(proc.minWall != null ? `${proc.minWall}mm` : '—', 25),
+          ],
+        }))
+      }
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: procRows }))
+    }
+
+    if (ei.hardwareCount > 0) {
+      children.push(textParagraph(
+        `${ei.hardwareCount} ISO metric fastener specifications referenced (bolt clearance holes, thread pitches, nut dimensions, bearing specs).`,
+        { after: 200, color: MID_TEXT },
+      ))
+    }
+  }
+
+  // ── 8. Stage-specific sections ──
 
   // Specify: Specialist Reviews
   if (data.stage === 'specify' && data.moduleReviews) {
