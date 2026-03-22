@@ -89,39 +89,53 @@ export default function CadLabResearchPage(): React.ReactNode {
   // Fetch as blob and create an object URL to force a real download.
   const handleDownloadFile = useCallback(async (url: string, filename: string) => {
     try {
+      // SECURITY: Only allow downloads from our Supabase Storage domain
+      const parsed = new URL(url)
+      if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".supabase.co")) {
+        console.error("[Download] Blocked: URL not from allowed domain")
+        return
+      }
       const res = await fetch(url)
+      if (!res.ok) throw new Error(`Download failed: ${res.status}`)
       const blob = await res.blob()
+      // SECURITY: Sanitize filename — strip path separators and special chars
+      const safeFilename = filename.replace(/[^a-zA-Z0-9_\-.\s]/g, "").slice(0, 100) || "download"
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = objUrl
-      a.download = filename
+      a.download = safeFilename
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(objUrl)
     } catch (e) {
       console.error("[Download] Failed:", e)
-      // Fallback: open in new tab
-      window.open(url, "_blank")
     }
   }, [])
 
   // INTENT: Fetch engineering intelligence independently of research result.
   // This way the panel shows real data even when research synthesis failed.
-  type EngIntel = NonNullable<typeof researchResult>["engineeringData"]
+  // INTENT: Destructure stable primitives from researchResult to avoid object-identity
+  // re-renders. The effect should only re-fire when the actual data changes.
+  const resStandardCodes = researchResult?.standardCodes
+  const resIndustryDomain = researchResult?.industryDomain
+  const resEngDataPoints = researchResult?.engineeringData?.totalDataPoints
+  const resEngData = researchResult?.engineeringData
+
+  type EngIntel = typeof resEngData
   const [liveEngData, setLiveEngData] = useState<EngIntel>(undefined)
   useEffect(() => {
     if (!subject || subject.length < 3) return
-    // Use research result data if available, otherwise fetch fresh
-    if (researchResult?.engineeringData && researchResult.engineeringData.totalDataPoints > 1) {
-      setLiveEngData(researchResult.engineeringData)
+    // Use research result data if available and meaningful
+    if (resEngData && (resEngDataPoints ?? 0) > 1) {
+      setLiveEngData(resEngData)
       return
     }
     let cancelled = false
     import("@/actions/design-standards").then(({ getEngineeringIntelligenceForReport }) =>
       getEngineeringIntelligenceForReport(
-        researchResult?.standardCodes ?? [],
-        researchResult?.industryDomain ?? null,
+        resStandardCodes ?? [],
+        resIndustryDomain ?? null,
         subject,
       ).then(data => {
         if (cancelled) return
@@ -131,12 +145,14 @@ export default function CadLabResearchPage(): React.ReactNode {
           hardwareItemCount: data.hardwareCount,
           processesApplied: data.processes.map(p => p.displayName),
           supplierTechniques: 27,
-          totalDataPoints: (researchResult?.standardCodes?.length ?? 0) + data.materials.length + data.hardwareCount + data.processes.length,
+          totalDataPoints: (resStandardCodes?.length ?? 0) + data.materials.length + data.hardwareCount + data.processes.length,
         })
       })
-    ).catch(() => {})
+    ).catch(err => {
+      console.warn("[THE-FORGE] Engineering data fetch failed (non-fatal):", err instanceof Error ? err.message : err)
+    })
     return () => { cancelled = true }
-  }, [subject, researchResult])
+  }, [subject, resStandardCodes, resIndustryDomain, resEngDataPoints, resEngData])
 
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)

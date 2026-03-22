@@ -12,6 +12,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { withUser } from '@/lib/server-action-utils'
 import { sendNotification, sendBulkNotification } from '@/lib/notifications/service'
 import { sendTemplatedEmail } from '@/lib/notifications/channels/email'
 import { MARKETPLACE_NOTIFICATION_TYPES } from '@/lib/notifications/channels/in-app'

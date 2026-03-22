@@ -17,6 +17,22 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { rateLimit } from "@/lib/security/rate-limit"
 import { detectDomainFromResearchReport } from "@/lib/cad-lab/domain-prompts"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
+
+// SECURITY: SSRF protection — only allow image fetches from Supabase Storage
+const ALLOWED_IMAGE_HOSTS = [
+  "jyarhvinengfyrwgtskq.supabase.co",
+]
+
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:") return false
+    return ALLOWED_IMAGE_HOSTS.includes(parsed.hostname)
+  } catch {
+    return false
+  }
+}
 import { imageToCADViaGenCAD } from "@/lib/cad-lab/gencad"
 import { glbToStl } from "@/lib/cad-lab/mesh-convert"
 import type {
@@ -184,9 +200,19 @@ export async function POST(request: Request): Promise<Response> {
 
       try {
         // 1. Fetch hero image as base64
+        // SECURITY: Validate URL to prevent SSRF (must be from Supabase Storage)
+        if (!isAllowedImageUrl(systemIllustrationUrl)) {
+          throw new Error("Image URL not from allowed domain")
+        }
         const imageRes = await fetch(systemIllustrationUrl)
         if (!imageRes.ok) throw new Error(`Failed to fetch hero image: ${imageRes.status}`)
+        // SECURITY: Validate content type and size before buffering
+        const contentType = imageRes.headers.get("content-type") ?? ""
+        if (!contentType.startsWith("image/")) throw new Error("URL did not return an image")
+        const contentLength = parseInt(imageRes.headers.get("content-length") ?? "0", 10)
+        if (contentLength > 10 * 1024 * 1024) throw new Error("Image too large (>10MB)")
         const imageBuffer = Buffer.from(await imageRes.arrayBuffer())
+        if (imageBuffer.length > 10 * 1024 * 1024) throw new Error("Image too large (>10MB)")
         const imageBase64 = imageBuffer.toString("base64")
 
         // 2. Call GenCAD (image-to-CAD on Modal)
@@ -272,7 +298,9 @@ export async function POST(request: Request): Promise<Response> {
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : "Unknown error"
         console.error("[CAD-LAB-UNIFIED] GenCAD generation failed:", errMsg)
-        emit({ type: "error", message: `CAD generation failed: ${errMsg}` })
+        // SECURITY: Sanitize error message — never leak internal details to client
+        const safeMsg = sanitizeErrorMessage(err)
+        emit({ type: "error", message: `CAD generation failed: ${safeMsg}` })
         controller.close()
         return
       }
