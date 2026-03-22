@@ -227,9 +227,14 @@ export function ProductOverviewCard({
                   <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
                     Engineering Intelligence Applied
                   </h4>
-                  {engineeringData && (
+                  {engineeringData && engineeringData.totalDataPoints > 0 && (
                     <span className="text-xs text-muted-foreground font-normal normal-case ml-1">
-                      — {engineeringData.totalDataPoints}+ data points
+                      — {engineeringData.totalDataPoints} data points applied
+                    </span>
+                  )}
+                  {standardCodes && standardCodes.length > 0 && (!engineeringData || engineeringData.totalDataPoints === 0) && (
+                    <span className="text-xs text-muted-foreground font-normal normal-case ml-1">
+                      — {standardCodes.length} standards applied
                     </span>
                   )}
                 </div>
