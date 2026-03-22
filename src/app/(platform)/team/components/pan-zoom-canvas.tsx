@@ -33,6 +33,19 @@ export function PanZoomCanvas({ children, onBackgroundClick }: PanZoomCanvasProp
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef({ x: 0, y: 0, px: 0, py: 0 })
 
+  // DECISION: Auto-fit SVG to container on mount so mobile users see the
+  // full orbit instead of a cropped 720px view on a 375px screen.
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const w = el.clientWidth
+    if (w < 720) {
+      const fitZoom = Math.max(MIN_ZOOM, w / 720)
+      setZoom(fitZoom)
+      setPan({ x: 0, y: 0 })
+    }
+  }, [])
+
   // ── Scroll-to-zoom ───────────────────────────────────────
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()

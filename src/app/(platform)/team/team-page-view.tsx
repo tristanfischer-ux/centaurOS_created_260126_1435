@@ -858,7 +858,7 @@ export function TeamPageView({
                                         <td className="px-4 py-3 text-right pr-6">
                                             <Button
                                                 variant="ghost"
-                                                className="h-8 w-8 p-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="h-8 w-8 min-h-[44px] min-w-[44px] p-0 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                                 aria-label={`Actions for ${member.full_name}`}
                                                 onClick={(e) => {
                                                     e.stopPropagation()
@@ -945,7 +945,7 @@ export function TeamPageView({
 
                 {/* Row 2: Tabs + mobile view toggle */}
                 <div className="flex items-center gap-2">
-                    <div role="tablist" aria-label="Team views" data-tour="team-members" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-none">
+                    <div role="tablist" aria-label="Team views" data-tour="team-members" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-thin">
                         <button
                             role="tab"
                             aria-selected={activeTab === 'members'}

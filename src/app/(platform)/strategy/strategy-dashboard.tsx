@@ -319,17 +319,17 @@ export function StrategyDashboard({
               label="Discuss Strategy"
             />
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-              <TabsList className="h-9">
-                <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3">
-                  <LayoutDashboard className="h-3.5 w-3.5" />
+              <TabsList className="min-h-[44px]">
+                <TabsTrigger value="dashboard" className="text-xs gap-1.5 px-3 min-h-[44px]">
+                  <LayoutDashboard className="h-4 w-4" />
                   <span className="hidden xs:inline">Dashboard</span>
                 </TabsTrigger>
-                <TabsTrigger value="river" className="text-xs gap-1.5 px-3">
-                  <Waypoints className="h-3.5 w-3.5" />
+                <TabsTrigger value="river" className="text-xs gap-1.5 px-3 min-h-[44px]">
+                  <Waypoints className="h-4 w-4" />
                   <span className="hidden xs:inline">River</span>
                 </TabsTrigger>
-                <TabsTrigger value="link" className="text-xs gap-1.5 px-3">
-                  <Link2 className="h-3.5 w-3.5" />
+                <TabsTrigger value="link" className="text-xs gap-1.5 px-3 min-h-[44px]">
+                  <Link2 className="h-4 w-4" />
                   <span className="hidden xs:inline">Link</span>
                 </TabsTrigger>
               </TabsList>

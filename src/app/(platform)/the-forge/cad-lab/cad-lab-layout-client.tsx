@@ -105,7 +105,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
 
 
   return (
-    <div className="space-y-6 pb-16">
+    <div className="space-y-6 pb-32 sm:pb-16">
       {/* ── Header: title + badges + save status + projects ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-muted">
         <div className="flex items-center gap-3 min-w-0">

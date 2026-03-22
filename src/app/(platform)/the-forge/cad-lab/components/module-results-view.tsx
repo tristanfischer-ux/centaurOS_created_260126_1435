@@ -318,7 +318,7 @@ export function ModuleResultsView({
                   onClick={() => result.stepData
                     ? onDownload(`${moduleName}.step`, result.stepData!, false)
                     : result.stepUrl && handleDownloadFromUrl(result.stepUrl, `${moduleName}.step`)}
-                  className="gap-1 text-xs h-7"
+                  className="gap-1 text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                 >
                   <Download className="h-3 w-3" /> STEP
                 </Button>
@@ -330,12 +330,12 @@ export function ModuleResultsView({
                   onClick={() => result.stlData
                     ? onDownload(`${moduleName}.stl`, result.stlData!)
                     : result.stlUrl && handleDownloadFromUrl(result.stlUrl, `${moduleName}.stl`)}
-                  className="gap-1 text-xs h-7"
+                  className="gap-1 text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                 >
                   <Download className="h-3 w-3" /> STL
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => onFullscreen(activeViewTab, moduleId)} className="gap-1 text-xs h-7">
+              <Button variant="outline" size="sm" onClick={() => onFullscreen(activeViewTab, moduleId)} className="gap-1 text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7">
                 <Maximize2 className="h-3 w-3" /> Fullscreen
               </Button>
             </div>
@@ -435,10 +435,10 @@ export function ModuleResultsView({
               <span className="font-normal text-muted-foreground">({editedCode.split("\n").length} lines)</span>
             </p>
             <div className="flex items-center gap-1.5">
-              <Button variant="outline" size="sm" onClick={() => onCopyCode(editedCode)} className="gap-1 text-xs h-7">
+              <Button variant="outline" size="sm" onClick={() => onCopyCode(editedCode)} className="gap-1 text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7">
                 {codeCopied ? <><Check className="h-3 w-3" /> Copied!</> : <><Copy className="h-3 w-3" /> Copy</>}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowCode(!showCode)} className="text-xs h-7">
+              <Button variant="ghost" size="sm" onClick={() => setShowCode(!showCode)} className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7">
                 {showCode ? "Hide" : "Show"}
               </Button>
             </div>
@@ -465,7 +465,7 @@ export function ModuleResultsView({
                   variant="outline"
                   size="sm"
                   onClick={handleCancel}
-                  className="gap-1 text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  className="gap-1 text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7 border-destructive/30 text-destructive hover:bg-destructive/10"
                 >
                   <XCircle className="h-3 w-3" /> Cancel
                 </Button>
