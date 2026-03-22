@@ -99,7 +99,7 @@ export default async function PlatformHealthPage() {
                             <p className="text-sm text-muted-foreground">
                                 {health.stripe.message}
                             </p>
-                            <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t">
                                 <div>
                                     <p className="text-xs text-muted-foreground">Pending Events</p>
                                     <p className="text-lg font-semibold">{health.stripe.pendingEvents}</p>

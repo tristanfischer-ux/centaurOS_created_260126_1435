@@ -45,6 +45,9 @@ import {
     TrendingUp,
     Building2,
     ScrollText,
+    UserCircle,
+    Sprout,
+    Sparkles,
 } from "lucide-react"
 import {
     DropdownMenu,
@@ -79,13 +82,15 @@ const mainNavigation = [
 
 // "More" dropdown — Me section (items not in main bar)
 const meMoreNavigation = [
+    { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Knowledge", href: "/knowledge", icon: Library },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow },
+    { name: "What's New", href: "/whats-new", icon: Sparkles },
 ]
 
 // "More" dropdown — Plan section
 const planMoreNavigation = [
-    { name: "Strategy", href: "/canvas", icon: Waypoints },
+    { name: "Strategy", href: "/strategy", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
 ]
 
@@ -96,6 +101,7 @@ const cashBurnNavigation = [
     { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp },
     { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3 },
     { name: "Investors", href: "/investors", icon: Building2 },
+    { name: "Fundraise", href: "/fundraise", icon: Sprout },
 ]
 
 // "More" dropdown — Workshop section
@@ -189,7 +195,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
                 data-testid="mobile-fab"
-                className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
+                className="absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />

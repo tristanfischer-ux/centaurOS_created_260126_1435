@@ -194,7 +194,7 @@ export default function ApplicationDetailPage({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <Label className="text-muted-foreground">Category</Label>
                                 <p className="font-medium capitalize">{application.category}</p>

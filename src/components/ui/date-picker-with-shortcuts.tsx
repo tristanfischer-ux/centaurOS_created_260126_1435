@@ -59,7 +59,7 @@ export function DatePickerWithShortcuts({
                         variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(new Date())}
-                        className="text-xs h-7"
+                        className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                     >
                         Today
                     </Button>
@@ -67,7 +67,7 @@ export function DatePickerWithShortcuts({
                         variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 1))}
-                        className="text-xs h-7"
+                        className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                     >
                         Tomorrow
                     </Button>
@@ -75,7 +75,7 @@ export function DatePickerWithShortcuts({
                         variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 7))}
-                        className="text-xs h-7"
+                        className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                     >
                         +7d
                     </Button>
@@ -83,7 +83,7 @@ export function DatePickerWithShortcuts({
                         variant="secondary"
                         size="sm"
                         onClick={() => handleQuickDate(addDays(new Date(), 14))}
-                        className="text-xs h-7"
+                        className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                     >
                         +14d
                     </Button>
@@ -91,7 +91,7 @@ export function DatePickerWithShortcuts({
                         variant="secondary"
                         size="sm"
                         onClick={handleClear}
-                        className="text-xs h-7"
+                        className="text-xs h-7 min-h-[44px] sm:min-h-0 sm:h-7"
                     >
                         Clear
                     </Button>
