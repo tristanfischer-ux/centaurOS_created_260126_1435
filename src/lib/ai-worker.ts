@@ -114,7 +114,7 @@ Your goal: Execute this task directly. Provide a concrete output, draft, or solu
 Do not say "I will do this". DO IT.`
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.3-instant",
+            model: "gpt-4o",
             max_tokens: 4096,
             messages: [
                 { role: "system", content: systemPrompt },

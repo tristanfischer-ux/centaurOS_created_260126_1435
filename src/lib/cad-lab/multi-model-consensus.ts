@@ -74,7 +74,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
   const OpenAI = (await import("openai")).default
   const openai = new OpenAI({ apiKey })
   const completion = await openai.chat.completions.create({
-    model: "gpt-5.3-instant",
+    model: "gpt-4o",
     max_tokens: 256,
     messages: [
       { role: "system", content: systemPrompt },

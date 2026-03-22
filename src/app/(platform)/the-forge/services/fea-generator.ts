@@ -162,7 +162,7 @@ What realistic loads and boundary conditions should be applied for structural an
   })
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5.3-instant",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: LOAD_CASE_SYSTEM_PROMPT },
       { role: "user", content: userPrompt },

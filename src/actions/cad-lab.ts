@@ -413,7 +413,7 @@ async function callGemini(
 async function callOpenAI(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "gpt-5.3-instant",
+  modelId: string = "gpt-4o",
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
@@ -931,8 +931,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         const claudeMsg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr)
         console.warn("[THE-FORGE] Step 1: Claude synthesis failed, trying OpenAI fallback:", claudeMsg.slice(0, 200))
         try {
-          synthesisModel = "gpt-5.3-instant"
-          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.3-instant", 8192, 120_000)
+          synthesisModel = "gpt-4o"
+          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-4o", 8192, 120_000)
           report = openaiResult.text
           console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
         } catch (openaiErr) {
@@ -2878,8 +2878,8 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       dlog(">>> ATTEMPTING OPENAI (timeout=120s) — final fallback")
       const openaiStart = Date.now()
       try {
-        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.3-instant", 8192, 120_000))
-        winnerModel = "GPT-5.3-Instant"
+        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-4o", 8192, 120_000))
+        winnerModel = "GPT-4o"
         dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
       } catch (openaiErr) {
         const msg = openaiErr instanceof Error ? openaiErr.message.slice(0, 200) : String(openaiErr)

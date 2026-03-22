@@ -141,8 +141,8 @@ export interface MonthlyUsage {
  * Updated Feb 2026. Check OpenAI pricing page for current rates.
  */
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
-  'gpt-5.3-instant': { input: 1.50, output: 6.00 },
-  'gpt-5.4-thinking': { input: 5.00, output: 20.00 },
+  'gpt-4o': { input: 1.50, output: 6.00 },
+  'o3': { input: 5.00, output: 20.00 },
   'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
   'gemini-3.1-flash-lite-preview': { input: 0.075, output: 0.30 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
@@ -169,7 +169,7 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
  */
 const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
   // OpenAI Realtime API (audio input + output combined)
-  'gpt-5.3-instant-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
+  'gpt-4o-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
   // Avatar providers
   'heygen-streaming': 0.07,
   'simli-streaming': 0.03,
@@ -186,7 +186,7 @@ const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
  */
 export function estimateRealtimeCost(
   durationSeconds: number,
-  voiceModel: string = 'gpt-5.3-instant-realtime-preview',
+  voiceModel: string = 'gpt-4o-realtime-preview',
   avatarProvider?: string
 ): number {
   const minutes = durationSeconds / 60
@@ -214,7 +214,7 @@ export function estimateWebSearchCost(webSearchRequests: number): number {
 /**
  * Estimate the cost of an AI API call based on token counts and model.
  *
- * @param model - The AI model used (e.g. 'gpt-5.3-instant')
+ * @param model - The AI model used (e.g. 'gpt-4o')
  * @param promptTokens - Number of input/prompt tokens
  * @param completionTokens - Number of output/completion tokens
  * @returns Estimated cost in USD
@@ -224,7 +224,7 @@ export function estimateAICost(
   promptTokens: number,
   completionTokens: number
 ): number {
-  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-5.3-instant']
+  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-4o']
   const inputCost = (promptTokens / 1_000_000) * costs.input
   const outputCost = (completionTokens / 1_000_000) * costs.output
   return Number((inputCost + outputCost).toFixed(6))

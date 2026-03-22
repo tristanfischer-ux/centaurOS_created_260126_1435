@@ -279,7 +279,7 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
   }).join("\n---\n")
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5.3-instant",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: DESIGN_CHANGE_SYSTEM_PROMPT },
       {

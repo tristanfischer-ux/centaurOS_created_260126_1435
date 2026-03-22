@@ -117,7 +117,7 @@ export async function generateFlowConditions(
     .join("\n")
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.3-instant",
+    model: "gpt-4o",
     temperature: 0.3,
     response_format: { type: "json_object" },
     messages: [

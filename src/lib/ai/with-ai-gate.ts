@@ -66,7 +66,7 @@ export interface AIGateContext extends AuthContext {
  * export async function analyzeObjective(objectiveId: string) {
  *   return withAIGate('analyze', async ({ supabase, user, foundryId, trackUsage }) => {
  *     const result = await callAI(...)
- *     await trackUsage({ model: 'gpt-5.3-instant', promptTokens: 500, completionTokens: 200 })
+ *     await trackUsage({ model: 'gpt-4o', promptTokens: 500, completionTokens: 200 })
  *     return { success: true, data: result }
  *   })
  * }

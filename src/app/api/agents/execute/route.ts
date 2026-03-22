@@ -126,20 +126,20 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "openai", modelId: "gpt-5.3-instant" },
+        { providerId: "openai", modelId: "gpt-4o" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     qwen: [
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.3-instant" },
+        { providerId: "openai", modelId: "gpt-4o" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "openai", modelId: "gpt-5.3-instant" },
+        { providerId: "openai", modelId: "gpt-4o" },
     ],
     "qwen-local": [
         { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },

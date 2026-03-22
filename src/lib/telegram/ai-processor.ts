@@ -78,7 +78,7 @@ export async function parseTextToObjective(text: string): Promise<ParsedObjectiv
     const currentDate = new Date().toISOString().split('T')[0]
 
     const completion = await openai.chat.completions.parse({
-        model: 'gpt-5.3-instant',
+        model: 'gpt-4o',
         messages: [
             {
                 role: 'system',
@@ -142,7 +142,7 @@ export async function refineObjective(
     }
 
     const completion = await openai.chat.completions.parse({
-        model: 'gpt-5.3-instant',
+        model: 'gpt-4o',
         messages: [
             {
                 role: 'system',
@@ -181,7 +181,7 @@ export async function generateHelpResponse(text: string): Promise<string> {
     }
 
     const completion = await openai.chat.completions.create({
-        model: 'gpt-5.3-instant',
+        model: 'gpt-4o',
         messages: [
             {
                 role: 'system',
