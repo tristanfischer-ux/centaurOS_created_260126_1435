@@ -146,6 +146,8 @@ export function MobileNav({ foundryName }: MobileNavProps) {
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
 
+    const [moreMenuOpen, setMoreMenuOpen] = React.useState(false)
+
     const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     /**
@@ -159,6 +161,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                 key={item.name}
                 onSelect={(event) => {
                     event.preventDefault()
+                    setMoreMenuOpen(false)
                     router.push(item.href)
                 }}
                 className={cn(
@@ -216,7 +219,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                         </Link>
                     )
                 })}
-                <DropdownMenu>
+                <DropdownMenu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
                     <DropdownMenuTrigger asChild>
                         <button
                             className={cn(
@@ -287,6 +290,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                         <DropdownMenuItem
                             onSelect={(event) => {
                                 event.preventDefault()
+                                setMoreMenuOpen(false)
                                 router.push("/settings")
                             }}
                             className={cn(

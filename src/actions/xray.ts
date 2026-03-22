@@ -2515,7 +2515,7 @@ export async function runConceptResearchAction(
       console.info("[Forge] Concept research: Starting web search...")
 
       // 1. Run Gemini + Google Search for real-world product intelligence
-      const apiKey = process.env.GOOGLE_AI_API_KEY
+      const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
       if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
       const searchPrompt = `Research this product concept thoroughly: ${idea.trim()}
@@ -2570,7 +2570,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
 
       // 2. Send raw data to Claude Opus for synthesis
       console.info("[Forge] Concept research: Synthesizing report with Claude Opus...")
-      const anthropicKey = process.env.ANTHROPIC_API_KEY
+      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
       const claudeData = await withRetry(async () => {
@@ -2582,7 +2582,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-opus-4-20250514",
+            model: "claude-opus-4-6",
             max_tokens: 8192,
             system: CONCEPT_RESEARCH_PROMPT,
             messages: [{

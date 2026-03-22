@@ -47,7 +47,7 @@ export async function generateAndStoreStandards(
   productDescription: string,
   existingStandardCodes: string[],
 ): Promise<DesignStandard[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     console.warn("[standards-auto-learn] ANTHROPIC_API_KEY not configured, skipping")
     return []

@@ -187,7 +187,7 @@ async function callClaude(
   tokensIn: number
   tokensOut: number
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
 
   const makeRequest = async (model: ClaudeModelId) => {
@@ -301,7 +301,7 @@ async function callGeminiWithSearch(
   tokensIn: number
   tokensOut: number
 }> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
@@ -372,7 +372,7 @@ async function callGemini(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
@@ -417,7 +417,7 @@ async function callOpenAI(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
 
   const response = await fetchWithTimeout(
@@ -463,7 +463,7 @@ async function callTogether(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.TOGETHER_API_KEY
+  const apiKey = process.env.TOGETHER_API_KEY?.trim()
   if (!apiKey) throw new Error("TOGETHER_API_KEY not configured")
 
   const response = await fetchWithTimeout(
@@ -4519,10 +4519,10 @@ ${catalogue}
 Return 3–4 suggestions as a JSON array.`
 
   try {
-    // DECISION: Using claude-sonnet-4-5-20250929 (fast variant) — this is a
+    // DECISION: Using claude-sonnet-4-6 (fast variant) — this is a
     // lightweight template-matching task, not code generation. Speed matters
     // here for a real-time UX response.
-    const { text } = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-5-20250929", 2048)
+    const { text } = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6", 2048)
 
     let raw: Array<{ name: string; description: string; concept: string; templateSlugs: string[] }>
     try {

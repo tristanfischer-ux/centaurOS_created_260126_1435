@@ -37,7 +37,7 @@ export async function scoreRenderVision(
   interfaceDefinition?: string,
   referenceImageBase64?: string,
 ): Promise<VisionScoreResult | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     console.warn("[VISION-SCORER] ANTHROPIC_API_KEY not configured, skipping")
     return null

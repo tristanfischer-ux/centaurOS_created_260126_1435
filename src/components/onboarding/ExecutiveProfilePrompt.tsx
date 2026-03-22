@@ -80,16 +80,13 @@ export function ExecutiveProfilePrompt({
               Set up your headline, bio, rates, and skills.
             </p>
             <div className="flex items-center gap-2 mt-3">
-              <Button 
-                asChild 
-                size="sm" 
-                className="bg-international-orange hover:bg-international-orange/90 h-8 text-xs"
+              <Link
+                href="/my-profile"
+                className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-md bg-international-orange hover:bg-international-orange/90 text-white transition-colors"
               >
-                <Link href="/my-profile">
-                  Set Up Profile
-                  <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-                </Link>
-              </Button>
+                Set Up Profile
+                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Link>
               <Button 
                 variant="ghost" 
                 size="sm" 

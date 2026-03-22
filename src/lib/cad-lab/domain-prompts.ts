@@ -56,7 +56,7 @@ async function classifyWithClaude(
   prompt: string,
   text: string,
 ): Promise<CadLabDomain> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) return "mechanical"
 
   const truncated = text.slice(0, 8000)

@@ -44,7 +44,7 @@ const apiShouldRetry = (error: Error) => {
 }
 
 async function callClaude(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
   return withRetry(async () => {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -69,7 +69,7 @@ async function callClaude(systemPrompt: string, userPrompt: string): Promise<str
 }
 
 async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
   const OpenAI = (await import("openai")).default
   const openai = new OpenAI({ apiKey })
@@ -85,7 +85,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
 }
 
 async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY ?? process.env.GEMINI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim() ?? process.env.GEMINI_API_KEY?.trim()
   if (!apiKey) throw new Error("Gemini API key not configured")
   const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`
@@ -125,7 +125,7 @@ export async function runMaterialConsensus(
     { name: "Claude", fn: () => callClaude(systemPrompt, userPrompt) },
     { name: "GPT-4o", fn: () => callOpenAI(systemPrompt, userPrompt) },
   ]
-  if (process.env.GOOGLE_AI_API_KEY || process.env.GEMINI_API_KEY) {
+  if (process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) {
     runners.push({ name: "Gemini", fn: () => callGemini(systemPrompt, userPrompt) })
   }
 
