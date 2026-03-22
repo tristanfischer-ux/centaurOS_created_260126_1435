@@ -254,7 +254,7 @@ export function TodayView({
                                         Complete your profile so ventures can find you, then browse what&apos;s available in the marketplace.
                                     </p>
                                 </div>
-                                <div className="flex flex-wrap gap-3 justify-center">
+                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
                                     <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
                                         <Link href="/my-profile">
                                             <Target className="h-3.5 w-3.5" />
@@ -279,7 +279,7 @@ export function TodayView({
                                         Start your first training objective and explore the tools that will make you 10x more productive.
                                     </p>
                                 </div>
-                                <div className="flex flex-wrap gap-3 justify-center">
+                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
                                     <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
                                         <Link href="/objectives">
                                             <Target className="h-3.5 w-3.5" />
@@ -305,7 +305,7 @@ export function TodayView({
                                         Get started by setting up your first goal.
                                     </p>
                                 </div>
-                                <div className="flex flex-wrap gap-3 justify-center">
+                                <div className="flex flex-col sm:flex-row flex-wrap gap-3 justify-center">
                                     <Button asChild size="sm" className="gap-1.5 bg-international-orange hover:bg-international-orange/90 text-white">
                                         <Link href="/new-objectives">
                                             <Target className="h-3.5 w-3.5" />
@@ -384,7 +384,7 @@ export function TodayView({
 
                         {/* Quick Stats with Trends */}
                         {pulseData?.personal && (
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                                 <AnimatedStatCard
                                     label="Completed"
                                     value={pulseData.personal.tasks_completed_count}
@@ -545,7 +545,7 @@ export function TodayView({
                                         </p>
                                     </div>
                                 </div>
-                                <Button variant="outline" size="sm" asChild className="gap-1.5 self-start sm:self-auto shrink-0">
+                                <Button variant="outline" size="sm" asChild className="gap-1.5 w-full sm:w-auto shrink-0">
                                     <Link href="/updates">
                                         View messages
                                         <ArrowRight className="h-3.5 w-3.5" />

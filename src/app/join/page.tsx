@@ -35,7 +35,7 @@ function FoundingMemberCounter({ spotsClaimed }: { spotsClaimed: number }) {
   const percentClaimed = (clampedClaimed / TOTAL_FOUNDING_SPOTS) * 100;
 
   return (
-    <div className="p-4 rounded-xl bg-muted/50 border">
+    <div className="px-3 py-2 sm:p-4 rounded-xl bg-muted/50 border">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-international-orange" />

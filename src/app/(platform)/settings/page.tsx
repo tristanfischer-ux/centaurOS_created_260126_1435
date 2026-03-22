@@ -73,7 +73,7 @@ export default async function SettingsPage() {
             </Card>
 
             {/* Quick links */}
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                 <Link href="/settings/billing" className="block">
                     <Card className="h-full hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">

@@ -570,7 +570,7 @@ export function ObjectivesBoard({
 
         {/* Right: Detail panel */}
         {hasDetailPanel && (
-          <div className="w-[360px] min-w-0 max-w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
+          <div className="hidden lg:block w-[360px] min-w-0 max-w-[360px] flex-shrink-0 rounded-xl border overflow-hidden h-[calc(100dvh-300px)] sticky top-8">
             {selectedTaskData ? (
               <TaskDetailPanel
                 task={selectedTaskData}
