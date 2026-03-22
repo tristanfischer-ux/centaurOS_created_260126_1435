@@ -120,25 +120,41 @@ export async function getEngineeringIntelligenceForReport(
   // Fetch full standard details for the referenced codes
   let standards: { code: string; name: string; issuingBody: string; summary: string }[] = []
   if (standardCodes.length > 0) {
-    const { data: stdData } = await supabase
+    const { data: stdData, error: stdErr } = await supabase
       .from("design_standards")
       .select("standard_code, standard_name, issuing_body, summary")
       .in("standard_code", standardCodes)
+    if (stdErr) console.warn("[design-standards] Standards fetch failed:", stdErr.message)
     if (stdData) {
       standards = stdData.map(s => ({
-        code: s.standard_code,
-        name: s.standard_name,
-        issuingBody: s.issuing_body,
-        summary: (s.summary as string).slice(0, 300),
+        code: s.standard_code as string,
+        name: s.standard_name as string,
+        issuingBody: s.issuing_body as string,
+        summary: ((s.summary as string | null) ?? "").slice(0, 300),
       }))
     }
   }
 
-  // Fetch material properties for detected families
-  const { data: matData } = await supabase
+  // Fetch material properties — filter by families detected in the description
+  const lower = description.toLowerCase()
+  const familyFilters: string[] = []
+  if (/\baluminu?m\b/i.test(lower)) familyFilters.push("aluminum")
+  if (/\bsteel\b/i.test(lower)) familyFilters.push("steel")
+  if (/\bstainless\b/i.test(lower)) familyFilters.push("stainless_steel")
+  if (/\btitanium\b/i.test(lower)) familyFilters.push("titanium")
+  if (/\bcopper|brass|bronze\b/i.test(lower)) familyFilters.push("copper")
+  if (/\bplastic|polymer|abs|pla|petg|nylon|peek\b/i.test(lower)) familyFilters.push("polymer")
+  if (/\brubber|silicone|tpu|elastomer\b/i.test(lower)) familyFilters.push("elastomer")
+  if (/\bcarbon fiber|composite|fiberglass\b/i.test(lower)) familyFilters.push("composite")
+  if (/\bwood|plywood|timber\b/i.test(lower)) familyFilters.push("wood")
+
+  let matQuery = supabase
     .from("material_properties")
     .select("material_code, material_name, density_kg_m3, yield_strength_mpa, thermal_conductivity_w_mk, cost_per_kg_usd")
-    .limit(20)
+  if (familyFilters.length > 0) {
+    matQuery = matQuery.in("material_family", familyFilters)
+  }
+  const { data: matData } = await matQuery.limit(20)
   const materials = (matData ?? []).map(m => ({
     code: m.material_code as string,
     name: m.material_name as string,

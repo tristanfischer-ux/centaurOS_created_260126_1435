@@ -279,6 +279,7 @@ Rules:
 - Set includeTable: true for sections where tabular data would help (specs, costs, supplier comparisons)
 - Set includeImage: true for module detail sections that have images
 - Set moduleId for module-specific sections so the writer can reference the right module data
+- If ENGINEERING STANDARDS REFERENCED data is present, include an "engineering-standards" section — this is critical for demonstrating design compliance and material traceability
 - Never mention that this report was written by AI or that you are structuring it
 - Return valid JSON matching the schema exactly`
 
@@ -515,6 +516,35 @@ function buildSectionDataSlice(section: ReportSectionOutline, data: DesignReport
         if (r.volumeMm3 != null) lines.push(`Volume: ${r.volumeMm3.toFixed(1)} mm³`)
         if (r.bbox) lines.push(`BBox: ${r.bbox.xLen.toFixed(1)} × ${r.bbox.yLen.toFixed(1)} × ${r.bbox.zLen.toFixed(1)} mm`)
         if (r.modelUsed) lines.push(`Model: ${r.modelUsed}`)
+      }
+      break
+
+    case "engineering-standards":
+      if (data.engineeringIntelligence) {
+        const ei = data.engineeringIntelligence
+        if (ei.industryDomain) lines.push(`Industry domain: ${ei.industryDomain.replace(/_/g, " ")}`)
+        if (ei.standards.length > 0) {
+          lines.push(`\n${ei.standards.length} design standards referenced:`)
+          for (const s of ei.standards.slice(0, 10)) {
+            lines.push(`- ${s.code} (${s.issuingBody}): ${s.name}`)
+            if (s.summary) lines.push(`  ${s.summary.slice(0, 150)}`)
+          }
+        }
+        if (ei.materials.length > 0) {
+          lines.push(`\n${ei.materials.length} verified material specifications:`)
+          for (const m of ei.materials.slice(0, 8)) {
+            lines.push(`- ${m.code} (${m.name}): density=${m.density ?? "?"}kg/m³, yield=${m.yieldStrength ?? "?"}MPa, thermal=${m.thermalConductivity ?? "?"}W/(m·K), cost=$${m.costPerKg ?? "?"}/kg`)
+          }
+        }
+        if (ei.processes.length > 0) {
+          lines.push(`\n${ei.processes.length} manufacturing process constraints:`)
+          for (const p of ei.processes) {
+            lines.push(`- ${p.displayName}: tolerance ±${p.toleranceTypical ?? "?"}mm, min wall ${p.minWall ?? "?"}mm`)
+          }
+        }
+        if (ei.hardwareCount > 0) {
+          lines.push(`\n${ei.hardwareCount} ISO metric fastener specifications referenced`)
+        }
       }
       break
 

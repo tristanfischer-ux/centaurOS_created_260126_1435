@@ -546,10 +546,10 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
             onClick={allExpanded ? onCollapseAll : onExpandAll}
             title={allExpanded ? 'Collapse all milestones' : 'Expand all milestones'}
             style={{
-              height: 26, borderRadius: 7, border: '1px solid #E2E8F0',
+              minHeight: 44, borderRadius: 7, border: '1px solid #E2E8F0',
               background: 'white', cursor: 'pointer', fontSize: 10, fontWeight: 700,
               color: '#64748B', display: 'flex', alignItems: 'center', gap: 4,
-              fontFamily: FONT, padding: '0 8px',
+              fontFamily: FONT, padding: '0 12px',
               boxShadow: '0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.04)',
               whiteSpace: 'nowrap' as const,
             }}
@@ -907,7 +907,7 @@ export function computeRiverStats(data: RiverStrategicObjective[]): { done: numb
 function ZoomBtn({ onClick, children, style = {} }: { onClick: () => void; children: React.ReactNode; style?: React.CSSProperties }): React.ReactElement {
   return (
     <button onClick={onClick} style={{
-      width: 26, height: 26, borderRadius: 7, border: '1px solid #E2E8F0',
+      minWidth: 44, minHeight: 44, borderRadius: 7, border: '1px solid #E2E8F0',
       background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 700,
       color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center',
       fontFamily: FONT, lineHeight: 1, padding: 0, ...style,

@@ -96,8 +96,8 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for high-stakes reasoning, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume work */
-    modelTier: "claude" | "qwen" | "qwen-local" | "minimax"
+    /** AI model tier: "claude" for Opus (finance, legal), "sonnet" for Sonnet 4.6 (most specialists), "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
+    modelTier: "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax"
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
     speculativeEnabled?: boolean

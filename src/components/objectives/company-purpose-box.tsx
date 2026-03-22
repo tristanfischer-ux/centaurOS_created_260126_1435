@@ -260,7 +260,7 @@ function CompanyPurposeInline({
       <div className={cn('flex items-center gap-3', className)}>
         <Compass className="h-4 w-4 text-international-orange flex-shrink-0" />
         <CollapsibleTrigger asChild>
-          <button className="text-sm text-foreground font-medium hover:text-international-orange transition-colors truncate max-w-xl text-left">
+          <button className="text-sm text-foreground font-medium hover:text-international-orange transition-colors truncate max-w-full sm:max-w-xl text-left">
             {purposeData.purpose}
           </button>
         </CollapsibleTrigger>
