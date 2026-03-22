@@ -6,8 +6,6 @@ import { Save, ArrowLeft, Trash2, Loader2, Pencil, CheckSquare } from "lucide-re
 import { toast } from "sonner"
 import Link from "next/link"
 
-import "@excalidraw/excalidraw/index.css"
-
 import { updateWhiteboard, deleteWhiteboard } from "@/actions/whiteboards"
 import { convertStickyNotesToTasks } from "@/actions/whiteboard-to-task"
 import type { WhiteboardRow } from "@/actions/whiteboards"
@@ -20,6 +18,8 @@ import type { WhiteboardRow } from "@/actions/whiteboards"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Excalidraw: any = dynamic(
   async () => {
+    // @ts-expect-error -- CSS module import, no type declarations
+    await import("@excalidraw/excalidraw/index.css")
     const mod = await import("@excalidraw/excalidraw")
     return mod.Excalidraw
   },

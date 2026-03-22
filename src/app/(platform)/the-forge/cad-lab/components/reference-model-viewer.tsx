@@ -9,8 +9,14 @@
  */
 
 import { useState, useEffect } from "react"
+import dynamic from "next/dynamic"
 import { Box } from "lucide-react"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-full rounded-lg" /> },
+)
 
 interface ReferenceModelViewerProps {
   /** URL to STL file (e.g. Supabase storage). When null, placeholder is shown. */

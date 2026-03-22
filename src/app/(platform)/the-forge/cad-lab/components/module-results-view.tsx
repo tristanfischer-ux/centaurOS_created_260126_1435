@@ -15,7 +15,13 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 import { Badge } from "@/components/ui/badge"
 import type { CadLabResult } from "@/lib/cad-lab-types"
 import { Metric, SvgView, RenderedView } from "../cad-lab-utils"

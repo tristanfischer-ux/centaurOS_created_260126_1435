@@ -37,7 +37,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MashupSourceSelector } from "../components/mashup-source-selector"
 import { MashupConceptSearch } from "../components/mashup-concept-search"
 import { MashupGenerationProgress } from "../components/mashup-generation-progress"
-import { STLViewer } from "@/components/cad/stl-viewer"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const STLViewer = dynamic(
+  () => import("@/components/cad/stl-viewer").then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 import { planMashup, executeMashupPlan } from "@/actions/cad-lab"
 import { createMashupRfqAction } from "@/actions/cad-lab-rfq"
 import type { MashupSourceInput, MashupPlan, MashupResult } from "@/lib/cad-lab-types"

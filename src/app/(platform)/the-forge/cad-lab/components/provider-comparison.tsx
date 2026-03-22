@@ -13,7 +13,13 @@ import { Loader2, CheckCircle2, XCircle, Download, Clock, Triangle, HardDrive, D
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ModelViewer } from "@/components/cad/model-viewer"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const ModelViewer = dynamic(
+  () => import("@/components/cad/model-viewer").then((m) => ({ default: m.ModelViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 import type { ABProvider, ProviderResult } from "@/lib/cad-lab-types"
 
 // ─── Provider metadata ───────────────────────────────────────────────

@@ -9,8 +9,22 @@
  */
 
 import { useCallback, useRef, useState, useEffect, useMemo } from "react"
-import Editor, { DiffEditor, type OnMount } from "@monaco-editor/react"
+import dynamic from "next/dynamic"
+import type { OnMount } from "@monaco-editor/react"
 import { Play, RotateCcw, Loader2, Send, Undo2, History, GitCompareArrows } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const EditorLoading = () => <Skeleton className="w-full h-[300px] rounded-lg" />
+
+const Editor = dynamic(
+  () => import("@monaco-editor/react").then((m) => m.default),
+  { ssr: false, loading: EditorLoading },
+)
+
+const DiffEditor = dynamic(
+  () => import("@monaco-editor/react").then((m) => m.DiffEditor),
+  { ssr: false, loading: EditorLoading },
+)
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 

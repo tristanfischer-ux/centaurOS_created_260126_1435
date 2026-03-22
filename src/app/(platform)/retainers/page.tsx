@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { RetainerCard } from '@/components/retainers'
-import { getMyRetainers, getRetainerStatistics } from '@/actions/retainers'
+import { getMyRetainers, getRetainerStatisticsBatch } from '@/actions/retainers'
 import { RetainerStatus } from '@/types/retainers'
 
 export const revalidate = 30
@@ -97,13 +97,12 @@ async function RetainersList({ role, status }: RetainersListProps) {
     )
   }
 
-  // Fetch stats for each retainer (in parallel)
-  const retainersWithStats = await Promise.all(
-    retainers.map(async (retainer) => {
-      const { data: stats } = await getRetainerStatistics(retainer.id)
-      return { retainer, stats }
-    })
-  )
+  // Fetch all retainer stats in a single batch query
+  const { data: statsMap } = await getRetainerStatisticsBatch(retainers.map(r => r.id))
+  const retainersWithStats = retainers.map((retainer) => ({
+    retainer,
+    stats: statsMap[retainer.id] ?? null,
+  }))
 
   return (
     <div className="space-y-4">

@@ -17,10 +17,10 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Performance Monitoring
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.05 : 1.0,
 
-  // Session Replay - capture 10% of sessions, 100% on error
-  replaysSessionSampleRate: 0.1,
+  // Session Replay - capture 1% of sessions, 100% on error
+  replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 1.0,
 
   // Enable debug in development

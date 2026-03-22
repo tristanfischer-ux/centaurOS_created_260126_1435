@@ -34,7 +34,13 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ModelViewer } from "@/components/cad/model-viewer"
+import dynamic from "next/dynamic"
+import { Skeleton } from "@/components/ui/skeleton"
+
+const ModelViewer = dynamic(
+  () => import("@/components/cad/model-viewer").then((m) => ({ default: m.ModelViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"

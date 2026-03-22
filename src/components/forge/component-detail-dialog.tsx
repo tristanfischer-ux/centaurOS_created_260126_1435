@@ -33,7 +33,12 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { getComponentDetail } from '@/actions/component-library'
 import type { ComponentDetail } from '@/actions/component-library'
-import { STLViewer } from '@/components/cad/stl-viewer'
+import dynamic from 'next/dynamic'
+
+const STLViewer = dynamic(
+  () => import('@/components/cad/stl-viewer').then((m) => ({ default: m.STLViewer })),
+  { ssr: false, loading: () => <Skeleton className="w-full h-[300px] rounded-lg" /> },
+)
 
 // ============================================================================
 // CONSTANTS

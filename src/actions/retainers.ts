@@ -453,6 +453,122 @@ export async function getRetainerStatistics(
 }
 
 // ==========================================
+// BATCH GET RETAINER STATS (avoids N+1)
+// ==========================================
+
+export async function getRetainerStatisticsBatch(
+  retainerIds: string[]
+): Promise<{ data: Record<string, RetainerStats>; error: string | null }> {
+  if (retainerIds.length === 0) {
+    return { data: {}, error: null }
+  }
+
+  if (retainerIds.length > 100) {
+    return { data: {}, error: "Too many retainer IDs (max 100)" }
+  }
+
+  try {
+    const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { data: {}, error: "Not authenticated" }
+    }
+
+    // Single query for all retainers
+    const { data: retainers, error: retainerError } = await supabase
+      .from("retainers")
+      .select("id, weekly_hours, hourly_rate, currency, started_at, status, buyer_id, seller:provider_profiles!retainers_seller_id_fkey(user_id)")
+      .in("id", retainerIds)
+
+    if (retainerError || !retainers) {
+      return { data: {}, error: "Failed to fetch retainers" }
+    }
+
+    // Filter to only retainers user has access to
+    const accessible = retainers.filter(r =>
+      r.buyer_id === user.id || r.seller?.user_id === user.id
+    )
+
+    if (accessible.length === 0) {
+      return { data: {}, error: null }
+    }
+
+    const accessibleIds = accessible.map(r => r.id)
+
+    // Single query for all timesheets across all retainers
+    const { data: allTimesheets, error: timesheetError } = await supabase
+      .from("timesheet_entries")
+      .select("retainer_id, hours_logged, week_start, status")
+      .in("retainer_id", accessibleIds)
+
+    if (timesheetError) {
+      return { data: {}, error: "Failed to fetch timesheet data" }
+    }
+
+    // Group timesheets by retainer_id
+    const timesheetsByRetainer = new Map<string, typeof allTimesheets>()
+    for (const ts of allTimesheets || []) {
+      const existing = timesheetsByRetainer.get(ts.retainer_id) || []
+      existing.push(ts)
+      timesheetsByRetainer.set(ts.retainer_id, existing)
+    }
+
+    const now = new Date()
+    const { format: fmt, startOfWeek: sow, differenceInWeeks: diw } = await import("date-fns")
+    const weekStart = sow(now, { weekStartsOn: 1 })
+    const weekStartStr = fmt(weekStart, "yyyy-MM-dd")
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const result: Record<string, RetainerStats> = {}
+
+    for (const retainer of accessible) {
+      const timesheets = timesheetsByRetainer.get(retainer.id) || []
+
+      const thisWeekTimesheet = timesheets.find(t => t.week_start === weekStartStr)
+      const totalHoursThisWeek = thisWeekTimesheet?.hours_logged || 0
+
+      const thisMonthTimesheets = timesheets.filter(t => new Date(t.week_start) >= monthStart)
+      const totalHoursThisMonth = thisMonthTimesheets.reduce((sum, t) => sum + (t.hours_logged || 0), 0)
+
+      const approvedTimesheets = timesheets.filter(t => t.status === "approved" || t.status === "paid")
+      const totalAmount = approvedTimesheets.reduce((sum, t) => sum + (t.hours_logged || 0) * retainer.hourly_rate, 0)
+
+      const submittedTimesheets = timesheets.filter(t => t.status !== "draft")
+      const approvalRate = submittedTimesheets.length > 0
+        ? (approvedTimesheets.length / submittedTimesheets.length) * 100
+        : 100
+
+      const weeksActive = retainer.started_at
+        ? diw(now, new Date(retainer.started_at)) + 1
+        : 0
+
+      const averageHoursPerWeek = weeksActive > 0
+        ? timesheets.reduce((sum, t) => sum + (t.hours_logged || 0), 0) / weeksActive
+        : 0
+
+      result[retainer.id] = {
+        totalHoursThisWeek,
+        totalHoursThisMonth,
+        weeklyCommitment: retainer.weekly_hours,
+        hoursRemaining: Math.max(0, retainer.weekly_hours - totalHoursThisWeek),
+        totalEarnings: totalAmount,
+        totalSpend: totalAmount,
+        weeksActive,
+        approvalRate,
+        averageHoursPerWeek,
+        currency: retainer.currency ?? "GBP",
+      }
+    }
+
+    return { data: result, error: null }
+  } catch (err) {
+    console.error("Failed to get retainer stats batch:", err)
+    return { data: {}, error: "Failed to load statistics" }
+  }
+}
+
+// ==========================================
 // CALCULATE RETAINER PRICING
 // ==========================================
 
