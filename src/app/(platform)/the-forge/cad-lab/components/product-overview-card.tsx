@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react"
-import { Pencil, Check, X, ShieldCheck, ChevronDown, Layers, Wrench, Cog, Building2 } from "lucide-react"
+import { Pencil, Check, X, ShieldCheck, ChevronDown, Layers, Wrench, Cog, Building2, AlertTriangle } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -156,6 +156,16 @@ export function ProductOverviewCard({
                 <Check className="h-3 w-3" />
                 Save
               </Button>
+            </div>
+          </div>
+        ) : overview?.includes("synthesis failed") ? (
+          <div className="rounded-lg border border-status-warning bg-status-warning-light p-3 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-status-warning mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-foreground">Research report needs regeneration</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                The original research synthesis failed. Hit <strong>Re-Research</strong> above to generate a full product overview with engineering standards and material data.
+              </p>
             </div>
           </div>
         ) : overview ? (

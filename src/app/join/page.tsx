@@ -168,6 +168,8 @@ function JoinPageInner() {
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
   const [foundingCount, setFoundingCount] = useState(53); // sensible default
   const [passwordValue, setPasswordValue] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const passwordMismatch = confirmPassword.length > 0 && passwordValue !== confirmPassword;
 
   // INTENT: Default role is executive. Founder deep-link still works for backward compat.
   const effectiveRole = isFounderDeepLink ? "founder" : "executive";
@@ -562,6 +564,29 @@ function JoinPageInner() {
               <PasswordStrength password={passwordValue} />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password" className="text-sm font-medium text-foreground">
+                Confirm Password
+                <span className="text-destructive ml-1" aria-label="required">*</span>
+              </Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                placeholder="Re-enter your password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                enterKeyHint="go"
+                className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${passwordMismatch ? "border-destructive" : ""}`}
+                required
+                aria-required="true"
+                aria-invalid={passwordMismatch}
+              />
+              {passwordMismatch && (
+                <p className="text-xs text-destructive" role="alert">Passwords do not match</p>
+              )}
+            </div>
+
             {/* Founder-specific fields — only shown via ?role=founder deep-link */}
             <AnimatePresence>
               {isFounderDeepLink && (
@@ -649,7 +674,7 @@ function JoinPageInner() {
             >
               <Button
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || passwordMismatch}
                 className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
               >
                 {isPending ? (

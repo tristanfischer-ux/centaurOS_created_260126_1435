@@ -1587,7 +1587,22 @@ ${finalCode}
       const prevRenderedSvg = (attempt > 0 && blueprintImageBase64 && modalResult?.svg_iso)
         ? modalResult.svg_iso
         : undefined
-      const codeResult = await callClaude(systemPrompt, userPrompt, modelId, attempt === 0 ? 64000 : 32000, undefined, undefined, blueprintImageBase64, prevRenderedSvg)
+      // DECISION: Fallback chain for code generation — Claude → OpenAI → Gemini.
+      // If Anthropic credits exhausted or API down, fall through to alternatives.
+      let codeResult: { text: string; tokensIn: number; tokensOut: number }
+      const maxOut = attempt === 0 ? 64000 : 32000
+      try {
+        codeResult = await callClaude(systemPrompt, userPrompt, modelId, maxOut, undefined, undefined, blueprintImageBase64, prevRenderedSvg)
+      } catch (claudeCodeErr) {
+        const msg = claudeCodeErr instanceof Error ? claudeCodeErr.message : String(claudeCodeErr)
+        console.warn(`[THE-FORGE] Step 3: Claude code gen failed (attempt ${attempt + 1}), trying OpenAI:`, msg.slice(0, 200))
+        try {
+          codeResult = await callOpenAI(systemPrompt, userPrompt, "gpt-4o", maxOut, 120_000)
+        } catch (openaiCodeErr) {
+          console.warn(`[THE-FORGE] Step 3: OpenAI code gen failed, trying Gemini:`, openaiCodeErr instanceof Error ? openaiCodeErr.message.slice(0, 200) : "")
+          codeResult = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", maxOut, 120_000)
+        }
+      }
       totalTokensIn += codeResult.tokensIn
       totalTokensOut += codeResult.tokensOut
 

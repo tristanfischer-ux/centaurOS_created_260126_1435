@@ -138,12 +138,19 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
+    // DECISION: GPT-5.x models require max_completion_tokens instead of max_tokens.
+    // Both params do the same thing, but OpenAI rejects the old name for newer models.
+    const isGpt5 = opts.modelId.startsWith("gpt-5")
+    const tokenParam = isGpt5
+        ? { max_completion_tokens: opts.maxTokens ?? 4096 }
+        : { max_tokens: opts.maxTokens ?? 4096 }
+
     try {
         const stream = await client.chat.completions.create({
             model: opts.modelId,
             messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
             stream: true,
-            max_tokens: opts.maxTokens ?? 4096,
+            ...tokenParam,
         })
 
         for await (const chunk of stream) {

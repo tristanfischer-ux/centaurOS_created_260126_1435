@@ -311,7 +311,7 @@ export function ModelViewer({
 
   return (
     <ViewerErrorBoundary className={className}>
-      <div className={`relative w-full h-full min-h-[300px] rounded-lg overflow-hidden border border-border ${className ?? ""}`}>
+      <div className={`relative w-full h-full min-h-[300px] rounded-lg overflow-hidden border border-border ${className ?? ""}`} style={{ background: backgroundColor }}>
         {providerLabel && (
           <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded bg-background text-xs font-medium text-foreground border border-border">
             {providerLabel}

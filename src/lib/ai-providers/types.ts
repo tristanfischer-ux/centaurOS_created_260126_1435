@@ -54,8 +54,9 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#10a37f",
         bgColor: "bg-emerald-50",
         models: [
-            { id: "gpt-4o", name: "GPT-4o", modality: "text", description: "Most capable — vision, code, reasoning", maxTokens: 128000, default: true },
-            { id: "gpt-4.1", name: "GPT-4.1", modality: "text", description: "Latest — improved coding and instruction following", maxTokens: 128000 },
+            { id: "gpt-4o", name: "GPT-4o", modality: "text", description: "Stable — vision, code, reasoning", maxTokens: 128000, default: true },
+            { id: "gpt-5.3-chat-latest", name: "GPT-5.3", modality: "text", description: "Latest — 26% fewer hallucinations, 400K context", maxTokens: 400000 },
+            { id: "gpt-4.1", name: "GPT-4.1", modality: "text", description: "Improved coding and instruction following", maxTokens: 128000 },
             { id: "o3", name: "o3", modality: "text", description: "Advanced reasoning model", maxTokens: 200000 },
             { id: "gpt-image-1", name: "GPT Image 1", modality: "image", description: "Image generation with text rendering", default: true },
             { id: "gpt-4o-mini-tts", name: "GPT TTS", modality: "audio", description: "Text to speech — 13 voices, low error rate", default: true },
