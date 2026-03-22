@@ -114,45 +114,41 @@ export default function CadLabResearchPage(): React.ReactNode {
   }, [])
 
   // INTENT: Fetch engineering intelligence independently of research result.
-  // This way the panel shows real data even when research synthesis failed.
-  // INTENT: Destructure stable primitives from researchResult to avoid object-identity
-  // re-renders. The effect should only re-fire when the actual data changes.
-  const resStandardCodes = researchResult?.standardCodes
-  const resIndustryDomain = researchResult?.industryDomain
-  const resEngDataPoints = researchResult?.engineeringData?.totalDataPoints
-  const resEngData = researchResult?.engineeringData
+  // Stringify array/object deps for stable identity (React compares by reference).
+  const resStdCodesKey = JSON.stringify(researchResult?.standardCodes ?? [])
+  const resIndustryDomain = researchResult?.industryDomain ?? null
+  const resEngDataPoints = researchResult?.engineeringData?.totalDataPoints ?? 0
 
-  type EngIntel = typeof resEngData
-  const [liveEngData, setLiveEngData] = useState<EngIntel>(undefined)
+  type EngIntel = NonNullable<NonNullable<typeof researchResult>["engineeringData"]>
+  const [liveEngData, setLiveEngData] = useState<EngIntel | undefined>(undefined)
   useEffect(() => {
     if (!subject || subject.length < 3) return
-    // Use research result data if available and meaningful
-    if (resEngData && (resEngDataPoints ?? 0) > 1) {
+    const resEngData = researchResult?.engineeringData
+    if (resEngData && resEngDataPoints > 1) {
       setLiveEngData(resEngData)
       return
     }
+    const stdCodes: string[] = JSON.parse(resStdCodesKey)
     let cancelled = false
     import("@/actions/design-standards").then(({ getEngineeringIntelligenceForReport }) =>
-      getEngineeringIntelligenceForReport(
-        resStandardCodes ?? [],
-        resIndustryDomain ?? null,
-        subject,
-      ).then(data => {
-        if (cancelled) return
-        setLiveEngData({
-          materialsApplied: data.materials.map(m => m.code),
-          materialFamilies: data.materials.map(m => m.name),
-          hardwareItemCount: data.hardwareCount,
-          processesApplied: data.processes.map(p => p.displayName),
-          supplierTechniques: 27,
-          totalDataPoints: (resStandardCodes?.length ?? 0) + data.materials.length + data.hardwareCount + data.processes.length,
+      getEngineeringIntelligenceForReport(stdCodes, resIndustryDomain, subject)
+        .then(data => {
+          if (cancelled) return
+          setLiveEngData({
+            materialsApplied: data.materials.map(m => m.code),
+            materialFamilies: data.materials.map(m => m.name),
+            hardwareItemCount: data.hardwareCount,
+            processesApplied: data.processes.map(p => p.displayName),
+            supplierTechniques: 27,
+            totalDataPoints: stdCodes.length + data.materials.length + data.hardwareCount + data.processes.length,
+          })
         })
-      })
     ).catch(err => {
       console.warn("[THE-FORGE] Engineering data fetch failed (non-fatal):", err instanceof Error ? err.message : err)
     })
     return () => { cancelled = true }
-  }, [subject, resStandardCodes, resIndustryDomain, resEngDataPoints, resEngData])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject, resStdCodesKey, resIndustryDomain, resEngDataPoints])
 
   // INTENT: Track hero image load failures via state instead of DOM mutation (avoids React error 418).
   const [heroImgError, setHeroImgError] = useState(false)

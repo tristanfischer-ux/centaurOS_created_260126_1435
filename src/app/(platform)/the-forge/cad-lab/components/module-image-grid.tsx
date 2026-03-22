@@ -428,9 +428,9 @@ function ModuleDetailDialog({
                 <div className="flex flex-wrap gap-1">
                   {engBadges.map((b, i) => (
                     <span key={`eng-${i}`} className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                      b.type === "material" ? "bg-info/10 text-info" :
-                      b.type === "hardware" ? "bg-warning/10 text-warning" :
-                      "bg-success/10 text-success"
+                      b.type === "material" ? "bg-status-info-light text-status-info" :
+                      b.type === "hardware" ? "bg-status-warning-light text-status-warning" :
+                      "bg-status-success-light text-status-success"
                     }`}>
                       {b.type === "material" ? "◆" : b.type === "hardware" ? "⚙" : "⛭"} {b.label}
                     </span>
