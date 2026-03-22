@@ -114,6 +114,7 @@ export async function getEngineeringIntelligenceForReport(
   materials: { code: string; name: string; density: number | null; yieldStrength: number | null; thermalConductivity: number | null; costPerKg: number | null }[]
   processes: { name: string; displayName: string; toleranceTypical: number | null; minWall: number | null }[]
   hardwareCount: number
+  supplierInsights: { technique: string; supplierCount: number; tolerances: string; materials: string }[]
 }> {
   const supabase = await createClient()
 
@@ -181,5 +182,29 @@ export async function getEngineeringIntelligenceForReport(
     .from("standard_hardware")
     .select("id", { count: "exact", head: true })
 
-  return { standards, materials, processes, hardwareCount: hardwareCount ?? 0 }
+  // Fetch Nightshift technique enrichments (real supplier data)
+  let supplierInsights: { technique: string; supplierCount: number; tolerances: string; materials: string }[] = []
+  try {
+    const { data: techData } = await supabase
+      .from("manufacturing_technique_enrichments")
+      .select("technique_slug, supplier_count, real_world_tolerances, real_world_materials")
+      .order("supplier_count", { ascending: false })
+      .limit(10)
+    if (techData) {
+      supplierInsights = techData.map(t => {
+        const tols = t.real_world_tolerances as Record<string, unknown> | null
+        const mats = t.real_world_materials as Array<{ material?: string }> | null
+        return {
+          technique: (t.technique_slug as string).replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase()),
+          supplierCount: (t.supplier_count as number) ?? 0,
+          tolerances: tols ? `${tols.min_mm ?? "?"}–${tols.max_mm ?? "?"}mm` : "—",
+          materials: Array.isArray(mats) ? mats.slice(0, 3).map(m => m.material ?? "").filter(Boolean).join(", ") : "—",
+        }
+      })
+    }
+  } catch {
+    // Non-fatal — technique enrichments may not exist
+  }
+
+  return { standards, materials, processes, hardwareCount: hardwareCount ?? 0, supplierInsights }
 }

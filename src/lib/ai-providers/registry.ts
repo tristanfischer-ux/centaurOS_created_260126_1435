@@ -567,19 +567,25 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
-    const stream = await client.chat.completions.create({
-        model: opts.modelId,
-        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
-        stream: true,
-        max_tokens: opts.maxTokens ?? 4096,
-    })
+    try {
+        const stream = await client.chat.completions.create({
+            model: opts.modelId,
+            messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
+            stream: true,
+            max_tokens: opts.maxTokens ?? 4096,
+        })
 
-    for await (const chunk of stream) {
-        if (opts.signal?.aborted) break
-        const text = chunk.choices[0]?.delta?.content ?? ""
-        if (text) opts.onChunk(text)
+        for await (const chunk of stream) {
+            if (opts.signal?.aborted) break
+            const text = chunk.choices[0]?.delta?.content ?? ""
+            if (text) opts.onChunk(text)
+        }
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamMiniMax] Stream failed:", { model: opts.modelId, error: errorMessage })
+        opts.onError(errorMessage)
     }
-    opts.onDone()
 }
 
 // ─── Together AI Text Streaming (OpenAI-compatible) ──────────────────
@@ -598,19 +604,25 @@ async function streamTogether(opts: StreamingTextOptions): Promise<void> {
 
     const messages = buildMessages(opts)
 
-    const stream = await client.chat.completions.create({
-        model: opts.modelId,
-        messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
-        stream: true,
-        max_tokens: opts.maxTokens ?? 4096,
-    })
+    try {
+        const stream = await client.chat.completions.create({
+            model: opts.modelId,
+            messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
+            stream: true,
+            max_tokens: opts.maxTokens ?? 4096,
+        })
 
-    for await (const chunk of stream) {
-        if (opts.signal?.aborted) break
-        const text = chunk.choices[0]?.delta?.content ?? ""
-        if (text) opts.onChunk(text)
+        for await (const chunk of stream) {
+            if (opts.signal?.aborted) break
+            const text = chunk.choices[0]?.delta?.content ?? ""
+            if (text) opts.onChunk(text)
+        }
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamTogether] Stream failed:", { model: opts.modelId, error: errorMessage })
+        opts.onError(errorMessage)
     }
-    opts.onDone()
 }
 
 // ─── Qwen Text Streaming (DashScope / OpenAI-compatible) ─────────────

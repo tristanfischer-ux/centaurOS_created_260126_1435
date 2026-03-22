@@ -66,9 +66,9 @@ export function ExecutiveProfilePrompt({
         isDismissed ? 'opacity-0 translate-y-4' : 'opacity-100 translate-y-0'
       }`}
     >
-      <div className="bg-white rounded-lg border border-orange-200 shadow-lg p-4">
+      <div className="bg-card rounded-lg border border-international-orange/20 shadow-lg p-4">
         <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-full bg-orange-50 border border-orange-200 flex items-center justify-center flex-shrink-0">
+          <div className="h-10 w-10 rounded-full bg-international-orange/10 border border-international-orange/20 flex items-center justify-center flex-shrink-0">
             <UserCircle className="h-5 w-5 text-international-orange" />
           </div>
           <div className="flex-1 min-w-0">

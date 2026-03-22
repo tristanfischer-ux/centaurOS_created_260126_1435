@@ -21,7 +21,7 @@ import type {
   SalesPipelineSectionData,
   EngineeringActivitySectionData,
 } from '@/lib/reports/report-document-types'
-import type { CompanyIntelligence, FoundryPurposeData, CompanyProfile } from '@/types/foundry'
+import type { CompanyIntelligence, FoundryPurposeData, CompanyProfile, CompanyIntelProduct, CompanyIntelCompetitor } from '@/types/foundry'
 
 /**
  * Collect auto-data from Supabase for the given sources and format as text.
@@ -230,7 +230,7 @@ async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string
   // GOTCHA: JSONB arrays are cast via `as unknown as Json` — could be non-array or contain null fields
   if (intel?.value_proposition) lines.push(`\n### Value Proposition\n${intel.value_proposition}`)
   if (Array.isArray(intel?.products_services) && intel.products_services.length > 0) {
-    const validProducts = intel.products_services.filter((p): p is { name: string; description: string } => !!p?.name)
+    const validProducts = intel.products_services.filter((p): p is CompanyIntelProduct => !!p?.name)
     if (validProducts.length > 0) {
       lines.push('\n### Products & Services')
       for (const p of validProducts) {
@@ -242,7 +242,7 @@ async function fetchCompetitiveIntel(supabase: SupabaseClient, foundryId: string
 
   // Competitor profiles
   if (Array.isArray(intel?.competitors) && intel.competitors.length > 0) {
-    const validCompetitors = intel.competitors.filter((c): c is { name: string; website: string; description: string; differentiator: string } => !!c?.name)
+    const validCompetitors = intel.competitors.filter((c): c is CompanyIntelCompetitor => !!c?.name)
     if (validCompetitors.length > 0) {
       lines.push('\n### Competitor Profiles')
       for (const c of validCompetitors) {
