@@ -42,7 +42,7 @@ export function SettingsNavigation({ isCompanyAdmin, isFounder }: SettingsNaviga
                         key={item.href}
                         href={item.href}
                         className={cn(
-                            "flex items-center gap-2 px-4 py-2.5 text-sm font-medium -mb-px transition-colors whitespace-nowrap",
+                            "flex items-center gap-2 px-3 py-3 sm:px-4 sm:py-2.5 text-sm font-medium -mb-px transition-colors whitespace-nowrap min-h-[44px]",
                             isActive
                                 ? "border-b-2 border-international-orange text-foreground"
                                 : "text-muted-foreground hover:text-foreground border-b-2 border-transparent"

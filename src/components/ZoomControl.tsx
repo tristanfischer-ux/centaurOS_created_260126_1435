@@ -69,14 +69,14 @@ export function ZoomControl({ className, onZoomChange }: ZoomControlProps) {
                 onClick={zoomOut}
                 disabled={!canZoomOut}
                 className={cn(
-                    "p-1.5 transition-colors",
+                    "p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors",
                     canZoomOut
                         ? "text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted/80"
                         : "text-muted-foreground/30 cursor-not-allowed"
                 )}
                 aria-label="Zoom out"
             >
-                <Minus className="h-3.5 w-3.5" />
+                <Minus className="h-4 w-4" />
             </button>
             
             <span className="min-w-[3rem] text-center text-[11px] font-mono text-muted-foreground tabular-nums">
@@ -87,14 +87,14 @@ export function ZoomControl({ className, onZoomChange }: ZoomControlProps) {
                 onClick={zoomIn}
                 disabled={!canZoomIn}
                 className={cn(
-                    "p-1.5 transition-colors",
+                    "p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors",
                     canZoomIn
                         ? "text-muted-foreground hover:text-foreground hover:bg-muted active:bg-muted/80"
                         : "text-muted-foreground/30 cursor-not-allowed"
                 )}
                 aria-label="Zoom in"
             >
-                <Plus className="h-3.5 w-3.5" />
+                <Plus className="h-4 w-4" />
             </button>
         </div>
     )

@@ -95,7 +95,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
     <div className="max-w-5xl space-y-6">
       {/* Action filters */}
       <div className="flex flex-wrap items-center gap-2">
-        <Link href="/settings/audit-log">
+        <Link href="/settings/audit-log" className="min-h-[44px] flex items-center">
           <Badge variant={!actionFilter ? 'default' : 'outline'} size="sm" className="cursor-pointer">
             All
           </Badge>
@@ -104,7 +104,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
           const config = getActionConfig(action)
           const isActive = actionFilter === action
           return (
-            <Link key={action} href={`/settings/audit-log?action=${action}`}>
+            <Link key={action} href={`/settings/audit-log?action=${action}`} className="min-h-[44px] flex items-center">
               <Badge
                 variant={isActive ? config.variant : 'outline'}
                 size="sm"
@@ -192,7 +192,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                       ...(actionFilter ? { action: actionFilter } : {}),
                       page: String(page - 1),
                     })}`}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center px-2"
                   >
                     Previous
                   </Link>
@@ -203,7 +203,7 @@ export default async function AuditLogPage({ searchParams }: PageProps) {
                       ...(actionFilter ? { action: actionFilter } : {}),
                       page: String(page + 1),
                     })}`}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center px-2"
                   >
                     Next
                   </Link>

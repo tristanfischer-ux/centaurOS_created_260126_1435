@@ -88,11 +88,15 @@ export function ZoomableContent({ children, className, style: styleProp, ...rest
         setMounted(true)
     }, [])
 
-    // Only apply zoom style when actually zoomed (not at 100%).
-    // Setting zoom: 1 explicitly can cause subpixel layout gaps in
-    // flex containers, especially in Safari/WebKit.
+    // DECISION: Use transform: scale() instead of CSS zoom property (RT).
+    // CSS `zoom` blocks native pinch-to-zoom on iOS/Android, making the
+    // page unzoomable. transform: scale() doesn't interfere with native
+    // pinch gestures. transformOrigin: "top left" prevents content from
+    // shifting during zoom.
     const zoomStyle: CSSProperties = mounted && zoom !== DEFAULT_ZOOM ? {
-        zoom: zoom / 100,
+        transform: `scale(${zoom / 100})`,
+        transformOrigin: "top left",
+        width: `${10000 / zoom}%`,
         WebkitTextSizeAdjust: "100%" as const,
     } : {}
 

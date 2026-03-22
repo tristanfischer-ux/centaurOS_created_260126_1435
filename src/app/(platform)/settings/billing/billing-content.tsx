@@ -293,7 +293,7 @@ export function BillingContent({
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <p className="text-2xl font-semibold text-foreground">
                 {aiUsage.totalAiTasks}
