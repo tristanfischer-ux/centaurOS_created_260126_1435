@@ -335,7 +335,7 @@ export function MessageBubble({
       {/* Avatar */}
       {showAvatar && !isOwn && (
         <UserAvatar
-          name={sender.full_name || sender.email}
+          name={sender.full_name || 'Unknown'}
           avatarUrl={sender.avatar_url}
           size="sm"
           className="flex-shrink-0"
@@ -347,7 +347,7 @@ export function MessageBubble({
         {/* Sender name (only for received messages) */}
         {!isOwn && showAvatar && (
           <span className="text-xs text-muted-foreground px-1">
-            {sender.full_name || sender.email}
+            {sender.full_name || 'Unknown'}
           </span>
         )}
 

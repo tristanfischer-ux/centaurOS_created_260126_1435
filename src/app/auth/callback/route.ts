@@ -2,7 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { setupNewUser } from '@/lib/auth/setup-new-user'
-import { escapeHtml } from '@/lib/security/sanitize'
 
 /**
  * Validates redirect path to prevent open redirect attacks.
@@ -77,17 +76,19 @@ export async function GET(request: Request) {
         const cookieStore = await cookies()
         const contextCookie = cookieStore.get('forge_signup_context')
         // DECISION: Default to executive for new OAuth users (simplified signup)
-        let signupRole: 'founder' | 'executive' | 'apprentice' | 'supplier' = 'executive'
+        const signupRole: 'founder' | 'executive' | 'apprentice' | 'supplier' = 'executive'
         let companyName: string | undefined
         let signupIndustry: string | undefined
         let signupStage: string | undefined
 
+        // SECURITY: OAuth users always default to 'executive'. The forge_signup_context
+        // cookie is unsigned and client-settable — trusting ctx.role would let anyone
+        // escalate to 'founder' (getting their own foundry) or 'supplier' via OAuth.
+        // Founders use the post-signup "Create Company" flow instead.
         if (contextCookie?.value) {
           try {
             const ctx = JSON.parse(decodeURIComponent(contextCookie.value))
-            if (ctx.role && ['founder', 'executive', 'apprentice', 'supplier'].includes(ctx.role)) {
-              signupRole = ctx.role
-            }
+            // SECURITY: Only read non-role fields from cookie. Role is always 'executive'.
             companyName = ctx.companyName
             signupIndustry = ctx.industry
             signupStage = ctx.stage
@@ -97,14 +98,16 @@ export async function GET(request: Request) {
         }
 
         // SECURITY: Sanitize all user-derived values before DB writes
+        // Strip HTML tags and control chars (escapeHtml was removed — it double-encodes
+        // names like O'Brien → O&#x27;Brien because React already auto-escapes on render)
         const rawName = user.user_metadata?.full_name
           || user.user_metadata?.name
           || user.email?.split('@')[0]
           || 'User'
-        const fullName = escapeHtml(String(rawName).trim().slice(0, 100))
-        const sanitizedCompany = companyName ? escapeHtml(String(companyName).trim().slice(0, 100)) : undefined
-        const sanitizedIndustry = signupIndustry ? escapeHtml(String(signupIndustry).trim().slice(0, 100)) : undefined
-        const sanitizedStage = signupStage ? escapeHtml(String(signupStage).trim().slice(0, 100)) : undefined
+        const fullName = String(rawName).trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '')
+        const sanitizedCompany = companyName ? String(companyName).trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : undefined
+        const sanitizedIndustry = signupIndustry ? String(signupIndustry).trim().slice(0, 100).replace(/<[^>]*>/g, '') : undefined
+        const sanitizedStage = signupStage ? String(signupStage).trim().slice(0, 100).replace(/<[^>]*>/g, '') : undefined
 
         // Read referral code from cookie (set via ?ref= on join page)
         const referralCode = cookieStore.get('forge_ref')?.value || null

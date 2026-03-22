@@ -237,6 +237,8 @@ const LISTING_COLUMNS = [
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import { rateLimit, getClientIP } from '@/lib/security/rate-limit'
+import { headers } from 'next/headers'
 
 /** Max semantic results to fetch during hybrid search. */
 const SEMANTIC_MATCH_COUNT = 50
@@ -305,6 +307,15 @@ export interface SearchMarketplaceListingsResult {
 export async function searchMarketplaceListings(
     params: SearchMarketplaceListingsParams
 ): Promise<SearchMarketplaceListingsResult> {
+    // SECURITY: Rate limit search — 60 searches per minute per IP
+    // (runs 7+ parallel queries per call, so limit is generous but prevents abuse)
+    const headersList = await headers()
+    const clientIP = getClientIP(headersList)
+    const rl = await rateLimit('aiSearch', clientIP)
+    if (!rl.success) {
+        return { data: [], totalCount: 0, hasMore: false, categoryCounts: {} }
+    }
+
     const supabase = await createClient()
     const page = Math.max(1, params.page ?? 1)
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? MARKETPLACE_PAGE_SIZE))

@@ -67,6 +67,23 @@ export async function setupNewUser({
   businessType,
   referralCode,
 }: SetupNewUserParams): Promise<SetupNewUserResult> {
+  // SECURITY: Idempotency guard — if profile already exists, this is a duplicate
+  // call (e.g., signup race condition, double-click). Return early to prevent
+  // duplicate foundry/membership creation.
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("id, foundry_id")
+    .eq("id", userId)
+    .single();
+
+  if (existingProfile) {
+    console.warn("[setupNewUser] Profile already exists for user, skipping:", userId);
+    return {
+      foundryId: existingProfile.foundry_id || "forge-guild",
+      redirectPath: role === "supplier" ? "/supplier-portal" : "/today",
+    };
+  }
+
   const memberRole = capitalizeRole(role);
   let foundryId: string;
   let accountType: "team_builder" | "supplier" | null = null;

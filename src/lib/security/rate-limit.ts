@@ -301,6 +301,20 @@ export async function checkRateLimit(
  * Useful for unlocking after successful verification
  */
 export async function resetRateLimit(action: string, identifier: string): Promise<void> {
-    const key = `ratelimit:${action}:${identifier}`
-    rateLimitStore.delete(key)
+    // Clear in-memory fallback
+    const memKey = `ratelimit:${action}:${identifier}`
+    rateLimitStore.delete(memKey)
+
+    // SECURITY: Also clear distributed store in production
+    if (useDistributed) {
+        const supabase = getRateLimitClient()
+        if (supabase) {
+            const distKey = `${action}:${identifier}`
+            try {
+                await supabase.rpc('reset_rate_limit', { p_key: distKey })
+            } catch (err) {
+                console.warn('[SECURITY] Failed to reset distributed rate limit:', err)
+            }
+        }
+    }
 }

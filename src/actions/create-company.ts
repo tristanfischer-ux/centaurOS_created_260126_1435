@@ -15,6 +15,7 @@ import { withUser } from "@/lib/server-action-utils"
 import { clearFoundryCache } from "@/lib/supabase/foundry-context"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { revalidatePath } from "next/cache"
+import { rateLimit } from "@/lib/security/rate-limit"
 
 function generateSlug(name: string): string {
   const slug = name
@@ -31,6 +32,12 @@ export async function createCompanyFoundry(params: {
   stage?: string
 }): Promise<{ success: true; foundryId: string; foundryName: string } | { success: false; error: string }> {
   return withUser(async ({ supabase, user }) => {
+    // SECURITY: Rate limit foundry creation — 5 attempts per hour per user
+    const rl = await rateLimit('api', `create-company:${user.id}`, { limit: 5, window: 60 * 60 * 1000 })
+    if (!rl.success) {
+      return { success: false as const, error: 'Too many attempts. Please try again later.' }
+    }
+
     const { companyName: rawName, industry, stage } = params
 
     // VALIDATION: Company name is required

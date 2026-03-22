@@ -20,5 +20,5 @@ export function getConversationDisplayName(
     return conv.title
   }
   const otherParticipant = conv.buyer?.id === currentUserId ? conv.seller : conv.buyer
-  return otherParticipant?.full_name || otherParticipant?.email || 'Unknown'
+  return otherParticipant?.full_name || 'Unknown'
 }

@@ -194,7 +194,6 @@ export async function sendNewMessage(
           id: sender?.id || user.id,
           full_name: sender?.full_name || null,
           avatar_url: sender?.avatar_url || null,
-          email: '', // Intentionally empty for security - not sent to client
         }
       }
       
@@ -316,14 +315,9 @@ export async function archiveConversation(
         return { error: 'Access denied' }
       }
 
-      // DECISION: Prevent archiving group conversations — archive is global (on
-      // conversations.status), so one user archiving would hide it for everyone.
-      const conv = await getConversation(supabase, conversationId)
-      if (conv?.is_group) {
-        return { error: 'Cannot archive group conversations' }
-      }
-
-      await archiveConv(supabase, conversationId)
+      // Per-user archive: sets is_archived on the participant row, not the
+      // conversation status. Group conversations are now safe to archive.
+      await archiveConv(supabase, conversationId, user.id)
       
       revalidatePath('/updates')
 
@@ -350,13 +344,8 @@ export async function unarchiveConversation(
         return { error: 'Access denied' }
       }
 
-      // DECISION: Prevent unarchiving group conversations (same as archive)
-      const conv = await getConversation(supabase, conversationId)
-      if (conv?.is_group) {
-        return { error: 'Cannot unarchive group conversations' }
-      }
-
-      await unarchiveConv(supabase, conversationId)
+      // Per-user unarchive
+      await unarchiveConv(supabase, conversationId, user.id)
       
       revalidatePath('/updates')
 

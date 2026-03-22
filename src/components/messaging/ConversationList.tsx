@@ -64,10 +64,9 @@ export function ConversationList({
       if (!otherParticipant) return false
       const searchLower = searchQuery.toLowerCase()
       const nameMatch = otherParticipant.full_name?.toLowerCase().includes(searchLower)
-      const emailMatch = otherParticipant.email.toLowerCase().includes(searchLower)
       const contentMatch = conv.last_message?.content?.toLowerCase().includes(searchLower)
-      
-      if (!nameMatch && !emailMatch && !contentMatch) return false
+
+      if (!nameMatch && !contentMatch) return false
     }
     
     return true
@@ -191,7 +190,7 @@ export function ConversationList({
                 >
                   {/* Avatar */}
                   <UserAvatar
-                    name={otherParticipant.full_name || otherParticipant.email}
+                    name={otherParticipant.full_name || 'Unknown'}
                     avatarUrl={otherParticipant.avatar_url}
                     size="md"
                     className="flex-shrink-0"
@@ -204,7 +203,7 @@ export function ConversationList({
                         'text-sm truncate',
                         hasUnread ? 'font-semibold text-foreground' : 'text-foreground'
                       )}>
-                        {otherParticipant.full_name || otherParticipant.email}
+                        {otherParticipant.full_name || 'Unknown'}
                       </span>
                       <span className="text-xs text-muted-foreground flex-shrink-0">
                         {conversation.last_message 

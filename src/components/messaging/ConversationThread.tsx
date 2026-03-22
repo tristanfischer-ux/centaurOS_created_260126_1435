@@ -463,13 +463,13 @@ export function ConversationThread({
               </Button>
             )}
             <UserAvatar
-              name={otherParticipant.full_name || otherParticipant.email}
+              name={otherParticipant.full_name || 'Unknown'}
               avatarUrl={otherParticipant.avatar_url}
               size="md"
             />
             <div>
               <h3 className="font-medium text-sm">
-                {otherParticipant.full_name || otherParticipant.email}
+                {otherParticipant.full_name || 'Unknown'}
               </h3>
               {!isConnected && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">

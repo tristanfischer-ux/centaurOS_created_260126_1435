@@ -127,31 +127,25 @@ async function checkAndGrantFoundingMember(
   try {
     const admin = createAdminClient()
 
-    // Check current count
-    const { data: count } = await admin.rpc('get_founding_member_count')
-    if ((count || 0) >= FOUNDING_MEMBER_LIMIT) return
+    // SECURITY: Use atomic SQL function to prevent TOCTOU race condition.
+    // The old approach (read count → assign count+1) could assign duplicate
+    // founding_member_numbers under concurrent signups.
+    const { data, error } = await admin.rpc('assign_founding_member_atomically' as never, {
+      p_user_id: userId,
+      p_foundry_id: foundryId,
+      p_credit_amount: FOUNDING_MEMBER_CREDIT_AMOUNT,
+      p_member_limit: FOUNDING_MEMBER_LIMIT,
+    } as never)
 
-    const memberNumber = (count || 0) + 1
+    if (error) {
+      console.warn('[Referral] assign_founding_member_atomically RPC failed:', error.message)
+      return
+    }
 
-    // Mark as founding member
-    await admin
-      .from('profiles')
-      .update({
-        is_founding_member: true,
-        founding_member_number: memberNumber,
-      })
-      .eq('id', userId)
-
-    // Grant +25 founding member credits
-    await admin.from('referral_credits').insert({
-      foundry_id: foundryId,
-      granted_to: userId,
-      granted_by: null,
-      amount: FOUNDING_MEMBER_CREDIT_AMOUNT,
-      reason: 'founding_member',
-    })
-
-    console.info('[Referral] Founding member #' + memberNumber + ':', userId)
+    const result = data as { granted: boolean; member_number?: number; reason?: string } | null
+    if (result?.granted) {
+      console.info('[Referral] Founding member #' + result.member_number + ':', userId)
+    }
   } catch (error) {
     console.warn('[Referral] checkAndGrantFoundingMember failed:', error)
   }

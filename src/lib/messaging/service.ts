@@ -38,11 +38,11 @@ export interface ConversationParticipant {
   joined_at: string
   last_read_at: string | null
   is_muted: boolean
+  is_archived: boolean
   profile?: {
     id: string
     full_name: string | null
     avatar_url: string | null
-    email: string
     role?: string | null
   }
 }
@@ -87,13 +87,11 @@ export interface ConversationWithParticipants extends Conversation {
     id: string
     full_name: string | null
     avatar_url: string | null
-    email: string
   } | null
   seller: {
     id: string
     full_name: string | null
     avatar_url: string | null
-    email: string
   } | null
   last_message?: Message | null
   unread_count?: number
@@ -122,7 +120,6 @@ export interface MessageWithSender extends Message {
     id: string
     full_name: string | null
     avatar_url: string | null
-    email: string
     role?: string | null
   }
 }
@@ -343,8 +340,8 @@ export async function getConversation(
     .from('conversations')
     .select(`
       *,
-      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
-      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email)
+      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url),
+      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url)
     `)
     .eq('id', conversationId)
     .single()
@@ -372,8 +369,8 @@ export async function getConversationsForUser(
     .from('conversations')
     .select(`
       *,
-      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
-      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email),
+      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url),
+      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url),
       conversation_participants!inner(profile_id)
     `)
     .eq('conversation_participants.profile_id', userId)
@@ -448,7 +445,7 @@ export async function getMessages(
     .from('messages')
     .select(`
       *,
-      sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email)
+      sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url)
     `)
     .eq('conversation_id', conversationId)
     .eq('is_deleted', false)
@@ -470,45 +467,72 @@ export async function getMessages(
 }
 
 /**
- * Archive a conversation
+ * Archive a conversation for a specific user.
+ *
+ * SECURITY: Sets is_archived on the participant row, not the conversation status.
+ * This way archiving only affects the requesting user, not all participants.
  */
 export async function archiveConversation(
   supabase: AnySupabaseClient,
-  conversationId: string
-): Promise<Conversation> {
-  const { data, error } = await supabase
-    .from('conversations')
-    .update({ status: 'archived' })
-    .eq('id', conversationId)
-    .select()
-    .single()
+  conversationId: string,
+  userId?: string
+): Promise<void> {
+  if (userId) {
+    // Per-user archive via conversation_participants
+    const { error } = await supabase
+      .from('conversation_participants')
+      .update({ is_archived: true })
+      .eq('conversation_id', conversationId)
+      .eq('profile_id', userId)
 
-  if (error) {
-    throw new Error(`Failed to archive conversation: ${error.message}`)
+    if (error) {
+      throw new Error(`Failed to archive conversation: ${error.message}`)
+    }
+  } else {
+    // Legacy fallback: global archive (kept for backward compat)
+    const { error } = await supabase
+      .from('conversations')
+      .update({ status: 'archived' })
+      .eq('id', conversationId)
+
+    if (error) {
+      throw new Error(`Failed to archive conversation: ${error.message}`)
+    }
   }
-
-  return data as Conversation
 }
 
 /**
- * Unarchive a conversation
+ * Unarchive a conversation for a specific user.
+ *
+ * SECURITY: Clears is_archived on the participant row only.
  */
 export async function unarchiveConversation(
   supabase: AnySupabaseClient,
-  conversationId: string
-): Promise<Conversation> {
-  const { data, error } = await supabase
-    .from('conversations')
-    .update({ status: 'active' })
-    .eq('id', conversationId)
-    .select()
-    .single()
+  conversationId: string,
+  userId?: string
+): Promise<void> {
+  if (userId) {
+    // Per-user unarchive via conversation_participants
+    const { error } = await supabase
+      .from('conversation_participants')
+      .update({ is_archived: false })
+      .eq('conversation_id', conversationId)
+      .eq('profile_id', userId)
 
-  if (error) {
-    throw new Error(`Failed to unarchive conversation: ${error.message}`)
+    if (error) {
+      throw new Error(`Failed to unarchive conversation: ${error.message}`)
+    }
+  } else {
+    // Legacy fallback
+    const { error } = await supabase
+      .from('conversations')
+      .update({ status: 'active' })
+      .eq('id', conversationId)
+
+    if (error) {
+      throw new Error(`Failed to unarchive conversation: ${error.message}`)
+    }
   }
-
-  return data as Conversation
 }
 
 // ============================================================================
@@ -821,7 +845,7 @@ export async function getConversationParticipants(
     .from('conversation_participants')
     .select(`
       *,
-      profile:profiles!conversation_participants_profile_id_fkey(id, full_name, avatar_url, email, role)
+      profile:profiles!conversation_participants_profile_id_fkey(id, full_name, avatar_url, role)
     `)
     .eq('conversation_id', conversationId)
 
@@ -851,8 +875,8 @@ export async function getEnhancedConversationsForUser(
     .from('conversations')
     .select(`
       *,
-      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
-      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email),
+      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url),
+      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url),
       task:tasks!conversations_task_id_fkey(id, title, task_number, status),
       objective:objectives!conversations_objective_id_fkey(id, title),
       listing:marketplace_listings!conversations_listing_id_fkey(id, title, category),
@@ -1034,8 +1058,8 @@ export async function searchConversations(
     .from('conversations')
     .select(`
       *,
-      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url, email),
-      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url, email),
+      buyer:profiles!conversations_buyer_id_fkey(id, full_name, avatar_url),
+      seller:profiles!conversations_seller_id_fkey(id, full_name, avatar_url),
       conversation_participants!inner(profile_id)
     `)
     .eq('conversation_participants.profile_id', userId)
@@ -1310,7 +1334,7 @@ export async function getTaskThread(
       content,
       created_at,
       conversation_id,
-      sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
+      sender:profiles!messages_sender_id_fkey(id, full_name, avatar_url, role, foundry_id)
     `)
     .eq('task_id', taskId)
     .eq('is_deleted', false)
@@ -1329,7 +1353,7 @@ export async function getTaskThread(
       created_at,
       task_id,
       synced_from_message,
-      user:profiles!task_comments_user_id_fkey(id, full_name, avatar_url, email, role, foundry_id)
+      user:profiles!task_comments_user_id_fkey(id, full_name, avatar_url, role, foundry_id)
     `)
     .eq('task_id', taskId)
     .order('created_at', { ascending: true })
