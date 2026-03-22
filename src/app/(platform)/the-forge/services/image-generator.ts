@@ -29,7 +29,7 @@ import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 
 const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 const NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview" // Nano Banana 2 — 2K resolution, native 3:2 support
-const NANO_BANANA_STABLE_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — stable fallback (gemini-2.5-flash-image was shut down)
+const NANO_BANANA_STABLE_MODEL = "gemini-2.5-flash-image" // Nano Banana (original) — confirmed available via ListModels
 const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
 const STORAGE_BUCKET = "xray-images"
 

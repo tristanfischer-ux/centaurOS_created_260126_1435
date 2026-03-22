@@ -290,7 +290,7 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
       const apiKey = process.env.GEMINI_API_KEY?.trim()
       if (apiKey) {
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite' })
+        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
 
         const topTaskSummaries = topTasks.map((t) =>
           `"${t.title}"${t.dueDate ? ` (due ${t.dueDate})` : ''}`

@@ -86,8 +86,8 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#4285f4",
         bgColor: "bg-blue-50",
         models: [
-            { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", modality: "text", description: "Most intelligent — advanced reasoning and agentic workflows", maxTokens: 1048576 },
-            { id: "gemini-3.1-flash-lite", name: "Gemini 3.1 Flash Lite", modality: "text", description: "Fastest, most cost-efficient Gemini 3 model", maxTokens: 1048576, default: true },
+            { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", modality: "text", description: "Most intelligent — advanced reasoning and agentic workflows", maxTokens: 1048576 },
+            { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite", modality: "text", description: "Fastest, most cost-efficient Gemini 3 model", maxTokens: 1048576, default: true },
             { id: "gemini-3-pro-image-preview", name: "Gemini 3 Pro Image", modality: "image", description: "Advanced image generation with text rendering", default: true },
         ],
     },

@@ -143,8 +143,8 @@ export interface MonthlyUsage {
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
   'gpt-5.3-instant': { input: 1.50, output: 6.00 },
   'gpt-5.4-thinking': { input: 5.00, output: 20.00 },
-  'gemini-3.1-pro': { input: 1.25, output: 5.00 },
-  'gemini-3.1-flash-lite': { input: 0.075, output: 0.30 },
+  'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
+  'gemini-3.1-flash-lite-preview': { input: 0.075, output: 0.30 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
   'claude-opus-4-6': { input: 15.00, output: 75.00 },

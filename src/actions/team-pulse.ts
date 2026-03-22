@@ -245,7 +245,7 @@ export async function generateDailyStandup(): Promise<{ data?: DailyStandup; err
       ).join('\n\n')
 
       const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-flash-lite',
+        model: 'gemini-3.1-flash-lite-preview',
         generationConfig: {
           temperature: 0.5,
           maxOutputTokens: 200,
