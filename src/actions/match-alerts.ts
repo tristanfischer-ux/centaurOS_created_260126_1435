@@ -65,7 +65,8 @@ export async function getMatchAlerts(options?: {
             .eq('user_id', user.id)
             .is('dismissed_at', null)
             .order('created_at', { ascending: false })
-            .limit(options?.limit || 20)
+            // SECURITY: Cap limit to prevent large data dumps
+            .limit(Math.min(options?.limit || 20, 100))
 
         if (options?.type) {
             query = query.eq('type', options.type)

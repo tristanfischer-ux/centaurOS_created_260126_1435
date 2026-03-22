@@ -95,6 +95,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         if (!query || typeof query !== 'string' || query.length < 3) {
             return NextResponse.json({ success: false, error: "Invalid query" }, { status: 400 })
         }
+        // SECURITY: Cap query length to prevent prompt injection and token waste
+        if (query.length > 500) {
+            return NextResponse.json({ success: false, error: "Query too long (max 500 characters)" }, { status: 400 })
+        }
         if (!listings || !Array.isArray(listings) || listings.length === 0) {
             return NextResponse.json({ success: false, error: "No listings provided" }, { status: 400 })
         }
@@ -238,8 +242,10 @@ async function notifyHighScoreMatches(
     // The user's scoped client may not have access to all listings/providers.
     const adminSupabase = createAdminClient()
 
-    // Resolve listing IDs → user IDs via marketplace_listings → provider_profiles
-    const listingIds = matches.map(m => m.id)
+    // SECURITY: Validate IDs from AI output are valid UUIDs before querying
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    const listingIds = matches.map(m => m.id).filter(id => uuidRegex.test(id))
+    if (listingIds.length === 0) return
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: listings } = await (adminSupabase as any)
         .from('marketplace_listings')

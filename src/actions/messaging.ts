@@ -32,6 +32,7 @@ import {
 } from '@/lib/messaging/service'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { createClient } from '@/lib/supabase/server'
+import { rateLimit } from '@/lib/security/rate-limit'
 
 // INTENT: Auth check via conversation_participants covers all conversation types
 // (direct, task, objective, expert) — unlike buyer_id/seller_id which are null
@@ -130,6 +131,12 @@ export async function sendNewMessage(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // SECURITY: Rate limit — 30 messages per minute per user
+      const rl = await rateLimit('api', `msg:${user.id}`, { limit: 30, window: 60 * 1000 })
+      if (!rl.success) {
+        return { error: 'Too many messages. Please slow down.' }
+      }
+
       // VALIDATION: Content must be non-empty and bounded
       const trimmed = content.trim()
       if (!trimmed && !fileUrl) {
@@ -212,6 +219,12 @@ export async function startConversation(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // SECURITY: Rate limit — 10 new conversations per hour per user
+      const rl = await rateLimit('api', `conv:${user.id}`, { limit: 10, window: 60 * 60 * 1000 })
+      if (!rl.success) {
+        return { error: 'Too many conversations. Please try again later.' }
+      }
+
       const { sellerId, orderId, rfqId, listingId, initialMessage } = params
 
       // VALIDATION: Verify seller exists and prevent self-messaging
@@ -637,6 +650,12 @@ export async function contactExpert(
 ) {
   return withUser(async ({ supabase, user }) => {
     try {
+      // SECURITY: Rate limit — 10 expert contacts per hour per user
+      const rl = await rateLimit('api', `expert:${user.id}`, { limit: 10, window: 60 * 60 * 1000 })
+      if (!rl.success) {
+        return { error: 'Too many contact requests. Please try again later.' }
+      }
+
       // Get provider's user_id from provider_profiles
       const { data: provider, error: providerError } = await supabase
         .from('provider_profiles')

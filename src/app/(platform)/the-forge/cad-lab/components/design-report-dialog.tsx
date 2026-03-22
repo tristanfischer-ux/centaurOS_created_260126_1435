@@ -18,7 +18,7 @@
  * - src/actions/cad-lab-report.ts — AI pipeline (structureReportOutline + writeReportSections)
  */
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { FileDown, FileText, Presentation, Printer, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
@@ -87,6 +87,11 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
   const [aiEnabled, setAiEnabled] = useState(true)
   const exportStartedRef = useRef(false)
+
+  // Reset guard when dialog reopens
+  useEffect(() => {
+    if (open) exportStartedRef.current = false
+  }, [open])
 
   const {
     subject,
@@ -192,7 +197,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             const { structureReportOutline, writeReportSections } = await import("@/actions/cad-lab-report")
             const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
 
-            update({ stepLabel: "AI: Writing executive summary...", progress: 40 })
+            update({ stepLabel: `AI: Writing ${moduleCount} sections...`, progress: 40 })
             const aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
 
             data.aiContent = aiContent

@@ -94,6 +94,8 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
  * @returns Demo account data if available, null otherwise
  */
 export async function getDemoAccountData(role: string): Promise<Omit<DemoAccountData, 'password'> | null> {
+  // SECURITY: Disable demo accounts in production
+  if (process.env.NODE_ENV === 'production') return null
   const normalizedRole = role.toLowerCase()
   const account = DEMO_ACCOUNTS[normalizedRole]
   if (!account) return null
@@ -104,9 +106,11 @@ export async function getDemoAccountData(role: string): Promise<Omit<DemoAccount
 
 /**
  * Get all available demo roles
- * 
+ *
  * @returns Array of available demo role names
  */
 export async function getAvailableDemoRoles(): Promise<string[]> {
+  // SECURITY: Disable demo accounts in production
+  if (process.env.NODE_ENV === 'production') return []
   return Object.keys(DEMO_ACCOUNTS)
 }

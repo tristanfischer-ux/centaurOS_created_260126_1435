@@ -552,6 +552,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [tripoPreviewStatus, setTripoPreviewStatus] = useState<"idle" | "generating" | "complete" | "failed">("idle")
   const [tripoPreviewError, setTripoPreviewError] = useState<string | null>(null)
   const tripoAbortRef = useRef<AbortController | null>(null)
+  const tripoGuardRef = useRef(false)
 
   // ── Integration (combined assembly) ──
   const [integratedAssemblyStlUrl, setIntegratedAssemblyStlUrl] = useState<string | null>(null)
@@ -2309,6 +2310,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               if (done) break
               buffer += decoder.decode(value, { stream: true })
 
+              // SECURITY: Guard against unbounded buffer accumulation
+              if (buffer.length > 1_000_000) {
+                console.warn("[CAD-LAB] SSE buffer exceeded 1MB, aborting")
+                await reader.cancel()
+                break
+              }
+
               // Parse complete SSE messages from buffer
               const messages = buffer.split("\n\n")
               buffer = messages.pop() ?? "" // Keep incomplete message in buffer
@@ -3443,6 +3451,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           if (done) break
           buffer += decoder.decode(value, { stream: true })
 
+          // SECURITY: Guard against unbounded buffer accumulation
+          if (buffer.length > 1_000_000) {
+            console.warn("[CAD-LAB] SSE buffer exceeded 1MB, aborting")
+            await reader.cancel()
+            break
+          }
+
           const messages = buffer.split("\n\n")
           buffer = messages.pop() ?? ""
 
@@ -3674,6 +3689,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       return
     }
 
+    // SECURITY: Prevent duplicate concurrent Tripo requests
+    if (tripoGuardRef.current) return
+    tripoGuardRef.current = true
+
     // Cancel any in-flight preview request
     if (tripoAbortRef.current) {
       tripoAbortRef.current.abort()
@@ -3744,18 +3763,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         const msg = err instanceof Error ? err.message : "Unknown error"
         setTripoPreviewStatus("failed")
         setTripoPreviewError(msg)
+      } finally {
+        tripoGuardRef.current = false
       }
     })()
   }, [providerResults, tripoPreviewStatus])
-
-  // INTENT: Auto-trigger Tripo 3D preview after hero illustration completes.
-  // This lets the 3D model start generating while the user views the 2D image,
-  // so it's ready (or nearly ready) when they switch to the 3D tab.
-  useEffect(() => {
-    if (systemIllustrationStatus === "complete" && tripoPreviewStatus === "idle") {
-      handleGenerateTripoPreview()
-    }
-  }, [systemIllustrationStatus, tripoPreviewStatus, handleGenerateTripoPreview])
 
   // INTENT: Execute edited unified code on Modal — mirrors handleExecuteModuleCode but
   // updates unifiedResult/unifiedCode instead of per-module state.

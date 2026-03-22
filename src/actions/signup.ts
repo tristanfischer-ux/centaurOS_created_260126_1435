@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers, cookies } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
-import { sanitizeEmail, escapeHtml, sanitizeErrorMessage } from "@/lib/security/sanitize";
+import { sanitizeEmail, sanitizeErrorMessage } from "@/lib/security/sanitize";
 import { setupNewUser, capitalizeRole } from "@/lib/auth/setup-new-user";
 
 // Direct signup roles (Founder, Executive, Apprentice, Supplier)
@@ -145,10 +145,12 @@ export async function signup(_prevState: SignupState, formData: FormData): Promi
     return errorWithValues("Invalid email address");
   }
 
-  // Security: Sanitize name to prevent XSS
-  const fullName = rawFullName ? escapeHtml(rawFullName.trim().slice(0, 100)) : "";
-  const companyName = rawCompanyName ? escapeHtml(rawCompanyName.trim().slice(0, 100)) : null;
-  const businessName = rawBusinessName ? escapeHtml(rawBusinessName.trim().slice(0, 100)) : null;
+  // SECURITY: Strip HTML tags and control characters — React auto-escapes on render,
+  // and Supabase parameterized queries prevent SQL injection. escapeHtml() was removed
+  // because it double-encodes (O'Brien → O&#x27;Brien in DB → literal entity in React).
+  const fullName = rawFullName ? rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : "";
+  const companyName = rawCompanyName ? rawCompanyName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
+  const businessName = rawBusinessName ? rawBusinessName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '') : null;
 
   // Founder-specific fields (used later for foundry creation)
   // SECURITY: Sanitize industry/stage same as other fields
@@ -366,7 +368,7 @@ export async function submitApplication(formData: FormData) {
   if (!email) {
     return redirect(`/join/${role}?error=Invalid+email+address`);
   }
-  const fullName = escapeHtml(rawFullName.trim().slice(0, 100));
+  const fullName = rawFullName.trim().slice(0, 100).replace(/<[^>]*>/g, '').replace(/[\x00-\x1F\x7F]/g, '');
 
   // SECURITY: Sanitize role-specific fields
   const sanitizeField = (key: string) => {

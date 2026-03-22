@@ -45,6 +45,12 @@ export async function notifyNewRFQ(
     try {
         const supabase = await createClient()
 
+        // SECURITY: Require authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, sent: 0, error: 'Authentication required' }
+        }
+
         // Get RFQ details
         const { data: rfq, error: rfqError } = await supabase
             .from('manufacturing_rfqs')
@@ -125,6 +131,12 @@ export async function notifyBookingRequest(
 ): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+
+        // SECURITY: Require authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, error: 'Authentication required' }
+        }
 
         // Get booking details - this assumes a marketplace_orders table exists
         // Note: marketplace_orders table may not be in generated types yet
@@ -223,6 +235,12 @@ export async function notifyPaymentReceived(
     try {
         const supabase = await createClient()
 
+        // SECURITY: Require authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, error: 'Authentication required' }
+        }
+
         // Get order details
         // Note: marketplace_orders table may not be in generated types yet
         const { data: order, error: orderError } = await supabase
@@ -318,6 +336,13 @@ export async function notifyOrderStatusChange(
 ): Promise<{ success: boolean; error: string | null }> {
     try {
         const supabase = await createClient()
+
+        // SECURITY: Require authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, error: 'Authentication required' }
+        }
+
         const { notifyBuyer = true, notifySeller = true, message } = options || {}
 
         // Get order details
@@ -468,8 +493,15 @@ export async function notifyEscrowReleased(
     amount: number
 ): Promise<{ success: boolean; error: string | null }> {
     try {
+        // SECURITY: Require authenticated user
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, error: 'Authentication required' }
+        }
+
         const formattedAmount = formatCurrency(amount)
-        
+
         const result = await sendNotification({
             userId: sellerId,
             priority: 'high',
@@ -501,6 +533,13 @@ export async function notifyNewReview(
     listingId: string
 ): Promise<{ success: boolean; error: string | null }> {
     try {
+        // SECURITY: Require authenticated user
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            return { success: false, error: 'Authentication required' }
+        }
+
         const result = await sendNotification({
             userId: sellerId,
             priority: 'medium',
