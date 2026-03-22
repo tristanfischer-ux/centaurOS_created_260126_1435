@@ -27,6 +27,7 @@ import { AdvisorPanel } from "@/components/specialists/advisor-panel";
 import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
+import { MobileDesktopBanner } from "@/components/mobile-desktop-banner";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
@@ -115,6 +116,7 @@ export default async function PlatformLayout({
                                     <ProfileSetupRequired userRole={profile?.role} />
                                 ) : (
                                     <>
+                                        <MobileDesktopBanner />
                                         <WelcomeBackBanner userName={profile?.full_name || user.email || "builder"} />
                                         <ErrorBoundary>
                                             {children}
@@ -126,7 +128,7 @@ export default async function PlatformLayout({
                         <Suspense fallback={null}>
                             <AdvisorPanel />
                         </Suspense>
-                        <MobileNav />
+                        <MobileNav foundryName={foundryName} />
                         <Suspense fallback={null}>
                             <FloatingSpecialistFAB />
                         </Suspense>

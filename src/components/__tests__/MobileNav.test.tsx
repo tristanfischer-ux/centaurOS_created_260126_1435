@@ -24,6 +24,10 @@ jest.mock("@/lib/features/registry", () => ({
   isRouteAlpha: jest.fn(() => false),
 }))
 
+jest.mock("@/actions/match-alerts", () => ({
+  getUnreadAlertCount: jest.fn(() => Promise.resolve(0)),
+}))
+
 jest.mock("@/components/ui/dropdown-menu", () => {
   type MockDropdownProps = {
     children?: React.ReactNode

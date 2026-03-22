@@ -65,6 +65,7 @@ import {
 import { isRouteAlpha } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
+import { getUnreadAlertCount } from "@/actions/match-alerts"
 
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 
@@ -140,10 +141,23 @@ const marketplaceMoreNavigation = [
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 
-export function MobileNav() {
+interface MobileNavProps {
+    foundryName?: string
+}
+
+export function MobileNav({ foundryName }: MobileNavProps) {
     const pathname = usePathname()
     const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
+    const [unreadCount, setUnreadCount] = React.useState(0)
+
+    // Fetch unread alert count on mount and route change (matches Sidebar pattern)
+    React.useEffect(() => {
+        const timeout = setTimeout(() => {
+            getUnreadAlertCount().then(setUnreadCount).catch(() => {})
+        }, 500)
+        return () => clearTimeout(timeout)
+    }, [pathname])
 
     const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
@@ -212,7 +226,12 @@ export function MobileNav() {
                                 isActive ? "text-international-orange" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
+                            <span className="relative">
+                                <item.icon className={cn("h-5 w-5 shrink-0", isActive && "fill-current")} />
+                                {item.href === '/updates' && unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-international-orange" />
+                                )}
+                            </span>
                             <span className="text-xs font-medium truncate max-w-[48px] xs:max-w-none">
                                 <span className="xs:hidden">{item.shortName}</span>
                                 <span className="hidden xs:inline">{item.name}</span>
@@ -234,7 +253,17 @@ export function MobileNav() {
                             <span className="text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56">
+                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56 max-h-[70vh] overflow-y-auto">
+                        {/* Foundry identity — shows which workspace the user is in */}
+                        {foundryName && (
+                            <>
+                                <DropdownMenuLabel className="text-xs font-semibold text-foreground truncate">
+                                    {foundryName}
+                                </DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                            </>
+                        )}
+
                         {/* Me section */}
                         <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
                             Me
