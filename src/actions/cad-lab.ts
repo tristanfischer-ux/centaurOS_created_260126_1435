@@ -864,6 +864,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       hardwareItemCount: number; processesApplied: string[];
       supplierTechniques: number; totalDataPoints: number;
     } | undefined
+    let synthesisModel = "claude-opus-4-6"
     try {
       const domain = await detectDomainFromProductDescription(description)
 
@@ -918,12 +919,37 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       }
 
       const synthesisPrompt = getResearchSynthesisPrompt(domain)
-      console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
-      const claudeResult = await callClaude(
-        synthesisPrompt,
-        `Product to research: ${description}\n\n${rawContext}${standardsSection}`,
-      )
-      report = claudeResult.text
+      const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}`
+
+      // DECISION: Fallback chain for synthesis — Claude → OpenAI → Gemini.
+      // If Anthropic credits are exhausted, fall through to alternatives.
+      try {
+        console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
+        const claudeResult = await callClaude(synthesisPrompt, synthesisUserPrompt)
+        report = claudeResult.text
+      } catch (claudeErr) {
+        const claudeMsg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr)
+        console.warn("[THE-FORGE] Step 1: Claude synthesis failed, trying OpenAI fallback:", claudeMsg.slice(0, 200))
+        try {
+          synthesisModel = "gpt-5.3-instant"
+          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.3-instant", 8192, 120_000)
+          report = openaiResult.text
+          console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
+        } catch (openaiErr) {
+          const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
+          console.warn("[THE-FORGE] Step 1: OpenAI synthesis failed, trying Gemini fallback:", openaiMsg.slice(0, 200))
+          try {
+            synthesisModel = "gemini-3.1-pro-preview"
+            const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
+            report = geminiResult.text
+            console.info("[THE-FORGE] Step 1: Gemini synthesis succeeded (fallback)")
+          } catch (geminiErr) {
+            console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
+            report = "Research sources found but report synthesis failed — tap Retry to try again."
+            synthesisSucceeded = false
+          }
+        }
+      }
     } catch (synthesisError) {
       console.error(
         "[THE-FORGE] Step 1: Claude synthesis failed:",
@@ -946,7 +972,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       researchTime: Date.now() - start,
       designBrief: options?.designBrief,
       assumptionNotes: options?.assumptionNotes,
-      modelUsed: "claude-opus-4-6",
+      modelUsed: synthesisModel,
       standardCodes: matchedStandardCodes,
       industryDomain: detectedIndustryDomain,
       totalStandardsMatched,
