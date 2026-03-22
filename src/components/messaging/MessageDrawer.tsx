@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { ConversationList } from './ConversationList'
 import { ConversationThread } from './ConversationThread'
@@ -14,7 +14,6 @@ import { cn } from '@/lib/utils'
 interface MessageDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  // Optional: Pre-select a conversation context
   sellerId?: string
   orderId?: string
   rfqId?: string
@@ -38,7 +37,6 @@ export function MessageDrawer({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [isStartingConversation, setIsStartingConversation] = useState(false)
 
-  // Get current user on mount
   useEffect(() => {
     const getUser = async () => {
       const supabase = createClient()
@@ -48,7 +46,6 @@ export function MessageDrawer({
     getUser()
   }, [])
 
-  // Handle starting a new conversation when drawer opens with seller context
   useEffect(() => {
     if (open && sellerId && currentUserId && !selectedConversation) {
       const initConversation = async () => {
@@ -74,10 +71,8 @@ export function MessageDrawer({
     }
   }, [open, sellerId, orderId, rfqId, listingId, initialMessage, currentUserId, selectedConversation])
 
-  // Reset state when drawer closes
   useEffect(() => {
     if (!open) {
-      // Small delay to allow animation to complete
       const timer = setTimeout(() => {
         if (!sellerId) {
           setSelectedConversation(null)
@@ -88,13 +83,11 @@ export function MessageDrawer({
     }
   }, [open, sellerId])
 
-  // Handle conversation selection from list
   const handleSelectConversation = useCallback((conversation: ConversationWithParticipants) => {
     setSelectedConversation(conversation)
     setViewMode('conversation')
   }, [])
 
-  // Handle back to list
   const handleBackToList = useCallback(() => {
     setSelectedConversation(null)
     setViewMode('list')
@@ -105,13 +98,10 @@ export function MessageDrawer({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent 
-        side="right" 
-        className="w-full sm:w-[480px] sm:max-w-[480px] p-0 flex flex-col"
-      >
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="lg" className="max-h-[90dvh] flex flex-col p-0">
         {/* Header */}
-        <SheetHeader className="p-4 border-b border-border flex-shrink-0">
+        <DialogHeader className="p-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
             {viewMode === 'conversation' && !sellerId && (
               <Button variant="ghost" size="icon" onClick={handleBackToList}>
@@ -119,14 +109,14 @@ export function MessageDrawer({
               </Button>
             )}
             <MessageSquare className="w-5 h-5 text-muted-foreground" />
-            <SheetTitle className="text-lg font-semibold">
+            <DialogTitle className="text-lg font-semibold">
               {viewMode === 'list' ? 'Messages' : 'Conversation'}
-            </SheetTitle>
+            </DialogTitle>
           </div>
-        </SheetHeader>
+        </DialogHeader>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden min-h-[300px]">
           {isStartingConversation ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-3">
@@ -151,8 +141,8 @@ export function MessageDrawer({
             />
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
 

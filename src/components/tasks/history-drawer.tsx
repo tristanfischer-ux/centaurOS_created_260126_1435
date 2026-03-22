@@ -1,14 +1,13 @@
 "use client"
 
 import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-    SheetDescription,
-    SheetFooter,
-    SheetClose,
-} from "@/components/ui/sheet"
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserAvatar } from "@/components/ui/user-avatar"
@@ -38,8 +37,8 @@ type TaskHistoryItem = Database['public']['Tables']['task_history']['Row'] & {
 
 function isTaskHistoryItemArray(data: unknown): data is TaskHistoryItem[] {
     if (!Array.isArray(data)) return false
-    return data.every(item => 
-        typeof item === 'object' && 
+    return data.every(item =>
+        typeof item === 'object' &&
         item !== null &&
         'id' in item &&
         'task_id' in item &&
@@ -54,7 +53,6 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     useEffect(() => {
         let mounted = true
         if (open) {
-            // Delay setting loading to avoid synchronous update warning
             const timer = setTimeout(() => {
                 if (mounted) setLoading(true)
             }, 0)
@@ -104,12 +102,10 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
             <div className="mt-2 space-y-1">
                 {Object.entries(changeObj).map(([key, value]) => {
                     if (key === 'initial_status' || key === 'source') return null
-                    // Skip some fields if too verbose
                     return (
                         <div key={key} className="text-xs text-muted-foreground flex flex-wrap items-center gap-1">
                             <span className="font-medium text-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
                             {typeof value === 'object' && value !== null ? (
-                                // Handle nested objects like dates
                                 <span>{JSON.stringify(value)}</span>
                             ) : (
                                 <span>{String(value)}</span>
@@ -122,17 +118,17 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
     }
 
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0 bg-card">
-                <SheetHeader className="p-6 border-b border-border">
-                    <SheetTitle className="flex items-center gap-2 text-foreground">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent size="md" className="max-h-[90dvh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-foreground">
                         <History className="w-5 h-5 text-muted-foreground" />
                         History: {taskTitle}
-                    </SheetTitle>
-                    <SheetDescription>Audit log of all actions performed on this task.</SheetDescription>
-                </SheetHeader>
+                    </DialogTitle>
+                    <DialogDescription>Audit log of all actions performed on this task.</DialogDescription>
+                </DialogHeader>
 
-                <ScrollArea className="flex-1 px-6">
+                <ScrollArea className="flex-1 min-h-0 px-1">
                     {loading ? (
                         <div className="flex justify-center py-8"><Loader2 className="animate-spin h-6 w-6 text-muted-foreground" /></div>
                     ) : history.length === 0 ? (
@@ -141,7 +137,6 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                         <div className="relative border-l border-border ml-2 my-6 space-y-8">
                             {history.map((item) => (
                                 <div key={item.id} className="relative pl-6">
-                                    {/* Dot on timeline */}
                                     <div className="absolute -left-[5px] top-1.5 h-2.5 w-2.5 rounded-full bg-muted-foreground/50 border-2 border-card" />
 
                                     <div className="flex flex-col gap-1">
@@ -169,7 +164,6 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
 
                                         <div className="bg-muted/50 p-2 mt-1 border border-border text-sm">
                                             {renderChanges(item.changes)}
-                                            {/* Handle specifics for better readability */}
                                             {item.action_type === 'CREATED' && <div className="text-xs text-muted-foreground">Task created.</div>}
                                             {item.action_type === 'COMPLETED' && <div className="text-xs text-foreground font-medium">Task marked as complete.</div>}
                                         </div>
@@ -180,12 +174,10 @@ export function HistoryDrawer({ open, onOpenChange, taskId, taskTitle }: History
                     )}
                 </ScrollArea>
 
-                <SheetFooter className="p-6 border-t border-border mt-auto">
-                    <SheetClose asChild>
-                        <Button variant="secondary">Close</Button>
-                    </SheetClose>
-                </SheetFooter>
-            </SheetContent>
-        </Sheet>
+                <DialogFooter>
+                    <Button variant="secondary" onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     )
 }

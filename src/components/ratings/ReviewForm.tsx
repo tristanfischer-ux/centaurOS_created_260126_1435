@@ -140,7 +140,7 @@ export function ReviewForm({
                   type="button"
                   onClick={() => handleStarClick(value)}
                   onMouseEnter={() => handleStarHover(value)}
-                  className="p-1 rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                  className="p-1 min-h-[44px] min-w-[44px] flex items-center justify-center rounded focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   aria-checked={rating === value}
                   role="radio"
                   aria-label={`${value} star${value > 1 ? "s" : ""}`}
@@ -298,7 +298,7 @@ export function StarSelector({
           onMouseEnter={() => !disabled && setHoveredRating(star)}
           disabled={disabled}
           className={cn(
-            "p-0.5 transition-transform",
+            "p-0.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-transform",
             !disabled && "hover:scale-110"
           )}
         >
