@@ -161,20 +161,20 @@ export interface CompanyProfile {
 export interface CompanyIntelProduct {
   /** Product/service name */
   name: string
-  /** Brief description */
-  description: string
+  /** Brief description — optional because JSONB data may be incomplete */
+  description?: string
 }
 
 /** A competitor identified through analysis or user input */
 export interface CompanyIntelCompetitor {
   /** Competitor company name */
   name: string
-  /** Competitor website URL */
-  website: string
+  /** Competitor website URL — optional because JSONB data may be incomplete */
+  website?: string
   /** Brief description of what they do */
-  description: string
+  description?: string
   /** Key differentiator vs. the user's company */
-  differentiator: string
+  differentiator?: string
 }
 
 /** A team member bio extracted from website or LinkedIn enrichment */

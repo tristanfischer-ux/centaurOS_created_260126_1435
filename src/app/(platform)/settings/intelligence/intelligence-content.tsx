@@ -359,7 +359,7 @@ export function IntelligenceContent({
                 <div key={i} className="border rounded-lg p-3 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm text-foreground">{c.name}</span>
-                    {c.website !== 'unknown' && (
+                    {c.website && c.website !== 'unknown' && (
                       <a
                         href={c.website}
                         target="_blank"

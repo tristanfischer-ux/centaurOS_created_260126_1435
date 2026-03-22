@@ -81,7 +81,7 @@ export function ExecutiveProfilePrompt({
             </p>
             <div className="flex items-center gap-2 mt-3">
               <Link
-                href="/my-profile"
+                href="/provider-portal"
                 className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-md bg-international-orange hover:bg-international-orange/90 text-white transition-colors"
               >
                 Set Up Profile
