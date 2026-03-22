@@ -153,7 +153,7 @@ export default function SpecifyPage(): React.ReactNode {
     aiCostEstimates,
     activeProjectId,
     generatingModuleIds,
-    researchModelUsed, decompositionModelUsed,
+    researchModelUsed, decompositionModelUsed, researchResult,
     revisedModuleIds,
     isApplyingReviewRevisions,
     handleApplyReviewRevisions,
@@ -594,6 +594,10 @@ export default function SpecifyPage(): React.ReactNode {
               overview={productOverview}
               onSave={setProductOverview}
               modelAudit={modelAudit}
+              standardCodes={researchResult?.standardCodes}
+              industryDomain={researchResult?.industryDomain}
+              totalStandardsMatched={researchResult?.totalStandardsMatched}
+              engineeringData={researchResult?.engineeringData}
             />
 
             {/* Design revision banner — shows revision status on Overview tab too */}

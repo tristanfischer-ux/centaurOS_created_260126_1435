@@ -2795,12 +2795,23 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
       researchTimers.forEach(clearTimeout)
 
-      setProgressLines([
+      const engLines: string[] = [
         `Found ${res.sources.length} web sources with engineering data`,
         `Found ${res.referenceModels.length} reference CAD models`,
         `Report complete — ${res.report.length.toLocaleString()} characters`,
         `Research time: ${(res.researchTime / 1000).toFixed(1)}s`,
-      ])
+      ]
+      // Show engineering intelligence applied
+      if (res.standardCodes?.length) {
+        engLines.push(`Referenced ${res.standardCodes.length} design standards (${res.industryDomain?.replace(/_/g, " ") ?? "general"} domain)`)
+      }
+      if (res.engineeringData) {
+        const ed = res.engineeringData
+        if (ed.materialsApplied.length) engLines.push(`Applied ${ed.materialsApplied.length} verified material specifications`)
+        if (ed.processesApplied.length) engLines.push(`Enforcing ${ed.processesApplied.join(", ")} process constraints`)
+        if (ed.hardwareItemCount) engLines.push(`${ed.hardwareItemCount} ISO hardware specs available (bolts, bearings, washers)`)
+      }
+      setProgressLines(engLines)
 
       setResearchResult(res)
       setEditableReport(res.report)
