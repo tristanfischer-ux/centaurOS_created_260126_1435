@@ -176,7 +176,7 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
             variants={formContainerVariants}
             initial="hidden"
             animate="visible"
-            className="w-full max-w-sm mx-auto space-y-8 relative z-10"
+            className="w-full max-w-sm mx-auto space-y-8 relative z-10 my-auto"
         >
             <motion.div variants={formItemVariants} className="space-y-2">
                 <a href={marketingDomain} className="inline-flex items-center min-h-[44px] mb-8 group">
@@ -228,7 +228,6 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                             name="email"
                             type="email"
                             placeholder="you@company.com"
-                            autoFocus
                             autoComplete="off"
                             required
                             aria-required="true"
@@ -297,7 +296,11 @@ export function LoginView({ redirect }: { redirect?: string | null }): React.Rea
             </div>
 
             {/* Right Side - Login Form */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-8 lg:p-12 relative bg-background flex-1">
+            {/* GOTCHA: Do NOT use justify-center — pushes top off-screen when
+                form overflows on mobile (keyboard open shrinks viewport by ~50%).
+                Use my-auto on child instead (centers when space allows, scrolls
+                naturally when not). overflow-y-auto enables scroll to submit button. */}
+            <div className="w-full lg:w-1/2 flex items-center p-8 lg:p-12 relative bg-background flex-1 overflow-y-auto">
                 {/* Subtle animated background pattern */}
                 <div
                     className="absolute inset-0 opacity-[0.03] pointer-events-none"

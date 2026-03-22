@@ -29,7 +29,7 @@ import type { VisualStyleSpec } from "@/lib/cad-lab-types"
 
 const GOOGLE_AI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 const NANO_BANANA_MODEL = "gemini-3.1-flash-image-preview" // Nano Banana 2 — 2K resolution, native 3:2 support
-const NANO_BANANA_STABLE_MODEL = "gemini-2.5-flash-image" // Nano Banana (original) — stable fallback when 3.1 preview is flaky
+const NANO_BANANA_STABLE_MODEL = "gemini-3-pro-image-preview" // Gemini 3 Pro Image — stable fallback (gemini-2.5-flash-image was shut down)
 const OPENAI_IMAGE_MODEL = "gpt-image-1" // OpenAI fallback — high-quality technical illustrations
 const STORAGE_BUCKET = "xray-images"
 
@@ -299,7 +299,8 @@ async function callNanoBananaImage(
   aspectRatio?: string,
   model: string = NANO_BANANA_MODEL,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  // GOTCHA: Vercel env vars can have trailing whitespace/newlines — always trim
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
   }
@@ -383,7 +384,7 @@ async function callNanoBananaImageWithReference(
   referenceImages: ReferenceImage[],
   aspectRatio?: string,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayImageGen] GOOGLE_AI_API_KEY is not configured")
   }
@@ -479,7 +480,7 @@ async function callOpenAIImage(
   prompt: string,
   size: "1024x1024" | "1024x1536" | "1536x1024",
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     throw new Error("[XRayImageGen] OPENAI_API_KEY is not configured — cannot use OpenAI fallback")
   }
@@ -558,7 +559,7 @@ async function callImageWithFallback(
   } catch (nbStableError) {
     const msg = nbStableError instanceof Error ? nbStableError.message : String(nbStableError)
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY?.trim()) {
       console.warn("[XRayImageGen] All Gemini models failed and OPENAI_API_KEY is not set — no fallback available")
       throw nbStableError
     }
@@ -660,7 +661,7 @@ export async function analyseHeroBoundingBoxes(
   heroBase64: string,
   moduleNames: string[],
 ): Promise<Record<string, ModuleBoundingBox>> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
     console.warn("[XRayImageGen] No ANTHROPIC_API_KEY — skipping bounding box analysis")
     return {}
@@ -852,13 +853,14 @@ async function tryOpenAIEdit(
   referenceBase64: string,
   visualStyle: VisualStyleSpec,
 ): Promise<{ mimeType: string; data: string } | null> {
-  if (!process.env.OPENAI_API_KEY) return null
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!openaiKey) return null
 
   try {
     const openaiModule = await import("openai")
     const OpenAI = openaiModule.default
     const { toFile } = openaiModule
-    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    const client = new OpenAI({ apiKey: openaiKey })
 
     const prompt = buildReferenceEditPrompt(module, visualStyle)
     const imageFile = await toFile(Buffer.from(referenceBase64, "base64"), "reference.png", { type: "image/png" })
@@ -906,7 +908,7 @@ async function scoreImageConsistency(
   moduleBase64: string,
   moduleName: string,
 ): Promise<ConsistencyScoreResult | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) return null
 
   try {
@@ -1046,7 +1048,7 @@ export async function generateModuleImage(
   })
 
   // Layer 3: Geometric consistency verification + single retry
-  if (referenceBase64 && process.env.ANTHROPIC_API_KEY) {
+  if (referenceBase64 && process.env.ANTHROPIC_API_KEY?.trim()) {
     const consistencyResult = await scoreImageConsistency(referenceBase64, imageData.data, module.name)
     if (consistencyResult) {
       console.log(`[XRayImageGen] Geometric consistency score ${consistencyResult.score}/10 for ${module.name}`)
