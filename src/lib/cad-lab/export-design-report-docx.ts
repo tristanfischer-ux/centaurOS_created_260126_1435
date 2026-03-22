@@ -401,7 +401,11 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
           ],
         }),
       ]
-      for (const std of ei.standards.slice(0, 15)) {
+      const STD_MAX = 15
+      if (ei.standards.length > STD_MAX) {
+        children.push(textParagraph(`Showing ${STD_MAX} of ${ei.standards.length} referenced standards.`, { after: 80, color: MID_TEXT }))
+      }
+      for (const std of ei.standards.slice(0, STD_MAX)) {
         stdRows.push(new TableRow({
           children: [
             dataCell(std.code, 20),
@@ -431,7 +435,11 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
           ],
         }),
       ]
-      for (const mat of ei.materials.slice(0, 15)) {
+      const MAT_MAX = 15
+      if (ei.materials.length > MAT_MAX) {
+        children.push(textParagraph(`Showing ${MAT_MAX} of ${ei.materials.length} materials.`, { after: 80, color: MID_TEXT }))
+      }
+      for (const mat of ei.materials.slice(0, MAT_MAX)) {
         matRows.push(new TableRow({
           children: [
             dataCell(`${mat.code} — ${mat.name}`, 25),

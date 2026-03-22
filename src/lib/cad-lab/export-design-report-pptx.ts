@@ -421,29 +421,37 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   if (data.engineeringIntelligence) {
     const ei = data.engineeringIntelligence
 
+    const STD_SHOWN = 8
+    const MAT_SHOWN = 8
+    const PROC_SHOWN = 8
+    const HALF_W = (CONTENT_W - 0.2) / 2 // Two-column with 0.2" gap
+    const RIGHT_X = MARGIN + HALF_W + 0.2
+
     if (ei.standards.length > 0) {
       const stdSlide = pres.addSlide()
       addSectionTitle(stdSlide, 'Referenced Design Standards')
-      if (ei.industryDomain) {
-        stdSlide.addText(
-          `${ei.industryDomain.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} domain — ${ei.standards.length} standards applied`,
-          { x: 0.5, y: 0.8, w: 9, h: 0.35, fontSize: 11, color: '666666', fontFace: 'Helvetica Neue' },
-        )
-      }
+      const domainLabel = ei.industryDomain
+        ? `${ei.industryDomain.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())} domain — `
+        : ''
+      const truncNote = ei.standards.length > STD_SHOWN ? ` (showing ${STD_SHOWN} of ${ei.standards.length})` : ''
+      stdSlide.addText(
+        `${domainLabel}${ei.standards.length} standards applied${truncNote}`,
+        { x: MARGIN, y: 0.8, w: CONTENT_W, h: 0.35, fontSize: 11, color: '666666', fontFace: 'Helvetica Neue' },
+      )
       const stdTableRows = [
         [
           { text: 'Code', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
           { text: 'Standard', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
           { text: 'Issuing Body', options: { bold: true, fontSize: 9, fill: { color: 'F5F5F5' } } },
         ],
-        ...ei.standards.slice(0, 8).map(s => [
+        ...ei.standards.slice(0, STD_SHOWN).map(s => [
           { text: s.code, options: { fontSize: 8 } },
           { text: s.name, options: { fontSize: 8 } },
           { text: s.issuingBody, options: { fontSize: 8 } },
         ]),
       ]
       stdSlide.addTable(stdTableRows, {
-        x: 0.5, y: 1.2, w: 9, colW: [2.5, 4.5, 2],
+        x: MARGIN, y: 1.2, w: CONTENT_W, colW: [2.5, 4.5, 2],
         border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
         rowH: 0.3,
         fontFace: 'Helvetica Neue',
@@ -455,8 +463,9 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
       addSectionTitle(engSlide, 'Material & Process Specifications')
 
       if (ei.materials.length > 0) {
-        engSlide.addText('Verified Material Properties', {
-          x: 0.5, y: 0.8, w: 4.5, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
+        const matTrunc = ei.materials.length > MAT_SHOWN ? ` (${MAT_SHOWN} of ${ei.materials.length})` : ''
+        engSlide.addText(`Verified Material Properties${matTrunc}`, {
+          x: MARGIN, y: 0.8, w: HALF_W, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
         })
         const matRows = [
           [
@@ -465,7 +474,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
             { text: 'σy (MPa)', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
             { text: '$/kg', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
           ],
-          ...ei.materials.slice(0, 8).map(m => [
+          ...ei.materials.slice(0, MAT_SHOWN).map(m => [
             { text: m.code, options: { fontSize: 7 } },
             { text: m.density != null ? String(m.density) : '—', options: { fontSize: 7 } },
             { text: m.yieldStrength != null ? String(m.yieldStrength) : '—', options: { fontSize: 7 } },
@@ -473,7 +482,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
           ]),
         ]
         engSlide.addTable(matRows, {
-          x: 0.5, y: 1.15, w: 4.5, colW: [1.5, 1, 1, 1],
+          x: MARGIN, y: 1.15, w: HALF_W, colW: [1.5, 1, 1, 0.9],
           border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
           rowH: 0.25,
           fontFace: 'Helvetica Neue',
@@ -481,8 +490,9 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
       }
 
       if (ei.processes.length > 0) {
-        engSlide.addText('Process Constraints', {
-          x: 5.2, y: 0.8, w: 4.5, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
+        const procTrunc = ei.processes.length > PROC_SHOWN ? ` (${PROC_SHOWN} of ${ei.processes.length})` : ''
+        engSlide.addText(`Process Constraints${procTrunc}`, {
+          x: RIGHT_X, y: 0.8, w: HALF_W, h: 0.3, fontSize: 10, bold: true, color: '333333', fontFace: 'Helvetica Neue',
         })
         const procRows = [
           [
@@ -490,14 +500,14 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
             { text: 'Tolerance', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
             { text: 'Min Wall', options: { bold: true, fontSize: 8, fill: { color: 'F5F5F5' } } },
           ],
-          ...ei.processes.slice(0, 8).map(p => [
+          ...ei.processes.slice(0, PROC_SHOWN).map(p => [
             { text: p.displayName, options: { fontSize: 7 } },
             { text: p.toleranceTypical != null ? `±${p.toleranceTypical}mm` : '—', options: { fontSize: 7 } },
             { text: p.minWall != null ? `${p.minWall}mm` : '—', options: { fontSize: 7 } },
           ]),
         ]
         engSlide.addTable(procRows, {
-          x: 5.2, y: 1.15, w: 4.3, colW: [2, 1.15, 1.15],
+          x: RIGHT_X, y: 1.15, w: HALF_W, colW: [2, 1.2, 1.2],
           border: { type: 'solid', pt: 0.5, color: 'DDDDDD' },
           rowH: 0.25,
           fontFace: 'Helvetica Neue',
