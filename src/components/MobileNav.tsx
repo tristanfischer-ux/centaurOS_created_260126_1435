@@ -36,20 +36,10 @@ import {
     AppWindow,
     FileOutput,
     Globe,
-    Brain,
+    Library,
     Handshake,
     MessageCircle,
-    PoundSterling,
-    FileText,
-    Map,
-    BellRing,
-    Activity,
     BarChart3,
-    PiggyBank,
-    FolderKanban,
-    Receipt,
-    Landmark,
-    Link2,
     TrendingDown,
     TrendingUp,
     Building2,
@@ -87,7 +77,7 @@ const mainNavigation = [
 
 // "More" dropdown — Me section (items not in main bar)
 const meMoreNavigation = [
-    { name: "Knowledge", href: "/knowledge", icon: Brain },
+    { name: "Knowledge", href: "/knowledge", icon: Library },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow },
 ]
 
@@ -96,21 +86,6 @@ const planMoreNavigation = [
     { name: "Strategy", href: "/canvas", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
 ]
-
-// "More" dropdown — Finance section (hidden for now, may be restored later)
-// const financeMoreNavigation = [
-//     { name: "Finance", href: "/finance", icon: PoundSterling },
-//     { name: "Money Map", href: "/finance/money-map", icon: Map },
-//     { name: "Invoices", href: "/finance/invoices", icon: FileText },
-//     { name: "Cash Flow", href: "/finance/cash-flow", icon: Activity },
-//     { name: "Reports", href: "/finance/reports", icon: BarChart3 },
-//     { name: "Budgets", href: "/finance/budgets", icon: PiggyBank },
-//     { name: "Projects", href: "/finance/projects", icon: FolderKanban },
-//     { name: "Expenses", href: "/finance/expenses", icon: Receipt },
-//     { name: "Funding", href: "/finance/funding", icon: Landmark },
-//     { name: "Integrations", href: "/finance/integrations", icon: Link2 },
-//     { name: "Alerts", href: "/finance/settings", icon: BellRing },
-// ]
 
 // "More" dropdown — Cash Burn section
 const cashBurnNavigation = [
@@ -126,8 +101,8 @@ const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Flame },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
-    { name: "AI Team", href: "/agents", icon: UsersRound },
-    { name: "AI Outputs", href: "/agents/artifacts", icon: FileOutput },
+    { name: "Specialists", href: "/agents", icon: UsersRound },
+    { name: "Outputs", href: "/agents/artifacts", icon: FileOutput },
     { name: "Browse", href: "/browse", icon: Globe },
     { name: "Inspiration", href: "/learn", icon: BookOpen },
 ]

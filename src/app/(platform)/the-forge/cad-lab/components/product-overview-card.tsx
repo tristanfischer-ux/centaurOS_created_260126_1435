@@ -245,8 +245,8 @@ export function ProductOverviewCard({
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-foreground">Design Standards</p>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {standardCodes.slice(0, 5).map((code) => (
-                          <span key={code} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
+                        {standardCodes.slice(0, 5).map((code, i) => (
+                          <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
                             {code}
                           </span>
                         ))}
@@ -271,8 +271,8 @@ export function ProductOverviewCard({
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-foreground">Material Properties</p>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {engineeringData.materialsApplied.slice(0, 4).map((code) => (
-                          <span key={code} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                        {engineeringData.materialsApplied.slice(0, 4).map((code, i) => (
+                          <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
                             {code}
                           </span>
                         ))}
@@ -309,8 +309,8 @@ export function ProductOverviewCard({
                     <div className="min-w-0">
                       <p className="text-xs font-medium text-foreground">Process Capabilities</p>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {engineeringData.processesApplied.map((name) => (
-                          <span key={name} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                        {engineeringData.processesApplied.map((name, i) => (
+                          <span key={`proc-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
                             {name}
                           </span>
                         ))}
