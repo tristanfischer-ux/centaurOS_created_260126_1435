@@ -217,8 +217,8 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
             <CardTitle className="text-base font-semibold">All Expenses</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
-              <div className="grid grid-cols-7 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+            <div className="space-y-1 overflow-x-auto">
+              <div className="grid grid-cols-7 min-w-[600px] text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span className="col-span-2">Description</span>
                 <span>Category</span>
                 <span>Vendor</span>
@@ -227,7 +227,7 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
                 <span className="text-right">Actions</span>
               </div>
               {filtered.map((expense) => (
-                <div key={expense.id} className="grid grid-cols-7 items-center text-sm py-2 border-b border-border last:border-0 group">
+                <div key={expense.id} className="grid grid-cols-7 min-w-[600px] items-center text-sm py-2 border-b border-border last:border-0 group">
                   <div className="col-span-2">
                     <p className="text-foreground font-medium">{expense.description}</p>
                     <p className="text-xs text-muted-foreground">

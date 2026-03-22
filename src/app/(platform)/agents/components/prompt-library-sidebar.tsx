@@ -237,7 +237,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                                 }
                                                 className="group flex items-center gap-2.5 p-2.5 rounded-lg border border-transparent hover:border hover:bg-muted cursor-grab active:cursor-grabbing transition-all"
                                             >
-                                                <GripVertical className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                                <GripVertical className="w-3.5 h-3.5 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex-shrink-0" />
                                                 <div
                                                     className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0"
                                                     style={{
@@ -264,7 +264,7 @@ export function PromptLibrarySidebar({ onClose, onCreatePrompt, customPrompts, d
                                                             e.preventDefault()
                                                             handleDeleteCustom(prompt.id)
                                                         }}
-                                                        className="p-1 rounded hover:bg-status-error-light text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                                                        className="p-1 rounded hover:bg-status-error-light text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100 transition-all flex-shrink-0"
                                                     >
                                                         <Trash2 className="w-3 h-3" />
                                                     </button>

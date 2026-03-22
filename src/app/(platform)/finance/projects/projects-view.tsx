@@ -149,9 +149,9 @@ export function ProjectsView({ initialData }: ProjectsViewProps) {
             <CardTitle className="text-base font-semibold">All Projects</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
+            <div className="space-y-1 overflow-x-auto">
               {/* Header row */}
-              <div className="grid grid-cols-7 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+              <div className="grid grid-cols-7 min-w-[600px] text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span className="col-span-2">Project</span>
                 <span className="text-right">Revenue</span>
                 <span className="text-right">Expenses</span>
@@ -163,7 +163,7 @@ export function ProjectsView({ initialData }: ProjectsViewProps) {
                 <Link
                   key={item.project.id}
                   href={`/finance/projects/${item.project.id}`}
-                  className="grid grid-cols-7 items-center text-sm py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors rounded-sm group"
+                  className="grid grid-cols-7 min-w-[600px] items-center text-sm py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors rounded-sm group"
                 >
                   <div className="col-span-2">
                     <p className="font-medium text-foreground group-hover:text-international-orange transition-colors">

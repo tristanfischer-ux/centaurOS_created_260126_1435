@@ -84,7 +84,7 @@ export function PlanSectionIntro(): React.ReactElement {
                                             <h3 className="text-sm font-semibold text-foreground group-hover:text-international-orange transition-colors">
                                                 {step.title}
                                             </h3>
-                                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                                         </div>
                                         <p className="text-sm text-muted-foreground leading-relaxed">
                                             {step.description}

@@ -937,7 +937,7 @@ function PlanPreviewDialog({
                               >
                                 {editedTitles[key] ?? task.title}
                               </span>
-                              <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                              <Pencil className="h-3 w-3 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0" />
                             </button>
                           )}
 

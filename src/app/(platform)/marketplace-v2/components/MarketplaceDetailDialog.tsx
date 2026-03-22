@@ -136,7 +136,7 @@ function CompanyDetailsSection({ attrs }: { attrs: Record<string, unknown> }) {
     return (
         <div>
             <h3 className="text-sm font-semibold text-foreground mb-2">Company Details</h3>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                 {details.map((d) => (
                     <div key={d.label} className="flex items-center gap-1.5 text-sm">
                         <span className="text-muted-foreground shrink-0">{d.icon}</span>
@@ -237,7 +237,7 @@ function PeopleProfileSection({ attrs }: { attrs: Record<string, unknown> }) {
             {details.length > 0 && (
                 <div>
                     <h3 className="text-sm font-semibold text-foreground mb-2">Profile Details</h3>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
                         {details.map((d) => (
                             <div key={d.label} className="flex items-center gap-1.5 text-sm">
                                 <span className="text-muted-foreground shrink-0">{d.icon}</span>
@@ -593,13 +593,13 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                                         <Separator className="mb-6" />
                                         <h3 className="text-sm font-semibold text-foreground mb-3">Similar Suppliers</h3>
                                         {isSimilarLoading ? (
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {[1, 2, 3, 4].map((i) => (
                                                     <div key={i} className="h-20 rounded-lg bg-muted animate-pulse" />
                                                 ))}
                                             </div>
                                         ) : (
-                                            <div className="grid grid-cols-2 gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 {similarListings.map((sim) => {
                                                     const simGradient = getAvatarGradient(sim.category as MarketplaceCategory, sim.title)
                                                     const simInitials = getInitials(sim.title)

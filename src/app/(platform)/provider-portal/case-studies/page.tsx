@@ -447,7 +447,7 @@ export default function CaseStudiesPage() {
                                     placeholder="What did the client say about working with you?"
                                     className="min-h-[80px]"
                                 />
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <Input
                                         value={formData.testimonial_author || ''}
                                         onChange={(e) => setFormData({ ...formData, testimonial_author: e.target.value })}

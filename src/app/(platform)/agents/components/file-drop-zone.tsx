@@ -233,7 +233,7 @@ export function FileDropZone({ onFilesAdded, attachedFiles = [], onRemoveFile, c
                                         e.stopPropagation()
                                         onRemoveFile(file.name)
                                     }}
-                                    className="p-0.5 rounded hover:bg-slate-200 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="p-0.5 rounded hover:bg-slate-200 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>

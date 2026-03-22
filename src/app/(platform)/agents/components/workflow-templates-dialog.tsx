@@ -261,7 +261,7 @@ function TemplateCard({
                     size="sm"
                     variant="ghost"
                     onClick={() => onSelect(template)}
-                    className="gap-1.5 text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="gap-1.5 text-xs flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                 >
                     Use
                     <ArrowRight className="w-3.5 h-3.5" />

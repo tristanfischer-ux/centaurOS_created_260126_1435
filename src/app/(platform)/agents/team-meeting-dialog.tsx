@@ -1481,7 +1481,7 @@ export function TeamMeetingDialog({
                             <Label className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
                                 Who should attend? (pick 2 or more)
                             </Label>
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 {SPECIALISTS.map((s) => {
                                     const isSelected = selectedIds.has(s.id)
                                     return (

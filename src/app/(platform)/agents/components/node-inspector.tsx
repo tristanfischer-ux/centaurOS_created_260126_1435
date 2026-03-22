@@ -106,7 +106,7 @@ function ProviderModelSelector({
             </div>
 
             {/* Provider + Model selectors side by side */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                     <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Provider</label>
                     <select
@@ -164,7 +164,7 @@ function VideoConfigPanel({
     return (
         <div className="space-y-2.5">
             <label className="text-xs font-semibold text-foreground">Video Settings</label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div>
                     <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Duration</label>
                     <select
@@ -573,7 +573,7 @@ export function NodeInspector({
                 <div className="p-4 space-y-4">
                     {/* Input/Output labels */}
                     {prompt && (
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-100">
                                 <p className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider mb-0.5">
                                     Input

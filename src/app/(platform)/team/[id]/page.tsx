@@ -117,7 +117,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
                         const activeTasks = tasks?.filter(t => t.status === 'Pending' || t.status === 'Accepted') || []
                         const completedTasks = tasks?.filter(t => t.status === 'Completed') || []
                         return (
-                            <div className="grid grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8 border-t border-slate-100 pt-6">
                                 <div className="flex items-center gap-3">
 <div className="p-2 bg-status-info-light text-status-info rounded-lg">
                                                         <Briefcase className="w-5 h-5" />

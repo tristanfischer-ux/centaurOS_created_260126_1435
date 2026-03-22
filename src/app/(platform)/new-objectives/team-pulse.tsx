@@ -170,7 +170,7 @@ ${standup.entries.map((e) =>
         </CardHeader>
         <CardContent className="pt-0">
           {/* Stats Summary */}
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div className="text-center">
               <p className="text-lg font-bold text-foreground">{pulse.totalActiveTasks}</p>
               <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Active</p>
