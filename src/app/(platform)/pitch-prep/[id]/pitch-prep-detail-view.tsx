@@ -147,7 +147,7 @@ export function PitchPrepDetailView({ request }: PitchPrepDetailViewProps) {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Company Name</p>
                   <p className="font-medium">{request.company_name}</p>
@@ -183,7 +183,7 @@ export function PitchPrepDetailView({ request }: PitchPrepDetailViewProps) {
               {(request.founder_count || request.team_size) && (
                 <>
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {request.founder_count && (
                       <div>
                         <p className="text-sm text-muted-foreground">Founders</p>
@@ -266,7 +266,7 @@ export function PitchPrepDetailView({ request }: PitchPrepDetailViewProps) {
                 <>
                   <Separator />
                   <p className="text-sm text-muted-foreground">Fundraising Context (informational)</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {request.amount_seeking && (
                       <div>
                         <p className="text-sm text-muted-foreground">Amount Seeking</p>

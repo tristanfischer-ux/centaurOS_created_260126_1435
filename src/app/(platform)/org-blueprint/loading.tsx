@@ -18,7 +18,7 @@ export default function OrgBlueprintLoading() {
                 {/* Status Summary Cards */}
                 <div className="space-y-4">
                     <Skeleton className="h-4 w-32" />
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {[1, 2, 3, 4].map((i) => (
                             <div key={i} className="p-4 rounded-lg bg-muted/50">
                                 <Skeleton className="h-5 w-5 mb-2" />

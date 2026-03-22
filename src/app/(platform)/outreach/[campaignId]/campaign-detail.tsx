@@ -147,7 +147,7 @@ export function CampaignDetail({
                     )}
                     <div className="flex items-center gap-3 flex-wrap">
                         <Select value={campaign.status} onValueChange={handleStatusChange}>
-                            <SelectTrigger className="w-[140px] h-8">
+                            <SelectTrigger className="w-full sm:w-[140px] h-8">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>

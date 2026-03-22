@@ -82,7 +82,7 @@ export function CanvasDetailPanel({ nodeType, data, onClose }: CanvasDetailPanel
           </div>
 
           {/* Task counts */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <div className="text-center p-2 rounded-lg bg-muted/50">
               <p className="text-lg font-bold text-foreground">{objData.totalTasks}</p>
               <p className="text-[10px] text-muted-foreground">Total</p>

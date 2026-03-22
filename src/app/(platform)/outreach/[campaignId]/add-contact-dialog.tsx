@@ -88,7 +88,7 @@ export function AddContactDialog({ open, onOpenChange, campaignId, onAdded }: Ad
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="first-name">First Name *</Label>
                             <Input
@@ -133,7 +133,7 @@ export function AddContactDialog({ open, onOpenChange, campaignId, onAdded }: Ad
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="title">Job Title</Label>
                             <Input
@@ -154,7 +154,7 @@ export function AddContactDialog({ open, onOpenChange, campaignId, onAdded }: Ad
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="domain">Company Domain</Label>
                             <Input

@@ -144,7 +144,7 @@ export function CreateCampaignDialog({ open, onOpenChange, onCreated }: CreateCa
                             </div>
                             <div className="space-y-2">
                                 <Label>Tone</Label>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     {TONE_OPTIONS.map(opt => (
                                         <button
                                             key={opt.value}

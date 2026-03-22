@@ -272,7 +272,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={category} onValueChange={(v) => setCategory(v as BudgetCategory)}>
@@ -300,7 +300,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="budget-amount">Amount ({'\u00A3'})</Label>
                 <Input
@@ -354,7 +354,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
                 onChange={(e) => setEditName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={editCategory} onValueChange={(v) => setEditCategory(v as BudgetCategory)}>

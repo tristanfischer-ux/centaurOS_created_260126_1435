@@ -283,7 +283,7 @@ export function ContactsTab({ campaign, contacts, emails, onRefresh, onSwitchToE
                                 Generate Sequences ({selectedIds.size})
                             </Button>
                             <Select onValueChange={handleBulkStatusChange} disabled={isPending}>
-                                <SelectTrigger className="w-[150px] h-8 text-xs">
+                                <SelectTrigger className="w-full sm:w-[150px] h-8 text-xs">
                                     <SelectValue placeholder="Change Status" />
                                 </SelectTrigger>
                                 <SelectContent>

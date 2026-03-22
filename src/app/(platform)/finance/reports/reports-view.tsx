@@ -234,7 +234,7 @@ function VATReportView({ report }: { report: VATReport }) {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Summary */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="text-center p-3 rounded-lg bg-muted">
             <p className="text-xs text-muted-foreground">VAT Collected</p>
             <p className="text-lg font-semibold">{formatCurrency(report.vatCollected, report.currency)}</p>

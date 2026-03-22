@@ -18,7 +18,7 @@
  * - src/actions/cad-lab-report.ts — AI pipeline (structureReportOutline + writeReportSections)
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { FileDown, FileText, Presentation, Printer, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 
@@ -86,6 +86,7 @@ const STAGE_LABELS: Record<ReportStage, string> = {
 export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stageData }: DesignReportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
   const [aiEnabled, setAiEnabled] = useState(true)
+  const exportStartedRef = useRef(false)
 
   const {
     subject,
@@ -153,12 +154,17 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
   ])
 
   const handleExport = useCallback(async () => {
-    if (!selectedFormat) return
+    if (!selectedFormat || exportStartedRef.current) return
+    exportStartedRef.current = true
 
-    // PDF uses browser print dialog — can't run in background
+    // PDF uses browser print dialog — close dialog first, then print after repaint
     if (selectedFormat === "pdf") {
-      window.print()
       onOpenChange(false)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          window.print()
+        })
+      })
       return
     }
 

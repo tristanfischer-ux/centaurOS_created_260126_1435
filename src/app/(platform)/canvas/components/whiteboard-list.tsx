@@ -169,7 +169,7 @@ export function WhiteboardList({ whiteboards, objectives, toolbarPortalRef }: Wh
                   <button
                     onClick={(e) => handleDelete(e, wb.id)}
                     disabled={isDeleting}
-                    className="p-1 rounded opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-status-error-light transition-all"
+                    className="p-1 rounded sm:opacity-0 sm:group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-status-error-light transition-all"
                     aria-label={`Delete ${wb.title}`}
                   >
                     {isDeleting ? (

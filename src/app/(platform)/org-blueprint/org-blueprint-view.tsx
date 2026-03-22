@@ -353,7 +353,7 @@ export function OrgBlueprintView({ functions: initialFunctions, summary: initial
                         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                             Coverage Summary
                         </h3>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <motion.button
                                 onClick={() => setStatusFilter(statusFilter === 'covered' ? 'all' : 'covered')}
                                 className={cn(

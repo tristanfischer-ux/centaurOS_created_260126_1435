@@ -412,7 +412,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={type} onValueChange={(v) => setType(v as FundingType)}>
@@ -439,7 +439,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="funding-funder">Funder (optional)</Label>
                 <Input
@@ -510,7 +510,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                 onChange={(e) => setEditName(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={editType} onValueChange={(v) => setEditType(v as FundingType)}>
@@ -537,7 +537,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-funding-funder">Funder (optional)</Label>
                 <Input

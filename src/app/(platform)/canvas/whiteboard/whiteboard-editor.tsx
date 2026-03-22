@@ -288,7 +288,7 @@ export function WhiteboardEditor({ whiteboard, objectiveId }: WhiteboardEditorPr
               aria-label="Edit whiteboard title"
             >
               {title}
-              <Pencil className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <Pencil className="w-3 h-3 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
             </button>
           )}
         </div>

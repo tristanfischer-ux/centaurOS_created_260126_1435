@@ -299,7 +299,7 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="expense-amount">Amount ({'\u00A3'})</Label>
                 <Input
@@ -326,7 +326,7 @@ export function ExpensesView({ initialData }: ExpensesViewProps) {
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="expense-vendor">Vendor (optional)</Label>
                 <Input

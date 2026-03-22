@@ -371,7 +371,7 @@ export function EnrichmentView({ foundryId }: EnrichmentViewProps) {
                 </div>
 
                 <Select value={category} onValueChange={v => { setCategory(v); setSubcategory('all') }}>
-                    <SelectTrigger className="w-[140px] h-9">
+                    <SelectTrigger className="w-full sm:w-[140px] h-9">
                         <SelectValue placeholder="Category" />
                     </SelectTrigger>
                     <SelectContent>
@@ -386,7 +386,7 @@ export function EnrichmentView({ foundryId }: EnrichmentViewProps) {
 
                 {subcategories.length > 0 && (
                     <Select value={subcategory} onValueChange={setSubcategory}>
-                        <SelectTrigger className="w-[160px] h-9">
+                        <SelectTrigger className="w-full sm:w-[160px] h-9">
                             <SelectValue placeholder="Subcategory" />
                         </SelectTrigger>
                         <SelectContent>
@@ -399,7 +399,7 @@ export function EnrichmentView({ foundryId }: EnrichmentViewProps) {
                 )}
 
                 <Select value={emailFilter} onValueChange={setEmailFilter}>
-                    <SelectTrigger className="w-[130px] h-9">
+                    <SelectTrigger className="w-full sm:w-[130px] h-9">
                         <SelectValue placeholder="Email" />
                     </SelectTrigger>
                     <SelectContent>
@@ -410,7 +410,7 @@ export function EnrichmentView({ foundryId }: EnrichmentViewProps) {
                 </Select>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px] h-9">
+                    <SelectTrigger className="w-full sm:w-[150px] h-9">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
