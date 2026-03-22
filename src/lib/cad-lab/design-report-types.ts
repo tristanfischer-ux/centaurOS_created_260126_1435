@@ -78,6 +78,7 @@ export interface DesignReportData {
     processes: { name: string; displayName: string; toleranceTypical: number | null; minWall: number | null }[]
     hardwareCount: number
     industryDomain: string | null
+    supplierInsights?: { technique: string; supplierCount: number; tolerances: string; materials: string }[]
   }
 
   // AI-generated narration (optional — when populated, exporters use prose instead of raw data)

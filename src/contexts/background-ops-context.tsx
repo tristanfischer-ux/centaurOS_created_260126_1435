@@ -9,6 +9,9 @@
  * etc.) and have it continue running — with visible progress — even when
  * the user navigates to a different page.
  *
+ * Completed ops with a downloadUrl persist to localStorage so they survive
+ * page refreshes. Running ops are NOT persisted (the async work is gone).
+ *
  * Features own their async logic; this context is a dumb status registry
  * that fires toasts on completion/failure and auto-dismisses finished ops.
  *
@@ -56,6 +59,8 @@ export interface BackgroundOp {
   startedAt: number
   /** Timestamp when the operation finished (complete or error) */
   finishedAt?: number
+  /** URL for downloading the result (e.g. Supabase Storage URL for reports) */
+  downloadUrl?: string
 }
 
 /** Fields that can be updated on a running operation */
@@ -74,7 +79,7 @@ interface BackgroundOpsContextValue {
   /** Update progress/step on a running operation */
   updateOp: (id: string, update: BackgroundOpUpdate) => void
   /** Mark an operation as successfully completed */
-  completeOp: (id: string, successMessage?: string) => void
+  completeOp: (id: string, successMessage?: string, opts?: { downloadUrl?: string }) => void
   /** Mark an operation as failed */
   failOp: (id: string, errorMessage?: string) => void
   /** Remove an operation from the list immediately */
@@ -85,6 +90,40 @@ interface BackgroundOpsContextValue {
 
 /** Completed/errored ops auto-dismiss after this duration */
 const AUTO_DISMISS_MS = 30_000
+
+/** localStorage key for persisting finished ops across refreshes */
+const STORAGE_KEY = "forgeos:background-ops"
+
+// ─── Persistence ────────────────────────────────────────────────────────────
+
+/** Read persisted ops from localStorage (only non-running ops). */
+function loadPersistedOps(): BackgroundOp[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as BackgroundOp[]
+    // Only restore non-running ops (running work can't be resumed)
+    return parsed.filter((op) => op.status !== "running")
+  } catch {
+    return []
+  }
+}
+
+/** Write non-running ops to localStorage. */
+function persistOps(ops: BackgroundOp[]): void {
+  if (typeof window === "undefined") return
+  try {
+    const toSave = ops.filter((op) => op.status !== "running")
+    if (toSave.length === 0) {
+      localStorage.removeItem(STORAGE_KEY)
+    } else {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+    }
+  } catch {
+    // localStorage full or unavailable — non-fatal
+  }
+}
 
 // ─── Context ────────────────────────────────────────────────────────────────
 
@@ -100,13 +139,19 @@ let nextOpId = 1
  * @description Wraps the platform layout so any feature can register
  * long-running work, report progress, and have it survive navigation.
  * Fires toasts on completion/failure and auto-dismisses finished ops.
+ * Ops with downloadUrl persist to localStorage across page refreshes.
  */
 export function BackgroundOpsProvider({ children }: { children: ReactNode }): React.ReactElement {
-  const [ops, setOps] = useState<BackgroundOp[]>([])
+  const [ops, setOps] = useState<BackgroundOp[]>(() => loadPersistedOps())
   const router = useRouter()
   const routerRef = useRef(router)
   routerRef.current = router
   const dismissTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+
+  // Persist to localStorage whenever ops change
+  useEffect(() => {
+    persistOps(ops)
+  }, [ops])
 
   // Clean up timers on unmount
   useEffect(() => {
@@ -153,11 +198,18 @@ export function BackgroundOpsProvider({ children }: { children: ReactNode }): Re
     )
   }, [])
 
-  const completeOp = useCallback((id: string, successMessage?: string): void => {
+  const completeOp = useCallback((id: string, successMessage?: string, opts?: { downloadUrl?: string }): void => {
     setOps((prev) =>
       prev.map((op) =>
         op.id === id
-          ? { ...op, status: "complete" as const, progress: 100, finishedAt: Date.now(), successMessage }
+          ? {
+              ...op,
+              status: "complete" as const,
+              progress: 100,
+              finishedAt: Date.now(),
+              successMessage,
+              ...(opts?.downloadUrl ? { downloadUrl: opts.downloadUrl } : {}),
+            }
           : op,
       ),
     )
@@ -179,7 +231,11 @@ export function BackgroundOpsProvider({ children }: { children: ReactNode }): Re
       }
       return prev
     })
-    scheduleDismiss(id)
+    // INTENT: Ops with a downloadUrl stay until manually dismissed (user needs to re-download).
+    // Ops without downloadUrl auto-dismiss after 30s (existing behavior).
+    if (!opts?.downloadUrl) {
+      scheduleDismiss(id)
+    }
   }, [scheduleDismiss])
 
   const failOp = useCallback((id: string, errorMessage?: string): void => {

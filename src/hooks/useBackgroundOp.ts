@@ -7,6 +7,9 @@
  * Provides a `runInBackground` function that wraps any async function
  * with automatic startOp / completeOp / failOp lifecycle management.
  *
+ * If the async function returns `{ downloadUrl }`, the completed op
+ * will persist in the indicator with a download button (no auto-dismiss).
+ *
  * Features needing manual control can use the raw context methods
  * (startOp, updateOp, completeOp) directly via useBackgroundOps().
  *
@@ -23,6 +26,11 @@ interface RunInBackgroundCallbacks {
   update: (patch: BackgroundOpUpdate) => void
 }
 
+/** Optional result from the background function */
+export interface BackgroundOpResult {
+  downloadUrl?: string
+}
+
 interface RunInBackgroundOptions {
   /** Message shown in toast on success (defaults to "{label} complete") */
   successMessage?: string
@@ -34,7 +42,7 @@ interface UseBackgroundOpReturn {
   /** Wrap an async function with automatic background op lifecycle */
   runInBackground: (
     label: string,
-    fn: (callbacks: RunInBackgroundCallbacks) => Promise<void>,
+    fn: (callbacks: RunInBackgroundCallbacks) => Promise<BackgroundOpResult | void>,
     options?: RunInBackgroundOptions,
   ) => Promise<void>
 }
@@ -54,6 +62,7 @@ interface UseBackgroundOpReturn {
  *   update({ stepLabel: "System blueprint", progress: 25 })
  *   await generateImagesAction(scanId)
  *   update({ progress: 100 })
+ *   return { downloadUrl: "https://..." }
  * }, { successMessage: "Blueprints ready" })
  * ```
  */
@@ -64,7 +73,7 @@ export function useBackgroundOp(): UseBackgroundOpReturn {
   const runInBackground = useCallback(
     async (
       label: string,
-      fn: (callbacks: RunInBackgroundCallbacks) => Promise<void>,
+      fn: (callbacks: RunInBackgroundCallbacks) => Promise<BackgroundOpResult | void>,
       options?: RunInBackgroundOptions,
     ): Promise<void> => {
       const route = options?.sourceRoute ?? pathname
@@ -75,8 +84,9 @@ export function useBackgroundOp(): UseBackgroundOpReturn {
       }
 
       try {
-        await fn({ update })
-        completeOp(id, options?.successMessage)
+        const result = await fn({ update })
+        const downloadUrl = result && typeof result === "object" ? result.downloadUrl : undefined
+        completeOp(id, options?.successMessage, downloadUrl ? { downloadUrl } : undefined)
       } catch (err) {
         const message = err instanceof Error ? err.message : "Unknown error"
         failOp(id, `${label} failed: ${message}`)

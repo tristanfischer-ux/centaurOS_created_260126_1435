@@ -165,7 +165,7 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
  * @description Generate a branded PowerPoint presentation from design report
  * data and trigger a browser download.
  */
-export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<void> {
+export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<Blob> {
   // INTENT: If AI narration is available, use the polished prose path
   if (data.aiContent) {
     return buildAiPptx(data)
@@ -693,22 +693,35 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   }
 
   // ── Download ──
-  await downloadPptx(pres, data)
+  return downloadPptx(pres, data)
 }
 
 // ─── Download Helper ─────────────────────────────────────────────────
 
-async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<void> {
+async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<Blob> {
   const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
   const stageLabel = data.stage ? `-${data.stage.charAt(0).toUpperCase() + data.stage.slice(1)}` : ''
   const dateStr = new Date(data.generatedAt).toISOString().split('T')[0]
+  const filename = `${safeName}${stageLabel}-Report-${dateStr}.pptx`
 
-  await pres.writeFile({ fileName: `${safeName}${stageLabel}-Report-${dateStr}.pptx` })
+  // INTENT: Use write() to get a blob instead of writeFile() which triggers
+  // a direct download we can't capture. We trigger the download manually.
+  const output = await pres.write({ outputType: 'blob' })
+  const blob = output as Blob
+
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+
+  return blob
 }
 
 // ─── AI Prose Presentation Builder ───────────────────────────────────
 
-async function buildAiPptx(data: DesignReportData): Promise<void> {
+async function buildAiPptx(data: DesignReportData): Promise<Blob> {
   const aiContent = data.aiContent!
   const pres = new PptxGenJS()
   pres.layout = 'LAYOUT_16x9'
@@ -806,7 +819,7 @@ async function buildAiPptx(data: DesignReportData): Promise<void> {
     }
   }
 
-  await downloadPptx(pres, data)
+  return downloadPptx(pres, data)
 }
 
 /** Create a data table slide for the given section type. */

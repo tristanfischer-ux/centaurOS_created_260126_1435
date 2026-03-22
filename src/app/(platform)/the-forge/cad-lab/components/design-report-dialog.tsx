@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label"
 
 import { useCadLab } from "../cad-lab-context"
 import { useBackgroundOp } from "@/hooks/useBackgroundOp"
+import { createClient } from "@/lib/supabase/client"
 import type { DesignReportFormat, DesignReportData, ReportStage } from "@/lib/cad-lab/design-report-types"
 
 interface DesignReportDialogProps {
@@ -105,6 +106,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     systemIllustrationUrl,
     researchModelUsed,
     decompositionModelUsed,
+    activeProjectId,
   } = useCadLab()
 
   const { runInBackground } = useBackgroundOp()
@@ -162,14 +164,22 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     if (!selectedFormat || exportStartedRef.current) return
     exportStartedRef.current = true
 
-    // PDF uses browser print dialog — close dialog first, then print after repaint
+    // PDF: Generate DOCX (same quality as Word export) — user can save as PDF.
+    // This replaces the broken window.print() approach which lost all formatting.
     if (selectedFormat === "pdf") {
       onOpenChange(false)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          window.print()
-        })
-      })
+      runInBackground(
+        `${STAGE_LABELS[stage]} Report (PDF)`,
+        async ({ update }) => {
+          update({ stepLabel: "Collecting design data...", progress: 10 })
+          const data = await assembleData()
+          update({ stepLabel: "Formatting document...", progress: 50 })
+          const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
+          await exportDesignReportAsDOCX(data)
+          update({ progress: 100 })
+        },
+        { successMessage: "Word document downloaded — open and Save As PDF for best quality" },
+      )
       return
     }
 
@@ -179,6 +189,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     const formatLabel = selectedFormat === "docx" ? "Word" : "Slides"
     const moduleCount = modules.length
     const useAi = aiEnabled
+    const projectId = activeProjectId
 
     // Capture assembled data before the dialog unmounts
     // (closures over useCadLab values are stable via useCallback deps)
@@ -219,19 +230,52 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         // Step 3: Format and download
         update({ stepLabel: `Formatting ${formatLabel} document...`, progress: 85 })
 
+        let blob: Blob
         if (selectedFormat === "docx") {
           const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
-          await exportDesignReportAsDOCX(data)
+          blob = await exportDesignReportAsDOCX(data)
         } else {
           const { exportDesignReportAsPPTX } = await import("@/lib/cad-lab/export-design-report-pptx")
-          await exportDesignReportAsPPTX(data)
+          blob = await exportDesignReportAsPPTX(data)
+        }
+
+        // Step 4: Upload to Supabase Storage for persistent re-download
+        update({ stepLabel: "Uploading to cloud...", progress: 95 })
+        let downloadUrl: string | undefined
+        try {
+          const ext = selectedFormat === "docx" ? "docx" : "pptx"
+          const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-")
+          const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
+          const storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.${ext}`
+
+          const supabase = createClient()
+          const { error: uploadError } = await supabase.storage
+            .from("xray-images")
+            .upload(storagePath, blob, {
+              contentType: ext === "docx"
+                ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                : "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              upsert: true,
+            })
+
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage
+              .from("xray-images")
+              .getPublicUrl(storagePath)
+            downloadUrl = urlData.publicUrl
+          } else {
+            console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadError.message)
+          }
+        } catch (uploadErr) {
+          console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadErr)
         }
 
         update({ progress: 100 })
+        return downloadUrl ? { downloadUrl } : undefined
       },
       { successMessage: `${formatLabel} report ready — downloaded` },
     )
-  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, modules.length, stage, runInBackground])
+  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, modules.length, stage, activeProjectId, runInBackground])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -8,6 +8,8 @@
  * OfflineIndicator. Collapsed view shows a pill with spinner + count;
  * expanded view shows a card listing each operation with progress.
  *
+ * Ops with a downloadUrl show a download button that persists until dismissed.
+ *
  * @related
  * - BackgroundOps context: src/contexts/background-ops-context.tsx
  * - useBackgroundOp hook: src/hooks/useBackgroundOp.ts
@@ -28,6 +30,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  Download,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -170,8 +173,20 @@ function OpRow({ op, onDismiss, pathname }: { op: BackgroundOp; onDismiss: (id: 
         </div>
       )}
 
-      {/* Go to source route — hidden when already on the source page */}
-      {op.sourceRoute && !pathname.startsWith(op.sourceRoute) && (
+      {/* Download button — for completed ops with a downloadUrl */}
+      {op.status === "complete" && op.downloadUrl && (
+        <a
+          href={op.downloadUrl}
+          download
+          className="flex items-center gap-1 text-xs text-international-orange hover:underline pl-6"
+        >
+          <Download className="h-3 w-3" />
+          Download report
+        </a>
+      )}
+
+      {/* Go to source route — hidden when already on the source page or when download is available */}
+      {op.sourceRoute && !op.downloadUrl && !pathname.startsWith(op.sourceRoute) && (
         <Link
           href={op.sourceRoute}
           className="flex items-center gap-1 text-xs text-international-orange hover:underline pl-6"

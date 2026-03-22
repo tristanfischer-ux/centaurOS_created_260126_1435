@@ -213,10 +213,17 @@ export function UnifiedOnboarding({
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-background"
+      initial={{ opacity: 0, y: 0 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 100 }}
+      drag="y"
+      dragConstraints={{ top: 0, bottom: 0 }}
+      dragElastic={0.3}
+      onDragEnd={(_e, info) => {
+        // Swipe down to dismiss — threshold of 100px
+        if (info.offset.y > 100) handleSkip()
+      }}
+      className="fixed inset-0 z-50 bg-background touch-pan-x"
     >
       {/* Background image */}
       <div className="absolute inset-0">

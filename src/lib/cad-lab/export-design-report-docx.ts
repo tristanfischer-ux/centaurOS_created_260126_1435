@@ -141,7 +141,7 @@ const DIAG_LABELS: Record<string, string> = {
  * @description Generate a branded Word document from design report data
  * and trigger a browser download.
  */
-export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<void> {
+export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<Blob> {
   // INTENT: If AI narration is available, use the polished prose path
   if (data.aiContent) {
     return buildAiDocx(data)
@@ -483,8 +483,37 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     if (ei.hardwareCount > 0) {
       children.push(textParagraph(
         `${ei.hardwareCount} ISO metric fastener specifications referenced (bolt clearance holes, thread pitches, nut dimensions, bearing specs).`,
-        { after: 200, color: MID_TEXT },
+        { after: 120, color: MID_TEXT },
       ))
+    }
+
+    if (ei.supplierInsights && ei.supplierInsights.length > 0) {
+      children.push(sectionHeading('Supplier Intelligence (Nightshift)'))
+      children.push(textParagraph(
+        'Real-world manufacturing capabilities aggregated from verified UK supplier data.',
+        { after: 120, color: MID_TEXT },
+      ))
+      const supRows: TableRow[] = [
+        new TableRow({
+          children: [
+            headerCell('Technique', 30),
+            headerCell('Verified Suppliers', 20),
+            headerCell('Tolerances', 25),
+            headerCell('Common Materials', 25),
+          ],
+        }),
+      ]
+      for (const s of ei.supplierInsights) {
+        supRows.push(new TableRow({
+          children: [
+            dataCell(s.technique, 30),
+            dataCell(String(s.supplierCount), 20),
+            dataCell(s.tolerances, 25),
+            dataCell(s.materials, 25),
+          ],
+        }))
+      }
+      children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: supRows }))
     }
   }
 
@@ -713,12 +742,12 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
 
   // ── Build document (shared helper) ──
   const doc = buildDocxDocument(children, data)
-  await downloadDocx(doc, data)
+  return downloadDocx(doc, data)
 }
 
 // ─── Download Helper ─────────────────────────────────────────────────
 
-async function downloadDocx(doc: Document, data: DesignReportData): Promise<void> {
+async function downloadDocx(doc: Document, data: DesignReportData): Promise<Blob> {
   const blob = await Packer.toBlob(doc)
   const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, '-')
   const stageLabel = data.stage ? `-${data.stage.charAt(0).toUpperCase() + data.stage.slice(1)}` : ''
@@ -731,6 +760,8 @@ async function downloadDocx(doc: Document, data: DesignReportData): Promise<void
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+
+  return blob
 }
 
 // ─── Reusable Table Builders ─────────────────────────────────────────
@@ -1053,7 +1084,7 @@ function buildDocxDocument(children: DocChild[], data: DesignReportData): Docume
 
 // ─── AI Prose Document Builder ───────────────────────────────────────
 
-async function buildAiDocx(data: DesignReportData): Promise<void> {
+async function buildAiDocx(data: DesignReportData): Promise<Blob> {
   const aiContent = data.aiContent!
   const children: DocChild[] = []
 
@@ -1148,7 +1179,7 @@ async function buildAiDocx(data: DesignReportData): Promise<void> {
   )
 
   const doc = buildDocxDocument(children, data)
-  await downloadDocx(doc, data)
+  return downloadDocx(doc, data)
 }
 
 /** Map section type to the appropriate data table. */
