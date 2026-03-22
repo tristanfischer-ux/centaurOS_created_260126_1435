@@ -329,23 +329,25 @@ export interface ConversationMessage {
 
 /**
  * Maximum token budget for conversation history passed to the LLM.
- * This prevents long conversations from blowing up the context window.
- * The system prompt (personality, context layers, observations) typically
- * uses 5,000-15,000 tokens, so we reserve ~16,000 for conversation history.
+ * Claude Sonnet 4.6 supports 1M context; system prompt uses ~5-15K tokens,
+ * output reserves ~16K. 100K for history lets specialists recall 50+ turns
+ * of detailed conversation — enough for a full strategy session.
  */
-const CONVERSATION_TOKEN_BUDGET = 16_000
+const CONVERSATION_TOKEN_BUDGET = 100_000
 
 /**
  * Messages within this count from the end are kept at full length.
- * Older messages get truncated to save tokens while preserving recent context.
+ * With 100K budget, we can keep the last 20 messages fully intact while
+ * still truncating very old messages to save tokens.
  */
-const FULL_LENGTH_RECENT_COUNT = 6
+const FULL_LENGTH_RECENT_COUNT = 20
 
 /**
  * Maximum characters to keep from a truncated older message.
- * Roughly ~300 tokens — enough to preserve the gist without the full detail.
+ * ~800 tokens — enough to preserve detailed reasoning and recommendations
+ * from earlier in the conversation, not just the gist.
  */
-const TRUNCATED_MESSAGE_MAX_CHARS = 1200
+const TRUNCATED_MESSAGE_MAX_CHARS = 3200
 
 /**
  * Extracts recent unobserved messages as a properly typed array for
@@ -368,7 +370,7 @@ const TRUNCATED_MESSAGE_MAX_CHARS = 1200
  */
 export function getConversationHistory(
   context: MemoryContext,
-  maxMessages: number = 20
+  maxMessages: number = 100
 ): ConversationMessage[] {
   if (context.recentMessages.length === 0) {
     return []
