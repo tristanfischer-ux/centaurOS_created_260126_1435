@@ -86,6 +86,7 @@ import { detectIndustryDomain, extractProductKeywords } from "@/lib/cad-lab/indu
 import { retrieveStandardsForPrompt } from "@/lib/cad-lab/standards-retriever"
 import { generateAndStoreStandards } from "@/lib/cad-lab/standards-auto-learn"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
+import { retrieveProductDimensionsForPrompt } from "@/lib/cad-lab/product-dimensions-retriever"
 
 /** Maximum STEP file size in bytes (50 MB) — duplicated from step-template-matching
  * because "use server" files cannot export non-function values */
@@ -1499,6 +1500,17 @@ Resolve any ambiguities with engineering judgment — do not ask for clarificati
       }
     } catch (engErr) {
       console.warn("[THE-FORGE] Step 3: Engineering data retrieval failed (non-fatal):", engErr instanceof Error ? engErr.message : engErr)
+    }
+
+    // Retrieve real-world product dimensions if a matching category exists
+    try {
+      const dimResult = await retrieveProductDimensionsForPrompt(description)
+      if (dimResult.content) {
+        codeGenStandardsSection += (codeGenStandardsSection ? "\n\n" : "") + dimResult.content
+        console.info(`[THE-FORGE] Step 3: Injected product reference dimensions (category: ${dimResult.matchedCategory})`)
+      }
+    } catch (dimErr) {
+      console.warn("[THE-FORGE] Step 3: Product dimensions retrieval failed (non-fatal):", dimErr instanceof Error ? dimErr.message : dimErr)
     }
 
     if (!codeGenStandardsSection) {

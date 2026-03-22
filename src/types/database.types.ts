@@ -4876,6 +4876,7 @@ export type Database = {
         Row: {
           conversation_id: string
           id: string
+          is_archived: boolean
           is_muted: boolean | null
           joined_at: string | null
           last_read_at: string | null
@@ -4884,6 +4885,7 @@ export type Database = {
         Insert: {
           conversation_id: string
           id?: string
+          is_archived?: boolean
           is_muted?: boolean | null
           joined_at?: string | null
           last_read_at?: string | null
@@ -4892,6 +4894,7 @@ export type Database = {
         Update: {
           conversation_id?: string
           id?: string
+          is_archived?: boolean
           is_muted?: boolean | null
           joined_at?: string | null
           last_read_at?: string | null
@@ -9334,6 +9337,45 @@ export type Database = {
           },
         ]
       }
+      match_alerts: {
+        Row: {
+          created_at: string
+          description: string | null
+          dismissed_at: string | null
+          id: string
+          listing_id: string | null
+          metadata: Json | null
+          read_at: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          dismissed_at?: string | null
+          id?: string
+          listing_id?: string | null
+          metadata?: Json | null
+          read_at?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          dismissed_at?: string | null
+          id?: string
+          listing_id?: string | null
+          metadata?: Json | null
+          read_at?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       material_properties: {
         Row: {
           coefficient_of_thermal_expansion: number | null
@@ -12504,6 +12546,87 @@ export type Database = {
           typical_lead_time_days?: number | null
           unsuitable_materials?: string[] | null
           verified?: boolean | null
+        }
+        Relationships: []
+      }
+      product_reference_dimensions: {
+        Row: {
+          common_materials: string[] | null
+          common_processes: string[] | null
+          component_dimensions: Json | null
+          created_at: string | null
+          display_name: string
+          height_range_max_mm: number | null
+          height_range_min_mm: number | null
+          id: string
+          length_range_max_mm: number | null
+          length_range_min_mm: number | null
+          notes: string | null
+          product_category: string
+          product_subcategory: string | null
+          search_keywords: string[] | null
+          source: string | null
+          typical_height_mm: number | null
+          typical_length_mm: number | null
+          typical_weight_kg: number | null
+          typical_width_mm: number | null
+          verified: boolean | null
+          weight_range_max_kg: number | null
+          weight_range_min_kg: number | null
+          width_range_max_mm: number | null
+          width_range_min_mm: number | null
+        }
+        Insert: {
+          common_materials?: string[] | null
+          common_processes?: string[] | null
+          component_dimensions?: Json | null
+          created_at?: string | null
+          display_name: string
+          height_range_max_mm?: number | null
+          height_range_min_mm?: number | null
+          id?: string
+          length_range_max_mm?: number | null
+          length_range_min_mm?: number | null
+          notes?: string | null
+          product_category: string
+          product_subcategory?: string | null
+          search_keywords?: string[] | null
+          source?: string | null
+          typical_height_mm?: number | null
+          typical_length_mm?: number | null
+          typical_weight_kg?: number | null
+          typical_width_mm?: number | null
+          verified?: boolean | null
+          weight_range_max_kg?: number | null
+          weight_range_min_kg?: number | null
+          width_range_max_mm?: number | null
+          width_range_min_mm?: number | null
+        }
+        Update: {
+          common_materials?: string[] | null
+          common_processes?: string[] | null
+          component_dimensions?: Json | null
+          created_at?: string | null
+          display_name?: string
+          height_range_max_mm?: number | null
+          height_range_min_mm?: number | null
+          id?: string
+          length_range_max_mm?: number | null
+          length_range_min_mm?: number | null
+          notes?: string | null
+          product_category?: string
+          product_subcategory?: string | null
+          search_keywords?: string[] | null
+          source?: string | null
+          typical_height_mm?: number | null
+          typical_length_mm?: number | null
+          typical_weight_kg?: number | null
+          typical_width_mm?: number | null
+          verified?: boolean | null
+          weight_range_max_kg?: number | null
+          weight_range_min_kg?: number | null
+          width_range_max_mm?: number | null
+          width_range_min_mm?: number | null
         }
         Relationships: []
       }
@@ -17951,6 +18074,15 @@ export type Database = {
           success: boolean
         }[]
       }
+      assign_founding_member_atomically: {
+        Args: {
+          p_credit_amount?: number
+          p_foundry_id: string
+          p_member_limit?: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
       calculate_ai_cost: {
         Args: {
           completion_tokens: number
@@ -18739,6 +18871,7 @@ export type Database = {
           task_title: string
         }[]
       }
+      get_unread_alert_count: { Args: { p_user_id: string }; Returns: number }
       get_unread_message_count: { Args: { user_id: string }; Returns: number }
       get_user_foundries: {
         Args: { p_user_id: string }
@@ -19080,6 +19213,7 @@ export type Database = {
         Returns: boolean
       }
       repair_user_profile: { Args: never; Returns: Json }
+      reset_rate_limit: { Args: { p_key: string }; Returns: undefined }
       schedule_payment_retry: {
         Args: { p_failed_payment_id: string }
         Returns: string
@@ -19105,6 +19239,14 @@ export type Database = {
           summary: string
           trust_score: number
         }[]
+      }
+      seed_demo_air_quality_sensor: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: string
+      }
+      seed_demo_drone_motor_mount: {
+        Args: { p_foundry_id: string; p_user_id: string }
+        Returns: string
       }
       seed_demo_forge_concept: {
         Args: { p_foundry_id: string; p_user_id: string }
