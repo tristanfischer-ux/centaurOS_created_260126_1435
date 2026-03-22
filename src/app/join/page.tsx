@@ -241,8 +241,9 @@ function JoinPageInner() {
               </p>
             </div>
 
-            <GoogleOAuthButton redirect={redirectParam} signupContext={{ role: "supplier" }} />
-            <OAuthDivider />
+            {/* Google OAuth — disabled until redirect URI is registered in Google Cloud Console */}
+            {/* <GoogleOAuthButton redirect={redirectParam} signupContext={{ role: "supplier" }} />
+            <OAuthDivider /> */}
 
             {state.error && (
               <motion.div
@@ -469,9 +470,9 @@ function JoinPageInner() {
             </div>
           )}
 
-          {/* Google OAuth */}
-          <GoogleOAuthButton redirect={redirectParam} signupContext={signupContext} />
-          <OAuthDivider />
+          {/* Google OAuth — disabled until redirect URI is registered in Google Cloud Console */}
+          {/* <GoogleOAuthButton redirect={redirectParam} signupContext={signupContext} />
+          <OAuthDivider /> */}
 
           <form action={formAction} className="space-y-5">
             <input type="hidden" name="role" value={effectiveRole} />
