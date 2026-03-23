@@ -22,7 +22,8 @@
  * - src/lib/reports/export-infographic.ts — Infographic PNG export
  */
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 import {
   CalendarDays,
@@ -257,8 +258,13 @@ export default function ReportsPage(): React.JSX.Element {
   const isGeneratingReportRef = useRef(false)
   const isGeneratingBriefingRef = useRef(false)
 
-  // Change 6: Tab-level page mode
-  const [pageMode, setPageMode] = useState<PageMode>('reports')
+  // Change 6: Tab-level page mode (supports ?tab= deep linking from The Forge)
+  const searchParams = useSearchParams()
+  const validTabs = new Set<PageMode>(['reports', 'presentations', 'documents', 'downloads'])
+  const tabParam = searchParams.get('tab') as PageMode | null
+  const [pageMode, setPageMode] = useState<PageMode>(
+    tabParam && validTabs.has(tabParam) ? tabParam : 'reports'
+  )
 
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)
@@ -580,7 +586,7 @@ export default function ReportsPage(): React.JSX.Element {
 
       const supabase = createClient()
       supabase.storage
-        .from('xray-images')
+        .from('report-exports')
         .upload(storagePath, blob, {
           contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           upsert: true,
@@ -612,8 +618,39 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       toast.info('Generating PDF…')
       const filename = `${sanitizeFilename(reportDocument.foundryName)}-${sanitizeFilename(reportDocument.title)}-${reportDocument.dateRange.start}.pdf`
-      await exportReportAsPDF(reportRef.current, filename)
+      const blob = await exportReportAsPDF(reportRef.current, filename)
       toast.success('PDF downloaded')
+
+      // Fire-and-forget: upload to Storage + track
+      const safeName = sanitizeFilename(reportDocument.foundryName) || 'report'
+      const safeTitle = sanitizeFilename(reportDocument.title) || 'export'
+      const dateStr = reportDocument.dateRange.start
+      const uid = crypto.randomUUID().slice(0, 8)
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}-${uid}.pdf`
+
+      const supabase = createClient()
+      supabase.storage
+        .from('report-exports')
+        .upload(storagePath, blob, {
+          contentType: 'application/pdf',
+          upsert: true,
+        })
+        .then(async ({ error: uploadError }) => {
+          if (uploadError) {
+            toast.info('Downloaded locally — cloud backup unavailable')
+          }
+          const { saveReportDownload } = await import('@/actions/report-downloads')
+          await saveReportDownload({
+            reportName: reportDocument.title,
+            reportSource: 'reports',
+            fileFormat: 'pdf',
+            fileSizeBytes: blob.size,
+            storagePath: uploadError ? null : storagePath,
+          })
+        })
+        .catch(() => {
+          // Non-fatal — local download already succeeded
+        })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PDF generation failed'
       toast.error(message)
@@ -653,7 +690,7 @@ export default function ReportsPage(): React.JSX.Element {
 
       const supabase = createClient()
       supabase.storage
-        .from('xray-images')
+        .from('report-exports')
         .upload(storagePath, blob, {
           contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           upsert: true,
@@ -697,7 +734,7 @@ export default function ReportsPage(): React.JSX.Element {
 
       const supabase = createClient()
       supabase.storage
-        .from('xray-images')
+        .from('report-exports')
         .upload(storagePath, blob, {
           contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
           upsert: true,
@@ -730,8 +767,38 @@ export default function ReportsPage(): React.JSX.Element {
       toast.info('Exporting infographic as image…')
       const { downloadInfographicAsImage } = await import('@/lib/reports/export-infographic')
       const filename = `${sanitizeFilename(reportDocument.foundryName)}-infographic-${reportDocument.dateRange.start}.png`
-      await downloadInfographicAsImage(infographicRef.current, filename)
+      const blob = await downloadInfographicAsImage(infographicRef.current, filename)
       toast.success('Infographic image downloaded')
+
+      // Fire-and-forget: upload to Storage + track
+      const safeName = sanitizeFilename(reportDocument.foundryName) || 'report'
+      const dateStr = reportDocument.dateRange.start
+      const uid = crypto.randomUUID().slice(0, 8)
+      const storagePath = `reports/general/${safeName}/infographic-${dateStr}-${uid}.png`
+
+      const supabase = createClient()
+      supabase.storage
+        .from('report-exports')
+        .upload(storagePath, blob, {
+          contentType: 'image/png',
+          upsert: true,
+        })
+        .then(async ({ error: uploadError }) => {
+          if (uploadError) {
+            toast.info('Downloaded locally — cloud backup unavailable')
+          }
+          const { saveReportDownload } = await import('@/actions/report-downloads')
+          await saveReportDownload({
+            reportName: `${reportDocument.title} — Infographic`,
+            reportSource: 'reports',
+            fileFormat: 'png',
+            fileSizeBytes: blob.size,
+            storagePath: uploadError ? null : storagePath,
+          })
+        })
+        .catch(() => {
+          // Non-fatal — local download already succeeded
+        })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Image export failed'
       toast.error(message)

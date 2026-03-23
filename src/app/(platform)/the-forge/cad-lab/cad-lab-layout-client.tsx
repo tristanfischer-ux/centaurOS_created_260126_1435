@@ -22,6 +22,7 @@ import {
   Plus,
   ShieldAlert,
   AlertCircle,
+  FileDown,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -131,6 +132,17 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
               ) : null}
             </span>
           )}
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="gap-1.5 text-muted-foreground"
+          >
+            <Link href="/reports?tab=downloads">
+              <FileDown className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Downloads</span>
+            </Link>
+          </Button>
           <Button
             variant={showProjects ? "default" : "outline"}
             size="sm"

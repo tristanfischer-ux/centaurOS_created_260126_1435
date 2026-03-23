@@ -18,12 +18,10 @@ import {
   ClipboardList,
   ShoppingCart,
   Package,
-  Box,
   CheckCircle2,
   Lock,
   type LucideIcon,
 } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import {
@@ -94,16 +92,6 @@ export const STAGES: StageDefinition[] = [
     unlockHint: "Award at least one supplier contract in Source",
     features: ["Manufacturing order tracking", "Parts receiving & QC", "Assembly job management", "Shipping & delivery"],
   },
-  {
-    id: "cad",
-    label: "CAD",
-    mobileLabel: "C",
-    icon: Box,
-    href: FORGE_ROUTES.cadLabCad,
-    description: "Generate parametric CAD models and build the system assembly.",
-    unlockHint: "Complete module decomposition in the Design stage",
-    features: ["Per-module CadQuery generation", "Batch pipeline", "DFM analysis", "Hierarchical STEP assembly"],
-  },
 ]
 
 /**
@@ -128,7 +116,6 @@ export function getStageAccess(
     specify: { enabled: hasResearch && moduleCount > 0, completed: specifiedModuleCount > 0 && specifiedModuleCount === moduleCount },
     source: { enabled: specifiedModuleCount > 0, completed: manufacturingOrderCount > 0 },
     assemble: { enabled: hasResearch && moduleCount > 0, completed: manufacturingOrderCount > 0 },
-    cad: { enabled: hasResearch && moduleCount > 0, completed: false },
   }
 }
 
@@ -180,7 +167,6 @@ export function CadLabBottomNav(): React.ReactNode {
                 <span className="flex items-center gap-0.5">
                   <span className="sm:hidden">{stage.mobileLabel}</span>
                   <span className="hidden sm:inline">{stage.label}</span>
-                  {stage.id === "cad" && <Badge variant="secondary" className="text-[8px] px-1 py-0 leading-tight font-semibold uppercase hidden sm:inline">Beta</Badge>}
                 </span>
               </Link>
             ) : (
@@ -193,7 +179,6 @@ export function CadLabBottomNav(): React.ReactNode {
                 <span className="flex items-center gap-0.5">
                   <span className="sm:hidden">{stage.mobileLabel}</span>
                   <span className="hidden sm:inline">{stage.label}</span>
-                  {stage.id === "cad" && <Badge variant="secondary" className="text-[8px] px-1 py-0 leading-tight font-semibold uppercase hidden sm:inline">Beta</Badge>}
                 </span>
               </button>
             )
@@ -329,7 +314,6 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                             {specifiedModuleCount}/{modules.length}
                           </span>
                         )}
-                        {stage.id === "cad" && <Badge variant="secondary" className="ml-1 text-[8px] px-1 py-0 leading-tight font-semibold uppercase">Beta</Badge>}
                       </span>
                     </span>
                   </Link>
@@ -346,7 +330,6 @@ export function CadLabNav({ className }: { className?: string }): React.ReactNod
                       <span className="sm:hidden">{stage.mobileLabel}</span>
                       <span className="hidden sm:inline">
                         {stage.label}
-                        {stage.id === "cad" && <Badge variant="secondary" className="ml-1 text-[8px] px-1 py-0 leading-tight font-semibold uppercase">Beta</Badge>}
                       </span>
                     </span>
                   </button>

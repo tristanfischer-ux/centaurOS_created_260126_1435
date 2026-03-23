@@ -278,6 +278,16 @@ export default function CadLabResearchPage(): React.ReactNode {
     }
   }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose, activeProjectId])
 
+  // INTENT: Reset freshResearchRef on unmount so navigating away and back
+  // doesn't re-trigger auto-decompose. "Fresh research" means research that
+  // completed in THIS mount cycle — not research from a previous session.
+  // DECISION: Runs on unmount only. If research completes while user is away
+  // (async in provider), handleResearch re-sets it to true, so auto-decompose
+  // will correctly fire when the user returns.
+  useEffect(() => {
+    return () => { freshResearchRef.current = false }
+  }, [freshResearchRef])
+
   // INTENT: Compute model audit data from modules for attribution display.
   const modelAudit = useMemo(() => {
     const generatedCount = modules.filter(m => m.result?.modelUsed).length

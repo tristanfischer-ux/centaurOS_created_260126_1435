@@ -3096,6 +3096,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if ("orders" in ordersRes) {
         setManufacturingOrderCount(ordersRes.orders.length)
       }
+
+      // INTENT: Prevent the auto-decompose effect from re-triggering on project reload.
+      // freshResearchRef is set true during handleResearch() to auto-decompose after
+      // fresh research. Without this reset, loading a saved project with research
+      // causes hasResearch to flip false→true, triggering handleDecompose() which
+      // clears the restored state.
+      freshResearchRef.current = false
     } catch {
       console.error("[CAD-LAB] Failed to load project")
     }

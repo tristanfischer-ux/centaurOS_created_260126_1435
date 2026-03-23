@@ -11,7 +11,7 @@
  */
 
 import { Suspense, useMemo, useState, useEffect, Component, type ReactNode } from "react"
-import { Canvas, useLoader } from "@react-three/fiber"
+import { Canvas, useLoader, useThree } from "@react-three/fiber"
 import { OrbitControls, Grid, PerspectiveCamera, Environment } from "@react-three/drei"
 import * as THREE from "three"
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader.js"
@@ -30,6 +30,20 @@ interface ModelViewerProps {
   backgroundColor?: string
   /** Optional CSS class */
   className?: string
+}
+
+// ─── Scene Background ────────────────────────────────────────────────
+
+// INTENT: CSS `style={{ background }}` on the Canvas only affects the HTML element.
+// The Three.js scene itself has no background set, so it renders black behind the
+// model. This component sets scene.background to match the desired color.
+function SceneBackground({ color }: { color: string }) {
+  const { scene } = useThree()
+  useEffect(() => {
+    scene.background = new THREE.Color(color)
+    return () => { scene.background = null }
+  }, [scene, color])
+  return null
 }
 
 // ─── GLB Model (loaded from URL) ─────────────────────────────────────
@@ -322,17 +336,20 @@ export function ModelViewer({
           style={{ background: backgroundColor }}
           gl={{ antialias: true, alpha: false }}
         >
+          <SceneBackground color={backgroundColor} />
+
           {/* INTENT: PBR metallic surfaces reflect their environment — without an
               environment map they reflect black/nothing, appearing grey. "studio"
               provides neutral product-photography lighting. Only needed for GLB
               (STL uses a fixed material colour, not PBR textures).
-              DECISION: Separate Suspense so the GLB model renders immediately with
-              direct lights while the HDR loads asynchronously from CDN. Once the
-              HDR arrives, PBR reflections appear — progressive enhancement. */}
+              DECISION: background={false} keeps env as reflection-only while
+              SceneBackground handles the visible color. Separate Suspense so the
+              GLB model renders immediately with direct lights while the HDR loads
+              asynchronously from CDN. */}
           {isGlb && (
             <SilentErrorBoundary>
               <Suspense fallback={null}>
-                <Environment preset="studio" />
+                <Environment preset="studio" background={false} />
               </Suspense>
             </SilentErrorBoundary>
           )}
@@ -341,7 +358,10 @@ export function ModelViewer({
               the illumination via HDR reflections. STL has no env map so needs
               stronger direct lights. All values scaled for Three.js r182
               physically-correct mode (old 1.0 ≈ Math.PI). */}
-          <ambientLight intensity={isGlb ? 0.8 : 1.5} />
+          {/* DECISION: GLB lighting bumped (ambient 0.8→1.2, hemisphere 0.6→1.0) so
+              metallic PBR surfaces reflect the now-light background instead of
+              appearing flat grey. STL values unchanged. */}
+          <ambientLight intensity={isGlb ? 1.2 : 1.5} />
           <directionalLight
             position={[10, 10, 5]}
             intensity={isGlb ? 1.5 : 2.5}
@@ -351,7 +371,7 @@ export function ModelViewer({
           />
           <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.5 : 1.0} />
           <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.3 : 0.5} />
-          <hemisphereLight intensity={isGlb ? 0.6 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
+          <hemisphereLight intensity={isGlb ? 1.0 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
 
           <Suspense fallback={null}>
             {isGlb ? (

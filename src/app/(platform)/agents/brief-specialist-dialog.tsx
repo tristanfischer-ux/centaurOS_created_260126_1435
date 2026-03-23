@@ -533,8 +533,15 @@ export function BriefSpecialistDialog({
         setIsPlayingIntroVideo(false)
     }, [])
 
-    // Reset messages and greeting flag when specialist changes
+    // INTENT: Reset messages and greeting flag when the user switches to a
+    // DIFFERENT specialist (e.g., Max → Sarah). Must NOT clear on initial mount
+    // because the history-loading effect (line 411) is async — clearing here
+    // would race and wipe messages before history arrives.
+    // DECISION: Track the previous specialist.id and only clear when it changes.
+    const prevSpecialistIdRef = useRef(specialist.id)
     useEffect(() => {
+        if (prevSpecialistIdRef.current === specialist.id) return
+        prevSpecialistIdRef.current = specialist.id
         setMessages([])
         setHistoryMessages([])
         setShowHistory(false)
