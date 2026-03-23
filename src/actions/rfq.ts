@@ -1154,3 +1154,56 @@ export async function getRFQClarifications(
 
   return { data: (data || []) as RFQClarification[], error: null }
 }
+
+/**
+ * Get quote data for a linked RFQ — used by sourcing reports.
+ * Returns top quotes with supplier name, price, timeline.
+ */
+export async function getLinkedRFQQuotes(rfqId: string): Promise<{
+  quotes: { supplierName: string; price: number | null; timelineWeeks: number | null; proposalTitle: string | null }[]
+  rfqTitle: string | null
+}> {
+  const supabase = await createClient()
+
+  // Get RFQ title
+  const { data: rfq } = await supabase
+    .from("rfqs")
+    .select("title")
+    .eq("id", rfqId)
+    .single()
+
+  // Get responses with accepted/interest status
+  const { data: responses } = await supabase
+    .from("rfq_responses")
+    .select("quoted_price, timeline_weeks, proposal_title, provider_id")
+    .eq("rfq_id", rfqId)
+    .in("response_type", ["accept", "interest"])
+    .order("quoted_price", { ascending: true })
+    .limit(10)
+
+  if (!responses || responses.length === 0) {
+    return { quotes: [], rfqTitle: (rfq?.title as string) ?? null }
+  }
+
+  // Get provider names
+  const providerIds = responses.map(r => r.provider_id).filter(Boolean)
+  const { data: providers } = await supabase
+    .from("marketplace_listings")
+    .select("id, title")
+    .in("id", providerIds)
+
+  const providerNames = new Map<string, string>()
+  if (providers) {
+    for (const p of providers) providerNames.set(p.id, p.title as string)
+  }
+
+  return {
+    rfqTitle: (rfq?.title as string) ?? null,
+    quotes: responses.map(r => ({
+      supplierName: providerNames.get(r.provider_id as string) ?? "Unknown Supplier",
+      price: r.quoted_price as number | null,
+      timelineWeeks: r.timeline_weeks as number | null,
+      proposalTitle: r.proposal_title as string | null,
+    })),
+  }
+}

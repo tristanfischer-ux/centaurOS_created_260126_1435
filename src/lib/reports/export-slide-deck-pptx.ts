@@ -700,7 +700,7 @@ function buildSlide(
  */
 export async function exportSlideDeckAsPPTX(
   briefing: StrategicBriefing,
-): Promise<void> {
+): Promise<Blob> {
   const pres = new PptxGenJS()
 
   pres.layout = 'LAYOUT_16x9'
@@ -715,6 +715,16 @@ export async function exportSlideDeckAsPPTX(
   const safeName = briefing.companyName.replace(/[^a-zA-Z0-9]/g, '-')
   const safeTitle = briefing.title.replace(/[^a-zA-Z0-9]/g, '-')
   const dateStr = new Date().toISOString().split('T')[0]
+  const filename = `${safeName}-${safeTitle}-${dateStr}.pptx`
 
-  await pres.writeFile({ fileName: `${safeName}-${safeTitle}-${dateStr}.pptx` })
+  // Write as blob for upload, then trigger browser download
+  const content = await pres.write({ outputType: 'blob' }) as Blob
+  const url = URL.createObjectURL(content)
+  const link = window.document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+
+  return content
 }

@@ -616,6 +616,35 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
     }
   }
 
+  // Source: RFQ Quotes Received
+  if (data.stage === 'source' && data.rfqQuotes && data.rfqQuotes.quotes.length > 0) {
+    children.push(sectionHeading('Quotes Received'))
+    if (data.rfqQuotes.rfqTitle) {
+      children.push(textParagraph(`RFQ: ${data.rfqQuotes.rfqTitle}`, { after: 120, color: MID_TEXT }))
+    }
+    const quoteRows: TableRow[] = [
+      new TableRow({
+        children: [
+          headerCell('Supplier', 30),
+          headerCell('Quoted Price', 20),
+          headerCell('Lead Time', 15),
+          headerCell('Proposal', 35),
+        ],
+      }),
+    ]
+    for (const q of data.rfqQuotes.quotes) {
+      quoteRows.push(new TableRow({
+        children: [
+          dataCell(q.supplierName, 30),
+          dataCell(q.price != null ? `£${q.price.toFixed(2)}` : '—', 20),
+          dataCell(q.timelineWeeks != null ? `${q.timelineWeeks} weeks` : '—', 15),
+          dataCell(q.proposalTitle ?? '—', 35),
+        ],
+      }))
+    }
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: quoteRows }))
+  }
+
   // Source: Technique Recommendations
   if (data.stage === 'source' && data.techniqueRecommendations) {
     const techModuleIds = Object.keys(data.techniqueRecommendations)

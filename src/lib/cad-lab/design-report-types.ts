@@ -62,6 +62,7 @@ export interface DesignReportData {
   classifiedParts?: ReportClassifiedPart[]
   supplierMatches?: Record<string, SupplierMatch[]>
   techniqueRecommendations?: Record<string, TechniqueRecommendation[]>
+  rfqQuotes?: { rfqTitle: string | null; quotes: { supplierName: string; price: number | null; timelineWeeks: number | null; proposalTitle: string | null }[] }
 
   // Assemble-stage extras
   assemblyPartners?: { name: string; score: number; reasons: string[] }[]

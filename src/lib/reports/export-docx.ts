@@ -499,7 +499,7 @@ const SECTION_BUILDERS: Record<string, SectionBuilder> = {
 const MARGIN_DEFAULT = 1440
 const MARGIN_COMPACT = 1080 // Smaller for weekly-update
 
-export async function exportReportAsDOCX(document: ReportDocument): Promise<void> {
+export async function exportReportAsDOCX(document: ReportDocument): Promise<Blob> {
   const templateId = document.templateId ?? 'custom'
   const isBoardPack = templateId === 'board-pack'
   const isWeeklyUpdate = templateId === 'weekly-update'
@@ -596,4 +596,6 @@ export async function exportReportAsDOCX(document: ReportDocument): Promise<void
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+
+  return blob
 }

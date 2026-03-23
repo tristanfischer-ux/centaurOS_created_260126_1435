@@ -100,8 +100,10 @@ import { SlideDeckRenderer } from '@/components/reports/SlideDeckRenderer'
 import { ReportHistory } from '@/components/reports/ReportHistory'
 import { SkillDocumentSection } from '@/components/reports/SkillDocumentSection'
 import { ReportsHeroShowcase } from '@/components/reports/ReportsHeroShowcase'
+import { ReportDownloads } from '@/components/reports/ReportDownloads'
 
 import { exportReportAsPDF, printReport } from '@/lib/reports/export-pdf'
+import { createClient } from '@/lib/supabase/client'
 
 import type {
   ReportDocument as ReportDocumentType,
@@ -223,12 +225,13 @@ function sanitizeFilename(str: string): string {
   return str.replace(/[/\\:*?"<>|]+/g, '').replace(/\s+/g, '-')
 }
 
-type PageMode = 'reports' | 'presentations' | 'documents'
+type PageMode = 'reports' | 'presentations' | 'documents' | 'downloads'
 
 const PAGE_TABS: { value: PageMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'reports', label: 'Reports', icon: FileText },
   { value: 'presentations', label: 'Presentations', icon: Presentation },
   { value: 'documents', label: 'Documents', icon: FileEdit },
+  { value: 'downloads', label: 'Downloads', icon: FileDown },
 ]
 
 // Report-only templates (excludes strategic-briefing and skill-document)
@@ -565,8 +568,43 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       toast.info('Generating slide deck…')
       const { exportSlideDeckAsPPTX } = await import('@/lib/reports/export-slide-deck-pptx')
-      await exportSlideDeckAsPPTX(briefingResult)
+      const blob = await exportSlideDeckAsPPTX(briefingResult)
       toast.success('PPTX downloaded')
+
+      // Fire-and-forget: upload to Storage + track
+      const safeName = sanitizeFilename(briefingResult.companyName)
+      const safeTitle = sanitizeFilename(briefingResult.title)
+      const dateStr = new Date().toISOString().split('T')[0]
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.pptx`
+
+      const supabase = createClient()
+      supabase.storage
+        .from('xray-images')
+        .upload(storagePath, blob, {
+          contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          upsert: true,
+        })
+        .then(async ({ error: uploadError }) => {
+          let fileUrl: string | null = null
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
+            fileUrl = urlData.publicUrl
+          } else {
+            toast.info('Downloaded locally — cloud backup unavailable')
+          }
+          const { saveReportDownload } = await import('@/actions/report-downloads')
+          await saveReportDownload({
+            reportName: briefingResult.title,
+            reportSource: 'reports',
+            fileFormat: 'pptx',
+            fileUrl,
+            fileSizeBytes: blob.size,
+            storagePath,
+          })
+        })
+        .catch(() => {
+          // Non-fatal — local download already succeeded
+        })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PPTX generation failed'
       toast.error(message)
@@ -607,8 +645,43 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       toast.info('Generating Word document…')
       const { exportReportAsDOCX } = await import('@/lib/reports/export-docx')
-      await exportReportAsDOCX(reportDocument)
+      const blob = await exportReportAsDOCX(reportDocument)
       toast.success('DOCX downloaded')
+
+      // Fire-and-forget: upload to Storage + track
+      const safeName = sanitizeFilename(reportDocument.foundryName)
+      const safeTitle = sanitizeFilename(reportDocument.title)
+      const dateStr = reportDocument.dateRange.start
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.docx`
+
+      const supabase = createClient()
+      supabase.storage
+        .from('xray-images')
+        .upload(storagePath, blob, {
+          contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          upsert: true,
+        })
+        .then(async ({ error: uploadError }) => {
+          let fileUrl: string | null = null
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
+            fileUrl = urlData.publicUrl
+          } else {
+            toast.info('Downloaded locally — cloud backup unavailable')
+          }
+          const { saveReportDownload } = await import('@/actions/report-downloads')
+          await saveReportDownload({
+            reportName: reportDocument.title,
+            reportSource: 'reports',
+            fileFormat: 'docx',
+            fileUrl,
+            fileSizeBytes: blob.size,
+            storagePath,
+          })
+        })
+        .catch(() => {
+          // Non-fatal — local download already succeeded
+        })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'DOCX generation failed'
       toast.error(message)
@@ -620,8 +693,43 @@ export default function ReportsPage(): React.JSX.Element {
     try {
       toast.info('Generating slide deck…')
       const { exportReportAsPPTX } = await import('@/lib/reports/export-pptx')
-      await exportReportAsPPTX(reportDocument)
+      const blob = await exportReportAsPPTX(reportDocument)
       toast.success('PPTX downloaded')
+
+      // Fire-and-forget: upload to Storage + track
+      const safeName = sanitizeFilename(reportDocument.foundryName)
+      const safeTitle = sanitizeFilename(reportDocument.title)
+      const dateStr = reportDocument.dateRange.start
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.pptx`
+
+      const supabase = createClient()
+      supabase.storage
+        .from('xray-images')
+        .upload(storagePath, blob, {
+          contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          upsert: true,
+        })
+        .then(async ({ error: uploadError }) => {
+          let fileUrl: string | null = null
+          if (!uploadError) {
+            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
+            fileUrl = urlData.publicUrl
+          } else {
+            toast.info('Downloaded locally — cloud backup unavailable')
+          }
+          const { saveReportDownload } = await import('@/actions/report-downloads')
+          await saveReportDownload({
+            reportName: reportDocument.title,
+            reportSource: 'reports',
+            fileFormat: 'pptx',
+            fileUrl,
+            fileSizeBytes: blob.size,
+            storagePath,
+          })
+        })
+        .catch(() => {
+          // Non-fatal — local download already succeeded
+        })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'PPTX generation failed'
       toast.error(message)
@@ -1491,6 +1599,15 @@ export default function ReportsPage(): React.JSX.Element {
       {pageMode === 'documents' && (
         <div id="tabpanel-documents" role="tabpanel" aria-labelledby="tab-documents">
           <SkillDocumentSection />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════ */}
+      {/* DOWNLOADS TAB                                 */}
+      {/* ══════════════════════════════════════════════ */}
+      {pageMode === 'downloads' && (
+        <div id="tabpanel-downloads" role="tabpanel" aria-labelledby="tab-downloads">
+          <ReportDownloads />
         </div>
       )}
 

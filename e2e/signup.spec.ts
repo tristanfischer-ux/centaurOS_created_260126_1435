@@ -222,8 +222,10 @@ test.describe('Unified Signup Flow (/join)', () => {
 
       await expect(page.getByLabel(/full name/i)).toBeVisible()
       await expect(page.getByLabel(/^email/i)).toBeVisible()
-      await expect(page.getByLabel(/^password$/i)).toBeVisible()
-      await expect(page.getByLabel(/confirm password/i)).toBeVisible()
+      // Password and Confirm Password use id-based selectors to avoid
+      // label ambiguity (both contain "password" text + asterisk spans)
+      await expect(page.locator('#password')).toBeVisible()
+      await expect(page.locator('#confirm-password')).toBeVisible()
       await expect(page.getByLabel(/company name/i)).toBeVisible()
       await expect(page.getByLabel(/industry/i)).toBeVisible()
       await expect(page.getByLabel(/stage/i)).toBeVisible()
@@ -302,8 +304,11 @@ test.describe('Unified Signup Flow (/join)', () => {
     test('demo mode banner appears and fields are pre-filled', async ({ page }) => {
       await page.goto(`${TEST_URL}/join?role=founder&demo=true`)
 
-      await expect(page.getByText('Demo Mode Active')).toBeVisible({ timeout: 10_000 })
-      await expect(page.getByLabel(/full name/i)).not.toHaveValue('')
+      // Demo data is fetched async — wait for the banner which appears after load
+      await expect(page.getByText('Demo Mode Active')).toBeVisible({ timeout: 15_000 })
+
+      // Wait for demo data to populate fields (async server action)
+      await expect(page.getByLabel(/full name/i)).not.toHaveValue('', { timeout: 10_000 })
       await expect(page.getByLabel(/^email/i)).not.toHaveValue('')
     })
   })
@@ -314,6 +319,9 @@ test.describe('Unified Signup Flow (/join)', () => {
     const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
     const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
+    // INTENT: These tests create real Supabase accounts and may fail due to
+    // production rate limiting when run repeatedly. They're the gold standard
+    // for signup verification but should be run sparingly.
     test.skip(!SUPABASE_URL || !SUPABASE_SERVICE_KEY, 'Requires SUPABASE_SERVICE_ROLE_KEY')
     test.setTimeout(120_000)
 

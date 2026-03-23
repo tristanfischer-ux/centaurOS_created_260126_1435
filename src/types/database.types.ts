@@ -13859,6 +13859,70 @@ export type Database = {
           },
         ]
       }
+      report_downloads: {
+        Row: {
+          created_at: string | null
+          expires_at: string | null
+          file_format: string
+          file_size_bytes: number | null
+          file_url: string | null
+          foundry_id: string
+          id: string
+          profile_id: string
+          report_name: string
+          report_source: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at?: string | null
+          file_format: string
+          file_size_bytes?: number | null
+          file_url?: string | null
+          foundry_id: string
+          id?: string
+          profile_id: string
+          report_name: string
+          report_source: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string | null
+          file_format?: string
+          file_size_bytes?: number | null
+          file_url?: string | null
+          foundry_id?: string
+          id?: string
+          profile_id?: string
+          report_name?: string
+          report_source?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_downloads_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_downloads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "report_downloads_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_preferences: {
         Row: {
           created_at: string | null

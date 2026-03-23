@@ -622,7 +622,7 @@ function buildSlideForSection(
  *
  * @param document The fully-populated report document to export
  */
-export async function exportReportAsPPTX(document: ReportDocument): Promise<void> {
+export async function exportReportAsPPTX(document: ReportDocument): Promise<Blob> {
   const pres = new PptxGenJS()
   const templateId = document.templateId ?? 'custom'
 
@@ -641,6 +641,16 @@ export async function exportReportAsPPTX(document: ReportDocument): Promise<void
   const safeName = document.foundryName.replace(/[^a-zA-Z0-9]/g, '-')
   const safeTitle = document.title.replace(/[^a-zA-Z0-9]/g, '-')
   const dateStr = document.dateRange.start
+  const filename = `${safeName}-${safeTitle}-${dateStr}.pptx`
 
-  await pres.writeFile({ fileName: `${safeName}-${safeTitle}-${dateStr}.pptx` })
+  // Write as blob for upload, then trigger browser download
+  const content = await pres.write({ outputType: 'blob' }) as Blob
+  const url = URL.createObjectURL(content)
+  const link = window.document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+
+  return content
 }

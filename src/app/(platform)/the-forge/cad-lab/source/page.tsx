@@ -89,6 +89,15 @@ export default function SourcePage(): React.ReactNode {
     linkRfqToProject,
   } = useCadLab()
 
+  // Fetch RFQ quotes if linked
+  const [rfqQuotes, setRfqQuotes] = useState<{ rfqTitle: string | null; quotes: { supplierName: string; price: number | null; timelineWeeks: number | null; proposalTitle: string | null }[] } | undefined>()
+  useEffect(() => {
+    if (!linkedRfqId) return
+    import("@/actions/rfq").then(({ getLinkedRFQQuotes }) =>
+      getLinkedRFQQuotes(linkedRfqId).then(setRfqQuotes)
+    ).catch(() => {})
+  }, [linkedRfqId])
+
   // Gate: redirect to Specify if no specified modules
   useEffect(() => {
     if (!hasResearch || specifiedModuleCount === 0) {
@@ -828,6 +837,7 @@ export default function SourcePage(): React.ReactNode {
               })),
             ]),
           ),
+          ...(rfqQuotes && rfqQuotes.quotes.length > 0 ? { rfqQuotes } : {}),
         }}
       />
     </div>

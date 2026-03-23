@@ -164,21 +164,69 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     if (!selectedFormat || exportStartedRef.current) return
     exportStartedRef.current = true
 
-    // PDF: Generate DOCX (same quality as Word export) — user can save as PDF.
-    // This replaces the broken window.print() approach which lost all formatting.
+    // PDF: Native PDF export via html2pdf.js — proper formatted PDF download
     if (selectedFormat === "pdf") {
+      const projectId = activeProjectId
       onOpenChange(false)
       runInBackground(
         `${STAGE_LABELS[stage]} Report (PDF)`,
         async ({ update }) => {
           update({ stepLabel: "Collecting design data...", progress: 10 })
           const data = await assembleData()
-          update({ stepLabel: "Formatting document...", progress: 50 })
-          const { exportDesignReportAsDOCX } = await import("@/lib/cad-lab/export-design-report-docx")
-          await exportDesignReportAsDOCX(data)
+          update({ stepLabel: "Generating PDF...", progress: 50 })
+          const { exportDesignReportAsPDF } = await import("@/lib/cad-lab/export-design-report-pdf")
+          const blob = await exportDesignReportAsPDF(data)
+
+          // Upload to Storage for persistent re-download
+          update({ stepLabel: "Uploading to cloud...", progress: 80 })
+          let downloadUrl: string | undefined
+          let storagePath: string | undefined
+          try {
+            const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-")
+            const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
+            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.pdf`
+
+            const supabase = createClient()
+            const { error: uploadError } = await supabase.storage
+              .from("xray-images")
+              .upload(storagePath, blob, {
+                contentType: "application/pdf",
+                upsert: true,
+              })
+
+            if (!uploadError) {
+              const { data: urlData } = supabase.storage
+                .from("xray-images")
+                .getPublicUrl(storagePath)
+              downloadUrl = urlData.publicUrl
+            } else {
+              console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadError.message)
+              toast.info("Downloaded locally — cloud backup unavailable")
+            }
+          } catch (uploadErr) {
+            console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadErr)
+            toast.info("Downloaded locally — cloud backup unavailable")
+          }
+
+          // Track in report_downloads
+          try {
+            const { saveReportDownload } = await import("@/actions/report-downloads")
+            await saveReportDownload({
+              reportName: data.projectName,
+              reportSource: "cad-lab",
+              fileFormat: "pdf",
+              fileUrl: downloadUrl ?? null,
+              fileSizeBytes: blob.size,
+              storagePath: storagePath ?? null,
+            })
+          } catch {
+            // Non-fatal — download still works
+          }
+
           update({ progress: 100 })
+          return downloadUrl ? { downloadUrl } : undefined
         },
-        { successMessage: "Word document downloaded — open and Save As PDF for best quality" },
+        { successMessage: "PDF report downloaded" },
       )
       return
     }
@@ -242,11 +290,12 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         // Step 4: Upload to Supabase Storage for persistent re-download
         update({ stepLabel: "Uploading to cloud...", progress: 95 })
         let downloadUrl: string | undefined
+        let storagePath: string | undefined
         try {
           const ext = selectedFormat === "docx" ? "docx" : "pptx"
           const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-")
           const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
-          const storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.${ext}`
+          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.${ext}`
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
@@ -265,9 +314,26 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             downloadUrl = urlData.publicUrl
           } else {
             console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadError.message)
+            toast.info("Downloaded locally — cloud backup unavailable")
           }
         } catch (uploadErr) {
           console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadErr)
+          toast.info("Downloaded locally — cloud backup unavailable")
+        }
+
+        // Track in report_downloads
+        try {
+          const { saveReportDownload } = await import("@/actions/report-downloads")
+          await saveReportDownload({
+            reportName: data.projectName,
+            reportSource: "cad-lab",
+            fileFormat: selectedFormat === "docx" ? "docx" : "pptx",
+            fileUrl: downloadUrl ?? null,
+            fileSizeBytes: blob.size,
+            storagePath: storagePath ?? null,
+          })
+        } catch {
+          // Non-fatal — download still works
         }
 
         update({ progress: 100 })

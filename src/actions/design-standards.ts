@@ -252,5 +252,6 @@ export async function getStandardDetail(id: string): Promise<{
     .eq("id", id)
     .single()
   if (error) return { data: null, error: error.message }
-  return { data: data as typeof data, error: null }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { data: data as any, error: null }
 }
