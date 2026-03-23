@@ -57,8 +57,9 @@ test.describe('Mobile Onboarding — iPhone SE (320px)', () => {
     await page.goto(`${TEST_URL}/join`)
 
     await expect(page.getByLabel(/full name/i)).toBeVisible()
-    await expect(page.getByLabel(/email/i)).toBeVisible()
-    await expect(page.getByLabel(/password/i)).toBeVisible()
+    await expect(page.getByLabel(/^email/i)).toBeVisible()
+    await expect(page.locator('#password')).toBeVisible()
+    await expect(page.locator('#confirm-password')).toBeVisible()
   })
 
   test('join page: no autoFocus steals keyboard', async ({ page }) => {
@@ -119,8 +120,9 @@ test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
     await checkNoHorizontalOverflow(page)
 
     await expect(page.getByLabel(/full name/i)).toBeVisible()
-    await expect(page.getByLabel(/email/i)).toBeVisible()
-    await expect(page.getByLabel(/password/i)).toBeVisible()
+    await expect(page.getByLabel(/^email/i)).toBeVisible()
+    await expect(page.locator('#password')).toBeVisible()
+    await expect(page.locator('#confirm-password')).toBeVisible()
   })
 
   test('founder deep-link: Industry/Stage stack vertically', async ({ page }) => {
@@ -161,10 +163,20 @@ test.describe('Mobile Onboarding — iPhone 14 Pro (390px)', () => {
     await checkNoHorizontalOverflow(page)
   })
 
+  test('confirm password mismatch disables submit on mobile', async ({ page }) => {
+    await page.goto(`${TEST_URL}/join`)
+
+    await page.locator('#password').fill('TestPass123!')
+    await page.locator('#confirm-password').fill('Wrong1!')
+
+    await expect(page.getByText('Passwords do not match')).toBeVisible()
+    await expect(page.getByRole('button', { name: /create account/i })).toBeDisabled()
+  })
+
   test('password strength indicator is visible', async ({ page }) => {
     await page.goto(`${TEST_URL}/join`)
 
-    const passwordField = page.getByLabel(/password/i)
+    const passwordField = page.locator('#password')
     await passwordField.fill('TestPass1')
 
     await expect(page.locator('#password-hint')).toBeVisible()

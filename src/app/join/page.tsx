@@ -4,6 +4,7 @@ import { useState, useEffect, useActionState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -577,7 +578,10 @@ function JoinPageInner() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
                 enterKeyHint="go"
-                className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${passwordMismatch ? "border-destructive" : ""}`}
+                className={cn(
+                  "bg-background border-input focus:border-international-orange focus:ring-international-orange/20",
+                  passwordMismatch && "border-destructive",
+                )}
                 required
                 aria-required="true"
                 aria-invalid={passwordMismatch}
