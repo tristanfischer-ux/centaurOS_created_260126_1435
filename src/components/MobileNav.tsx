@@ -14,7 +14,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
     Users,
@@ -126,6 +126,8 @@ const marketplaceMoreNavigation = [
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 
+const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
+
 function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
     return (
         <div
@@ -150,6 +152,7 @@ interface MobileNavProps {
 
 export function MobileNav({ foundryName }: MobileNavProps) {
     const pathname = usePathname()
+    const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [unreadCount, setUnreadCount] = React.useState(0)
 
@@ -163,15 +166,13 @@ export function MobileNav({ foundryName }: MobileNavProps) {
 
     const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
-        window.location.href = `/new-objectives?prefill=${encodeURIComponent(prefillText)}`
+        router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
     }
 
     const handleCaptureTask = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
-        window.location.href = `/new-tasks?prefill=${encodeURIComponent(prefillText)}`
+        router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
-
-    const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
     const renderDrawerItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
         const isActive = isRouteActive(pathname, item.href)
@@ -266,7 +267,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             <span className="text-xs font-medium">More</span>
                         </button>
                     </DrawerTrigger>
-                    <DrawerContent className="max-h-[85dvh] rounded-t-2xl">
+                    <DrawerContent className="max-h-[85dvh] rounded-t-2xl border-b-0">
                         <DrawerHeader className="pb-0">
                             {foundryName && (
                                 <p className="text-sm font-semibold text-foreground truncate text-left">{foundryName}</p>
@@ -274,7 +275,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             <DrawerTitle className="sr-only">Navigation Menu</DrawerTitle>
                         </DrawerHeader>
 
-                        <nav className="overflow-y-auto pb-safe px-safe" data-testid="drawer-nav">
+                        <nav className="overflow-y-auto pb-safe px-safe" data-testid="drawer-nav" aria-label="Main navigation">
                             {/* Me section */}
                             <SectionLabel icon={UserCircle} label="Me" />
                             {meMoreNavigation.map(renderDrawerItem)}

@@ -72,6 +72,8 @@ export function DesignBriefInterview({
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const submittingRef = useRef(false)
+  const onSkipRef = useRef(onSkip)
+  onSkipRef.current = onSkip
 
   // INTENT: Auto-scroll to bottom when new messages appear
   useEffect(() => {
@@ -97,6 +99,11 @@ export function DesignBriefInterview({
         if (result.nextQuestion) {
           setMessages([{ role: "max", content: result.nextQuestion }])
           setSuggestedChips(result.suggestedChips ?? [])
+        } else if (result.done) {
+          // GOTCHA: done=true with no question means auth/rate-limit failed silently.
+          // Skip straight to research rather than showing an empty interview.
+          onSkipRef.current()
+          return
         }
       } catch (err) {
         if (cancelled) return
@@ -178,13 +185,13 @@ export function DesignBriefInterview({
         setMessages((prev) => [...prev, { role: "max", content: maxContent }])
         setSuggestedChips(result.suggestedChips ?? [])
         setIsThinking(false)
-        submittingRef.current = false
       }
     } catch (err) {
       console.error("[INTERVIEW] Question failed:", err)
       setIsThinking(false)
-      submittingRef.current = false
       setError("Something went wrong. Try again or skip to research.")
+    } finally {
+      submittingRef.current = false
     }
   }, [messages, conversation, subject, isThinking, isSynthesizing, onComplete])
 

@@ -13,7 +13,11 @@
 import { createClient } from "@/lib/supabase/server"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { checkRateLimit } from "@/lib/security/rate-limit"
+import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import type { CadLabDesignBrief } from "@/lib/cad-lab-types"
+
+/** Maximum length for a single user answer — prevents context overflow and cost abuse */
+const MAX_ANSWER_LENGTH = 2000
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -68,7 +72,8 @@ async function callClaudeForInterview(
 
   if (!response.ok) {
     const text = await response.text().catch(() => "")
-    throw new Error(`Claude API error ${response.status}: ${text.slice(0, 200)}`)
+    console.error(`[INTERVIEW] Claude API error ${response.status}: ${text.slice(0, 500)}`)
+    throw new Error(sanitizeErrorMessage(`Interview request failed (${response.status})`))
   }
 
   const data = await response.json()
@@ -158,9 +163,15 @@ export async function getNextInterviewQuestion(
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { done: true }
 
-  const userPrompt = conversation.length === 0
-    ? `The user wants to build: "${subject}"\n\nThis is your first question — no acknowledgment needed.`
-    : `The user wants to build: "${subject}"\n\nConversation so far:\n${conversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nGenerate your next response.`
+  // SECURITY: Truncate answers to prevent context overflow and cost abuse
+  const safeConversation = conversation.map((e) => ({
+    question: e.question.slice(0, MAX_ANSWER_LENGTH),
+    answer: e.answer.slice(0, MAX_ANSWER_LENGTH),
+  }))
+
+  const userPrompt = safeConversation.length === 0
+    ? `The user wants to build: "${subject.slice(0, 500)}"\n\nThis is your first question — no acknowledgment needed.`
+    : `The user wants to build: "${subject.slice(0, 500)}"\n\nConversation so far:\n${safeConversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nGenerate your next response.`
 
   const text = await callClaudeForInterview(
     INTERVIEW_SYSTEM_PROMPT,
@@ -203,7 +214,13 @@ export async function synthesizeDesignBrief(
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) throw new Error("Rate limit exceeded")
 
-  const userPrompt = `Original subject: "${subject}"\n\nInterview transcript:\n${conversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nSynthesize into a design brief.`
+  // SECURITY: Truncate to prevent context overflow
+  const safeConversation = conversation.map((e) => ({
+    question: e.question.slice(0, MAX_ANSWER_LENGTH),
+    answer: e.answer.slice(0, MAX_ANSWER_LENGTH),
+  }))
+
+  const userPrompt = `Original subject: "${subject.slice(0, 500)}"\n\nInterview transcript:\n${safeConversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nSynthesize into a design brief.`
 
   const text = await callClaudeForInterview(
     SYNTHESIS_SYSTEM_PROMPT,

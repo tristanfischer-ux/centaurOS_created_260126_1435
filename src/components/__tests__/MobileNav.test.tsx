@@ -5,6 +5,9 @@ import { MobileNav } from "@/components/MobileNav"
 
 jest.mock("next/navigation", () => ({
   usePathname: jest.fn(() => "/today"),
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+  })),
 }))
 
 jest.mock("@/actions/auth", () => ({
