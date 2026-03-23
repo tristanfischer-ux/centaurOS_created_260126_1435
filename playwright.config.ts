@@ -130,14 +130,27 @@ export default defineConfig({
     {
       name: 'chromium',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
+    },
+    // Mobile Authenticated — full-screen Drawer menu tests, iPhone 14 Pro, Founder auth
+    {
+      name: 'mobile-authenticated',
+      testMatch: /mobile-authenticated\.spec\.ts$/,
+      dependencies: ['auth-setup'],
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: path.join(authDir, 'founder.json'),
+      },
     },
     // Mobile Delight Audit — iPhone 14 Pro viewport, Founder auth
     // No auth-setup dependency; run auth-setup once manually to create founder.json

@@ -1,15 +1,10 @@
 import React from "react"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { render, screen } from "@testing-library/react"
 
 import { MobileNav } from "@/components/MobileNav"
 
-const pushMock = jest.fn()
-
 jest.mock("next/navigation", () => ({
   usePathname: jest.fn(() => "/today"),
-  useRouter: jest.fn(() => ({
-    push: pushMock,
-  })),
 }))
 
 jest.mock("@/actions/auth", () => ({
@@ -22,64 +17,71 @@ jest.mock("@/components/smart/quick-capture-dialog", () => ({
 
 jest.mock("@/lib/features/registry", () => ({
   isRouteAlpha: jest.fn(() => false),
+  isRouteBeta: jest.fn(() => false),
+  isRouteDemo: jest.fn(() => false),
 }))
 
 jest.mock("@/actions/match-alerts", () => ({
   getUnreadAlertCount: jest.fn(() => Promise.resolve(0)),
 }))
 
-jest.mock("@/components/ui/dropdown-menu", () => {
-  type MockDropdownProps = {
+jest.mock("@/components/ui/drawer", () => {
+  type MockProps = {
     children?: React.ReactNode
     asChild?: boolean
     className?: string
   }
 
-  type MockDropdownItemProps = MockDropdownProps & {
-    onSelect?: (event: { preventDefault: () => void }) => void
-  }
-
   return {
-    DropdownMenu: ({ children }: MockDropdownProps) => <div>{children}</div>,
-    DropdownMenuTrigger: ({ children, asChild }: MockDropdownProps) =>
+    Drawer: ({ children }: MockProps) => <div>{children}</div>,
+    DrawerTrigger: ({ children, asChild }: MockProps) =>
       asChild ? children : <button type="button">{children}</button>,
-    DropdownMenuContent: ({ children }: MockDropdownProps) => <div>{children}</div>,
-    DropdownMenuLabel: ({ children }: MockDropdownProps) => <div>{children}</div>,
-    DropdownMenuSeparator: () => <hr />,
-    DropdownMenuItem: ({ children, onSelect, asChild, className }: MockDropdownItemProps) =>
-      asChild ? (
-        <div>{children}</div>
-      ) : (
-        <button
-          className={className}
-          role="menuitem"
-          type="button"
-          onClick={() => onSelect?.({ preventDefault: () => undefined })}
-        >
-          {children}
-        </button>
-      ),
+    DrawerContent: ({ children }: MockProps) => <div>{children}</div>,
+    DrawerHeader: ({ children }: MockProps) => <div>{children}</div>,
+    DrawerTitle: ({ children, className }: MockProps) => <h2 className={className}>{children}</h2>,
+    DrawerClose: ({ children, asChild }: MockProps) =>
+      asChild ? children : <button type="button">{children}</button>,
   }
 })
 
-describe("MobileNav dropdown routing", () => {
-  beforeEach(() => {
-    pushMock.mockClear()
-  })
-
-  it("routes The Forge from More menu via router push", async () => {
+describe("MobileNav drawer navigation", () => {
+  it("renders The Forge link in the drawer", () => {
     render(<MobileNav />)
 
-    fireEvent.click(await screen.findByRole("menuitem", { name: /^The Forge$/i }))
-
-    expect(pushMock).toHaveBeenCalledWith("/the-forge")
+    const forgeLink = screen.getByTestId("drawer-item-the-forge")
+    expect(forgeLink).toBeInTheDocument()
+    expect(forgeLink).toHaveAttribute("href", "/the-forge")
   })
 
-  it("routes Settings from More menu via router push", async () => {
+  it("renders Settings link in the drawer", () => {
     render(<MobileNav />)
 
-    fireEvent.click(await screen.findByRole("menuitem", { name: /^Settings$/i }))
+    const settingsLink = screen.getByTestId("drawer-item-settings")
+    expect(settingsLink).toBeInTheDocument()
+    expect(settingsLink).toHaveAttribute("href", "/settings")
+  })
 
-    expect(pushMock).toHaveBeenCalledWith("/settings")
+  it("renders Reports link in the Plan section", () => {
+    render(<MobileNav />)
+
+    const reportsLink = screen.getByTestId("drawer-item-reports")
+    expect(reportsLink).toBeInTheDocument()
+    expect(reportsLink).toHaveAttribute("href", "/reports")
+  })
+
+  it("renders Sign Out button", () => {
+    render(<MobileNav />)
+
+    expect(screen.getByTestId("drawer-item-sign-out")).toBeInTheDocument()
+  })
+
+  it("renders all five section headers", () => {
+    render(<MobileNav />)
+
+    expect(screen.getByTestId("section-me")).toBeInTheDocument()
+    expect(screen.getByTestId("section-plan")).toBeInTheDocument()
+    expect(screen.getByTestId("section-cash-burn")).toBeInTheDocument()
+    expect(screen.getByTestId("section-workshop")).toBeInTheDocument()
+    expect(screen.getByTestId("section-marketplace")).toBeInTheDocument()
   })
 })

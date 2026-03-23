@@ -2,8 +2,8 @@
  * @file MobileNav.tsx — Bottom navigation bar for mobile devices.
  *
  * @description Shows Today, Comms, Tasks in the main bar.
- * "More" dropdown groups remaining items into four sections matching
- * the sidebar: Plan, Workshop, Marketplace, and Account.
+ * "More" opens a full-screen Drawer (vaul) that groups remaining items
+ * into five sections matching the sidebar: Me, Plan, Cash Burn, Workshop, Marketplace.
  *
  * @related
  * - Sidebar: src/components/Sidebar.tsx
@@ -14,7 +14,7 @@
 
 import React from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
     Users,
@@ -50,19 +50,20 @@ import {
     Sparkles,
 } from "lucide-react"
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
-import { isRouteAlpha } from "@/lib/features/registry"
+    Drawer,
+    DrawerTrigger,
+    DrawerContent,
+    DrawerHeader,
+    DrawerTitle,
+    DrawerClose,
+} from "@/components/ui/drawer"
+import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
+import type { LucideIcon } from "lucide-react"
 
 /**
  * Determines if a navigation item should be marked as active.
@@ -80,7 +81,7 @@ const mainNavigation = [
     { name: "Tasks", shortName: "Tasks", href: "/new-tasks", icon: CheckSquare },
 ]
 
-// "More" dropdown — Me section (items not in main bar)
+// Drawer — Me section
 const meMoreNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Knowledge", href: "/knowledge", icon: Library },
@@ -88,13 +89,14 @@ const meMoreNavigation = [
     { name: "What's New", href: "/whats-new", icon: Sparkles },
 ]
 
-// "More" dropdown — Plan section
+// Drawer — Plan section
 const planMoreNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
+    { name: "Reports", href: "/reports", icon: FileOutput },
 ]
 
-// "More" dropdown — Cash Burn section
+// Drawer — Cash Burn section
 const cashBurnNavigation = [
     { name: "Cash Burn", href: "/cash-burn", icon: Flame },
     { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown },
@@ -104,7 +106,7 @@ const cashBurnNavigation = [
     { name: "Fundraise", href: "/fundraise", icon: Sprout },
 ]
 
-// "More" dropdown — Workshop section
+// Drawer — Workshop section
 const workshopMoreNavigation = [
     { name: "The Forge", href: "/the-forge", icon: Hammer },
     { name: "Team", href: "/team", icon: Users },
@@ -115,7 +117,7 @@ const workshopMoreNavigation = [
     { name: "Inspiration", href: "/learn", icon: BookOpen },
 ]
 
-// "More" dropdown — Marketplace section
+// Drawer — Marketplace section
 const marketplaceMoreNavigation = [
     { name: "Recruits", href: "/recruits", icon: UserSearch },
     { name: "Guild", href: "/guild", icon: GraduationCap },
@@ -124,13 +126,30 @@ const marketplaceMoreNavigation = [
     { name: "Orders", href: "/marketplace-orders", icon: ShoppingBag },
 ]
 
+function SectionLabel({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+    return (
+        <div
+            data-testid={`section-${label.toLowerCase().replace(/\s+/g, '-')}`}
+            className="flex items-center gap-2 px-4 pt-4 pb-1"
+        >
+            <Icon className="h-4 w-4 text-muted-foreground" />
+            <span className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">
+                {label}
+            </span>
+        </div>
+    )
+}
+
+function Divider() {
+    return <div className="border-t border-border mx-4 my-1" />
+}
+
 interface MobileNavProps {
     foundryName?: string
 }
 
 export function MobileNav({ foundryName }: MobileNavProps) {
     const pathname = usePathname()
-    const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [unreadCount, setUnreadCount] = React.useState(0)
 
@@ -144,47 +163,54 @@ export function MobileNav({ foundryName }: MobileNavProps) {
 
     const handleCaptureObjective = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
-        router.push(`/new-objectives?prefill=${encodeURIComponent(prefillText)}`)
+        window.location.href = `/new-objectives?prefill=${encodeURIComponent(prefillText)}`
     }
 
     const handleCaptureTask = (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
         const prefillText = suggestion?.title || rawIdea
-        router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
+        window.location.href = `/new-tasks?prefill=${encodeURIComponent(prefillText)}`
     }
-
-    const [moreMenuOpen, setMoreMenuOpen] = React.useState(false)
 
     const allMoreItems = [...meMoreNavigation, ...planMoreNavigation, ...cashBurnNavigation, ...workshopMoreNavigation, ...marketplaceMoreNavigation]
 
-    /**
-     * Renders a dropdown menu item with active state highlighting.
-     */
-    const renderDropdownItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
+    const renderDrawerItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
         const isActive = isRouteActive(pathname, item.href)
         const isAlpha = isRouteAlpha(item.href)
+        const isBeta = isRouteBeta(item.href)
+        const isDemo = isRouteDemo(item.href)
         return (
-            <DropdownMenuItem
-                key={item.name}
-                onSelect={(event) => {
-                    event.preventDefault()
-                    setMoreMenuOpen(false)
-                    router.push(item.href)
-                }}
-                className={cn(
-                    "flex items-center justify-between gap-2 cursor-pointer w-full",
-                    isActive && "text-international-orange"
-                )}
-            >
-                <span className="flex items-center gap-2">
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                </span>
-                {isAlpha && (
-                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
-                        Alpha
+            <DrawerClose asChild key={item.name}>
+                <Link
+                    href={item.href}
+                    data-testid={`drawer-item-${item.name.toLowerCase().replace(/\s+/g, '-')}`}
+                    className={cn(
+                        "flex items-center justify-between gap-2 px-4 min-h-[44px] rounded-lg mx-2 transition-colors",
+                        isActive
+                            ? "bg-orange-50 text-international-orange"
+                            : "text-foreground hover:bg-muted"
+                    )}
+                >
+                    <span className="flex items-center gap-3">
+                        <item.icon className="h-4 w-4" />
+                        <span className="text-sm font-medium">{item.name}</span>
                     </span>
-                )}
-            </DropdownMenuItem>
+                    {isAlpha && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
+                            Alpha
+                        </span>
+                    )}
+                    {isBeta && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-info/10 text-info border border-info/20">
+                            Beta
+                        </span>
+                    )}
+                    {isDemo && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                            Demo
+                        </span>
+                    )}
+                </Link>
+            </DrawerClose>
         )
     }
 
@@ -225,102 +251,91 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                         </Link>
                     )
                 })}
-                <DropdownMenu open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
-                    <DropdownMenuTrigger asChild>
+                <Drawer>
+                    <DrawerTrigger asChild>
                         <button
+                            data-testid="mobile-more-button"
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
                                 allMoreItems.some(item => isRouteActive(pathname, item.href))
-                                    ? "text-international-orange" 
+                                    ? "text-international-orange"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
                             <MoreHorizontal className={cn("h-5 w-5 shrink-0", allMoreItems.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
                             <span className="text-xs font-medium">More</span>
                         </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56 max-w-[calc(100vw-16px)] max-h-[70vh] overflow-y-auto">
-                        {/* Foundry identity — shows which workspace the user is in */}
-                        {foundryName && (
-                            <>
-                                <DropdownMenuLabel className="text-xs font-semibold text-foreground truncate">
-                                    {foundryName}
-                                </DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                            </>
-                        )}
-
-                        {/* Me section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Me
-                        </DropdownMenuLabel>
-                        {meMoreNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Plan section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Plan
-                        </DropdownMenuLabel>
-                        {planMoreNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Finance section — hidden for now */}
-
-                        {/* Cash Burn section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Cash Burn
-                        </DropdownMenuLabel>
-                        {cashBurnNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Workshop section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Workshop
-                        </DropdownMenuLabel>
-                        {workshopMoreNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Marketplace section */}
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                            Marketplace
-                        </DropdownMenuLabel>
-                        {marketplaceMoreNavigation.map(renderDropdownItem)}
-
-                        <DropdownMenuSeparator />
-
-                        {/* Settings + Sign Out */}
-                        <DropdownMenuItem
-                            onSelect={(event) => {
-                                event.preventDefault()
-                                setMoreMenuOpen(false)
-                                router.push("/settings")
-                            }}
-                            className={cn(
-                                "flex items-center gap-2 cursor-pointer w-full",
-                                isRouteActive(pathname, "/settings") && "text-international-orange"
+                    </DrawerTrigger>
+                    <DrawerContent className="max-h-[85dvh] rounded-t-2xl">
+                        <DrawerHeader className="pb-0">
+                            {foundryName && (
+                                <p className="text-sm font-semibold text-foreground truncate text-left">{foundryName}</p>
                             )}
-                        >
-                            <Settings className="h-4 w-4" />
-                            Settings
-                        </DropdownMenuItem>
+                            <DrawerTitle className="sr-only">Navigation Menu</DrawerTitle>
+                        </DrawerHeader>
 
-                        <DropdownMenuItem asChild>
-                            <form action={signOut} className="w-full">
+                        <nav className="overflow-y-auto pb-safe px-safe" data-testid="drawer-nav">
+                            {/* Me section */}
+                            <SectionLabel icon={UserCircle} label="Me" />
+                            {meMoreNavigation.map(renderDrawerItem)}
+
+                            <Divider />
+
+                            {/* Plan section */}
+                            <SectionLabel icon={Waypoints} label="Plan" />
+                            {planMoreNavigation.map(renderDrawerItem)}
+
+                            <Divider />
+
+                            {/* Cash Burn section */}
+                            <SectionLabel icon={Flame} label="Cash Burn" />
+                            {cashBurnNavigation.map(renderDrawerItem)}
+
+                            <Divider />
+
+                            {/* Workshop section */}
+                            <SectionLabel icon={Hammer} label="Workshop" />
+                            {workshopMoreNavigation.map(renderDrawerItem)}
+
+                            <Divider />
+
+                            {/* Marketplace section */}
+                            <SectionLabel icon={Store} label="Marketplace" />
+                            {marketplaceMoreNavigation.map(renderDrawerItem)}
+
+                            <Divider />
+
+                            {/* Settings */}
+                            <DrawerClose asChild>
+                                <Link
+                                    href="/settings"
+                                    data-testid="drawer-item-settings"
+                                    className={cn(
+                                        "flex items-center gap-3 px-4 min-h-[44px] rounded-lg mx-2 transition-colors",
+                                        isRouteActive(pathname, "/settings")
+                                            ? "bg-orange-50 text-international-orange"
+                                            : "text-foreground hover:bg-muted"
+                                    )}
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Settings</span>
+                                </Link>
+                            </DrawerClose>
+
+                            {/* Sign Out */}
+                            <form action={signOut} className="mx-2 mb-4">
                                 <button
                                     type="submit"
-                                    className="flex items-center gap-2 cursor-pointer w-full text-destructive"
+                                    data-testid="drawer-item-sign-out"
+                                    className="flex items-center gap-3 px-4 min-h-[44px] rounded-lg w-full text-destructive hover:bg-destructive/10 transition-colors"
                                 >
                                     <LogOut className="h-4 w-4" />
-                                    Sign Out
+                                    <span className="text-sm font-medium">Sign Out</span>
                                 </button>
                             </form>
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+                        </nav>
+                    </DrawerContent>
+                </Drawer>
             </div>
         </div>
 
