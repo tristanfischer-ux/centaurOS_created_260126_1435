@@ -68,6 +68,34 @@ export async function estimateModuleCostsAi(
     return { success: false, error: "No modules to estimate" }
   }
 
+  // DECISION: Query internal material_properties + process_capabilities for
+  // verified pricing and tolerances instead of relying on hardcoded estimates.
+  let materialPricingContext = ""
+  try {
+    const { createClient } = await import("@/lib/supabase/server")
+    const supabase = await createClient()
+    const [matRes, procRes] = await Promise.all([
+      supabase.from("material_properties").select("material_name, cost_per_kg_usd, density_kg_m3, yield_strength_mpa").limit(30),
+      supabase.from("process_capabilities").select("display_name, tolerance_typical_mm, min_wall_thickness_mm, setup_cost_usd_typical, per_part_cost_multiplier, typical_lead_time_days").limit(20),
+    ])
+    const mats = matRes.data ?? []
+    const procs = procRes.data ?? []
+    if (mats.length > 0) {
+      materialPricingContext += "\n\nVERIFIED MATERIAL PRICES (from internal database — use these over generic estimates):\n" +
+        mats.filter(m => m.cost_per_kg_usd).map(m =>
+          `- ${m.material_name}: $${m.cost_per_kg_usd}/kg (≈£${((m.cost_per_kg_usd ?? 0) * 0.79).toFixed(2)}/kg), density=${m.density_kg_m3 ?? "?"}kg/m3, yield=${m.yield_strength_mpa ?? "?"}MPa`
+        ).join("\n")
+    }
+    if (procs.length > 0) {
+      materialPricingContext += "\n\nMANUFACTURING PROCESS DATA (verified):\n" +
+        procs.map(p =>
+          `- ${p.display_name}: tolerance=±${p.tolerance_typical_mm ?? "?"}mm, min wall=${p.min_wall_thickness_mm ?? "?"}mm, setup≈$${p.setup_cost_usd_typical ?? "?"}, lead=${p.typical_lead_time_days ?? "?"}d`
+        ).join("\n")
+    }
+  } catch (dbErr) {
+    console.warn("[CAD-COST] Material DB query failed (non-blocking):", dbErr instanceof Error ? dbErr.message : dbErr)
+  }
+
   // DECISION: Compact summaries — keyParts + diagnostics only, no description/failureModes.
   // Full descriptions caused 90s+ responses and token-limit truncation with 9 modules.
   const moduleSummaries = modules.map((mod) => {
@@ -127,7 +155,7 @@ RULES:
 - Buy parts: UK 2026 market price (RS Components, Farnell)
 - Make parts: process + material + complexity from diagnostics
 - Group identical parts: "M6 cap screws (×8)" with combined cost
-- Reference: mild steel ~£1.50/kg, aluminium 6061 ~£8/kg, stainless 304 ~£6/kg
+- Reference material prices: see VERIFIED MATERIAL PRICES section below (prefer over generic estimates)
 - Confidence: "high" only when parts are standard/well-understood
 - Keep ALL reasoning BRIEF — under 15 words each
 - When realWorldContext is provided, ground estimates using: supplierCount as market depth, equipment to determine cost tier, topMaterials for realistic material grades
@@ -155,7 +183,8 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
 }`
 
   const userPrompt = `Estimate costs for these ${modules.length} modules. Be CONCISE.
-${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}
+${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}${materialPricingContext}
+
 MODULES:
 ${JSON.stringify(moduleSummaries, null, 2)}
 

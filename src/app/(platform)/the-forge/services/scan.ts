@@ -112,50 +112,62 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   }
 
   // FLOW: Claude returns JSON matching our schema. We validate with Zod after.
+  // Wrapped in withRetry for transient API errors (429, 502, 503, network, timeout).
   const systemPrompt = SCAN_SYSTEM_PROMPT + "\n\nReturn ONLY valid JSON matching the schema. No markdown fences, no commentary outside the JSON object."
 
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-opus-4-6",
-      max_tokens: 16384,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-    }),
-    signal: AbortSignal.timeout(180_000), // 3 min — Opus is thorough
-  })
+  const { withRetry } = await import("@/lib/retry")
 
-  if (!resp.ok) {
-    const errText = await resp.text()
-    throw new Error(`[XRayScan] Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
-  }
-
-  const data = await resp.json()
-  const rawText: string = data.content?.[0]?.text ?? ""
-
-  // Extract JSON from response (may have markdown fences)
-  let jsonStr = rawText.trim()
-  if (jsonStr.startsWith("```")) {
-    jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
-  }
-
-  let parsed: AIScanOutput
-  try {
-    const raw = JSON.parse(jsonStr)
-    parsed = AIScanOutputSchema.parse(raw)
-  } catch (parseErr) {
-    console.error("[XRayScan] Failed to parse Claude output:", {
-      error: parseErr instanceof Error ? parseErr.message : parseErr,
-      responseLength: rawText.length,
-      firstChars: rawText.slice(0, 200),
+  const parsed = await withRetry<AIScanOutput>(async () => {
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-6",
+        max_tokens: 16384,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+      }),
+      signal: AbortSignal.timeout(180_000),
     })
-    throw new Error(`[XRayScan] AI output failed schema validation: ${parseErr instanceof Error ? parseErr.message : "Unknown"}`)
-  }
+
+    if (!resp.ok) {
+      const errText = await resp.text()
+      throw new Error(`Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await resp.json()
+    const rawText: string = data.content?.[0]?.text ?? ""
+
+    // Extract JSON from response (may have markdown fences)
+    let jsonStr = rawText.trim()
+    if (jsonStr.startsWith("```")) {
+      jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
+    }
+
+    try {
+      const raw = JSON.parse(jsonStr)
+      return AIScanOutputSchema.parse(raw)
+    } catch (parseErr) {
+      console.error("[XRayScan] Failed to parse Claude output:", {
+        error: parseErr instanceof Error ? parseErr.message : parseErr,
+        responseLength: rawText.length,
+        firstChars: rawText.slice(0, 200),
+      })
+      throw new Error(`AI output failed schema validation: ${parseErr instanceof Error ? parseErr.message : "Unknown"}`)
+    }
+  }, {
+    maxRetries: 2,
+    baseDelay: 3000,
+    shouldRetry: (error) => {
+      const msg = error.message.toLowerCase()
+      return msg.includes("429") || msg.includes("502") || msg.includes("503") ||
+        msg.includes("network") || msg.includes("timeout") || msg.includes("529")
+    },
+  })
 
   console.info("[XRayScan] AI scan complete:", {
     moduleCount: parsed.modules.length,
