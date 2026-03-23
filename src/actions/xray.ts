@@ -133,11 +133,11 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
       return { error: "Idea text is too long (max 5000 characters)" }
     }
 
-    // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
-    // DECISION: Increased from 50K to 80K to accommodate internal DB context
-    // that's now synthesized into the research report. Opus 4.6 has 200K context
-    // so 80K of research (~20K tokens) is well within limits.
-    const cappedReport = researchReport?.slice(0, 80_000)
+    // SECURITY: Cap research report to prevent truly unbounded prompts.
+    // Opus 4.6 has 1M context tokens (~4M chars). 200K chars (~50K tokens) is
+    // generous for even the most detailed research report with full internal DB
+    // context, while still leaving 950K tokens for the system prompt + output.
+    const cappedReport = researchReport?.slice(0, 200_000)
 
     // Create placeholder row first with scan_status = 'scanning'
     // so Realtime subscribers see the scan-in-progress state
@@ -252,11 +252,11 @@ export async function refineScanAction(
       return { error: "Idea text is too long (max 5000 characters)" }
     }
 
-    // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
-    // DECISION: Increased from 50K to 80K to accommodate internal DB context
-    // that's now synthesized into the research report. Opus 4.6 has 200K context
-    // so 80K of research (~20K tokens) is well within limits.
-    const cappedReport = researchReport?.slice(0, 80_000)
+    // SECURITY: Cap research report to prevent truly unbounded prompts.
+    // Opus 4.6 has 1M context tokens (~4M chars). 200K chars (~50K tokens) is
+    // generous for even the most detailed research report with full internal DB
+    // context, while still leaving 950K tokens for the system prompt + output.
+    const cappedReport = researchReport?.slice(0, 200_000)
 
     // Mark scan as in-progress so Realtime subscribers see the state change
     await supabase
@@ -2635,14 +2635,14 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
           },
           body: JSON.stringify({
             model: "claude-opus-4-6",
-            max_tokens: 8192,
+            max_tokens: 16384,
             system: CONCEPT_RESEARCH_PROMPT,
             messages: [{
               role: "user",
               content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
             }],
           }),
-          signal: AbortSignal.timeout(120_000),
+          signal: AbortSignal.timeout(180_000), // 3 min — Opus with 16K output + internal DB context
         })
 
         if (!resp.ok) {

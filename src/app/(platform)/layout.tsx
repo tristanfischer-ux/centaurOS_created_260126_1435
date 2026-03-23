@@ -32,6 +32,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedLayoutData } from "@/lib/supabase/cached-layout-data";
 import { redirect } from "next/navigation";
 
+// DECISION: Vercel Pro caps at 300s. Server actions (research, decomposition,
+// image generation) called from platform pages need up to 240s per invocation.
+export const maxDuration = 300
+
 export default async function PlatformLayout({
     children,
 }: Readonly<{

@@ -127,11 +127,11 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
       },
       body: JSON.stringify({
         model: "claude-opus-4-6",
-        max_tokens: 16384,
+        max_tokens: 32768,
         system: systemPrompt,
         messages: [{ role: "user", content: userMessage }],
       }),
-      signal: AbortSignal.timeout(180_000),
+      signal: AbortSignal.timeout(240_000), // 4 min — Opus with 32K output for thorough decomposition
     })
 
     if (!resp.ok) {
