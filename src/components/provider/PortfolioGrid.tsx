@@ -115,7 +115,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                                     <Button
                                         variant="secondary"
                                         size="icon"
-                                        className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 h-7 w-7 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                         onClick={handlePrevImage}
                                     >
                                         <ChevronLeft className="w-4 h-4" />
@@ -125,7 +125,7 @@ function PortfolioGridCard({ item, showFeaturedHighlight, onClick }: PortfolioGr
                                     <Button
                                         variant="secondary"
                                         size="icon"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-7 w-7 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                         onClick={handleNextImage}
                                     >
                                         <ChevronRight className="w-4 h-4" />

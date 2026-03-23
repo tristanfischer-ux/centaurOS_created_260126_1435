@@ -162,7 +162,7 @@ export function FinancialSnapshotSection({
       </div>
 
       {/* Hero: Revenue / Expenses / Net */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="border-l-4 border-l-status-success">
           <CardContent className="p-5 space-y-1">
             <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground">

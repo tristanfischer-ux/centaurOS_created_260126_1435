@@ -131,7 +131,7 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
                           {item.label}
                         </span>
                       </div>
-                      <span className="text-xs font-medium text-international-orange opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <span className="text-xs font-medium text-international-orange sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
                         Go
                       </span>
                     </Link>

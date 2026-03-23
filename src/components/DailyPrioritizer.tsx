@@ -291,7 +291,7 @@ export function DailyPrioritizer({ tasks, maxTasks = 5, compact = false, members
                                     variant="ghost"
                                     size="sm"
                                     className={cn(
-                                        "flex-shrink-0 h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity",
+                                        "flex-shrink-0 h-8 w-8 p-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity",
                                         "hover:bg-status-success-light hover:text-status-success"
                                     )}
                                     onClick={(e) => handleQuickComplete(e, task.id)}

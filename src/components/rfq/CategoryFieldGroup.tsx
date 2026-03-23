@@ -126,7 +126,7 @@ export function CategoryFieldGroup({
         {categoryGroup === 'physical_products' && (
           <>
             {/* Quantity */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input
@@ -251,7 +251,7 @@ export function CategoryFieldGroup({
         {categoryGroup === 'materials_supplies' && (
           <>
             {/* Quantity */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input

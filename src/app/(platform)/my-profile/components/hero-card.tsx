@@ -132,7 +132,7 @@ export function HeroCard({
                 {isUploading ? (
                   <Loader2 className="h-6 w-6 text-background animate-spin" />
                 ) : (
-                  <Camera className="h-6 w-6 text-background opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Camera className="h-6 w-6 text-background sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                 )}
               </div>
             </button>

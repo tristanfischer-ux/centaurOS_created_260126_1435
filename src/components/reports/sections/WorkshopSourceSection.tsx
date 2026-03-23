@@ -252,7 +252,7 @@ export function WorkshopSourceSection({
                   <h3 className="text-sm font-semibold">Manufacturing Orders</h3>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="text-center">
                     <StatCallout
                       value={String(orderSummary.total)}

@@ -429,7 +429,7 @@ export function ActivityItem({ item, onReply, onTaskClick }: ActivityItemProps) 
           <Button
             variant="ghost"
             size="sm"
-            className="text-muted-foreground hover:text-foreground -ml-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="text-muted-foreground hover:text-foreground -ml-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
             onClick={() => setIsReplying(true)}
           >
             <MessageSquare className="h-4 w-4 mr-1" />

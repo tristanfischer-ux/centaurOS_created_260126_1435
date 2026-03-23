@@ -674,7 +674,7 @@ export function PitchPrepForm({ onSuccess, onCancel, className }: PitchPrepFormP
               )}
 
               {(formData.amount_seeking || formData.timeline) && (
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {formData.amount_seeking && (
                     <div>
                       <h4 className="font-medium text-sm text-muted-foreground mb-1">Amount Seeking</h4>

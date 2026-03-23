@@ -517,7 +517,7 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
                                         toast.success("Agent unpaired")
                                     })
                                 }}
-                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded p-1 transition-all opacity-0 group-hover:opacity-100"
+                                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded p-1 transition-all sm:opacity-0 sm:group-hover:opacity-100"
                             >
                                 <Unplug className="h-3 w-3" />
                             </button>
@@ -541,7 +541,7 @@ export function TeamComparisonView({ founders, executives, apprentices, teams, c
                 <td className="px-4 py-3 text-right pr-6">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" aria-label={`Actions for ${member.full_name}`}>
+                            <Button variant="ghost" className="h-8 w-8 p-0 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" aria-label={`Actions for ${member.full_name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>

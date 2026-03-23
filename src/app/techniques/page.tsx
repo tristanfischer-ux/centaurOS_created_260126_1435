@@ -403,7 +403,7 @@ function TechniqueCard({ technique, isExpanded, onToggle }: TechniqueCardProps) 
               </div>
 
               {/* Details grid */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {technique.toleranceRange && (
                   <div>
                     <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-0.5">
@@ -445,7 +445,7 @@ function TechniqueCard({ technique, isExpanded, onToggle }: TechniqueCardProps) 
               </div>
 
               {/* Pros / Cons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <p className="text-[10px] font-mono uppercase tracking-widest text-status-success mb-1">
                     Advantages

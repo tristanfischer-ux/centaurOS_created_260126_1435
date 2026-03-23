@@ -315,7 +315,7 @@ export function EnrollmentCreateDialog({
             </div>
 
             {/* Weekly Hours */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="weekly-hours">Weekly Working Hours</Label>
                 <Select value={weeklyHours} onValueChange={setWeeklyHours}>
@@ -359,7 +359,7 @@ export function EnrollmentCreateDialog({
                 Mentor Assignment (Optional)
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="senior-mentor">Senior Mentor</Label>
                   <Select value={seniorMentor} onValueChange={setSeniorMentor}>

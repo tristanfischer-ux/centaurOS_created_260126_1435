@@ -698,7 +698,7 @@ function PricingTab({
         <p className="text-xs text-muted-foreground mb-3">
           Search for this component on popular distributors:
         </p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {DISTRIBUTORS.map((dist) => (
             <a
               key={dist.name}
@@ -775,7 +775,7 @@ function CertificationsTab({ certifications }: { certifications: Record<string, 
       {compliance && (
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-2">Compliance Summary</p>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
             {compliance.rohs_compliant != null && (
               <ComplianceItem
                 label="RoHS"

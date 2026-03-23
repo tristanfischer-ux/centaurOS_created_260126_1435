@@ -291,7 +291,7 @@ export function AssessmentModal({ functions, onComplete, children }: AssessmentM
                                         </div>
 
                                         {/* Status Options */}
-                                        <div className="grid grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                             {statusOptions.map(option => {
                                                 const isSelected = answer?.status === option.status
                                                 return (

@@ -231,7 +231,7 @@ export const ProviderTrustSection = memo(function ProviderTrustSection({
                                         <ChevronRight className="w-3 h-3 ml-1" />
                                     </Button>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                     {featuredPortfolio.map((item) => (
                                         <div 
                                             key={item.id}

@@ -57,7 +57,7 @@ export function TeamPulseWidget({ members }: TeamPulseWidgetProps) {
             </CardHeader>
             <CardContent className="space-y-4">
                 {/* Status summary */}
-                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                     <div className="flex items-center gap-1.5">
                         <span className="h-2 w-2 shrink-0 rounded-full bg-status-success" />
                         <span className="text-muted-foreground">{onlineCount} online</span>

@@ -80,7 +80,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
           <Skeleton className="h-4 w-48 mt-1" />
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[...Array(4)].map((_, i) => (
               <Skeleton key={i} className="h-16" />
             ))}
@@ -120,7 +120,7 @@ export function RFQWidget({ className }: RFQWidgetProps) {
 
       <CardContent className="relative space-y-4">
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Active Matches */}
           <div className="p-3 rounded-lg bg-background border border-slate-100">
             <div className="flex items-center gap-2 mb-1">

@@ -128,7 +128,7 @@ export function MessageInputHelp({ className }: { className?: string }) {
               <Keyboard className="w-3.5 h-3.5 text-muted-foreground" />
               <span>Keyboard Shortcuts</span>
             </div>
-            <div className="ml-5 text-muted-foreground grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+            <div className="ml-5 text-muted-foreground grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
               <div>
                 <kbd className="px-1.5 py-0.5 bg-background rounded font-mono text-[10px]">Cmd+Enter</kbd>
                 <span className="ml-1">Send message</span>

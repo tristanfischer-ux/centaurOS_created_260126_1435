@@ -250,7 +250,7 @@ export function OrderTasksList({
                                 {dueInfo.text}
                               </span>
                             )}
-                            <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <ChevronRight className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                           </div>
                         </Link>
                       )

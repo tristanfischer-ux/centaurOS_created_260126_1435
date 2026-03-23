@@ -137,7 +137,7 @@ function StepRevenue({ items, onAdd, onRemove, onUpdate }: StepRevenueProps): Re
       <div className="space-y-3">
         {items.map((item) => (
           <div key={item._key} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
-            <div className="flex-1 grid grid-cols-3 gap-3">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="col-span-3 sm:col-span-1">
                 <Input
                   value={item.name}
@@ -216,7 +216,7 @@ function StepCosts({ title, description, items, onAdd, onRemove, onUpdate }: Ste
       <div className="space-y-3">
         {items.map((item) => (
           <div key={item._key} className="flex items-start gap-3 p-3 rounded-lg border bg-muted/30">
-            <div className="flex-1 grid grid-cols-3 gap-3">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="col-span-3 sm:col-span-1">
                 <Input
                   value={item.name}
@@ -301,7 +301,7 @@ function StepReview({ revenueStreams, directCosts, sharedCosts, overheadCosts }:
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 rounded-lg bg-muted/30 border">
           <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Revenue</p>
           <p className="text-xl font-semibold text-foreground mt-1">{formatCurrency(totalRevenue)}</p>

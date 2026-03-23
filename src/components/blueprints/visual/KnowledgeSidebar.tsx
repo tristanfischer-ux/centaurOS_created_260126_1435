@@ -136,7 +136,7 @@ function SkillTreeNode({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 text-international-orange hover:text-international-orange hover:bg-orange-100"
+            className="h-6 px-2 text-xs sm:opacity-0 sm:group-hover:opacity-100 text-international-orange hover:text-international-orange hover:bg-orange-100"
             onClick={() => onNeedsExpert?.(skill)}
           >
             Find Expert
@@ -147,7 +147,7 @@ function SkillTreeNode({
           <Button 
             variant="ghost" 
             size="sm" 
-            className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100"
+            className="h-6 px-2 text-xs sm:opacity-0 sm:group-hover:opacity-100"
             onClick={() => onToggle?.(skill.id)}
           >
             I know this

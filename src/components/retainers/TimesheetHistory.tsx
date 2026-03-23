@@ -196,7 +196,7 @@ export function TimesheetHistory({
                       )}
 
                       {/* Timestamps */}
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         {timesheet.submitted_at && (
                           <div>
                             <p className="text-muted-foreground">Submitted</p>

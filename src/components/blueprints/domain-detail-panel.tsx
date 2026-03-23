@@ -133,7 +133,7 @@ export function DomainDetailPanel({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button asChild>
                   <a href={`/marketplace?q=${encodeURIComponent(domain.name)}`}>
                     <ShoppingBag className="mr-2 h-4 w-4" />

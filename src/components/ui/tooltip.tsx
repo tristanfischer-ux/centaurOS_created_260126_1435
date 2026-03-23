@@ -4,7 +4,20 @@ import * as React from 'react'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
 import { cn } from '@/lib/utils'
 
-const TooltipProvider = TooltipPrimitive.Provider
+/**
+ * TooltipProvider with instant open on touch devices.
+ *
+ * @description Radix tooltips open on first tap on mobile (built-in).
+ * delayDuration={0} makes them appear instantly so users discover them.
+ * skipDelayDuration={300} keeps rapid hover-switching smooth on desktop.
+ */
+function TooltipProvider({ children, ...props }: React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Provider>) {
+  return (
+    <TooltipPrimitive.Provider delayDuration={0} skipDelayDuration={300} {...props}>
+      {children}
+    </TooltipPrimitive.Provider>
+  )
+}
 
 const Tooltip = TooltipPrimitive.Root
 

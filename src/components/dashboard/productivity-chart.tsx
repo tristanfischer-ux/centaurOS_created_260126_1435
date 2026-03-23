@@ -87,7 +87,7 @@ export function ProductivityChart({ data }: ProductivityChartProps) {
                         style={{ height: `${myPercent}%` }}
                       >
                         {day.myTasks > 0 && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <span className="text-xs font-bold text-white">{day.myTasks}</span>
                           </div>
                         )}
@@ -103,7 +103,7 @@ export function ProductivityChart({ data }: ProductivityChartProps) {
                         style={{ height: `${teamPercent}%` }}
                       >
                         {day.teamTasks > 0 && (
-                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="absolute inset-0 flex items-center justify-center sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <span className="text-xs font-bold text-white">{day.teamTasks}</span>
                           </div>
                         )}
@@ -131,7 +131,7 @@ export function ProductivityChart({ data }: ProductivityChartProps) {
 
       {/* Footer Stats */}
       <div className="px-6 pb-6">
-        <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-xl">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-xl">
           <div className="text-center">
             <p className="text-2xl font-bold text-foreground">{total}</p>
             <p className="text-xs text-muted-foreground">Total</p>

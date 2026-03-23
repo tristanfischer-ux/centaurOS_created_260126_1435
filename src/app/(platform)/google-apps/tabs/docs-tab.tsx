@@ -297,7 +297,7 @@ export function DocsTab({ isEnabled }: DocsTabProps) {
                                         )}
                                     </p>
                                 </div>
-                                <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                <ExternalLink className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0" />
                             </a>
                         )
                     })}

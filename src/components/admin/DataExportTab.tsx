@@ -116,7 +116,7 @@ export function DataExportTab({ foundryId }: DataExportTabProps) {
             {/* Format selection - optimized toggle buttons */}
             <div className="space-y-2">
                 <Label className="text-xs font-medium text-muted-foreground">Export Format</Label>
-                <div className="grid grid-cols-3 gap-1 p-1 bg-muted rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 p-1 bg-muted rounded-lg">
                     <button
                         type="button"
                         onClick={() => setFormat('csv')}

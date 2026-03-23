@@ -196,7 +196,7 @@ export function GuidedAssessment({
           {/* Answer options */}
           <div className="space-y-3">
             <Label>Your Coverage</Label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <AnswerButton
                 status="covered"
                 icon={CheckCircle2}

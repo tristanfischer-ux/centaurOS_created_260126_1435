@@ -6,6 +6,7 @@
  * dimensions (330×120×260mm, 3kg) so Claude doesn't invent sizes.
  */
 
+import { unstable_cache } from "next/cache"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 export interface ProductDimensionMatch {
@@ -22,14 +23,10 @@ export interface ProductDimensionMatch {
 export async function retrieveProductDimensionsForPrompt(
   description: string,
 ): Promise<{ content: string; matchedCategory: string | null }> {
-  const supabase = createAdminClient()
   const lower = description.toLowerCase()
 
-  // Fetch all product dimensions (small table, <100 rows)
-  const { data } = await supabase
-    .from("product_reference_dimensions")
-    .select("*")
-    .limit(100)
+  // Fetch all product dimensions (small table, <100 rows) — cached 1hr
+  const data = await getCachedProductDimensions()
 
   if (!data || data.length === 0) {
     return { content: "", matchedCategory: null }
@@ -93,3 +90,19 @@ export async function retrieveProductDimensionsForPrompt(
     matchedCategory: m.product_category as string,
   }
 }
+
+// DECISION: unstable_cache with 1hr TTL — this is static reference data (<100 rows)
+// that rarely changes. Same pattern as cached-layout-data.ts. Uses admin client
+// because unstable_cache can revalidate during a different user's request.
+const getCachedProductDimensions = unstable_cache(
+  async () => {
+    const supabase = createAdminClient()
+    const { data } = await supabase
+      .from("product_reference_dimensions")
+      .select("*")
+      .limit(100)
+    return data
+  },
+  ["product-reference-dimensions"],
+  { revalidate: 3600 },
+)

@@ -306,7 +306,7 @@ export function AdminDashboard({
                             </div>
                           </div>
 
-                          <div className="mt-4 grid grid-cols-2 gap-4">
+                          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                               <div className="flex items-center justify-between text-sm mb-1">
                                 <span className="text-muted-foreground flex items-center gap-1">

@@ -319,7 +319,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-auto p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="h-auto p-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                                 onClick={() => handleOpenEdit(opp)}
                                 disabled={isPending}
                               >
@@ -328,7 +328,7 @@ export function FundingView({ initialData }: FundingViewProps) {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className={`h-auto p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteId === opp.id ? 'opacity-100 text-destructive' : ''}`}
+                                className={`h-auto p-0.5 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ${confirmDeleteId === opp.id ? 'opacity-100 text-destructive' : ''}`}
                                 onClick={() => handleDelete(opp.id)}
                                 onBlur={() => setConfirmDeleteId(null)}
                                 disabled={isPending}

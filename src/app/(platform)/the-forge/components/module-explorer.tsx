@@ -694,7 +694,7 @@ function MassPropertiesCard({ mp }: { mp: MassProperties }): React.ReactNode {
       </div>
 
       {/* Key metrics grid */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <MetricCell label="Mass" value={massDisplay} icon={<Scale className="h-3 w-3" />} />
         <MetricCell label="Volume" value={volumeDisplay} icon={<Box className="h-3 w-3" />} />
         <MetricCell
@@ -763,7 +763,7 @@ function DfmReportCard({ dfm }: { dfm: DfmAnalysis }): React.ReactNode {
       </div>
 
       {/* Estimates */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {dfm.estimatedPrintTime_min !== undefined && (
           <MetricCell
             label="Est. Print Time"
@@ -930,7 +930,7 @@ function StructuralAnalysisCard({
         </div>
 
         {/* Key Metrics Row */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <MetricCell
             label="Max Stress"
             value={structural.maxVonMisesStress_MPa != null ? `${structural.maxVonMisesStress_MPa.toFixed(1)} MPa` : "—"}
@@ -1044,7 +1044,7 @@ function EmiShieldingCard({ emi }: { emi: EmiShielding }): React.ReactNode {
           <ForgeInfoTip text={FORGE_EXPLANATIONS.emiShielding.description} />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <MetricCell
             label="SE @ 1 GHz"
             value={emi.seAt1GHz_dB != null ? `${emi.seAt1GHz_dB.toFixed(1)} dB` : "—"}
@@ -1103,7 +1103,7 @@ function FatigueCard({ fatigue }: { fatigue: Fatigue }): React.ReactNode {
           <ForgeInfoTip text={FORGE_EXPLANATIONS.fatigueLife.description} />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <MetricCell
             label="Cycles to Failure"
             value={fatigue.cyclesToFailureLabel ?? (fatigue.cyclesToFailure != null ? fatigue.cyclesToFailure.toExponential(1) : "—")}
@@ -1169,7 +1169,7 @@ function ImpactCard({ impact }: { impact: Impact }): React.ReactNode {
           <ForgeInfoTip text={FORGE_EXPLANATIONS.impactResistance.description} />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <MetricCell
             label="Safety Factor"
             value={impact.safetyFactor != null ? impact.safetyFactor.toFixed(2) : "—"}
@@ -1183,7 +1183,7 @@ function ImpactCard({ impact }: { impact: Impact }): React.ReactNode {
         </div>
 
         {impact.kineticEnergy_J != null && impact.energyAbsorptionCapacity_J != null && (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <MetricCell
               label="Kinetic Energy"
               value={`${impact.kineticEnergy_J.toFixed(1)} J`}

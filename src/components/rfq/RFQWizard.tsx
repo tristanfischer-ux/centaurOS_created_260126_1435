@@ -612,7 +612,7 @@ export function RFQWizard({
                   {/* Budget */}
                   <div className="space-y-2">
                     <Label>Budget Range (GBP)</Label>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Input
                         type="number"
                         value={budgetMin}
@@ -665,7 +665,7 @@ export function RFQWizard({
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <button
                         type="button"
                         onClick={() => setUrgency('standard')}
@@ -711,7 +711,7 @@ export function RFQWizard({
 
                   {/* Summary card */}
                   <div className="rounded-lg border p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground">Title</span>
                         <p className="font-medium">{title || 'Not set'}</p>

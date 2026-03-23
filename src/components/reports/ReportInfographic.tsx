@@ -153,7 +153,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
             KPI ROW
             ============================================================== */}
         {remainingMetrics.length > 0 && (
-          <div className="grid grid-cols-4 gap-2 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
             {remainingMetrics.map((metric, idx) => (
               <div
                 key={`${metric.label}-${idx}`}
@@ -178,7 +178,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
         {/* ==============================================================
             TWO-COLUMN: TREND + OBJECTIVES
             ============================================================== */}
-        <div className="grid grid-cols-2 gap-4 flex-1 min-h-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-1 min-h-0">
           {/* --- Mini Completion Trend (sparkline) --- */}
           <div className="flex flex-col bg-muted/20 rounded-lg p-3 -m-1">
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-medium">
@@ -263,7 +263,7 @@ export function ReportInfographic({ document }: ReportInfographicProps): React.J
         {/* ==============================================================
             TEAM & BLOCKERS ROW
             ============================================================== */}
-        <div className="grid grid-cols-2 gap-4 shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 shrink-0">
           {/* --- Top Contributors --- */}
           <div>
             <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-2 font-medium">

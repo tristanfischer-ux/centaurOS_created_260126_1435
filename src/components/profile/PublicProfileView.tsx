@@ -117,7 +117,7 @@ export function PublicProfileView({ profile }: PublicProfileViewProps) {
                             </div>
                             
                             {/* Quick Stats */}
-                            <div className="grid grid-cols-2 gap-3 mb-6 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 text-sm">
                                 {profile.location && (
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <MapPin className="w-4 h-4" />

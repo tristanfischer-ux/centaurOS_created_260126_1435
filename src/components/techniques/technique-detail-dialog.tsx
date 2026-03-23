@@ -270,7 +270,7 @@ export function TechniqueDetailDialog({
                 </div>
 
                 {/* Quick stats row */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {enrichment.real_world_tolerances?.typical_mm != null && (
                     <div className="rounded-lg border bg-card p-3 text-center">
                       <p className="text-[10px] text-muted-foreground mb-0.5">Typical Tolerance</p>
@@ -340,7 +340,7 @@ export function TechniqueDetailDialog({
                             <Ruler className="h-3 w-3" />
                             Real-World Tolerances
                           </p>
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {enrichment.real_world_tolerances.min_mm != null && (
                               <div className="rounded-lg border p-3 text-center">
                                 <p className="text-[10px] text-muted-foreground mb-0.5">Best</p>

@@ -142,7 +142,7 @@ export function EngineeringActivitySection({
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card>
               <CardContent className="p-4">
                 <StatCallout value={String(totalActive)} label="Active Projects" size="sm" />
@@ -291,7 +291,7 @@ export function EngineeringActivitySection({
                 <GitBranch className="h-4 w-4" />
                 Design Health
               </h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card>
                   <CardContent className="p-4">
                     <StatCallout value={String(designHealth.averageRevisions)} label="Avg Revisions" size="sm" />
@@ -464,7 +464,7 @@ function CostSummaryCard({ summary }: { summary: CostSummary }): React.JSX.Eleme
       <Card>
         <CardContent className="p-6 space-y-4">
           <StatCallout value={formatGBP(totalEstimatedCost)} label="Total Estimated Cost" size="md" />
-          <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
             <div>
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Avg Per Unit</p>
               <p className="text-lg font-bold font-display">{formatGBP(averageCostPerUnit)}</p>

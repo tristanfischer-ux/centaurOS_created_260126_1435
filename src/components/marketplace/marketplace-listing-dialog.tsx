@@ -467,7 +467,7 @@ function KeyMetricsGrid({ category, attrs }: { category: string; attrs: Record<s
     if (metrics.length === 0) return null
 
     return (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {metrics.map((metric, idx) => (
                 <Card key={idx}>
                     <CardContent className="pt-6">
@@ -757,7 +757,7 @@ function ProcessCapabilitiesSection({ capabilities }: { capabilities: ProcessCap
             </div>
 
             {/* Summary stat grid */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="rounded-lg border bg-card p-3 text-center">
                     <p className="text-xs text-muted-foreground">Best Tolerance</p>
                     <p className="text-sm font-semibold text-foreground">

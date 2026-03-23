@@ -362,7 +362,7 @@ export function PricingForm({
                                 <p className="text-sm font-medium text-foreground mb-2">
                                     Retainer Summary
                                 </p>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                                     <div>
                                         <p className="text-muted-foreground">Weekly</p>
                                         <p className="font-semibold text-foreground">

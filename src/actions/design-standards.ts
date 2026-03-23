@@ -208,3 +208,49 @@ export async function getEngineeringIntelligenceForReport(
 
   return { standards, materials, processes, hardwareCount: hardwareCount ?? 0, supplierInsights }
 }
+
+/**
+ * Verify a single standard (admin action — uses service role to bypass RLS).
+ */
+export async function verifyStandard(id: string): Promise<{ success: boolean; error?: string }> {
+  const { createAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from("design_standards")
+    .update({ verified: true, updated_at: new Date().toISOString() })
+    .eq("id", id)
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+/**
+ * Bulk verify multiple standards.
+ */
+export async function bulkVerifyStandards(ids: string[]): Promise<{ success: boolean; count: number; error?: string }> {
+  if (ids.length === 0) return { success: true, count: 0 }
+  const { createAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = createAdminClient()
+  const { error, count } = await supabase
+    .from("design_standards")
+    .update({ verified: true, updated_at: new Date().toISOString() })
+    .in("id", ids)
+  if (error) return { success: false, count: 0, error: error.message }
+  return { success: true, count: count ?? ids.length }
+}
+
+/**
+ * Get full standard detail including requirements markdown.
+ */
+export async function getStandardDetail(id: string): Promise<{
+  data: { standard_code: string; standard_name: string; issuing_body: string; summary: string; requirements_markdown: string; design_rules: unknown; verified: boolean; source: string; industry_domain: string } | null
+  error: string | null
+}> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from("design_standards")
+    .select("standard_code, standard_name, issuing_body, summary, requirements_markdown, design_rules, verified, source, industry_domain")
+    .eq("id", id)
+    .single()
+  if (error) return { data: null, error: error.message }
+  return { data: data as typeof data, error: null }
+}

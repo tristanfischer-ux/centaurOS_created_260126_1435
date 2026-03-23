@@ -129,7 +129,7 @@ export function InvestorCard({
             'absolute top-3 left-3 z-10 h-5 w-5 rounded border flex items-center justify-center transition-all',
             isCompareSelected
               ? 'bg-foreground border-foreground text-background'
-              : 'border-border bg-background opacity-0 group-hover:opacity-100'
+              : 'border-border bg-background sm:opacity-0 sm:group-hover:opacity-100'
           )}
           aria-label={isCompareSelected ? 'Remove from compare' : 'Add to compare'}
         >

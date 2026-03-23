@@ -321,7 +321,7 @@ export function DomainActionPanel({
             <RadioGroup
               value={familiarity}
               onValueChange={(value) => handleFamiliarityChange(value as FamiliarityLevel)}
-              className="grid grid-cols-2 gap-2"
+              className="grid grid-cols-1 sm:grid-cols-2 gap-2"
               disabled={isPending || !foundryId}
             >
               {FAMILIARITY_LEVELS.map((level) => {
@@ -442,7 +442,7 @@ export function DomainActionPanel({
             </div>
 
             {/* Action Grid - All actions always visible */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <ActionButton
                 href={`/objectives?prefill=${encodeURIComponent(domain.name)}`}
                 icon={Target}

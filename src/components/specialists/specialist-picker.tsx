@@ -79,7 +79,7 @@ export function SpecialistPicker({
           <p className="text-xs font-medium text-muted-foreground px-1">
             Choose a specialist
           </p>
-          <div className="grid grid-cols-3 gap-1.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
             {SPECIALISTS.map((specialist) => (
               <SpecialistPickerItem
                 key={specialist.id}

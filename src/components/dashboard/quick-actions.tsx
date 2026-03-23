@@ -97,7 +97,7 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
       {/* Do Section */}
       <div className="p-4 pb-2">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Do</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {doActions.map((action) => (
             <ActionButton key={action.label} action={action} />
           ))}
@@ -107,7 +107,7 @@ export function QuickActions({ foundryId }: QuickActionsProps) {
       {/* Discover Section */}
       <div className="p-4 pt-2">
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">Discover</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {discoverActions.map((action) => (
             <ActionButton key={action.label} action={action} />
           ))}
@@ -129,7 +129,7 @@ function ActionButton({ action }: { action: ActionItem }) {
     >
       {/* Gradient Background (on hover) */}
       <div className={cn(
-        "absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br",
+        "absolute inset-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br",
         action.color
       )} />
       

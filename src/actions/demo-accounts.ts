@@ -2,12 +2,12 @@
 
 /**
  * Demo Account Data Provider
- * 
+ *
  * @description Returns pre-populated form data for demo accounts
  * to enable quick testing of onboarding flows.
- * 
- * @security This only returns form data, not actual credentials.
- * The credentials are used during signup but never exposed to client.
+ *
+ * @security Credentials come from DEMO_ACCOUNTS_PASSWORD env var.
+ * Never hardcoded in source. Only works when env var is explicitly set.
  */
 
 export interface DemoAccountData {
@@ -25,10 +25,12 @@ export interface DemoAccountData {
   department?: string
 }
 
-const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
+// SECURITY: Passwords read from env var, never hardcoded in source
+const DEMO_PASSWORD = process.env.DEMO_ACCOUNTS_PASSWORD
+
+const DEMO_ACCOUNTS: Record<string, Omit<DemoAccountData, 'password'>> = {
   founder: {
     email: 'demo.founder@fractionalforge.app',
-    password: 'DemoFounder2026!',
     fullName: 'Alex Founder',
     companyName: 'RocketTech Industries',
     industry: 'Hardware, Aerospace',
@@ -36,24 +38,20 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
   },
   executive: {
     email: 'demo.executive@fractionalforge.app',
-    password: 'DemoExecutive2026!',
     fullName: 'Jordan Executive'
   },
   apprentice: {
     email: 'demo.apprentice@fractionalforge.app',
-    password: 'DemoApprentice2026!',
     fullName: 'Sam Apprentice'
   },
   vc: {
     email: 'demo.vc@fractionalforge.app',
-    password: 'DemoVC2026!',
     fullName: 'Taylor Venture',
     firm: 'Demo Ventures',
     aum: '£50M - £100M'
   },
   supplier: {
     email: 'demo.supplier@fractionalforge.app',
-    password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
     capabilities: '3D Printing, CNC Machining',
@@ -61,7 +59,6 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
   },
   factory: {
     email: 'demo.supplier@fractionalforge.app',
-    password: 'DemoSupplier2026!',
     fullName: 'Morgan Manufacturer',
     companyName: 'Precision Parts Co',
     capabilities: '3D Printing, CNC Machining',
@@ -69,39 +66,48 @@ const DEMO_ACCOUNTS: Record<string, DemoAccountData> = {
   },
   university: {
     email: 'demo.university@fractionalforge.app',
-    password: 'DemoUniversity2026!',
     fullName: 'Dr. Casey Academic',
     institution: 'Demo Tech University',
     department: 'Mechanical Engineering'
   },
   network: {
     email: 'demo.network@fractionalforge.app',
-    password: 'DemoNetwork2026!',
     fullName: 'River Network',
     companyName: 'Global Logistics Partners'
   },
   general: {
     email: 'demo.general@fractionalforge.app',
-    password: 'DemoGeneral2026!',
     fullName: 'Jamie General'
   }
 }
 
 /**
- * Get demo account data for a specific role
- * 
+ * Get demo account data for a specific role (without password)
+ *
  * @param role - The role type (founder, executive, apprentice, etc.)
  * @returns Demo account data if available, null otherwise
  */
 export async function getDemoAccountData(role: string): Promise<Omit<DemoAccountData, 'password'> | null> {
-  // SECURITY: Disable demo accounts in production
-  if (process.env.NODE_ENV === 'production') return null
+  if (!DEMO_PASSWORD) return null
   const normalizedRole = role.toLowerCase()
   const account = DEMO_ACCOUNTS[normalizedRole]
   if (!account) return null
-  // SECURITY: Never expose passwords to the client
-  const { password: _pw, ...safeData } = account
-  return safeData
+  return account
+}
+
+/**
+ * Get demo account credentials for a specific role (includes password)
+ *
+ * @security Only returns credentials when DEMO_ACCOUNTS_PASSWORD env var is set.
+ * @param role - The role type
+ * @returns Full account data including password, or null
+ */
+export async function getDemoAccountCredentials(role: string): Promise<{ email: string; password: string } | null> {
+  if (!DEMO_PASSWORD) return null
+  const normalizedRole = role.toLowerCase()
+  const account = DEMO_ACCOUNTS[normalizedRole]
+  if (!account) return null
+  return { email: account.email, password: DEMO_PASSWORD }
 }
 
 /**
@@ -110,7 +116,6 @@ export async function getDemoAccountData(role: string): Promise<Omit<DemoAccount
  * @returns Array of available demo role names
  */
 export async function getAvailableDemoRoles(): Promise<string[]> {
-  // SECURITY: Disable demo accounts in production
-  if (process.env.NODE_ENV === 'production') return []
+  if (!DEMO_PASSWORD) return []
   return Object.keys(DEMO_ACCOUNTS)
 }

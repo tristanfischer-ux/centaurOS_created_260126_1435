@@ -216,7 +216,7 @@ function ModuleDetailDialog({
                       className="w-full h-auto object-contain"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/90 rounded-full p-2 shadow-sm">
+                      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-background/90 rounded-full p-2 shadow-sm">
                         <Maximize2 className="h-4 w-4 text-foreground" />
                       </div>
                     </div>

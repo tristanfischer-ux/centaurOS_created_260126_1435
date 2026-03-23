@@ -147,7 +147,7 @@ export function CreateBlueprintDialog({
 
             <div className="space-y-2">
               <Label htmlFor="stage">Project Stage</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {PROJECT_STAGES.slice(0, 6).map((s) => (
                   <Button
                     key={s.value}
@@ -207,7 +207,7 @@ export function CreateBlueprintDialog({
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto">
                 {templates.map((template) => {
                   const Icon = templateIcons[template.product_category.toLowerCase()] || templateIcons.default
                   const isSelected = selectedTemplate === template.id

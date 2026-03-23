@@ -320,7 +320,7 @@ export function CalendarTab({ isEnabled }: CalendarTabProps) {
                                                     asChild
                                                     className={cn(
                                                         'h-8 w-8',
-                                                        !event.meetLink && 'opacity-0 group-hover:opacity-100 transition-opacity'
+                                                        !event.meetLink && 'sm:opacity-0 sm:group-hover:opacity-100 transition-opacity'
                                                     )}
                                                 >
                                                     <a

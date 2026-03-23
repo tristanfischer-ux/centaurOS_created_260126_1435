@@ -1,76 +1,46 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { TestTube2, ArrowRight, User, Briefcase, GraduationCap, Building2, Factory, BookOpen, Network, Users } from 'lucide-react'
+import { TestTube2, ArrowRight, User, Briefcase, GraduationCap, Building2, Factory, BookOpen, Network, Users, type LucideIcon } from 'lucide-react'
+import { getDemoAccountCredentials, getAvailableDemoRoles } from '@/actions/demo-accounts'
 
-const DEMO_ROLES = [
-  {
-    id: 'founder',
-    name: 'Founder',
-    description: 'Test the founder onboarding flow with pre-filled startup details',
-    icon: User,
-    email: 'demo.founder@fractionalforge.app',
-    password: 'DemoFounder2026!'
-  },
-  {
-    id: 'executive',
-    name: 'Executive',
-    description: 'Test the executive cadre application with fractional expertise profile',
-    icon: Briefcase,
-    email: 'demo.executive@fractionalforge.app',
-    password: 'DemoExecutive2026!'
-  },
-  {
-    id: 'apprentice',
-    name: 'Apprentice',
-    description: 'Test the Guild entry flow for Founder-in-Training apprentices',
-    icon: GraduationCap,
-    email: 'demo.apprentice@fractionalforge.app',
-    password: 'DemoApprentice2026!'
-  },
-  {
-    id: 'vc',
-    name: 'Venture Capital',
-    description: 'Test the VC application flow with firm and AUM details',
-    icon: Building2,
-    email: 'demo.vc@fractionalforge.app',
-    password: 'DemoVC2026!'
-  },
-  {
-    id: 'supplier',
-    name: 'Supplier / Factory',
-    description: 'Test marketplace supplier onboarding with manufacturing capabilities',
-    icon: Factory,
-    email: 'demo.supplier@fractionalforge.app',
-    password: 'DemoSupplier2026!'
-  },
-  {
-    id: 'university',
-    name: 'University',
-    description: 'Test academic partnership application with institution details',
-    icon: BookOpen,
-    email: 'demo.university@fractionalforge.app',
-    password: 'DemoUniversity2026!'
-  },
-  {
-    id: 'network',
-    name: 'Network Partner',
-    description: 'Test network partner application for infrastructure providers',
-    icon: Network,
-    email: 'demo.network@fractionalforge.app',
-    password: 'DemoNetwork2026!'
-  },
-  {
-    id: 'general',
-    name: 'General Signup',
-    description: 'Test the general signup flow without a specific role',
-    icon: Users,
-    email: 'demo.general@fractionalforge.app',
-    password: 'DemoGeneral2026!'
+const ROLE_META: Record<string, { name: string; description: string; icon: LucideIcon }> = {
+  founder: { name: 'Founder', description: 'Test the founder onboarding flow with pre-filled startup details', icon: User },
+  executive: { name: 'Executive', description: 'Test the executive cadre application with fractional expertise profile', icon: Briefcase },
+  apprentice: { name: 'Apprentice', description: 'Test the Guild entry flow for Founder-in-Training apprentices', icon: GraduationCap },
+  vc: { name: 'Venture Capital', description: 'Test the VC application flow with firm and AUM details', icon: Building2 },
+  supplier: { name: 'Supplier / Factory', description: 'Test marketplace supplier onboarding with manufacturing capabilities', icon: Factory },
+  university: { name: 'University', description: 'Test academic partnership application with institution details', icon: BookOpen },
+  network: { name: 'Network Partner', description: 'Test network partner application for infrastructure providers', icon: Network },
+  general: { name: 'General Signup', description: 'Test the general signup flow without a specific role', icon: Users },
+}
+
+export default async function DemoPage() {
+  const roles = await getAvailableDemoRoles()
+
+  if (roles.length === 0) {
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Demo Mode Unavailable</CardTitle>
+            <CardDescription>Demo accounts are not configured in this environment.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
   }
-]
 
-export default function DemoPage() {
+  // Fetch credentials for all roles server-side
+  const roleData = await Promise.all(
+    roles
+      .filter(r => ROLE_META[r])
+      .map(async (r) => {
+        const creds = await getDemoAccountCredentials(r)
+        return { id: r, ...ROLE_META[r], creds }
+      })
+  )
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -113,7 +83,7 @@ export default function DemoPage() {
 
         {/* Demo Roles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {DEMO_ROLES.map(role => {
+          {roleData.map(role => {
             const Icon = role.icon
             return (
               <Card key={role.id} className="border hover:border-violet-300 transition-colors">
@@ -133,17 +103,19 @@ export default function DemoPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2 text-xs bg-muted p-3 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Email:</span>
-                      <code className="text-foreground font-mono">{role.email}</code>
+                  {role.creds && (
+                    <div className="space-y-2 text-xs bg-muted p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Email:</span>
+                        <code className="text-foreground font-mono">{role.creds.email}</code>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Password:</span>
+                        <code className="text-foreground font-mono">{role.creds.password}</code>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Password:</span>
-                      <code className="text-foreground font-mono">{role.password}</code>
-                    </div>
-                  </div>
-                  
+                  )}
+
                   <Link href={`/join/${role.id}?demo=true`} className="block">
                     <Button className="w-full" variant="default">
                       Test {role.name} Flow

@@ -258,7 +258,7 @@ function VATReportView({ report }: { report: VATReport }) {
             <h3 className="text-sm font-medium mb-2">Sales (Output VAT)</h3>
             <div className="space-y-1">
               {report.salesBreakdown.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-4 text-sm py-1 border-b border-border last:border-0">
+                <div key={idx} className="grid grid-cols-4 min-w-[500px] text-sm py-1 border-b border-border last:border-0">
                   <span className="text-muted-foreground">{item.description}</span>
                   <span className="text-right">{formatCurrency(item.net, report.currency)}</span>
                   <span className="text-right">{formatCurrency(item.vat, report.currency)}</span>

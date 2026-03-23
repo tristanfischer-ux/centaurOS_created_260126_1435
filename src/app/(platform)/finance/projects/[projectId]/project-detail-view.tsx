@@ -251,8 +251,8 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
           {transactions.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No transactions yet. Add revenue or expenses to track this project&apos;s P&L.</p>
           ) : (
-            <div className="space-y-1">
-              <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+            <div className="space-y-1 overflow-x-auto">
+              <div className="grid grid-cols-6 min-w-[600px] text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span className="col-span-2">Description</span>
                 <span>Type</span>
                 <span className="text-right">Amount</span>
@@ -260,7 +260,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
                 <span />
               </div>
               {transactions.map((tx) => (
-                <div key={tx.id} data-testid="tx-row" className="relative group grid grid-cols-6 items-center text-sm py-2 border-b border-border last:border-0">
+                <div key={tx.id} data-testid="tx-row" className="relative group grid grid-cols-6 min-w-[600px] items-center text-sm py-2 border-b border-border last:border-0">
                   <div className="col-span-2 flex items-center gap-2">
                     {tx.isRevenue ? (
                       <ArrowUpRight className="h-3.5 w-3.5 text-status-success flex-shrink-0" />
@@ -286,7 +286,7 @@ export function ProjectDetailView({ project, initialTransactions }: ProjectDetai
                         data-testid="tx-delete-btn"
                         variant="ghost"
                         size="sm"
-                        className={`h-auto p-1 opacity-0 group-hover:opacity-100 transition-opacity ${confirmDeleteTxId === tx.id ? 'opacity-100 text-destructive' : ''}`}
+                        className={`h-auto p-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity ${confirmDeleteTxId === tx.id ? 'opacity-100 text-destructive' : ''}`}
                         onClick={() => handleDeleteTransaction(tx)}
                         onBlur={() => setConfirmDeleteTxId(null)}
                         disabled={isPending}

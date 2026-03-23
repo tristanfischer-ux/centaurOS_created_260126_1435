@@ -194,7 +194,7 @@ export function ProjectsView({ initialData }: ProjectsViewProps) {
                     <Badge variant={STATUS_VARIANTS[item.project.status as ProjectStatus]}>
                       {item.project.status}
                     </Badge>
-                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                   </span>
                 </Link>
               ))}

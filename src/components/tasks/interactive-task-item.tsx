@@ -172,7 +172,7 @@ export function InteractiveTaskItem({ task, members, currentUserId, variant = "d
                     </div>
                     
                     {/* Metadata Grid - Better spacing and visual hierarchy */}
-                    <div className="grid grid-cols-2 gap-5 pt-4 border-t-2 border-foundry-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 pt-4 border-t-2 border-foundry-100">
                         {/* Assignees */}
                         <div className="space-y-2">
                             <div className="text-xs text-muted-foreground font-bold uppercase tracking-wider">

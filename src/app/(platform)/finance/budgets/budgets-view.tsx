@@ -223,9 +223,9 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
             <CardTitle className="text-base font-semibold">Variance Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-1">
+            <div className="space-y-1 overflow-x-auto">
               {/* Header row */}
-              <div className="grid grid-cols-6 text-xs font-medium text-muted-foreground pb-2 border-b border-border">
+              <div className="grid grid-cols-6 min-w-[600px] text-xs font-medium text-muted-foreground pb-2 border-b border-border">
                 <span>Category</span>
                 <span className="text-right">Budget</span>
                 <span className="text-right">Recurring</span>
@@ -236,7 +236,7 @@ export function BudgetsView({ initialData }: BudgetsViewProps) {
               {data.map((item) => {
                 const monthlyBudget = normaliseToMonthly(item.budget.amount, item.budget.period)
                 return (
-                  <div key={item.budget.id} className="grid grid-cols-6 text-sm py-2 border-b border-border last:border-0">
+                  <div key={item.budget.id} className="grid grid-cols-6 min-w-[600px] text-sm py-2 border-b border-border last:border-0">
                     <span className="text-foreground font-medium">{item.budget.name}</span>
                     <span className="text-right text-muted-foreground">{formatCurrency(monthlyBudget, item.budget.currency)}</span>
                     <span className="text-right text-muted-foreground">{formatCurrency(item.recurringActual, item.budget.currency)}</span>
@@ -486,7 +486,7 @@ function BudgetCard({ item, onEdit, onDeactivate, isPending }: {
         <Button
           variant="ghost"
           size="sm"
-          className="absolute top-2 right-8 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-8 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
           onClick={() => onEdit(budget)}
           disabled={isPending}
         >
@@ -497,7 +497,7 @@ function BudgetCard({ item, onEdit, onDeactivate, isPending }: {
         <Button
           variant="ghost"
           size="sm"
-          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
           onClick={() => onDeactivate(budget.id)}
           disabled={isPending}
         >

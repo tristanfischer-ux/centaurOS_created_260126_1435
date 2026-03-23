@@ -355,7 +355,7 @@ export function PricingContent() {
             <div className="overflow-x-auto">
               <div className="min-w-[600px]">
                 {/* Header row */}
-                <div className="grid grid-cols-4 gap-4 pb-4 border-b border-muted">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-4 border-b border-muted">
                   <div className="text-sm font-medium text-muted-foreground">Feature</div>
                   <div className="text-sm font-medium text-center">Explorer</div>
                   <div className="text-sm font-medium text-center">Startup Team</div>
@@ -365,7 +365,7 @@ export function PricingContent() {
                 {COMPARISON_FEATURES.map((feature) => (
                   <div
                     key={feature.name}
-                    className="grid grid-cols-4 gap-4 py-3 border-b border-muted/50"
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-4 py-3 border-b border-muted/50"
                   >
                     <div className="text-sm text-foreground flex items-center gap-1.5">
                       {feature.name}

@@ -222,7 +222,7 @@ export function UsePackDialog({ pack, trigger, members = [], open: controlledOpe
             </Card>
 
             {/* Pack Details */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {pack.estimated_duration && (
                 <Card>
                   <CardContent className="pt-6">

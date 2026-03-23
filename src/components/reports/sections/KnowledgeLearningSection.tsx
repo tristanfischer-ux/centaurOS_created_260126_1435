@@ -73,7 +73,7 @@ export function KnowledgeLearningSection({
                 <h3 className="text-sm font-semibold">Knowledge Vault</h3>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="text-center">
                   <p className="text-xl font-bold font-display">{knowledge.totalNotes}</p>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Total</p>
@@ -173,7 +173,7 @@ export function KnowledgeLearningSection({
                 </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="text-center">
                       <p className="text-xl font-bold font-display">{apprenticeships.activeEnrollments}</p>
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Active</p>

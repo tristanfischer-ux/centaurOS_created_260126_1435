@@ -248,7 +248,7 @@ export function InvoicesView({ initialInvoices, standaloneInvoices: initialStand
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity h-7 px-2"
+                            className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity h-7 px-2"
                             onClick={() => handleMarkPaid(invoice.id)}
                             disabled={isPending}
                           >

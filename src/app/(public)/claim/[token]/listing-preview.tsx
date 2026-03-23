@@ -129,7 +129,7 @@ export function ListingPreview({ preview }: ListingPreviewProps) {
                             <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                                 Company Facts
                             </h4>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {location && (
                                     <FactItem icon={MapPin} label="Location" value={location} />
                                 )}

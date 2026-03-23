@@ -143,7 +143,7 @@ export function CostItemDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ci-cost-type">Cost Type</Label>
               <Select value={costType} onValueChange={(v) => setCostType(v as CostType)}>
@@ -173,7 +173,7 @@ export function CostItemDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ci-amount">
                 Amount (GBP) <span className="text-destructive" aria-label="required">*</span>

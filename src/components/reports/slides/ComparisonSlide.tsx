@@ -23,7 +23,7 @@ export function ComparisonSlide({ slide }: ComparisonSlideProps): React.JSX.Elem
       </h2>
 
       {/* Column headers */}
-      <div className="grid grid-cols-2 gap-6 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-4">
         <div className="flex items-center gap-3">
           <div className="h-3 w-3 rounded-full bg-muted-foreground/30" />
           <span className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -44,7 +44,7 @@ export function ComparisonSlide({ slide }: ComparisonSlideProps): React.JSX.Elem
           <div
             key={index}
             className={cn(
-              'grid grid-cols-2 gap-6 rounded-xl p-4',
+              'grid grid-cols-1 sm:grid-cols-2 gap-6 rounded-xl p-4',
               index % 2 === 0 ? 'bg-muted/40' : 'bg-transparent'
             )}
           >

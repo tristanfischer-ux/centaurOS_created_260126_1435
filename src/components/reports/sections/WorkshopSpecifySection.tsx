@@ -151,7 +151,7 @@ export function WorkshopSpecifySection({
                   </div>
                   <h3 className="text-sm font-semibold">Cost Estimates</h3>
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="text-center">
                     <StatCallout
                       value={formatPence(costOverview.totalEstimatedCost * 100)}

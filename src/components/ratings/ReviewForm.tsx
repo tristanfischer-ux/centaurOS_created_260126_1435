@@ -166,7 +166,7 @@ export function ReviewForm({
         {showCategoryRatings && (
           <div className="space-y-4">
             <Label>Category Ratings (Optional)</Label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {Object.entries(categoryRatings).map(([category, value]) => (
                 <div key={category} className="space-y-2">
                   <span className="text-sm capitalize text-muted-foreground">

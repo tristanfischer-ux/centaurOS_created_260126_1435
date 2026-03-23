@@ -348,7 +348,7 @@ export function DriveTab({ isEnabled }: DriveTabProps) {
                                     </p>
                                 </div>
                                 {!isFolder && (
-                                    <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0" />
                                 )}
                                 {isFolder && (
                                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />

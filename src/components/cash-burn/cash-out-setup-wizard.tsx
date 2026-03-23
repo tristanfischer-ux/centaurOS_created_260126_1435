@@ -492,7 +492,7 @@ function StepReview({ fixedRows, variableRows }: StepReviewProps) {
       </div>
 
       {/* Two-column summary */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="p-4 rounded-lg bg-muted/30 border">
           <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Fixed Costs</p>
           <p className="text-xl font-semibold text-foreground mt-1">{formatCurrency(weeklyFixed)}/wk</p>

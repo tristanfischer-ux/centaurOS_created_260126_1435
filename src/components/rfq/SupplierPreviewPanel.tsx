@@ -156,7 +156,7 @@ export function SupplierPreviewPanel({
 
           <CardContent className="space-y-4">
             {/* Key Info Grid */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="p-2.5 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <Wallet className="w-3.5 h-3.5" />

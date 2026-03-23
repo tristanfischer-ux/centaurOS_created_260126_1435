@@ -290,7 +290,7 @@ export function CreateEventDialog({ open, onOpenChange, onCreated }: CreateEvent
                     {/* Step 3: Logistics */}
                     {step === 2 && (
                         <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="event-date" className="flex items-center gap-1">
                                         <Calendar className="h-3.5 w-3.5" /> Date <span className="text-destructive" aria-label="required">*</span>
