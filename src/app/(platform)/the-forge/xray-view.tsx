@@ -17,6 +17,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
 
+import { AnimatePresence, motion } from "framer-motion"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -38,6 +39,7 @@ import {
 } from "@/actions/xray"
 
 import { ScanHero } from "./components/scan-hero"
+import { DesignBriefInterview } from "./cad-lab/components/design-brief-interview"
 import { SystemBlueprint } from "./components/system-blueprint"
 import { ExecutiveDashboard } from "./components/executive-dashboard"
 import { ModuleExplorer } from "./components/module-explorer"
@@ -134,6 +136,10 @@ export function XRayView(): React.ReactNode {
 
   // Interview state (ported from v1)
   const [interviewModule, setInterviewModule] = useState<ModuleSpec | null>(null)
+
+  // Design brief interview state (Max CTO guided Q&A before first scan)
+  const [interviewPhase, setInterviewPhase] = useState<"idle" | "interviewing" | "complete">("idle")
+  const pendingScanIdeaRef = useRef<string>("")
 
   // Edit module dialog state
   const [editingModule, setEditingModule] = useState<ModuleSpec | null>(null)
@@ -524,10 +530,55 @@ export function XRayView(): React.ReactNode {
         functionStatement={spec.function}
         isScanning={isScanning}
         hasExistingSpec={spec.modules.length > 0}
-        onScan={handleScan}
+        onScan={(idea) => {
+          if (spec.modules.length > 0) {
+            // Re-scan — skip interview
+            handleScan(idea)
+          } else {
+            // First scan — start interview
+            pendingScanIdeaRef.current = idea
+            setInterviewPhase("interviewing")
+          }
+        }}
         onRefine={handleRefineScan}
         onIdeaChange={(idea) => setSpec({ ...spec, idea })}
       />
+
+      {/* Design brief interview (Max CTO guided Q&A) */}
+      <AnimatePresence>
+        {interviewPhase === "interviewing" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <DesignBriefInterview
+              subject={pendingScanIdeaRef.current}
+              onComplete={(brief, enrichedSubject, _summary) => {
+                setInterviewPhase("complete")
+                // Build an enriched idea string with the brief context for scanIdeaAction
+                const briefContext = [
+                  enrichedSubject || pendingScanIdeaRef.current,
+                  brief.useCase && `Use case: ${brief.useCase}`,
+                  brief.targetProcess && `Manufacturing: ${brief.targetProcess}`,
+                  brief.targetMaterial && `Material: ${brief.targetMaterial}`,
+                  brief.toleranceTarget && `Tolerance: ${brief.toleranceTarget}`,
+                  brief.quantityTarget && `Quantity: ${brief.quantityTarget}`,
+                  brief.complianceNotes && `Compliance: ${brief.complianceNotes}`,
+                ].filter(Boolean).join("\n")
+                // Update the idea in spec so ScanHero shows the enriched text
+                setSpec({ ...spec, idea: enrichedSubject || pendingScanIdeaRef.current })
+                handleScan(briefContext)
+              }}
+              onSkip={() => {
+                setInterviewPhase("complete")
+                handleScan(pendingScanIdeaRef.current)
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {isScanning && <ScanningPlaceholder />}
 
