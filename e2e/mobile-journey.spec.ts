@@ -60,8 +60,10 @@ test.describe('Mobile Journey — Landing Page', () => {
       const hamburger = page.locator('[aria-label="Open menu"]')
       await hamburger.click()
 
-      // Menu should appear
-      const joinLink = page.getByRole('link', { name: /join the forge/i })
+      // Menu should appear — scope to the nav menu container to avoid matching
+      // other "Join the Forge" CTAs scattered across the landing page
+      const menuContainer = page.locator('nav')
+      const joinLink = menuContainer.getByRole('link', { name: /join the forge/i })
       await expect(joinLink).toBeVisible()
 
       const joinBox = await getBoundingBoxOrFail(joinLink, 'Join the Forge link')
@@ -129,7 +131,7 @@ test.describe('Mobile Journey — Login Page', () => {
     test('login page: submit button meets touch target', async ({ page }) => {
       await page.goto(`${TEST_URL}/login`)
 
-      const submitButton = page.getByRole('button', { name: /sign in|log in/i })
+      const submitButton = page.getByRole('button', { name: /enter the forge/i })
       await expect(submitButton).toBeVisible()
 
       const box = await getBoundingBoxOrFail(submitButton, 'Login submit button')
@@ -158,7 +160,7 @@ test.describe('Mobile Journey — Login Page', () => {
     test('login page: sign up link is visible', async ({ page }) => {
       await page.goto(`${TEST_URL}/login`)
 
-      const signUpLink = page.getByRole('link', { name: /sign up|join|create.*account/i })
+      const signUpLink = page.getByRole('link', { name: /create one for free/i })
       await expect(signUpLink).toBeVisible()
     })
   })
@@ -267,7 +269,7 @@ test.describe('Mobile Journey — Landscape', () => {
 
     await expect(page.getByLabel(/email/i)).toBeVisible()
 
-    const submitButton = page.getByRole('button', { name: /sign in|log in/i })
+    const submitButton = page.getByRole('button', { name: /enter the forge/i })
     await submitButton.scrollIntoViewIfNeeded()
     await expect(submitButton).toBeVisible()
   })
