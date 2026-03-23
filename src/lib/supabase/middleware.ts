@@ -19,6 +19,7 @@ const PUBLIC_ROUTES = [
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
     '/claim',  // Public listing claim flow (outreach)
+    '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
 ]
 
 // Routes that require company admin (Executive/Founder) role
