@@ -40,7 +40,7 @@ export default function PrivacyPage() {
           Privacy Policy
         </h1>
         <p className="text-sm text-muted-foreground mb-8">
-          Last updated: February 2026
+          Last updated: March 2026
         </p>
 
         <div className="prose prose-sm max-w-none space-y-8 text-foreground">
@@ -78,6 +78,60 @@ export default function PrivacyPage() {
               We implement industry-standard security measures to protect your data, including
               encryption in transit and at rest, access controls, and regular security audits.
             </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">4A. Design Data Protection</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Design files you upload or create on the platform receive additional protection
+              beyond standard personal data. Specifically:
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground leading-relaxed space-y-1.5 ml-1">
+              <li>Design data is encrypted at rest and in transit</li>
+              <li>Access is role-based: only authorised team members and factory partners can view relevant files</li>
+              <li>Data is stored in isolated per-foundry containers</li>
+              <li>Design data is never used to train AI models or shared with third parties</li>
+            </ul>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">4B. Data Access Tiers</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              We enforce tiered access to your project data:
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-muted-foreground border-collapse">
+                <thead>
+                  <tr className="border-b border-muted">
+                    <th className="text-left py-2 pr-4 font-semibold text-foreground">Tier</th>
+                    <th className="text-left py-2 pr-4 font-semibold text-foreground">Who</th>
+                    <th className="text-left py-2 font-semibold text-foreground">Access</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-muted">
+                  <tr>
+                    <td className="py-2 pr-4">1</td>
+                    <td className="py-2 pr-4">You</td>
+                    <td className="py-2">Full access to all project data</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">2</td>
+                    <td className="py-2 pr-4">Your team</td>
+                    <td className="py-2">Shared project data per your settings</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">3</td>
+                    <td className="py-2 pr-4">Factory partners</td>
+                    <td className="py-2">Manufacturing specifications only</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2 pr-4">4</td>
+                    <td className="py-2 pr-4">Platform ops</td>
+                    <td className="py-2">Aggregated, anonymised analytics only</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section className="space-y-3">

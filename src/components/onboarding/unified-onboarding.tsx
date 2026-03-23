@@ -16,6 +16,9 @@ import {
   Package,
   Building2,
   Sparkles,
+  Hammer,
+  Shield,
+  Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
@@ -27,11 +30,11 @@ import { GuidedTour } from './guided-tour'
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
-// DECISION: Removed 'firstlook' step — team_builders go to guided tour,
-// suppliers redirect to /supplier-portal. Nobody reaches a third step (RT3-03).
-type OnboardingStep = 'welcome' | 'intent'
+// DECISION: Added 'how-it-works' step between welcome and intent to pre-empt
+// IP/risk/clarity concerns before the user commits to an intent path.
+type OnboardingStep = 'welcome' | 'how-it-works' | 'intent'
 
-const STEPS: OnboardingStep[] = ['welcome', 'intent']
+const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -306,7 +309,7 @@ export function UnifiedOnboarding({
                   whileTap={{ scale: 0.98 }}
                 >
                   <Button
-                    onClick={() => goToStep('intent')}
+                    onClick={() => goToStep('how-it-works')}
                     className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
                   >
                     Let&apos;s go
@@ -316,7 +319,77 @@ export function UnifiedOnboarding({
               </div>
             )}
 
-            {/* STEP 2: Intent */}
+            {/* STEP 2: How It Works — trust & clarity */}
+            {currentStep === 'how-it-works' && (
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
+                    How We Protect You
+                  </h2>
+                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                    Three things to know before you start.
+                  </p>
+                </div>
+
+                <div className="max-w-md mx-auto space-y-4 text-left">
+                  {[
+                    {
+                      icon: Hammer,
+                      title: 'Build products without a factory',
+                      desc: 'We connect you with expert teams and manufacturing capacity.',
+                    },
+                    {
+                      icon: Shield,
+                      title: 'Your IP stays yours. Always.',
+                      desc: 'Every design belongs to you. Confidentiality agreements protect everything you share.',
+                    },
+                    {
+                      icon: Scale,
+                      title: 'Clear responsibility',
+                      desc: 'Factories liable for manufacturing quality. You own your designs. Written terms for every engagement.',
+                    },
+                  ].map((item, i) => (
+                    <motion.div
+                      key={item.title}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.15 * i }}
+                      className="flex items-start gap-4 p-4 rounded-xl bg-card border"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <item.icon className="w-5 h-5 text-international-orange" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-semibold text-foreground mb-1">
+                          {item.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    onClick={() => goToStep('intent')}
+                    className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </motion.div>
+              </div>
+            )}
+
+            {/* STEP 3: Intent */}
             {currentStep === 'intent' && (
               <div className="space-y-8">
                 <div className="space-y-4">

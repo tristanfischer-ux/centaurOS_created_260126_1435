@@ -41,6 +41,8 @@ import {
   LineChart,
   Building2,
   Beaker,
+  Lock,
+  Scale,
 } from "lucide-react"
 import {
   Accordion,
@@ -432,8 +434,12 @@ function HeroSection() {
           </motion.span>
         </motion.h1>
 
-        <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
+        <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
           Access fractional experts, AI-enabled execution, and on-demand manufacturing capacity — all through one platform. No factory required.
+        </motion.p>
+
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
+          We help hardware startups design, prototype, and manufacture physical products — without hiring a full team or leasing a factory.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
@@ -823,30 +829,72 @@ function WhoItsForSection() {
  * TRUST STRIP
  * ═══════════════════════════════════════════════════════════════════════ */
 
-const TRUST_SIGNALS = [
-  { icon: Shield, label: "Your IP, 100%" },
-  { icon: UserCheck, label: "Verified Experts" },
-  { icon: DollarSign, label: "No Equity Required" },
-  { icon: CheckCircle2, label: "Cancel Anytime" },
+const TRUST_CARDS = [
+  {
+    icon: Shield,
+    title: "Your IP Stays Yours",
+    description:
+      "Every design, prototype, and product you create belongs entirely to you. Contractually guaranteed.",
+    link: { href: "/terms#ip", label: "Learn more" },
+  },
+  {
+    icon: Lock,
+    title: "Confidentiality Built In",
+    description:
+      "Designs visible only to team members you choose. Factory partners see only what\u2019s needed to quote and manufacture. All parties sign confidentiality agreements.",
+    link: null,
+  },
+  {
+    icon: Scale,
+    title: "Clear Risk Allocation",
+    description:
+      "Manufacturing defects are the factory\u2019s responsibility. Design intent is yours. Written terms for every engagement.",
+    link: { href: "/terms#risk", label: "Learn more" },
+  },
 ] as const
 
 function TrustStrip() {
   return (
-    <section className="py-8 sm:py-12 bg-background border-t border-muted">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        <AnimatedSection>
-          <div className="flex flex-wrap justify-center gap-x-4 sm:gap-x-8 gap-y-3 text-sm text-muted-foreground">
-            {TRUST_SIGNALS.map((signal) => {
-              const Icon = signal.icon
-              return (
-                <div key={signal.label} className="flex items-center gap-2">
-                  <Icon className="h-4 w-4 text-international-orange flex-shrink-0" />
-                  <span className="font-medium text-foreground text-xs sm:text-sm">{signal.label}</span>
-                </div>
-              )
-            })}
-          </div>
+    <section className="py-12 sm:py-16 md:py-24 bg-background border-t border-muted">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12">
+          <span className="text-xs text-electric-blue font-mono uppercase tracking-widest mb-3 block">
+            Protection &amp; Trust
+          </span>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black">
+            How We Protect You
+          </h2>
         </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {TRUST_CARDS.map((card) => {
+            const Icon = card.icon
+            return (
+              <AnimatedCard key={card.title}>
+                <div className="bg-card border rounded-xl p-6 sm:p-8 h-full flex flex-col">
+                  <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-5">
+                    <Icon className="h-6 w-6 text-international-orange" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    {card.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                    {card.description}
+                  </p>
+                  {card.link && (
+                    <Link
+                      href={card.link.href}
+                      className="text-sm text-international-orange hover:underline mt-4 inline-flex items-center gap-1"
+                    >
+                      {card.link.label}
+                      <ArrowRight className="h-3 w-3" />
+                    </Link>
+                  )}
+                </div>
+              </AnimatedCard>
+            )
+          })}
+        </StaggerContainer>
       </div>
     </section>
   )
@@ -902,6 +950,14 @@ const FAQS = [
   {
     question: "How much does it cost?",
     answer: "We're in early access and working directly with founding members to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
+  },
+  {
+    question: "Can factory partners steal my idea?",
+    answer: "No. All factory partners are bound by confidentiality agreements before they see any of your data. They only receive the manufacturing specifications needed to quote and produce — never your full designs, strategy, or broader project context. You control exactly what each collaborator sees.",
+  },
+  {
+    question: "Who is liable if something goes wrong?",
+    answer: "Responsibility is clearly allocated in writing. Factory partners are responsible for manufacturing defects and spec conformance. You are responsible for your design specifications. Fractional Forge facilitates the relationship but does not guarantee manufacturing outcomes. Written terms govern every engagement.",
   },
 ] as const
 

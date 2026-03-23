@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { CadLabProgress } from "@/components/cad/cad-lab-progress"
+import { IpProtectionNote } from "@/components/ui/ip-protection-note"
 import { CadLabMilestone } from "@/components/cad/cad-lab-milestone"
 import { SECTOR_LABELS } from "@/types/foundry"
 
@@ -242,6 +243,11 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
       <PageTransition>
         {children}
       </PageTransition>
+
+      {/* ── IP trust signal — visible at moment of design anxiety ── */}
+      <div className="pt-4">
+        <IpProtectionNote />
+      </div>
 
       {/* ── Live progress (below page content so input stays at top; hidden in post-research idle, during decomposition, and on CAD page which has its own progress) ── */}
       {!(hasResearch && modules.length === 0 && !isAnyActive) && !isDecomposing && !pathname.includes("/cad-lab/cad") && (

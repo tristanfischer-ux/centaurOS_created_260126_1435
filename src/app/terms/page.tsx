@@ -40,7 +40,7 @@ export default function TermsPage() {
           Terms of Service
         </h1>
         <p className="text-sm text-muted-foreground mb-8">
-          Last updated: February 2026
+          Last updated: March 2026
         </p>
 
         <div className="prose prose-sm max-w-none space-y-8 text-foreground">
@@ -71,12 +71,44 @@ export default function TermsPage() {
             </p>
           </section>
 
-          <section className="space-y-3">
+          <section id="ip" className="space-y-3 scroll-mt-24">
             <h2 className="text-xl font-semibold text-foreground">4. Intellectual Property</h2>
             <p className="text-muted-foreground leading-relaxed">
-              All intellectual property created by you through the platform remains your property.
-              Fractional Forge does not claim ownership of any designs, prototypes, or products
-              you create. You retain full IP ownership at all times.
+              All intellectual property you create through the platform — including designs,
+              prototypes, specifications, and finished products — remains your sole property.
+              Fractional Forge does not claim any ownership, assignment, or equity stake in
+              your work. This is a contractual guarantee, not a courtesy.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              You grant Fractional Forge a limited, revocable licence to display your designs
+              and project data solely to authorised members of your team within the platform.
+              This licence terminates automatically when you remove a team member or close
+              your account.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Factory partners engaged through the platform receive access only to the
+              manufacturing specifications required to quote and produce your parts. They do
+              not receive access to your full design files, business strategy, or other
+              project data.
+            </p>
+          </section>
+
+          <section id="confidentiality" className="space-y-3 scroll-mt-24">
+            <h2 className="text-xl font-semibold text-foreground">4A. Confidentiality</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              All parties using the platform — including you, your team members, and factory
+              partners — are bound by confidentiality obligations. Your design files are
+              treated as confidential information by default.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Factory partners receive only the manufacturing-relevant specifications needed
+              to quote and produce your parts. They do not gain access to your broader design
+              intent, business plans, or other project data.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Technical measures supporting confidentiality include: role-based access controls,
+              encryption at rest and in transit, per-foundry data isolation, and audit logging
+              of access events.
             </p>
           </section>
 
@@ -90,14 +122,54 @@ export default function TermsPage() {
             </p>
           </section>
 
-          <section className="space-y-3">
-            <h2 className="text-xl font-semibold text-foreground">6. Limitation of Liability</h2>
-            <p className="text-muted-foreground leading-relaxed">
-              Fractional Forge provides the platform on an &quot;as is&quot; basis. We are not liable for
-              any indirect, incidental, or consequential damages arising from your use of the
-              platform. Our total liability shall not exceed the fees you have paid in the
-              preceding twelve months.
-            </p>
+          <section id="risk" className="space-y-4 scroll-mt-24">
+            <h2 className="text-xl font-semibold text-foreground">6. Liability &amp; Risk Allocation</h2>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-medium text-foreground">6.1 Platform Role</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Fractional Forge operates as a facilitator — connecting you with expert teams and
+                manufacturing capacity. We are not a manufacturer, and do not take physical
+                custody of your products.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-medium text-foreground">6.2 Manufacturing Responsibility</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Factory partners engaged through the platform are responsible for manufacturing
+                defects, specification conformance, and quality control of the parts they produce.
+                Written terms govern every manufacturing engagement.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-medium text-foreground">6.3 Design Responsibility</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                You are responsible for the fitness and suitability of your designs. Platform tools
+                (including AI-assisted analysis) are provided to support — but not replace — your
+                engineering judgement. Final design sign-off remains yours.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-medium text-foreground">6.4 Liability Cap</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Fractional Forge provides the platform on an &quot;as is&quot; basis. We are not liable for
+                any indirect, incidental, or consequential damages. Our total aggregate liability
+                shall not exceed the greater of (a) the fees you have paid in the preceding twelve
+                months, or (b) GBP 100.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-base font-medium text-foreground">6.5 Statutory Exclusions</h3>
+              <p className="text-muted-foreground leading-relaxed">
+                Nothing in these terms excludes or limits liability for death or personal injury
+                caused by negligence, fraud or fraudulent misrepresentation, or any other liability
+                that cannot be excluded or limited under applicable law.
+              </p>
+            </div>
           </section>
 
           <section className="space-y-3">
@@ -115,6 +187,32 @@ export default function TermsPage() {
               <a href="mailto:legal@fractionalforge.com" className="text-electric-blue hover:underline">
                 legal@fractionalforge.com
               </a>
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">8A. Indemnification</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              You agree to indemnify and hold harmless Fractional Forge from any claims, losses,
+              or damages arising from the designs you create or the products manufactured to
+              your specifications.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Factory partners engaged through the platform agree to indemnify you against claims
+              arising from manufacturing defects or failure to conform to agreed specifications.
+              These obligations are set out in the manufacturing engagement terms.
+            </p>
+          </section>
+
+          <section className="space-y-3">
+            <h2 className="text-xl font-semibold text-foreground">8B. Dispute Resolution</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              In the event of a dispute between you and a factory partner or team member, the
+              parties shall first attempt to resolve the matter through the platform&apos;s dispute
+              process. If unresolved within 30 days, the parties shall submit the dispute to
+              mediation under the rules of the Centre for Effective Dispute Resolution (CEDR).
+              If mediation fails, either party may commence proceedings in the courts of England
+              and Wales.
             </p>
           </section>
         </div>

@@ -15,6 +15,9 @@ import {
   Factory,
   TestTube2,
   Loader2,
+  Shield,
+  Lock,
+  Scale,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signup } from "@/actions/signup";
@@ -416,7 +419,7 @@ function JoinPageInner() {
               Join ForgeOS
             </h1>
             <p className="text-muted-foreground text-base sm:text-lg max-w-lg mx-auto">
-              Create your account and start building.
+              The operating system for building physical products — expert teams, guided manufacturing, and full IP protection.
             </p>
           </div>
 
@@ -695,6 +698,22 @@ function JoinPageInner() {
 
           {/* Founding member counter */}
           <FoundingMemberCounter spotsClaimed={foundingCount} />
+
+          {/* Trust signals */}
+          <div className="flex justify-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Shield className="h-3.5 w-3.5 text-international-orange" />
+              <span>Your IP, always</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Lock className="h-3.5 w-3.5 text-international-orange" />
+              <span>Designs stay confidential</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Scale className="h-3.5 w-3.5 text-international-orange" />
+              <span>Clear risk terms</span>
+            </div>
+          </div>
 
           <p className="text-xs text-center text-muted-foreground">
             By joining, you agree to our{" "}
