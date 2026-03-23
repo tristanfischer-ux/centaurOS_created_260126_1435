@@ -211,7 +211,7 @@ export default function MarketingPage() {
                 transition={{ duration: 0.25, ease: "easeOut" }}
                 className="md:hidden border-t border-muted bg-background overflow-hidden shadow-lg"
               >
-                <div className="px-4 sm:px-6 py-4 flex flex-col gap-1">
+                <div className="px-4 sm:px-6 py-4 pb-safe flex flex-col gap-1">
                   <Link
                     href="/join"
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"

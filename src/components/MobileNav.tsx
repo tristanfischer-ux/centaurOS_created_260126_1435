@@ -218,7 +218,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                                     <span className="absolute -top-1 -right-1.5 h-2 w-2 rounded-full bg-international-orange" />
                                 )}
                             </span>
-                            <span className="text-xs font-medium truncate max-w-[48px] xs:max-w-none">
+                            <span className="text-xs font-medium truncate max-w-[56px] xs:max-w-none">
                                 <span className="xs:hidden">{item.shortName}</span>
                                 <span className="hidden xs:inline">{item.name}</span>
                             </span>
@@ -239,7 +239,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             <span className="text-xs font-medium">More</span>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56 max-h-[70vh] overflow-y-auto">
+                    <DropdownMenuContent align="end" side="top" className="mb-2 mr-safe w-56 max-w-[calc(100vw-16px)] max-h-[70vh] overflow-y-auto">
                         {/* Foundry identity — shows which workspace the user is in */}
                         {foundryName && (
                             <>

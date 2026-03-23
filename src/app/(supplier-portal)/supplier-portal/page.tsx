@@ -58,7 +58,7 @@ async function DashboardContent() {
           </p>
           <a 
             href="/supplier-portal/listing" 
-            className="inline-flex items-center justify-center px-6 py-3 bg-international-orange text-white font-semibold rounded-lg hover:bg-international-orange/90 transition-colors"
+            className="inline-flex items-center justify-center px-6 py-3 min-h-[48px] bg-international-orange text-white font-semibold rounded-lg hover:bg-international-orange/90 transition-colors"
           >
             Create Your Listing
           </a>
