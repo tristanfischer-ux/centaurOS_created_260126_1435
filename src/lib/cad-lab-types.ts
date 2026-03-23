@@ -444,7 +444,7 @@ export interface CadLabDecompositionResult {
   /** Tokens used */
   tokensIn: number
   tokensOut: number
-  /** Which model won the decomposition race (e.g. "Opus", "Gemini", "GPT-4o") */
+  /** Which model won the decomposition race (e.g. "Opus", "Gemini", "GPT-5.3") */
   modelUsed?: string
 }
 

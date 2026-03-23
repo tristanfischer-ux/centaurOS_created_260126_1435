@@ -5,7 +5,7 @@
  *
  * @description AI-powered SMART goal engine that takes raw ideas and helps
  * users refine them into Specific, Measurable, Achievable, Relevant, and
- * Time-bound objectives or tasks. Uses GPT-4o with company context to
+ * Time-bound objectives or tasks. Uses GPT-5.3 with company context to
  * generate contextually relevant suggestions.
  *
  * @security Requires authenticated user with foundry membership
@@ -202,7 +202,7 @@ Guidelines:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-5.3-chat-latest',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: sanitizedIdea },
@@ -281,7 +281,7 @@ export async function scoreSmartGoal(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-5.3-chat-latest',
       messages: [
         {
           role: 'system',

@@ -189,7 +189,7 @@ export async function getDependenciesForObjective(
 // ─── AI Strategic Plan Generator ─────────────────────────────────
 
 /**
- * Generates a strategic plan using GPT-4o, decomposing a high-level goal
+ * Generates a strategic plan using GPT-5.3, decomposing a high-level goal
  * into phases, tasks, dependencies, resource gaps, and risks.
  *
  * @param goal - The strategic goal description (e.g., "Raise 500k seed round")
@@ -362,7 +362,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-5.3-chat-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `My strategic goal: ${goal}\n\nTarget deadline: ${deadline}` },

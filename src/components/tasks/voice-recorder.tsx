@@ -5,7 +5,7 @@
  *
  * @description Voice input component for creating tasks. Uses the browser-native
  * Web Speech API (via useSpeechRecognition) for real-time transcription, then
- * sends the text to /api/voice-to-task for GPT-4o task extraction.
+ * sends the text to /api/voice-to-task for GPT-5.3 task extraction.
  *
  * DECISION: Switched from recording audio blobs and sending them to the server
  * for Whisper transcription to using browser-native STT. This eliminates the

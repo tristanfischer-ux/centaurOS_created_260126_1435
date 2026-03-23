@@ -143,7 +143,7 @@ export async function POST(
             })
         }
 
-        // Prepare data for GPT-4o analysis
+        // Prepare data for GPT-5.3 analysis
         const memberProfile = {
             name: member.full_name || 'Unknown',
             role: member.role,
@@ -161,7 +161,7 @@ export async function POST(
             isVerified: listing.is_verified
         }))
 
-        // Generate talent matching suggestions using GPT-4o
+        // Generate talent matching suggestions using GPT-5.3
         const systemPrompt = `You are an expert at matching humans with AI tools to form effective partnerships - human-AI teams that leverage the strengths of both.
 
 Your task is to analyze a human team member's profile and suggest the top 3 AI tools that would best complement their skills and role.
@@ -199,7 +199,7 @@ ${JSON.stringify(aiTools, null, 2)}
 Please suggest the top 3 AI tools that would form the best partnership with this human.`
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-chat-latest',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
@@ -208,7 +208,7 @@ Please suggest the top 3 AI tools that would form the best partnership with this
         })
 
         guard.trackUsage({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-chat-latest',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         }).catch(() => {})

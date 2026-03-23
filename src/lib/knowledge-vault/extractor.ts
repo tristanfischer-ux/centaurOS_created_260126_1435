@@ -241,7 +241,7 @@ async function callExtractionLLM(
     .join('\n\n')
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o',
+    model: 'gpt-5.3-chat-latest',
     temperature: 0.2,
     max_tokens: 4000,
     messages: [

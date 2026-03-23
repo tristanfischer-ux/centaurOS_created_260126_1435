@@ -73,16 +73,19 @@ $(echo "$matches" | head -10 | sed 's/^/- /' | sed 's/\$/\\$/g; s/`/\\`/g')
   fi
 }
 
-check_model_filtered "gpt-4o" "gpt-4o-mini-tts" "gpt-5.3-instant" "GPT-4o retired March 11 2026"
-check_model "gpt-4-turbo" "gpt-5.3-instant" "GPT-4 Turbo retired"
-# o1 needs quotes in pattern to avoid matching "icon", "color", etc.
-check_model '"o1"' "gpt-5.4-thinking" "o1 replaced by GPT-5.4 Thinking"
+# VERIFIED 2026-03-23: gpt-4o retired Feb 13 2026. API replacement is gpt-5.3-chat-latest
+# (NOT gpt-5.3-instant — that's the ChatGPT consumer name, not the API model ID).
+# Source: https://community.openai.com/t/api-model-gpt-5-3-chat-latest-available-aka-instant-on-chatgpt/1375606
+check_model_filtered "gpt-4o" "gpt-4o-mini-tts" "gpt-5.3-chat-latest" "GPT-4o retired Feb 13 2026"
+check_model "gpt-4-turbo" "gpt-5.3-chat-latest" "GPT-4 Turbo retired"
 
-# ── Preview → GA migrations ───────────────────────────────────────
-check_model "gemini-3.1-pro-preview" "gemini-3.1-pro" "GA version available"
-check_model "gemini-3.1-flash-lite-preview" "gemini-3.1-flash-lite" "GA version available"
-check_model "gemini-3-pro-preview" "gemini-3.1-pro" "Superseded by 3.1"
-check_model "gemini-3-flash-preview" "gemini-3.1-flash-lite" "Superseded by 3.1"
+# VERIFIED 2026-03-23: Gemini 3.1 Pro and Flash-Lite are STILL in preview. No GA model ID exists.
+# Do NOT replace -preview suffix until Google announces GA.
+# Source: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro
+# check_model "gemini-3.1-pro-preview" "gemini-3.1-pro" "GA version available"
+# check_model "gemini-3.1-flash-lite-preview" "gemini-3.1-flash-lite" "GA version available"
+# check_model "gemini-3-pro-preview" "gemini-3.1-pro" "Superseded by 3.1"
+# check_model "gemini-3-flash-preview" "gemini-3.1-flash-lite" "Superseded by 3.1"
 
 # ── Retired audio/TTS models ──────────────────────────────────────
 check_model "\"tts-1\"" "gpt-4o-mini-tts" "Legacy TTS, 35% higher error rate"

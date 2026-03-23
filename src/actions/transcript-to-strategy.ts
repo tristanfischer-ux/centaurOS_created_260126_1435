@@ -5,11 +5,11 @@
  *
  * @description Converts raw text (meeting transcripts, notes, brainstorms) into
  * a structured strategic plan with strategic objectives, operational objectives,
- * and tasks. Uses GPT-4o structured output for reliable parsing, then checks
+ * and tasks. Uses GPT-5.3 structured output for reliable parsing, then checks
  * for duplicates against existing foundry data before persistence.
  *
  * @dependencies
- * - OpenAI SDK (GPT-4o with structured output / Zod schemas)
+ * - OpenAI SDK (GPT-5.3 with structured output / Zod schemas)
  * - Supabase (objectives, tasks tables)
  * - server-action-utils (withAuth wrapper)
  *
@@ -19,7 +19,7 @@
  * - Rate limited to prevent cost abuse
  *
  * @related
- * - src/lib/telegram/ai-processor.ts — Similar GPT-4o structured output pattern
+ * - src/lib/telegram/ai-processor.ts — Similar GPT-5.3 structured output pattern
  * - src/actions/objectives.ts — createStrategicObjective, linkObjectiveToStrategic
  * - src/actions/objective-from-input.ts — createObjectiveFromInput
  */
@@ -51,7 +51,7 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 // ============================================================================
-// ZOD SCHEMAS (enforced by GPT-4o structured output)
+// ZOD SCHEMAS (enforced by GPT-5.3 structured output)
 // ============================================================================
 
 const ParsedTaskSchema = z.object({
@@ -282,7 +282,7 @@ function computeTaskDates(
 
 /**
  * Parses raw text (transcript, notes, brainstorm) into a structured strategic plan
- * using GPT-4o structured output. Computes dates for all tasks and checks for
+ * using GPT-5.3 structured output. Computes dates for all tasks and checks for
  * duplicates against existing foundry data.
  *
  * @param text - Raw text input (up to 50,000 characters)
@@ -319,7 +319,7 @@ export async function parseTranscriptToStrategy(text: string): Promise<{ plan?: 
     let parsedPlan: z.infer<typeof StrategicPlanSchema>
     try {
       const completion = await openai.chat.completions.parse({
-        model: 'gpt-4o',
+        model: 'gpt-5.3-chat-latest',
         messages: [
           {
             role: 'system',

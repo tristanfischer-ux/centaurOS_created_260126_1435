@@ -3,7 +3,7 @@
  *
  * @description Renders the ScanHero input and progress animation.
  * On concept creation, runs product research FIRST (Gemini + Claude) then
- * passes the research report to the GPT-4o scan for grounded module
+ * passes the research report to the GPT-5.3 scan for grounded module
  * decomposition. Shows two visible progress phases to the user.
  *
  * @related
@@ -38,7 +38,7 @@ export type CreatePhase = "idle" | "researching" | "creating"
  *
  * @description Wraps ScanHero with a research-first creation flow:
  * 1. Research phase: Gemini searches the web, Claude synthesizes a report
- * 2. Creation phase: GPT-4o decomposes the idea into modules WITH research context
+ * 2. Creation phase: GPT-5.3 decomposes the idea into modules WITH research context
  * 3. Redirect to concept page with both research and modules ready
  */
 export function NewScanView(): React.ReactNode {
@@ -78,7 +78,7 @@ export function NewScanView(): React.ReactNode {
       toast.warning("Research unavailable — creating concept from idea alone")
     }
 
-    // ── Phase 2: Create modules with research context (GPT-4o) ──
+    // ── Phase 2: Create modules with research context (GPT-5.3) ──
     setPhase("creating")
     try {
       toast.info("Creating your modules — building the engineering breakdown...", { duration: 8000 })

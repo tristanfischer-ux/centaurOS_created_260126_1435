@@ -292,7 +292,7 @@ async function buildSweepContext(foundryId: string): Promise<string> {
 /**
  * Analyzes a single intelligence source using AI.
  *
- * @description Calls OpenAI (gpt-4o) with the source's analysis prompt
+ * @description Calls OpenAI (gpt-5.3-chat-latest) with the source's analysis prompt
  * and company context to generate an intelligence report.
  *
  * @param source - The intelligence source to analyze
@@ -316,7 +316,7 @@ async function analyzeSource(
         const prompt = `${companyContext}\n\n---\n\n${source.analysisPrompt}`
 
         const response = await client.chat.completions.create({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-chat-latest',
             messages: [
                 {
                     role: 'system',

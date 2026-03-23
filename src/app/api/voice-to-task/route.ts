@@ -7,7 +7,7 @@
  *
  * DECISION: Accept both JSON { text } and multipart/form-data { file } to
  * support the fast path (native STT sends text directly, skipping Whisper) and
- * the fallback path (audio file → Whisper → GPT-4o). This keeps the API
+ * the fallback path (audio file → Whisper → GPT-5.3). This keeps the API
  * backward-compatible while eliminating 4-6s of Whisper latency for most users.
  *
  * @security Requires authenticated user. Rate-limited to 5 req/hour per user.
@@ -153,12 +153,12 @@ export async function POST(req: NextRequest) {
                 foundryId: profileForRollout.foundry_id,
                 userId: user.id,
                 agentId: 'voice_to_task',
-                metadata: { model: 'gpt-4o' },
+                metadata: { model: 'gpt-5.3-chat-latest' },
             });
         }
 
         const completion = await openai.chat.completions.parse({
-            model: "gpt-4o",
+            model: "gpt-5.3-chat-latest",
             messages: [
                 {
                     role: "system",
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
         });
 
         await guard.trackUsage({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-chat-latest',
             promptTokens: completion.usage?.prompt_tokens || 500,
             completionTokens: completion.usage?.completion_tokens || 200,
         })
@@ -202,7 +202,7 @@ export async function POST(req: NextRequest) {
                 responseSnapshot,
                 promptTokens: completion.usage?.prompt_tokens ?? null,
                 completionTokens: completion.usage?.completion_tokens ?? null,
-                metadata: { model: 'gpt-4o' },
+                metadata: { model: 'gpt-5.3-chat-latest' },
             });
             await finishRollout(rolloutId, 'finished');
         }

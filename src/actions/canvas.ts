@@ -1607,10 +1607,10 @@ export async function linkTaskToObjective(
 // ============================================================================
 
 /**
- * Generates a full milestone plan for an existing strategic goal using GPT-4o.
+ * Generates a full milestone plan for an existing strategic goal using GPT-5.3.
  *
  * @description Fetches the goal's context (title, description, target date),
- * builds company/team context, and asks GPT-4o to backward-plan from the
+ * builds company/team context, and asks GPT-5.3 to backward-plan from the
  * deadline to today. Returns phases (milestones), tasks, dependencies, risks,
  * resource gaps, and AI suggestions.
  *
@@ -1802,7 +1802,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: 'gpt-5.3-chat-latest',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userMessage },

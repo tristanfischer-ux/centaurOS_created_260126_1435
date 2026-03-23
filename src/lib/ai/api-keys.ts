@@ -19,7 +19,7 @@ export function getAnthropicKey(): string | undefined {
   return process.env.ANTHROPIC_API_KEY?.trim() || undefined
 }
 
-/** OpenAI API key (GPT-4o, GPT Image, TTS) */
+/** OpenAI API key (GPT-5.3, GPT Image, TTS) */
 export function getOpenAIKey(): string | undefined {
   return process.env.OPENAI_API_KEY?.trim() || undefined
 }

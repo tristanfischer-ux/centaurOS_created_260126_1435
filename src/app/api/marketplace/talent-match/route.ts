@@ -9,7 +9,7 @@ import { aiGuard } from "@/lib/ai/guard"
  * @file talent-match/route.ts
  *
  * @description AI-powered talent matching endpoint. Takes a natural language
- * query and a set of People listings, then uses GPT-4o to score each listing
+ * query and a set of People listings, then uses GPT-5.3 to score each listing
  * against the user's requirements. Returns scored matches with per-listing
  * reasoning and highlighted skills.
  *
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         // Call OpenAI for matching and scoring
         const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
+            model: "gpt-5.3-chat-latest",
             messages: [
                 {
                     role: "system",
@@ -177,7 +177,7 @@ ${JSON.stringify(listingSummaries, null, 1)}`
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-4o',
+            model: 'gpt-5.3-chat-latest',
             promptTokens: completion.usage?.prompt_tokens || 1200,
             completionTokens: completion.usage?.completion_tokens || 500,
         })

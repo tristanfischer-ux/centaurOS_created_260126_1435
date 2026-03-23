@@ -33,7 +33,7 @@ function getModelDisplayName(modelId: string): string {
     "Sonnet": "Claude Sonnet 4.6",
     "Haiku": "Claude Haiku 4.5",
     "Gemini": "Gemini Pro",
-    "GPT-4o": "GPT-4o",
+    "GPT-5.3": "GPT-5.3",
   }
   return DISPLAY_NAMES[modelId] ?? modelId
 }

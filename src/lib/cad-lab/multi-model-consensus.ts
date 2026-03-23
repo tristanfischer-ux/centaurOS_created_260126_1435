@@ -2,7 +2,7 @@
  * @file multi-model-consensus.ts
  *
  * @description Multi-model consensus for high-stakes engineering recommendations.
- * Runs the same prompt through Claude, GPT-4o, and optionally Gemini; returns
+ * Runs the same prompt through Claude, GPT-5.3, and optionally Gemini; returns
  * consensus value or flags disagreement with alternatives.
  *
  * @related src/actions/cad-lab.ts (prefillDiagnostics)
@@ -74,7 +74,7 @@ async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<str
   const OpenAI = (await import("openai")).default
   const openai = new OpenAI({ apiKey })
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5.3-chat-latest",
     max_tokens: 256,
     messages: [
       { role: "system", content: systemPrompt },
@@ -107,7 +107,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
 }
 
 /**
- * Runs a material-recommendation prompt through Claude and GPT-4o (and Gemini if configured).
+ * Runs a material-recommendation prompt through Claude and GPT-5.3 (and Gemini if configured).
  * Returns consensus material or alternatives when models disagree.
  *
  * @param systemPrompt - System instruction for the recommendation
@@ -123,7 +123,7 @@ export async function runMaterialConsensus(
 
   const runners: Array<{ name: string; fn: () => Promise<string> }> = [
     { name: "Claude", fn: () => callClaude(systemPrompt, userPrompt) },
-    { name: "GPT-4o", fn: () => callOpenAI(systemPrompt, userPrompt) },
+    { name: "GPT-5.3", fn: () => callOpenAI(systemPrompt, userPrompt) },
   ]
   if (process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) {
     runners.push({ name: "Gemini", fn: () => callGemini(systemPrompt, userPrompt) })
