@@ -1,5 +1,6 @@
 # Large untracked directories (root-anchored to avoid matching src/**/data/)
-screenshots/
+# GOTCHA: Do NOT use bare "screenshots/" — it matches public/images/screenshots/ too.
+/screenshots/
 e2e/
 e2e-results/
 _archive/
