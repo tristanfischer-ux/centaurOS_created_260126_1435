@@ -4,17 +4,32 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
-import { rateLimit, getClientIP, resetRateLimit } from '@/lib/security/rate-limit'
+import { rateLimit, getClientIP, resetRateLimit, type RateLimitResult } from '@/lib/security/rate-limit'
 import { sanitizeEmail } from '@/lib/security/sanitize'
 import { logFailedLogin, logSuccessfulLogin, logSecurityEvent } from '@/lib/security/audit-log'
+
+/**
+ * Race a promise against a timeout. Returns the fallback if the promise
+ * doesn't settle within `ms` milliseconds.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ])
+}
 
 export async function login(formData: FormData) {
     // Security: Get client IP for rate limiting
     const headersList = await headers()
     const clientIP = getClientIP(headersList)
 
-    // Security: Rate limit login attempts
-    const rateLimitResult = await rateLimit('login', clientIP)
+    // Security: Rate limit login attempts (3s timeout — don't let a slow DB block login)
+    const rateLimitResult = await withTimeout<RateLimitResult>(
+        rateLimit('login', clientIP),
+        3000,
+        { success: true, remaining: 1, resetTime: 0 },
+    )
     if (!rateLimitResult.success) {
         // SECURITY: Log rate limit exceeded event (fire-and-forget — don't block redirect)
         logSecurityEvent({
@@ -57,10 +72,14 @@ export async function login(formData: FormData) {
         redirect('/login?error=password-too-long')
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-    })
+    // DECISION: 10s timeout on auth call — if Supabase is unresponsive, show error
+    // instead of hanging forever.
+    const authResult = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        10000,
+        { error: { message: 'Login timed out. Please try again.', name: 'timeout', status: 504 } as never, data: { user: null, session: null } },
+    )
+    const { error } = authResult
 
     if (error) {
         // Security: Log failed login attempt (fire-and-forget — don't block error redirect)
@@ -69,10 +88,11 @@ export async function login(formData: FormData) {
             .catch((err) => console.error('[LOGIN] Failed login audit log error:', err))
 
         // INTENT: Surface specific, actionable errors instead of a generic message.
-        // "Email not confirmed" is safe to reveal — it doesn't leak whether the account exists
-        // because signup already confirms the email was registered.
         if (error.message?.toLowerCase().includes('email not confirmed')) {
             redirect('/login?error=email-not-confirmed')
+        }
+        if (error.message?.includes('timed out')) {
+            redirect('/login?error=timeout')
         }
         redirect('/login?error=invalid-credentials')
     }
@@ -107,7 +127,7 @@ export async function login(formData: FormData) {
             .select('account_type, active_foundry_id')
             .eq('id', loggedInUser.id)
             .single()
-        
+
         // INTENT: Honor the redirect param first — suppliers may be returning
         // to a claim page after login, and must not be short-circuited.
         if (redirectTo) {
@@ -137,7 +157,7 @@ export async function login(formData: FormData) {
             redirect('/today')
         }
     }
-    
+
     // Default: users without foundry memberships
     redirect('/today')
 }

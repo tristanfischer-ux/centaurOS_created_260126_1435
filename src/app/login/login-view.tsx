@@ -54,6 +54,7 @@ const ERROR_MESSAGES: Record<string, string> = {
     'password-required': 'Password is required',
     'password-too-short': 'Password must be at least 8 characters',
     'password-too-long': 'Password is too long',
+    'timeout': 'Login timed out — please try again.',
 }
 
 /**
