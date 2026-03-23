@@ -1,14 +1,14 @@
 /**
  * @file capture-screenshots.ts
  *
- * @description Captures marketing screenshots from the live ForgeOS app
- * using Playwright. Logs in with the demo account, navigates to 5 key
- * pages, and saves 1920x1080 screenshots.
+ * @description Captures POLISHED marketing screenshots from the live ForgeOS
+ * app. Dismisses all tooltips, modals, and onboarding artifacts before
+ * capturing. Each page is carefully waited for and cleaned up.
  *
  * Usage: npx tsx scripts/capture-screenshots.ts
  */
 
-import { chromium } from 'playwright'
+import { chromium, type Page } from 'playwright'
 import path from 'path'
 import * as dotenv from 'dotenv'
 
@@ -19,20 +19,108 @@ const EMAIL = process.env.E2E_EMAIL || 'mktg-demo@fractionalforge.app'
 const PASSWORD = process.env.E2E_PASSWORD || 'ForgeScreenshots2026!'
 const SCREENSHOT_DIR = path.join(__dirname, '..', 'public', 'images', 'screenshots')
 
-const PAGES = [
-  { route: '/the-forge', filename: 'forge-cad-lab.png' },
-  { route: '/today', filename: 'dashboard-today.png' },
-  { route: '/marketplace', filename: 'marketplace.png' },
-  { route: '/investors', filename: 'investors.png' },
-  { route: '/team', filename: 'team-orbit.png' },
-]
+/**
+ * Dismiss ALL onboarding artifacts: tooltips, checklists, banners, modals.
+ * Runs in the browser context.
+ */
+async function dismissAllOnboarding(page: Page) {
+  await page.evaluate(() => {
+    // Mark all FeatureTips as seen (localStorage)
+    const tipIds = [
+      'forge-home', 'today-dashboard', 'marketplace-browse', 'marketplace-saved',
+      'investors-browse', 'team-members', 'team-workload', 'team-orbit',
+      'strategy-dashboard', 'strategy-river', 'strategy-link',
+      'objectives-board', 'tasks-command', 'agents-specialists',
+      'guild-events', 'guild-network', 'cash-burn', 'settings',
+      'knowledge', 'reports', 'forge-concept', 'forge-build',
+      'forge-specify', 'forge-source', 'forge-cad', 'forge-review',
+    ]
+    tipIds.forEach(id => localStorage.setItem(`forgeos:tip:${id}`, 'true'))
+
+    // Mark onboarding checklist as dismissed
+    localStorage.setItem('forgeos_onboarding_completed', 'true')
+
+    // Mark desktop banner as dismissed
+    localStorage.setItem('forgeos_desktop_banner_dismissed', new Date().toISOString())
+  })
+
+  // Close any visible modals/dialogs by pressing Escape
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+
+  // Click away any remaining tooltips
+  try {
+    // Click "Skip" or "Next" on any tour tooltips
+    const skipBtns = page.locator('button:has-text("Skip"), button:has-text("Got it"), button:has-text("Dismiss")')
+    const count = await skipBtns.count()
+    for (let i = 0; i < count; i++) {
+      try { await skipBtns.nth(i).click({ timeout: 500 }) } catch { /* */ }
+      await page.waitForTimeout(200)
+    }
+  } catch { /* */ }
+
+  // Dismiss sonner toasts
+  try {
+    const toasts = page.locator('[data-sonner-toast]')
+    const toastCount = await toasts.count()
+    for (let i = 0; i < toastCount; i++) {
+      try { await toasts.nth(i).click({ timeout: 500 }) } catch { /* */ }
+    }
+  } catch { /* */ }
+}
+
+/**
+ * Hide UI elements that clutter screenshots.
+ */
+async function cleanupUI(page: Page) {
+  await page.evaluate(() => {
+    // Hide mobile nav, FAB, floating specialist, zoom controls
+    const selectors = [
+      '[data-testid="mobile-nav"]',
+      '[data-testid="mobile-fab"]',
+      '.sm\\:hidden', // mobile-only elements
+    ]
+    selectors.forEach(sel => {
+      document.querySelectorAll(sel).forEach(el => {
+        (el as HTMLElement).style.display = 'none'
+      })
+    })
+
+    // Hide Getting Started checklist in sidebar
+    const checklist = document.querySelector('[data-testid="getting-started-checklist"]')
+    if (checklist) (checklist as HTMLElement).style.display = 'none'
+
+    // Also hide by text content match
+    document.querySelectorAll('div, section').forEach(el => {
+      const text = (el as HTMLElement).innerText
+      if (text?.startsWith('Getting Started') && (el as HTMLElement).offsetHeight < 200) {
+        (el as HTMLElement).style.display = 'none'
+      }
+    })
+
+    // Hide any remaining tooltip/popover overlays
+    document.querySelectorAll('[role="tooltip"], [data-radix-popper-content-wrapper]').forEach(el => {
+      (el as HTMLElement).style.display = 'none'
+    })
+
+    // Hide the "Get the most from ForgeOS" onboarding banner
+    document.querySelectorAll('div').forEach(el => {
+      const text = (el as HTMLElement).innerText
+      if (text?.includes('Get the most from ForgeOS') && (el as HTMLElement).offsetHeight < 150) {
+        (el as HTMLElement).style.display = 'none'
+      }
+    })
+  })
+}
 
 async function main() {
   console.log('Launching browser...')
   const browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({
     viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 2, // Retina screenshots
+    deviceScaleFactor: 2,
   })
   const page = await context.newPage()
 
@@ -42,71 +130,134 @@ async function main() {
   await page.waitForLoadState('networkidle')
   await page.fill('input[name="email"]', EMAIL)
   await page.fill('input[name="password"]', PASSWORD)
-  await page.click('button:has-text("Enter the Forge"), button[type="submit"]')
+  await page.click('button:has-text("Enter the Forge")')
 
   try {
     await page.waitForURL('**/today**', { timeout: 20000 })
     console.log('Login successful!')
   } catch {
-    console.error('Login failed or redirect timed out. Current URL:', page.url())
+    console.error('Login failed. URL:', page.url())
     await browser.close()
     process.exit(1)
   }
 
-  // Dismiss any onboarding modals/banners
-  await page.waitForTimeout(2000)
+  // Wait for initial page load and dismiss all onboarding
+  await page.waitForTimeout(3000)
+  await dismissAllOnboarding(page)
+  await page.waitForTimeout(1000)
+
+  // ──────────────────────────────────────────────────
+  // 1. THE FORGE — Show a project with modules visible
+  // The CAD Lab is context-driven (no URL params for project ID).
+  // We need to: go to /the-forge → click project card → wait for cad-lab
+  // ──────────────────────────────────────────────────
+  console.log('Capturing The Forge (home page with sample components)...')
+  await page.goto(`${BASE_URL}/the-forge`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(4000)
+
+  // Dismiss "Start a Design" modal and any tooltips
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+  await dismissAllOnboarding(page)
+
+  // Scroll down to show the "See what you'll get" section with sample components
+  await page.evaluate(() => {
+    const main = document.querySelector('main')
+    if (main) main.scrollTop = 200
+  })
+  await page.waitForTimeout(1000)
+  await cleanupUI(page)
+
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'forge-cad-lab.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved forge-cad-lab.png')
+
+  // ──────────────────────────────────────────────────
+  // 2. DASHBOARD — /today with content
+  // ──────────────────────────────────────────────────
+  console.log('Capturing Dashboard...')
+  await page.goto(`${BASE_URL}/today`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(4000)
+  await dismissAllOnboarding(page)
+  await cleanupUI(page)
+
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'dashboard-today.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved dashboard-today.png')
+
+  // ──────────────────────────────────────────────────
+  // 3. MARKETPLACE
+  // ──────────────────────────────────────────────────
+  console.log('Capturing Marketplace...')
+  await page.goto(`${BASE_URL}/marketplace`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(4000)
+  await dismissAllOnboarding(page)
+  await cleanupUI(page)
+
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'marketplace.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved marketplace.png')
+
+  // ──────────────────────────────────────────────────
+  // 4. INVESTORS
+  // ──────────────────────────────────────────────────
+  console.log('Capturing Investors...')
+  await page.goto(`${BASE_URL}/investors`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(4000)
+  await dismissAllOnboarding(page)
+  await cleanupUI(page)
+
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'investors.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved investors.png')
+
+  // ──────────────────────────────────────────────────
+  // 5. TEAM (orbital view)
+  // ──────────────────────────────────────────────────
+  console.log('Capturing Team...')
+  await page.goto(`${BASE_URL}/team`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(5000) // Extra time for SVG orbit to render
+  await dismissAllOnboarding(page)
+  await cleanupUI(page)
+
+  // Click "Orbital" or third view tab if available
   try {
-    const skipButton = page.locator('text=Skip tour, text=Skip, button:has-text("Dismiss")')
-    if (await skipButton.first().isVisible({ timeout: 2000 })) {
-      await skipButton.first().click()
-      await page.waitForTimeout(500)
+    const orbitalTab = page.locator('button:has-text("Orbital"), [role="tab"]:has-text("Orbital")')
+    if (await orbitalTab.isVisible({ timeout: 2000 })) {
+      await orbitalTab.click()
+      await page.waitForTimeout(2000)
     }
-  } catch {
-    // No modal to dismiss
-  }
+  } catch { /* */ }
 
-  // Capture each page
-  for (const { route, filename } of PAGES) {
-    console.log(`Capturing ${route}...`)
-    await page.goto(`${BASE_URL}${route}`)
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(3000) // Wait for animations + data loading
+  await dismissAllOnboarding(page)
+  await cleanupUI(page)
 
-    // Dismiss any toasts
-    try {
-      const toasts = page.locator('[data-sonner-toast]')
-      const count = await toasts.count()
-      for (let i = 0; i < count; i++) {
-        await toasts.nth(i).click({ timeout: 500 }).catch(() => {})
-      }
-    } catch {
-      // No toasts
-    }
-
-    // Hide mobile-only elements
-    await page.evaluate(() => {
-      document.querySelectorAll('[data-testid="mobile-nav"], [data-testid="mobile-fab"]').forEach(el => {
-        (el as HTMLElement).style.display = 'none'
-      })
-      // Also hide desktop banner if visible
-      document.querySelectorAll('.sm\\:hidden').forEach(el => {
-        (el as HTMLElement).style.display = 'none'
-      })
-    })
-
-    const filepath = path.join(SCREENSHOT_DIR, filename)
-    await page.screenshot({
-      path: filepath,
-      clip: { x: 0, y: 0, width: 1920, height: 1080 },
-    })
-    console.log(`  Saved: ${filepath}`)
-  }
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'team-orbit.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved team-orbit.png')
 
   await browser.close()
   console.log('\nAll screenshots captured!')
 }
 
 main().catch(err => {
-  console.error('Screenshot capture failed:', err)
+  console.error('Failed:', err)
   process.exit(1)
 })
