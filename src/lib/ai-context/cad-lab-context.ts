@@ -216,7 +216,25 @@ export function buildCadLabReviewContext(
         sections.push("### Open Questions\n" + mod.unknowns.map(u => `- ${u}`).join("\n"))
     }
 
-    // 9. Specialist-specific review focus
+    // 9. Internal engineering database context
+    // DECISION: Specialists should see verified material properties, process
+    // capabilities, and design standards — not just reason from training data.
+    sections.push(`## Internal Engineering Database
+Use these verified data points to ground your review. Prefer these over general knowledge.
+
+To check material properties, manufacturing tolerances, and applicable standards,
+use the lookup tools available to you. When reviewing material choices, cross-reference
+against the material_properties database. When reviewing tolerances, check against
+process_capabilities. When reviewing compliance, check against design_standards.
+
+Key reference data available:
+- Material properties: density, yield strength, thermal conductivity, cost per kg
+- Process capabilities: typical tolerances, min wall thickness, setup costs, lead times
+- Design standards: ISO, ASTM, DIN, BS standards with requirements and design rules
+- Supplier intelligence: real tolerances, equipment, and materials from UK manufacturers
+- Hardware library: standard bolts, nuts, washers, bearings (ISO 4762, 4032, 7089)`)
+
+    // 10. Specialist-specific review focus
     const focus = REVIEW_FOCUS[specialistId]
     if (focus) {
         sections.push(focus)

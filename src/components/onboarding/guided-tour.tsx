@@ -80,7 +80,7 @@ const TOUR_STOPS: TourStop[] = [
     title: 'The Forge',
     subtitle: 'Design and build products',
     calMessage:
-      "The Forge is where ideas become real products. We've loaded a few demo designs so you can see how it works — from concept to bill of materials to supplier sourcing. Start one of your own whenever you're ready.",
+      "The Forge is where ideas become real products. Describe what you want to build and the system researches it, breaks it into modules, generates illustrations, and produces a full engineering package. From concept to bill of materials in minutes.",
     icon: <Hammer className="w-6 h-6" />,
     route: '/the-forge',
     accentColor: 'text-international-orange',

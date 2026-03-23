@@ -40,25 +40,51 @@ export async function imageToCADViaGenCAD(
   const authToken = process.env.GENCAD_AUTH_TOKEN?.trim()
   if (!authToken) throw new Error("GENCAD_AUTH_TOKEN not configured")
 
-  const response = await fetchWithTimeout(
-    url,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image_base64: imageBase64,
-        auth_token: authToken,
-      }),
-    },
-    120_000,
-  )
+  // DECISION: Retry once on failure — Modal serverless GPU functions cold-start
+  // and can timeout on first request after scale-to-zero. A single retry typically
+  // succeeds because the container is warm from the first attempt.
+  let response: Response
+  let attempts = 0
+  const maxAttempts = 2
 
-  if (!response.ok) {
-    // SECURITY: Truncate error body to prevent log injection / memory pressure
-    const detail = await response.text().catch(() => "Unknown error")
-    throw new Error(`GenCAD endpoint returned ${response.status}: ${detail.slice(0, 500)}`)
+  while (true) {
+    attempts++
+    try {
+      response = await fetchWithTimeout(
+        url,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            image_base64: imageBase64,
+            auth_token: authToken,
+          }),
+        },
+        120_000,
+      )
+
+      if (response.ok) break
+
+      const detail = await response.text().catch(() => "Unknown error")
+      const errMsg = `GenCAD endpoint returned ${response.status}: ${detail.slice(0, 500)}`
+
+      if (attempts >= maxAttempts) throw new Error(errMsg)
+
+      // Retry on 5xx (cold start) or timeout
+      if (response.status >= 500 || response.status === 408) {
+        console.warn(`[GenCAD] Attempt ${attempts} failed (${response.status}), retrying...`)
+        await new Promise(resolve => setTimeout(resolve, 3000))
+        continue
+      }
+
+      throw new Error(errMsg)
+    } catch (err) {
+      if (attempts >= maxAttempts) throw err
+      console.warn(`[GenCAD] Attempt ${attempts} failed:`, (err as Error).message?.slice(0, 100))
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
   }
 
   // SECURITY: Reject oversized responses to prevent OOM

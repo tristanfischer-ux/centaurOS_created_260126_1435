@@ -134,7 +134,10 @@ export async function scanIdeaAction(idea: string, researchReport?: string): Pro
     }
 
     // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
-    const cappedReport = researchReport?.slice(0, 50_000)
+    // DECISION: Increased from 50K to 80K to accommodate internal DB context
+    // that's now synthesized into the research report. Opus 4.6 has 200K context
+    // so 80K of research (~20K tokens) is well within limits.
+    const cappedReport = researchReport?.slice(0, 80_000)
 
     // Create placeholder row first with scan_status = 'scanning'
     // so Realtime subscribers see the scan-in-progress state
@@ -250,7 +253,10 @@ export async function refineScanAction(
     }
 
     // SECURITY: Cap research report length to prevent unbounded AI prompt (F2)
-    const cappedReport = researchReport?.slice(0, 50_000)
+    // DECISION: Increased from 50K to 80K to accommodate internal DB context
+    // that's now synthesized into the research report. Opus 4.6 has 200K context
+    // so 80K of research (~20K tokens) is well within limits.
+    const cappedReport = researchReport?.slice(0, 80_000)
 
     // Mark scan as in-progress so Realtime subscribers see the state change
     await supabase
