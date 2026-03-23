@@ -55,6 +55,7 @@ import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
 import { buildHandoffContext } from "@/lib/agents/handoff-context"
+import { isEngineeringRelevant, buildEngineeringReferenceLayer } from "@/lib/agents/engineering-context"
 
 // ─── Token Budget ────────────────────────────────────────────────────────────
 
@@ -76,6 +77,7 @@ const LAYER_PRIORITIES: Record<string, number> = {
     'Specialist Knowledge': 75,    // Persistent facts from past conversations
     'Temporal Awareness': 70,      // Time-of-day, milestones
     'External Intelligence': 60,   // Sweep reports
+    'Engineering Reference Data': 58, // Verified material/process/standards data
     'Task Ownership': 55,          // Active work
     'Since Last Talked': 50,       // What changed since last chat
     'Knowledge Vault': 45,         // Organizational knowledge search results
@@ -155,6 +157,8 @@ export interface ContextLayerParams {
     handoffSourceThreadId?: string
     /** Source specialist's ID for cross-specialist handoff context (optional) */
     handoffSourceSpecialistId?: string
+    /** CAD Lab project ID — triggers engineering reference data injection */
+    cadLabProjectId?: string
 }
 
 /**
@@ -181,7 +185,7 @@ export async function buildContextLayers(params: ContextLayerParams & {
 }> {
     const {
         foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath,
-        handoffSourceThreadId, handoffSourceSpecialistId, modelTier = 'claude',
+        handoffSourceThreadId, handoffSourceSpecialistId, cadLabProjectId, modelTier = 'claude',
     } = params
     const collectedLayers: CollectedLayer[] = []
 
@@ -314,6 +318,16 @@ export async function buildContextLayers(params: ContextLayerParams & {
                     return { block, layer: 'Specialist Knowledge' }
                 })()
             )
+
+            // Layer 9: Engineering Reference Data (materials, tolerances, standards, supplier intel)
+            if (isEngineeringRelevant(input, specialistId, cadLabProjectId)) {
+                layerPromises.push(
+                    (async () => {
+                        const block = await buildEngineeringReferenceLayer(input, foundryId, cadLabProjectId)
+                        return { block, layer: 'Engineering Reference Data' }
+                    })()
+                )
+            }
 
             const results = await Promise.allSettled(layerPromises)
             for (const result of results) {
