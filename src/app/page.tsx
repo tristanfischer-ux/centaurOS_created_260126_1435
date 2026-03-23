@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { ProductShowcase } from "@/components/marketing/product-showcase"
 import { useState, useEffect } from "react"
 import {
   motion,
@@ -251,6 +252,7 @@ export default function MarketingPage() {
         <HeroSection />
         <ProblemSection />
         <SolutionSection />
+        <ProductShowcase />
         <WhoItsForSection />
         <TrustStrip />
         <FinalCTASection />
