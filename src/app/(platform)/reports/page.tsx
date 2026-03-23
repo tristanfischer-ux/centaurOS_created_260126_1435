@@ -228,6 +228,8 @@ function sanitizeFilename(str: string): string {
 
 type PageMode = 'reports' | 'presentations' | 'documents' | 'downloads'
 
+const VALID_TABS = new Set<PageMode>(['reports', 'presentations', 'documents', 'downloads'])
+
 const PAGE_TABS: { value: PageMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { value: 'reports', label: 'Reports', icon: FileText },
   { value: 'presentations', label: 'Presentations', icon: Presentation },
@@ -260,11 +262,17 @@ export default function ReportsPage(): React.JSX.Element {
 
   // Change 6: Tab-level page mode (supports ?tab= deep linking from The Forge)
   const searchParams = useSearchParams()
-  const validTabs = new Set<PageMode>(['reports', 'presentations', 'documents', 'downloads'])
   const tabParam = searchParams.get('tab') as PageMode | null
   const [pageMode, setPageMode] = useState<PageMode>(
-    tabParam && validTabs.has(tabParam) ? tabParam : 'reports'
+    tabParam && VALID_TABS.has(tabParam) ? tabParam : 'reports'
   )
+
+  // INTENT: Sync pageMode when searchParams change (e.g., browser back/forward,
+  // or navigating from The Forge Downloads button while already on /reports).
+  useEffect(() => {
+    const tab = searchParams.get('tab') as PageMode | null
+    if (tab && VALID_TABS.has(tab)) setPageMode(tab)
+  }, [searchParams])
 
   const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateId>('weekly-update')
   const [dateRange, setDateRange] = useState(defaultDateRange)

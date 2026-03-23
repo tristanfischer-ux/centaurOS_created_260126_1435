@@ -51,6 +51,9 @@ interface StageDefinition {
   features: string[]
 }
 
+// DECISION: CAD stage hidden from nav (not functional enough yet) but the page,
+// route (FORGE_ROUTES.cadLabCad), and background ops still exist at /the-forge/cad-lab/cad.
+// It was removed from here intentionally — not deleted from the codebase.
 export const STAGES: StageDefinition[] = [
   {
     id: "design",

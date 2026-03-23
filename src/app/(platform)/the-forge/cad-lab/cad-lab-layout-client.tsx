@@ -138,7 +138,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
             asChild
             className="gap-1.5 text-muted-foreground"
           >
-            <Link href="/reports?tab=downloads">
+            <Link href="/reports?tab=downloads" aria-label="Downloads">
               <FileDown className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Downloads</span>
             </Link>
