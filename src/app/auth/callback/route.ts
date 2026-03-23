@@ -37,10 +37,20 @@ export async function GET(request: Request) {
   const errorDescription = requestUrl.searchParams.get('error_description')
 
   // Handle auth errors from Supabase
+  // SECURITY: Map to safe error codes — never pass raw error text in URL params.
+  // An attacker could craft callback URLs with arbitrary error_description text
+  // for phishing (e.g., "Your account was locked, call +1-800-SCAM").
   if (error) {
     console.error('Auth callback error:', error, errorDescription)
     const loginUrl = new URL('/login', requestUrl.origin)
-    loginUrl.searchParams.set('error', errorDescription || error)
+    const desc = (errorDescription || error || '').toLowerCase()
+    if (desc.includes('expired') || desc.includes('invalid')) {
+      loginUrl.searchParams.set('error', 'invalid-credentials')
+    } else if (desc.includes('not confirmed') || desc.includes('not verified')) {
+      loginUrl.searchParams.set('error', 'email-not-confirmed')
+    } else {
+      loginUrl.searchParams.set('error', 'invalid-credentials')
+    }
     return NextResponse.redirect(loginUrl)
   }
 
@@ -53,7 +63,8 @@ export async function GET(request: Request) {
     if (exchangeError) {
       console.error('Error exchanging code for session:', exchangeError)
       const loginUrl = new URL('/login', requestUrl.origin)
-      loginUrl.searchParams.set('error', 'Failed to verify email. Please try again.')
+      // SECURITY: Use safe error code, not raw text
+      loginUrl.searchParams.set('error', 'invalid-credentials')
       return NextResponse.redirect(loginUrl)
     }
 
@@ -161,8 +172,8 @@ export async function GET(request: Request) {
         }
       }
 
+      // SECURITY: Don't append ?verified=true — unnecessary info disclosure
       const redirectUrl = new URL(redirectPath, requestUrl.origin)
-      redirectUrl.searchParams.set('verified', 'true')
       return NextResponse.redirect(redirectUrl)
     }
   }

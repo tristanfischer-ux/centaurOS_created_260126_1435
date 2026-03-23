@@ -23,6 +23,11 @@ export default function UpdatePasswordPage(): React.ReactNode {
             setError('Password must be at least 8 characters.')
             return
         }
+        // SECURITY: Prevent DoS with extremely long passwords (bcrypt has ~72 byte limit anyway)
+        if (password.length > 128) {
+            setError('Password must be 128 characters or fewer.')
+            return
+        }
         if (password !== confirm) {
             setError('Passwords do not match.')
             return
@@ -33,7 +38,15 @@ export default function UpdatePasswordPage(): React.ReactNode {
         const { error: updateError } = await supabase.auth.updateUser({ password })
 
         if (updateError) {
-            setError(updateError.message)
+            // SECURITY: Don't render raw Supabase errors — may leak internal details
+            const msg = updateError.message?.toLowerCase() || ''
+            if (msg.includes('weak') || msg.includes('short') || msg.includes('strength')) {
+                setError('Password is too weak. Include uppercase, lowercase, numbers, and special characters.')
+            } else if (msg.includes('same') || msg.includes('reuse') || msg.includes('previous')) {
+                setError('Please choose a different password than your previous one.')
+            } else {
+                setError('Failed to update password. Please try again.')
+            }
             setLoading(false)
             return
         }

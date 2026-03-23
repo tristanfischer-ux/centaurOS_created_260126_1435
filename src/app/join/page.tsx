@@ -107,7 +107,8 @@ function GoogleOAuthButton({
         if (industryEl?.value) ctx.industry = industryEl.value.trim().slice(0, 100);
         if (stageEl?.value) ctx.stage = stageEl.value.trim().slice(0, 100);
       }
-      document.cookie = `forge_signup_context=${encodeURIComponent(JSON.stringify(ctx))}; path=/; max-age=300; samesite=lax`;
+      const secureSuffix = window.location.protocol === 'https:' ? '; secure' : ''
+      document.cookie = `forge_signup_context=${encodeURIComponent(JSON.stringify(ctx))}; path=/; max-age=300; samesite=lax${secureSuffix}`;
     }
 
     const supabase = createClient();
@@ -181,7 +182,8 @@ function JoinPageInner() {
   // Set forge_ref cookie when ?ref= param is present
   useEffect(() => {
     if (refCode) {
-      document.cookie = `forge_ref=${encodeURIComponent(refCode)}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax`;
+      const secureSuffix = window.location.protocol === 'https:' ? '; secure' : ''
+      document.cookie = `forge_ref=${encodeURIComponent(refCode)}; path=/; max-age=${30 * 24 * 60 * 60}; samesite=lax${secureSuffix}`;
       // Look up referrer for warm banner
       lookupReferrer(refCode).then((info) => {
         if (info) setReferrerInfo(info);
