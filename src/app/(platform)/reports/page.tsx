@@ -571,11 +571,12 @@ export default function ReportsPage(): React.JSX.Element {
       const blob = await exportSlideDeckAsPPTX(briefingResult)
       toast.success('PPTX downloaded')
 
-      // Fire-and-forget: upload to Storage + track
-      const safeName = sanitizeFilename(briefingResult.companyName)
-      const safeTitle = sanitizeFilename(briefingResult.title)
+      // Fire-and-forget: upload to Storage + track (signed URLs generated on-demand by server action)
+      const safeName = sanitizeFilename(briefingResult.companyName) || 'report'
+      const safeTitle = sanitizeFilename(briefingResult.title) || 'briefing'
       const dateStr = new Date().toISOString().split('T')[0]
-      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.pptx`
+      const uid = crypto.randomUUID().slice(0, 8)
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}-${uid}.pptx`
 
       const supabase = createClient()
       supabase.storage
@@ -585,11 +586,7 @@ export default function ReportsPage(): React.JSX.Element {
           upsert: true,
         })
         .then(async ({ error: uploadError }) => {
-          let fileUrl: string | null = null
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
-            fileUrl = urlData.publicUrl
-          } else {
+          if (uploadError) {
             toast.info('Downloaded locally — cloud backup unavailable')
           }
           const { saveReportDownload } = await import('@/actions/report-downloads')
@@ -597,9 +594,8 @@ export default function ReportsPage(): React.JSX.Element {
             reportName: briefingResult.title,
             reportSource: 'reports',
             fileFormat: 'pptx',
-            fileUrl,
             fileSizeBytes: blob.size,
-            storagePath,
+            storagePath: uploadError ? null : storagePath,
           })
         })
         .catch(() => {
@@ -648,11 +644,12 @@ export default function ReportsPage(): React.JSX.Element {
       const blob = await exportReportAsDOCX(reportDocument)
       toast.success('DOCX downloaded')
 
-      // Fire-and-forget: upload to Storage + track
-      const safeName = sanitizeFilename(reportDocument.foundryName)
-      const safeTitle = sanitizeFilename(reportDocument.title)
+      // Fire-and-forget: upload to Storage + track (signed URLs generated on-demand by server action)
+      const safeName = sanitizeFilename(reportDocument.foundryName) || 'report'
+      const safeTitle = sanitizeFilename(reportDocument.title) || 'export'
       const dateStr = reportDocument.dateRange.start
-      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.docx`
+      const uid = crypto.randomUUID().slice(0, 8)
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}-${uid}.docx`
 
       const supabase = createClient()
       supabase.storage
@@ -662,11 +659,7 @@ export default function ReportsPage(): React.JSX.Element {
           upsert: true,
         })
         .then(async ({ error: uploadError }) => {
-          let fileUrl: string | null = null
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
-            fileUrl = urlData.publicUrl
-          } else {
+          if (uploadError) {
             toast.info('Downloaded locally — cloud backup unavailable')
           }
           const { saveReportDownload } = await import('@/actions/report-downloads')
@@ -674,9 +667,8 @@ export default function ReportsPage(): React.JSX.Element {
             reportName: reportDocument.title,
             reportSource: 'reports',
             fileFormat: 'docx',
-            fileUrl,
             fileSizeBytes: blob.size,
-            storagePath,
+            storagePath: uploadError ? null : storagePath,
           })
         })
         .catch(() => {
@@ -696,11 +688,12 @@ export default function ReportsPage(): React.JSX.Element {
       const blob = await exportReportAsPPTX(reportDocument)
       toast.success('PPTX downloaded')
 
-      // Fire-and-forget: upload to Storage + track
-      const safeName = sanitizeFilename(reportDocument.foundryName)
-      const safeTitle = sanitizeFilename(reportDocument.title)
+      // Fire-and-forget: upload to Storage + track (signed URLs generated on-demand by server action)
+      const safeName = sanitizeFilename(reportDocument.foundryName) || 'report'
+      const safeTitle = sanitizeFilename(reportDocument.title) || 'export'
       const dateStr = reportDocument.dateRange.start
-      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}.pptx`
+      const uid = crypto.randomUUID().slice(0, 8)
+      const storagePath = `reports/general/${safeName}/${safeTitle}-${dateStr}-${uid}.pptx`
 
       const supabase = createClient()
       supabase.storage
@@ -710,11 +703,7 @@ export default function ReportsPage(): React.JSX.Element {
           upsert: true,
         })
         .then(async ({ error: uploadError }) => {
-          let fileUrl: string | null = null
-          if (!uploadError) {
-            const { data: urlData } = supabase.storage.from('xray-images').getPublicUrl(storagePath)
-            fileUrl = urlData.publicUrl
-          } else {
+          if (uploadError) {
             toast.info('Downloaded locally — cloud backup unavailable')
           }
           const { saveReportDownload } = await import('@/actions/report-downloads')
@@ -722,9 +711,8 @@ export default function ReportsPage(): React.JSX.Element {
             reportName: reportDocument.title,
             reportSource: 'reports',
             fileFormat: 'pptx',
-            fileUrl,
             fileSizeBytes: blob.size,
-            storagePath,
+            storagePath: uploadError ? null : storagePath,
           })
         })
         .catch(() => {

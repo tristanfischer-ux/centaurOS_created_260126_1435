@@ -179,12 +179,13 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
 
           // Upload to Storage for persistent re-download
           update({ stepLabel: "Uploading to cloud...", progress: 80 })
-          let downloadUrl: string | undefined
           let storagePath: string | undefined
+          let uploaded = false
           try {
-            const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-")
+            const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
             const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
-            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.pdf`
+            const uid = crypto.randomUUID().slice(0, 8)
+            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}-${uid}.pdf`
 
             const supabase = createClient()
             const { error: uploadError } = await supabase.storage
@@ -195,10 +196,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
               })
 
             if (!uploadError) {
-              const { data: urlData } = supabase.storage
-                .from("xray-images")
-                .getPublicUrl(storagePath)
-              downloadUrl = urlData.publicUrl
+              uploaded = true
             } else {
               console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadError.message)
               toast.info("Downloaded locally — cloud backup unavailable")
@@ -215,16 +213,14 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
               reportName: data.projectName,
               reportSource: "cad-lab",
               fileFormat: "pdf",
-              fileUrl: downloadUrl ?? null,
               fileSizeBytes: blob.size,
-              storagePath: storagePath ?? null,
+              storagePath: uploaded ? storagePath ?? null : null,
             })
           } catch {
             // Non-fatal — download still works
           }
 
           update({ progress: 100 })
-          return downloadUrl ? { downloadUrl } : undefined
         },
         { successMessage: "PDF report downloaded" },
       )
@@ -289,13 +285,14 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
 
         // Step 4: Upload to Supabase Storage for persistent re-download
         update({ stepLabel: "Uploading to cloud...", progress: 95 })
-        let downloadUrl: string | undefined
         let storagePath: string | undefined
+        let uploaded = false
         try {
           const ext = selectedFormat === "docx" ? "docx" : "pptx"
-          const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-")
+          const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
           const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
-          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}.${ext}`
+          const uid = crypto.randomUUID().slice(0, 8)
+          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}-${uid}.${ext}`
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
@@ -308,10 +305,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             })
 
           if (!uploadError) {
-            const { data: urlData } = supabase.storage
-              .from("xray-images")
-              .getPublicUrl(storagePath)
-            downloadUrl = urlData.publicUrl
+            uploaded = true
           } else {
             console.warn("[DesignReport] Storage upload failed (non-fatal):", uploadError.message)
             toast.info("Downloaded locally — cloud backup unavailable")
@@ -321,23 +315,21 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           toast.info("Downloaded locally — cloud backup unavailable")
         }
 
-        // Track in report_downloads
+        // Track in report_downloads (signed URLs generated on-demand by server action)
         try {
           const { saveReportDownload } = await import("@/actions/report-downloads")
           await saveReportDownload({
             reportName: data.projectName,
             reportSource: "cad-lab",
             fileFormat: selectedFormat === "docx" ? "docx" : "pptx",
-            fileUrl: downloadUrl ?? null,
             fileSizeBytes: blob.size,
-            storagePath: storagePath ?? null,
+            storagePath: uploaded ? storagePath ?? null : null,
           })
         } catch {
           // Non-fatal — download still works
         }
 
         update({ progress: 100 })
-        return downloadUrl ? { downloadUrl } : undefined
       },
       { successMessage: `${formatLabel} report ready — downloaded` },
     )

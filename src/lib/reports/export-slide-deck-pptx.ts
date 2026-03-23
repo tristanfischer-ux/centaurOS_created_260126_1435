@@ -718,7 +718,8 @@ export async function exportSlideDeckAsPPTX(
   const filename = `${safeName}-${safeTitle}-${dateStr}.pptx`
 
   // Write as blob for upload, then trigger browser download
-  const content = await pres.write({ outputType: 'blob' }) as Blob
+  const content = await pres.write({ outputType: 'blob' })
+  if (!(content instanceof Blob)) throw new Error('Expected Blob from PptxGenJS')
   const url = URL.createObjectURL(content)
   const link = window.document.createElement('a')
   link.href = url
