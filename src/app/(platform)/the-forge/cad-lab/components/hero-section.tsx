@@ -55,6 +55,10 @@ interface HeroSectionProps {
   hasResearch: boolean
   /** Trigger the research action */
   onResearch: () => void
+  /** Current interview phase — controls collapse behavior */
+  interviewPhase?: "idle" | "interviewing" | "synthesizing" | "complete"
+  /** Start the design brief interview (first research only) */
+  onStartInterview?: () => void
 }
 
 /**
@@ -69,6 +73,8 @@ export function HeroSection({
   isResearching,
   hasResearch,
   onResearch,
+  interviewPhase = "idle",
+  onStartInterview,
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
   const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
@@ -78,6 +84,29 @@ export function HeroSection({
   const specialistContext = subject.trim()
     ? `The user is designing a product in The Forge. So far they've described it as: "${subject}". Help them refine this into a clear, manufacturing-focused engineering brief — think about materials, process, tolerance, and scale.`
     : `The user is about to describe a product they want to build in The Forge engineering pipeline. Help them think through what to build and how to describe it clearly for manufacturing research.`
+
+  const isInterviewing = interviewPhase === "interviewing" || interviewPhase === "synthesizing"
+
+  // INTENT: During interview, collapse to a compact read-only bar showing the subject.
+  if (isInterviewing) {
+    return (
+      <div className="rounded-xl border bg-card px-5 py-3 flex items-center gap-3">
+        <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="text-sm font-medium text-foreground truncate flex-1">{subject}</span>
+      </div>
+    )
+  }
+
+  // INTENT: First-time research triggers interview; re-research skips it.
+  const handleResearchClick = () => {
+    if (hasResearch) {
+      setIsConfirmReResearchOpen(true)
+    } else if (onStartInterview) {
+      onStartInterview()
+    } else {
+      onResearch()
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -108,14 +137,14 @@ export function HeroSection({
               disabled={isAnyLoading}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && subjectTrimmed && !isAnyLoading) {
-                  onResearch()
+                  handleResearchClick()
                 }
               }}
             />
           </div>
           <Button
             id="research-btn"
-            onClick={hasResearch ? () => setIsConfirmReResearchOpen(true) : onResearch}
+            onClick={handleResearchClick}
             disabled={isAnyLoading || !subjectTrimmed}
             size="lg"
             variant={hasResearch ? "secondary" : "default"}

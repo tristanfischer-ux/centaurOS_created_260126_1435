@@ -345,6 +345,10 @@ export interface CadLabContextValue {
   reExpandingModuleIds: Set<string>
   handleReExpandModule: (moduleId: string) => Promise<void>
 
+  // Design brief interview (Max CTO guided Q&A)
+  interviewPhase: "idle" | "interviewing" | "synthesizing" | "complete"
+  setInterviewPhase: Dispatch<SetStateAction<"idle" | "interviewing" | "synthesizing" | "complete">>
+
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }
@@ -443,6 +447,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     complianceNotes: "",
   })
   const [assumptionNotes, setAssumptionNotes] = useState("")
+
+  // ── Design brief interview phase ──
+  const [interviewPhase, setInterviewPhase] = useState<"idle" | "interviewing" | "synthesizing" | "complete">("idle")
 
   // ── Research state ──
   const [isResearching, setIsResearching] = useState(false)
@@ -2892,6 +2899,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       complianceNotes: "",
     })
     setAssumptionNotes("")
+    setInterviewPhase("idle")
     setModules([])
     setResearchModelUsed(null)
     setDecompositionModelUsed(null)
@@ -3893,6 +3901,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     referenceModel,
     subject, setSubject, modelId, setModelId,
     designBrief, setDesignBrief, assumptionNotes, setAssumptionNotes, designReadinessPct,
+    interviewPhase, setInterviewPhase,
     isResearching, researchResult, editableReport, setEditableReport,
     showSources, setShowSources, hasResearch, freshResearchRef,
     handleResearch, handleReset,

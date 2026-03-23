@@ -18,7 +18,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Loader2,
@@ -46,6 +46,7 @@ const ModelViewer = dynamic(
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { useCadLab } from "./cad-lab-context"
 import { HeroSection } from "./components/hero-section"
+import { DesignBriefInterview } from "./components/design-brief-interview"
 import { ModuleImageGrid } from "./components/module-image-grid"
 import { ModuleFlowCanvas } from "./components/module-flow-canvas"
 import { ProductOverviewCard } from "./components/product-overview-card"
@@ -64,6 +65,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     isResearching,
     hasResearch, isAnyLoading, freshResearchRef, activeProjectId,
     handleResearch, handleDecompose,
+    interviewPhase, setInterviewPhase, setDesignBrief,
     modules, isDecomposing, decompositionError,
     expandedModuleId, setExpandedModuleId,
     isGeneratingImages, handleGenerateModuleImages,
@@ -269,6 +271,26 @@ export default function CadLabResearchPage(): React.ReactNode {
     prevModuleCount.current = modules.length
   }, [modules.length, prevModuleCount])
 
+  // INTENT: Auto-trigger research after interview completes (or is skipped).
+  // DECISION: Uses useEffect instead of calling handleResearch() in onComplete callback
+  // because handleResearch closes over subject/designBrief — calling it synchronously
+  // after setDesignBrief/setSubject would use stale values. The effect fires after React
+  // commits the state updates, so handleResearch sees the correct enriched values.
+  const interviewResearchFiredRef = useRef(false)
+  useEffect(() => {
+    if (interviewPhase === "complete" && !interviewResearchFiredRef.current && !isResearching && !hasResearch) {
+      interviewResearchFiredRef.current = true
+      handleResearch()
+    }
+  }, [interviewPhase, isResearching, hasResearch, handleResearch])
+
+  // Reset the guard when interview resets to idle (e.g. handleReset)
+  useEffect(() => {
+    if (interviewPhase === "idle") {
+      interviewResearchFiredRef.current = false
+    }
+  }, [interviewPhase])
+
   // INTENT: Auto-trigger decomposition after fresh research completes.
   // freshResearchRef is only set by handleResearch — loading a saved project won't trigger this.
   useEffect(() => {
@@ -319,7 +341,37 @@ export default function CadLabResearchPage(): React.ReactNode {
         isResearching={isResearching}
         hasResearch={hasResearch}
         onResearch={handleResearch}
+        interviewPhase={interviewPhase}
+        onStartInterview={() => setInterviewPhase("interviewing")}
       />
+
+      {/* ── Design brief interview (Max CTO guided Q&A) ── */}
+      <AnimatePresence>
+        {interviewPhase === "interviewing" && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            <DesignBriefInterview
+              subject={subject}
+              onComplete={(brief, enrichedSubject, _summary) => {
+                setDesignBrief(brief)
+                if (enrichedSubject) setSubject(enrichedSubject)
+                setInterviewPhase("complete")
+                // GOTCHA: Do NOT call handleResearch() here — it closes over
+                // stale subject/designBrief. The useEffect below fires after
+                // React commits the state updates with the correct values.
+              }}
+              onSkip={() => {
+                setInterviewPhase("complete")
+                // Same stale-closure issue — let the effect handle it.
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Tab navigation — appears after research is complete ── */}
       {hasResearch && CONCEPT_TABS.length > 1 && (
