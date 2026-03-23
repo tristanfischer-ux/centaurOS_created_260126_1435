@@ -105,14 +105,19 @@ export function SoftwareVsHardwareSection() {
           </p>
         </AnimatedSection>
 
-        {/* Pain Stats */}
+        {/* Pain Stats — framed as "the old way" */}
+        <AnimatedSection className="text-center mb-4">
+          <p className="text-xs font-mono uppercase tracking-widest text-destructive font-bold">
+            The traditional hardware startup
+          </p>
+        </AnimatedSection>
         <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-10 sm:mb-12 md:mb-16">
           {PAIN_STATS.map((item) => {
             const Icon = item.icon
             return (
               <AnimatedCard
                 key={item.label}
-                className="text-center p-4 sm:p-6 rounded-xl border bg-card"
+                className="text-center p-4 sm:p-6 rounded-xl border border-destructive/20 bg-destructive/5"
               >
                 <div className="inline-flex items-center justify-center h-10 w-10 rounded-full bg-destructive/10 mb-3">
                   <Icon className="h-5 w-5 text-destructive" />

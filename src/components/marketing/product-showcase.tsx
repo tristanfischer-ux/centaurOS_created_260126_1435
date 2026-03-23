@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, LayoutDashboard, Store, TrendingUp, Users } from 'lucide-react'
+import { Hammer, LayoutDashboard, Store, TrendingUp, Users, Target } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -69,6 +69,19 @@ const TABS: ShowcaseTab[] = [
     callouts: [
       { text: '8,600+ suppliers', position: 'top-[10%] right-[5%]' },
       { text: 'Instant contact', position: 'bottom-[25%] left-[5%]' },
+    ],
+  },
+  {
+    id: 'strategy',
+    label: 'Strategy',
+    icon: <Target className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/strategy',
+    image: '/images/screenshots/strategy-river.png',
+    headline: 'Strategic objectives, visualised',
+    description: 'See your company objectives flow from vision to execution. Track progress, spot blockers, stay aligned.',
+    callouts: [
+      { text: 'Objective river', position: 'top-[15%] left-[5%]' },
+      { text: 'Live progress', position: 'top-[45%] right-[5%]' },
     ],
   },
   {

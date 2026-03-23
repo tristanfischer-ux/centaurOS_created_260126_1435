@@ -151,7 +151,7 @@ async function main() {
   // The CAD Lab is context-driven (no URL params for project ID).
   // We need to: go to /the-forge → click project card → wait for cad-lab
   // ──────────────────────────────────────────────────
-  console.log('Capturing The Forge (home page with sample components)...')
+  console.log('Capturing The Forge (CAD Lab with designs)...')
   await page.goto(`${BASE_URL}/the-forge`)
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(4000)
@@ -163,12 +163,17 @@ async function main() {
   await page.waitForTimeout(300)
   await dismissAllOnboarding(page)
 
-  // Scroll down to show the "See what you'll get" section with sample components
-  await page.evaluate(() => {
-    const main = document.querySelector('main')
-    if (main) main.scrollTop = 200
-  })
-  await page.waitForTimeout(1000)
+  // Try to click the first project card to show actual designs
+  try {
+    const projectCard = page.locator('[data-testid="project-card"], .cursor-pointer').first()
+    if (await projectCard.isVisible({ timeout: 3000 })) {
+      await projectCard.click()
+      await page.waitForLoadState('networkidle')
+      await page.waitForTimeout(4000)
+      await dismissAllOnboarding(page)
+    }
+  } catch { /* Fall back to the forge home page */ }
+
   await cleanupUI(page)
 
   await page.screenshot({
@@ -210,7 +215,32 @@ async function main() {
   console.log('  Saved marketplace.png')
 
   // ──────────────────────────────────────────────────
-  // 4. INVESTORS
+  // 4. STRATEGY — river flow of objectives
+  // ──────────────────────────────────────────────────
+  console.log('Capturing Strategy (objectives river flow)...')
+  await page.goto(`${BASE_URL}/strategy`)
+  await page.waitForLoadState('networkidle')
+  await page.waitForTimeout(4000)
+  await dismissAllOnboarding(page)
+
+  // Click "River" tab if available
+  try {
+    const riverTab = page.locator('button:has-text("River"), [role="tab"]:has-text("River")')
+    if (await riverTab.isVisible({ timeout: 2000 })) {
+      await riverTab.click()
+      await page.waitForTimeout(2000)
+    }
+  } catch { /* */ }
+
+  await cleanupUI(page)
+  await page.screenshot({
+    path: path.join(SCREENSHOT_DIR, 'strategy-river.png'),
+    clip: { x: 0, y: 0, width: 1920, height: 1080 },
+  })
+  console.log('  Saved strategy-river.png')
+
+  // ──────────────────────────────────────────────────
+  // 5. INVESTORS
   // ──────────────────────────────────────────────────
   console.log('Capturing Investors...')
   await page.goto(`${BASE_URL}/investors`)
@@ -226,7 +256,7 @@ async function main() {
   console.log('  Saved investors.png')
 
   // ──────────────────────────────────────────────────
-  // 5. TEAM (orbital view)
+  // 6. TEAM (orbital view)
   // ──────────────────────────────────────────────────
   console.log('Capturing Team...')
   await page.goto(`${BASE_URL}/team`)
