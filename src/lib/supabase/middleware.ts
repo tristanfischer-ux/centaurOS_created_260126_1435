@@ -19,6 +19,8 @@ const PUBLIC_ROUTES = [
     '/access-revoked',  // Access revoked page for deactivated users
     '/workspace-picker', // Multi-foundry workspace selector
     '/claim',  // Public listing claim flow (outreach)
+    '/forgot-password',  // Password reset request
+    '/update-password',  // Set new password (after reset link)
     '/api/admin/dashboard',  // Standalone admin dashboard (own password gate)
 ]
 

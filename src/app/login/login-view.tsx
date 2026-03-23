@@ -47,7 +47,8 @@ function SubmitButton(): React.ReactNode {
  * an attacker can craft phishing URLs with arbitrary "error" text.
  */
 const ERROR_MESSAGES: Record<string, string> = {
-    'invalid-credentials': 'Invalid email or password',
+    'invalid-credentials': 'Invalid email or password. Try resetting your password if you\'re sure the email is correct.',
+    'email-not-confirmed': 'Please check your inbox and confirm your email address before signing in.',
     'rate-limited': 'Too many login attempts. Please try again in 15 minutes.',
     'invalid-email': 'Invalid email address',
     'password-required': 'Password is required',
@@ -247,6 +248,14 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                             aria-required="true"
                             className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium font-mono tracking-widest"
                         />
+                    </div>
+                    <div className="flex justify-end">
+                        <Link
+                            href="/forgot-password"
+                            className="text-xs text-muted-foreground hover:text-international-orange transition-colors"
+                        >
+                            Forgot password?
+                        </Link>
                     </div>
                 </motion.div>
 

@@ -67,6 +67,13 @@ export async function login(formData: FormData) {
         const userAgentHeader = headersList.get('user-agent') || undefined
         logFailedLogin(email, clientIP, userAgentHeader, error.message)
             .catch((err) => console.error('[LOGIN] Failed login audit log error:', err))
+
+        // INTENT: Surface specific, actionable errors instead of a generic message.
+        // "Email not confirmed" is safe to reveal — it doesn't leak whether the account exists
+        // because signup already confirms the email was registered.
+        if (error.message?.toLowerCase().includes('email not confirmed')) {
+            redirect('/login?error=email-not-confirmed')
+        }
         redirect('/login?error=invalid-credentials')
     }
 
