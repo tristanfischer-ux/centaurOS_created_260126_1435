@@ -16,18 +16,18 @@ export async function login(formData: FormData) {
     // Security: Rate limit login attempts
     const rateLimitResult = await rateLimit('login', clientIP)
     if (!rateLimitResult.success) {
-        // SECURITY: Log rate limit exceeded event
-        await logSecurityEvent({
+        // SECURITY: Log rate limit exceeded event (fire-and-forget — don't block redirect)
+        logSecurityEvent({
             type: 'RATE_LIMIT_EXCEEDED',
             ipAddress: clientIP,
             resource: 'login',
             action: 'login_attempt',
             success: false,
-            details: { 
+            details: {
                 remaining: rateLimitResult.remaining,
-                resetIn: rateLimitResult.resetTime 
+                resetIn: rateLimitResult.resetTime
             }
-        })
+        }).catch((err) => console.error('[LOGIN] Rate limit audit log error:', err))
         redirect('/login?error=rate-limited')
     }
 
@@ -63,19 +63,26 @@ export async function login(formData: FormData) {
     })
 
     if (error) {
-        // Security: Log failed login attempt
+        // Security: Log failed login attempt (fire-and-forget — don't block error redirect)
         const userAgentHeader = headersList.get('user-agent') || undefined
-        await logFailedLogin(email, clientIP, userAgentHeader, error.message)
+        logFailedLogin(email, clientIP, userAgentHeader, error.message)
+            .catch((err) => console.error('[LOGIN] Failed login audit log error:', err))
         redirect('/login?error=invalid-credentials')
     }
 
     // Success - log and reset rate limit for this IP
     const { data: { user: loggedInUser } } = await supabase.auth.getUser()
+
+    // DECISION: Fire-and-forget for audit log + rate limit reset.
+    // These are non-critical and call Supabase RPCs that can hang under load,
+    // which blocks redirect() and makes the login form appear frozen.
     if (loggedInUser) {
         const userAgentHeader = headersList.get('user-agent') || undefined
-        await logSuccessfulLogin(loggedInUser.id, email, clientIP, userAgentHeader)
+        logSuccessfulLogin(loggedInUser.id, email, clientIP, userAgentHeader)
+            .catch((err) => console.error('[LOGIN] Audit log failed:', err))
     }
-    await resetRateLimit('login', clientIP)
+    resetRateLimit('login', clientIP)
+        .catch((err) => console.error('[LOGIN] Rate limit reset failed:', err))
 
     revalidatePath('/', 'layout')
 
