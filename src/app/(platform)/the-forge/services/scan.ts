@@ -90,44 +90,77 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
  * @throws Error if AI call fails or response doesn't match schema
  */
 async function callScanAI(idea: string, researchReport?: string): Promise<AIScanOutput> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  // DECISION: Use Claude Opus 4.6 instead of GPT-5.3 for module decomposition.
+  // Opus is already used for research synthesis — using it for decomposition too
+  // ensures consistent reasoning quality and allows the model to build on its own
+  // research output when the report is passed as context.
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
+    throw new Error("[XRayScan] ANTHROPIC_API_KEY is not configured")
   }
 
-  const openai = new OpenAI({ apiKey })
-
-  console.info("[XRayScan] Starting AI scan for idea:", {
+  console.info("[XRayScan] Starting AI scan with Claude Opus for idea:", {
     ideaLength: idea.length,
     hasResearch: !!researchReport,
   })
 
-  // Build user message — include research report when available so GPT-5.3
+  // Build user message — include research report when available so Opus
   // can ground its module decomposition in real-world specs and standards
   let userMessage = `Product idea to reverse engineer:\n\n${idea}`
   if (researchReport?.trim()) {
-    userMessage += `\n\n--- PRODUCT RESEARCH (from web search) ---\n\n${researchReport.trim()}`
+    userMessage += `\n\n--- PRODUCT RESEARCH (from web search + internal engineering database) ---\n\n${researchReport.trim()}`
   }
 
-  const completion = await openai.chat.completions.parse({
-    model: "gpt-5.3-chat-latest",
-    messages: [
-      { role: "system", content: SCAN_SYSTEM_PROMPT },
-      { role: "user", content: userMessage },
-    ],
-    response_format: zodResponseFormat(AIScanOutputSchema, "xray_scan"),
-    max_tokens: 8192,
+  // FLOW: Claude returns JSON matching our schema. We validate with Zod after.
+  const systemPrompt = SCAN_SYSTEM_PROMPT + "\n\nReturn ONLY valid JSON matching the schema. No markdown fences, no commentary outside the JSON object."
+
+  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-opus-4-6",
+      max_tokens: 16384,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userMessage }],
+    }),
+    signal: AbortSignal.timeout(180_000), // 3 min — Opus is thorough
   })
 
-  const parsed = completion.choices[0]?.message?.parsed
-  if (!parsed) {
-    const refusal = completion.choices[0]?.message?.refusal
-    throw new Error(`[XRayScan] AI refused or returned no parsed output: ${refusal || "unknown"}`)
+  if (!resp.ok) {
+    const errText = await resp.text()
+    throw new Error(`[XRayScan] Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await resp.json()
+  const rawText: string = data.content?.[0]?.text ?? ""
+
+  // Extract JSON from response (may have markdown fences)
+  let jsonStr = rawText.trim()
+  if (jsonStr.startsWith("```")) {
+    jsonStr = jsonStr.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")
+  }
+
+  let parsed: AIScanOutput
+  try {
+    const raw = JSON.parse(jsonStr)
+    parsed = AIScanOutputSchema.parse(raw)
+  } catch (parseErr) {
+    console.error("[XRayScan] Failed to parse Claude output:", {
+      error: parseErr instanceof Error ? parseErr.message : parseErr,
+      responseLength: rawText.length,
+      firstChars: rawText.slice(0, 200),
+    })
+    throw new Error(`[XRayScan] AI output failed schema validation: ${parseErr instanceof Error ? parseErr.message : "Unknown"}`)
   }
 
   console.info("[XRayScan] AI scan complete:", {
     moduleCount: parsed.modules.length,
     gatingModule: parsed.modules.find((m: { isGatingModule?: boolean; name: string }) => m.isGatingModule)?.name,
+    model: "claude-opus-4-6",
   })
 
   return parsed

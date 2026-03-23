@@ -2568,7 +2568,53 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
         console.warn("[Forge] Web search failed, continuing with Claude synthesis only")
       }
 
-      // 2. Send raw data to Claude Opus for synthesis
+      // 2. Query internal engineering databases for grounded context
+      // DECISION: Feed verified material properties, real manufacturing tolerances,
+      // and supplier intelligence into the research synthesis. Previously the AI
+      // only saw web search results — now it also sees our curated engineering data.
+      console.info("[Forge] Concept research: Querying internal engineering databases...")
+      let internalDbContext = ""
+      try {
+        const { getEngineeringIntelligenceForReport } = await import("@/actions/design-standards")
+        const engData = await getEngineeringIntelligenceForReport([], null, idea.trim())
+
+        const parts: string[] = []
+        if (engData.materials.length > 0) {
+          parts.push("Materials Library (verified handbook data):\n" +
+            engData.materials.map(m =>
+              `- ${m.name}: density=${m.density ?? "?"}kg/m3, yield=${m.yieldStrength ?? "?"}MPa, thermal=${m.thermalConductivity ?? "?"}W/mK, cost=$${m.costPerKg ?? "?"}/kg`
+            ).join("\n"))
+        }
+        if (engData.processes.length > 0) {
+          parts.push("Manufacturing Processes (real tolerances from supplier data):\n" +
+            engData.processes.map(p =>
+              `- ${p.displayName}: typical tolerance=±${p.toleranceTypical ?? "?"}mm, min wall=${p.minWall ?? "?"}mm`
+            ).join("\n"))
+        }
+        if (engData.supplierInsights.length > 0) {
+          parts.push("Supplier Intelligence (from real UK manufacturers):\n" +
+            engData.supplierInsights.map(s =>
+              `- ${s.technique}: ${s.supplierCount} suppliers, tolerances: ${s.tolerances}, materials: ${s.materials}`
+            ).join("\n"))
+        }
+        if (engData.hardwareCount > 0) {
+          parts.push(`Hardware Library: ${engData.hardwareCount} verified standard components (ISO bolts, nuts, washers, bearings, etc.)`)
+        }
+        if (engData.standards.length > 0) {
+          parts.push("Design Standards:\n" +
+            engData.standards.map(s => `- ${s.code} (${s.issuingBody}): ${s.name} — ${s.summary?.slice(0, 200)}`).join("\n"))
+        }
+
+        if (parts.length > 0) {
+          internalDbContext = "\n\n=== INTERNAL ENGINEERING DATABASE (verified data — prefer over web estimates) ===\n" + parts.join("\n\n")
+          console.info("[Forge] Concept research: Added", parts.length, "internal data sections")
+        }
+      } catch (dbErr) {
+        // Non-blocking — continue with web data only
+        console.warn("[Forge] Internal DB query failed (non-blocking):", dbErr instanceof Error ? dbErr.message : dbErr)
+      }
+
+      // 3. Send raw data + internal DB context to Claude Opus for synthesis
       console.info("[Forge] Concept research: Synthesizing report with Claude Opus...")
       const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
       if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
@@ -2587,7 +2633,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
             system: CONCEPT_RESEARCH_PROMPT,
             messages: [{
               role: "user",
-              content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}`,
+              content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
             }],
           }),
           signal: AbortSignal.timeout(120_000),
