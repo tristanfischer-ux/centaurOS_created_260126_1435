@@ -96,21 +96,6 @@ export async function getDemoAccountData(role: string): Promise<Omit<DemoAccount
 }
 
 /**
- * Get demo account credentials for a specific role (includes password)
- *
- * @security Only returns credentials when DEMO_ACCOUNTS_PASSWORD env var is set.
- * @param role - The role type
- * @returns Full account data including password, or null
- */
-export async function getDemoAccountCredentials(role: string): Promise<{ email: string; password: string } | null> {
-  if (!DEMO_PASSWORD) return null
-  const normalizedRole = role.toLowerCase()
-  const account = DEMO_ACCOUNTS[normalizedRole]
-  if (!account) return null
-  return { email: account.email, password: DEMO_PASSWORD }
-}
-
-/**
  * Get all available demo roles
  *
  * @returns Array of available demo role names

@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { TestTube2, ArrowRight, User, Briefcase, GraduationCap, Building2, Factory, BookOpen, Network, Users, type LucideIcon } from 'lucide-react'
-import { getDemoAccountCredentials, getAvailableDemoRoles } from '@/actions/demo-accounts'
+import { getAvailableDemoRoles, getDemoAccountData } from '@/actions/demo-accounts'
 
 const ROLE_META: Record<string, { name: string; description: string; icon: LucideIcon }> = {
   founder: { name: 'Founder', description: 'Test the founder onboarding flow with pre-filled startup details', icon: User },
@@ -16,9 +16,11 @@ const ROLE_META: Record<string, { name: string; description: string; icon: Lucid
 }
 
 export default async function DemoPage() {
+  // SECURITY: Read password directly from env — never expose via server action
+  const demoPassword = process.env.DEMO_ACCOUNTS_PASSWORD
   const roles = await getAvailableDemoRoles()
 
-  if (roles.length === 0) {
+  if (!demoPassword || roles.length === 0) {
     return (
       <div className="min-h-screen bg-background p-6 flex items-center justify-center">
         <Card className="max-w-md">
@@ -31,13 +33,13 @@ export default async function DemoPage() {
     )
   }
 
-  // Fetch credentials for all roles server-side
+  // Fetch account data (no password) from server action, add password from env
   const roleData = await Promise.all(
     roles
       .filter(r => ROLE_META[r])
       .map(async (r) => {
-        const creds = await getDemoAccountCredentials(r)
-        return { id: r, ...ROLE_META[r], creds }
+        const account = await getDemoAccountData(r)
+        return { id: r, ...ROLE_META[r], email: account?.email ?? null }
       })
   )
 
@@ -103,15 +105,15 @@ export default async function DemoPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {role.creds && (
+                  {role.email && (
                     <div className="space-y-2 text-xs bg-muted p-3 rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Email:</span>
-                        <code className="text-foreground font-mono">{role.creds.email}</code>
+                        <code className="text-foreground font-mono">{role.email}</code>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Password:</span>
-                        <code className="text-foreground font-mono">{role.creds.password}</code>
+                        <code className="text-foreground font-mono">{demoPassword}</code>
                       </div>
                     </div>
                   )}
