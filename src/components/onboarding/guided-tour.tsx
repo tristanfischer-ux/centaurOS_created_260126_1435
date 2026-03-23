@@ -69,7 +69,7 @@ const TOUR_STOPS: TourStop[] = [
     title: 'Investor Database',
     subtitle: 'Access to capital',
     calMessage:
-      "Here's your investor database — hundreds of UK VC and PE firms, pre-researched with fund sizes, sector focus, and contact details. When you're ready to raise, the intel is already here.",
+      "Here's your investor database — 1,200+ UK VC and PE firms, pre-researched with fund sizes, sector focus, and contact details. When you're ready to raise, the intel is already here.",
     icon: <TrendingUp className="w-6 h-6" />,
     route: '/investors',
     accentColor: 'text-success',

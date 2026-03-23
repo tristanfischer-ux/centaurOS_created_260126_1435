@@ -64,10 +64,10 @@ const TABS: ShowcaseTab[] = [
     icon: <Store className="h-4 w-4" />,
     url: 'app.fractionalforge.com/marketplace',
     image: '/images/screenshots/marketplace.png',
-    headline: '300+ verified suppliers',
+    headline: '8,600+ suppliers',
     description: 'UK manufacturers, component suppliers, and fractional executives. Vetted, ready to quote.',
     callouts: [
-      { text: '300+ verified', position: 'top-[10%] right-[5%]' },
+      { text: '8,600+ suppliers', position: 'top-[10%] right-[5%]' },
       { text: 'Instant contact', position: 'bottom-[25%] left-[5%]' },
     ],
   },
@@ -77,11 +77,11 @@ const TABS: ShowcaseTab[] = [
     icon: <TrendingUp className="h-4 w-4" />,
     url: 'app.fractionalforge.com/investors',
     image: '/images/screenshots/investors.png',
-    headline: 'Pre-researched investor database',
+    headline: '1,200+ investors pre-researched',
     description: 'UK VC and PE firms with fund sizes, sector focus, and contact details. Ready when you are.',
     callouts: [
-      { text: 'Fund sizes + focus', position: 'top-[15%] left-[5%]' },
-      { text: 'Direct contacts', position: 'top-[45%] right-[5%]' },
+      { text: '1,200+ investors', position: 'top-[15%] left-[5%]' },
+      { text: 'Fund sizes + contacts', position: 'top-[45%] right-[5%]' },
     ],
   },
   {
