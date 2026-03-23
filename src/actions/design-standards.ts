@@ -9,6 +9,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type { DesignStandard } from "@/types/design-standards"
 import type { IndustryDomain } from "@/lib/cad-lab/industry-domains"
 
@@ -213,7 +214,6 @@ export async function getEngineeringIntelligenceForReport(
  * Verify a single standard (admin action — uses service role to bypass RLS).
  */
 export async function verifyStandard(id: string): Promise<{ success: boolean; error?: string }> {
-  const { createAdminClient } = await import("@/lib/supabase/admin")
   const supabase = createAdminClient()
   const { error } = await supabase
     .from("design_standards")
@@ -228,7 +228,6 @@ export async function verifyStandard(id: string): Promise<{ success: boolean; er
  */
 export async function bulkVerifyStandards(ids: string[]): Promise<{ success: boolean; count: number; error?: string }> {
   if (ids.length === 0) return { success: true, count: 0 }
-  const { createAdminClient } = await import("@/lib/supabase/admin")
   const supabase = createAdminClient()
   const { error, count } = await supabase
     .from("design_standards")

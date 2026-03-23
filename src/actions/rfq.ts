@@ -1185,16 +1185,19 @@ export async function getLinkedRFQQuotes(rfqId: string): Promise<{
     return { quotes: [], rfqTitle: (rfq?.title as string) ?? null }
   }
 
-  // Get provider names
-  const providerIds = responses.map(r => r.provider_id).filter(Boolean)
-  const { data: providers } = await supabase
-    .from("marketplace_listings")
-    .select("id, title")
-    .in("id", providerIds)
-
+  // Get provider names via provider_profiles → display_name
+  const providerIds = responses.map(r => r.provider_id).filter(Boolean) as string[]
   const providerNames = new Map<string, string>()
-  if (providers) {
-    for (const p of providers) providerNames.set(p.id, p.title as string)
+  if (providerIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("provider_profiles")
+      .select("id, display_name, headline")
+      .in("id", providerIds)
+    if (profiles) {
+      for (const p of profiles) {
+        providerNames.set(p.id, (p.display_name as string) ?? (p.headline as string) ?? "Supplier")
+      }
+    }
   }
 
   return {

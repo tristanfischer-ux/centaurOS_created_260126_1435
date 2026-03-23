@@ -48,9 +48,11 @@ export default function StandardsAdminPage() {
         const { getStandardsStats } = await import("@/actions/design-standards")
         const stats = await getStandardsStats()
         const domains = Object.keys(stats.byDomain)
+        const results = await Promise.all(
+          domains.map(d => getStandardsByDomain(d as never))
+        )
         const all: StandardRow[] = []
-        for (const domain of domains) {
-          const { data } = await getStandardsByDomain(domain as never)
+        for (const { data } of results) {
           if (data) all.push(...(data as unknown as StandardRow[]))
         }
         setStandards(all)

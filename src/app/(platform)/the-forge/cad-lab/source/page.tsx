@@ -89,13 +89,20 @@ export default function SourcePage(): React.ReactNode {
     linkRfqToProject,
   } = useCadLab()
 
-  // Fetch RFQ quotes if linked
+  // Fetch RFQ quotes if linked — with proper cleanup to avoid stale state
   const [rfqQuotes, setRfqQuotes] = useState<{ rfqTitle: string | null; quotes: { supplierName: string; price: number | null; timelineWeeks: number | null; proposalTitle: string | null }[] } | undefined>()
   useEffect(() => {
-    if (!linkedRfqId) return
+    if (!linkedRfqId) { setRfqQuotes(undefined); return }
+    let cancelled = false
     import("@/actions/rfq").then(({ getLinkedRFQQuotes }) =>
-      getLinkedRFQQuotes(linkedRfqId).then(setRfqQuotes)
-    ).catch(() => {})
+      getLinkedRFQQuotes(linkedRfqId).then(result => {
+        if (!cancelled) setRfqQuotes(result)
+      })
+    ).catch(err => {
+      console.warn("[SOURCE] RFQ quotes fetch failed:", err instanceof Error ? err.message : err)
+      if (!cancelled) setRfqQuotes(undefined)
+    })
+    return () => { cancelled = true }
   }, [linkedRfqId])
 
   // Gate: redirect to Specify if no specified modules
