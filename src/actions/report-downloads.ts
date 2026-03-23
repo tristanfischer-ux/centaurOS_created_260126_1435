@@ -81,6 +81,13 @@ export async function saveReportDownload(
 const MAX_DOWNLOADS = 50
 const SIGNED_URL_EXPIRY_SECONDS = 3600 // 1 hour
 
+// INTENT: Bucket migration — new uploads go to 'report-exports' (private),
+// but existing rows may reference files in 'xray-images' (public, legacy).
+// We try report-exports first, then fall back to xray-images for legacy files.
+// Once all legacy entries expire (30 days from creation), the fallback can be removed.
+const CURRENT_BUCKET = 'report-exports'
+const LEGACY_BUCKET = 'xray-images'
+
 export async function getReportDownloads(): Promise<
   { success: true; downloads: ReportDownloadRow[] } | ActionError
 > {
@@ -107,14 +114,31 @@ export async function getReportDownloads(): Promise<
 
     const signedUrlMap: Record<string, string> = {}
     if (storagePaths.length > 0) {
+      // Try current bucket first
       const { data: signedData } = await admin.storage
-        .from('xray-images')
+        .from(CURRENT_BUCKET)
         .createSignedUrls(storagePaths, SIGNED_URL_EXPIRY_SECONDS)
 
       if (signedData) {
         for (const entry of signedData) {
           if (entry.signedUrl && entry.path) {
             signedUrlMap[entry.path] = entry.signedUrl
+          }
+        }
+      }
+
+      // Fall back to legacy bucket for paths that didn't resolve
+      const missingPaths = storagePaths.filter((p) => !signedUrlMap[p])
+      if (missingPaths.length > 0) {
+        const { data: legacyData } = await admin.storage
+          .from(LEGACY_BUCKET)
+          .createSignedUrls(missingPaths, SIGNED_URL_EXPIRY_SECONDS)
+
+        if (legacyData) {
+          for (const entry of legacyData) {
+            if (entry.signedUrl && entry.path) {
+              signedUrlMap[entry.path] = entry.signedUrl
+            }
           }
         }
       }
@@ -167,13 +191,16 @@ export async function cleanExpiredReportDownloads(): Promise<
       return { error: delErr.message }
     }
 
-    // 3. Delete Storage files (best-effort, after DB rows are gone)
+    // 3. Delete Storage files from both buckets (best-effort, after DB rows are gone)
     const storagePaths = expired
       .map((r) => r.storage_path)
       .filter((p): p is string => !!p)
 
     if (storagePaths.length > 0) {
-      await admin.storage.from('xray-images').remove(storagePaths)
+      await Promise.all([
+        admin.storage.from(CURRENT_BUCKET).remove(storagePaths),
+        admin.storage.from(LEGACY_BUCKET).remove(storagePaths),
+      ])
     }
 
     return { success: true as const, deleted: ids.length }
@@ -210,10 +237,13 @@ export async function deleteReportDownload(
       return { error: delErr.message }
     }
 
-    // Delete Storage file (best-effort, after DB row is gone)
+    // Delete Storage file from both buckets (best-effort, after DB row is gone)
     if (row.storage_path) {
       const admin = createAdminClient()
-      await admin.storage.from('xray-images').remove([row.storage_path])
+      await Promise.all([
+        admin.storage.from(CURRENT_BUCKET).remove([row.storage_path]),
+        admin.storage.from(LEGACY_BUCKET).remove([row.storage_path]),
+      ])
     }
 
     return { success: true as const }
