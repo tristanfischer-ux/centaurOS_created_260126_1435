@@ -2772,7 +2772,7 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 : `What do you need from ${specialist.name}?`
                                     }
                                     className={cn(
-                                        "resize-none pr-[140px] min-h-[60px]",
+                                        "resize-none pr-[140px] min-h-[120px]",
                                         (speechRecognition.isListening || speechRecognition.isProcessing) && "border-destructive/50"
                                     )}
                                     aria-required
