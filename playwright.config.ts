@@ -130,13 +130,13 @@ export default defineConfig({
     {
       name: 'chromium',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated|mobile-delight-audit)\.spec\.ts$/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
       name: 'Mobile Chrome',
       testMatch:
-        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated)\.spec\.ts$/,
+        /(?<!qa-.*|auth\.setup|updates|specialist-proposed-actions|specialist-full-suite|outreach|cad-lab-concept-editing|finance-phase2-crud|mobile-authenticated|mobile-delight-audit)\.spec\.ts$/,
       use: { ...devices['Pixel 5'] },
     },
     // Mobile Authenticated — full-screen Drawer menu tests, iPhone 14 Pro, Founder auth

@@ -66,11 +66,36 @@ import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import type { LucideIcon } from "lucide-react"
 
 /**
+ * All drawer/bar item hrefs that have their own nav entry.
+ * Used to prevent parent routes from matching child routes
+ * (e.g. /agents should not highlight when on /agents/artifacts).
+ */
+const allNavHrefs = new Set([
+    "/today", "/updates", "/new-tasks",
+    "/my-profile", "/knowledge", "/google-apps", "/whats-new",
+    "/strategy", "/new-objectives", "/reports",
+    "/cash-burn", "/cash-burn/cash-out", "/cash-burn/cash-in", "/cash-burn/pnl", "/investors", "/fundraise",
+    "/the-forge", "/team", "/retainers", "/agents", "/agents/artifacts", "/browse", "/learn",
+    "/recruits", "/guild", "/apprenticeship", "/marketplace", "/marketplace-orders",
+    "/settings",
+])
+
+/**
  * Determines if a navigation item should be marked as active.
+ * Prevents parent routes from matching when a more specific child route
+ * has its own nav entry (e.g. /agents vs /agents/artifacts).
  */
 function isRouteActive(pathname: string, href: string): boolean {
     if (pathname === href) return true
-    if (pathname.startsWith(href + '/')) return true
+    if (pathname.startsWith(href + '/')) {
+        // Don't match parent if the actual pathname matches a more specific nav entry
+        for (const navHref of allNavHrefs) {
+            if (navHref !== href && navHref.startsWith(href + '/') && (pathname === navHref || pathname.startsWith(navHref + '/'))) {
+                return false
+            }
+        }
+        return true
+    }
     return false
 }
 
@@ -155,6 +180,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
     const router = useRouter()
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [unreadCount, setUnreadCount] = React.useState(0)
+    const [drawerOpen, setDrawerOpen] = React.useState(false)
 
     // Fetch unread alert count on mount and route change (matches Sidebar pattern)
     React.useEffect(() => {
@@ -201,12 +227,12 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                         </span>
                     )}
                     {isBeta && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-info/10 text-info border border-info/20">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
                             Beta
                         </span>
                     )}
                     {isDemo && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-international-orange/10 text-international-orange border border-international-orange/20">
                             Demo
                         </span>
                     )}
@@ -217,12 +243,18 @@ export function MobileNav({ foundryName }: MobileNavProps) {
 
     return (
         <>
-        <div data-testid="mobile-nav" className="fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe">
+        <div data-testid="mobile-nav" className={cn(
+            "fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe transition-opacity duration-200",
+            drawerOpen && "opacity-0 pointer-events-none"
+        )}>
             {/* Floating "+" FAB centered above the nav bar */}
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
                 data-testid="mobile-fab"
-                className="absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
+                className={cn(
+                    "absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95",
+                    drawerOpen && "opacity-0 pointer-events-none"
+                )}
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />
@@ -252,7 +284,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                         </Link>
                     )
                 })}
-                <Drawer>
+                <Drawer shouldScaleBackground={false} open={drawerOpen} onOpenChange={setDrawerOpen}>
                     <DrawerTrigger asChild>
                         <button
                             data-testid="mobile-more-button"
@@ -275,7 +307,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             <DrawerTitle className="sr-only">Navigation Menu</DrawerTitle>
                         </DrawerHeader>
 
-                        <nav className="overflow-y-auto pb-safe px-safe" data-testid="drawer-nav" aria-label="Main navigation">
+                        <nav className="overflow-y-auto overflow-x-hidden pb-safe px-safe" data-testid="drawer-nav" aria-label="Main navigation">
                             {/* Me section */}
                             <SectionLabel icon={UserCircle} label="Me" />
                             {meMoreNavigation.map(renderDrawerItem)}

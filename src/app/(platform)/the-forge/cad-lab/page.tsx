@@ -130,9 +130,15 @@ export default function CadLabResearchPage(): React.ReactNode {
   useEffect(() => {
     if (!subject || subject.length < 3) return
     const resEngData = researchResult?.engineeringData
-    if (resEngData && resEngDataPoints > 1) {
+    if (resEngData && resEngDataPoints > 1 && resEngData.supplierTechniqueNames?.length) {
+      // Cached data has everything including technique names — use it
       setLiveEngData(resEngData)
       return
+    }
+    if (resEngData && resEngDataPoints > 1) {
+      // Cached data exists but lacks technique names — show it while fetching names
+      setLiveEngData(resEngData)
+      // Fall through to fetch technique names below
     }
     const stdCodes: string[] = JSON.parse(resStdCodesKey)
     let cancelled = false
@@ -145,7 +151,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             materialFamilies: data.materials.map(m => m.name),
             hardwareItemCount: data.hardwareCount,
             processesApplied: data.processes.map(p => p.displayName),
-            supplierTechniques: data.supplierInsights?.length ?? 27,
+            supplierTechniques: data.supplierInsights?.length ?? 0,
             supplierTechniqueNames: data.supplierInsights?.map(s => `${s.technique} (${s.supplierCount} suppliers)`) ?? [],
             totalDataPoints: stdCodes.length + data.materials.length + data.hardwareCount + data.processes.length,
           })
@@ -268,7 +274,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   // INTENT: Show a pulsing notification dot on the Modules tab when modules
   // first appear, instead of auto-switching tabs (which was disorienting).
   const [modulesUnseen, setModulesUnseen] = useState(false)
-  const prevModuleCount = useMemo(() => ({ current: 0 }), [])
+  const prevModuleCount = useRef(0)
   useEffect(() => {
     if (modules.length > 0 && prevModuleCount.current === 0) {
       setModulesUnseen(true)
@@ -506,7 +512,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <div>
                             <p className="text-xs font-medium text-foreground">Hardware Library</p>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {engData.hardwareItemCount} items — ISO 4762 bolts, ISO 4032 nuts, ISO 7089 washers, bearings
+                              {engData.hardwareItemCount} standard components in library
                             </p>
                           </div>
                         </div>
