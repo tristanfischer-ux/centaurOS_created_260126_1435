@@ -203,6 +203,7 @@ export default function SpecifyPage(): React.ReactNode {
   // ── DFM Insights — fetched per process from Nightshift technique knowledge ──
   const [processInsights, setProcessInsights] = useState<Record<string, ProcessInsights>>({})
   const fetchedProcessesRef = useRef<Set<string>>(new Set())
+  const lastMirrorToastRef = useRef(0)
 
   // INTENT: Fetch insights when a module's mfg_process is set. Cache by process name
   // to avoid re-fetching when switching between modules with the same process.
@@ -273,7 +274,9 @@ export default function SpecifyPage(): React.ReactNode {
       return updated
     })
 
-    if (mirrorCount > 0) {
+    // Debounce mirror toast — suppress if fired within 3s (avoids spam on rapid answers)
+    if (mirrorCount > 0 && Date.now() - lastMirrorToastRef.current > 3000) {
+      lastMirrorToastRef.current = Date.now()
       toast.info(`Synced to ${mirrorCount} mirror module${mirrorCount !== 1 ? "s" : ""}`)
     }
   }, [setDiagnosticAnswers, modules])
@@ -522,7 +525,7 @@ export default function SpecifyPage(): React.ReactNode {
             Specify
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Define detailed specs per module. Reviews are optional.
+            Define specs, then get expert review before sourcing.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1331,7 +1334,7 @@ export default function SpecifyPage(): React.ReactNode {
                         ? "Complete diagnostics for all modules first."
                         : allModulesReviewed
                           ? "All modules reviewed. Design ready for sourcing."
-                          : `Review recommended before finalizing. ${unreviewedModuleCount} module${unreviewedModuleCount !== 1 ? "s" : ""} pending.`}
+                          : `Expert review catches issues before they become expensive. ${unreviewedModuleCount} module${unreviewedModuleCount !== 1 ? "s" : ""} pending.`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
@@ -1557,7 +1560,7 @@ export default function SpecifyPage(): React.ReactNode {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => {
-                          if (window.confirm("Proceed without specialist reviews? Manufacturing insights and assembly notes may be missed.")) {
+                          if (window.confirm("Skip expert review? Manufacturing issues won\u2019t be caught until sourcing \u2014 this can be costly.")) {
                             handleSkipReviews()
                           }
                         }}

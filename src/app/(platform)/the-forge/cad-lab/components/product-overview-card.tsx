@@ -139,11 +139,11 @@ export function ProductOverviewCard({
               placeholder="Describe your product at a high level..."
             />
             <div className="flex items-center justify-end gap-2">
-              <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-1.5">
+              <Button variant="ghost" size="sm" onClick={handleCancel} className="gap-1.5 min-h-[44px] sm:min-h-0">
                 <X className="h-3 w-3" />
                 Cancel
               </Button>
-              <Button size="sm" onClick={handleSave} className="gap-1.5">
+              <Button size="sm" onClick={handleSave} className="gap-1.5 min-h-[44px] sm:min-h-0">
                 <Check className="h-3 w-3" />
                 Save
               </Button>
@@ -188,7 +188,7 @@ export function ProductOverviewCard({
             </div>
             <Button
               size="sm"
-              className="gap-1.5 shrink-0"
+              className="gap-1.5 shrink-0 min-h-[44px] sm:min-h-0"
               onClick={onApprove}
             >
               Approve & Continue

@@ -390,7 +390,7 @@ export function ClassificationReviewPanel({
                               next.has(part.partKey) ? next.delete(part.partKey) : next.add(part.partKey)
                               return next
                             })}
-                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors min-h-[44px] sm:min-h-0 py-1"
                           >
                             {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                             Why {part.type}?
