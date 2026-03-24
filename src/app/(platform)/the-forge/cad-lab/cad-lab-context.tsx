@@ -2786,14 +2786,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setSystemIllustrationUrl(null)
     setSystemIllustrationError(null)
 
-    addProgressLine("Searching engineering databases for real-world specifications...")
+    // INTENT: Honest progress lines that describe what's actually happening.
+    // The server action runs Gemini web search + Thingiverse search in parallel,
+    // then Claude synthesises the results with injected standards + engineering data.
+    addProgressLine("Running web search for real-world specifications (Gemini Search)...")
     const researchTimers: ReturnType<typeof setTimeout>[] = []
-    researchTimers.push(setTimeout(() => addProgressLine("Querying Thingiverse and GrabCAD for reference CAD models..."), 3000))
-    researchTimers.push(setTimeout(() => addProgressLine("Cross-referencing manufacturer datasheets and published specs..."), 6000))
-    researchTimers.push(setTimeout(() => addProgressLine("Identifying material candidates and manufacturing constraints..."), 9000))
-    researchTimers.push(setTimeout(() => addProgressLine("Synthesising engineering report from all sources..."), 13000))
-    researchTimers.push(setTimeout(() => addProgressLine("Extracting key dimensions, tolerances, and interface constraints..."), 17000))
-    researchTimers.push(setTimeout(() => addProgressLine("Validating specifications against industry standards..."), 22000))
+    researchTimers.push(setTimeout(() => addProgressLine("Searching Thingiverse for reference CAD models..."), 3000))
+    researchTimers.push(setTimeout(() => addProgressLine("Querying design standards database (220+ standards across 19 domains)..."), 8000))
+    researchTimers.push(setTimeout(() => addProgressLine("Loading material properties and process constraints from engineering library..."), 12000))
+    researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report with Claude Opus..."), 18000))
+    researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
     try {
       const res = await runCadLabResearch(subject, {

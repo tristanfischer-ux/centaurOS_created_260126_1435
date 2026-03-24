@@ -24,9 +24,9 @@ import { Card, CardContent } from "@/components/ui/card"
 // ─────────────────────────────────────────────────────────────────────
 const OPERATION_EXPLAINERS: Record<string, string[]> = {
   research: [
-    "Scanning engineering databases for real-world specifications. Every dimension comes from datasheets, not estimation.",
-    "Cross-referencing technical documentation, manufacturer specs, and published reference designs.",
-    "Identifying material candidates, manufacturing constraints, and dimensional tolerances from industry data.",
+    "Searching the web for real-world specifications and reference dimensions using Gemini Search.",
+    "Querying the ForgeOS engineering library — 220+ design standards, 31 materials, 44 hardware specs, 16 process capabilities.",
+    "Synthesising research with Claude Opus using verified engineering data from the ForgeOS standards database.",
   ],
   breakdown: [
     "Detecting engineering domain from your research report, then building a domain-specific decomposition prompt.",
