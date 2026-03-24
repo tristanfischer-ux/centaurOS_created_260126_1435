@@ -2779,8 +2779,9 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                                 : `What do you need from ${specialist.name}?`
                                     }
                                     className={cn(
-                                        "resize-none pr-[140px] min-h-[120px]",
-                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-destructive/50"
+                                        "resize-none pr-[140px]",
+                                        hasNonHistoricalMessages ? "min-h-[56px]" : "min-h-[80px]",
+                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-international-orange/50"
                                     )}
                                     aria-required
                                     disabled={isExecuting}
@@ -3611,8 +3612,8 @@ Only recommend ONE specialist. Choose based on what gaps or next steps emerged f
                                     }
                                     className={cn(
                                         "resize-none pr-[120px]",
-                                        hasNonHistoricalMessages ? "min-h-[60px]" : "min-h-[100px]",
-                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-destructive/50"
+                                        hasNonHistoricalMessages ? "min-h-[56px]" : "min-h-[80px]",
+                                        (speechRecognition.isListening || speechRecognition.isProcessing) && "border-international-orange/50"
                                     )}
                                     aria-required
                                     disabled={isExecuting}
