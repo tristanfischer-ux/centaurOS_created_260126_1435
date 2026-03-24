@@ -248,6 +248,15 @@ For each major component, list:
 - Clearance requirements: X mm
 - Any symmetry axes or alignment requirements
 
+## Key Performance Specifications
+For each relevant metric, state the value and source:
+- Throughput / capacity (units/hr, flow rate, payload, etc.)
+- Operating range (temperature, pressure, voltage, speed, etc.)
+- Efficiency / yield (%, ratio, power consumption)
+- Lifecycle / durability (hours, cycles, MTBF)
+- Regulatory limits (max emissions, noise dB, safety class)
+If a metric is not applicable to this product type, omit it.
+
 ## Material & Manufacturing Notes
 Primary materials, wall thicknesses, manufacturing method if known.
 

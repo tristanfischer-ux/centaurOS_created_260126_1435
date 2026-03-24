@@ -83,6 +83,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     checkpoints, isCheckpointing,
     isRevising, revisedModuleIds, checkpointAcknowledged, handleAcknowledgeCheckpoints,
     productOverview, setProductOverview,
+    saveError,
     handleUpdateModule,
     researchModelUsed, decompositionModelUsed, researchResult,
     handleRefreshModuleImages,
@@ -93,6 +94,14 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [heroView, setHeroView] = useState<"2d" | "3d">("2d")
+  const [overviewApproved, setOverviewApproved] = useState(false)
+
+  // INTENT: If loading a saved project that already has modules, skip the approval gate.
+  useEffect(() => {
+    if (modules.length > 0 && !overviewApproved) {
+      setOverviewApproved(true)
+    }
+  }, [modules.length, overviewApproved])
 
   // INTENT: Cross-origin URLs ignore the <a download> attribute.
   // Fetch as blob and create an object URL to force a real download.
@@ -304,21 +313,24 @@ export default function CadLabResearchPage(): React.ReactNode {
     }
   }, [interviewPhase, isResearching, hasResearch, handleResearch])
 
-  // Reset the guard when interview resets to idle (e.g. handleReset)
+  // Reset guards when interview resets to idle (e.g. handleReset)
   useEffect(() => {
     if (interviewPhase === "idle") {
       interviewResearchFiredRef.current = false
+      setOverviewApproved(false)
     }
   }, [interviewPhase])
 
-  // INTENT: Auto-trigger decomposition after fresh research completes.
+  // INTENT: Auto-trigger decomposition after user approves the product overview.
   // freshResearchRef is only set by handleResearch — loading a saved project won't trigger this.
+  // DECISION: Gated on overviewApproved so the user reviews the research before
+  // decomposition begins — prevents wasted compute on a bad research synthesis.
   useEffect(() => {
-    if (freshResearchRef.current && hasResearch && modules.length === 0 && !isDecomposing && activeProjectId) {
+    if (freshResearchRef.current && overviewApproved && hasResearch && modules.length === 0 && !isDecomposing && activeProjectId) {
       freshResearchRef.current = false
       handleDecompose()
     }
-  }, [freshResearchRef, hasResearch, modules.length, isDecomposing, handleDecompose, activeProjectId])
+  }, [freshResearchRef, overviewApproved, hasResearch, modules.length, isDecomposing, handleDecompose, activeProjectId])
 
   // INTENT: Reset freshResearchRef on unmount so navigating away and back
   // doesn't re-trigger auto-decompose. "Fresh research" means research that
@@ -439,6 +451,10 @@ export default function CadLabResearchPage(): React.ReactNode {
                   overview={productOverview}
                   onSave={setProductOverview}
                   modelAudit={modelAudit}
+                  overviewApproved={overviewApproved}
+                  onApprove={modules.length === 0 && !isDecomposing ? () => setOverviewApproved(true) : undefined}
+                  saveError={saveError}
+                  isDecomposing={isDecomposing}
                 />
               )}
 

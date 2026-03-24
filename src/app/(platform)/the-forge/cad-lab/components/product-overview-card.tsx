@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react"
-import { Pencil, Check, X, AlertTriangle } from "lucide-react"
+import { Pencil, Check, X, AlertTriangle, CheckCircle2, ArrowRight, AlertCircle, Info } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -62,6 +62,14 @@ interface ProductOverviewCardProps {
   overview: string
   onSave: (text: string) => void
   modelAudit?: ModelAudit
+  /** Whether the user has approved the overview to proceed with decomposition */
+  overviewApproved?: boolean
+  /** Callback to approve the overview and trigger decomposition */
+  onApprove?: () => void
+  /** Whether the last save attempt failed */
+  saveError?: boolean
+  /** Whether decomposition is currently in progress */
+  isDecomposing?: boolean
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -70,6 +78,10 @@ export function ProductOverviewCard({
   overview,
   onSave,
   modelAudit,
+  overviewApproved,
+  onApprove,
+  saveError,
+  isDecomposing,
 }: ProductOverviewCardProps): React.ReactNode {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(overview)
@@ -155,6 +167,44 @@ export function ProductOverviewCard({
           <p className="text-sm text-muted-foreground/60 italic">
             No product overview yet. Click Add to describe your product.
           </p>
+        )}
+
+        {/* ── Save feedback — error only; success is silent (autosave pattern) ── */}
+        {!isEditing && saveError && (
+          <div className="flex items-center gap-1.5 mt-2">
+            <AlertCircle className="h-3 w-3 text-destructive" />
+            <span className="text-[11px] text-destructive">Save failed — check your connection</span>
+          </div>
+        )}
+
+        {/* ── Approval banner — shown after research, before decomposition ── */}
+        {onApprove && !overviewApproved && overview && !overview.includes("synthesis failed") && (
+          <div className="mt-4 rounded-lg border border-international-orange/30 bg-international-orange/5 p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Info className="h-4 w-4 text-international-orange shrink-0" />
+              <p className="text-sm text-foreground">
+                Review the overview above, then approve to start module decomposition.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              className="gap-1.5 shrink-0"
+              onClick={onApprove}
+            >
+              Approve & Continue
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
+        {/* INTENT: Show "approved" badge only during the brief transitional window —
+            user just clicked approve, decomposition is starting. Hidden on loaded projects
+            (where modules already exist) and once modules arrive. */}
+        {overviewApproved && isDecomposing && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+            <span className="text-xs text-success font-medium">Overview approved — decomposing into modules…</span>
+          </div>
         )}
 
         {/* ── Model Attribution ── */}
