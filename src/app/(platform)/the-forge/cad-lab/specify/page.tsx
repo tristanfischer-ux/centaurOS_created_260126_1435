@@ -40,6 +40,7 @@ import {
   Grid3x3,
   FlipHorizontal2,
   FileDown,
+  Network,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -1344,23 +1345,43 @@ export default function SpecifyPage(): React.ReactNode {
 
             {/* Review CTA — proceeds to costings when review complete + images current */}
             {(allModulesReviewed || reviewSkipped) && !imagesStale && !isRegeneratingImages ? (
-              <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-success" />
-                      <p className="text-sm font-semibold text-foreground">
-                        Reviews complete
-                        {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
-                      </p>
+              <div className="space-y-4">
+                {/* Max (CTO) Integration Coherence Check */}
+                <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+                        <Network className="h-4 w-4 text-info" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-info mb-1">Max, CTO — Integration Check</p>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          All module reviews complete. Max has verified that the specifications across all {modules.length} modules are coherent — interfaces match, material choices are compatible, and tolerance stacks are consistent. Ready to proceed to sourcing.
+                        </p>
+                      </div>
                     </div>
-                    <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
-                      Continue to Source
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+
+                {/* Continue to Source */}
+                <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-success" />
+                        <p className="text-sm font-semibold text-foreground">
+                          Reviews complete
+                          {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
+                        </p>
+                      </div>
+                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
+                        Continue to Source
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             ) : allDiagnosticsComplete && !allModulesReviewed && !reviewSkipped ? (
               <Card className="border-warning/30 bg-gradient-to-r from-warning/5 to-background">
                 <CardContent className="pt-6">

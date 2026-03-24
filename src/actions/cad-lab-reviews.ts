@@ -137,12 +137,29 @@ export async function requestSpecialistReview(
             req.specialistId,
         )
 
+        // DECISION: Fang (VP Manufacturing) owns the Specify stage. Her reviews
+        // include Assembly Notes that carry forward to the Assemble stage as
+        // constraints for Chase (VP Supply Chain).
+        const assemblyNotesInstructions = req.specialistId === "vp-manufacturing"
+            ? `
+
+## Assembly Notes (REQUIRED for manufacturing specialist)
+In addition to your DFM review, provide Assembly Notes for this module:
+- **Assembly sequence**: Should this module be assembled early, middle, or late in the build?
+- **Fixtures & alignment**: What jigs, fixtures, or alignment tools are needed?
+- **Critical assembly tolerances**: Which dimensions must be held during assembly (not just manufacturing)?
+- **Test points**: What should be verified immediately after this module is assembled?
+- **Dependencies**: Which other modules must be assembled before this one?
+
+Include these in your recommendations section with the prefix "ASSEMBLY:" so they can be extracted.`
+            : ""
+
         let systemPrompt = `${personalityPrompt}
 
 ## Current Task: Design Review
 You are performing a structured design review of a CAD Lab module. Use your tools to verify claims with real data — never guess material properties or process constraints.
 
-${reviewContext}`
+${reviewContext}${assemblyNotesInstructions}`
 
         // ── Bridge specialist memory (Tier 1) ──
         // Memory is additive — if it fails, reviews still work as before.

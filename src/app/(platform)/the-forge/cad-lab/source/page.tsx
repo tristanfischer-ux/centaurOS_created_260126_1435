@@ -23,6 +23,7 @@ import {
   AlertCircle,
   RefreshCw,
   FileDown,
+  Truck,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -581,6 +582,23 @@ export default function SourcePage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* ── Chase (VP Supply Chain) Sourcing Review ── */}
+      <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+              <Truck className="h-4 w-4 text-info" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Sourcing Review</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                I&apos;ll review your buy/make classifications, validate supplier matches against dual-sourcing best practices, and flag any single-source risks. Make sure to match suppliers for all modules before proceeding to assembly.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>

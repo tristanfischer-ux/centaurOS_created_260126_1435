@@ -134,9 +134,15 @@ export function recommendSpecialist(
     return { id: spec.id, score, matchedKeywords }
   })
 
-  // Sort descending by score. Tiebreak: Fang (vp-manufacturing) first since
-  // manufacturing is the most commonly relevant review for hardware modules.
-  const tiebreakOrder = ["vp-manufacturing", "vp-engineering", "cto", "vp-supply-chain"]
+  // DECISION: Fang (VP Manufacturing) owns the Specify stage. She is the default
+  // reviewer for ALL hardware modules — DFM, tolerances, materials, assembly notes.
+  // Give Fang a +10 baseline so she always wins unless another specialist has
+  // overwhelmingly strong keyword matches. Users can still override manually.
+  const fangBonus = rankings.find(r => r.id === "vp-manufacturing")
+  if (fangBonus) fangBonus.score += 10
+
+  // Sort descending by score. Tiebreak: Fang first.
+  const tiebreakOrder = ["vp-manufacturing", "cto", "vp-supply-chain", "vp-engineering"]
   rankings.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
     return tiebreakOrder.indexOf(a.id) - tiebreakOrder.indexOf(b.id)

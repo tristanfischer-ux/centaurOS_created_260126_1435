@@ -444,6 +444,23 @@ export default function AssemblePage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
+      {/* ── Chase (VP Supply Chain) Assembly Review ── */}
+      <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
+        <CardContent className="pt-6">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+              <Truck className="h-4 w-4 text-info" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Assembly & Logistics</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                I&apos;m overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment. Watch for Fang&apos;s assembly notes from the Specify stage — they define the build sequence and fixture requirements.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>
