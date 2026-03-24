@@ -36,6 +36,7 @@ import {
   Cog,
   Building2,
   Clock,
+  RefreshCw,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -643,10 +644,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-2">Failure Modes</p>
                             <div className="space-y-1">
-                              {allFailures.slice(0, 5).map((f, i) => (
+                              {allFailures.map((f, i) => (
                                 <p key={`f-${i}`} className="text-xs text-foreground"><span className="text-muted-foreground">{f.module}:</span> {f.issue}</p>
                               ))}
-                              {allFailures.length > 5 && <p className="text-xs text-muted-foreground">+{allFailures.length - 5} more</p>}
                             </div>
                           </div>
                         )}
@@ -654,10 +654,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <div>
                             <p className="text-xs font-medium text-muted-foreground mb-2">Open Questions</p>
                             <div className="space-y-1">
-                              {allUnknowns.slice(0, 5).map((u, i) => (
+                              {allUnknowns.map((u, i) => (
                                 <p key={`u-${i}`} className="text-xs text-foreground"><span className="text-muted-foreground">{u.module}:</span> {u.issue}</p>
                               ))}
-                              {allUnknowns.length > 5 && <p className="text-xs text-muted-foreground">+{allUnknowns.length - 5} more</p>}
                             </div>
                           </div>
                         )}
@@ -956,9 +955,22 @@ export default function CadLabResearchPage(): React.ReactNode {
                 {modules.map((mod) => (
                   <Card key={mod.id}>
                     <CardContent className="pt-4 pb-4 space-y-2">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2">
                         <h4 className="text-sm font-semibold text-foreground">{mod.name}</h4>
-                        {mod.imageStatus === "complete" && <Badge variant="success" className="text-[10px]">Illustrated</Badge>}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {mod.imageStatus === "complete" && <Badge variant="success" className="text-[10px]">Illustrated</Badge>}
+                          {(!mod.keyParts || mod.keyParts.length === 0 || !mod.failureModes || mod.failureModes.length === 0) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1 text-xs h-6 text-status-warning"
+                              onClick={() => handleReExpandModule(mod.id)}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                              Incomplete — Retry
+                            </Button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-xs text-muted-foreground">{mod.purpose}</p>
                       {mod.description && <p className="text-xs text-foreground leading-relaxed">{mod.description}</p>}
