@@ -59,19 +59,19 @@ export async function GET() {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
-        body: JSON.stringify({ model: "gpt-4o-mini", max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
+        body: JSON.stringify({ model: "gpt-5.3-chat-latest", max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
         signal: AbortSignal.timeout(timeout),
       })
       const data = await res.json()
       results.push({
         provider: "OpenAI",
-        model: "gpt-4o-mini",
+        model: "gpt-5.3-chat-latest",
         status: data.choices ? "ok" : "error",
         responseMs: Date.now() - start,
         ...(data.error && { error: data.error.message?.slice(0, 100) }),
       })
     } catch (err) {
-      results.push({ provider: "OpenAI", model: "gpt-4o-mini", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
+      results.push({ provider: "OpenAI", model: "gpt-5.3-chat-latest", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
     }
   } else {
     results.push({ provider: "OpenAI", model: "—", status: "not_configured", responseMs: null })

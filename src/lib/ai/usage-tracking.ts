@@ -169,7 +169,7 @@ const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number 
  */
 const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
   // OpenAI Realtime API (audio input + output combined)
-  'gpt-4o-realtime-preview': 0.10,   // ~$0.02 input + $0.08 output
+  'gpt-realtime': 0.08,   // ~20% cheaper than gpt-4o-realtime-preview
   // Avatar providers
   'heygen-streaming': 0.07,
   'simli-streaming': 0.03,
@@ -186,7 +186,7 @@ const REALTIME_COSTS_PER_MINUTE: Record<string, number> = {
  */
 export function estimateRealtimeCost(
   durationSeconds: number,
-  voiceModel: string = 'gpt-4o-realtime-preview',
+  voiceModel: string = 'gpt-realtime',
   avatarProvider?: string
 ): number {
   const minutes = durationSeconds / 60
