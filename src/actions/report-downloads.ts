@@ -29,7 +29,7 @@ export interface ReportDownloadRow {
   reportName: string
   reportSource: ReportSource
   fileFormat: FileFormat
-  fileUrl: string | null
+  signedUrl: string | null
   fileSizeBytes: number | null
   storagePath: string | null
   expiresAt: string
@@ -50,8 +50,8 @@ export async function saveReportDownload(
   input: SaveInput,
 ): Promise<{ success: true; id: string } | ActionError> {
   return withAuth(async ({ supabase, user, foundryId }) => {
-    // SECURITY: file_url is NOT stored — signed URLs are generated on-demand
-    // in getReportDownloads() to prevent unauthenticated access via public URLs.
+    // SECURITY: signed URLs are generated on-demand in getReportDownloads()
+    // to prevent unauthenticated access via public URLs.
     const { data, error } = await supabase
       .from('report_downloads')
       .insert({
@@ -60,7 +60,6 @@ export async function saveReportDownload(
         report_name: input.reportName.slice(0, 500),
         report_source: input.reportSource,
         file_format: input.fileFormat,
-        file_url: null,
         file_size_bytes: input.fileSizeBytes ?? null,
         storage_path: input.storagePath ?? null,
       })
@@ -149,7 +148,7 @@ export async function getReportDownloads(): Promise<
       reportName: row.report_name,
       reportSource: row.report_source as ReportSource,
       fileFormat: row.file_format as FileFormat,
-      fileUrl: row.storage_path ? (signedUrlMap[row.storage_path] ?? null) : null,
+      signedUrl: row.storage_path ? (signedUrlMap[row.storage_path] ?? null) : null,
       fileSizeBytes: row.file_size_bytes,
       storagePath: row.storage_path,
       expiresAt: row.expires_at ?? '',
@@ -197,7 +196,7 @@ export async function cleanExpiredReportDownloads(): Promise<
       .filter((p): p is string => !!p)
 
     if (storagePaths.length > 0) {
-      await Promise.all([
+      await Promise.allSettled([
         admin.storage.from(CURRENT_BUCKET).remove(storagePaths),
         admin.storage.from(LEGACY_BUCKET).remove(storagePaths),
       ])
@@ -240,7 +239,7 @@ export async function deleteReportDownload(
     // Delete Storage file from both buckets (best-effort, after DB row is gone)
     if (row.storage_path) {
       const admin = createAdminClient()
-      await Promise.all([
+      await Promise.allSettled([
         admin.storage.from(CURRENT_BUCKET).remove([row.storage_path]),
         admin.storage.from(LEGACY_BUCKET).remove([row.storage_path]),
       ])

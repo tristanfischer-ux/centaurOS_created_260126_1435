@@ -41,6 +41,7 @@ import {
   FlipHorizontal2,
   FileDown,
   Network,
+  PoundSterling,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -605,6 +606,40 @@ export default function SpecifyPage(): React.ReactNode {
               isRegenerating={isRegeneratingImages}
               progressLines={progressLines}
             />
+
+            {/* Cost summary — aggregate early estimates across modules */}
+            {aiCostEstimates && Object.keys(aiCostEstimates).length > 0 && (
+              <Card>
+                <CardContent className="pt-5 pb-4">
+                  <div className="flex items-center gap-1.5 mb-3">
+                    <PoundSterling className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <h3 className="text-sm font-semibold text-foreground">Cost Summary</h3>
+                    <span className="text-xs text-muted-foreground ml-1">— early estimates across {Object.keys(aiCostEstimates).length} modules</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {modules.map(mod => {
+                      const est = aiCostEstimates[mod.id]
+                      if (!est) return null
+                      return (
+                        <div key={mod.id} className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground truncate max-w-[60%]">{mod.name}</span>
+                          <span className="font-medium text-foreground">
+                            £{est.totalPerUnit?.toFixed(0) ?? "?"}/unit
+                            <span className="text-xs text-muted-foreground ml-1">({est.confidence ?? "?"})</span>
+                          </span>
+                        </div>
+                      )
+                    })}
+                    <div className="border-t pt-2 mt-2 flex items-center justify-between text-sm font-semibold">
+                      <span className="text-foreground">Total per unit</span>
+                      <span className="text-international-orange">
+                        £{Object.values(aiCostEstimates).reduce((sum, e) => sum + (e.totalPerUnit ?? 0), 0).toFixed(0)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Module summary cards */}
             <div>

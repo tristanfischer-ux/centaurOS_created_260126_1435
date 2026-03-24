@@ -592,7 +592,14 @@ export default function SourcePage(): React.ReactNode {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Sourcing Review</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                I&apos;ll review your buy/make classifications, validate supplier matches against dual-sourcing best practices, and flag any single-source risks. Make sure to match suppliers for all modules before proceeding to assembly.
+                {(() => {
+                  const matched = [...supplierMatches.values()].filter(v => v.length > 0).length
+                  const total = eligibleModules.length
+                  if (matched === 0) return "Match suppliers for each module to start building your supply chain. I'll validate dual-sourcing and flag single-source risks."
+                  if (matched < total) return `${matched} of ${total} modules matched. Keep going — match all modules before proceeding to assembly.`
+                  if (manufacturingOrderCount > 0) return `All ${total} modules matched with ${manufacturingOrderCount} manufacturing order${manufacturingOrderCount !== 1 ? "s" : ""} created. Ready to proceed to assembly.`
+                  return `All ${total} modules matched. Create RFQs and manufacturing orders to proceed to assembly.`
+                })()}
               </p>
             </div>
           </div>
@@ -729,6 +736,7 @@ export default function SourcePage(): React.ReactNode {
         {/* ═══ Shortlist tab ═══ */}
         {activeTab === "shortlist" && (
           <motion.div key="shortlist" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+            <p className="text-xs text-muted-foreground">Click a supplier to set priority (1st → 2nd → 3rd). Top-ranked suppliers per category receive your RFQ.</p>
             <CadLabShortlist
               modules={eligibleModules}
               projectName={subject}

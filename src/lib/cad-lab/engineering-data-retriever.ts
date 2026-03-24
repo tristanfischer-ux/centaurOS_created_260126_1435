@@ -158,7 +158,7 @@ export async function retrieveEngineeringDataForPrompt(
 
 // ─── Detection Helpers ──────────────────────────────────────────────
 
-function detectMaterialFamilies(text: string, materials: string[]): string[] {
+export function detectMaterialFamilies(text: string, materials: string[]): string[] {
   const combined = text + " " + materials.join(" ").toLowerCase()
   const families: string[] = []
 
@@ -186,7 +186,7 @@ function detectMaterialFamilies(text: string, materials: string[]): string[] {
   return families
 }
 
-function detectProcesses(text: string, processes: string[]): string[] {
+export function detectProcesses(text: string, processes: string[]): string[] {
   const combined = text + " " + processes.join(" ").toLowerCase()
   const detected: string[] = []
 

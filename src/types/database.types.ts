@@ -13865,7 +13865,6 @@ export type Database = {
           expires_at: string | null
           file_format: string
           file_size_bytes: number | null
-          file_url: string | null
           foundry_id: string
           id: string
           profile_id: string
@@ -13878,7 +13877,6 @@ export type Database = {
           expires_at?: string | null
           file_format: string
           file_size_bytes?: number | null
-          file_url?: string | null
           foundry_id: string
           id?: string
           profile_id: string
@@ -13891,7 +13889,6 @@ export type Database = {
           expires_at?: string | null
           file_format?: string
           file_size_bytes?: number | null
-          file_url?: string | null
           foundry_id?: string
           id?: string
           profile_id?: string

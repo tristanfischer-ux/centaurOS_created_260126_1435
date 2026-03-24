@@ -205,10 +205,15 @@ export function CadLabShortlist({
         const next = new Map(prev)
         for (const result of results) {
           if (result.status === "fulfilled") {
-            next.set(result.value.supplierId, {
-              status: result.value.status,
-              responseCount: result.value.responseCount,
-            })
+            const { supplierId, status, responseCount } = result.value
+            const prevCount = prev.get(supplierId)?.responseCount ?? 0
+            // DECISION: Toast when a new response arrives (count increased)
+            if (responseCount > prevCount && prevCount > 0) {
+              import("sonner").then(({ toast }) => {
+                toast.success(`New quote received — ${responseCount} response${responseCount !== 1 ? "s" : ""} total`)
+              })
+            }
+            next.set(supplierId, { status, responseCount })
           }
         }
         return next
@@ -554,7 +559,7 @@ export function CadLabShortlist({
                         }}
                         disabled={creatingRfqFor === supplier.id}
                       >
-                        {creatingRfqFor === supplier.id ? "Creating…" : "Create RFQ"}
+                        {creatingRfqFor === supplier.id ? "Creating…" : "Preview RFQ Template"}
                       </Button>
                     ) : (
                       <>
@@ -709,7 +714,7 @@ export function CadLabShortlist({
                           onClick={() => handleCreateSupplierRfq(supplier.id, supplier)}
                           disabled={creatingRfqFor === supplier.id}
                         >
-                          {creatingRfqFor === supplier.id ? "Creating…" : "Create Marketplace RFQ"}
+                          {creatingRfqFor === supplier.id ? "Sending…" : "Send to Suppliers"}
                         </Button>
                       ) : (
                         <>

@@ -26,12 +26,13 @@ const PDF_GENERATION_TIMEOUT_MS = 30_000
  *
  * @param element - The DOM element containing the rendered report
  * @param filename - Output filename (should end in .pdf)
+ * @returns The PDF as a Blob (also triggers browser download)
  * @throws {Error} If PDF generation times out or fails
  */
 export async function exportReportAsPDF(
   element: HTMLElement,
   filename: string
-): Promise<void> {
+): Promise<Blob> {
   const html2pdfModule = await import('html2pdf.js')
   const html2pdf = html2pdfModule.default
 
@@ -58,7 +59,10 @@ export async function exportReportAsPDF(
     },
   }
 
-  const pdfPromise = html2pdf().set(options).from(element).save()
+  // DECISION: Use outputPdf("blob") instead of .save() to capture the Blob
+  // for Storage upload. Manual download via createObjectURL avoids the
+  // double-download bug where save() triggers its own download.
+  const pdfPromise = html2pdf().set(options).from(element).outputPdf('blob') as Promise<Blob>
   let timeoutId: ReturnType<typeof setTimeout>
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
     timeoutId = setTimeout(
@@ -67,11 +71,27 @@ export async function exportReportAsPDF(
     )
   })
 
+  let blob: Blob
   try {
-    await Promise.race([pdfPromise, timeoutPromise])
+    blob = await Promise.race([pdfPromise, timeoutPromise])
   } finally {
     clearTimeout(timeoutId!)
   }
+
+  // GOTCHA: outputPdf returns a union type — runtime check required
+  if (!(blob instanceof Blob)) {
+    blob = new Blob([blob], { type: 'application/pdf' })
+  }
+
+  // Trigger browser download manually
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(url)
+
+  return blob
 }
 
 /**

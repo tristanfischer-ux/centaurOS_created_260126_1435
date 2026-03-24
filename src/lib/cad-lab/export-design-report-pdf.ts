@@ -162,7 +162,10 @@ export async function exportDesignReportAsPDF(data: DesignReportData): Promise<B
   // Generate blob for upload + manual browser download
   // DECISION: Don't call worker.save() — it triggers a second download prompt.
   // Instead, do a manual download via createObjectURL (consistent with DOCX/PPTX paths).
-  const blob: Blob = await worker.outputPdf("blob")
+  let blob = await worker.outputPdf("blob")
+  if (!(blob instanceof Blob)) {
+    blob = new Blob([blob], { type: 'application/pdf' })
+  }
 
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")

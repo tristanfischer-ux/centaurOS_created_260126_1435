@@ -49,11 +49,12 @@ export async function exportInfographicAsImage(element: HTMLElement): Promise<Bl
  *
  * @param element The DOM element to capture
  * @param filename The download filename (should end in .png)
+ * @returns The PNG image as a Blob (also triggers browser download)
  */
 export async function downloadInfographicAsImage(
   element: HTMLElement,
   filename: string
-): Promise<void> {
+): Promise<Blob> {
   const blob = await exportInfographicAsImage(element)
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -61,4 +62,5 @@ export async function downloadInfographicAsImage(
   link.download = filename
   link.click()
   URL.revokeObjectURL(url)
+  return blob
 }

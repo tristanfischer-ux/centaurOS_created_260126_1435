@@ -535,6 +535,7 @@ export interface CadLabResearchResult {
     hardwareItemCount: number
     processesApplied: string[]
     supplierTechniques: number
+    supplierTechniqueNames?: string[]
     totalDataPoints: number
   }
 }

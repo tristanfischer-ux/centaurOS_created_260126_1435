@@ -154,13 +154,13 @@ export function ReportDownloads() {
                     <td className="px-4 py-3 text-muted-foreground">{formatDate(dl.createdAt)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        {dl.fileUrl && (
+                        {dl.signedUrl && (
                           <Button
                             variant="ghost"
                             size="sm"
                             asChild
                           >
-                            <a href={dl.fileUrl} download target="_blank" rel="noopener noreferrer">
+                            <a href={dl.signedUrl} download target="_blank" rel="noopener noreferrer">
                               <Download className="h-4 w-4" />
                             </a>
                           </Button>

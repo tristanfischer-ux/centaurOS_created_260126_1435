@@ -1067,6 +1067,7 @@ Rules:
         isConversationalFastPath,
         handoffSourceThreadId,
         handoffSourceSpecialistId,
+        cadLabProjectId,
         modelTier: modelTier ?? 'claude',
     })
     systemPromptWithContext += contextLayers

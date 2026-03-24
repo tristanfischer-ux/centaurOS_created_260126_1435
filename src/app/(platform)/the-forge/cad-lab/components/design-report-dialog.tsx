@@ -189,7 +189,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
 
             const supabase = createClient()
             const { error: uploadError } = await supabase.storage
-              .from("xray-images")
+              .from("report-exports")
               .upload(storagePath, blob, {
                 contentType: "application/pdf",
                 upsert: true,
@@ -296,7 +296,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage
-            .from("xray-images")
+            .from("report-exports")
             .upload(storagePath, blob, {
               contentType: ext === "docx"
                 ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

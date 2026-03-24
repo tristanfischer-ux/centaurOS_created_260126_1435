@@ -145,7 +145,8 @@ export default function CadLabResearchPage(): React.ReactNode {
             materialFamilies: data.materials.map(m => m.name),
             hardwareItemCount: data.hardwareCount,
             processesApplied: data.processes.map(p => p.displayName),
-            supplierTechniques: 27,
+            supplierTechniques: data.supplierInsights?.length ?? 27,
+            supplierTechniqueNames: data.supplierInsights?.map(s => `${s.technique} (${s.supplierCount} suppliers)`) ?? [],
             totalDataPoints: stdCodes.length + data.materials.length + data.hardwareCount + data.processes.length,
           })
         })
@@ -460,14 +461,11 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-foreground">Design Standards</p>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {stdCodes.slice(0, 5).map((code, i) => (
-                                <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
+                              {stdCodes.map((code, i) => (
+                                <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[220px] truncate">
                                   {code}
                                 </span>
                               ))}
-                              {stdCodes.length > 5 && (
-                                <span className="text-[11px] text-muted-foreground py-0.5">+{stdCodes.length - 5} more</span>
-                              )}
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
                               {researchResult?.industryDomain && <>{researchResult.industryDomain.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} domain</>}
@@ -486,14 +484,11 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-foreground">Material Properties</p>
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {engData.materialsApplied.slice(0, 4).map((code, i) => (
+                              {engData.materialsApplied.map((code, i) => (
                                 <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
                                   {code}
                                 </span>
                               ))}
-                              {engData.materialsApplied.length > 4 && (
-                                <span className="text-[11px] text-muted-foreground py-0.5">+{engData.materialsApplied.length - 4} more</span>
-                              )}
                             </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
                               {engData.materialFamilies.length > 0
@@ -541,14 +536,66 @@ export default function CadLabResearchPage(): React.ReactNode {
                       {engData && engData.supplierTechniques > 0 && (
                         <div className="flex items-start gap-2">
                           <Building2 className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-xs font-medium text-foreground">Supplier Intelligence</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {engData.supplierTechniques} manufacturing techniques enriched from real supplier data
-                            </p>
+                            {engData.supplierTechniqueNames && engData.supplierTechniqueNames.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {engData.supplierTechniqueNames.map((name, i) => (
+                                  <span key={`tech-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {engData.supplierTechniques} manufacturing techniques enriched from real supplier data
+                              </p>
+                            )}
                           </div>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
+              {/* Known Challenges — surface failure modes and unknowns early */}
+              {modules.length > 0 && (() => {
+                const allFailures = modules.flatMap(m => (m.failureModes ?? []).map(f => ({ module: m.name, issue: f })))
+                const allUnknowns = modules.flatMap(m => (m.unknowns ?? []).map(u => ({ module: m.name, issue: u })))
+                if (allFailures.length === 0 && allUnknowns.length === 0) return null
+                return (
+                  <Card>
+                    <CardContent className="pt-5 pb-4">
+                      <div className="flex items-center gap-1.5 mb-3">
+                        <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+                        <h3 className="text-sm font-semibold text-foreground">Known Challenges</h3>
+                        <span className="text-xs text-muted-foreground ml-1">— {allFailures.length + allUnknowns.length} items across {modules.length} modules</span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {allFailures.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Failure Modes</p>
+                            <div className="space-y-1">
+                              {allFailures.slice(0, 5).map((f, i) => (
+                                <p key={`f-${i}`} className="text-xs text-foreground"><span className="text-muted-foreground">{f.module}:</span> {f.issue}</p>
+                              ))}
+                              {allFailures.length > 5 && <p className="text-xs text-muted-foreground">+{allFailures.length - 5} more</p>}
+                            </div>
+                          </div>
+                        )}
+                        {allUnknowns.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground mb-2">Open Questions</p>
+                            <div className="space-y-1">
+                              {allUnknowns.slice(0, 5).map((u, i) => (
+                                <p key={`u-${i}`} className="text-xs text-foreground"><span className="text-muted-foreground">{u.module}:</span> {u.issue}</p>
+                              ))}
+                              {allUnknowns.length > 5 && <p className="text-xs text-muted-foreground">+{allUnknowns.length - 5} more</p>}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 )
