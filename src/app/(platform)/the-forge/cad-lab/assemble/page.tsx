@@ -71,7 +71,7 @@ import type { ShortlistedSupplier } from "../source/page"
 // ─── localStorage helpers ───────────────────────────────────────────
 
 function loadJson<T>(key: string | null, fallback: T): T {
-  if (!key) return fallback
+  if (!key || typeof window === "undefined") return fallback
   try {
     const stored = localStorage.getItem(key)
     if (stored) return JSON.parse(stored) as T

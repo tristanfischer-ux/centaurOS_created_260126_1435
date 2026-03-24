@@ -117,7 +117,7 @@ export default function SourcePage(): React.ReactNode {
   const storageKey = activeProjectId ? `forge-supplier-matches-${activeProjectId}` : null
 
   const [supplierMatches, setSupplierMatchesRaw] = useState<Map<string, CadLabSupplierMatch[]>>(() => {
-    if (!storageKey) return new Map()
+    if (!storageKey || typeof window === "undefined") return new Map()
     try {
       const stored = localStorage.getItem(storageKey)
       if (stored) return new Map(JSON.parse(stored) as [string, CadLabSupplierMatch[]][])
@@ -144,7 +144,7 @@ export default function SourcePage(): React.ReactNode {
   const rfqIdsKey = activeProjectId ? `forge-supplier-rfqs-${activeProjectId}` : null
 
   const [shortlistedSuppliers, setShortlistedSuppliersRaw] = useState<Map<string, ShortlistedSupplier>>(() => {
-    if (!shortlistKey) return new Map()
+    if (!shortlistKey || typeof window === "undefined") return new Map()
     try {
       const stored = localStorage.getItem(shortlistKey)
       if (stored) return new Map(JSON.parse(stored) as [string, ShortlistedSupplier][])
@@ -163,7 +163,7 @@ export default function SourcePage(): React.ReactNode {
   }, [shortlistKey])
 
   const [perSupplierRfqIds, setPerSupplierRfqIdsRaw] = useState<Map<string, string>>(() => {
-    if (!rfqIdsKey) return new Map()
+    if (!rfqIdsKey || typeof window === "undefined") return new Map()
     try {
       const stored = localStorage.getItem(rfqIdsKey)
       if (stored) return new Map(JSON.parse(stored) as [string, string][])
@@ -195,7 +195,7 @@ export default function SourcePage(): React.ReactNode {
   const categoryRankingsKey = activeProjectId ? `forge-supplier-shortlist-v3-${activeProjectId}` : null
 
   const [categoryRankings, setCategoryRankingsRaw] = useState<Map<string, string[]>>(() => {
-    if (!categoryRankingsKey) return new Map()
+    if (!categoryRankingsKey || typeof window === "undefined") return new Map()
     try {
       const stored = localStorage.getItem(categoryRankingsKey)
       if (stored) return new Map(JSON.parse(stored) as [string, string[]][])
@@ -218,7 +218,7 @@ export default function SourcePage(): React.ReactNode {
   const buySearchKey = activeProjectId ? `forge-buy-search-v7-${activeProjectId}` : null
 
   const [buyPartResults, setBuyPartResultsRaw] = useState<BuyPartSearchResult[]>(() => {
-    if (!buySearchKey) return []
+    if (!buySearchKey || typeof window === "undefined") return []
     try {
       const stored = localStorage.getItem(buySearchKey)
       if (stored) return JSON.parse(stored) as BuyPartSearchResult[]
