@@ -199,7 +199,16 @@ function ModuleDetailDialog({
           )}
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+        <div className="relative flex-1 min-h-0 overflow-y-auto pr-2">
+          {/* INTENT: Full-content loading overlay when reloading — makes it obvious
+              that data is being refreshed, not just the tiny button spinner */}
+          {isReloading && (
+            <div className="absolute inset-0 z-10 bg-background/60 flex flex-col items-center justify-center gap-2 rounded-lg">
+              <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
+              <p className="text-sm font-medium text-foreground">Fetching full module specifications…</p>
+              <p className="text-xs text-muted-foreground">This typically takes 10–20 seconds</p>
+            </div>
+          )}
           <div className="space-y-6">
             {/* Illustration (view-only in both modes) */}
             {module.imageStatus === "complete" && module.imageUrl && !isEditing && (
@@ -270,8 +279,24 @@ function ModuleDetailDialog({
                   rows={4}
                   className="resize-y text-sm"
                 />
-              ) : (
+              ) : module.description ? (
                 <p className="text-sm text-foreground">{module.description}</p>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border bg-muted/30 p-3 flex items-center gap-2">
+                  <Info className="h-4 w-4 text-muted-foreground/60 shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Module details not yet generated.{" "}
+                    {onReload && (
+                      <button
+                        className="text-international-orange hover:underline font-medium"
+                        onClick={onReload}
+                        disabled={isReloading}
+                      >
+                        {isReloading ? "Loading…" : "Click Reload to fetch full specifications."}
+                      </button>
+                    )}
+                  </p>
+                </div>
               )}
             </div>
 

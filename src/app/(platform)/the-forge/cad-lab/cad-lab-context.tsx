@@ -1060,25 +1060,36 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       )
 
       if (expRes.success && expRes.expansion) {
+        // INTENT: Quality gate — if the expansion returns no meaningful data,
+        // treat it as a failure. Prevents misleading "success" toast when the AI
+        // returned an empty/garbage response.
+        const exp = expRes.expansion
+        const hasSubstance = (exp.description?.length ?? 0) > 10 || exp.keyParts.length > 0 || exp.failureModes.length > 0
+        if (!hasSubstance) {
+          console.warn(`[CAD-LAB] Re-expansion returned empty data for ${target.name}`)
+          toast.error(`Re-expansion returned no data for ${target.name} — try again in a moment`)
+          return
+        }
+
         setModules((prev) => prev.map((m) =>
           m.id === moduleId
             ? {
                 ...m,
-                description: expRes.expansion!.description,
-                keyParts: expRes.expansion!.keyParts,
-                failureModes: expRes.expansion!.failureModes,
-                unknowns: expRes.expansion!.unknowns,
-                whyItMatters: expRes.expansion!.whyItMatters,
-                leadWeeks: expRes.expansion!.leadWeeks,
-                ...(expRes.expansion!.estimatedMassKg ? { estimatedMassKg: expRes.expansion!.estimatedMassKg } : {}),
+                description: exp.description,
+                keyParts: exp.keyParts,
+                failureModes: exp.failureModes,
+                unknowns: exp.unknowns,
+                whyItMatters: exp.whyItMatters,
+                leadWeeks: exp.leadWeeks,
+                ...(exp.estimatedMassKg ? { estimatedMassKg: exp.estimatedMassKg } : {}),
               }
             : m
         ))
         debouncedSaveModules()
-        toast.success(`${target.name} re-expanded`)
+        toast.success(`${target.name} specifications loaded`)
       } else {
         console.error(`[CAD-LAB] Re-expansion failed for ${target.name}:`, expRes.error)
-        toast.error(`Failed to re-expand ${target.name}`)
+        toast.error(`Failed to re-expand ${target.name} — ${expRes.error ?? "try again"}`)
       }
     } catch (err) {
       console.error(`[CAD-LAB] Re-expansion error for ${target.name}:`, err)
