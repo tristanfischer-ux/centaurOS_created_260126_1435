@@ -47,8 +47,8 @@ export function AssemblyCostRollup({
 }: AssemblyCostRollupProps) {
   const [targetPrice, setTargetPrice] = useState<string>("")
 
-  // ── Aggregate costs from AI estimates ──
-  const { makeCost, buyCost } = useMemo(() => {
+  // ── Aggregate all cost data in one memo ──
+  const { costLines, totalCost, maxCost } = useMemo(() => {
     let make = 0
     let buy = 0
     if (aiCostEstimates) {
@@ -62,19 +62,20 @@ export function AssemblyCostRollup({
         }
       }
     }
-    return { makeCost: Math.round(make * 100) / 100, buyCost: Math.round(buy * 100) / 100 }
-  }, [aiCostEstimates])
+    const makeCost = Math.round(make * 100) / 100
+    const buyCost = Math.round(buy * 100) / 100
 
-  const costLines: CostLine[] = [
-    { label: "Manufacturing", value: makeCost, color: "#6366f1" },
-    { label: "Bought parts", value: buyCost, color: "#0891b2" },
-    { label: "Assembly", value: assemblyEstimate, color: "#d97706" },
-    { label: "Packaging", value: packagingEstimate, color: "#059669" },
-    { label: "Shipping", value: shippingEstimate, color: "#dc2626" },
-  ]
-
-  const totalCost = costLines.reduce((sum, l) => sum + l.value, 0)
-  const maxCost = Math.max(...costLines.map((l) => l.value), 1)
+    const lines: CostLine[] = [
+      { label: "Manufacturing", value: makeCost, color: "var(--color-status-info)" },
+      { label: "Bought parts", value: buyCost, color: "var(--color-international-orange)" },
+      { label: "Assembly", value: assemblyEstimate, color: "var(--color-status-warning)" },
+      { label: "Packaging", value: packagingEstimate, color: "var(--color-status-success)" },
+      { label: "Shipping", value: shippingEstimate, color: "var(--color-destructive)" },
+    ]
+    const total = lines.reduce((sum, l) => sum + l.value, 0)
+    const max = Math.max(...lines.map((l) => l.value), 1)
+    return { costLines: lines, totalCost: total, maxCost: max }
+  }, [aiCostEstimates, assemblyEstimate, packagingEstimate, shippingEstimate])
 
   // ── Margin calculation ──
   const targetPriceNum = parseFloat(targetPrice) || 0

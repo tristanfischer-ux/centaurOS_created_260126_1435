@@ -44,6 +44,7 @@ import {
   PoundSterling,
 } from "lucide-react"
 
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
@@ -248,6 +249,10 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Diagnostic handlers ──
 
   const handleAnswer = useCallback((moduleId: string, questionId: string, value: string) => {
+    // Count mirrors before state update (for toast after)
+    const isPrimary = !modules.find((m) => m.id === moduleId)?.mirrorOf
+    const mirrorCount = isPrimary ? modules.filter((m) => m.mirrorOf === moduleId).length : 0
+
     setDiagnosticAnswers((prev: DiagnosticAnswers) => {
       const updated: DiagnosticAnswers = {
         ...prev,
@@ -257,7 +262,6 @@ export default function SpecifyPage(): React.ReactNode {
       // INTENT: Auto-sync diagnostics from primary → mirror modules.
       // Primary always wins — mirrors inherit every change. This matches the UI label
       // "Synced from {primary}" and avoids stale-comparison race conditions.
-      const isPrimary = !modules.find((m) => m.id === moduleId)?.mirrorOf
       if (isPrimary) {
         for (const mod of modules) {
           if (mod.mirrorOf === moduleId) {
@@ -268,6 +272,10 @@ export default function SpecifyPage(): React.ReactNode {
 
       return updated
     })
+
+    if (mirrorCount > 0) {
+      toast.info(`Synced to ${mirrorCount} mirror module${mirrorCount !== 1 ? "s" : ""}`)
+    }
   }, [setDiagnosticAnswers, modules])
 
   const handleUseRecommended = useCallback((moduleId: string) => {
@@ -292,6 +300,8 @@ export default function SpecifyPage(): React.ReactNode {
   }, [modules, designBrief, setDiagnosticAnswers])
 
   const handleAutoSelectAll = useCallback(() => {
+    const mirrorCount = modules.filter((m) => m.mirrorOf).length
+
     setDiagnosticAnswers((prev: DiagnosticAnswers) => {
       const updated = { ...prev }
       for (const mod of modules) {
@@ -308,6 +318,10 @@ export default function SpecifyPage(): React.ReactNode {
       }
       return updated
     })
+
+    if (mirrorCount > 0) {
+      toast.info(`Synced diagnostics to ${mirrorCount} mirror module${mirrorCount !== 1 ? "s" : ""}`)
+    }
   }, [modules, designBrief, setDiagnosticAnswers])
 
   // ── Diagnostic completion stats ──
