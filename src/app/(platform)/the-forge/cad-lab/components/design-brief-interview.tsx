@@ -159,10 +159,11 @@ export function DesignBriefInterview({
           ])
           setIsSynthesizing(false)
 
-          // Brief delay so user can see the summary before research fires
+          // INTENT: Give user time to read Max's summary before research fires.
+          // 3s is enough to scan 4-6 sentences at reading speed.
           setTimeout(() => {
             onComplete(synthesis.brief, synthesis.enrichedSubject, synthesis.summary)
-          }, 800)
+          }, 3000)
         } catch (synthErr) {
           console.error("[INTERVIEW] Synthesis failed:", synthErr)
           // INTENT: Fallback — pass raw conversation data as a basic brief
