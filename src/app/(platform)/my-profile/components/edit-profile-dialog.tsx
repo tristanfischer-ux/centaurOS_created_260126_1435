@@ -110,9 +110,17 @@ export function EditProfileDialog({
         }
         return true
       case 'contact':
-        if (formState.linkedinUrl && !formState.linkedinUrl.startsWith('http')) {
-          setError('LinkedIn URL must start with https://')
-          return false
+        if (formState.linkedinUrl) {
+          try {
+            const url = new URL(formState.linkedinUrl)
+            if (!url.hostname.endsWith('linkedin.com')) {
+              setError('Please enter a valid LinkedIn URL (e.g. https://linkedin.com/in/yourname)')
+              return false
+            }
+          } catch {
+            setError('LinkedIn URL must be a valid URL starting with https://')
+            return false
+          }
         }
         return true
       default:
@@ -339,6 +347,7 @@ function StepNameBio({
             value={fullName}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="Jane Smith"
+            maxLength={100}
             aria-required
           />
         </div>
@@ -421,6 +430,7 @@ function StepBackground({
             value={previousCompanies}
             onChange={(e) => onCompaniesChange(e.target.value)}
             placeholder="e.g. Rolls-Royce, Airbus, Boeing"
+            maxLength={300}
           />
           <p className="text-xs text-muted-foreground">
             Companies you&apos;ve worked at — helps specialists understand your network and industry experience.
@@ -434,6 +444,7 @@ function StepBackground({
             value={education}
             onChange={(e) => onEducationChange(e.target.value)}
             placeholder="e.g. MSc Mechanical Engineering, Imperial College London"
+            maxLength={200}
           />
         </div>
       </div>
@@ -473,6 +484,7 @@ function StepContactLinks({
             value={phoneNumber}
             onChange={(e) => onPhoneChange(e.target.value)}
             placeholder="+44 7700 900000"
+            maxLength={30}
           />
         </div>
 
@@ -486,6 +498,7 @@ function StepContactLinks({
             value={linkedinUrl}
             onChange={(e) => onLinkedinChange(e.target.value)}
             placeholder="https://linkedin.com/in/yourname"
+            maxLength={200}
           />
           <p className="text-xs text-muted-foreground">
             Adding your LinkedIn helps others verify your background

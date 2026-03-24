@@ -84,6 +84,7 @@ export function MarketplaceEditWizard({
   const [isPending, startTransition] = useTransition()
   const [currentStep, setCurrentStep] = useState<StepId>('headline')
   const [error, setError] = useState<string | null>(null)
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false)
 
   const [formState, setFormState] = useState<FormState>({
     headline: providerProfile?.headline || '',
@@ -117,6 +118,32 @@ export function MarketplaceEditWizard({
         if (formState.bio && formState.bio.length > 2000) {
           setError('Bio must be 2000 characters or less')
           return false
+        }
+        return true
+      case 'location':
+        if (formState.linkedinUrl) {
+          try {
+            const url = new URL(formState.linkedinUrl)
+            if (!url.hostname.endsWith('linkedin.com')) {
+              setError('Please enter a valid LinkedIn URL (e.g. https://linkedin.com/in/yourname)')
+              return false
+            }
+          } catch {
+            setError('LinkedIn URL must be a valid URL starting with https://')
+            return false
+          }
+        }
+        if (formState.websiteUrl) {
+          try {
+            const url = new URL(formState.websiteUrl)
+            if (!['http:', 'https:'].includes(url.protocol)) {
+              setError('Website URL must start with https://')
+              return false
+            }
+          } catch {
+            setError('Website must be a valid URL (e.g. https://yoursite.com)')
+            return false
+          }
         }
         return true
       default:
@@ -178,8 +205,14 @@ export function MarketplaceEditWizard({
   }
 
   async function handleGenerateBio(): Promise<void> {
-    const template = await generateBioTemplate(userRole)
-    updateField('bio', template)
+    if (isGeneratingBio) return
+    setIsGeneratingBio(true)
+    try {
+      const template = await generateBioTemplate(userRole)
+      updateField('bio', template)
+    } finally {
+      setIsGeneratingBio(false)
+    }
   }
 
   function handleClose(): void {
@@ -246,6 +279,7 @@ export function MarketplaceEditWizard({
               onHeadlineChange={(v) => updateField('headline', v)}
               onBioChange={(v) => updateField('bio', v)}
               onGenerateBio={handleGenerateBio}
+              isGeneratingBio={isGeneratingBio}
             />
           )}
           {currentStep === 'rates' && (
@@ -335,12 +369,14 @@ function StepHeadlineBio({
   onHeadlineChange,
   onBioChange,
   onGenerateBio,
+  isGeneratingBio,
 }: {
   headline: string
   bio: string
   onHeadlineChange: (v: string) => void
   onBioChange: (v: string) => void
   onGenerateBio: () => void
+  isGeneratingBio: boolean
 }) {
   return (
     <div className="space-y-6">
@@ -378,8 +414,12 @@ function StepHeadlineBio({
               What problems do you solve? What makes you different? Aim for 150-300 words.
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={onGenerateBio}>
-            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+          <Button type="button" variant="outline" size="sm" onClick={onGenerateBio} disabled={isGeneratingBio}>
+            {isGeneratingBio ? (
+              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+            )}
             Template
           </Button>
         </div>
@@ -439,6 +479,7 @@ function StepRatesExperience({
             onChange={(e) => onDayRateChange(e.target.value)}
             placeholder="1000"
             min={0}
+            max={100000}
           />
         </div>
         <div className="space-y-2">
@@ -509,6 +550,7 @@ function StepLocationLinks({
             value={location}
             onChange={(e) => onLocationChange(e.target.value)}
             placeholder="London, UK"
+            maxLength={100}
           />
         </div>
         <div className="space-y-2">
@@ -520,6 +562,7 @@ function StepLocationLinks({
             value={timezone}
             onChange={(e) => onTimezoneChange(e.target.value)}
             placeholder="Europe/London"
+            maxLength={50}
           />
         </div>
         <div className="space-y-2">
@@ -532,6 +575,7 @@ function StepLocationLinks({
             value={linkedinUrl}
             onChange={(e) => onLinkedinChange(e.target.value)}
             placeholder="https://linkedin.com/in/yourname"
+            maxLength={200}
           />
         </div>
         <div className="space-y-2">
@@ -544,6 +588,7 @@ function StepLocationLinks({
             value={websiteUrl}
             onChange={(e) => onWebsiteChange(e.target.value)}
             placeholder="https://yoursite.com"
+            maxLength={200}
           />
         </div>
       </div>
@@ -580,6 +625,7 @@ function StepSkills({
           onChange={(e) => onSpecializationsChange(e.target.value)}
           placeholder="Financial Planning, Fundraising, Board Management, M&A"
           rows={4}
+          maxLength={500}
         />
         <p className={typography.wizardCharacterCount}>
           {skillCount} {skillCount === 1 ? 'skill' : 'skills'} added

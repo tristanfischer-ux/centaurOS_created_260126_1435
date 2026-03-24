@@ -340,12 +340,47 @@ export async function updateMarketplaceProfile(formData: FormData): Promise<{ su
     }
   }
 
-  // VALIDATION: Numeric fields — guard against NaN and negative values
-  if (dayRate !== null && (isNaN(dayRate) || dayRate < 0)) {
-    return { success: false, error: 'Day rate must be a non-negative number' }
+  // VALIDATION: Website URL — must be http/https (prevents javascript: XSS)
+  if (websiteUrl) {
+    try {
+      const url = new URL(websiteUrl)
+      if (!['http:', 'https:'].includes(url.protocol)) {
+        return { success: false, error: 'Website URL must start with https://' }
+      }
+    } catch {
+      return { success: false, error: 'Website must be a valid URL (e.g. https://yoursite.com)' }
+    }
   }
-  if (yearsExperience !== null && (isNaN(yearsExperience) || yearsExperience < 0)) {
-    return { success: false, error: 'Years of experience must be a non-negative number' }
+
+  // VALIDATION: Currency must be one of the allowed values
+  const allowedCurrencies = ['GBP', 'USD', 'EUR']
+  if (currency && !allowedCurrencies.includes(currency)) {
+    return { success: false, error: 'Currency must be GBP, USD, or EUR' }
+  }
+
+  // VALIDATION: Numeric fields — guard against NaN, negative, and absurd values
+  if (dayRate !== null && (isNaN(dayRate) || dayRate < 0 || dayRate > 100000)) {
+    return { success: false, error: 'Day rate must be between 0 and 100,000' }
+  }
+  if (yearsExperience !== null && (isNaN(yearsExperience) || yearsExperience < 0 || yearsExperience > 80)) {
+    return { success: false, error: 'Years of experience must be between 0 and 80' }
+  }
+
+  // VALIDATION: String length limits
+  if (location && location.length > 100) {
+    return { success: false, error: 'Location must be 100 characters or less' }
+  }
+  if (timezone && timezone.length > 50) {
+    return { success: false, error: 'Timezone must be 50 characters or less' }
+  }
+  if (linkedinUrl && linkedinUrl.length > 200) {
+    return { success: false, error: 'LinkedIn URL must be 200 characters or less' }
+  }
+  if (websiteUrl && websiteUrl.length > 200) {
+    return { success: false, error: 'Website URL must be 200 characters or less' }
+  }
+  if (specializationsRaw && specializationsRaw.length > 500) {
+    return { success: false, error: 'Specializations must be 500 characters or less' }
   }
 
   // Check if provider profile exists
@@ -455,14 +490,22 @@ export async function updateBasicProfile(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Not authenticated' }
 
-  // VALIDATION: Name is required
+  // VALIDATION: Name is required and capped
   if (!data.fullName.trim()) {
     return { success: false, error: 'Full name is required' }
+  }
+  if (data.fullName.length > 100) {
+    return { success: false, error: 'Full name must be 100 characters or less' }
   }
 
   // VALIDATION: Bio length
   if (data.bio && data.bio.length > 2000) {
     return { success: false, error: 'Bio must be 2000 characters or less' }
+  }
+
+  // VALIDATION: Phone number length
+  if (data.phoneNumber && data.phoneNumber.length > 30) {
+    return { success: false, error: 'Phone number must be 30 characters or less' }
   }
 
   // VALIDATION: LinkedIn URL must be a valid linkedin.com URL
@@ -474,6 +517,19 @@ export async function updateBasicProfile(data: {
       }
     } catch {
       return { success: false, error: 'LinkedIn URL must be a valid URL (e.g. https://linkedin.com/in/yourname)' }
+    }
+  }
+
+  // VALIDATION: Professional background field lengths
+  if (data.professionalBackground) {
+    if (data.professionalBackground.summary && data.professionalBackground.summary.length > 500) {
+      return { success: false, error: 'Career summary must be 500 characters or less' }
+    }
+    if (data.professionalBackground.previous_companies && data.professionalBackground.previous_companies.length > 300) {
+      return { success: false, error: 'Previous companies must be 300 characters or less' }
+    }
+    if (data.professionalBackground.education && data.professionalBackground.education.length > 200) {
+      return { success: false, error: 'Education must be 200 characters or less' }
     }
   }
 
