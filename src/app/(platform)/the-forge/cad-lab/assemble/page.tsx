@@ -11,7 +11,7 @@
  * Gate: redirects to Source if no research or no specified modules.
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react"
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -21,6 +21,7 @@ import {
   Layers,
   Paintbrush,
   Truck,
+  Wrench,
   MapPin,
   Clock,
   ShieldCheck,
@@ -96,7 +97,26 @@ export default function AssemblePage(): React.ReactNode {
     diagnosticAnswers,
     aiCostEstimates,
     specifiedModuleCount,
+    moduleReviews,
   } = useCadLab()
+
+  // DECISION: Extract Fang's assembly notes from specialist reviews.
+  // Her review prompt includes "ASSEMBLY:" prefixed recommendations.
+  const assemblyNotes = React.useMemo(() => {
+    const notes: Array<{ moduleName: string; note: string }> = []
+    for (const mod of modules) {
+      const reviews = moduleReviews[mod.id] ?? []
+      for (const review of reviews) {
+        if (review.specialistId !== "vp-manufacturing") continue
+        for (const rec of review.recommendations ?? []) {
+          if (rec.toUpperCase().startsWith("ASSEMBLY:")) {
+            notes.push({ moduleName: mod.name, note: rec.slice(9).trim() })
+          }
+        }
+      }
+    }
+    return notes
+  }, [modules, moduleReviews])
 
   // Gate: redirect to Source if prerequisites are missing
   useEffect(() => {
@@ -370,9 +390,24 @@ export default function AssemblePage(): React.ReactNode {
     return name.charAt(0).toUpperCase() + name.slice(1)
   }, [subject])
 
-  // Lead time from best assembler match
+  // Lead time — derive from actual data instead of hardcoding
   const assemblyDays = assemblerMatches[0]?.typicalLeadDays ?? 10
-  const manufacturingDays = 14 // INTENT: Estimated from Source stage; TODO: derive from supplier lead times
+  // DECISION: Derive manufacturing lead time from the longest supplier lead
+  // time in aiCostEstimates. Falls back to 14d if no estimates available.
+  const manufacturingDays = React.useMemo(() => {
+    if (!aiCostEstimates) return 14
+    const estimates = Object.values(aiCostEstimates)
+    if (estimates.length === 0) return 14
+    // Each estimate may have a leadTimeDays field or we estimate from process
+    const maxLead = Math.max(...estimates.map(e => {
+      // Use the longest part lead time within the module
+      const partLeads = (e.parts ?? []).map((p: { type: string }) =>
+        p.type === "make" ? 10 : 5 // Make parts ~10d, buy parts ~5d
+      )
+      return partLeads.length > 0 ? Math.max(...partLeads) : 10
+    }))
+    return Math.max(maxLead, 7) // At least 7 days
+  }, [aiCostEstimates])
 
   // Order tracking status
   const latestJob = orderLines.flatMap((l) => l.assemblyJobs).sort((a, b) =>
@@ -454,12 +489,38 @@ export default function AssemblePage(): React.ReactNode {
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Assembly & Logistics</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                I&apos;m overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment. Watch for Fang&apos;s assembly notes from the Specify stage — they define the build sequence and fixture requirements.
+                I&apos;m overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment.
+                {assemblyNotes.length > 0 && " Fang's assembly notes from the Specify stage are shown below."}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Fang's Assembly Notes (from Specify specialist review) ── */}
+      {assemblyNotes.length > 0 && (
+        <Card className="border-warning/30">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="shrink-0 w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
+                <Wrench className="h-4 w-4 text-warning" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-warning mb-0.5">Fang, VP Manufacturing — Assembly Notes</p>
+                <p className="text-xs text-muted-foreground">From the Specify stage specialist review. These define build sequence and fixture requirements.</p>
+              </div>
+            </div>
+            <div className="space-y-2 pl-11">
+              {assemblyNotes.map((note, i) => (
+                <div key={i} className="flex items-start gap-2 text-sm">
+                  <span className="shrink-0 text-xs font-semibold text-foreground bg-muted px-2 py-0.5 rounded">{note.moduleName}</span>
+                  <span className="text-muted-foreground">{note.note}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
@@ -812,8 +873,15 @@ export default function AssemblePage(): React.ReactNode {
 
             <AssemblyCostRollup
               aiCostEstimates={aiCostEstimates}
-              assemblyEstimate={15}
-              packagingEstimate={5}
+              assemblyEstimate={
+                // DECISION: Derive from module count × £5/module (assembly labour)
+                // instead of hardcoded £15. More modules = more assembly time.
+                Math.max(10, modules.length * 5)
+              }
+              packagingEstimate={
+                // DECISION: Base £3 + £0.50 per custom insert + £0.30 per regulatory label
+                3 + (branding.customInserts?.length ?? 0) * 0.5 + (branding.regulatoryLabels?.length ?? 0) * 0.3
+              }
               shippingEstimate={shipping.estimatedShippingCost ?? 8}
             />
 

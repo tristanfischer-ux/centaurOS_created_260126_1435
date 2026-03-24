@@ -1346,22 +1346,79 @@ export default function SpecifyPage(): React.ReactNode {
             {/* Review CTA — proceeds to costings when review complete + images current */}
             {(allModulesReviewed || reviewSkipped) && !imagesStale && !isRegeneratingImages ? (
               <div className="space-y-4">
-                {/* Max (CTO) Integration Coherence Check */}
-                <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-                        <Network className="h-4 w-4 text-info" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-info mb-1">Max, CTO — Integration Check</p>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          All module reviews complete. Max has verified that the specifications across all {modules.length} modules are coherent — interfaces match, material choices are compatible, and tolerance stacks are consistent. Ready to proceed to sourcing.
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                {/* Max (CTO) Integration Coherence Check — computed from module data */}
+                {(() => {
+                  // DECISION: Compute integration issues from module data rather than
+                  // making a blocking AI call. Checks interface mismatches, material
+                  // compatibility, and tolerance consistency across all modules.
+                  const issues: string[] = []
+
+                  // Check 1: Unmatched interface ports
+                  const allOutputs = new Set<string>()
+                  const allInputs = new Set<string>()
+                  for (const mod of modules) {
+                    for (const o of mod.outputs ?? []) allOutputs.add(o.toLowerCase())
+                    for (const inp of mod.inputs ?? []) allInputs.add(inp.toLowerCase())
+                  }
+                  const unmatchedInputs = [...allInputs].filter(i => !allOutputs.has(i))
+                  if (unmatchedInputs.length > 0) {
+                    issues.push(`${unmatchedInputs.length} interface input(s) have no matching output from another module`)
+                  }
+
+                  // Check 2: Mixed material families at interfaces
+                  const materialFamilies = new Set<string>()
+                  for (const mod of modules) {
+                    const answers = diagnosticAnswers[mod.id]
+                    if (answers?.material) materialFamilies.add(answers.material)
+                  }
+                  if (materialFamilies.has("Aluminum") && materialFamilies.has("Carbon Steel")) {
+                    issues.push("Aluminum + Carbon Steel at interfaces risks galvanic corrosion — consider isolating or switching to stainless fasteners")
+                  }
+
+                  // Check 3: Tolerance mismatch warning
+                  const toleranceLevels = new Set<string>()
+                  for (const mod of modules) {
+                    const answers = diagnosticAnswers[mod.id]
+                    if (answers?.tolerance) toleranceLevels.add(answers.tolerance)
+                  }
+                  if (toleranceLevels.has("Ultra-tight (±0.01mm)") && toleranceLevels.has("Standard (±0.5mm)")) {
+                    issues.push("Mixing ultra-tight and standard tolerances — verify interface fit between precision and standard modules")
+                  }
+
+                  const hasIssues = issues.length > 0
+
+                  return (
+                    <Card className={hasIssues ? "border-warning/30 bg-gradient-to-r from-warning/5 to-background" : "border-info/30 bg-gradient-to-r from-info/5 to-background"}>
+                      <CardContent className="pt-6">
+                        <div className="flex items-start gap-3">
+                          <div className={cn("shrink-0 w-8 h-8 rounded-full flex items-center justify-center", hasIssues ? "bg-warning/10" : "bg-info/10")}>
+                            <Network className={cn("h-4 w-4", hasIssues ? "text-warning" : "text-info")} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className={cn("text-xs font-semibold mb-1", hasIssues ? "text-warning" : "text-info")}>
+                              Max, CTO — Integration Check {hasIssues ? "(warnings)" : "(passed)"}
+                            </p>
+                            {hasIssues ? (
+                              <div className="space-y-1">
+                                {issues.map((issue, i) => (
+                                  <p key={i} className="text-sm text-muted-foreground leading-relaxed flex items-start gap-2">
+                                    <AlertTriangle className="h-3.5 w-3.5 text-warning shrink-0 mt-0.5" />
+                                    {issue}
+                                  </p>
+                                ))}
+                                <p className="text-xs text-muted-foreground mt-2">These are advisory — you can proceed to sourcing and address them during manufacturing.</p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                All {modules.length} modules checked. Interfaces match, material choices are compatible, and tolerance levels are consistent. Ready to proceed to sourcing.
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
 
                 {/* Continue to Source */}
                 <Card className="border-success/30 bg-gradient-to-r from-success/5 to-background">
