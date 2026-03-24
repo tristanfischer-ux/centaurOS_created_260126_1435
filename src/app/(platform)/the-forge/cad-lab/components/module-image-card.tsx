@@ -51,7 +51,7 @@ function ImageSection({ module, onRetry }: { module: CadLabModule; onRetry?: () 
         <div className="text-center space-y-0.5">
           <span className="text-xs font-medium text-muted-foreground/60">Illustration queued</span>
           <p className="text-[11px] text-muted-foreground/40 leading-tight">
-            This usually takes 5–10 min — you can navigate away and come back.
+            Generating in background — typically 2–4 minutes for all modules.
           </p>
         </div>
       </div>
