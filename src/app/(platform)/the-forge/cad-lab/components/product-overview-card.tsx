@@ -12,8 +12,7 @@
  */
 
 import { useState, useRef, useEffect } from "react"
-import { Pencil, Check, X, ShieldCheck, ChevronDown, Layers, Wrench, Cog, Building2, AlertTriangle } from "lucide-react"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Pencil, Check, X, AlertTriangle } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -63,21 +62,6 @@ interface ProductOverviewCardProps {
   overview: string
   onSave: (text: string) => void
   modelAudit?: ModelAudit
-  standardCodes?: string[]
-  industryDomain?: string
-  totalStandardsMatched?: number
-  engineeringData?: {
-    materialsApplied: string[]
-    materialFamilies: string[]
-    hardwareItemCount: number
-    processesApplied: string[]
-    supplierTechniques: number
-    totalDataPoints: number
-  }
-}
-
-function formatDomainLabel(domain: string): string {
-  return domain.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
 }
 
 // ─── Component ───────────────────────────────────────────────────────
@@ -86,12 +70,7 @@ export function ProductOverviewCard({
   overview,
   onSave,
   modelAudit,
-  standardCodes,
-  industryDomain,
-  totalStandardsMatched,
-  engineeringData,
 }: ProductOverviewCardProps): React.ReactNode {
-  const [engExpanded, setEngExpanded] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(overview)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -225,131 +204,6 @@ export function ProductOverviewCard({
                 </div>
               )}
             </div>
-          </div>
-        )}
-        {/* ── Engineering Intelligence Panel ── */}
-        {((standardCodes && standardCodes.length > 0) || (engineeringData && engineeringData.totalDataPoints > 0)) && (
-          <div className="border-t border-border mt-4 pt-3">
-            <Collapsible open={engExpanded} onOpenChange={setEngExpanded}>
-              <CollapsibleTrigger className="flex items-center justify-between w-full group" aria-label="Toggle engineering intelligence details">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="h-3.5 w-3.5 text-success" />
-                  <h4 className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                    Engineering Intelligence Applied
-                  </h4>
-                  {engineeringData && engineeringData.totalDataPoints > 0 && (
-                    <span className="text-xs text-muted-foreground font-normal normal-case ml-1">
-                      — {engineeringData.totalDataPoints} data points applied
-                    </span>
-                  )}
-                  {standardCodes && standardCodes.length > 0 && (!engineeringData || engineeringData.totalDataPoints === 0) && (
-                    <span className="text-xs text-muted-foreground font-normal normal-case ml-1">
-                      — {standardCodes.length} standards applied
-                    </span>
-                  )}
-                </div>
-                <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${engExpanded ? "rotate-180" : ""}`} />
-              </CollapsibleTrigger>
-
-              <CollapsibleContent className="mt-3 space-y-3">
-                {/* Standards */}
-                {standardCodes && standardCodes.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground">Design Standards</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {standardCodes.slice(0, 5).map((code, i) => (
-                          <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
-                            {code}
-                          </span>
-                        ))}
-                        {standardCodes.length > 5 && (
-                          <span className="text-[11px] text-muted-foreground py-0.5">+{standardCodes.length - 5} more</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {industryDomain && <>{formatDomainLabel(industryDomain)} domain</>}
-                        {totalStandardsMatched != null && standardCodes && totalStandardsMatched > standardCodes.length && (
-                          <> — {totalStandardsMatched} matched</>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Materials */}
-                {engineeringData?.materialsApplied && engineeringData.materialsApplied.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Layers className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground">Material Properties</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {engineeringData.materialsApplied.slice(0, 4).map((code, i) => (
-                          <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
-                            {code}
-                          </span>
-                        ))}
-                        {engineeringData.materialsApplied.length > 4 && (
-                          <span className="text-[11px] text-muted-foreground py-0.5">+{engineeringData.materialsApplied.length - 4} more</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {engineeringData.materialFamilies.length > 0
-                          ? `${engineeringData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data`
-                          : "Verified handbook data"}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Hardware */}
-                {engineeringData && engineeringData.hardwareItemCount > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Wrench className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-medium text-foreground">Hardware Library</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {engineeringData.hardwareItemCount} items — ISO 4762 bolts, ISO 4032 nuts, ISO 7089 washers, bearings
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Processes */}
-                {engineeringData?.processesApplied && engineeringData.processesApplied.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Cog className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-xs font-medium text-foreground">Process Capabilities</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {engineeringData.processesApplied.map((name, i) => (
-                          <span key={`proc-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
-                            {name}
-                          </span>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Real tolerances, min wall thicknesses, draft angles
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Supplier Intelligence */}
-                {engineeringData && engineeringData.supplierTechniques > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-xs font-medium text-foreground">Supplier Intelligence</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {engineeringData.supplierTechniques} manufacturing techniques enriched from real supplier data
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CollapsibleContent>
-            </Collapsible>
           </div>
         )}
       </CardContent>

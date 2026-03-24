@@ -31,6 +31,10 @@ import {
   FileDown,
   Box,
   Download,
+  ShieldCheck,
+  Wrench,
+  Cog,
+  Building2,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -413,20 +417,209 @@ export default function CadLabResearchPage(): React.ReactNode {
           {/* ═══ Research tab ═══ */}
           {activeTab === "research" && (
             <motion.div key="research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-              {/* Product overview — always first so it stays visible above the illustration */}
+              {/* Product overview — always first */}
               {(productOverview || modules.length > 0 || isDecomposing) && (
                 <ProductOverviewCard
                   overview={productOverview}
                   onSave={setProductOverview}
                   modelAudit={modelAudit}
-                  standardCodes={researchResult?.standardCodes}
-                  industryDomain={researchResult?.industryDomain}
-                  totalStandardsMatched={researchResult?.totalStandardsMatched}
-                  engineeringData={liveEngData ?? researchResult?.engineeringData}
                 />
               )}
 
-              {/* System overview illustration — below product overview */}
+              {/* ── Engineering Intelligence — standalone, always expanded ── */}
+              {(() => {
+                const engData = liveEngData ?? researchResult?.engineeringData
+                const stdCodes = researchResult?.standardCodes
+                const hasEngIntel = (stdCodes && stdCodes.length > 0) || (engData && engData.totalDataPoints > 0)
+                if (!hasEngIntel) return null
+
+                const parts: string[] = []
+                if (stdCodes && stdCodes.length > 0) parts.push(`${stdCodes.length} design standard${stdCodes.length !== 1 ? "s" : ""}`)
+                if (engData?.materialsApplied && engData.materialsApplied.length > 0) parts.push(`${engData.materialsApplied.length} verified material${engData.materialsApplied.length !== 1 ? "s" : ""}`)
+                if (engData && engData.hardwareItemCount > 0) parts.push(`${engData.hardwareItemCount} hardware items`)
+                if (engData?.processesApplied && engData.processesApplied.length > 0) parts.push(`${engData.processesApplied.length} manufacturing process${engData.processesApplied.length !== 1 ? "es" : ""}`)
+                if (engData && engData.supplierTechniques > 0) parts.push(`${engData.supplierTechniques} supplier techniques`)
+
+                return (
+                  <Card>
+                    <CardContent className="pt-5 pb-5 space-y-3">
+                      <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-4 w-4 text-success shrink-0" />
+                        <h3 className="text-sm font-semibold text-foreground">Engineering Intelligence</h3>
+                        {parts.length > 0 && (
+                          <span className="text-xs text-muted-foreground ml-1">
+                            — {parts.join(", ")}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Standards */}
+                      {stdCodes && stdCodes.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground">Design Standards</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {stdCodes.slice(0, 5).map((code, i) => (
+                                <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[200px] truncate">
+                                  {code}
+                                </span>
+                              ))}
+                              {stdCodes.length > 5 && (
+                                <span className="text-[11px] text-muted-foreground py-0.5">+{stdCodes.length - 5} more</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {researchResult?.industryDomain && <>{researchResult.industryDomain.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} domain</>}
+                              {researchResult?.totalStandardsMatched != null && stdCodes && researchResult.totalStandardsMatched > stdCodes.length && (
+                                <> — {researchResult.totalStandardsMatched} matched</>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Materials */}
+                      {engData?.materialsApplied && engData.materialsApplied.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <Layers className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground">Material Properties</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {engData.materialsApplied.slice(0, 4).map((code, i) => (
+                                <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                                  {code}
+                                </span>
+                              ))}
+                              {engData.materialsApplied.length > 4 && (
+                                <span className="text-[11px] text-muted-foreground py-0.5">+{engData.materialsApplied.length - 4} more</span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {engData.materialFamilies.length > 0
+                                ? `${engData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data`
+                                : "Verified handbook data"}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Hardware */}
+                      {engData && engData.hardwareItemCount > 0 && (
+                        <div className="flex items-start gap-2">
+                          <Wrench className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Hardware Library</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {engData.hardwareItemCount} items — ISO 4762 bolts, ISO 4032 nuts, ISO 7089 washers, bearings
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Processes */}
+                      {engData?.processesApplied && engData.processesApplied.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <Cog className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground">Process Capabilities</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {engData.processesApplied.map((name, i) => (
+                                <span key={`proc-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Real tolerances, min wall thicknesses, draft angles
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Supplier Intelligence */}
+                      {engData && engData.supplierTechniques > 0 && (
+                        <div className="flex items-start gap-2">
+                          <Building2 className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs font-medium text-foreground">Supplier Intelligence</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {engData.supplierTechniques} manufacturing techniques enriched from real supplier data
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )
+              })()}
+
+              {/* During decomposition — rich progress below overview */}
+              {!decompositionError && isDecomposing && (
+                <CadLabProgress
+                  lines={progressLines}
+                  isActive={true}
+                  operationType="breakdown"
+                  subject={subject}
+                />
+              )}
+
+              {/* "View Modules" banner — shown as soon as modules exist (not gated on system illustration) */}
+              {modules.length > 0 && !isDecomposing && activeTab === "research" && (
+                <Card className="border-international-orange/20 bg-international-orange-light/10">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-4 w-4 text-international-orange shrink-0" />
+                        <p className="text-sm text-foreground">
+                          {isGeneratingImages || systemIllustrationStatus === "generating"
+                            ? `${modules.length} sub-assemblies mapped \u2014 generating illustrations (${modules.filter(m => m.imageStatus === "complete").length} of ${modules.length} ready)`
+                            : `${modules.length} sub-assembly illustrations ready`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 border-international-orange text-international-orange hover:bg-international-orange-light/20"
+                        onClick={() => handleTabClick("modules")}
+                      >
+                        View Modules
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Module summary — shown during illustration generation so user sees what was found */}
+              {modules.length > 0 && !isDecomposing && (isGeneratingImages || systemIllustrationStatus === "generating") && activeTab === "research" && (
+                <Card className="border-border">
+                  <CardContent className="pt-4 pb-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Layers className="h-4 w-4 text-international-orange shrink-0" />
+                      <p className="text-sm font-medium text-foreground">
+                        {modules.length} sub-assemblies identified
+                      </p>
+                    </div>
+                    <div className="grid gap-1.5">
+                      {modules.map((m, i) => (
+                        <div key={m.id} className="flex items-start gap-2 text-xs">
+                          <span className="text-muted-foreground shrink-0 w-4 text-right tabular-nums">{i + 1}.</span>
+                          <div>
+                            <span className="font-medium text-foreground">{m.name}</span>
+                            <span className="text-muted-foreground"> — {m.purpose.slice(0, 80)}{m.purpose.length > 80 ? "..." : ""}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Generating engineering illustrations — {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} ready. Each illustration coordinates manufacturing constraints, interfaces, and dimensional specs.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* System overview illustration — below modules so user reads text content first */}
               {hasResearch && (
                 <>
                   {systemIllustrationUrl && systemIllustrationStatus === "complete" && (
@@ -594,71 +787,6 @@ export default function CadLabResearchPage(): React.ReactNode {
                     </Card>
                   )}
                 </>
-              )}
-
-              {/* During decomposition — rich progress below overview */}
-              {!decompositionError && isDecomposing && (
-                <CadLabProgress
-                  lines={progressLines}
-                  isActive={true}
-                  operationType="breakdown"
-                  subject={subject}
-                />
-              )}
-
-              {/* "View Modules" banner — shown as soon as modules exist (not gated on system illustration) */}
-              {modules.length > 0 && !isDecomposing && activeTab === "research" && (
-                <Card className="border-international-orange/20 bg-international-orange-light/10">
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Layers className="h-4 w-4 text-international-orange shrink-0" />
-                        <p className="text-sm text-foreground">
-                          {isGeneratingImages || systemIllustrationStatus === "generating"
-                            ? `${modules.length} sub-assemblies mapped \u2014 generating illustrations (${modules.filter(m => m.imageStatus === "complete").length} of ${modules.length} ready)`
-                            : `${modules.length} sub-assembly illustrations ready`}
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 border-international-orange text-international-orange hover:bg-international-orange-light/20"
-                        onClick={() => handleTabClick("modules")}
-                      >
-                        View Modules
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Module summary — shown during illustration generation so user sees what was found */}
-              {modules.length > 0 && !isDecomposing && (isGeneratingImages || systemIllustrationStatus === "generating") && activeTab === "research" && (
-                <Card className="border-border">
-                  <CardContent className="pt-4 pb-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Layers className="h-4 w-4 text-international-orange shrink-0" />
-                      <p className="text-sm font-medium text-foreground">
-                        {modules.length} sub-assemblies identified
-                      </p>
-                    </div>
-                    <div className="grid gap-1.5">
-                      {modules.map((m, i) => (
-                        <div key={m.id} className="flex items-start gap-2 text-xs">
-                          <span className="text-muted-foreground shrink-0 w-4 text-right tabular-nums">{i + 1}.</span>
-                          <div>
-                            <span className="font-medium text-foreground">{m.name}</span>
-                            <span className="text-muted-foreground"> — {m.purpose.slice(0, 80)}{m.purpose.length > 80 ? "..." : ""}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Generating engineering illustrations — {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} ready. Each illustration coordinates manufacturing constraints, interfaces, and dimensional specs.
-                    </p>
-                  </CardContent>
-                </Card>
               )}
 
               {/* Recovery card — loaded project has research but no modules */}
