@@ -178,7 +178,7 @@ export function ProductOverviewCard({
         )}
 
         {/* ── Approval banner — shown after research, before decomposition ── */}
-        {onApprove && !overviewApproved && overview && !overview.includes("synthesis failed") && (
+        {onApprove && !overviewApproved && !isEditing && overview && !overview.includes("synthesis failed") && (
           <div className="mt-4 rounded-lg border border-international-orange/30 bg-international-orange/5 p-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 min-w-0">
               <Info className="h-4 w-4 text-international-orange shrink-0" />

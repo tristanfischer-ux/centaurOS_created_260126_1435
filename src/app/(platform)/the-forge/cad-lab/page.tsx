@@ -452,7 +452,15 @@ export default function CadLabResearchPage(): React.ReactNode {
                   onSave={setProductOverview}
                   modelAudit={modelAudit}
                   overviewApproved={overviewApproved}
-                  onApprove={modules.length === 0 && !isDecomposing ? () => setOverviewApproved(true) : undefined}
+                  onApprove={modules.length === 0 && !isDecomposing ? () => {
+                    setOverviewApproved(true)
+                    // INTENT: Call handleDecompose directly — don't rely on the useEffect alone.
+                    // If user navigated away and back, freshResearchRef is false (cleared on unmount),
+                    // so the effect won't fire. Direct call ensures decomposition always starts.
+                    // Clear the ref to prevent the effect from double-firing.
+                    freshResearchRef.current = false
+                    if (hasResearch && activeProjectId) handleDecompose()
+                  } : undefined}
                   saveError={saveError}
                   isDecomposing={isDecomposing}
                 />
