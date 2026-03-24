@@ -349,7 +349,7 @@ export function ModelViewer({
           {isGlb && (
             <SilentErrorBoundary>
               <Suspense fallback={null}>
-                <Environment preset="studio" background={false} />
+                <Environment preset="warehouse" background={false} />
               </Suspense>
             </SilentErrorBoundary>
           )}
@@ -361,17 +361,20 @@ export function ModelViewer({
           {/* DECISION: GLB lighting bumped (ambient 0.8→1.2, hemisphere 0.6→1.0) so
               metallic PBR surfaces reflect the now-light background instead of
               appearing flat grey. STL values unchanged. */}
-          <ambientLight intensity={isGlb ? 1.2 : 1.5} />
+          {/* DECISION: GLB lighting boosted so PBR textures from Tripo/Meshy render
+              with visible colour and contrast. "warehouse" environment provides richer
+              reflections than "studio". Direct lights fill shadows. */}
+          <ambientLight intensity={isGlb ? 1.8 : 1.5} />
           <directionalLight
             position={[10, 10, 5]}
-            intensity={isGlb ? 1.5 : 2.5}
+            intensity={isGlb ? 2.0 : 2.5}
             castShadow
             shadow-mapSize-width={2048}
             shadow-mapSize-height={2048}
           />
-          <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.5 : 1.0} />
-          <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.3 : 0.5} />
-          <hemisphereLight intensity={isGlb ? 1.0 : 1.5} color="#ffffff" groundColor="#d0d0d0" />
+          <directionalLight position={[-10, -10, -5]} intensity={isGlb ? 0.8 : 1.0} />
+          <directionalLight position={[0, -5, 5]} intensity={isGlb ? 0.5 : 0.5} />
+          <hemisphereLight intensity={isGlb ? 1.5 : 1.5} color="#ffffff" groundColor="#e0e0e0" />
 
           <Suspense fallback={null}>
             {isGlb ? (
