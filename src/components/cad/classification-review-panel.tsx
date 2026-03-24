@@ -66,6 +66,7 @@ export function ClassificationReviewPanel({
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isAutoClassifying, setIsAutoClassifying] = useState(false)
   const [aiReasonings, setAiReasonings] = useState<Map<string, string>>(new Map())
+  const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set())
 
   // Build classified parts list from modules + AI estimates
   const classifiedParts = useMemo(() => {
@@ -377,21 +378,38 @@ export function ClassificationReviewPanel({
                     </div>
                   </div>
 
-                  {/* Classification reasons — rule-based (hidden when AI reasoning present) */}
-                  {part.reasons.length > 0 && !reasoning && (
-                    <div className="px-3 pb-2 pl-8 space-y-0.5">
-                      {part.reasons.map((r, i) => (
-                        <p key={i} className="text-xs text-muted-foreground italic">{r}</p>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* AI reasoning line — replaces rule-based reasons when AI has classified */}
-                  {reasoning && (
-                    <p className="px-3 pb-2 pl-8 text-xs text-muted-foreground italic">
-                      AI: {reasoning}
-                    </p>
-                  )}
+                  {/* Classification reasoning — always visible for low confidence, expandable otherwise */}
+                  {(part.reasons.length > 0 || reasoning) && (() => {
+                    const isExpanded = needsReview || expandedReasons.has(part.partKey)
+                    return (
+                      <div className="px-3 pb-2 pl-8">
+                        {!needsReview && (
+                          <button
+                            onClick={() => setExpandedReasons((prev) => {
+                              const next = new Set(prev)
+                              next.has(part.partKey) ? next.delete(part.partKey) : next.add(part.partKey)
+                              return next
+                            })}
+                            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                          >
+                            {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                            Why {part.type}?
+                          </button>
+                        )}
+                        {isExpanded && (
+                          <div className={cn("space-y-0.5", !needsReview && "mt-1")}>
+                            {reasoning ? (
+                              <p className="text-xs text-muted-foreground italic">AI: {reasoning}</p>
+                            ) : (
+                              part.reasons.map((r, i) => (
+                                <p key={i} className="text-xs text-muted-foreground italic">{r}</p>
+                              ))
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                   </div>
                 )
               })}

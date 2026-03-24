@@ -655,6 +655,62 @@ export default function SpecifyPage(): React.ReactNode {
               </Card>
             )}
 
+            {/* Aggregated technique recommendations */}
+            {(() => {
+              const bySlug = new Map<string, { name: string; score: number; moduleCount: number; supplierCount: number; moduleNames: string[] }>()
+              for (const [moduleId, recs] of Object.entries(techniqueRecs)) {
+                const mod = modules.find((m) => m.id === moduleId)
+                for (const rec of recs) {
+                  const existing = bySlug.get(rec.slug)
+                  if (existing) {
+                    existing.moduleCount++
+                    existing.score = Math.max(existing.score, rec.score)
+                    existing.supplierCount = Math.max(existing.supplierCount, rec.supplierCount)
+                    if (mod) existing.moduleNames.push(mod.name)
+                  } else {
+                    bySlug.set(rec.slug, {
+                      name: rec.name,
+                      score: rec.score,
+                      moduleCount: 1,
+                      supplierCount: rec.supplierCount,
+                      moduleNames: mod ? [mod.name] : [],
+                    })
+                  }
+                }
+              }
+              const aggregated = [...bySlug.values()].sort((a, b) => b.score - a.score).slice(0, 8)
+              if (aggregated.length === 0) return null
+              return (
+                <Card>
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center gap-1.5 mb-3">
+                      <FlaskConical className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <h3 className="text-sm font-semibold text-foreground">Recommended Techniques</h3>
+                      <span className="text-xs text-muted-foreground ml-1">
+                        {aggregated.length} across modules
+                      </span>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {aggregated.map((rec) => (
+                        <div key={rec.name} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-foreground truncate">{rec.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {rec.moduleCount} module{rec.moduleCount !== 1 ? "s" : ""}
+                              {rec.supplierCount > 0 && ` · ${rec.supplierCount} supplier${rec.supplierCount !== 1 ? "s" : ""}`}
+                            </p>
+                          </div>
+                          <Badge variant={rec.score >= 60 ? "success" : rec.score >= 40 ? "warning" : "secondary"} className="text-xs shrink-0 ml-2">
+                            {rec.score}pt
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })()}
+
             {/* Module summary cards */}
             <div>
               <div className="flex items-center justify-between mb-3">
