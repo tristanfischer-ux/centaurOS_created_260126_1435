@@ -126,7 +126,11 @@ export default function CadLabResearchPage(): React.ReactNode {
   const resEngDataPoints = researchResult?.engineeringData?.totalDataPoints ?? 0
 
   type EngIntel = NonNullable<NonNullable<typeof researchResult>["engineeringData"]>
+  type EngReportData = Awaited<ReturnType<typeof import("@/actions/design-standards").getEngineeringIntelligenceForReport>>
   const [liveEngData, setLiveEngData] = useState<EngIntel | undefined>(undefined)
+  const [engReportData, setEngReportData] = useState<EngReportData | null>(null)
+  const [showAllStandards, setShowAllStandards] = useState(false)
+  const [showAllMaterials, setShowAllMaterials] = useState(false)
   useEffect(() => {
     if (!subject || subject.length < 3) return
     const resEngData = researchResult?.engineeringData
@@ -146,6 +150,7 @@ export default function CadLabResearchPage(): React.ReactNode {
       getEngineeringIntelligenceForReport(stdCodes, resIndustryDomain, subject)
         .then(data => {
           if (cancelled) return
+          setEngReportData(data)
           setLiveEngData({
             materialsApplied: data.materials.map(m => m.code),
             materialFamilies: data.materials.map(m => m.name),
@@ -460,47 +465,78 @@ export default function CadLabResearchPage(): React.ReactNode {
                         )}
                       </div>
 
-                      {/* Standards */}
+                      {/* Standards — rich detail when report data available */}
                       {stdCodes && stdCodes.length > 0 && (
                         <div className="flex items-start gap-2">
                           <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1">
                             <p className="text-xs font-medium text-foreground">Design Standards</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {stdCodes.map((code, i) => (
-                                <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[220px] truncate">
-                                  {code}
-                                </span>
-                              ))}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {researchResult?.industryDomain && <>{researchResult.industryDomain.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())} domain</>}
-                              {researchResult?.totalStandardsMatched != null && stdCodes && researchResult.totalStandardsMatched > stdCodes.length && (
-                                <> — {researchResult.totalStandardsMatched} matched</>
-                              )}
-                            </p>
+                            {engReportData?.standards && engReportData.standards.length > 0 ? (
+                              <>
+                                {engReportData.standards.slice(0, showAllStandards ? undefined : 3).map((std, i) => (
+                                  <div key={`std-${i}`} className="text-[11px]">
+                                    <span className="font-medium text-foreground">{std.code}</span>
+                                    <span className="text-muted-foreground"> — {std.name}</span>
+                                    {std.issuingBody && <span className="text-muted-foreground/70"> ({std.issuingBody})</span>}
+                                  </div>
+                                ))}
+                                {engReportData.standards.length > 3 && (
+                                  <button onClick={() => setShowAllStandards((p) => !p)} className="text-[11px] text-international-orange hover:underline">
+                                    {showAllStandards ? "Show less" : `View all ${engReportData.standards.length}`}
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {stdCodes.map((code, i) => (
+                                  <span key={`std-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground max-w-[220px] truncate">
+                                    {code}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
 
-                      {/* Materials */}
+                      {/* Materials — rich detail when report data available */}
                       {engData?.materialsApplied && engData.materialsApplied.length > 0 && (
                         <div className="flex items-start gap-2">
                           <Layers className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1">
                             <p className="text-xs font-medium text-foreground">Material Properties</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {engData.materialsApplied.map((code, i) => (
-                                <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
-                                  {code}
-                                </span>
-                              ))}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {engData.materialFamilies.length > 0
-                                ? `${engData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data`
-                                : "Verified handbook data"}
-                            </p>
+                            {engReportData?.materials && engReportData.materials.length > 0 ? (
+                              <>
+                                {engReportData.materials.slice(0, showAllMaterials ? undefined : 3).map((mat, i) => (
+                                  <div key={`mat-${i}`} className="text-[11px] flex flex-wrap items-center gap-x-2">
+                                    <span className="font-medium text-foreground">{mat.code}</span>
+                                    <span className="text-muted-foreground">{mat.name}</span>
+                                    {mat.yieldStrength != null && <span className="text-muted-foreground">· {mat.yieldStrength} MPa</span>}
+                                    {mat.costPerKg != null && <span className="text-muted-foreground">· £{(mat.costPerKg * 0.79).toFixed(2)}/kg</span>}
+                                  </div>
+                                ))}
+                                {engReportData.materials.length > 3 && (
+                                  <button onClick={() => setShowAllMaterials((p) => !p)} className="text-[11px] text-international-orange hover:underline">
+                                    {showAllMaterials ? "Show less" : `View all ${engReportData.materials.length}`}
+                                  </button>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {engData.materialsApplied.map((code, i) => (
+                                    <span key={`mat-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                                      {code}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {engData.materialFamilies.length > 0
+                                    ? `${engData.materialFamilies.map(f => f.replace(/_/g, " ")).join(", ")} — verified handbook data`
+                                    : "Verified handbook data"}
+                                </p>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -518,33 +554,48 @@ export default function CadLabResearchPage(): React.ReactNode {
                         </div>
                       )}
 
-                      {/* Processes */}
+                      {/* Processes — rich detail when report data available */}
                       {engData?.processesApplied && engData.processesApplied.length > 0 && (
                         <div className="flex items-start gap-2">
                           <Cog className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1">
                             <p className="text-xs font-medium text-foreground">Process Capabilities</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {engData.processesApplied.map((name, i) => (
-                                <span key={`proc-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
-                                  {name}
-                                </span>
-                              ))}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              Real tolerances, min wall thicknesses, draft angles
-                            </p>
+                            {engReportData?.processes && engReportData.processes.length > 0 ? (
+                              engReportData.processes.map((proc, i) => (
+                                <div key={`proc-${i}`} className="text-[11px] flex flex-wrap items-center gap-x-2">
+                                  <span className="font-medium text-foreground">{proc.displayName}</span>
+                                  {proc.toleranceTypical != null && <span className="text-muted-foreground">· ±{proc.toleranceTypical}mm</span>}
+                                  {proc.minWall != null && <span className="text-muted-foreground">· {proc.minWall}mm min wall</span>}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {engData.processesApplied.map((name, i) => (
+                                  <span key={`proc-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
+                                    {name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
 
-                      {/* Supplier Intelligence */}
+                      {/* Supplier Intelligence — rich detail when report data available */}
                       {engData && engData.supplierTechniques > 0 && (
                         <div className="flex items-start gap-2">
                           <Building2 className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div className="min-w-0">
+                          <div className="min-w-0 space-y-1">
                             <p className="text-xs font-medium text-foreground">Supplier Intelligence</p>
-                            {engData.supplierTechniqueNames && engData.supplierTechniqueNames.length > 0 ? (
+                            {engReportData?.supplierInsights && engReportData.supplierInsights.length > 0 ? (
+                              engReportData.supplierInsights.map((si, i) => (
+                                <div key={`si-${i}`} className="text-[11px]">
+                                  <span className="font-medium text-foreground">{si.technique}</span>
+                                  <span className="text-muted-foreground"> — {si.supplierCount} supplier{si.supplierCount !== 1 ? "s" : ""}</span>
+                                  {si.tolerances && <span className="text-muted-foreground">, {si.tolerances}</span>}
+                                </div>
+                              ))
+                            ) : engData.supplierTechniqueNames && engData.supplierTechniqueNames.length > 0 ? (
                               <div className="flex flex-wrap gap-1 mt-1">
                                 {engData.supplierTechniqueNames.map((name, i) => (
                                   <span key={`tech-${i}`} className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">
