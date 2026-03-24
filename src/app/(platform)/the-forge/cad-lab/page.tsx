@@ -405,7 +405,7 @@ export default function CadLabResearchPage(): React.ReactNode {
               onClick={() => setIsReportDialogOpen(true)}
             >
               <FileDown className="h-4 w-4" />
-              <span className="hidden sm:inline">Download Report</span>
+              <span className="hidden sm:inline">Download Engineering Report</span>
             </Button>
           </div>
         </nav>
@@ -692,13 +692,13 @@ export default function CadLabResearchPage(): React.ReactNode {
                         ) : tripoPreviewStatus === "generating" ? (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                             <Loader2 className="h-6 w-6 animate-spin text-international-orange" />
-                            <p className="text-sm text-muted-foreground">Generating 3D preview...</p>
+                            <p className="text-sm text-muted-foreground">Generating interactive 3D model from the system illustration...</p>
                             <span className="text-xs tabular-nums text-muted-foreground">{tripoElapsed}s</span>
                           </div>
                         ) : tripoPreviewStatus === "failed" ? (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                             <AlertTriangle className="h-6 w-6 text-muted-foreground/30" />
-                            <p className="text-xs text-muted-foreground">{tripoPreviewError ?? "3D preview failed"}</p>
+                            <p className="text-xs text-muted-foreground">{tripoPreviewError ?? "3D model generation failed — try again or use the 2D view"}</p>
                             <Button variant="ghost" size="sm" className="text-xs gap-1.5" onClick={handleGenerateTripoPreview}>
                               <RotateCcw className="h-3 w-3" />
                               Retry

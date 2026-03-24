@@ -1451,7 +1451,11 @@ export default function SpecifyPage(): React.ReactNode {
                     </div>
                     <div className="flex items-center gap-3">
                       <button
-                        onClick={handleSkipReviews}
+                        onClick={() => {
+                          if (window.confirm("Proceed without specialist reviews? Manufacturing insights and assembly notes may be missed.")) {
+                            handleSkipReviews()
+                          }
+                        }}
                         className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
                       >
                         Skip &amp; Finalize

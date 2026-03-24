@@ -533,10 +533,15 @@ export default function AssemblePage(): React.ReactNode {
             Converge parts into a finished, branded product.
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSource)}>
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          Source
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSource)}>
+            <ArrowLeft className="h-4 w-4 mr-1.5" />
+            Source
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabSource)}>
+            Edit Suppliers
+          </Button>
+        </div>
       </div>
 
       {/* ── Tab navigation ── */}
