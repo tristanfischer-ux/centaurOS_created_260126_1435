@@ -27,6 +27,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -144,6 +152,8 @@ export function ReviewIssueSummary({
     issues.sort((a, b) => (SEVERITY_ORDER[a.issue.severity] ?? 99) - (SEVERITY_ORDER[b.issue.severity] ?? 99))
     return issues
   }, [modules, moduleReviews])
+
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
 
   // Accept/reject state — CRITICAL and WARNING default accepted, INFO default rejected
   const [accepted, setAccepted] = useState<Set<string>>(() => {
@@ -354,7 +364,7 @@ export function ReviewIssueSummary({
                 {acceptedIssues.length} of {allIssues.length} issue{allIssues.length !== 1 ? "s" : ""} selected for revision
               </p>
               <Button
-                onClick={() => onApplyRevisions(acceptedIssues)}
+                onClick={() => setShowConfirmDialog(true)}
                 disabled={acceptedIssues.length === 0 || isApplying}
                 className="gap-2"
               >
@@ -373,6 +383,45 @@ export function ReviewIssueSummary({
             </>
           )}
         </div>
+
+        {/* Confirmation dialog */}
+        <Dialog open={showConfirmDialog} onOpenChange={(open) => { if (!isApplying) setShowConfirmDialog(open) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Apply Revisions</DialogTitle>
+              <DialogDescription>
+                Applying {acceptedIssues.length} revision{acceptedIssues.length !== 1 ? "s" : ""} to{" "}
+                {new Set(acceptedIssues.map(i => i.moduleId)).size} module{new Set(acceptedIssues.map(i => i.moduleId)).size !== 1 ? "s" : ""}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              {acceptedIssues.map(item => (
+                <div key={item.key} className="flex items-start gap-2 text-sm">
+                  <Badge variant={severityBadgeVariant(item.issue.severity)} className="text-[10px] shrink-0 mt-0.5">
+                    {item.issue.severity}
+                  </Badge>
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-foreground">{item.moduleName}:</span>{" "}
+                    {item.issue.message.length > 80 ? `${item.issue.message.slice(0, 80)}…` : item.issue.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setShowConfirmDialog(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  setShowConfirmDialog(false)
+                  onApplyRevisions(acceptedIssues)
+                }}
+                className="gap-2"
+              >
+                <Wrench className="h-4 w-4" />
+                Apply
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   )

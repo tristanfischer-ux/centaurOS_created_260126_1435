@@ -33,6 +33,7 @@ import {
   FileDown,
 } from "lucide-react"
 
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { Button } from "@/components/ui/button"
@@ -50,6 +51,7 @@ import { SupplierDetailDialog } from "@/components/cad/supplier-detail-dialog"
 import { AssemblerCompareDialog } from "@/components/cad/assembler-compare-dialog"
 import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
 import { toast } from "sonner"
+import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import {
   DEFAULT_BRANDING,
@@ -486,9 +488,16 @@ export default function AssemblePage(): React.ReactNode {
       <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-info" />
-            </div>
+            {(() => {
+              const chase = getSpecialistById("vp-supply-chain")
+              return chase?.avatarImage ? (
+                <Image src={chase.avatarImage} alt={chase.name} width={32} height={32} className="rounded-full flex-shrink-0" />
+              ) : (
+                <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+                  <Truck className="h-4 w-4 text-info" />
+                </div>
+              )
+            })()}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Assembly & Logistics</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -505,9 +514,16 @@ export default function AssemblePage(): React.ReactNode {
         <Card className="border-warning/30">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3 mb-4">
-              <div className="shrink-0 w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
-                <Wrench className="h-4 w-4 text-warning" />
-              </div>
+              {(() => {
+                const fang = getSpecialistById("vp-manufacturing")
+                return fang?.avatarImage ? (
+                  <Image src={fang.avatarImage} alt={fang.name} width={32} height={32} className="rounded-full flex-shrink-0" />
+                ) : (
+                  <div className="shrink-0 w-8 h-8 rounded-full bg-warning/10 flex items-center justify-center">
+                    <Wrench className="h-4 w-4 text-warning" />
+                  </div>
+                )
+              })()}
               <div>
                 <p className="text-xs font-semibold text-warning mb-0.5">Fang, VP Manufacturing — Assembly Notes</p>
                 <p className="text-xs text-muted-foreground">From the Specify stage specialist review. These define build sequence and fixture requirements.</p>
@@ -517,7 +533,7 @@ export default function AssemblePage(): React.ReactNode {
               {assemblyNotes.map((note, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <span className="shrink-0 text-xs font-semibold text-foreground bg-muted px-2 py-0.5 rounded">{note.moduleName}</span>
-                  <span className="text-muted-foreground break-words">{note.note}</span>
+                  <span className="text-muted-foreground break-words"><span className="font-medium text-foreground">Fang recommends:</span> {note.note}</span>
                 </div>
               ))}
             </div>

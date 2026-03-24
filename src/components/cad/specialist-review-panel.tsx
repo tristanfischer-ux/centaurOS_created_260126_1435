@@ -32,6 +32,11 @@ import {
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+    HoverCard,
+    HoverCardContent,
+    HoverCardTrigger,
+} from "@/components/ui/hover-card"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { requestSpecialistReview, quickSpecialistVerdict } from "@/actions/cad-lab-reviews"
 import type { ReviewRequest, QuickVerdictResult } from "@/actions/cad-lab-reviews"
@@ -111,6 +116,89 @@ function VerdictBadge({ verdict }: { verdict: ReviewVerdict }) {
     }
 }
 
+// ─── Thinking Phases Indicator ───────────────────────────────────────
+
+function ThinkingPhases({ specialistId, moduleName }: { specialistId: string; moduleName: string }) {
+    const spec = getSpecialistById(specialistId)
+    const phases = spec?.thinkingPhases ?? [`Reviewing ${moduleName}...`, "Analyzing details...", "Writing up findings..."]
+    const [phaseIndex, setPhaseIndex] = useState(0)
+
+    useEffect(() => {
+        setPhaseIndex(0)
+        const timers = [
+            setTimeout(() => setPhaseIndex(1), 3000),
+            setTimeout(() => setPhaseIndex(2), 8000),
+        ]
+        return () => timers.forEach(clearTimeout)
+    }, [specialistId])
+
+    return (
+        <div className="flex items-center gap-3 py-2">
+            {spec?.avatarImage ? (
+                <Image
+                    src={spec.avatarImage}
+                    alt={spec.name}
+                    width={28}
+                    height={28}
+                    className="rounded-full flex-shrink-0"
+                />
+            ) : (
+                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-medium text-muted-foreground">{spec?.name?.[0] ?? "?"}</span>
+                </div>
+            )}
+            <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                <span className="text-sm text-muted-foreground animate-pulse">
+                    {phases[phaseIndex]}
+                </span>
+            </div>
+        </div>
+    )
+}
+
+// ─── Specialist Profile HoverCard ────────────────────────────────────
+
+function SpecialistProfileHover({ specialistId, children }: { specialistId: string; children: React.ReactNode }) {
+    const spec = getSpecialistById(specialistId)
+    if (!spec) return <>{children}</>
+
+    return (
+        <HoverCard openDelay={300}>
+            <HoverCardTrigger asChild>
+                <span className="cursor-default">{children}</span>
+            </HoverCardTrigger>
+            <HoverCardContent side="top" className="w-72">
+                <div className="flex items-start gap-3">
+                    {spec.avatarImage ? (
+                        <Image
+                            src={spec.avatarImage}
+                            alt={spec.name}
+                            width={48}
+                            height={48}
+                            className="rounded-full flex-shrink-0"
+                        />
+                    ) : (
+                        <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                            <span className="text-sm font-medium text-muted-foreground">{spec.name[0]}</span>
+                        </div>
+                    )}
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-sm font-semibold text-foreground">{spec.name}</p>
+                        <p className="text-xs text-muted-foreground">{spec.title}</p>
+                        <p className="text-xs text-muted-foreground italic">{spec.tagline}</p>
+                        <div className="flex flex-wrap gap-1 pt-1">
+                            {spec.highlights.slice(0, 3).map((h, i) => (
+                                <Badge key={i} variant="secondary" className="text-[10px]">{h}</Badge>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </HoverCardContent>
+        </HoverCard>
+    )
+}
+
 // ─── Single Review Card ─────────────────────────────────────────────
 
 function ReviewCard({ review }: { review: SpecialistReview }) {
@@ -144,9 +232,11 @@ function ReviewCard({ review }: { review: SpecialistReview }) {
 
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                            {review.specialistName}
-                        </span>
+                        <SpecialistProfileHover specialistId={review.specialistId}>
+                            <span className="text-sm font-medium text-foreground">
+                                {review.specialistName}
+                            </span>
+                        </SpecialistProfileHover>
                         <VerdictBadge verdict={review.verdict} />
                     </div>
                     <p className="text-xs text-muted-foreground truncate">
@@ -255,8 +345,6 @@ export function SpecialistReviewPanel({
     const [detailLoading, setDetailLoading] = useState<string | null>(null)
     const [quickVerdicts, setQuickVerdicts] = useState<Record<string, QuickVerdictResult>>({})
     const [error, setError] = useState<string | null>(null)
-    const [showOtherSpecialists, setShowOtherSpecialists] = useState(false)
-
     // INTENT: Auto-trigger review when batch orchestrator sets triggerReview prop.
     // Only fires when prop changes and no review is already in progress.
     const triggerFiredRef = useRef<string | null>(null)
@@ -427,36 +515,36 @@ export function SpecialistReviewPanel({
             {/* Recommended specialist — primary CTA */}
             {topSpec && (
                 <div className="space-y-1.5">
-                    <SpecButton spec={topSpec} primary />
-                    {topRanked.matchedKeywords.length > 0 && (
-                        <p className="text-[11px] text-muted-foreground pl-1">
-                            Matched: {topRanked.matchedKeywords.slice(0, 4).join(", ")}
-                        </p>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <SpecButton spec={topSpec} primary />
+                        <Badge variant="secondary" className="text-[10px] font-normal">Recommended</Badge>
+                    </div>
+                    {topRanked.matchedKeywords.length > 0 && (() => {
+                        const modAnswers = diagnosticAnswers?.[module.id] ?? {}
+                        const diagnosticMatches = topRanked.matchedKeywords.filter(kw =>
+                            Object.values(modAnswers).includes(kw)
+                        )
+                        const textMatches = topRanked.matchedKeywords.filter(kw =>
+                            !Object.values(modAnswers).includes(kw)
+                        )
+                        return (
+                            <p className="text-xs text-foreground pl-1">
+                                {textMatches.length > 0
+                                    ? `Recommended because this module involves ${textMatches.slice(0, 4).join(", ")}.`
+                                    : `Recommended for this module's specifications.`}
+                                {diagnosticMatches.length > 0 &&
+                                    ` Your ${diagnosticMatches[0]} choice makes ${topSpec.label}'s review especially relevant.`}
+                            </p>
+                        )
+                    })()}
                 </div>
             )}
 
-            {/* Other specialists — expandable */}
-            <div>
-                <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                    onClick={() => setShowOtherSpecialists(prev => !prev)}
-                >
-                    {showOtherSpecialists ? (
-                        <ChevronDown className="h-3 w-3" />
-                    ) : (
-                        <ChevronRight className="h-3 w-3" />
-                    )}
-                    Choose a different specialist
-                </button>
-                {showOtherSpecialists && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                        {otherSpecs.map(spec => (
-                            <SpecButton key={spec.id} spec={spec} />
-                        ))}
-                    </div>
-                )}
+            {/* Other specialists — always visible */}
+            <div className="flex flex-wrap gap-1.5">
+                {otherSpecs.map(spec => (
+                    <SpecButton key={spec.id} spec={spec} />
+                ))}
             </div>
 
             {/* Error */}
@@ -464,16 +552,11 @@ export function SpecialistReviewPanel({
                 <p className="text-xs text-destructive">{error}</p>
             )}
 
-            {/* Loading indicator — local state OR context-level pending (survives navigation) */}
+            {/* Loading indicator — specialist thinking phases */}
             {(loadingSpecialist || (!loadingSpecialist && anyPendingInContext && Object.keys(quickVerdicts).length === 0)) && (() => {
                 const activeSpecId = loadingSpecialist ?? Array.from(pendingReviewKeys ?? []).find(k => k.startsWith(`${module.id}:`))?.split(":")[1]
                 return activeSpecId ? (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
-                        <span>
-                            {getSpecialistById(activeSpecId)?.name ?? "Specialist"} is reviewing {module.name}...
-                        </span>
-                    </div>
+                    <ThinkingPhases specialistId={activeSpecId} moduleName={module.name} />
                 ) : null
             })()}
 
@@ -524,12 +607,37 @@ export function SpecialistReviewPanel({
                 </div>
             )}
 
-            {/* Empty state */}
-            {reviews.length === 0 && !loadingSpecialist && !anyPendingInContext && (
-                <p className="text-xs text-muted-foreground italic">
-                    No reviews yet — optional, but recommended for extra confidence.
-                </p>
-            )}
+            {/* Empty state — specialist introduction */}
+            {reviews.length === 0 && !loadingSpecialist && !anyPendingInContext && topSpec && (() => {
+                const spec = getSpecialistById(topRanked.id)
+                const specName = spec?.name ?? topSpec.label
+                const keywordSentence = topRanked.matchedKeywords.length > 0
+                    ? ` spotted ${topRanked.matchedKeywords.slice(0, 3).join(", ")} in this module`
+                    : " is the best match for this module"
+                return (
+                    <div className="flex items-start gap-3 rounded-md border p-3 bg-muted/30">
+                        {spec?.avatarImage ? (
+                            <Image
+                                src={spec.avatarImage}
+                                alt={spec.name}
+                                width={32}
+                                height={32}
+                                className="rounded-full flex-shrink-0 mt-0.5"
+                            />
+                        ) : (
+                            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <span className="text-xs font-medium text-muted-foreground">{spec?.name?.[0] ?? "?"}</span>
+                            </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm text-foreground">
+                                <span className="font-semibold">{specName}</span>
+                                {keywordSentence}. {specName}&apos;s review catches issues before they reach your suppliers.
+                            </p>
+                        </div>
+                    </div>
+                )
+            })()}
         </div>
     )
 }

@@ -13,7 +13,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { redirect } from 'next/navigation'
 import { TimeTrackerView } from './time-tracker-view'
-import { toTimeEntryWithRelations } from '@/actions/time-tracking'
+import { toTimeEntryWithRelations, TIME_ENTRY_SELECT } from '@/lib/time-tracking-utils'
 
 export const metadata = {
   title: 'Time | ForgeOS',
@@ -49,12 +49,7 @@ export default async function TimePage() {
   const [entriesResult, tasksResult, projectsResult] = await Promise.all([
     supabase
       .from('time_entries')
-      .select(`
-        *,
-        user:profiles!user_id(full_name, avatar_url),
-        task:tasks!task_id(title),
-        project:finance_projects!finance_project_id(name)
-      `)
+      .select(TIME_ENTRY_SELECT)
       .eq('foundry_id', foundryId)
       .eq('user_id', user.id)
       .gte('entry_date', weekStart)

@@ -93,6 +93,7 @@ import type { TechniqueRecommendation } from "@/lib/cad-lab/technique-recommende
 import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
+import { SpecialistIntroCard } from "@/components/cad/specialist-intro-card"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -623,6 +624,11 @@ export default function SpecifyPage(): React.ReactNode {
               isRegenerating={isRegeneratingImages}
               progressLines={progressLines}
             />
+
+            {/* Meet Your Engineering Team — only shown before first review */}
+            {Object.keys(moduleReviews).length === 0 && allDiagnosticsComplete && (
+              <SpecialistIntroCard onNavigateToReview={() => setActiveTab("review")} />
+            )}
 
             {/* Cost summary — aggregate early estimates across modules */}
             {aiCostEstimates && Object.keys(aiCostEstimates).length > 0 && (

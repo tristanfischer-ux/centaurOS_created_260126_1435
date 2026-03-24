@@ -49,6 +49,9 @@ import { ExecutiveReviewTab } from "@/components/cad/executive-review-tab"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { classifyPart } from "@/lib/part-classification"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
+import { SourceSpecialistInsights } from "@/components/cad/source-specialist-insights"
+import Image from "next/image"
+import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -88,6 +91,8 @@ export default function SourcePage(): React.ReactNode {
     clearPartCategoryOverride,
     linkedRfqId,
     linkRfqToProject,
+    moduleReviews,
+    revisedModuleIds,
   } = useCadLab()
 
   // Fetch RFQ quotes if linked — with proper cleanup to avoid stale state
@@ -586,9 +591,16 @@ export default function SourcePage(): React.ReactNode {
       <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
         <CardContent className="pt-6">
           <div className="flex items-start gap-3">
-            <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-info" />
-            </div>
+            {(() => {
+              const chase = getSpecialistById("vp-supply-chain")
+              return chase?.avatarImage ? (
+                <Image src={chase.avatarImage} alt={chase.name} width={32} height={32} className="rounded-full flex-shrink-0" />
+              ) : (
+                <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
+                  <Truck className="h-4 w-4 text-info" />
+                </div>
+              )
+            })()}
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Sourcing Review</p>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -605,6 +617,13 @@ export default function SourcePage(): React.ReactNode {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── Unresolved specialist warnings from Specify reviews ── */}
+      <SourceSpecialistInsights
+        modules={modules}
+        moduleReviews={moduleReviews}
+        revisedModuleIds={revisedModuleIds}
+      />
 
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">

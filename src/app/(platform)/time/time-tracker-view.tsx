@@ -69,7 +69,6 @@ function formatWeekRange(weekStart: string): string {
 
 /** Check if a date falls within the Mon–Sun week. */
 function isInWeek(dateStr: string, weekStart: string): boolean {
-  const weekEnd = addWeeks(weekStart, 0) // same week
   const endDate = new Date(weekStart + 'T00:00:00Z')
   endDate.setUTCDate(endDate.getUTCDate() + 6)
   const end = endDate.toISOString().split('T')[0]
@@ -207,16 +206,20 @@ export function TimeTrackerView({
     setFormOpen(true)
   }
 
-  // M-8 fix: Delete confirmation
+  // M-8 fix: Delete confirmation. RT2-H1 fix: try/catch for unhandled rejection.
   const handleDeleteEntry = async (id: string) => {
     if (!window.confirm('Delete this time entry? This cannot be undone.')) return
 
-    const result = await deleteTimeEntry(id)
-    if ('error' in result && result.error) {
-      setError(result.error)
-      return
+    try {
+      const result = await deleteTimeEntry(id)
+      if ('error' in result && result.error) {
+        setError(result.error)
+        return
+      }
+      setEntries((prev) => prev.filter((e) => e.id !== id))
+    } catch {
+      setError('Failed to delete time entry. Please try again.')
     }
-    setEntries((prev) => prev.filter((e) => e.id !== id))
   }
 
   // L-8 fix: try/catch/finally. H-2 fix: show errors, keep dialog open.
@@ -346,7 +349,7 @@ export function TimeTrackerView({
       ) : entries.length === 0 ? (
         <EmptyState
           icon={<Clock className="h-10 w-10" />}
-          title={isCurrentWeek ? 'No time logged this week' : 'No time logged this week'}
+          title={isCurrentWeek ? 'No time logged yet' : 'No time logged this week'}
           description={isCurrentWeek
             ? 'Start tracking your hours by clicking the + button on any day, or use the Log Time button above.'
             : 'No entries were logged during this week.'

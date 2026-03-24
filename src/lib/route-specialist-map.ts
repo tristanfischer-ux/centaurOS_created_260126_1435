@@ -43,7 +43,10 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/recruits", specialistId: "hiring-team" },
   { pattern: "/apprenticeship", specialistId: "hiring-team" },
   // Prefix patterns (more specific before broader)
-  { pattern: "/the-forge/cad-lab", specialistId: "vp-manufacturing" },
+  { pattern: "/the-forge/cad-lab/specify", specialistId: "vp-manufacturing" },
+  { pattern: "/the-forge/cad-lab/source", specialistId: "vp-supply-chain" },
+  { pattern: "/the-forge/cad-lab/assemble", specialistId: "vp-supply-chain" },
+  { pattern: "/the-forge/cad-lab", specialistId: "cto" },
   { pattern: "/the-forge", specialistId: "product-lead" },
   { pattern: "/strategic-planner", specialistId: "strategist" },
   { pattern: "/team", specialistId: "hiring-team" },

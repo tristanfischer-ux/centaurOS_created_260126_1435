@@ -27,6 +27,7 @@ import type {
   WeekSummary,
   TimeEntryStatus,
 } from '@/types/time-tracking'
+import { toTimeEntryWithRelations, TIME_ENTRY_SELECT } from '@/lib/time-tracking-utils'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Validation helpers
@@ -55,50 +56,9 @@ function todayUTC(): string {
 
 const MAX_DESCRIPTION_LENGTH = 5000
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Row mapping
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Convert a Supabase row (snake_case) to TimeEntryWithRelations (camelCase). */
-export function toTimeEntryWithRelations(row: Record<string, unknown>): TimeEntryWithRelations {
-  const user = row.user as Record<string, unknown> | null
-  const task = row.task as Record<string, unknown> | null
-  const project = row.project as Record<string, unknown> | null
-
-  return {
-    id: row.id as string,
-    foundryId: row.foundry_id as string,
-    userId: row.user_id as string,
-    entryDate: row.entry_date as string,
-    durationMinutes: row.duration_minutes as number,
-    startedAt: row.started_at as string | null,
-    endedAt: row.ended_at as string | null,
-    description: row.description as string,
-    taskId: row.task_id as string | null,
-    financeProjectId: row.finance_project_id as string | null,
-    isBillable: row.is_billable as boolean,
-    hourlyRatePence: row.hourly_rate_pence as number | null,
-    status: row.status as TimeEntryStatus,
-    submittedAt: row.submitted_at as string | null,
-    reviewedBy: row.reviewed_by as string | null,
-    reviewedAt: row.reviewed_at as string | null,
-    rejectionReason: row.rejection_reason as string | null,
-    createdAt: row.created_at as string,
-    updatedAt: row.updated_at as string,
-    userName: (user?.full_name as string) ?? 'Unknown',
-    userAvatarUrl: (user?.avatar_url as string) ?? null,
-    taskTitle: (task?.title as string) ?? null,
-    projectName: (project?.name as string) ?? null,
-  }
-}
-
-// INTENT: Shared select string for time_entries with joined relations.
-const TIME_ENTRY_SELECT = `
-  *,
-  user:profiles!user_id(full_name, avatar_url),
-  task:tasks!task_id(title),
-  project:finance_projects!finance_project_id(name)
-`
+// INTENT: toTimeEntryWithRelations and TIME_ENTRY_SELECT live in
+// @/lib/time-tracking-utils (extracted from 'use server' file because
+// Next.js 16 only allows async function exports from server action files).
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Actions
