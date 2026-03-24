@@ -183,7 +183,10 @@ export function EditProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent size="md" className="max-h-[90vh] flex flex-col">
+      {/* MOBILE: Near-full-screen dialog so keyboard doesn't hide form fields.
+          overflow-hidden on outer → only inner content area scrolls (not the whole dialog).
+          h-[calc(100dvh-2rem)] accounts for centering wrapper p-4 padding. */}
+      <DialogContent size="md" className="max-h-[calc(100dvh-2rem)] sm:max-h-[90dvh] h-[calc(100dvh-2rem)] sm:h-auto flex flex-col overflow-hidden p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Edit Profile</DialogTitle>
         </DialogHeader>
@@ -224,8 +227,9 @@ export function EditProfileDialog({
           </Alert>
         )}
 
-        {/* Step content */}
-        <div className="flex-1 overflow-y-auto px-1 py-2" data-edit-profile-field>
+        {/* Step content — flex-1 + min-h-0 ensures this div takes remaining space
+            and overflow-y-auto creates the sole scroll container */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-1 py-2" data-edit-profile-field>
           {currentStep === 'basics' && (
             <StepNameBio
               fullName={formState.fullName}
@@ -254,8 +258,8 @@ export function EditProfileDialog({
           )}
         </div>
 
-        {/* Navigation footer */}
-        <DialogFooter>
+        {/* Navigation footer — sticky at bottom, safe-area padding for mobile */}
+        <DialogFooter className="flex-shrink-0 border-t pt-4 pb-safe">
           <div className="flex w-full items-center justify-between">
             <Button
               variant="secondary"
