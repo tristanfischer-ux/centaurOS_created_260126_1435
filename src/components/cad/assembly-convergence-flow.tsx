@@ -16,7 +16,7 @@
 
 "use client"
 
-import { useMemo, useState, useCallback } from "react"
+import { useMemo, useState, useCallback, useRef } from "react"
 import {
   SANKEY,
   CAT_COLORS,
@@ -94,6 +94,8 @@ export function AssemblyConvergenceFlow({
 }: AssemblyConvergenceFlowProps) {
   const [hoveredLeft, setHoveredLeft] = useState<string | null>(null)
   const [hoveredAssembler, setHoveredAssembler] = useState<string | null>(null)
+  const [hasHovered, setHasHovered] = useState(false)
+  const hoverHintRef = useRef(false)
 
   // ── Build category data from modules ──
   const { categories, totalParts } = useMemo(
@@ -262,19 +264,27 @@ export function AssemblyConvergenceFlow({
   const handleLeftHover = useCallback((id: string | null) => {
     setHoveredLeft(id)
     setHoveredAssembler(null)
+    if (id && !hoverHintRef.current) {
+      hoverHintRef.current = true
+      setHasHovered(true)
+    }
   }, [])
 
   const handleAssemblerHover = useCallback((asmId: string | null) => {
     setHoveredAssembler(asmId)
     setHoveredLeft(null)
+    if (asmId && !hoverHintRef.current) {
+      hoverHintRef.current = true
+      setHasHovered(true)
+    }
   }, [])
 
   // ── Ribbon opacity helpers ──
   const leftRibbonOpacity = useCallback((leftId: string, asmId: string) => {
-    if (!hoveredLeft && !hoveredAssembler) return 0.35
-    if (hoveredLeft === leftId) return 0.6
-    if (hoveredAssembler === asmId) return 0.6
-    return 0.1
+    if (!hoveredLeft && !hoveredAssembler) return 0.55
+    if (hoveredLeft === leftId) return 0.85
+    if (hoveredAssembler === asmId) return 0.85
+    return 0.15
   }, [hoveredLeft, hoveredAssembler])
 
   // ── No data state ──
@@ -330,24 +340,59 @@ export function AssemblyConvergenceFlow({
     }
   }
 
-  // Assembler -> Product ribbons
+  // INTENT: Per-category colored ribbons from assembler→product so users can
+  // trace category colors end-to-end (left→mid→right) instead of one giant orange blob.
   const asmToProductRibbons: {
     asmId: string
+    catId: string
     path: string
+    color: string
     opacity: number
   }[] = []
 
+  // Build a lookup: categoryId → color from leftLayout
+  const catColorMap = new Map<string, string>()
+  for (const left of leftLayout) {
+    catColorMap.set(left.id, left.color)
+  }
+
   for (const asm of assemblerLayout) {
     if (asm.tierLevel === 2 || assemblerLayout.length === 1) {
-      const path = flowPath(
-        COL.MID_X + COL.MID_BAR_W, asm.top, asm.top + asm.barH,
-        COL.RIGHT_X, productLayout.top, productLayout.top + productLayout.height,
-      )
-      asmToProductRibbons.push({
-        asmId: asm.id,
-        path,
-        opacity: hoveredAssembler === asm.id ? 0.6 : (!hoveredAssembler && !hoveredLeft ? 0.35 : 0.1),
-      })
+      // Get the category nodes assigned to this assembler (preserves left-column order)
+      const assignedCats = leftLayout.filter((l) => asm.assignedCategories.includes(l.id))
+      const totalAssignedParts = assignedCats.reduce((sum, l) => sum + l.partCount, 0)
+
+      // Proportional vertical slots on assembler side
+      let asmSlotOffset = 0
+      // Proportional vertical slots on product side
+      let prodSlotOffset = 0
+
+      for (const cat of assignedCats) {
+        // Assembler side: proportional slot within asm card height
+        const asmY1 = asm.top + (asmSlotOffset / Math.max(totalAssignedParts, 1)) * asm.barH
+        const asmY2 = asm.top + ((asmSlotOffset + cat.partCount) / Math.max(totalAssignedParts, 1)) * asm.barH
+
+        // Product side: proportional slot within product height
+        const prodY1 = productLayout.top + (prodSlotOffset / Math.max(totalAssignedParts, 1)) * productLayout.height
+        const prodY2 = productLayout.top + ((prodSlotOffset + cat.partCount) / Math.max(totalAssignedParts, 1)) * productLayout.height
+
+        const path = flowPath(
+          COL.MID_X + COL.MID_BAR_W, asmY1, asmY2,
+          COL.RIGHT_X, prodY1, prodY2,
+        )
+
+        const isHighlighted = hoveredAssembler === asm.id || hoveredLeft === cat.id
+        asmToProductRibbons.push({
+          asmId: asm.id,
+          catId: cat.id,
+          path,
+          color: catColorMap.get(cat.id) ?? "#ff4500",
+          opacity: isHighlighted ? 0.85 : (!hoveredAssembler && !hoveredLeft ? 0.55 : 0.15),
+        })
+
+        asmSlotOffset += cat.partCount
+        prodSlotOffset += cat.partCount
+      }
     }
   }
 
@@ -379,7 +424,7 @@ export function AssemblyConvergenceFlow({
         fromId: t1.id,
         toId: tier2.id,
         path,
-        opacity: isHl ? 0.6 : (!hoveredAssembler && !hoveredLeft ? 0.3 : 0.08),
+        opacity: isHl ? 0.85 : (!hoveredAssembler && !hoveredLeft ? 0.45 : 0.15),
       })
     }
   }
@@ -402,6 +447,18 @@ export function AssemblyConvergenceFlow({
           Final Assembly &amp; Despatch
         </text>
 
+        {/* ── Hover hint — fades out after first interaction ── */}
+        {!hasHovered && (
+          <text
+            x={COL.SVG_W / 2}
+            y={svgHeight - 4}
+            textAnchor="middle"
+            style={{ fontSize: 8, fontStyle: "italic", fill: "#9ca3af", transition: "opacity 0.5s" }}
+          >
+            Hover a card to trace its flows
+          </text>
+        )}
+
         {/* ── Flow ribbons: Left -> Assemblers ── */}
         {flowRibbons.map((r, i) => (
           <path
@@ -409,6 +466,9 @@ export function AssemblyConvergenceFlow({
             d={r.path}
             fill={r.color}
             opacity={r.opacity}
+            stroke={r.color}
+            strokeOpacity={0.4}
+            strokeWidth={0.5}
             className="transition-opacity duration-200"
           />
         ))}
@@ -420,17 +480,23 @@ export function AssemblyConvergenceFlow({
             d={r.path}
             fill="#64748b"
             opacity={r.opacity}
+            stroke="#64748b"
+            strokeOpacity={0.4}
+            strokeWidth={0.5}
             className="transition-opacity duration-200"
           />
         ))}
 
-        {/* ── Flow ribbons: Assembler -> Product ── */}
+        {/* ── Flow ribbons: Assembler -> Product (per-category colored) ── */}
         {asmToProductRibbons.map((r, i) => (
           <path
             key={`asm-prod-${i}`}
             d={r.path}
-            fill="#ff4500"
+            fill={r.color}
             opacity={r.opacity}
+            stroke={r.color}
+            strokeOpacity={0.4}
+            strokeWidth={0.5}
             className="transition-opacity duration-200"
           />
         ))}

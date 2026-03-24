@@ -35,9 +35,11 @@ import {
   Wrench,
   Cog,
   Building2,
+  Clock,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -252,6 +254,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   const CONCEPT_TABS = useMemo(() => {
     const tabs = [{ id: "research", label: "Research" }]
     if (modules.length > 0) tabs.push({ id: "modules", label: "Modules" })
+    if (modules.length > 0) tabs.push({ id: "images", label: "Images" })
     return tabs
   }, [modules.length])
 
@@ -262,7 +265,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   // useSearchParams() returns empty during SSR; reading in useState causes mismatch.
   useEffect(() => {
     const param = searchParams.get("tab")
-    if (param && (param === "research" || (param === "modules" && modules.length > 0))) {
+    if (param && (param === "research" || ((param === "modules" || param === "images") && modules.length > 0))) {
       setActiveTab(param)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,7 +344,7 @@ export default function CadLabResearchPage(): React.ReactNode {
 
   // Fall back to research if modules tab is active but no modules exist
   useEffect(() => {
-    if (activeTab === "modules" && modules.length === 0) {
+    if ((activeTab === "modules" || activeTab === "images") && modules.length === 0) {
       setActiveTab("research")
     }
   }, [activeTab, modules.length])
@@ -545,10 +548,16 @@ export default function CadLabResearchPage(): React.ReactNode {
                       {engData && engData.hardwareItemCount > 0 && (
                         <div className="flex items-start gap-2">
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-xs font-medium text-foreground">Hardware Library</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 4762 Socket Head Bolts (M2–M24)</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 4032 Hex Nuts (M3–M20)</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 7089 Plain Washers (M3–M20)</span>
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">Deep Groove Ball Bearings (608–6205)</span>
+                            </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {engData.hardwareItemCount} standard components in library
+                              {engData.hardwareItemCount} items with exact clearance holes, thread pitches, load ratings
                             </p>
                           </div>
                         </div>
@@ -931,72 +940,68 @@ export default function CadLabResearchPage(): React.ReactNode {
             </motion.div>
           )}
 
-          {/* ═══ Modules tab ═══ */}
+          {/* ═══ Modules tab (text-only — no images, focused on reading) ═══ */}
           {activeTab === "modules" && modules.length > 0 && (
             <motion.div key="modules" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
-              {/* Header with reveal progress */}
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-foreground">
-                  {Math.min(revealedModuleIds.size, modules.length)} of {modules.length} sub-assemblies
-                </p>
-                {(() => {
-                  const heroReady = systemIllustrationStatus === "complete" || !!systemIllustrationUrl
-                  const hasStuck = modules.some(m => !m.imageStatus || m.imageStatus === "pending")
-                  const hasFailed = modules.some(m => m.imageStatus === "failed")
-                  if (!heroReady || isGeneratingImages || (!hasStuck && !hasFailed)) return null
-                  return (
-                    <Button variant="ghost" size="sm" onClick={handleRefreshModuleImages} className="gap-1.5 text-xs">
-                      <ImageIcon className="h-3.5 w-3.5" />
-                      {hasStuck ? "Generate Illustrations" : "Retry All Failed"}
-                    </Button>
-                  )
-                })()}
+                <p className="text-sm font-semibold text-foreground">{modules.length} Sub-Assemblies</p>
+                <Button variant="ghost" size="sm" onClick={() => handleTabClick("images")} className="gap-1.5 text-xs">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                  View Illustrations
+                </Button>
               </div>
 
-              {/* Illustration progress card — prominent feedback during image generation */}
-              {(isGeneratingImages || systemIllustrationStatus === "generating") && (() => {
-                const completed = modules.filter(m => m.imageStatus === "complete").length
-                const failed = modules.filter(m => m.imageStatus === "failed").length
-                const done = completed + failed
-                const total = modules.length
-                const pct = total > 0 ? Math.round((done / total) * 100) : 0
-                const isHeroPhase = systemIllustrationStatus === "generating"
-
-                return (
-                  <Card className="border-international-orange/20 bg-muted/50">
-                    <CardContent className="pt-4 pb-4 space-y-2.5">
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-international-orange shrink-0" />
-                        <p className="text-sm font-medium text-foreground">
-                          {isHeroPhase
-                            ? "Creating system overview..."
-                            : `Generating module illustrations — ${done} of ${total}`}
-                        </p>
+              {/* Text-only module cards — no images, user can read everything */}
+              <div className="grid gap-3">
+                {modules.map((mod) => (
+                  <Card key={mod.id}>
+                    <CardContent className="pt-4 pb-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-semibold text-foreground">{mod.name}</h4>
+                        {mod.imageStatus === "complete" && <Badge variant="success" className="text-[10px]">Illustrated</Badge>}
                       </div>
-                      {!isHeroPhase && total > 0 && (
-                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-international-orange transition-all duration-500 ease-out"
-                            style={{ width: `${pct}%` }}
-                          />
+                      <p className="text-xs text-muted-foreground">{mod.purpose}</p>
+                      {mod.description && <p className="text-xs text-foreground leading-relaxed">{mod.description}</p>}
+                      {mod.whyItMatters && (
+                        <div className="border-l-2 border-international-orange/30 pl-3 py-1">
+                          <p className="text-xs text-muted-foreground italic">{mod.whyItMatters}</p>
                         </div>
+                      )}
+                      {mod.keyParts && mod.keyParts.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Key Components</p>
+                          <div className="flex flex-wrap gap-1">
+                            {mod.keyParts.map((part, i) => (
+                              <span key={i} className="text-[11px] bg-muted px-1.5 py-0.5 rounded font-mono">{part}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {mod.failureModes && mod.failureModes.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Failure Modes</p>
+                          <ul className="space-y-0.5">
+                            {mod.failureModes.map((fm, i) => (
+                              <li key={i} className="text-[11px] text-foreground flex items-start gap-1">
+                                <AlertTriangle className="h-3 w-3 text-status-warning shrink-0 mt-0.5" />{fm}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {(mod.inputs?.length > 0 || mod.outputs?.length > 0) && (
+                        <div className="flex gap-4 text-[11px]">
+                          {mod.inputs?.length > 0 && <span className="text-muted-foreground">In: {mod.inputs.join(", ")}</span>}
+                          {mod.outputs?.length > 0 && <span className="text-muted-foreground">Out: {mod.outputs.join(", ")}</span>}
+                        </div>
+                      )}
+                      {mod.leadWeeks > 0 && (
+                        <Badge variant="secondary" className="text-[10px] gap-1"><Clock className="h-3 w-3" />{mod.leadWeeks} weeks lead</Badge>
                       )}
                     </CardContent>
                   </Card>
-                )
-              })()}
-
-              {/* Module image grid with progressive reveal */}
-              <ModuleImageGrid
-                modules={modules}
-                revealedModuleIds={revealedModuleIds}
-                expandedModuleId={expandedModuleId}
-                onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
-                onModuleSave={handleUpdateModule}
-                onRetryModule={handleRetryModule}
-                onReloadModule={handleReExpandModule}
-                reloadingModuleIds={reExpandingModuleIds}
-              />
+                ))}
+              </div>
 
               {/* Process flow — how modules connect via inputs and outputs */}
               {isExtractingContracts && (
@@ -1059,6 +1064,58 @@ export default function CadLabResearchPage(): React.ReactNode {
                   </CardContent>
                 </Card>
               )}
+            </motion.div>
+          )}
+
+          {/* ═══ Images tab — all illustrations in one place ═══ */}
+          {activeTab === "images" && modules.length > 0 && (
+            <motion.div key="images" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">
+                  {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} illustrations
+                </p>
+                {(() => {
+                  const heroReady = systemIllustrationStatus === "complete" || !!systemIllustrationUrl
+                  const hasStuck = modules.some(m => !m.imageStatus || m.imageStatus === "pending")
+                  const hasFailed = modules.some(m => m.imageStatus === "failed")
+                  if (!heroReady || isGeneratingImages || (!hasStuck && !hasFailed)) return null
+                  return (
+                    <Button variant="ghost" size="sm" onClick={handleRefreshModuleImages} className="gap-1.5 text-xs">
+                      <ImageIcon className="h-3.5 w-3.5" />
+                      {hasStuck ? "Generate Illustrations" : "Retry Failed"}
+                    </Button>
+                  )
+                })()}
+              </div>
+
+              {/* Image generation progress */}
+              {(isGeneratingImages || systemIllustrationStatus === "generating") && (
+                <Card>
+                  <CardContent className="pt-4 pb-4">
+                    <p className="text-xs text-muted-foreground">
+                      Generating illustrations — {modules.filter(m => m.imageStatus === "complete").length} of {modules.length} ready
+                    </p>
+                    <div className="mt-2 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-international-orange rounded-full transition-all duration-500"
+                        style={{ width: `${modules.length > 0 ? Math.round((modules.filter(m => m.imageStatus === "complete" || m.imageStatus === "failed").length / modules.length) * 100) : 0}%` }}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Module image grid */}
+              <ModuleImageGrid
+                modules={modules}
+                revealedModuleIds={revealedModuleIds}
+                expandedModuleId={expandedModuleId}
+                onToggleExpand={(id) => setExpandedModuleId(expandedModuleId === id ? null : id)}
+                onModuleSave={handleUpdateModule}
+                onRetryModule={handleRetryModule}
+                onReloadModule={handleReExpandModule}
+                reloadingModuleIds={reExpandingModuleIds}
+              />
             </motion.div>
           )}
         </AnimatePresence>
