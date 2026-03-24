@@ -410,7 +410,7 @@ export function CadLabShortlist({
             <Button
               variant="default"
               size="sm"
-              className="gap-1.5 h-7 text-xs"
+              className="gap-1.5 h-7 min-h-[44px] sm:min-h-0 sm:h-7 text-xs"
               onClick={onMatchAll}
               disabled={matchAllLoading || modules.length === 0}
             >
@@ -550,7 +550,7 @@ export function CadLabShortlist({
                       <Button
                         variant="default"
                         size="sm"
-                        className="h-6 px-2 text-[10px]"
+                        className="h-6 min-h-[44px] sm:min-h-0 sm:h-6 px-2 text-[10px]"
                         onClick={(e) => {
                           e.stopPropagation()
                           handleCreateSupplierRfq(supplier.id, supplier)
@@ -578,7 +578,7 @@ export function CadLabShortlist({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-6 px-1.5 text-[10px] text-muted-foreground"
+                          className="h-6 min-h-[44px] sm:min-h-0 sm:h-6 px-1.5 text-[10px] text-muted-foreground"
                           onClick={(e) => {
                             e.stopPropagation()
                             window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")
@@ -593,7 +593,7 @@ export function CadLabShortlist({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
+                    className="h-6 min-h-[44px] sm:min-h-0 sm:h-6 px-2 text-[10px] text-muted-foreground hover:text-destructive"
                     onClick={() => onRemoveFromShortlist(supplier.id)}
                   >
                     <X className="h-3 w-3" />
@@ -682,7 +682,7 @@ export function CadLabShortlist({
                             <Button
                               variant={isGenerated ? "secondary" : "outline"}
                               size="sm"
-                              className="h-7 text-[10px] gap-1"
+                              className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 text-[10px] gap-1"
                               onClick={() => handleGenerateDoc(supplier.id, supplier, doc.id)}
                             >
                               {isGenerated && <CheckCircle2 className="h-2.5 w-2.5 text-status-success" />}
@@ -692,7 +692,7 @@ export function CadLabShortlist({
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 px-1.5 text-[10px]"
+                                className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 px-1.5 text-[10px]"
                                 onClick={() => handleCopyDoc(supplier.id, doc.id)}
                               >
                                 <Copy className="h-2.5 w-2.5" />
@@ -708,7 +708,7 @@ export function CadLabShortlist({
                         <Button
                           variant="default"
                           size="sm"
-                          className="h-7 text-[10px]"
+                          className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 text-[10px]"
                           onClick={() => handleCreateSupplierRfq(supplier.id, supplier)}
                           disabled={creatingRfqFor === supplier.id}
                         >
@@ -719,7 +719,7 @@ export function CadLabShortlist({
                           <Button
                             variant="outline"
                             size="sm"
-                            className="h-7 text-[10px]"
+                            className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 text-[10px]"
                             onClick={() => {
                               window.open(`/rfq/${rfqId}`, "_blank", "noopener,noreferrer")
                             }}
@@ -731,7 +731,7 @@ export function CadLabShortlist({
                             <Button
                               variant="default"
                               size="sm"
-                              className="h-7 text-[10px]"
+                              className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 text-[10px]"
                               onClick={() => handleAwardOrder(supplier.id, supplier)}
                               disabled={awardingFor === supplier.id}
                             >

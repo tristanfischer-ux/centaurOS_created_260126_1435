@@ -107,7 +107,7 @@ export function ProductOverviewCard({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 gap-1.5 text-xs text-muted-foreground"
+              className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 gap-1.5 text-xs text-muted-foreground"
               onClick={() => setIsEditing(true)}
             >
               <Pencil className="h-3 w-3" />

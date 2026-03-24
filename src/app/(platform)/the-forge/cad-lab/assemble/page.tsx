@@ -514,7 +514,7 @@ export default function AssemblePage(): React.ReactNode {
               {assemblyNotes.map((note, i) => (
                 <div key={i} className="flex items-start gap-2 text-sm">
                   <span className="shrink-0 text-xs font-semibold text-foreground bg-muted px-2 py-0.5 rounded">{note.moduleName}</span>
-                  <span className="text-muted-foreground">{note.note}</span>
+                  <span className="text-muted-foreground break-words">{note.note}</span>
                 </div>
               ))}
             </div>

@@ -1278,7 +1278,7 @@ export default function SpecifyPage(): React.ReactNode {
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-international-orange" />
                           <span>{batchCompletedCount}/{batchTotalCount} reviewed</span>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={cancelBatchReview} className="h-7 gap-1 text-xs">
+                        <Button variant="ghost" size="sm" onClick={cancelBatchReview} className="h-7 min-h-[44px] sm:min-h-0 sm:h-7 gap-1 text-xs">
                           <XCircle className="h-3 w-3" />
                           Cancel
                         </Button>
