@@ -691,8 +691,10 @@ SUMMARY: <1-2 sentences>
 SUGGESTIONS: <comma-separated list, or "none">
 FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
 
+                // DECISION: Use Sonnet for checkpoints — fast gut-level assessment,
+                // not full Opus review. Saves cost and latency.
                 const response = await client.messages.create({
-                    model: REVIEW_MODEL,
+                    model: QUICK_VERDICT_MODEL,
                     max_tokens: CHECKPOINT_MAX_TOKENS,
                     system: systemPrompt,
                     messages: [{
@@ -764,10 +766,12 @@ FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
 
         // Save to project
         try {
+            // SECURITY: Filter by foundry_id to prevent cross-tenant checkpoint overwrites
             const { error: saveError } = await supabase
                 .from("cad_lab_projects")
                 .update({ checkpoints: checkpoints as unknown as Json })
                 .eq("id", req.projectId)
+                .eq("foundry_id", foundryId)
 
             if (saveError) {
                 console.error("[CAD-REVIEWS] Failed to save checkpoints:", saveError)

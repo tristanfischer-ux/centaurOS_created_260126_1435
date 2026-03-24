@@ -208,7 +208,7 @@ export function CadLabShortlist({
             const { supplierId, status, responseCount } = result.value
             const prevCount = prev.get(supplierId)?.responseCount ?? 0
             // DECISION: Toast when a new response arrives (count increased)
-            if (responseCount > prevCount && prevCount > 0) {
+            if (responseCount > prevCount && prev.has(supplierId)) {
               toast.success(`New quote received — ${responseCount} response${responseCount !== 1 ? "s" : ""} total`)
             }
             next.set(supplierId, { status, responseCount })
@@ -359,6 +359,8 @@ export function CadLabShortlist({
 
     setAwardingFor(supplierId)
     try {
+      // GOTCHA: responseId param is currently unused in createOrderFromAward.
+      // When response tracking is added, pass the actual response ID here.
       const res = await createOrderFromAward(
         rfqId,
         rfqId,

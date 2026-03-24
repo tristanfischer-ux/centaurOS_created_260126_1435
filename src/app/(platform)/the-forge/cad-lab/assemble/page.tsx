@@ -222,7 +222,7 @@ export default function AssemblePage(): React.ReactNode {
       .then((result) => {
         if ("orderLines" in result) setOrderLines(result.orderLines)
       })
-      .catch(() => { /* non-blocking */ })
+      .catch((err) => console.warn("[ASSEMBLE] Dashboard fetch failed:", err))
   }, [pid])
 
   // ── Required specialties (persisted so badges survive page reload) ──
@@ -286,7 +286,7 @@ export default function AssemblePage(): React.ReactNode {
           toast.success(`Found ${matches.length} assembly companies`)
         }
       } else {
-        toast.success("No assembly companies matched")
+        toast.info("No assembly companies matched")
       }
     } catch (err) {
       console.error("[ASSEMBLE] Match failed:", err)
@@ -391,7 +391,10 @@ export default function AssemblePage(): React.ReactNode {
   }, [subject])
 
   // Lead time — derive from actual data instead of hardcoding
-  const assemblyDays = assemblerMatches[0]?.typicalLeadDays ?? 10
+  // DECISION: Use active assembler's lead time, not just first match
+  const assemblyDays = (activeAssemblerId
+    ? assemblerMatches.find(m => m.id === activeAssemblerId)?.typicalLeadDays
+    : assemblerMatches[0]?.typicalLeadDays) ?? 10
   // DECISION: Derive manufacturing lead time from the longest supplier lead
   // time in aiCostEstimates. Falls back to 14d if no estimates available.
   const manufacturingDays = React.useMemo(() => {
@@ -670,9 +673,9 @@ export default function AssemblePage(): React.ReactNode {
                       </span>
                     ))}
                     <span className="text-[10px] text-muted-foreground flex items-center gap-1.5 ml-2">
-                      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: "#059669" }} /> Strong
-                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1" style={{ backgroundColor: "#d97706" }} /> Partial
-                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1" style={{ backgroundColor: "#94a3b8" }} /> None
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm bg-success" /> Strong
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1 bg-warning" /> Partial
+                      <span className="inline-block h-2.5 w-2.5 rounded-sm ml-1 bg-muted-foreground/40" /> None
                     </span>
                   </div>
 
@@ -813,11 +816,8 @@ export default function AssemblePage(): React.ReactNode {
                                   <span className="text-[9px] font-bold text-muted-foreground w-3 text-right">{label}</span>
                                   <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
                                     <div
-                                      className="h-full rounded-full"
-                                      style={{
-                                        width: `${(value / max) * 100}%`,
-                                        backgroundColor: value > max * 0.5 ? "#059669" : value > 0 ? "#d97706" : "#94a3b8",
-                                      }}
+                                      className={`h-full rounded-full ${value > max * 0.5 ? "bg-success" : value > 0 ? "bg-warning" : "bg-muted-foreground/40"}`}
+                                      style={{ width: `${((value ?? 0) / max) * 100}%` }}
                                     />
                                   </div>
                                   <span className="text-[9px] text-muted-foreground font-mono w-7 text-right">{value}/{max}</span>
@@ -881,7 +881,7 @@ export default function AssemblePage(): React.ReactNode {
               assemblyEstimate={
                 // DECISION: Derive from module count × £5/module (assembly labour)
                 // instead of hardcoded £15. More modules = more assembly time.
-                Math.max(10, modules.length * 5)
+                Math.max(10, eligibleModules.length * 5)
               }
               packagingEstimate={
                 // DECISION: Base £3 + £0.50 per custom insert + £0.30 per regulatory label
@@ -909,7 +909,7 @@ export default function AssemblePage(): React.ReactNode {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: "spring", damping: 20, stiffness: 300 }}
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 rounded-full bg-card border border-border shadow-lg px-5 py-2.5"
+            className="fixed bottom-6 inset-x-0 mx-auto w-fit z-40 flex items-center gap-3 rounded-full bg-card border border-border shadow-lg px-5 py-2.5"
           >
             <Button size="sm" onClick={() => setShowCompare(true)}>
               Compare ({compareIds.size})

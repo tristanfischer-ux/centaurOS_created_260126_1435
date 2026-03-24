@@ -221,7 +221,7 @@ export default function SpecifyPage(): React.ReactNode {
         if (result) {
           setProcessInsights((prev) => ({ ...prev, [process]: result }))
         }
-      })
+      }).catch((err) => console.warn("[SPECIFY] Technique insight fetch failed:", err))
     }
   }, [modules, diagnosticAnswers])
 
@@ -241,7 +241,7 @@ export default function SpecifyPage(): React.ReactNode {
         if (recs.length > 0) {
           setTechniqueRecs((prev) => ({ ...prev, [mod.id]: recs }))
         }
-      })
+      }).catch((err) => console.warn("[SPECIFY] Process recommendation fetch failed:", err))
     }
   }, [modules, diagnosticAnswers])
 
@@ -686,7 +686,7 @@ export default function SpecifyPage(): React.ReactNode {
                             />
                             {imagesStale && revisedModuleIds.has(mod.id) && (
                               <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="flex items-center gap-1 rounded-full bg-warning/90 px-2 py-1 text-[10px] font-medium text-white">
+                                <div className="flex items-center gap-1 rounded-full bg-warning/90 px-2 py-1 text-[10px] font-medium text-primary-foreground">
                                   <RefreshCw className="h-3 w-3" />
                                   Drawing outdated
                                 </div>
@@ -1284,7 +1284,7 @@ export default function SpecifyPage(): React.ReactNode {
                         </Button>
                       </div>
                     )}
-                    {allDiagnosticsComplete && !batchReviewActive && (
+                    {allDiagnosticsComplete && !batchReviewActive && unreviewedModuleCount === 0 && (
                       <CheckCircle2 className="h-6 w-6 text-success" />
                     )}
                   </div>
