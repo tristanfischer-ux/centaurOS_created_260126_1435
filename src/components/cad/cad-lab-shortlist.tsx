@@ -209,9 +209,7 @@ export function CadLabShortlist({
             const prevCount = prev.get(supplierId)?.responseCount ?? 0
             // DECISION: Toast when a new response arrives (count increased)
             if (responseCount > prevCount && prevCount > 0) {
-              import("sonner").then(({ toast }) => {
-                toast.success(`New quote received — ${responseCount} response${responseCount !== 1 ? "s" : ""} total`)
-              })
+              toast.success(`New quote received — ${responseCount} response${responseCount !== 1 ? "s" : ""} total`)
             }
             next.set(supplierId, { status, responseCount })
           }
