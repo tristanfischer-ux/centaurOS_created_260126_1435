@@ -17078,6 +17078,122 @@ export type Database = {
           },
         ]
       }
+      time_entries: {
+        Row: {
+          created_at: string
+          description: string
+          duration_minutes: number
+          ended_at: string | null
+          entry_date: string
+          finance_project_id: string | null
+          foundry_id: string
+          hourly_rate_pence: number | null
+          id: string
+          is_billable: boolean
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          started_at: string | null
+          status: string
+          submitted_at: string | null
+          task_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          duration_minutes: number
+          ended_at?: string | null
+          entry_date: string
+          finance_project_id?: string | null
+          foundry_id: string
+          hourly_rate_pence?: number | null
+          id?: string
+          is_billable?: boolean
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          started_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          task_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          duration_minutes?: number
+          ended_at?: string | null
+          entry_date?: string
+          finance_project_id?: string | null
+          foundry_id?: string
+          hourly_rate_pence?: number | null
+          id?: string
+          is_billable?: boolean
+          rejection_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          started_at?: string | null
+          status?: string
+          submitted_at?: string | null
+          task_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "time_entries_finance_project_id_fkey"
+            columns: ["finance_project_id"]
+            isOneToOne: false
+            referencedRelation: "finance_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "time_entries_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "time_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "time_entries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       timesheet_entries: {
         Row: {
           approved_at: string | null

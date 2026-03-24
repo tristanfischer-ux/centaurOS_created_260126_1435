@@ -1,0 +1,343 @@
+/**
+ * @file time-tracking.ts — Server actions for time entry CRUD (Phase 1).
+ *
+ * @description Handles manual time logging: create, read, update, delete entries
+ * and weekly summary aggregation. All actions use withAuth() for multi-tenant isolation.
+ *
+ * Phase 2 will add: startTimer, stopTimer, submitForApproval, approveEntry, rejectEntry.
+ * Phase 3 will add: getTeamTimeReport, getBillableHoursSummary.
+ *
+ * @security All queries filter by foundry_id. RLS enforces row-level access.
+ * Input validation: date format, integer duration, description length, weekStart Monday check.
+ *
+ * @related
+ * - src/types/time-tracking.ts — Type definitions
+ * - src/app/(platform)/time/page.tsx — UI
+ * - supabase/migrations/20260324100000_time_tracking.sql — Schema
+ * - supabase/migrations/20260324200000_time_tracking_hardening.sql — RLS hardening
+ */
+
+'use server'
+
+import { withAuth } from '@/lib/server-action-utils'
+import type {
+  TimeEntryWithRelations,
+  CreateTimeEntryInput,
+  UpdateTimeEntryInput,
+  WeekSummary,
+  TimeEntryStatus,
+} from '@/types/time-tracking'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Validation helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Validate a YYYY-MM-DD string is a real date. */
+function isValidDate(dateStr: string): boolean {
+  if (!DATE_RE.test(dateStr)) return false
+  const d = new Date(dateStr + 'T00:00:00Z')
+  return !isNaN(d.getTime()) && d.toISOString().startsWith(dateStr)
+}
+
+/** Validate weekStart is a valid Monday. */
+function isValidMonday(dateStr: string): boolean {
+  if (!isValidDate(dateStr)) return false
+  const d = new Date(dateStr + 'T00:00:00Z')
+  return d.getUTCDay() === 1 // Monday
+}
+
+/** Get today's date in YYYY-MM-DD (UTC). */
+function todayUTC(): string {
+  return new Date().toISOString().split('T')[0]
+}
+
+const MAX_DESCRIPTION_LENGTH = 5000
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Row mapping
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Convert a Supabase row (snake_case) to TimeEntryWithRelations (camelCase). */
+export function toTimeEntryWithRelations(row: Record<string, unknown>): TimeEntryWithRelations {
+  const user = row.user as Record<string, unknown> | null
+  const task = row.task as Record<string, unknown> | null
+  const project = row.project as Record<string, unknown> | null
+
+  return {
+    id: row.id as string,
+    foundryId: row.foundry_id as string,
+    userId: row.user_id as string,
+    entryDate: row.entry_date as string,
+    durationMinutes: row.duration_minutes as number,
+    startedAt: row.started_at as string | null,
+    endedAt: row.ended_at as string | null,
+    description: row.description as string,
+    taskId: row.task_id as string | null,
+    financeProjectId: row.finance_project_id as string | null,
+    isBillable: row.is_billable as boolean,
+    hourlyRatePence: row.hourly_rate_pence as number | null,
+    status: row.status as TimeEntryStatus,
+    submittedAt: row.submitted_at as string | null,
+    reviewedBy: row.reviewed_by as string | null,
+    reviewedAt: row.reviewed_at as string | null,
+    rejectionReason: row.rejection_reason as string | null,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+    userName: (user?.full_name as string) ?? 'Unknown',
+    userAvatarUrl: (user?.avatar_url as string) ?? null,
+    taskTitle: (task?.title as string) ?? null,
+    projectName: (project?.name as string) ?? null,
+  }
+}
+
+// INTENT: Shared select string for time_entries with joined relations.
+const TIME_ENTRY_SELECT = `
+  *,
+  user:profiles!user_id(full_name, avatar_url),
+  task:tasks!task_id(title),
+  project:finance_projects!finance_project_id(name)
+`
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Actions
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get the current user's time entries for a given week.
+ *
+ * @param weekStart - ISO date string for Monday of the target week (YYYY-MM-DD)
+ * @returns Array of time entries with relations, or error
+ */
+export async function getMyTimeEntries(weekStart: string) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: weekStart must be a valid Monday
+    if (!isValidMonday(weekStart)) {
+      return { error: 'Invalid week start date — must be a Monday in YYYY-MM-DD format' }
+    }
+
+    const weekEnd = addDays(weekStart, 6)
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select(TIME_ENTRY_SELECT)
+      .eq('foundry_id', foundryId)
+      .eq('user_id', user.id)
+      .gte('entry_date', weekStart)
+      .lte('entry_date', weekEnd)
+      .order('entry_date', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) return { error: error.message }
+
+    const entries = (data ?? []).map(toTimeEntryWithRelations)
+    return { success: true as const, data: entries }
+  })
+}
+
+/**
+ * Create a manual time entry.
+ *
+ * @param input - Entry data (date, duration, description, optional task/project)
+ * @returns The created entry, or error
+ */
+export async function createTimeEntry(input: CreateTimeEntryInput) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Date format
+    if (!isValidDate(input.entryDate)) {
+      return { error: 'Invalid date format — use YYYY-MM-DD' }
+    }
+
+    // VALIDATION: Duration must be a whole number 1–1440
+    if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1 || input.durationMinutes > 1440) {
+      return { error: 'Duration must be a whole number between 1 and 1440 minutes' }
+    }
+
+    // VALIDATION: Date cannot be in the future
+    if (input.entryDate > todayUTC()) {
+      return { error: 'Cannot log time for future dates' }
+    }
+
+    // VALIDATION: Description length
+    if (input.description.length > MAX_DESCRIPTION_LENGTH) {
+      return { error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer` }
+    }
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert({
+        foundry_id: foundryId,
+        user_id: user.id,
+        entry_date: input.entryDate,
+        duration_minutes: input.durationMinutes,
+        description: input.description,
+        task_id: input.taskId ?? null,
+        finance_project_id: input.financeProjectId ?? null,
+        is_billable: input.isBillable ?? true,
+      })
+      .select(TIME_ENTRY_SELECT)
+      .single()
+
+    if (error) return { error: error.message }
+
+    return { success: true as const, data: toTimeEntryWithRelations(data) }
+  })
+}
+
+/**
+ * Update an existing time entry. Only own draft/rejected entries can be updated.
+ *
+ * @param id - Time entry ID
+ * @param input - Fields to update
+ * @returns The updated entry, or error
+ */
+export async function updateTimeEntry(id: string, input: UpdateTimeEntryInput) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: Duration bounds + integer
+    if (input.durationMinutes != null) {
+      if (!Number.isInteger(input.durationMinutes) || input.durationMinutes < 1 || input.durationMinutes > 1440) {
+        return { error: 'Duration must be a whole number between 1 and 1440 minutes' }
+      }
+    }
+
+    // VALIDATION: Date format + no future dates
+    if (input.entryDate !== undefined) {
+      if (!isValidDate(input.entryDate)) {
+        return { error: 'Invalid date format — use YYYY-MM-DD' }
+      }
+      if (input.entryDate > todayUTC()) {
+        return { error: 'Cannot log time for future dates' }
+      }
+    }
+
+    // VALIDATION: Description length
+    if (input.description !== undefined && input.description.length > MAX_DESCRIPTION_LENGTH) {
+      return { error: `Description must be ${MAX_DESCRIPTION_LENGTH} characters or fewer` }
+    }
+
+    // SECURITY: Build update payload — only include provided fields (allowlist)
+    const updates: Record<string, unknown> = {}
+    if (input.entryDate !== undefined) updates.entry_date = input.entryDate
+    if (input.durationMinutes !== undefined) updates.duration_minutes = input.durationMinutes
+    if (input.description !== undefined) updates.description = input.description
+    if (input.taskId !== undefined) updates.task_id = input.taskId
+    if (input.financeProjectId !== undefined) updates.finance_project_id = input.financeProjectId
+    if (input.isBillable !== undefined) updates.is_billable = input.isBillable
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('foundry_id', foundryId)
+      .in('status', ['draft', 'rejected'])
+      .select(TIME_ENTRY_SELECT)
+      .single()
+
+    if (error) return { error: error.message }
+
+    return { success: true as const, data: toTimeEntryWithRelations(data) }
+  })
+}
+
+/**
+ * Delete a time entry. Only own draft entries can be deleted.
+ *
+ * @param id - Time entry ID
+ * @returns Success or error
+ */
+export async function deleteTimeEntry(id: string) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // SECURITY: select() to verify a row was actually deleted (C-4 fix)
+    const { data, error } = await supabase
+      .from('time_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('foundry_id', foundryId)
+      .eq('status', 'draft')
+      .select('id')
+
+    if (error) return { error: error.message }
+
+    if (!data || data.length === 0) {
+      return { error: 'Entry not found or cannot be deleted (only draft entries can be deleted)' }
+    }
+
+    return { success: true as const }
+  })
+}
+
+/**
+ * Get an aggregated weekly summary for the current user.
+ *
+ * @param weekStart - ISO date string for Monday of the target week (YYYY-MM-DD)
+ * @returns WeekSummary with totals, by-day breakdown, and status counts
+ */
+export async function getWeekSummary(weekStart: string) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // VALIDATION: weekStart must be a valid Monday
+    if (!isValidMonday(weekStart)) {
+      return { error: 'Invalid week start date — must be a Monday in YYYY-MM-DD format' }
+    }
+
+    const weekEnd = addDays(weekStart, 6)
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select(TIME_ENTRY_SELECT)
+      .eq('foundry_id', foundryId)
+      .eq('user_id', user.id)
+      .gte('entry_date', weekStart)
+      .lte('entry_date', weekEnd)
+      .order('entry_date', { ascending: true })
+      .order('created_at', { ascending: true })
+
+    if (error) return { error: error.message }
+
+    const entries = (data ?? []).map(toTimeEntryWithRelations)
+
+    // Aggregate
+    let totalMinutes = 0
+    let billableMinutes = 0
+    const entriesByDay: Record<string, TimeEntryWithRelations[]> = {}
+    const statusCounts: Record<TimeEntryStatus, number> = {
+      draft: 0,
+      submitted: 0,
+      approved: 0,
+      rejected: 0,
+    }
+
+    for (const entry of entries) {
+      totalMinutes += entry.durationMinutes
+      if (entry.isBillable) billableMinutes += entry.durationMinutes
+
+      if (!entriesByDay[entry.entryDate]) entriesByDay[entry.entryDate] = []
+      entriesByDay[entry.entryDate].push(entry)
+
+      statusCounts[entry.status]++
+    }
+
+    const summary: WeekSummary = {
+      weekStart,
+      totalMinutes,
+      billableMinutes,
+      entriesByDay,
+      statusCounts,
+    }
+
+    return { success: true as const, data: summary }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Date utility (avoids importing date-fns in server action)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Add days to an ISO date string, returning a new ISO date string. */
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().split('T')[0]
+}

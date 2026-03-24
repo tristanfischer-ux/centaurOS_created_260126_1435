@@ -66,6 +66,7 @@ import {
     TrendingUp,
     Sprout,
     ScrollText,
+    Clock,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -122,6 +123,7 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
+    { name: "Time", href: "/time", icon: Clock, tooltip: "Track hours across your projects and tasks" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
 ]
 
