@@ -22,6 +22,8 @@ const MAX_IMAGES_PER_REQUEST = 5
 const MAX_IMAGES_PER_PROJECT = 10
 /** Server-side base64 size limit: ~15MB base64 ≈ ~11MB raw (after client resize, images are usually <2MB) */
 const MAX_BASE64_LENGTH = 20_000_000
+// SECURITY: Prevent path traversal via crafted image IDs
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
  * Uploads reference images to Supabase Storage.
@@ -65,6 +67,12 @@ export async function uploadReferenceImages(
       const failed: string[] = []
 
       for (const img of images) {
+        // SECURITY: Validate img.id is a UUID to prevent path traversal
+        if (!UUID_RE.test(img.id)) {
+          failed.push(`${img.name}: invalid image ID`)
+          continue
+        }
+
         // SECURITY: Validate MIME type server-side
         if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(img.mimeType)) {
           failed.push(`${img.name}: invalid file type (${img.mimeType})`)

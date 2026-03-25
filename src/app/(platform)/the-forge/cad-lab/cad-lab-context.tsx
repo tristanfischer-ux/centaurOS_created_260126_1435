@@ -1139,7 +1139,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         return next
       })
     }
-  }, [subject, editableReport, modelId, detectedDomain, visualStyle?.consistencyBrief, debouncedSaveModules])
+  }, [subject, editableReport, modelId, detectedDomain, visualStyle?.consistencyBrief, debouncedSaveModules, documentContext])
 
   // ── Debounced save: diagnostic answers ──
   const diagPendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -2439,7 +2439,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain, documentContext])
 
   /**
    * Single-click handler that runs the full pipeline for one module
@@ -2534,7 +2534,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       generatingGuardRef.current.delete(moduleId)
       stopGenerating(moduleId)
     }
-  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain])
+  }, [modules, editableReport, modelId, activeProjectId, checkpoints, addProgressLine, startGenerating, stopGenerating, waitForSlot, debouncedSaveModules, detectedDomain, documentContext])
 
   // ── Detect running batch on project load ──
   // If user reloads while modules were generating, check DB for any
@@ -2798,7 +2798,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         sendNotification("The Forge — Batch Finished", `${errorCount} module(s) failed for "${subject}". Check results.`)
       }
     }
-  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot, detectedDomain])
+  }, [modules, isBatchRunning, activeProjectId, addProgressLine, sendNotification, subject, waitForSlot, detectedDomain, documentContext])
 
   // ── Retry system illustration ──
   const handleRetryIllustration = useCallback(() => {
@@ -2889,7 +2889,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             const existingStored = currentImages
               .filter((img) => img.uploaded && img.storageUrl && !storedMap.has(img.id))
               .map((img) => ({ id: img.id, name: img.name, mimeType: img.mimeType, storageUrl: img.storageUrl!, originalSize: img.originalSize }))
-            await saveReferenceImageUrls(projId, [...existingStored, ...uploadRes.stored])
+            const imgSaveRes = await saveReferenceImageUrls(projId, [...existingStored, ...uploadRes.stored])
+            if ("error" in imgSaveRes) {
+              console.error("[CAD-LAB] Failed to save image metadata:", imgSaveRes.error)
+              toast.error("Images uploaded but metadata save failed — they may not persist on reload")
+            }
             if (uploadRes.failed.length > 0) {
               toast.error(`Some images failed: ${uploadRes.failed.join(", ")}`)
             }
@@ -2996,7 +3000,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               extractionStatus: doc.extractionStatus,
               uploadedAt: new Date().toISOString(),
             }))
-            await saveReferenceDocumentUrls(projId, allStoredDocs)
+            const docSaveRes = await saveReferenceDocumentUrls(projId, allStoredDocs)
+            if ("error" in docSaveRes) {
+              console.error("[CAD-LAB] Failed to save document metadata:", docSaveRes.error)
+              toast.error("Documents uploaded but metadata save failed — they may not persist on reload")
+            }
 
             if (docUploadRes.failed.length > 0) {
               toast.error(`Some documents failed: ${docUploadRes.failed.join(", ")}`)

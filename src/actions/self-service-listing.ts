@@ -2,23 +2,33 @@
 
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import type { Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function repairListingLink(supabase: any, providerId: string, listingId: string) {
-    // Repair both directions so ownership checks and future lookups work
+    // GOTCHA: RLS UPDATE policy on marketplace_listings checks created_by_provider_id,
+    // which is NULL for Nightshift-pushed listings. The user client can't update it.
+    // Use admin client (service role, bypasses RLS) for the marketplace_listings repair.
+    const admin = createAdminClient()
     await Promise.allSettled([
         supabase
             .from('provider_profiles')
             .update({ listing_id: listingId })
             .eq('id', providerId),
-        supabase
+        admin
             .from('marketplace_listings')
             .update({ created_by_provider_id: providerId })
             .eq('id', listingId),
     ])
+}
+
+function revalidateListingPaths() {
+    revalidatePath('/provider-portal')
+    revalidatePath('/supplier-portal')
+    revalidatePath('/marketplace')
 }
 
 export interface SelfServiceListingInput {
@@ -96,8 +106,7 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         return { success: false, error: sanitizeErrorMessage(linkError) }
     }
     
-    revalidatePath('/provider-portal')
-    revalidatePath('/marketplace')
+    revalidateListingPaths()
     return { success: true, listingId: listing.id, error: null }
 }
 
@@ -142,15 +151,28 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
         ...(input.attributes !== undefined && { attributes: input.attributes }),
         approval_status: 'pending' // Require re-approval after edit
     }
-    const { error } = await supabase
+
+    // GOTCHA: RLS UPDATE policy checks created_by_provider_id. If it's NULL (Nightshift
+    // listings where repair hasn't completed), RLS silently blocks the update — zero rows
+    // affected, no error returned. Use admin client to ensure the update goes through,
+    // since we've already verified ownership above.
+    const admin = createAdminClient()
+    const { error } = await admin
         .from('marketplace_listings')
         .update(updateData)
         .eq('id', listingId)
-    
+
     if (error) return { success: false, error: sanitizeErrorMessage(error) }
-    
-    revalidatePath('/provider-portal')
-    revalidatePath('/marketplace')
+
+    // Ensure created_by_provider_id is set for future RLS checks
+    if (!ownsViaProvider) {
+        await admin
+            .from('marketplace_listings')
+            .update({ created_by_provider_id: provider.id })
+            .eq('id', listingId)
+    }
+
+    revalidateListingPaths()
     return { success: true, error: null }
 }
 
@@ -370,13 +392,15 @@ export async function submitListingForApproval(listingId: string) {
         return { success: false, error: 'Listing is already pending approval' }
     }
     
-    const { error } = await supabase
+    // Use admin client — RLS UPDATE policy may block when created_by_provider_id is NULL
+    const admin = createAdminClient()
+    const { error } = await admin
         .from('marketplace_listings')
         .update({ approval_status: 'pending' })
         .eq('id', listingId)
-    
+
     if (error) return { success: false, error: sanitizeErrorMessage(error) }
-    
-    revalidatePath('/provider-portal')
+
+    revalidateListingPaths()
     return { success: true, error: null }
 }
