@@ -6,6 +6,21 @@ import { revalidatePath } from 'next/cache'
 import type { Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function repairListingLink(supabase: any, providerId: string, listingId: string) {
+    // Repair both directions so ownership checks and future lookups work
+    await Promise.allSettled([
+        supabase
+            .from('provider_profiles')
+            .update({ listing_id: listingId })
+            .eq('id', providerId),
+        supabase
+            .from('marketplace_listings')
+            .update({ created_by_provider_id: providerId })
+            .eq('id', listingId),
+    ])
+}
+
 export interface SelfServiceListingInput {
     title: string
     category: 'People' | 'Products' | 'Services'
@@ -46,11 +61,7 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .maybeSingle()
 
     if (existingListing) {
-        // Repair the FK and redirect to update flow
-        await supabase
-            .from('provider_profiles')
-            .update({ listing_id: existingListing.id })
-            .eq('id', provider.id)
+        await repairListingLink(supabase, provider.id, existingListing.id)
         return { success: false, error: 'You already have a listing. Please refresh the page to edit it.' }
     }
 
@@ -97,17 +108,28 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
     
-    // Verify ownership
+    // Verify ownership: check that the user's provider_profiles.listing_id matches,
+    // OR that created_by_provider_id points to their provider profile.
+    // The !inner join fails when created_by_provider_id is NULL (Nightshift listings).
+    const { data: provider } = await supabase
+        .from('provider_profiles')
+        .select('id, listing_id')
+        .eq('user_id', user.id)
+        .single()
+
+    if (!provider) return { success: false, error: 'Provider profile not found' }
+
     const { data: listing } = await supabase
         .from('marketplace_listings')
-        .select('created_by_provider_id, provider_profiles!inner(user_id)')
+        .select('id, created_by_provider_id')
         .eq('id', listingId)
         .single()
-    
+
     if (!listing) return { success: false, error: 'Listing not found' }
-    
-    const providerUserId = (listing.provider_profiles as { user_id: string })?.user_id
-    if (providerUserId !== user.id) {
+
+    const ownsViaFK = provider.listing_id === listingId
+    const ownsViaProvider = listing.created_by_provider_id === provider.id
+    if (!ownsViaFK && !ownsViaProvider) {
         return { success: false, error: 'Not authorized to edit this listing' }
     }
     
@@ -169,9 +191,11 @@ export async function getProviderListing() {
     }
 
     // GOTCHA: listing_id FK may not be set even though a listing exists for this
-    // provider (e.g. created via Nightshift claim, or a previous create where the
-    // UPDATE of listing_id failed). Fall back to searching by created_by_provider_id.
+    // provider. Two fallback paths:
+    //   1. created_by_provider_id — set by self-service create
+    //   2. listing_claim_tokens — set by Nightshift claim flow
     if (provider?.id) {
+        // Fallback 1: Search by created_by_provider_id
         const { data: orphanedListing } = await supabase
             .from('marketplace_listings')
             .select('id, title, category, subcategory, description, attributes, is_verified, approval_status, approval_notes, created_at')
@@ -181,13 +205,30 @@ export async function getProviderListing() {
             .maybeSingle()
 
         if (orphanedListing) {
-            // Repair the FK so future lookups use the fast path
-            await supabase
-                .from('provider_profiles')
-                .update({ listing_id: orphanedListing.id })
-                .eq('id', provider.id)
-
+            await repairListingLink(supabase, provider.id, orphanedListing.id)
             return { listing: orphanedListing, error: null }
+        }
+
+        // Fallback 2: Search via claim tokens (Nightshift-pushed listings
+        // don't have created_by_provider_id set — only claim_tokens link them)
+        const { data: claimedListing } = await supabase
+            .rpc('get_my_claimed_listing')
+
+        if (claimedListing && (claimedListing as Record<string, unknown>[]).length > 0) {
+            const claimed = (claimedListing as Record<string, unknown>[])[0]
+            const listingId = claimed.listing_id as string
+
+            // Fetch full listing data for the page
+            const { data: fullListing } = await supabase
+                .from('marketplace_listings')
+                .select('id, title, category, subcategory, description, attributes, is_verified, approval_status, approval_notes, created_at')
+                .eq('id', listingId)
+                .single()
+
+            if (fullListing) {
+                await repairListingLink(supabase, provider.id, fullListing.id)
+                return { listing: fullListing, error: null }
+            }
         }
     }
 
@@ -299,16 +340,25 @@ export async function submitListingForApproval(listingId: string) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
     
-    // Verify ownership
+    // Verify ownership via provider profile (works even when created_by_provider_id is NULL)
+    const { data: approvalProvider } = await supabase
+        .from('provider_profiles')
+        .select('id, listing_id')
+        .eq('user_id', user.id)
+        .single()
+
+    if (!approvalProvider) return { success: false, error: 'Provider profile not found' }
+
     const { data: listing } = await supabase
         .from('marketplace_listings')
-        .select('created_by_provider_id, approval_status, provider_profiles!inner(user_id)')
+        .select('id, created_by_provider_id, approval_status')
         .eq('id', listingId)
         .single()
-    
+
     if (!listing) return { success: false, error: 'Listing not found' }
-    
-    if ((listing.provider_profiles as { user_id: string }).user_id !== user.id) {
+
+    const ownsListing = approvalProvider.listing_id === listingId || listing.created_by_provider_id === approvalProvider.id
+    if (!ownsListing) {
         return { success: false, error: 'Not authorized' }
     }
     
