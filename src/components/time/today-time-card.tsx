@@ -12,16 +12,7 @@ import { Clock, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { getWeeklyTimeProgress } from '@/actions/time-tracking'
-
-/** Format minutes as "Xh Ym" */
-function fmt(minutes: number): string {
-  if (minutes === 0) return '0h'
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
-}
+import { formatDuration } from '@/components/time/time-entry-card'
 
 /**
  * TodayTimeCard — Self-loading card for the Today dashboard stats grid.
@@ -32,12 +23,17 @@ export function TodayTimeCard() {
   const [data, setData] = useState<{ totalMinutes: number; billableMinutes: number; todayMinutes: number } | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     getWeeklyTimeProgress().then((result) => {
-      if (!('error' in result)) setData(result)
+      if (!cancelled && !('error' in result)) setData(result)
     }).catch((err) => console.warn('[TIME] Dashboard fetch failed:', err))
+    return () => { cancelled = true }
   }, [])
 
-  if (!data) return null
+  // Skeleton placeholder to avoid layout shift in the stats grid
+  if (!data) {
+    return <div className="h-[76px] rounded-xl border border-border bg-card animate-pulse" />
+  }
 
   const nothingToday = data.todayMinutes === 0
 
@@ -49,6 +45,7 @@ export function TodayTimeCard() {
     >
       <Link
         href="/time"
+        aria-label={nothingToday ? 'No time logged today — tap to log time' : `${formatDuration(data.todayMinutes)} logged today, ${formatDuration(data.totalMinutes)} this week`}
         className={`block rounded-xl border p-3 transition-all duration-200 hover:-translate-y-0.5 ${
           nothingToday
             ? 'border-warning/40 bg-warning/5'
@@ -68,11 +65,11 @@ export function TodayTimeCard() {
           )}
         </div>
         <p className={`text-lg font-bold tabular-nums ${nothingToday ? 'text-warning' : 'text-foreground'}`}>
-          {nothingToday ? '—' : fmt(data.todayMinutes)}
+          {nothingToday ? '—' : formatDuration(data.todayMinutes)}
         </p>
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          {fmt(data.totalMinutes)} this week
-          {data.billableMinutes > 0 && ` · ${fmt(data.billableMinutes)} billable`}
+          {formatDuration(data.totalMinutes)} this week
+          {data.billableMinutes > 0 && ` · ${formatDuration(data.billableMinutes)} billable`}
         </p>
       </Link>
     </motion.div>

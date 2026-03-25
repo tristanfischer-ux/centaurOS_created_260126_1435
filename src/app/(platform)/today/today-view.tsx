@@ -385,7 +385,7 @@ export function TodayView({
 
                         {/* Quick Stats with Trends */}
                         {pulseData?.personal && (
-                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+                            <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
                                 <AnimatedStatCard
                                     label="Completed"
                                     value={pulseData.personal.tasks_completed_count}

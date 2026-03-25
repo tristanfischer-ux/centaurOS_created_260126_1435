@@ -11,18 +11,9 @@ import { useState, useEffect } from 'react'
 import { Clock } from 'lucide-react'
 import Link from 'next/link'
 import { getWeeklyTimeProgress } from '@/actions/time-tracking'
+import { formatDuration } from '@/components/time/time-entry-card'
 
 const TARGET_MINUTES = 40 * 60 // 40h standard week
-
-/** Format minutes as "Xh Ym" */
-function fmt(minutes: number): string {
-  if (minutes === 0) return '0h'
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
-}
 
 /**
  * TimeWeekBarLoader — Self-loading wrapper that fetches weekly time data.
@@ -31,9 +22,11 @@ export function TimeWeekBarLoader() {
   const [data, setData] = useState<{ totalMinutes: number; billableMinutes: number; todayMinutes: number } | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     getWeeklyTimeProgress().then((result) => {
-      if (!('error' in result)) setData(result)
+      if (!cancelled && !('error' in result)) setData(result)
     }).catch((err) => console.warn('[TIME] Sidebar fetch failed:', err))
+    return () => { cancelled = true }
   }, [])
 
   if (!data) return null
@@ -59,7 +52,7 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBa
     <Link
       href="/time"
       className="block w-full text-left px-2 py-2 min-h-[44px] sm:min-h-0 rounded-md hover:bg-muted/50 transition-colors"
-      aria-label={`Time this week: ${fmt(totalMinutes)} of 40h`}
+      aria-label={`Time this week: ${formatDuration(totalMinutes)} of 40h`}
     >
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -67,24 +60,28 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBa
           This Week
         </span>
         <span className="text-[10px] font-semibold text-foreground">
-          {fmt(totalMinutes)} / 40h
+          {formatDuration(totalMinutes)} / 40h
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
         <div
+          role="progressbar"
+          aria-valuenow={totalMinutes}
+          aria-valuemin={0}
+          aria-valuemax={TARGET_MINUTES}
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${Math.max(percent, 2)}%` }}
         />
       </div>
       {todayMinutes > 0 && (
         <p className="text-[9px] text-muted-foreground mt-1">
-          {fmt(todayMinutes)} today
-          {billableMinutes > 0 && ` · ${fmt(billableMinutes)} billable`}
+          {formatDuration(todayMinutes)} today
+          {billableMinutes > 0 && ` · ${formatDuration(billableMinutes)} billable`}
         </p>
       )}
       {todayMinutes === 0 && totalMinutes > 0 && billableMinutes > 0 && (
         <p className="text-[9px] text-muted-foreground mt-1">
-          {fmt(billableMinutes)} billable
+          {formatDuration(billableMinutes)} billable
         </p>
       )}
     </Link>

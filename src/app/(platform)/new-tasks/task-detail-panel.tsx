@@ -27,6 +27,7 @@ import {
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
   Sparkles, Send, Loader2, Flame, ListChecks, Plus, CheckCircle2,
 } from 'lucide-react'
+import { formatDuration } from '@/components/time/time-entry-card'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import type { SpecialistContext } from '@/components/specialists/types'
@@ -61,23 +62,20 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
   const [data, setData] = useState<{ totalMinutes: number; entryCount: number } | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     import('@/actions/time-tracking').then(({ getTimeForTask }) =>
       getTimeForTask(taskId).then((result) => {
-        if (!('error' in result)) setData(result)
+        if (!cancelled && !('error' in result)) setData(result)
       })
     ).catch((err) => console.warn('[TASKS] Time fetch failed:', err))
+    return () => { cancelled = true }
   }, [taskId])
 
   if (!data || data.entryCount === 0) return null
 
-  const mins = Math.max(data.totalMinutes, 0)
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  const display = mins === 0 ? '0h' : h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
-
   return (
     <DetailRow icon={Clock} label="Time Logged">
-      {display}
+      {formatDuration(Math.max(data.totalMinutes, 0))}
       <span className="text-muted-foreground ml-1">
         ({data.entryCount} {data.entryCount === 1 ? 'entry' : 'entries'})
       </span>

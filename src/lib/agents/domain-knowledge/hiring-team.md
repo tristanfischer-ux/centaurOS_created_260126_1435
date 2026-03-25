@@ -85,6 +85,21 @@ Consistent questions: What prompted looking? What could we have done? How would 
 | Performance issues | Keeper Test | Scorecard + Radical Candor |
 | Struggling to attract | Employer Brand (EVP) | Compensation Benchmarking |
 
+## Grounding Decisions in Real Data
+
+You have access to the founder's actual team data. Use it — hiring advice without understanding the current team is guessing.
+
+### When to use `query_team_overview`
+Before any hiring or people conversation. Pull the actual team composition: member count by role, recent joins, and department distribution. Don't recommend hires without knowing who's already on the team, what gaps exist, and how the team has changed recently.
+
+Use it when:
+- Evaluating whether a hire is needed vs. redistributing existing work
+- Identifying skill gaps by comparing current roles to company objectives
+- Assessing team growth rate and recent hiring patterns
+- Preparing org health assessments for founders
+
+**If you're recommending a hire without checking the current team composition first, you're guessing at the gap. Pull the data.**
+
 ## Anti-Patterns
 
 - **Culture fit over culture add:** Using "fit" to filter for sameness instead of seeking complementary perspectives.

@@ -88,6 +88,27 @@ List assumptions, plot on evidence (none to strong) vs risk (low to catastrophic
 | PRD Structure | Documenting initiative | Problem-hypothesis-metrics doc |
 | Assumption Mapping | Evaluating a bet | Risk-evidence matrix + test plan |
 
+## Grounding Decisions in Real Data
+
+You have access to the founder's actual product and project data. Use it — product decisions without data are opinions.
+
+### When to use `query_product_roadmap`
+Before any product conversation. Pull the actual roadmap — objectives tagged as product-related with their child tasks, priorities, and delivery status. Don't discuss what to build without knowing what's already planned and how it's tracking.
+
+### When to use `analyze_critical_path`
+When the founder asks "what's blocking us?" or "why is this late?" Shows the longest dependency chain, bottleneck tasks, and which tasks have slack. Use it to make RICE and MoSCoW prioritisation concrete — the critical path tells you what actually matters for delivery.
+
+### When to use `analyze_workload`
+When evaluating team capacity for new initiatives. Shows task distribution across team members, overloaded people, and who has capacity. Prevents committing to a roadmap the team can't deliver.
+
+### When to use `predict_completion`
+When the founder asks "when will this ship?" Predicts completion dates from real task velocity over the last 30 days. Flags objectives behind schedule. Use it before committing to timelines.
+
+### When to use `run_calculation`
+For product math — RICE scoring, conversion funnel analysis, retention curve calculations, A/B test significance checks. Has charting support for visualising funnels and metrics.
+
+**If you're discussing product priorities without querying the actual roadmap and team capacity, you're planning in a vacuum. Pull the data first.**
+
 ## Anti-Patterns
 
 - **Feature factory:** Shipping from requests without validating problems or measuring outcomes.
