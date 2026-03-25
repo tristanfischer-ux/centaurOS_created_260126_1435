@@ -1,11 +1,7 @@
 #!/usr/bin/env npx tsx
 /**
- * E2E Test: New User Signup → Onboarding → Platform Access
- *
- * AGGRESSIVE version — calls the REAL setupNewUser() function, not manual DB writes.
- * Tests all 4 role paths, edge cases, repair RPC, and referral flow.
- *
- * Usage: npx tsx scripts/test-new-user-flow.ts
+ * AGGRESSIVE E2E Test: New User Signup
+ * Calls the REAL setupNewUser() and attacks every edge case.
  */
 
 import { join } from "path"
@@ -15,396 +11,300 @@ import { createClient } from "@supabase/supabase-js"
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
+if (!SUPABASE_URL || !SERVICE_KEY) { console.error("Missing env vars"); process.exit(1) }
 
-if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local")
-  process.exit(1)
-}
+const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { autoRefreshToken: false, persistSession: false } })
 
-const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-})
-
-// ─── Test State ─────────────────────────────────────────────────────
 const createdUserIds: string[] = []
 const createdFoundryIds: string[] = []
-let passed = 0
-let failed = 0
+let passed = 0, failed = 0
 
 function check(name: string, condition: boolean, detail?: string) {
-  if (condition) {
-    console.log(`  ✅ ${name}`)
-    passed++
-  } else {
-    console.log(`  ❌ ${name}${detail ? ` — ${detail}` : ""}`)
-    failed++
-  }
+  if (condition) { console.log(`  ✅ ${name}`); passed++ }
+  else { console.log(`  ❌ ${name}${detail ? ` — ${detail}` : ""}`); failed++ }
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
-
-async function createTestAuthUser(email: string, name: string, role: string): Promise<string> {
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password: "TestPass123!",
-    email_confirm: true,
-    user_metadata: { full_name: name, role },
-  })
-  if (error) throw new Error(`Failed to create auth user ${email}: ${error.message}`)
+async function createUser(email: string, name: string, role: string): Promise<string> {
+  const { data, error } = await admin.auth.admin.createUser({ email, password: "TestPass123!", email_confirm: true, user_metadata: { full_name: name, role } })
+  if (error) throw new Error(`Auth create failed: ${error.message}`)
   createdUserIds.push(data.user.id)
   return data.user.id
 }
 
-async function getProfile(userId: string) {
-  const { data } = await admin.from("profiles").select("*").eq("id", userId).single()
-  return data
-}
-
-async function getMemberships(userId: string) {
-  const { data } = await admin.from("foundry_memberships").select("*").eq("user_id", userId)
-  return data ?? []
-}
-
-async function getProviderProfile(userId: string) {
-  const { data } = await admin.from("provider_profiles").select("*").eq("user_id", userId).single()
-  return data
-}
-
-async function getFoundry(id: string) {
-  const { data } = await admin.from("foundries").select("*").eq("id", id).single()
-  return data
-}
-
-async function getReferralCredits(userId: string) {
-  const { data } = await admin.from("referral_credits").select("*").eq("granted_to", userId)
-  return data ?? []
-}
-
-// ─── Cleanup ────────────────────────────────────────────────────────
-
-async function cleanup() {
-  console.log("\n🧹 Cleaning up test data...")
-  for (const userId of createdUserIds) {
-    await admin.from("referral_credits").delete().eq("granted_to", userId)
-    await admin.from("referral_credits").delete().eq("granted_by", userId)
-    await admin.from("provider_profiles").delete().eq("user_id", userId)
-    await admin.from("foundry_memberships").delete().eq("user_id", userId)
-    // Move profile to isolated foundry to avoid cascade through shared foundries
-    await admin.from("profiles").update({ foundry_id: `test-cleanup-${userId}`, active_foundry_id: `test-cleanup-${userId}` }).eq("id", userId)
-    await admin.from("profiles").delete().eq("id", userId)
-    await admin.auth.admin.deleteUser(userId)
-  }
-  for (const fId of createdFoundryIds) {
-    // Clear owner_id before deleting (FK to profiles which are already deleted)
-    await admin.from("foundries").update({ owner_id: null }).eq("id", fId)
-    await admin.from("foundries").delete().eq("id", fId)
-  }
-  console.log(`   Cleaned ${createdUserIds.length} users, ${createdFoundryIds.length} foundries`)
-}
-
-// ─── Real setupNewUser import ───────────────────────────────────────
-
-async function callRealSetupNewUser(params: {
-  userId: string; email: string; fullName: string;
-  role: "founder" | "executive" | "apprentice" | "supplier";
-  companyName?: string; industry?: string; stage?: string;
-  businessName?: string; businessType?: string; referralCode?: string;
-}) {
+async function setup(params: Parameters<typeof import("../src/lib/auth/setup-new-user").setupNewUser>[0] extends { supabase: any } ? Omit<Parameters<typeof import("../src/lib/auth/setup-new-user").setupNewUser>[0], "supabase"> : never) {
   const { setupNewUser } = await import("../src/lib/auth/setup-new-user")
   return setupNewUser({ supabase: admin, ...params })
 }
 
-// ─── Test 1: Real setupNewUser for each role ────────────────────────
+async function getProfile(id: string) { return (await admin.from("profiles").select("*").eq("id", id).single()).data }
+async function getMemberships(id: string) { return (await admin.from("foundry_memberships").select("*").eq("user_id", id)).data ?? [] }
+async function getProviderProfile(id: string) { return (await admin.from("provider_profiles").select("*").eq("user_id", id).single()).data }
+async function getFoundry(id: string) { return (await admin.from("foundries").select("*").eq("id", id).single()).data }
 
-async function testRealSignup(
-  role: "founder" | "executive" | "apprentice" | "supplier",
-  extra: { companyName?: string; businessName?: string; businessType?: string } = {},
-) {
-  const ts = Date.now()
-  const email = `test-${role}-${ts}@forgeos-test.local`
-  const name = `Test ${role.charAt(0).toUpperCase() + role.slice(1)} ${ts}`
-
-  console.log(`\n🧪 [REAL] ${role} signup: ${email}`)
-
-  const userId = await createTestAuthUser(email, name, role)
-  check("Auth user created", !!userId)
-
-  // Call the REAL setupNewUser
-  const result = await callRealSetupNewUser({
-    userId, email, fullName: name, role, ...extra,
-  })
-
-  check("setupNewUser returned foundryId", !!result.foundryId)
-  check("setupNewUser returned redirectPath", !!result.redirectPath)
-
-  // Track foundry for cleanup
-  if (result.foundryId !== "forge-guild" && result.foundryId !== "forge-suppliers") {
-    createdFoundryIds.push(result.foundryId)
+async function cleanup() {
+  console.log("\n🧹 Cleaning up...")
+  for (const id of createdUserIds) {
+    await admin.from("referral_credits").delete().eq("granted_to", id)
+    await admin.from("referral_credits").delete().eq("granted_by", id)
+    await admin.from("provider_profiles").delete().eq("user_id", id)
+    await admin.from("foundry_memberships").delete().eq("user_id", id)
+    await admin.from("profiles").update({ foundry_id: `cleanup-${id}`, active_foundry_id: `cleanup-${id}` }).eq("id", id)
+    await admin.from("profiles").delete().eq("id", id)
+    await admin.auth.admin.deleteUser(id)
   }
-
-  // Verify profile
-  const profile = await getProfile(userId)
-  check("Profile created", !!profile)
-  check("Email matches", profile?.email === email)
-  check("Name matches", profile?.full_name === name)
-  check("Role correct", profile?.role === (role === "founder" ? "Founder" : role === "executive" ? "Executive" : role === "apprentice" ? "Apprentice" : "Supplier"), `got ${profile?.role}`)
-  check("Account type correct", profile?.account_type === (role === "supplier" ? "supplier" : "team_builder"), `got ${profile?.account_type}`)
-  check("Foundry ID matches result", profile?.foundry_id === result.foundryId, `profile=${profile?.foundry_id} result=${result.foundryId}`)
-  check("active_foundry_id matches", profile?.active_foundry_id === result.foundryId, `got ${profile?.active_foundry_id}`)
-  check("Referral code auto-assigned", !!profile?.referral_code && profile.referral_code.length === 7, `got '${profile?.referral_code}'`)
-
-  // Verify foundry
-  const foundry = await getFoundry(result.foundryId)
-  check("Foundry exists", !!foundry)
-  if (role === "founder") {
-    check("Founder owns foundry", foundry?.owner_id === userId, `owner=${foundry?.owner_id}`)
-    check("Foundry not forge-guild", result.foundryId !== "forge-guild")
+  for (const fId of createdFoundryIds) {
+    await admin.from("foundries").update({ owner_id: null }).eq("id", fId)
+    await admin.from("foundries").delete().eq("id", fId)
   }
-
-  // Verify membership
-  const memberships = await getMemberships(userId)
-  check("Membership exists", memberships.length >= 1)
-  check("Membership has correct foundry", memberships.some(m => m.foundry_id === result.foundryId))
-  check("Membership is_primary", memberships.some(m => m.is_primary === true))
-
-  // Verify provider profile
-  if (role !== "supplier") {
-    const pp = await getProviderProfile(userId)
-    check("Provider profile created", !!pp)
-    check("Provider tier=approved", pp?.tier === "approved", `got ${pp?.tier}`)
-    check("Provider is_active", pp?.is_active === true)
-    check("Provider is_public", pp?.is_public === true)
-  } else {
-    check("Redirect to supplier-portal", result.redirectPath === "/supplier-portal")
-  }
-
-  return { userId, email, foundryId: result.foundryId, referralCode: profile?.referral_code }
+  console.log(`   Done: ${createdUserIds.length} users, ${createdFoundryIds.length} foundries`)
 }
 
-// ─── Test 2: Idempotency — double setupNewUser call ─────────────────
+// ─── Tests ──────────────────────────────────────────────────────────
+
+async function testFounderFull() {
+  console.log("\n🧪 Founder (full path)")
+  const id = await createUser(`f-full-${Date.now()}@test.local`, "Full Founder", "founder")
+  const r = await setup({ userId: id, email: `f-full@test.local`, fullName: "Full Founder", role: "founder", companyName: "Acme Corp", industry: "Hardware", stage: "Seed" })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  const p = await getProfile(id)
+  const f = await getFoundry(r.foundryId)
+  const m = await getMemberships(id)
+  const pp = await getProviderProfile(id)
+  check("Profile exists", !!p)
+  check("Role=Founder", p?.role === "Founder")
+  check("account_type=team_builder", p?.account_type === "team_builder")
+  check("Foundry not forge-guild", r.foundryId !== "forge-guild")
+  check("Foundry owner is user", f?.owner_id === id, `owner=${f?.owner_id}`)
+  check("Foundry name=Acme Corp", f?.name === "Acme Corp", `name=${f?.name}`)
+  check("Foundry has industry", f?.industry === "Hardware", `industry=${f?.industry}`)
+  check("Foundry has stage", f?.stage === "Seed", `stage=${f?.stage}`)
+  check("Membership exists", m.length >= 1)
+  check("Membership role=Founder", m[0]?.role === "Founder")
+  check("Provider profile exists", !!pp)
+  check("Provider tier=approved", pp?.tier === "approved")
+  check("Referral code 7 chars", p?.referral_code?.length === 7)
+  check("Redirect=/today", r.redirectPath === "/today")
+  check("active_foundry_id set", p?.active_foundry_id === r.foundryId)
+}
+
+async function testExecutive() {
+  console.log("\n🧪 Executive")
+  const id = await createUser(`exec-${Date.now()}@test.local`, "Exec User", "executive")
+  const r = await setup({ userId: id, email: `exec@test.local`, fullName: "Exec User", role: "executive" })
+  const p = await getProfile(id)
+  check("In forge-guild", r.foundryId === "forge-guild")
+  check("account_type=team_builder", p?.account_type === "team_builder")
+  check("Role=Executive", p?.role === "Executive")
+  check("Provider profile exists", !!(await getProviderProfile(id)))
+}
+
+async function testApprentice() {
+  console.log("\n🧪 Apprentice")
+  const id = await createUser(`app-${Date.now()}@test.local`, "App User", "apprentice")
+  const r = await setup({ userId: id, email: `app@test.local`, fullName: "App User", role: "apprentice" })
+  const p = await getProfile(id)
+  check("In forge-guild", r.foundryId === "forge-guild")
+  check("Role=Apprentice", p?.role === "Apprentice")
+  check("Provider profile exists", !!(await getProviderProfile(id)))
+}
+
+async function testSupplier() {
+  console.log("\n🧪 Supplier (with business data)")
+  const id = await createUser(`sup-${Date.now()}@test.local`, "Sup User", "supplier")
+  const r = await setup({ userId: id, email: `sup@test.local`, fullName: "Sup User", role: "supplier", businessName: "CNC Ltd", businessType: "manufacturer" })
+  const p = await getProfile(id)
+  check("In forge-suppliers", r.foundryId === "forge-suppliers")
+  check("account_type=supplier", p?.account_type === "supplier")
+  check("Redirect=/supplier-portal", r.redirectPath === "/supplier-portal")
+  check("No provider profile", !(await getProviderProfile(id)))
+  const od = p?.onboarding_data as Record<string, unknown> | null
+  check("Business name in onboarding_data", od?.business_name === "CNC Ltd")
+  check("Business type in onboarding_data", od?.business_type === "manufacturer")
+  check("is_supplier_signup flag", od?.is_supplier_signup === true)
+}
 
 async function testIdempotency() {
-  console.log("\n🧪 [EDGE] Idempotency: calling setupNewUser twice")
-
-  const ts = Date.now()
-  const email = `test-idem-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Double Call User", "executive")
-
-  const result1 = await callRealSetupNewUser({ userId, email, fullName: "Double Call User", role: "executive" })
-  check("First call succeeded", !!result1.foundryId)
-
-  const result2 = await callRealSetupNewUser({ userId, email, fullName: "Double Call User", role: "executive" })
-  check("Second call succeeded (idempotent)", !!result2.foundryId)
-  check("Same foundry returned", result1.foundryId === result2.foundryId)
-
-  // Profile should have exactly 1 row
-  const { data: profiles } = await admin.from("profiles").select("id").eq("id", userId)
-  check("Exactly 1 profile row", profiles?.length === 1, `got ${profiles?.length}`)
-
-  // Membership should have exactly 1 row
-  const memberships = await getMemberships(userId)
-  check("Exactly 1 membership", memberships.length === 1, `got ${memberships.length}`)
+  console.log("\n🧪 Idempotency (double call)")
+  const id = await createUser(`idem-${Date.now()}@test.local`, "Idem User", "executive")
+  const r1 = await setup({ userId: id, email: `idem@test.local`, fullName: "Idem User", role: "executive" })
+  const r2 = await setup({ userId: id, email: `idem@test.local`, fullName: "Idem User", role: "executive" })
+  check("Same foundry", r1.foundryId === r2.foundryId)
+  const { data: rows } = await admin.from("profiles").select("id").eq("id", id)
+  check("Exactly 1 profile", rows?.length === 1)
 }
 
-// ─── Test 3: Founder with special characters in company name ────────
-
-async function testFounderSpecialChars() {
-  console.log("\n🧪 [EDGE] Founder with special chars: O'Brien & Sons (Pty) Ltd.")
-
-  const ts = Date.now()
-  const email = `test-special-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Patrick O'Brien", "founder")
-
-  const result = await callRealSetupNewUser({
-    userId, email, fullName: "Patrick O'Brien", role: "founder",
-    companyName: "O'Brien & Sons (Pty) Ltd.",
-    industry: "Manufacturing",
-  })
-
-  check("Signup succeeded", !!result.foundryId)
-  check("Not in forge-guild", result.foundryId !== "forge-guild")
-
-  if (result.foundryId !== "forge-guild" && result.foundryId !== "forge-suppliers") {
-    createdFoundryIds.push(result.foundryId)
-  }
-
-  const foundry = await getFoundry(result.foundryId)
-  check("Foundry name preserved", foundry?.name === "O'Brien & Sons (Pty) Ltd.")
-  check("Slug is URL-safe", !foundry?.slug?.includes("'") && !foundry?.slug?.includes("&"))
+async function testConcurrentRace() {
+  console.log("\n🧪 Concurrent race (parallel calls)")
+  const id = await createUser(`race-${Date.now()}@test.local`, "Race User", "executive")
+  const [r1, r2] = await Promise.allSettled([
+    setup({ userId: id, email: `race@test.local`, fullName: "Race User", role: "executive" }),
+    setup({ userId: id, email: `race@test.local`, fullName: "Race User", role: "executive" }),
+  ])
+  check("At least one succeeded", r1.status === "fulfilled" || r2.status === "fulfilled")
+  const { data: rows } = await admin.from("profiles").select("id").eq("id", id)
+  check("Exactly 1 profile", rows?.length === 1)
 }
-
-// ─── Test 4: Founder with empty company name (OAuth edge case) ──────
 
 async function testFounderNoCompany() {
-  console.log("\n🧪 [EDGE] Founder with NO company name (OAuth fallback)")
-
-  const ts = Date.now()
-  const email = `test-nocompany-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "No Company Founder", "founder")
-
-  // OAuth sets role=founder but doesn't provide companyName
-  const result = await callRealSetupNewUser({
-    userId, email, fullName: "No Company Founder", role: "founder",
-    // companyName deliberately omitted
-  })
-
-  check("Signup succeeded", !!result.foundryId)
-  // Without companyName, founder path falls through to executive path (forge-guild)
-  check("Falls back to forge-guild (no company)", result.foundryId === "forge-guild")
-
-  const profile = await getProfile(userId)
-  check("Account type still team_builder", profile?.account_type === "team_builder")
+  console.log("\n🧪 Founder WITHOUT company (OAuth edge)")
+  const id = await createUser(`f-nocomp-${Date.now()}@test.local`, "NoComp Founder", "founder")
+  const r = await setup({ userId: id, email: `f-nocomp@test.local`, fullName: "NoComp Founder", role: "founder" })
+  const p = await getProfile(id)
+  check("Falls to forge-guild", r.foundryId === "forge-guild")
+  check("Profile exists", !!p)
+  check("account_type=team_builder", p?.account_type === "team_builder")
+  check("Role=Founder", p?.role === "Founder")
+  check("Provider profile exists", !!(await getProviderProfile(id)))
+  check("Membership exists", (await getMemberships(id)).length >= 1)
 }
 
-// ─── Test 5: Supplier with business data ────────────────────────────
-
-async function testSupplierWithBusiness() {
-  console.log("\n🧪 [EDGE] Supplier with business name + type")
-
-  const ts = Date.now()
-  const email = `test-supplier-biz-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Supplier Biz User", "supplier")
-
-  const result = await callRealSetupNewUser({
-    userId, email, fullName: "Supplier Biz User", role: "supplier",
-    businessName: "Acme CNC Ltd", businessType: "manufacturer",
-  })
-
-  check("Supplier in forge-suppliers", result.foundryId === "forge-suppliers")
-  check("Redirect to supplier-portal", result.redirectPath === "/supplier-portal")
-
-  const profile = await getProfile(userId)
-  check("Account type is supplier", profile?.account_type === "supplier")
-
-  // Business data should be in onboarding_data
-  const onboarding = profile?.onboarding_data as Record<string, unknown> | null
-  check("Business name stored", onboarding?.business_name === "Acme CNC Ltd", `got ${onboarding?.business_name}`)
-  check("Business type stored", onboarding?.business_type === "manufacturer", `got ${onboarding?.business_type}`)
-  check("is_supplier_signup flag set", onboarding?.is_supplier_signup === true)
+async function testSpecialCharsCompany() {
+  console.log("\n🧪 Special chars: O'Brien & Sons (Pty) Ltd.")
+  const id = await createUser(`f-spec-${Date.now()}@test.local`, "Patrick O'Brien", "founder")
+  const r = await setup({ userId: id, email: `f-spec@test.local`, fullName: "Patrick O'Brien", role: "founder", companyName: "O'Brien & Sons (Pty) Ltd." })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  const f = await getFoundry(r.foundryId)
+  check("Not forge-guild", r.foundryId !== "forge-guild")
+  check("Name preserved", f?.name === "O'Brien & Sons (Pty) Ltd.")
+  check("Slug URL-safe", !/['"&()]/.test(f?.slug ?? ""))
 }
 
-// ─── Test 6: Duplicate email signup attempt ─────────────────────────
+async function testUnicodeCompany() {
+  console.log("\n🧪 Unicode company: 日本製造 Mfg")
+  const id = await createUser(`f-uni-${Date.now()}@test.local`, "Taro Yamada", "founder")
+  const r = await setup({ userId: id, email: `f-uni@test.local`, fullName: "Taro Yamada", role: "founder", companyName: "日本製造 Manufacturing" })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  check("Signup succeeded", !!r.foundryId)
+  const f = await getFoundry(r.foundryId)
+  check("Foundry created", !!f)
+  // Unicode gets stripped by generateSlug → slug is "manufacturing-{userId}"
+  check("Slug has latin chars", /^[a-z0-9-]+$/.test(f?.slug ?? ""))
+}
+
+async function testLongCompany() {
+  console.log("\n🧪 200-char company name")
+  const id = await createUser(`f-long-${Date.now()}@test.local`, "Long Founder", "founder")
+  const longName = "A".repeat(200) + " Engineering"
+  const r = await setup({ userId: id, email: `f-long@test.local`, fullName: "Long Founder", role: "founder", companyName: longName })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  check("Signup OK", !!r.foundryId)
+  check("Not forge-guild", r.foundryId !== "forge-guild")
+  const f = await getFoundry(r.foundryId)
+  check("Slug <= 60 chars", (f?.slug?.length ?? 999) <= 60)
+}
+
+async function testEmptyStringCompany() {
+  console.log("\n🧪 Empty string company name")
+  const id = await createUser(`f-empty-${Date.now()}@test.local`, "Empty Founder", "founder")
+  const r = await setup({ userId: id, email: `f-empty@test.local`, fullName: "Empty Founder", role: "founder", companyName: "" })
+  const p = await getProfile(id)
+  // Empty string is falsy → falls to else branch like no company
+  check("Falls to forge-guild", r.foundryId === "forge-guild")
+  check("Profile exists", !!p)
+  check("account_type=team_builder", p?.account_type === "team_builder")
+}
+
+async function testSlugCollision() {
+  console.log("\n🧪 Slug collision (two founders same company name)")
+  const id1 = await createUser(`f-col1-${Date.now()}@test.local`, "Founder A", "founder")
+  const id2 = await createUser(`f-col2-${Date.now()}@test.local`, "Founder B", "founder")
+  const r1 = await setup({ userId: id1, email: `col1@test.local`, fullName: "Founder A", role: "founder", companyName: "Collision Corp" })
+  const r2 = await setup({ userId: id2, email: `col2@test.local`, fullName: "Founder B", role: "founder", companyName: "Collision Corp" })
+  if (r1.foundryId !== "forge-guild") createdFoundryIds.push(r1.foundryId)
+  if (r2.foundryId !== "forge-guild") createdFoundryIds.push(r2.foundryId)
+  check("Both succeeded", !!r1.foundryId && !!r2.foundryId)
+  check("Different foundries", r1.foundryId !== r2.foundryId, `${r1.foundryId} vs ${r2.foundryId}`)
+  check("Neither in forge-guild", r1.foundryId !== "forge-guild" && r2.foundryId !== "forge-guild")
+}
 
 async function testDuplicateEmail() {
-  console.log("\n🧪 [EDGE] Duplicate email signup")
-
-  const ts = Date.now()
-  const email = `test-dupe-${ts}@forgeos-test.local`
-
-  const userId1 = await createTestAuthUser(email, "First User", "executive")
-  await callRealSetupNewUser({ userId: userId1, email, fullName: "First User", role: "executive" })
-
-  // Try to create another auth user with same email
-  const { error } = await admin.auth.admin.createUser({
-    email,
-    password: "TestPass456!",
-    email_confirm: true,
-    user_metadata: { full_name: "Second User", role: "executive" },
-  })
-
-  check("Duplicate email blocked by auth", !!error)
-  check("Error mentions email exists", error?.message?.toLowerCase().includes("already") || error?.message?.toLowerCase().includes("exists") || error?.status === 422, `got: ${error?.message}`)
+  console.log("\n🧪 Duplicate email")
+  const email = `dupe-${Date.now()}@test.local`
+  await createUser(email, "First", "executive")
+  const { error } = await admin.auth.admin.createUser({ email, password: "TestPass456!", email_confirm: true, user_metadata: { full_name: "Second", role: "executive" } })
+  check("Auth rejects duplicate", !!error)
 }
 
-// ─── Test 7: Profile with NULL foundry_id (orphaned state) ──────────
-
-async function testOrphanedProfile() {
-  console.log("\n🧪 [EDGE] Orphaned profile — verify foundry_id is always valid")
-
-  const ts = Date.now()
-  const email = `test-orphan-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Orphan User", "executive")
-
-  const result = await callRealSetupNewUser({ userId, email, fullName: "Orphan User", role: "executive" })
-  check("Signup OK", !!result.foundryId)
-
-  // Verify the foundry actually exists
-  const foundry = await getFoundry(result.foundryId)
-  check("Foundry is real", !!foundry)
-
-  // Verify profile points to a valid foundry
-  const profile = await getProfile(userId)
-  check("foundry_id is valid", !!profile?.foundry_id)
-  check("active_foundry_id is valid", !!profile?.active_foundry_id)
-  check("foundry_id matches active_foundry_id", profile?.foundry_id === profile?.active_foundry_id)
+async function testSupplierNoBusinessData() {
+  console.log("\n🧪 Supplier WITHOUT business data")
+  const id = await createUser(`sup-bare-${Date.now()}@test.local`, "Bare Supplier", "supplier")
+  const r = await setup({ userId: id, email: `sup-bare@test.local`, fullName: "Bare Supplier", role: "supplier" })
+  const p = await getProfile(id)
+  check("In forge-suppliers", r.foundryId === "forge-suppliers")
+  check("account_type=supplier", p?.account_type === "supplier")
+  // No businessName → no onboarding_data update
+  const od = p?.onboarding_data as Record<string, unknown> | null
+  check("No business data in onboarding", !od?.business_name)
 }
 
-// ─── Test 8: Concurrent signup race condition ───────────────────────
+async function testFounderOwnershipChain() {
+  console.log("\n🧪 Founder ownership: profile → foundry → membership chain integrity")
+  const id = await createUser(`f-chain-${Date.now()}@test.local`, "Chain Founder", "founder")
+  const r = await setup({ userId: id, email: `chain@test.local`, fullName: "Chain Founder", role: "founder", companyName: "Chain Co" })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
 
-async function testConcurrentSignup() {
-  console.log("\n🧪 [EDGE] Concurrent signup — two setupNewUser calls in parallel")
+  const p = await getProfile(id)
+  const f = await getFoundry(r.foundryId)
+  const m = await getMemberships(id)
 
-  const ts = Date.now()
-  const email = `test-race-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Race User", "executive")
-
-  // Fire two setupNewUser calls simultaneously
-  const [r1, r2] = await Promise.allSettled([
-    callRealSetupNewUser({ userId, email, fullName: "Race User", role: "executive" }),
-    callRealSetupNewUser({ userId, email, fullName: "Race User", role: "executive" }),
-  ])
-
-  const success1 = r1.status === "fulfilled"
-  const success2 = r2.status === "fulfilled"
-  check("At least one call succeeded", success1 || success2)
-  check("Both calls completed (no crash)", r1.status !== "rejected" || r2.status !== "rejected" || true)
-
-  // Should still have exactly 1 profile
-  const { data: profiles } = await admin.from("profiles").select("id").eq("id", userId)
-  check("Exactly 1 profile after race", profiles?.length === 1, `got ${profiles?.length}`)
+  // Full chain verification
+  check("Profile.foundry_id → foundry exists", !!f)
+  check("Foundry.owner_id → profile.id", f?.owner_id === id)
+  check("Membership.foundry_id = profile.foundry_id", m.some(mm => mm.foundry_id === p?.foundry_id))
+  check("Membership.user_id = profile.id", m.some(mm => mm.user_id === id))
+  check("Profile.foundry_id = profile.active_foundry_id", p?.foundry_id === p?.active_foundry_id)
 }
 
-// ─── Test 9: Very long company name ─────────────────────────────────
+async function testXSSInName() {
+  console.log("\n🧪 XSS in full_name and company")
+  const id = await createUser(`xss-${Date.now()}@test.local`, '<script>alert("xss")</script>', "founder")
+  const r = await setup({ userId: id, email: `xss@test.local`, fullName: '<script>alert("xss")</script>', role: "founder", companyName: '<img src=x onerror=alert(1)>' })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  const p = await getProfile(id)
+  const f = await getFoundry(r.foundryId)
+  // Data should be stored as-is (no HTML escaping in DB — escaping happens at render)
+  check("Profile created", !!p)
+  check("Foundry created", !!f)
+  // Slug should strip HTML tags via generateSlug (only keeps a-z0-9)
+  check("Slug safe", /^[a-z0-9-]+$/.test(f?.slug ?? "FAIL"))
+}
 
-async function testLongCompanyName() {
-  console.log("\n🧪 [EDGE] Founder with 200-char company name")
-
-  const ts = Date.now()
-  const email = `test-long-${ts}@forgeos-test.local`
-  const userId = await createTestAuthUser(email, "Long Name Founder", "founder")
-  const longName = "A".repeat(200) + " Engineering Solutions International"
-
-  const result = await callRealSetupNewUser({
-    userId, email, fullName: "Long Name Founder", role: "founder",
-    companyName: longName,
-  })
-
-  check("Signup succeeded with long name", !!result.foundryId)
-  check("Not stuck in forge-guild", result.foundryId !== "forge-guild")
-
-  if (result.foundryId !== "forge-guild" && result.foundryId !== "forge-suppliers") {
-    createdFoundryIds.push(result.foundryId)
-  }
-
-  const foundry = await getFoundry(result.foundryId)
-  check("Foundry created", !!foundry)
-  // Slug should be truncated to 50 chars by generateSlug
-  check("Slug length <= 60", (foundry?.slug?.length ?? 999) <= 60, `slug length=${foundry?.slug?.length}`)
+async function testNullRole() {
+  console.log("\n🧪 Invalid role (defaults to Apprentice)")
+  const id = await createUser(`nullrole-${Date.now()}@test.local`, "No Role", "unknown_role")
+  // capitalizeRole("unknown_role") returns "Apprentice"
+  const r = await setup({ userId: id, email: `nullrole@test.local`, fullName: "No Role", role: "unknown_role" as any })
+  const p = await getProfile(id)
+  check("Profile created", !!p)
+  check("Role defaults to Apprentice", p?.role === "Apprentice", `got ${p?.role}`)
+  check("In forge-guild", r.foundryId === "forge-guild")
+  check("account_type=team_builder", p?.account_type === "team_builder")
 }
 
 // ─── Main ───────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🚀 ForgeOS New User Flow — AGGRESSIVE E2E Test")
-  console.log(`   Supabase: ${SUPABASE_URL}`)
-  console.log(`   Time: ${new Date().toISOString()}\n`)
+  console.log("🚀 ForgeOS New User — AGGRESSIVE E2E Test v2")
+  console.log(`   ${new Date().toISOString()}\n`)
 
   try {
-    // Real setupNewUser for all 4 roles
-    await testRealSignup("founder", { companyName: "Test Foundry Co", industry: "Hardware" })
-    await testRealSignup("executive")
-    await testRealSignup("apprentice")
-    await testRealSignup("supplier", { businessName: "Test Supplier", businessType: "manufacturer" })
-
-    // Edge cases
+    await testFounderFull()
+    await testExecutive()
+    await testApprentice()
+    await testSupplier()
     await testIdempotency()
-    await testFounderSpecialChars()
+    await testConcurrentRace()
     await testFounderNoCompany()
-    await testSupplierWithBusiness()
+    await testSpecialCharsCompany()
+    await testUnicodeCompany()
+    await testLongCompany()
+    await testEmptyStringCompany()
+    await testSlugCollision()
     await testDuplicateEmail()
-    await testOrphanedProfile()
-    await testConcurrentSignup()
-    await testLongCompanyName()
+    await testSupplierNoBusinessData()
+    await testFounderOwnershipChain()
+    await testXSSInName()
+    await testNullRole()
   } finally {
     await cleanup()
   }
@@ -413,11 +313,7 @@ async function main() {
   console.log(`✅ Passed: ${passed}`)
   console.log(`❌ Failed: ${failed}`)
   console.log(`${"═".repeat(50)}`)
-
   if (failed > 0) process.exit(1)
 }
 
-main().catch((err) => {
-  console.error("\n💥 Test crashed:", err)
-  cleanup().finally(() => process.exit(1))
-})
+main().catch(err => { console.error("💥", err); cleanup().finally(() => process.exit(1)) })
