@@ -40,11 +40,14 @@ export function capitalizeRole(role: string): "Founder" | "Executive" | "Apprent
 }
 
 function generateSlug(name: string): string {
-  return name
+  const slug = name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 50);
+  // GOTCHA: Pure unicode names (e.g., "日本製造") produce empty slug.
+  // Fall back to "foundry" so the final ID is "foundry-{userId.slice(0,6)}".
+  return slug || "foundry";
 }
 
 /**
@@ -156,6 +159,11 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Founder profile creation failed:", profileError.message);
+      // INTENT: Clean up orphaned foundry — it has NULL owner and no profile pointing to it.
+      // Without this, retries create additional orphans via slug collision → retry slug.
+      if (foundryId !== "forge-guild") {
+        await (supabase as any).from("foundries").delete().eq("id", foundryId);
+      }
       return { foundryId: "forge-guild", redirectPath: "/today" };
     }
 
@@ -182,14 +190,15 @@ export async function setupNewUser({
 
     if (!foundryExists) {
       console.error(`[setupNewUser] Shared foundry "${foundryId}" missing. Creating.`);
-      // SECURITY: Use system UUID as owner, not the signing-up user (RT2-05)
-      const SYSTEM_UUID = '00000000-0000-0000-0000-000000000000';
+      // SECURITY: Use NULL owner for shared foundries — system UUID doesn't have a
+      // profile (FK violation). The check_foundry_owner trigger allows NULL on INSERT
+      // for system foundries listed in v_system_ids.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).from("foundries").insert({
         id: foundryId,
         name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
         slug: foundryId,
-        owner_id: SYSTEM_UUID,
+        owner_id: null,
       });
     }
   }
@@ -216,13 +225,18 @@ export async function setupNewUser({
 
   // --- Foundry membership ---
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase as any).from("foundry_memberships").insert({
+  const { error: membershipError } = await (supabase as any).from("foundry_memberships").insert({
     user_id: userId,
     foundry_id: foundryId,
     role: memberRole,
     is_primary: true,
     joined_at: new Date().toISOString(),
   });
+  if (membershipError) {
+    // INTENT: Log but don't fail — the repair RPC can create memberships later.
+    // Without a membership, RLS via get_my_foundry_id() blocks data access.
+    console.error("[setupNewUser] Membership creation failed:", membershipError.message);
+  }
 
   // --- Demo data for founders (own isolated foundry) ---
   // DECISION: Only seed demo data for founders who get their own foundry (RT-03).

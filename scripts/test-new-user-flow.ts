@@ -177,8 +177,20 @@ async function testUnicodeCompany() {
   check("Signup succeeded", !!r.foundryId)
   const f = await getFoundry(r.foundryId)
   check("Foundry created", !!f)
-  // Unicode gets stripped by generateSlug → slug is "manufacturing-{userId}"
   check("Slug has latin chars", /^[a-z0-9-]+$/.test(f?.slug ?? ""))
+}
+
+async function testPureUnicodeCompany() {
+  console.log("\n🧪 PURE Unicode company: 日本製造株式会社 (no latin chars)")
+  const id = await createUser(`f-punicode-${Date.now()}@test.local`, "Yuki Tanaka", "founder")
+  const r = await setup({ userId: id, email: `f-punicode@test.local`, fullName: "Yuki Tanaka", role: "founder", companyName: "日本製造株式会社" })
+  if (r.foundryId !== "forge-guild") createdFoundryIds.push(r.foundryId)
+  check("Signup succeeded", !!r.foundryId)
+  check("Not in forge-guild", r.foundryId !== "forge-guild")
+  const f = await getFoundry(r.foundryId)
+  check("Foundry created", !!f)
+  check("Slug not empty", (f?.slug?.length ?? 0) > 0)
+  check("Slug starts with 'foundry'", f?.slug?.startsWith("foundry") ?? false, `got ${f?.slug}`)
 }
 
 async function testLongCompany() {
@@ -297,6 +309,7 @@ async function main() {
     await testFounderNoCompany()
     await testSpecialCharsCompany()
     await testUnicodeCompany()
+    await testPureUnicodeCompany()
     await testLongCompany()
     await testEmptyStringCompany()
     await testSlugCollision()
