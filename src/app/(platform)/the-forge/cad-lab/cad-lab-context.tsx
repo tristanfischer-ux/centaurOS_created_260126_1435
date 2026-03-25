@@ -3072,17 +3072,26 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setMilestone("research")
         freshResearchRef.current = true // INTENT: must be set BEFORE any await so the auto-decompose effect sees it when React flushes the batch
         if (projId) {
-          setIsSaving(true)
-          await saveCadLabResearch(projId, res)
-          // Persist seeded overview alongside research
-          if (productOverviewRef.current) {
-            saveCadLabProductOverview(projId, productOverviewRef.current).catch(() => {
-              console.error("[CAD-LAB] Failed to persist seeded overview")
-            })
+          // INTENT: Inner try/catch so a save failure doesn't destroy the successful
+          // research result. The user waited 30+ seconds — don't nuke their report
+          // just because the DB save failed.
+          try {
+            setIsSaving(true)
+            await saveCadLabResearch(projId, res)
+            // Persist seeded overview alongside research
+            if (productOverviewRef.current) {
+              saveCadLabProductOverview(projId, productOverviewRef.current).catch(() => {
+                console.error("[CAD-LAB] Failed to persist seeded overview")
+              })
+            }
+            setLastSaved(new Date().toISOString())
+            refreshProjects()
+          } catch (saveErr) {
+            console.error("[CAD-LAB] Failed to save research to DB:", saveErr)
+            toast.error("Research completed but failed to save — your results are still visible")
+          } finally {
+            setIsSaving(false)
           }
-          setLastSaved(new Date().toISOString())
-          setIsSaving(false)
-          refreshProjects()
 
           // DECISION: No illustration here — wait until handleDecompose runs so the
           // system illustration is generated with full module context (names + purposes).
