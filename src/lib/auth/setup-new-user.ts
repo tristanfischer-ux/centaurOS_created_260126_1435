@@ -92,75 +92,72 @@ export async function setupNewUser({
   if (role === "founder" && companyName) {
     accountType = "team_builder";
 
-    // Profile must exist before foundry (FK: foundries.owner_id → profiles.id).
-    // Create with temp shared foundry, then create real foundry, then update.
-    const { error: tempProfileError } = await supabase.from("profiles").insert({
-      id: userId,
-      email,
-      full_name: fullName,
-      role: memberRole,
-      foundry_id: "forge-guild",
-      active_foundry_id: "forge-guild",
-      account_type: accountType,
-    });
-
-    if (tempProfileError) {
-      console.error("[setupNewUser] Founder profile creation failed:", tempProfileError.message);
-      return { foundryId: "forge-guild", redirectPath: "/today" };
-    }
-
+    // INTENT: Break the circular FK dependency (profiles.foundry_id → foundries.id,
+    // foundries.owner_id → profiles.id) by creating the foundry with NULL owner first,
+    // then the profile pointing to it, then setting the owner. This is atomic — if any
+    // step fails, the user doesn't end up in forge-guild with someone else's data.
     const baseSlug = generateSlug(companyName);
     const uniqueSlug = `${baseSlug}-${userId.slice(0, 6)}`;
 
+    // Step 1: Create foundry with NULL owner (no profile FK dependency)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: foundry, error: foundryError } = await (supabase as any)
+    let { data: foundry, error: foundryError } = await (supabase as any)
       .from("foundries")
       .insert({
         name: companyName,
         slug: uniqueSlug,
         industry: industry || null,
         stage: stage || null,
-        owner_id: userId,
+        owner_id: null,
       })
       .select("id")
       .single();
 
     if (foundryError) {
-      console.error("[setupNewUser] Foundry creation error:", foundryError);
-      // DECISION: Do NOT silently fall back to forge-guild for founders (RT2-04).
-      // A founder in forge-guild can see/modify shared data and gets demo data seeded
-      // into the shared foundry. Retry once with a more unique slug, then hard-fail.
+      // Retry with more unique slug (likely slug collision)
       const retrySlug = `${baseSlug}-${Date.now().toString(36)}`;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: retryFoundry, error: retryError } = await (supabase as any)
+      const retry = await (supabase as any)
         .from("foundries")
         .insert({
           name: companyName,
           slug: retrySlug,
           industry: industry || null,
           stage: stage || null,
-          owner_id: userId,
+          owner_id: null,
         })
         .select("id")
         .single();
+      foundry = retry.data;
+      foundryError = retry.error;
+    }
 
-      if (retryError) {
-        console.error("[setupNewUser] Foundry retry also failed:", retryError);
-        // Fall back to guild as last resort but mark it clearly
-        foundryId = "forge-guild";
-      } else {
-        foundryId = retryFoundry.id;
-        await supabase
-          .from("profiles")
-          .update({ foundry_id: foundryId, active_foundry_id: foundryId })
-          .eq("id", userId);
-      }
+    if (foundryError || !foundry) {
+      console.error("[setupNewUser] Foundry creation failed after retry:", foundryError);
+      foundryId = "forge-guild";
     } else {
       foundryId = foundry.id;
-      await supabase
-        .from("profiles")
-        .update({ foundry_id: foundryId, active_foundry_id: foundryId })
-        .eq("id", userId);
+    }
+
+    // Step 2: Create profile pointing to the real foundry (or forge-guild fallback)
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: userId,
+      email,
+      full_name: fullName,
+      role: memberRole,
+      foundry_id: foundryId,
+      active_foundry_id: foundryId,
+      account_type: accountType,
+    });
+
+    if (profileError) {
+      console.error("[setupNewUser] Founder profile creation failed:", profileError.message);
+      return { foundryId: "forge-guild", redirectPath: "/today" };
+    }
+
+    // Step 3: Set the foundry owner now that profile exists
+    if (foundryId !== "forge-guild") {
+      await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
     }
   } else if (role === "supplier") {
     accountType = "supplier";
