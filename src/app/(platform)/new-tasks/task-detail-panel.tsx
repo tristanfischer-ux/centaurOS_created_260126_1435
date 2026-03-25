@@ -56,6 +56,34 @@ interface TaskDetailPanelProps {
   onEdit?: (task: TaskWithData) => void
 }
 
+/** Self-loading time display for a specific task. */
+function TimeLoggedRow({ taskId }: { taskId: string }) {
+  const [data, setData] = useState<{ totalMinutes: number; entryCount: number } | null>(null)
+
+  useEffect(() => {
+    import('@/actions/time-tracking').then(({ getTimeForTask }) =>
+      getTimeForTask(taskId).then((result) => {
+        if ('totalMinutes' in result) setData(result)
+      })
+    ).catch(() => {})
+  }, [taskId])
+
+  if (!data || data.entryCount === 0) return null
+
+  const h = Math.floor(data.totalMinutes / 60)
+  const m = data.totalMinutes % 60
+  const display = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+
+  return (
+    <DetailRow icon={Clock} label="Time Logged">
+      {display}
+      <span className="text-muted-foreground ml-1">
+        ({data.entryCount} {data.entryCount === 1 ? 'entry' : 'entries'})
+      </span>
+    </DetailRow>
+  )
+}
+
 function DetailRow({ icon: Icon, label, children }: { icon: React.ComponentType<{ className?: string }>; label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3 py-2">
@@ -560,6 +588,9 @@ export function TaskDetailPanel({ task, onClose, onEdit }: TaskDetailPanelProps)
                 </Badge>
               </DetailRow>
             )}
+
+            {/* Time logged */}
+            <TimeLoggedRow taskId={task.id} />
           </div>
 
           {/* Specialist Input Section */}

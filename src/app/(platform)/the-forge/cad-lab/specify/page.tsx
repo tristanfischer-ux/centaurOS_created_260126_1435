@@ -1609,7 +1609,13 @@ export default function SpecifyPage(): React.ReactNode {
                           {designRevision > 1 && <span className="font-normal text-muted-foreground ml-1">(v{designRevision})</span>}
                         </p>
                       </div>
-                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabSource)} className="gap-1.5">
+                      <Button onClick={() => {
+                        router.push(FORGE_ROUTES.cadLabSource)
+                        toast("Specify stage complete", {
+                          description: "Log the time you spent specifying?",
+                          action: { label: "Log Time", onClick: () => router.push("/time") },
+                        })
+                      }} className="gap-1.5">
                         Continue to Source
                         <ArrowRight className="h-4 w-4" />
                       </Button>

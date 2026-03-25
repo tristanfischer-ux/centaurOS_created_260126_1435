@@ -226,6 +226,26 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
       })
     }
 
+    // Time tracking nudge — remind if nothing logged yesterday (weekdays only)
+    const yesterdayDay = yesterday.getDay()
+    if (yesterdayDay >= 1 && yesterdayDay <= 5) {
+      const { count: timeYesterday } = await supabase
+        .from('time_entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('foundry_id', foundryId)
+        .eq('user_id', user.id)
+        .eq('entry_date', yesterdayStr)
+
+      if ((timeYesterday ?? 0) === 0) {
+        nudges.push({
+          type: 'stale',
+          message: 'You didn\'t log any time yesterday — catch up now?',
+          actionLabel: 'Log time',
+          actionHref: '/time',
+        })
+      }
+    }
+
     // 8. Build greeting
     const hour = today.getHours()
     let timeGreeting = 'Good morning'

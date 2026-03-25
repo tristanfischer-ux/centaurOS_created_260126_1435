@@ -47,6 +47,7 @@ import { DesignReportDialog } from "../components/design-report-dialog"
 import { classifyPart } from "@/lib/part-classification"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
 import { SourceSpecialistInsights } from "@/components/cad/source-specialist-insights"
+import { SupplierFitnessReview } from "@/components/cad/supplier-fitness-review"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
 import { useStageBriefing } from "@/hooks/use-stage-briefing"
 import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
@@ -624,6 +625,15 @@ export default function SourcePage(): React.ReactNode {
         revisedModuleIds={revisedModuleIds}
       />
 
+      {/* ── Supplier fitness checks + AI company review ── */}
+      <SupplierFitnessReview
+        modules={eligibleModules}
+        diagnosticAnswers={diagnosticAnswers}
+        supplierMatches={supplierMatches}
+        activeProjectId={activeProjectId}
+        subject={subject}
+      />
+
       {/* ── Page header ── */}
       <div className="flex items-center justify-between">
         <div>
@@ -740,7 +750,13 @@ export default function SourcePage(): React.ReactNode {
                 isLoading={sourceExitLoading}
                 nextSpecialistId={nextSource?.specialistId}
                 nextStageName={nextSource?.stageLabel}
-                onProceed={() => router.push(FORGE_ROUTES.cadLabAssemble)}
+                onProceed={() => {
+                  router.push(FORGE_ROUTES.cadLabAssemble)
+                  toast("Source stage complete", {
+                    description: "Log the time you spent sourcing?",
+                    action: { label: "Log Time", onClick: () => router.push("/time") },
+                  })
+                }}
                 proceedLabel="Continue to Assemble"
               />
             )}
