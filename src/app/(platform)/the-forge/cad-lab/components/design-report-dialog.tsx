@@ -252,8 +252,16 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             const { structureReportOutline, writeReportSections } = await import("@/actions/cad-lab-report")
             const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
 
-            update({ stepLabel: `AI: Writing ${moduleCount} sections...`, progress: 40 })
-            const aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
+            update({ stepLabel: `AI: Writing ${moduleCount} sections...`, progress: 35 })
+            let aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
+
+            // Phase 2.5: Generate custom slide illustrations
+            const imageCount = outline.sections.filter((s) => s.imagePrompt && s.imagePrompt.length > 20).length
+            if (imageCount > 0) {
+              update({ stepLabel: `Generating ${imageCount} slide illustrations...`, progress: 60 })
+              const { generateSlideImages } = await import("@/actions/cad-lab-report")
+              aiContent = await generateSlideImages(outline, aiContent)
+            }
 
             data.aiContent = aiContent
             update({ stepLabel: "AI narration complete", progress: 75 })

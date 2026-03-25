@@ -86,6 +86,36 @@ export interface DesignReportData {
   aiContent?: AiReportContent
 }
 
+// ─── Slide Layout System ─────────────────────────────────────────────
+
+/** Visual layout for a PPTX slide — determines which builder function renders it */
+export type SlideLayout =
+  | 'hero-cover'            // Full-bleed hero image + title + subtitle
+  | 'value-props'           // Icon/image left, 3 stacked value-prop cards right
+  | 'comparison-two-col'    // Side-by-side "Legacy vs Ours" with visual contrast
+  | 'data-table'            // Styled comparison table with brand color rows
+  | 'architecture-diagram'  // AI illustration center + annotation cards + key specs sidebar
+  | 'process-flow'          // Chevron pipeline with phases
+  | 'stat-callouts'         // Before/after with 2-3 big-number callouts
+  | 'technical-dossiers'    // 3-card grid with profiles and specs
+  | 'quadrant-chart'        // 2×2 matrix with positioned items
+  | 'module-detail'         // Image left, specs right
+  | 'prose-section'         // Standard text slide
+
+/** Typed slide data — shape depends on slideLayout */
+export type SlideData =
+  | { layout: 'hero-cover'; title: string; subtitle: string }
+  | { layout: 'value-props'; heading?: string; items: { label: string; description: string }[] }
+  | { layout: 'comparison-two-col'; leftTitle: string; leftItems: string[]; rightTitle: string; rightDescription: string; rightItems?: string[] }
+  | { layout: 'data-table'; heading: string; columns: string[]; rows: { label: string; values: string[] }[]; footnote?: string }
+  | { layout: 'architecture-diagram'; heading: string; annotations: { label: string; description: string }[]; specs?: { label: string; value: string }[] }
+  | { layout: 'process-flow'; heading: string; subtitle?: string; phases: { name: string; title: string; description: string }[] }
+  | { layout: 'stat-callouts'; leftLabel?: string; rightLabel?: string; stats: { value: string; label: string }[] }
+  | { layout: 'technical-dossiers'; heading: string; cards: { title: string; profile: string; items: { label: string; value: string }[] }[] }
+  | { layout: 'quadrant-chart'; heading: string; xAxis: string; yAxis: string; items: { label: string; x: 'low' | 'mid' | 'high'; y: 'low' | 'mid' | 'high'; color?: string }[]; insight?: string }
+  | { layout: 'module-detail'; moduleName: string; specs: { label: string; value: string }[] }
+  | { layout: 'prose-section' }
+
 // ─── AI Report Pipeline Types ────────────────────────────────────────
 
 export type ReportSectionType =
@@ -111,6 +141,12 @@ export interface ReportSectionOutline {
   includeTable?: boolean
   includeImage?: boolean
   moduleId?: string
+  /** Visual layout for PPTX rendering */
+  slideLayout?: SlideLayout
+  /** Structured data for the slide layout builder */
+  slideData?: SlideData
+  /** Nano Banana 2 prompt for a custom per-slide illustration */
+  imagePrompt?: string
 }
 
 /** Phase 2 output: Gemini writes prose for each section */
@@ -131,4 +167,10 @@ export interface AiReportSection {
   includeTable: boolean
   includeImage: boolean
   moduleId?: string
+  /** Visual layout for PPTX rendering */
+  slideLayout?: SlideLayout
+  /** Structured data for the slide layout builder */
+  slideData?: SlideData
+  /** Base64-encoded per-slide illustration (populated in Phase 2.5) */
+  slideImageBase64?: string
 }

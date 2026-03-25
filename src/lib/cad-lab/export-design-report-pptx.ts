@@ -16,14 +16,19 @@
 
 import PptxGenJS from 'pptxgenjs'
 
-import type { DesignReportData, AiReportSection } from '@/lib/cad-lab/design-report-types'
+import type { DesignReportData, AiReportSection, SlideData } from '@/lib/cad-lab/design-report-types'
 
 // ─── Brand Constants ────────────────────────────────────────────────
 
 const ORANGE = 'FF4500'
+const TEAL = '14B8A6'
 const DARK_TEXT = '1E293B'
 const MID_TEXT = '64748B'
 const LIGHT_BG = 'F8FAFC'
+const WHITE = 'FFFFFF'
+const CARD_BORDER = 'E2E8F0'
+const SUCCESS_BG = 'ECFDF5'
+const WARN_BG = 'FEF3C7'
 
 // ─── Layout Constants ───────────────────────────────────────────────
 // INTENT: LAYOUT_16x9 = 10" × 5.625". Keep all content within bounds.
@@ -721,6 +726,317 @@ async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<Bl
 
 // ─── AI Prose Presentation Builder ───────────────────────────────────
 
+// ─── Rich Slide Layout Builders ──────────────────────────────────────
+// INTENT: Each builder creates a visually distinct slide layout matching
+// the quality of NotebookLM reports. Opus chooses the layout; these render it.
+
+function buildValuePropsSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'value-props' }> | undefined
+  if (!sd?.items?.length) return
+  const slide = pres.addSlide()
+
+  // Optional slide image on the left
+  const hasImg = !!slideImage
+  const cardX = hasImg ? 4.5 : MARGIN
+  const cardW = hasImg ? 5.0 : CONTENT_W
+
+  if (hasImg) {
+    slide.addImage({ data: `data:image/png;base64,${slideImage}`, x: MARGIN, y: 0.5, w: 3.8, h: 4.5, rounding: true })
+  }
+
+  if (sd.heading) {
+    slide.addText(sd.heading, { x: cardX, y: 0.3, w: cardW, h: 0.4, fontSize: 14, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+  }
+
+  // Stacked value-prop cards
+  const cardH = Math.min(1.2, 4.0 / sd.items.length)
+  sd.items.slice(0, 4).forEach((item, i) => {
+    const y = 0.9 + i * (cardH + 0.15)
+    slide.addShape('roundRect', { x: cardX, y, w: cardW, h: cardH, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.08 })
+    slide.addText(item.label, { x: cardX + 0.2, y: y + 0.1, w: cardW - 0.4, h: 0.3, fontSize: 13, fontFace: 'Helvetica Neue', bold: true, color: TEAL })
+    slide.addText(truncate(item.description, 120), { x: cardX + 0.2, y: y + 0.4, w: cardW - 0.4, h: cardH - 0.55, fontSize: 10, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.2 })
+  })
+}
+
+function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'comparison-two-col' }> | undefined
+  if (!sd) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, section.title)
+
+  const colW = 4.3
+  const leftX = MARGIN
+  const rightX = MARGIN + colW + 0.4
+
+  // Left column — "old way" with red accent
+  slide.addShape('roundRect', { x: leftX, y: 1.0, w: colW, h: 3.8, fill: { color: LIGHT_BG }, line: { color: 'FCA5A5', width: 1.5 }, rectRadius: 0.1 })
+  slide.addText(sd.leftTitle, { x: leftX + 0.2, y: 1.1, w: colW - 0.4, h: 0.35, fontSize: 14, fontFace: 'Helvetica Neue', bold: true, color: 'DC2626' })
+  const leftBullets = (sd.leftItems || []).slice(0, 5).map((item) => ({
+    text: truncate(item, 80),
+    options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 6 },
+  }))
+  slide.addText(leftBullets, { x: leftX + 0.2, y: 1.55, w: colW - 0.4, h: 3.1, valign: 'top' as const })
+
+  // Right column — "new way" with teal accent
+  slide.addShape('roundRect', { x: rightX, y: 1.0, w: colW, h: 3.8, fill: { color: SUCCESS_BG }, line: { color: TEAL, width: 1.5 }, rectRadius: 0.1 })
+  slide.addText(sd.rightTitle, { x: rightX + 0.2, y: 1.1, w: colW - 0.4, h: 0.35, fontSize: 14, fontFace: 'Helvetica Neue', bold: true, color: TEAL })
+  if (sd.rightDescription) {
+    slide.addText(truncate(sd.rightDescription, 200), { x: rightX + 0.2, y: 1.55, w: colW - 0.4, h: 1.0, fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, lineSpacingMultiple: 1.3 })
+  }
+  if (sd.rightItems?.length) {
+    const rightBullets = sd.rightItems.slice(0, 4).map((item) => ({
+      text: truncate(item, 80),
+      options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 6 },
+    }))
+    slide.addText(rightBullets, { x: rightX + 0.2, y: sd.rightDescription ? 2.6 : 1.55, w: colW - 0.4, h: 2.0, valign: 'top' as const })
+  }
+
+  // Arrow between columns
+  slide.addText('→', { x: MARGIN + colW, y: 2.5, w: 0.4, h: 0.5, fontSize: 28, fontFace: 'Helvetica Neue', color: TEAL, align: 'center' })
+}
+
+function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'data-table' }> | undefined
+  if (!sd?.rows?.length || !sd?.columns?.length) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd.heading || section.title)
+
+  const numCols = sd.columns.length + 1 // +1 for label column
+  const labelW = 2.0
+  const dataW = (CONTENT_W - labelW) / sd.columns.length
+
+  // Header row
+  const header: PptxGenJS.TableRow = [
+    { text: '', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
+    ...sd.columns.map((col) => ({
+      text: col,
+      options: { bold: true, fontSize: 9, color: WHITE, fill: { color: TEAL }, align: 'center' as const },
+    })),
+  ]
+
+  // Data rows — alternating colors
+  const rows: PptxGenJS.TableRow[] = sd.rows.slice(0, 10).map((row, i) => [
+    { text: row.label, options: { bold: true, fontSize: 9, color: DARK_TEXT, fill: { color: i % 2 === 0 ? WHITE : LIGHT_BG } } },
+    ...row.values.slice(0, sd.columns.length).map((val) => ({
+      text: val,
+      options: { fontSize: 9, color: DARK_TEXT, fill: { color: i % 2 === 0 ? WHITE : LIGHT_BG }, align: 'center' as const },
+    })),
+  ])
+
+  slide.addTable([header, ...rows], {
+    x: MARGIN, y: 1.0, w: CONTENT_W,
+    colW: [labelW, ...Array(sd.columns.length).fill(dataW)],
+    border: { type: 'solid', pt: 0.5, color: CARD_BORDER },
+    rowH: 0.4,
+    fontFace: 'Helvetica Neue',
+  })
+
+  if (sd.footnote) {
+    slide.addText(sd.footnote, { x: MARGIN, y: FOOTER_Y, w: CONTENT_W, h: 0.3, fontSize: 8, fontFace: 'Helvetica Neue', italic: true, color: MID_TEXT })
+  }
+}
+
+function buildProcessFlowSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'process-flow' }> | undefined
+  if (!sd?.phases?.length) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd.heading || section.title)
+
+  if (sd.subtitle) {
+    slide.addText(sd.subtitle, { x: MARGIN, y: 0.85, w: CONTENT_W, h: 0.3, fontSize: 10, fontFace: 'Helvetica Neue', color: MID_TEXT })
+  }
+
+  // Chevron pipeline
+  const phaseCount = Math.min(sd.phases.length, 5)
+  const chevronW = (CONTENT_W - (phaseCount - 1) * 0.15) / phaseCount
+  const chevronY = slideImage ? 1.3 : 1.3
+  const chevronH = slideImage ? 1.8 : 3.5
+
+  sd.phases.slice(0, phaseCount).forEach((phase, i) => {
+    const x = MARGIN + i * (chevronW + 0.15)
+    // Chevron background
+    slide.addShape('roundRect', { x, y: chevronY, w: chevronW, h: chevronH, fill: { color: WHITE }, line: { color: TEAL, width: 1 }, rectRadius: 0.08 })
+    // Phase label
+    slide.addText(phase.name.toUpperCase(), { x: x + 0.1, y: chevronY + 0.1, w: chevronW - 0.2, h: 0.25, fontSize: 7, fontFace: 'Helvetica Neue', bold: true, color: MID_TEXT })
+    // Title
+    slide.addText(truncate(phase.title, 30), { x: x + 0.1, y: chevronY + 0.4, w: chevronW - 0.2, h: 0.35, fontSize: 10, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+    // Description
+    slide.addText(truncate(phase.description, 80), { x: x + 0.1, y: chevronY + 0.8, w: chevronW - 0.2, h: chevronH - 1.0, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.2, valign: 'top' as const })
+
+    // Arrow between phases
+    if (i < phaseCount - 1) {
+      slide.addText('▸', { x: x + chevronW - 0.05, y: chevronY + chevronH / 2 - 0.15, w: 0.35, h: 0.3, fontSize: 16, color: TEAL, align: 'center' })
+    }
+  })
+}
+
+function buildStatCalloutsSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'stat-callouts' }> | undefined
+  if (!sd?.stats?.length) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, section.title)
+
+  // Optional before/after illustration
+  if (slideImage) {
+    slide.addImage({ data: `data:image/png;base64,${slideImage}`, x: MARGIN, y: 1.0, w: CONTENT_W, h: 2.5 })
+  }
+
+  // Stats bar
+  const statsY = slideImage ? 3.8 : 2.0
+  const statW = CONTENT_W / sd.stats.length
+  sd.stats.slice(0, 4).forEach((stat, i) => {
+    const x = MARGIN + i * statW
+    slide.addShape('roundRect', { x: x + 0.1, y: statsY, w: statW - 0.2, h: 1.2, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.08 })
+    slide.addText(stat.value, { x: x + 0.1, y: statsY + 0.1, w: statW - 0.2, h: 0.55, fontSize: 22, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT, align: 'center' })
+    slide.addText(truncate(stat.label, 50), { x: x + 0.15, y: statsY + 0.65, w: statW - 0.3, h: 0.45, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, align: 'center', lineSpacingMultiple: 1.1 })
+  })
+
+  // Labels
+  if (sd.leftLabel || sd.rightLabel) {
+    if (sd.leftLabel) slide.addText(sd.leftLabel, { x: MARGIN, y: statsY - 0.3, w: CONTENT_W / 2, h: 0.25, fontSize: 9, fontFace: 'Helvetica Neue', bold: true, color: MID_TEXT })
+    if (sd.rightLabel) slide.addText(sd.rightLabel, { x: MARGIN + CONTENT_W / 2, y: statsY - 0.3, w: CONTENT_W / 2, h: 0.25, fontSize: 9, fontFace: 'Helvetica Neue', bold: true, color: TEAL, align: 'right' as const })
+  }
+}
+
+function buildTechnicalDossiersSlide(pres: PptxGenJS, section: AiReportSection): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'technical-dossiers' }> | undefined
+  if (!sd?.cards?.length) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd.heading || section.title)
+
+  const cardCount = Math.min(sd.cards.length, 3)
+  const cardW = (CONTENT_W - (cardCount - 1) * 0.3) / cardCount
+  const cardH = 3.6
+
+  sd.cards.slice(0, 3).forEach((card, i) => {
+    const x = MARGIN + i * (cardW + 0.3)
+    const y = 1.0
+    // Card background
+    slide.addShape('roundRect', { x, y, w: cardW, h: cardH, fill: { color: WHITE }, line: { color: TEAL, width: 1.5 }, rectRadius: 0.1 })
+    // Title
+    slide.addText(card.title.toUpperCase(), { x: x + 0.15, y: y + 0.15, w: cardW - 0.3, h: 0.35, fontSize: 10, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+    // Profile text
+    slide.addText(truncate(card.profile, 100), { x: x + 0.15, y: y + 0.55, w: cardW - 0.3, h: 0.6, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.2 })
+    // Key-value items
+    card.items.slice(0, 5).forEach((item, j) => {
+      const itemY = y + 1.25 + j * 0.4
+      slide.addText(item.label + ':', { x: x + 0.15, y: itemY, w: cardW - 0.3, h: 0.18, fontSize: 8, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+      slide.addText(truncate(item.value, 60), { x: x + 0.15, y: itemY + 0.18, w: cardW - 0.3, h: 0.18, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT })
+    })
+  })
+}
+
+function buildQuadrantChartSlide(pres: PptxGenJS, section: AiReportSection): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'quadrant-chart' }> | undefined
+  if (!sd?.items?.length) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd.heading || section.title)
+
+  // Chart area
+  const chartX = MARGIN + 0.4
+  const chartY = 1.2
+  const chartW = 5.5
+  const chartH = 3.8
+
+  // Axes
+  slide.addShape('line', { x: chartX, y: chartY, w: 0, h: chartH, line: { color: DARK_TEXT, width: 1.5 } })
+  slide.addShape('line', { x: chartX, y: chartY + chartH, w: chartW, h: 0, line: { color: DARK_TEXT, width: 1.5 } })
+
+  // Axis labels
+  slide.addText(sd.yAxis, { x: MARGIN - 0.1, y: chartY + chartH / 2 - 0.5, w: 0.5, h: 1.0, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, rotate: 270 })
+  slide.addText(sd.xAxis, { x: chartX, y: chartY + chartH + 0.05, w: chartW, h: 0.3, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, align: 'center' })
+
+  // Plot items
+  const posMap = { low: 0.2, mid: 0.5, high: 0.8 }
+  sd.items.slice(0, 8).forEach((item) => {
+    const ix = chartX + (posMap[item.x] ?? 0.5) * chartW
+    const iy = chartY + (1 - (posMap[item.y] ?? 0.5)) * chartH
+    const itemColor = item.color === 'orange' ? ORANGE : item.color === 'teal' ? TEAL : DARK_TEXT
+    slide.addText(item.label, { x: ix - 0.5, y: iy - 0.15, w: 1.0, h: 0.3, fontSize: 11, fontFace: 'Helvetica Neue', bold: true, color: itemColor, align: 'center' })
+  })
+
+  // Insight box
+  if (sd.insight) {
+    slide.addShape('roundRect', { x: 6.5, y: 1.2, w: 3.0, h: 3.8, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.08 })
+    slide.addText(sd.insight, { x: 6.7, y: 1.4, w: 2.6, h: 3.4, fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, lineSpacingMultiple: 1.3, valign: 'top' as const })
+  }
+}
+
+function buildArchitectureDiagramSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'architecture-diagram' }> | undefined
+  if (!sd) return
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd.heading || section.title)
+
+  // AI illustration (center)
+  if (slideImage) {
+    slide.addImage({ data: `data:image/png;base64,${slideImage}`, x: 1.5, y: 1.0, w: 4.5, h: 3.5, rounding: true })
+  }
+
+  // Annotation cards (left side)
+  const annotations = sd.annotations?.slice(0, 4) ?? []
+  annotations.forEach((ann, i) => {
+    const y = 1.0 + i * 0.95
+    const ax = slideImage ? MARGIN - 0.2 : MARGIN
+    slide.addShape('roundRect', { x: ax, y, w: 1.8, h: 0.8, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.06 })
+    slide.addText(ann.label, { x: ax + 0.1, y: y + 0.05, w: 1.6, h: 0.25, fontSize: 9, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+    slide.addText(truncate(ann.description, 60), { x: ax + 0.1, y: y + 0.3, w: 1.6, h: 0.4, fontSize: 7, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.1 })
+  })
+
+  // Key specs sidebar (right)
+  if (sd.specs?.length) {
+    const specX = 6.8
+    slide.addShape('roundRect', { x: specX, y: 1.0, w: 2.7, h: 3.5, fill: { color: LIGHT_BG }, line: { color: TEAL, width: 1 }, rectRadius: 0.08 })
+    slide.addText('Key Specs', { x: specX + 0.15, y: 1.1, w: 2.4, h: 0.3, fontSize: 11, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+    sd.specs.slice(0, 6).forEach((spec, i) => {
+      const sy = 1.5 + i * 0.45
+      slide.addText(spec.label + ':', { x: specX + 0.15, y: sy, w: 2.4, h: 0.2, fontSize: 8, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+      slide.addText(spec.value, { x: specX + 0.15, y: sy + 0.2, w: 2.4, h: 0.2, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT })
+    })
+  }
+}
+
+/** Dispatch a section to the appropriate rich slide builder based on slideLayout */
+function buildRichSlide(
+  pres: PptxGenJS,
+  section: AiReportSection,
+  slideImage: string | null,
+): boolean {
+  const layout = section.slideLayout
+  if (!layout || layout === 'prose-section' || layout === 'hero-cover') return false
+
+  switch (layout) {
+    case 'value-props':
+      buildValuePropsSlide(pres, section, slideImage)
+      return true
+    case 'comparison-two-col':
+      buildComparisonTwoColSlide(pres, section)
+      return true
+    case 'data-table':
+      buildDataTableSlide(pres, section)
+      return true
+    case 'process-flow':
+      buildProcessFlowSlide(pres, section, slideImage)
+      return true
+    case 'stat-callouts':
+      buildStatCalloutsSlide(pres, section, slideImage)
+      return true
+    case 'technical-dossiers':
+      buildTechnicalDossiersSlide(pres, section)
+      return true
+    case 'quadrant-chart':
+      buildQuadrantChartSlide(pres, section)
+      return true
+    case 'architecture-diagram':
+      buildArchitectureDiagramSlide(pres, section, slideImage)
+      return true
+    case 'module-detail':
+      return false // Use existing module-detail rendering
+    default:
+      return false
+  }
+}
+
 async function buildAiPptx(data: DesignReportData): Promise<Blob> {
   const aiContent = data.aiContent!
   const pres = new PptxGenJS()
@@ -759,58 +1075,68 @@ async function buildAiPptx(data: DesignReportData): Promise<Blob> {
     // Skip executive-summary as it has its own slide above
     if (section.sectionType === 'executive-summary') continue
 
-    const slide = pres.addSlide()
-    addSectionTitle(slide, section.title)
+    // INTENT: Try the rich slide builder first. If the section has a slideLayout
+    // and structured slideData, render a visually rich slide (comparison, process
+    // flow, stat callouts, etc.). Fall back to the generic text layout if no
+    // rich builder matches or if slideData is missing.
+    const slideImage = section.slideImageBase64 ?? null
+    const usedRichLayout = buildRichSlide(pres, section, slideImage)
 
-    // Check if this section has a module image to show
-    const modIdx = section.moduleId
-      ? data.modules.findIndex((m) => m.id === section.moduleId)
-      : -1
-    const imgBase64 = modIdx >= 0 ? moduleImages[modIdx] : null
-    const hasImage = section.includeImage && !!imgBase64
+    if (!usedRichLayout) {
+      const slide = pres.addSlide()
+      addSectionTitle(slide, section.title)
 
-    if (hasImage && imgBase64) {
-      slide.addImage({
-        data: imgBase64,
-        x: MARGIN, y: 1.0, w: 4.0, h: 2.8,
-        rounding: true,
-      })
-    }
+      // Check if this section has a module image or per-slide AI illustration
+      const modIdx = section.moduleId
+        ? data.modules.findIndex((m) => m.id === section.moduleId)
+        : -1
+      const imgBase64 = slideImage ?? (modIdx >= 0 ? moduleImages[modIdx] : null)
+      const hasImage = (section.includeImage || !!slideImage) && !!imgBase64
 
-    // Prose text
-    const textX = hasImage ? 4.8 : MARGIN
-    const textW = hasImage ? 4.7 : CONTENT_W
-    const textH = hasImage ? 2.8 : 3.8
+      if (hasImage && imgBase64) {
+        const imgData = imgBase64.startsWith('data:') ? imgBase64 : `data:image/png;base64,${imgBase64}`
+        slide.addImage({
+          data: imgData,
+          x: MARGIN, y: 1.0, w: 4.0, h: 2.8,
+          rounding: true,
+        })
+      }
 
-    if (section.prose) {
-      // Strip markdown formatting for slides (keep it readable)
-      const cleanProse = section.prose.replace(/[#*_]/g, '').trim()
-      slide.addText(truncate(cleanProse, hasImage ? 400 : 700), {
-        x: textX, y: 1.0, w: textW, h: textH,
-        fontSize: 10,
-        fontFace: 'Helvetica Neue',
-        color: DARK_TEXT,
-        lineSpacingMultiple: 1.3,
-        valign: 'top',
-      })
-    }
+      // Prose text
+      const textX = hasImage ? 4.8 : MARGIN
+      const textW = hasImage ? 4.7 : CONTENT_W
+      const textH = hasImage ? 2.8 : 3.8
 
-    // Key points as bullets (below prose or image)
-    if (section.keyPoints?.length > 0 && !hasImage) {
-      const bullets = section.keyPoints.slice(0, 4).map((p) => ({
-        text: truncate(p, 80),
-        options: {
-          fontSize: 9,
+      if (section.prose) {
+        // Strip markdown formatting for slides (keep it readable)
+        const cleanProse = section.prose.replace(/[#*_]/g, '').trim()
+        slide.addText(truncate(cleanProse, hasImage ? 400 : 700), {
+          x: textX, y: 1.0, w: textW, h: textH,
+          fontSize: 10,
           fontFace: 'Helvetica Neue',
           color: DARK_TEXT,
-          bullet: { type: 'bullet' as const },
-          paraSpaceBefore: 3,
-        },
-      }))
-      slide.addText(bullets, {
-        x: MARGIN, y: 4.2, w: CONTENT_W, h: 1.0,
-        valign: 'top',
-      })
+          lineSpacingMultiple: 1.3,
+          valign: 'top',
+        })
+      }
+
+      // Key points as bullets (below prose or image)
+      if (section.keyPoints?.length > 0 && !hasImage) {
+        const bullets = section.keyPoints.slice(0, 4).map((p) => ({
+          text: truncate(p, 80),
+          options: {
+            fontSize: 9,
+            fontFace: 'Helvetica Neue',
+            color: DARK_TEXT,
+            bullet: { type: 'bullet' as const },
+            paraSpaceBefore: 3,
+          },
+        }))
+        slide.addText(bullets, {
+          x: MARGIN, y: 4.2, w: CONTENT_W, h: 1.0,
+          valign: 'top',
+        })
+      }
     }
 
     // Table slide if flagged — buildTableSlide adds the slide directly to pres

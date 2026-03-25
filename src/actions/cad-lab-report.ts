@@ -267,19 +267,41 @@ export async function structureReportOutline(
   const dataSummary = buildDataSummary(data)
   const stageContext = STAGE_CONTEXT[data.stage] ?? ""
 
-  const systemPrompt = `You are a senior engineering report architect at Fractional Forge. Your job is to read raw design data and create a structured report outline that a technical writer will use to write polished prose.
+  const systemPrompt = `You are a senior engineering report architect at Fractional Forge. Your job is to read raw design data and create a visually compelling, narrative-driven report outline. Think like a McKinsey consultant designing a boardroom presentation — every slide should have a clear visual layout and tell part of a story.
 
 ${stageContext}
 
+## Slide Layout System
+
+For each section, choose the best visual layout from this list:
+
+- "hero-cover" — Cover slide with hero image, title, subtitle
+- "value-props" — Icon/image left, 3 stacked value-proposition cards (use for product mission/vision)
+- "comparison-two-col" — Side-by-side comparison with visual contrast (use for "Legacy vs Our Approach", "Problem vs Solution")
+- "data-table" — Styled comparison matrix with labeled rows (use for technology/spec comparisons across categories)
+- "architecture-diagram" — AI illustration with annotation callouts and key specs sidebar (use for product architecture, exploded views)
+- "process-flow" — Chevron pipeline showing sequential phases (use for manufacturing flow, design process, treatment trains)
+- "stat-callouts" — 2-3 large statistics with labels, optional before/after framing (use for market size, key metrics)
+- "technical-dossiers" — 3-card grid showing distinct profiles/variants (use for material options, market segments, supplier categories)
+- "quadrant-chart" — 2×2 matrix with items positioned by two axes (use for priority/risk matrices, value vs effort)
+- "module-detail" — Image left, specifications right (use for individual module deep-dives)
+- "prose-section" — Standard text slide (use only when no visual layout fits)
+
+For each section, also provide:
+- "slideData" — structured data matching the chosen layout (see schema below)
+- "imagePrompt" — (optional) a 50-100 word prompt for Nano Banana 2 to generate a custom illustration for this slide. Start with "On a pure white background, create a full-color technical illustration..." Describe the SPECIFIC diagram needed (e.g., exploded view, process flow, comparison visual). Do NOT request text/labels in the image. Only include imagePrompt for slides where a custom illustration would add value (architecture, comparisons, process flows — NOT for data tables or text slides).
+
 Rules:
-- Create sections that tell a coherent narrative about this product's design journey
+- Create 8-15 sections that tell a coherent narrative about this product's design journey
+- Choose VARIED slide layouts — avoid more than 2 consecutive prose-section slides
 - The executive summary should be 2-3 sentences capturing the essence of the project
 - Each section brief should be 2-4 sentences instructing the writer what to emphasise
 - Include all relevant data — don't skip sections that have data
+- Populate slideData with REAL data from the source material — specific numbers, names, specs
 - Set includeTable: true for sections where tabular data would help (specs, costs, supplier comparisons)
 - Set includeImage: true for module detail sections that have images
 - Set moduleId for module-specific sections so the writer can reference the right module data
-- If ENGINEERING STANDARDS REFERENCED data is present, include an "engineering-standards" section — this is critical for demonstrating design compliance and material traceability
+- If ENGINEERING STANDARDS REFERENCED data is present, include an "engineering-standards" section
 - Never mention that this report was written by AI or that you are structuring it
 - Return valid JSON matching the schema exactly`
 
@@ -298,10 +320,26 @@ Rules:
       "dataHighlights": ["specific number or fact to reference"],
       "includeTable": false,
       "includeImage": false,
-      "moduleId": "optional module ID for module-specific sections"
+      "moduleId": "optional module ID for module-specific sections",
+      "slideLayout": "one of: hero-cover, value-props, comparison-two-col, data-table, architecture-diagram, process-flow, stat-callouts, technical-dossiers, quadrant-chart, module-detail, prose-section",
+      "slideData": "structured data object matching the slideLayout type — populate with REAL data from source material",
+      "imagePrompt": "optional 50-100 word Nano Banana 2 prompt for a custom per-slide illustration"
     }
   ]
 }
+
+slideData shapes by layout:
+- hero-cover: { "layout": "hero-cover", "title": "...", "subtitle": "..." }
+- value-props: { "layout": "value-props", "heading": "...", "items": [{ "label": "...", "description": "..." }] }
+- comparison-two-col: { "layout": "comparison-two-col", "leftTitle": "...", "leftItems": ["..."], "rightTitle": "...", "rightDescription": "...", "rightItems": ["..."] }
+- data-table: { "layout": "data-table", "heading": "...", "columns": ["Col A", "Col B"], "rows": [{ "label": "Row", "values": ["val1", "val2"] }], "footnote": "..." }
+- architecture-diagram: { "layout": "architecture-diagram", "heading": "...", "annotations": [{ "label": "...", "description": "..." }], "specs": [{ "label": "...", "value": "..." }] }
+- process-flow: { "layout": "process-flow", "heading": "...", "subtitle": "...", "phases": [{ "name": "Phase 1", "title": "...", "description": "..." }] }
+- stat-callouts: { "layout": "stat-callouts", "leftLabel": "...", "rightLabel": "...", "stats": [{ "value": "16,000+", "label": "..." }] }
+- technical-dossiers: { "layout": "technical-dossiers", "heading": "...", "cards": [{ "title": "...", "profile": "...", "items": [{ "label": "...", "value": "..." }] }] }
+- quadrant-chart: { "layout": "quadrant-chart", "heading": "...", "xAxis": "...", "yAxis": "...", "items": [{ "label": "...", "x": "low|mid|high", "y": "low|mid|high" }], "insight": "..." }
+- module-detail: { "layout": "module-detail", "moduleName": "...", "specs": [{ "label": "...", "value": "..." }] }
+- prose-section: { "layout": "prose-section" }
 
 DATA:
 ${dataSummary}`
@@ -373,6 +411,9 @@ ${dataSummary}`
     includeTable: s.includeTable ?? false,
     includeImage: s.includeImage ?? false,
     moduleId: s.moduleId,
+    slideLayout: s.slideLayout ?? 'prose-section',
+    slideData: s.slideData,
+    imagePrompt: typeof s.imagePrompt === 'string' ? s.imagePrompt : undefined,
   }))
   outline.executiveSummary ??= ''
   outline.narrativeThread ??= ''
@@ -626,6 +667,8 @@ ${dataSlice}`
     includeTable: section.includeTable ?? false,
     includeImage: section.includeImage ?? false,
     moduleId: section.moduleId,
+    slideLayout: section.slideLayout,
+    slideData: section.slideData,
     tokensIn: usage.promptTokenCount ?? 0,
     tokensOut: usage.candidatesTokenCount ?? 0,
   }
@@ -692,6 +735,8 @@ export async function writeReportSections(
         includeTable: result.value.includeTable,
         includeImage: result.value.includeImage,
         moduleId: result.value.moduleId,
+        slideLayout: result.value.slideLayout,
+        slideData: result.value.slideData,
       }
     }
     // INTENT: Failed sections get empty prose — builder falls back to raw data dump
@@ -705,6 +750,8 @@ export async function writeReportSections(
       includeTable: section.includeTable ?? false,
       includeImage: section.includeImage ?? false,
       moduleId: section.moduleId,
+      slideLayout: section.slideLayout,
+      slideData: section.slideData,
     }
   })
 
@@ -715,4 +762,101 @@ export async function writeReportSections(
     opusTokens,
     geminiTokens: { in: geminiIn, out: geminiOut },
   }
+}
+
+// ─── Phase 2.5: Slide Image Generation ──────────────────────────────
+
+/**
+ * Generates custom illustrations for slides that have imagePrompt set.
+ * Called between prose writing (Phase 2) and PPTX building (Phase 3).
+ *
+ * @param outline - The structured outline with imagePrompts from Phase 1
+ * @param content - The written content from Phase 2 (modified in place with slideImageBase64)
+ * @returns The content with slideImageBase64 populated for relevant sections
+ */
+export async function generateSlideImages(
+  outline: ReportOutline,
+  content: AiReportContent,
+): Promise<AiReportContent> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
+  if (!apiKey) {
+    console.warn("[CAD-REPORT] GOOGLE_AI_API_KEY not configured, skipping slide images")
+    return content
+  }
+
+  // Collect sections that need custom illustrations
+  const imageJobs: { sectionIdx: number; prompt: string }[] = []
+  for (let i = 0; i < outline.sections.length; i++) {
+    const prompt = outline.sections[i].imagePrompt
+    if (prompt && prompt.length > 20) {
+      imageJobs.push({ sectionIdx: i, prompt })
+    }
+  }
+
+  if (imageJobs.length === 0) return content
+
+  console.log(`[CAD-REPORT] Generating ${imageJobs.length} slide illustrations...`)
+
+  // INTENT: Generate all slide images in parallel for speed.
+  // Each call is independent — one failure shouldn't block others.
+  const results = await Promise.allSettled(
+    imageJobs.map(async (job) => {
+      const NO_TEXT_SUFFIX = "\n\nCRITICAL RULES:\n- ZERO text, letters, words, labels, annotations, captions, or numbers anywhere in the image\n- Pure white background (#FFFFFF)\n- Full color, not grayscale\n- Clean, professional technical illustration style"
+
+      const fullPrompt = job.prompt + NO_TEXT_SUFFIX
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`
+
+      const response = await fetchWithTimeout(
+        url,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: fullPrompt }] }],
+            generationConfig: {
+              responseModalities: ["IMAGE", "TEXT"],
+              temperature: 0.8,
+            },
+          }),
+        },
+        30_000,
+      )
+
+      if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Image API error (${response.status}): ${errText.slice(0, 200)}`)
+      }
+
+      const result = await response.json()
+      const parts = result.candidates?.[0]?.content?.parts ?? []
+      const imagePart = parts.find((p: Record<string, unknown>) => p.inlineData)
+      if (!imagePart?.inlineData?.data) {
+        throw new Error("No image data in response")
+      }
+
+      return { sectionIdx: job.sectionIdx, base64: imagePart.inlineData.data as string }
+    }),
+  )
+
+  // Merge results into content sections
+  const updatedSections = [...content.sections]
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const { sectionIdx, base64 } = result.value
+      if (updatedSections[sectionIdx]) {
+        updatedSections[sectionIdx] = {
+          ...updatedSections[sectionIdx],
+          slideImageBase64: base64,
+        }
+      }
+    } else {
+      console.warn("[CAD-REPORT] Slide image generation failed:", result.reason)
+    }
+  }
+
+  const successCount = results.filter((r) => r.status === "fulfilled").length
+  console.log(`[CAD-REPORT] ${successCount}/${imageJobs.length} slide images generated`)
+
+  return { ...content, sections: updatedSections }
 }
