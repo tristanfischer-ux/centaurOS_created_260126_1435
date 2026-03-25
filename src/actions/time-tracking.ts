@@ -292,6 +292,77 @@ export async function getWeekSummary(weekStart: string) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Lightweight aggregation actions (sidebar, dashboard, task detail)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Get weekly time progress for the sidebar bar. Lightweight — SUM only.
+ *
+ * @returns totalMinutes, billableMinutes, todayMinutes for current week
+ */
+export async function getWeeklyTimeProgress() {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const today = todayUTC()
+    const weekStart = getCurrentMondayUTC()
+    const weekEnd = addDays(weekStart, 6)
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('duration_minutes, is_billable, entry_date')
+      .eq('foundry_id', foundryId)
+      .eq('user_id', user.id)
+      .gte('entry_date', weekStart)
+      .lte('entry_date', weekEnd)
+
+    if (error) return { error: error.message }
+
+    let totalMinutes = 0
+    let billableMinutes = 0
+    let todayMinutes = 0
+    for (const row of data ?? []) {
+      totalMinutes += row.duration_minutes
+      if (row.is_billable) billableMinutes += row.duration_minutes
+      if (row.entry_date === today) todayMinutes += row.duration_minutes
+    }
+
+    return { totalMinutes, billableMinutes, todayMinutes }
+  })
+}
+
+/** Get the Monday (UTC) of the current week. */
+function getCurrentMondayUTC(): string {
+  const d = new Date()
+  const utcDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+  const day = utcDate.getUTCDay()
+  const diff = day === 0 ? -6 : 1 - day
+  utcDate.setUTCDate(utcDate.getUTCDate() + diff)
+  return utcDate.toISOString().split('T')[0]
+}
+
+/**
+ * Get total time logged against a specific task.
+ *
+ * @param taskId - The task to query
+ * @returns totalMinutes and entryCount, or error
+ */
+export async function getTimeForTask(taskId: string) {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!taskId) return { error: 'taskId required' }
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('duration_minutes')
+      .eq('foundry_id', foundryId)
+      .eq('task_id', taskId)
+
+    if (error) return { error: error.message }
+
+    const totalMinutes = (data ?? []).reduce((sum, row) => sum + row.duration_minutes, 0)
+    return { totalMinutes, entryCount: data?.length ?? 0 }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Date utility (avoids importing date-fns in server action)
 // ─────────────────────────────────────────────────────────────────────────────
 

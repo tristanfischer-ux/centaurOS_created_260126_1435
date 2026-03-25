@@ -79,6 +79,7 @@ import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { SectionHeader } from "@/components/sidebar/SectionHeader"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
+import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
 import { useSectionNewBadges } from "@/hooks/useSectionNewBadge"
 import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
@@ -493,8 +494,9 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     </button>
                 </form>
 
-                {/* AI Credits Bar */}
-                <div className="border-t border-slate-100 pt-2">
+                {/* Time + AI Bars */}
+                <div className="border-t border-slate-100 pt-2 space-y-1">
+                    <TimeWeekBarLoader />
                     <AICreditsBarLoader />
                 </div>
 
