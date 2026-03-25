@@ -902,7 +902,7 @@ function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): 
   slide.addShape('roundRect', { x: leftX, y: 1.0, w: colW, h: 3.8, fill: { color: LIGHT_BG }, line: { color: 'FCA5A5', width: 1.5 }, rectRadius: 0.1 })
   slide.addText(sd.leftTitle, { x: leftX + 0.2, y: 1.1, w: colW - 0.4, h: 0.35, fontSize: 14, fontFace: 'Helvetica Neue', bold: true, color: 'DC2626' })
   const leftBullets = (sd.leftItems || []).slice(0, 5).map((item) => ({
-    text: truncate(item, 80),
+    text: truncate(typeof item === 'string' ? item : String(item), 80),
     options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 6 },
   }))
   slide.addText(leftBullets, { x: leftX + 0.2, y: 1.55, w: colW - 0.4, h: 3.1, valign: 'top' as const })
@@ -915,7 +915,7 @@ function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): 
   }
   if (sd.rightItems?.length) {
     const rightBullets = sd.rightItems.slice(0, 4).map((item) => ({
-      text: truncate(item, 80),
+      text: truncate(typeof item === 'string' ? item : String(item), 80),
       options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 6 },
     }))
     slide.addText(rightBullets, { x: rightX + 0.2, y: sd.rightDescription ? 2.6 : 1.55, w: colW - 0.4, h: 2.0, valign: 'top' as const })
@@ -927,7 +927,12 @@ function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): 
 
 function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
   const sd = section.slideData as Extract<SlideData, { layout: 'data-table' }> | undefined
-  if (!sd?.rows?.length || !sd?.columns?.length) return
+  if (!sd?.rows?.length) return
+  // INTENT: Infer column headers from the first row's value count if Opus omitted them
+  if (!sd.columns?.length && sd.rows[0]?.values?.length) {
+    sd.columns = sd.rows[0].values.map((_: unknown, i: number) => `Col ${i + 1}`)
+  }
+  if (!sd.columns?.length) return
   const slide = pres.addSlide()
   addSectionTitle(slide, sd.heading || section.title)
 
@@ -976,10 +981,12 @@ function buildProcessFlowSlide(pres: PptxGenJS, section: AiReportSection, slideI
   }
 
   // Chevron pipeline
-  const phaseCount = Math.min(sd.phases.length, 5)
+  // INTENT: Cap at 4 phases — 5+ makes chevrons too narrow for readable text.
+  // Extra phases are omitted (the prose section covers them narratively).
+  const phaseCount = Math.min(sd.phases.length, 4)
   const chevronW = (CONTENT_W - (phaseCount - 1) * 0.15) / phaseCount
-  const chevronY = slideImage ? 1.3 : 1.3
-  const chevronH = slideImage ? 1.8 : 3.5
+  const chevronY = 1.3
+  const chevronH = 3.5
 
   sd.phases.slice(0, phaseCount).forEach((phase, i) => {
     const x = MARGIN + i * (chevronW + 0.15)

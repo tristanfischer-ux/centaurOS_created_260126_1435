@@ -8,7 +8,7 @@
  * usage >= 80%. Dismissable per session (reappears on refresh).
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Copy, Check, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getMyReferralInfo, getAIUsageForCreditsBar, type ReferralInfo } from '@/actions/referrals'
@@ -27,6 +27,7 @@ export function ReferralNudgeBanner() {
   const [remaining, setRemaining] = useState(0)
   const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null)
   const [copied, setCopied] = useState(false)
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
 
   useEffect(() => {
     const results = Promise.allSettled([
@@ -47,18 +48,28 @@ export function ReferralNudgeBanner() {
     })
   }, [])
 
+  // Cleanup copy timer on unmount
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+    }
+  }, [])
+
   const handleCopy = async () => {
     if (!referralInfo?.referralLink) return
     try {
       await navigator.clipboard.writeText(referralInfo.referralLink)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       // Clipboard API unavailable
     }
   }
 
   if (dismissed || !loaded) return null
+
+  const hasReferralLink = !!referralInfo?.referralLink
 
   return (
     <div
@@ -68,7 +79,7 @@ export function ReferralNudgeBanner() {
           : 'bg-muted/30 border border-border'
       }`}
     >
-      <Gift className={`h-5 w-5 shrink-0 ${isUrgent ? 'text-international-orange' : 'text-international-orange'}`} />
+      <Gift className="h-5 w-5 shrink-0 text-international-orange" />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p className="text-sm font-medium text-foreground">
@@ -93,22 +104,28 @@ export function ReferralNudgeBanner() {
           </p>
         )}
       </div>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleCopy}
-        className={`shrink-0 ${
-          isUrgent
-            ? 'border-international-orange/30 text-international-orange hover:bg-international-orange/10'
-            : ''
-        }`}
-      >
-        {copied ? (
-          <><Check className="h-3.5 w-3.5 mr-1.5" /> Copied</>
-        ) : (
-          <><Copy className="h-3.5 w-3.5 mr-1.5" /> Copy invite link</>
-        )}
-      </Button>
+      {hasReferralLink ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCopy}
+          className={`shrink-0 ${
+            isUrgent
+              ? 'border-international-orange/30 text-international-orange hover:bg-international-orange/10'
+              : ''
+          }`}
+        >
+          {copied ? (
+            <><Check className="h-3.5 w-3.5 mr-1.5" /> Copied</>
+          ) : (
+            <><Copy className="h-3.5 w-3.5 mr-1.5" /> Copy invite link</>
+          )}
+        </Button>
+      ) : (
+        <Button variant="outline" size="sm" disabled className="shrink-0">
+          <Copy className="h-3.5 w-3.5 mr-1.5" /> Loading...
+        </Button>
+      )}
       <button
         onClick={() => setDismissed(true)}
         className="absolute top-2 right-2 p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
