@@ -44,7 +44,9 @@ const SPECIALIST_SCORING: SpecialistKeywords[] = [
     textKeywords: [
       "stress", "load", "thermal", "motor", "bearing", "fatigue", "vibration",
       "strain", "fea", "simulation", "heat", "pressure", "force", "torque",
-      "deflection", "resonance", "damping", "seal",
+      "deflection", "resonance", "damping", "seal", "safety factor",
+      "yield", "tensile", "creep", "corrosion", "certification", "iso",
+      "asme", "structural", "analysis", "test", "compliance",
     ],
     diagnosticBoosts: [
       { questionId: "environment", values: ["High temperature", "Outdoor harsh", "Corrosive", "Space/Vacuum"] },
