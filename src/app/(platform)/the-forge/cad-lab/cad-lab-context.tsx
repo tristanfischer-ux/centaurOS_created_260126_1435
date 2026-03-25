@@ -2858,10 +2858,160 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
     try {
+      // INTENT: ensureProject() early — needed for storage paths (uploads + extraction).
+      // Idempotent: returns cached ID if project already exists.
+      const projId = await ensureProject()
+
+      // ── Upload reference images before research (no extraction needed) ──
+      // GOTCHA: Capture ref snapshot ONCE before any state mutations to avoid
+      // reading stale data after setReferenceImages calls.
+      if (projId) {
+        const currentImages = referenceImagesRef.current
+        const pendingImages = currentImages.filter((img) => !img.uploaded)
+        if (pendingImages.length > 0) {
+          addProgressLine("Uploading reference images...")
+          const uploadRes = await uploadReferenceImages(projId, pendingImages.map((img) => ({
+            id: img.id, name: img.name, mimeType: img.mimeType, base64: img.base64, originalSize: img.originalSize,
+          })))
+          if ("error" in uploadRes) {
+            console.error("[CAD-LAB] Reference image upload failed:", uploadRes.error)
+            toast.error(`Reference image upload failed: ${uploadRes.error}`)
+          } else if (uploadRes.stored.length > 0) {
+            const storedMap = new Map(uploadRes.stored.map((s) => [s.id, s]))
+            const updated = currentImages.map((img) => {
+              const stored = storedMap.get(img.id)
+              return stored ? { ...img, uploaded: true, storageUrl: stored.storageUrl } : img
+            })
+            setReferenceImages(updated)
+            const existingStored = currentImages
+              .filter((img) => img.uploaded && img.storageUrl && !storedMap.has(img.id))
+              .map((img) => ({ id: img.id, name: img.name, mimeType: img.mimeType, storageUrl: img.storageUrl!, originalSize: img.originalSize }))
+            await saveReferenceImageUrls(projId, [...existingStored, ...uploadRes.stored])
+            if (uploadRes.failed.length > 0) {
+              toast.error(`Some images failed: ${uploadRes.failed.join(", ")}`)
+            }
+          }
+        }
+      }
+
+      // ── Upload + extract reference documents BEFORE research ──
+      // INTENT: Document specs must be available for the research prompt.
+      // The old flow ran extraction AFTER research, so documentContext was always empty.
+      if (projId) {
+        const currentDocs = referenceDocumentsRef.current
+        // SECURITY: Only upload docs that have fileData (skip cleared/null ones)
+        const pendingDocs = currentDocs.filter((doc) => !doc.uploaded && doc.fileData)
+        if (pendingDocs.length > 0) {
+          addProgressLine("Uploading reference documents...")
+          const docUploadRes = await uploadReferenceDocuments(projId, pendingDocs.map((doc) => ({
+            id: doc.id,
+            name: doc.name,
+            mimeType: doc.mimeType,
+            base64Data: arrayBufferToBase64(doc.fileData!),
+            originalSize: doc.originalSize,
+            fileType: doc.fileType,
+          })))
+          if ("error" in docUploadRes) {
+            console.error("[CAD-LAB] Reference document upload failed:", docUploadRes.error)
+            toast.error(`Document upload failed: ${docUploadRes.error}`)
+          } else if (docUploadRes.stored.length > 0) {
+            const docStoredMap = new Map(docUploadRes.stored.map((s) => [s.id, s]))
+            let updatedDocs = currentDocs.map((doc) => {
+              const stored = docStoredMap.get(doc.id)
+              return stored ? { ...doc, uploaded: true, storageUrl: stored.storageUrl, fileData: null } : doc
+            })
+            setReferenceDocuments(updatedDocs)
+
+            // Extract text from each extractable document (parallel)
+            const extractableDocs = docUploadRes.stored.filter((s) => EXTRACTABLE_TYPES.includes(s.fileType))
+            if (extractableDocs.length > 0) {
+              addProgressLine("Extracting specs from uploaded documents...")
+              // Mark as extracting
+              updatedDocs = updatedDocs.map((doc) => {
+                if (extractableDocs.some((e) => e.id === doc.id)) {
+                  return { ...doc, extractionStatus: "extracting" as const }
+                }
+                return doc
+              })
+              setReferenceDocuments(updatedDocs)
+
+              const extractResults = await Promise.allSettled(
+                extractableDocs.map((doc) =>
+                  extractDocumentText(projId, doc.id, doc.fileType)
+                )
+              )
+
+              // Merge extraction results
+              const extractMap = new Map<string, { extractedSpecs: string | null; status: "complete" | "failed" | "not_applicable" }>()
+              extractResults.forEach((result, idx) => {
+                const docId = extractableDocs[idx].id
+                if (result.status === "fulfilled" && !("error" in result.value)) {
+                  extractMap.set(docId, { extractedSpecs: result.value.extractedSpecs, status: result.value.status })
+                } else {
+                  extractMap.set(docId, { extractedSpecs: null, status: "failed" })
+                }
+              })
+
+              updatedDocs = updatedDocs.map((doc) => {
+                const extractResult = extractMap.get(doc.id)
+                if (extractResult) {
+                  return { ...doc, extractionStatus: extractResult.status, extractedSpecs: extractResult.extractedSpecs }
+                }
+                if (!EXTRACTABLE_TYPES.includes(doc.fileType) && doc.uploaded) {
+                  return { ...doc, extractionStatus: "not_applicable" as const }
+                }
+                return doc
+              })
+              setReferenceDocuments(updatedDocs)
+            } else {
+              // Mark CAD-only docs as not_applicable
+              updatedDocs = updatedDocs.map((doc) =>
+                doc.uploaded && !EXTRACTABLE_TYPES.includes(doc.fileType)
+                  ? { ...doc, extractionStatus: "not_applicable" as const }
+                  : doc
+              )
+              setReferenceDocuments(updatedDocs)
+            }
+
+            // Save all document metadata to DB
+            const allStoredDocs = updatedDocs.filter((doc) => doc.uploaded && doc.storageUrl).map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              mimeType: doc.mimeType,
+              storageUrl: doc.storageUrl!,
+              originalSize: doc.originalSize,
+              fileType: doc.fileType,
+              rawText: null, // rawText lives server-side only
+              extractedSpecs: doc.extractedSpecs ?? null,
+              extractionStatus: doc.extractionStatus,
+              uploadedAt: new Date().toISOString(),
+            }))
+            await saveReferenceDocumentUrls(projId, allStoredDocs)
+
+            if (docUploadRes.failed.length > 0) {
+              toast.error(`Some documents failed: ${docUploadRes.failed.join(", ")}`)
+            }
+          }
+        }
+      }
+
+      // INTENT: Compute document context from extraction results inline.
+      // Can't rely on useMemo (documentContext) mid-async — React state won't flush.
+      // Re-read ref after mutations to get freshly-extracted specs.
+      let freshDocumentContext = ""
+      const finalDocs = referenceDocumentsRef.current
+      const specs = finalDocs
+        .filter(d => d.extractionStatus === "complete" && d.extractedSpecs)
+        .map(d => `### ${d.name}\n${d.extractedSpecs}`)
+        .join("\n\n")
+      freshDocumentContext = specs.length > 15_000
+        ? specs.slice(0, 15_000) + "\n\n[Document context truncated]"
+        : specs
+
       const res = await runCadLabResearch(subject, {
         designBrief,
         assumptionNotes,
-        documentContext: documentContext || undefined,
+        documentContext: freshDocumentContext || documentContext || undefined,
       })
       researchTimers.forEach(clearTimeout)
 
@@ -2899,7 +3049,6 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (res.success) {
         setMilestone("research")
         freshResearchRef.current = true // INTENT: must be set BEFORE any await so the auto-decompose effect sees it when React flushes the batch
-        const projId = await ensureProject()
         if (projId) {
           setIsSaving(true)
           await saveCadLabResearch(projId, res)
@@ -2913,140 +3062,10 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsSaving(false)
           refreshProjects()
 
-          // Upload reference images if any are pending
-          // GOTCHA: Capture ref snapshot ONCE before any state mutations to avoid
-          // reading stale data after setReferenceImages calls.
-          const currentImages = referenceImagesRef.current
-          const pendingImages = currentImages.filter((img) => !img.uploaded)
-          if (pendingImages.length > 0) {
-            const uploadRes = await uploadReferenceImages(projId, pendingImages.map((img) => ({
-              id: img.id, name: img.name, mimeType: img.mimeType, base64: img.base64, originalSize: img.originalSize,
-            })))
-            if ("error" in uploadRes) {
-              console.error("[CAD-LAB] Reference image upload failed:", uploadRes.error)
-              toast.error(`Reference image upload failed: ${uploadRes.error}`)
-            } else if (uploadRes.stored.length > 0) {
-              // Merge upload results back into state
-              const storedMap = new Map(uploadRes.stored.map((s) => [s.id, s]))
-              const updated = currentImages.map((img) => {
-                const stored = storedMap.get(img.id)
-                return stored ? { ...img, uploaded: true, storageUrl: stored.storageUrl } : img
-              })
-              setReferenceImages(updated)
-              // Combine existing DB images + newly uploaded
-              const existingStored = currentImages
-                .filter((img) => img.uploaded && img.storageUrl && !storedMap.has(img.id))
-                .map((img) => ({ id: img.id, name: img.name, mimeType: img.mimeType, storageUrl: img.storageUrl!, originalSize: img.originalSize }))
-              await saveReferenceImageUrls(projId, [...existingStored, ...uploadRes.stored])
-              // Surface partial failures
-              if (uploadRes.failed.length > 0) {
-                toast.error(`Some images failed: ${uploadRes.failed.join(", ")}`)
-              }
-            }
-          }
-
-          // Upload reference documents if any are pending
-          const currentDocs = referenceDocumentsRef.current
-          // SECURITY: Only upload docs that have fileData (skip cleared/null ones)
-          const pendingDocs = currentDocs.filter((doc) => !doc.uploaded && doc.fileData)
-          if (pendingDocs.length > 0) {
-            const docUploadRes = await uploadReferenceDocuments(projId, pendingDocs.map((doc) => ({
-              id: doc.id,
-              name: doc.name,
-              mimeType: doc.mimeType,
-              base64Data: arrayBufferToBase64(doc.fileData!),
-              originalSize: doc.originalSize,
-              fileType: doc.fileType,
-            })))
-            if ("error" in docUploadRes) {
-              console.error("[CAD-LAB] Reference document upload failed:", docUploadRes.error)
-              toast.error(`Document upload failed: ${docUploadRes.error}`)
-            } else if (docUploadRes.stored.length > 0) {
-              // Merge upload results back into state
-              const docStoredMap = new Map(docUploadRes.stored.map((s) => [s.id, s]))
-              let updatedDocs = currentDocs.map((doc) => {
-                const stored = docStoredMap.get(doc.id)
-                return stored ? { ...doc, uploaded: true, storageUrl: stored.storageUrl, fileData: null } : doc
-              })
-              setReferenceDocuments(updatedDocs)
-
-              // Extract text from each extractable document (parallel)
-              const extractableDocs = docUploadRes.stored.filter((s) => EXTRACTABLE_TYPES.includes(s.fileType))
-              if (extractableDocs.length > 0) {
-                // Mark as extracting
-                updatedDocs = updatedDocs.map((doc) => {
-                  if (extractableDocs.some((e) => e.id === doc.id)) {
-                    return { ...doc, extractionStatus: "extracting" as const }
-                  }
-                  return doc
-                })
-                setReferenceDocuments(updatedDocs)
-
-                const extractResults = await Promise.allSettled(
-                  extractableDocs.map((doc) =>
-                    extractDocumentText(projId, doc.id, doc.fileType)
-                  )
-                )
-
-                // Merge extraction results
-                const extractMap = new Map<string, { extractedSpecs: string | null; status: "complete" | "failed" | "not_applicable" }>()
-                extractResults.forEach((result, idx) => {
-                  const docId = extractableDocs[idx].id
-                  if (result.status === "fulfilled" && !("error" in result.value)) {
-                    extractMap.set(docId, { extractedSpecs: result.value.extractedSpecs, status: result.value.status })
-                  } else {
-                    extractMap.set(docId, { extractedSpecs: null, status: "failed" })
-                  }
-                })
-
-                updatedDocs = updatedDocs.map((doc) => {
-                  const extractResult = extractMap.get(doc.id)
-                  if (extractResult) {
-                    return { ...doc, extractionStatus: extractResult.status, extractedSpecs: extractResult.extractedSpecs }
-                  }
-                  // Mark CAD files as not_applicable
-                  if (!EXTRACTABLE_TYPES.includes(doc.fileType) && doc.uploaded) {
-                    return { ...doc, extractionStatus: "not_applicable" as const }
-                  }
-                  return doc
-                })
-                setReferenceDocuments(updatedDocs)
-              } else {
-                // Mark CAD-only docs as not_applicable
-                updatedDocs = updatedDocs.map((doc) =>
-                  doc.uploaded && !EXTRACTABLE_TYPES.includes(doc.fileType)
-                    ? { ...doc, extractionStatus: "not_applicable" as const }
-                    : doc
-                )
-                setReferenceDocuments(updatedDocs)
-              }
-
-              // Save all document metadata to DB
-              const allStoredDocs = updatedDocs.filter((doc) => doc.uploaded && doc.storageUrl).map((doc) => ({
-                id: doc.id,
-                name: doc.name,
-                mimeType: doc.mimeType,
-                storageUrl: doc.storageUrl!,
-                originalSize: doc.originalSize,
-                fileType: doc.fileType,
-                rawText: null, // rawText lives server-side only
-                extractedSpecs: doc.extractedSpecs ?? null,
-                extractionStatus: doc.extractionStatus,
-                uploadedAt: new Date().toISOString(),
-              }))
-              await saveReferenceDocumentUrls(projId, allStoredDocs)
-
-              if (docUploadRes.failed.length > 0) {
-                toast.error(`Some documents failed: ${docUploadRes.failed.join(", ")}`)
-              }
-            }
-          }
-
           // DECISION: No illustration here — wait until handleDecompose runs so the
           // system illustration is generated with full module context (names + purposes).
           // The image pipeline in handleDecompose already handles: visual style → system
           // illustration (with modules) → module images (referencing hero).
-
         }
       }
     } catch (err) {
