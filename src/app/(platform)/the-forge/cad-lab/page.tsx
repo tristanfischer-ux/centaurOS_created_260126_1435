@@ -94,6 +94,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     tripoPreviewUrl, tripoPreviewStatus, tripoPreviewError,
     handleGenerateTripoPreview,
     referenceImages, setReferenceImages,
+    referenceDocuments, setReferenceDocuments,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
@@ -417,6 +418,8 @@ export default function CadLabResearchPage(): React.ReactNode {
         onStartInterview={() => setInterviewPhase("interviewing")}
         referenceImages={referenceImages}
         onReferenceImagesChange={setReferenceImages}
+        referenceDocuments={referenceDocuments}
+        onReferenceDocumentsChange={setReferenceDocuments}
       />
 
       {/* ── Max (CTO) entry briefing — always visible as stage owner ── */}

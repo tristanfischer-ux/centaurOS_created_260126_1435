@@ -37,7 +37,9 @@ import {
 import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import type { ClaudeModelId, CadLabDesignBrief } from "@/lib/cad-lab-types"
 import { ReferenceImageUpload } from "./reference-image-upload"
+import { ReferenceDocumentUpload } from "./reference-document-upload"
 import type { ReferenceImageFile } from "@/lib/cad-lab/reference-image-types"
+import type { ReferenceDocumentFile } from "@/lib/cad-lab/reference-document-types"
 
 // ─── Option constants ────────────────────────────────────────────────
 
@@ -92,6 +94,8 @@ interface DesignIntakeFormProps {
   isAnyLoading: boolean
   referenceImages?: ReferenceImageFile[]
   onReferenceImagesChange?: (images: ReferenceImageFile[]) => void
+  referenceDocuments?: ReferenceDocumentFile[]
+  onReferenceDocumentsChange?: (documents: ReferenceDocumentFile[]) => void
 }
 
 /**
@@ -111,6 +115,8 @@ export function DesignIntakeForm({
   isAnyLoading,
   referenceImages,
   onReferenceImagesChange,
+  referenceDocuments,
+  onReferenceDocumentsChange,
 }: DesignIntakeFormProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -189,6 +195,21 @@ export function DesignIntakeForm({
               <ReferenceImageUpload
                 images={referenceImages}
                 onImagesChange={onReferenceImagesChange}
+                variant="grid"
+                disabled={isAnyLoading}
+              />
+            </div>
+          )}
+
+          {/* Reference documents */}
+          {referenceDocuments && onReferenceDocumentsChange && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5" /> Reference documents
+              </Label>
+              <ReferenceDocumentUpload
+                documents={referenceDocuments}
+                onDocumentsChange={onReferenceDocumentsChange}
                 variant="grid"
                 disabled={isAnyLoading}
               />

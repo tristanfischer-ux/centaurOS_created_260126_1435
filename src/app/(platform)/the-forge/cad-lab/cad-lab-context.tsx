@@ -18,6 +18,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useMemo,
   type ReactNode,
   type Dispatch,
   type SetStateAction,
@@ -86,6 +87,10 @@ import type { Sector } from "@/types/foundry"
 import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
 import type { ReferenceImageFile, StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
 import { uploadReferenceImages, saveReferenceImageUrls } from "@/actions/cad-lab-reference-images"
+import type { ReferenceDocumentFile } from "@/lib/cad-lab/reference-document-types"
+import { EXTRACTABLE_TYPES } from "@/lib/cad-lab/reference-document-types"
+import { uploadReferenceDocuments, extractDocumentText, saveReferenceDocumentUrls } from "@/actions/cad-lab-reference-documents"
+import { arrayBufferToBase64 } from "./components/reference-document-upload"
 
 // ─── Persistence key for last active project (restore on return) ─────
 
@@ -355,6 +360,12 @@ export interface CadLabContextValue {
   referenceImages: ReferenceImageFile[]
   setReferenceImages: Dispatch<SetStateAction<ReferenceImageFile[]>>
 
+  // Reference documents (user-uploaded spec sheets, datasheets, CAD files)
+  referenceDocuments: ReferenceDocumentFile[]
+  setReferenceDocuments: Dispatch<SetStateAction<ReferenceDocumentFile[]>>
+  /** Concatenated extracted specs from all completed documents, capped at 15K chars */
+  documentContext: string
+
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }
@@ -560,6 +571,21 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [referenceImages, setReferenceImages] = useState<ReferenceImageFile[]>([])
   const referenceImagesRef = useRef(referenceImages)
   useEffect(() => { referenceImagesRef.current = referenceImages }, [referenceImages])
+
+  // ── Reference documents (user-uploaded spec sheets, datasheets, CAD files) ──
+  const [referenceDocuments, setReferenceDocuments] = useState<ReferenceDocumentFile[]>([])
+  const referenceDocumentsRef = useRef(referenceDocuments)
+  useEffect(() => { referenceDocumentsRef.current = referenceDocuments }, [referenceDocuments])
+
+  // INTENT: Computed concatenation of all extracted specs, capped at 15K chars.
+  // Exposed on context so pipeline stages can inject into prompts.
+  const documentContext = useMemo(() => {
+    const specs = referenceDocuments
+      .filter(d => d.extractionStatus === "complete" && d.extractedSpecs)
+      .map(d => `### ${d.name}\n${d.extractedSpecs}`)
+      .join("\n\n")
+    return specs.length > 15_000 ? specs.slice(0, 15_000) + "\n\n[Document context truncated]" : specs
+  }, [referenceDocuments])
 
   // ── Provider A/B comparison ──
   const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
@@ -1068,6 +1094,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         modelId,
         detectedDomain ?? undefined,
         visualStyle?.consistencyBrief,
+        documentContext || undefined,
       )
 
       if (expRes.success && expRes.expansion) {
@@ -1283,7 +1310,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // ── Phase 1: Skeleton decomposition + product identity (parallel, ~60s) ──
       addProgressLine("Establishing product design identity...")
       const [skeletonRes, identityRes] = await Promise.all([
-        skeletonDecompose(subject, editableReport, modelId, domainHint),
+        skeletonDecompose(subject, editableReport, modelId, domainHint, documentContext || undefined),
         generateProductIdentityAction(subject, editableReport),
       ])
       const skeletonElapsed = ((Date.now() - apiStart) / 1000).toFixed(1)
@@ -1412,7 +1439,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           const refImageUrls = referenceImagesRef.current.filter(i => i.uploaded && i.storageUrl).map(i => i.storageUrl!)
           let visualStyle: VisualStyleSpec | undefined
           try {
-            const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800), refImageUrls.length > 0 ? refImageUrls : undefined)
+            const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800), refImageUrls.length > 0 ? refImageUrls : undefined, documentContext || undefined)
             if (!activeProjectIdRef.current) return
             if ("visualStyle" in styleRes) { visualStyle = styleRes.visualStyle; setVisualStyle(visualStyle); if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {}) }
           } catch { /* Non-critical */ }
@@ -1595,6 +1622,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           modelId,
           domainHint,
           consistencyBrief,
+          documentContext || undefined,
         )
 
         if (expRes.success && expRes.expansion) {
@@ -1708,6 +1736,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               skeletonRes.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
               extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
               refUrls.length > 0 ? refUrls : undefined,
+              documentContext || undefined,
             )
             if ("visualStyle" in styleRes) {
               style = styleRes.visualStyle
@@ -1869,7 +1898,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } finally {
       setIsDecomposing(false)
     }
-  }, [editableReport, subject, modelId, activeProjectId, refreshProjects, addProgressLine])
+  }, [editableReport, subject, modelId, activeProjectId, documentContext, refreshProjects, addProgressLine])
 
   // ── Generate Gemini blueprint images for modules (progressive reveal) ──
   const handleGenerateModuleImages = useCallback(async (modulesToProcess: CadLabModule[], explicitProjectId?: string, visualStyle?: VisualStyleSpec, referenceBase64?: string, moduleCrops?: Map<string, string>, heroUrl?: string) => {
@@ -2326,6 +2355,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               projectId: activeProjectId,
               moduleId,
               ...(detectedDomain && { domainHint: detectedDomain }),
+              ...(documentContext && { documentContext }),
             }),
           })
 
@@ -2472,6 +2502,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           projectId: activeProjectId,
           moduleId,
           ...(detectedDomain && { domainHint: detectedDomain }),
+          ...(documentContext && { documentContext }),
         }),
       })
 
@@ -2676,6 +2707,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 projectId: activeProjectId,
                 moduleId: mod.id,
                 ...(detectedDomain && { domainHint: detectedDomain }),
+                ...(documentContext && { documentContext }),
               }),
             })
 
@@ -2829,6 +2861,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       const res = await runCadLabResearch(subject, {
         designBrief,
         assumptionNotes,
+        documentContext: documentContext || undefined,
       })
       researchTimers.forEach(clearTimeout)
 
@@ -2912,6 +2945,103 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             }
           }
 
+          // Upload reference documents if any are pending
+          const currentDocs = referenceDocumentsRef.current
+          // SECURITY: Only upload docs that have fileData (skip cleared/null ones)
+          const pendingDocs = currentDocs.filter((doc) => !doc.uploaded && doc.fileData)
+          if (pendingDocs.length > 0) {
+            const docUploadRes = await uploadReferenceDocuments(projId, pendingDocs.map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              mimeType: doc.mimeType,
+              base64Data: arrayBufferToBase64(doc.fileData!),
+              originalSize: doc.originalSize,
+              fileType: doc.fileType,
+            })))
+            if ("error" in docUploadRes) {
+              console.error("[CAD-LAB] Reference document upload failed:", docUploadRes.error)
+              toast.error(`Document upload failed: ${docUploadRes.error}`)
+            } else if (docUploadRes.stored.length > 0) {
+              // Merge upload results back into state
+              const docStoredMap = new Map(docUploadRes.stored.map((s) => [s.id, s]))
+              let updatedDocs = currentDocs.map((doc) => {
+                const stored = docStoredMap.get(doc.id)
+                return stored ? { ...doc, uploaded: true, storageUrl: stored.storageUrl, fileData: null } : doc
+              })
+              setReferenceDocuments(updatedDocs)
+
+              // Extract text from each extractable document (parallel)
+              const extractableDocs = docUploadRes.stored.filter((s) => EXTRACTABLE_TYPES.includes(s.fileType))
+              if (extractableDocs.length > 0) {
+                // Mark as extracting
+                updatedDocs = updatedDocs.map((doc) => {
+                  if (extractableDocs.some((e) => e.id === doc.id)) {
+                    return { ...doc, extractionStatus: "extracting" as const }
+                  }
+                  return doc
+                })
+                setReferenceDocuments(updatedDocs)
+
+                const extractResults = await Promise.allSettled(
+                  extractableDocs.map((doc) =>
+                    extractDocumentText(projId, doc.id, doc.fileType)
+                  )
+                )
+
+                // Merge extraction results
+                const extractMap = new Map<string, { extractedSpecs: string | null; status: "complete" | "failed" | "not_applicable" }>()
+                extractResults.forEach((result, idx) => {
+                  const docId = extractableDocs[idx].id
+                  if (result.status === "fulfilled" && !("error" in result.value)) {
+                    extractMap.set(docId, { extractedSpecs: result.value.extractedSpecs, status: result.value.status })
+                  } else {
+                    extractMap.set(docId, { extractedSpecs: null, status: "failed" })
+                  }
+                })
+
+                updatedDocs = updatedDocs.map((doc) => {
+                  const extractResult = extractMap.get(doc.id)
+                  if (extractResult) {
+                    return { ...doc, extractionStatus: extractResult.status, extractedSpecs: extractResult.extractedSpecs }
+                  }
+                  // Mark CAD files as not_applicable
+                  if (!EXTRACTABLE_TYPES.includes(doc.fileType) && doc.uploaded) {
+                    return { ...doc, extractionStatus: "not_applicable" as const }
+                  }
+                  return doc
+                })
+                setReferenceDocuments(updatedDocs)
+              } else {
+                // Mark CAD-only docs as not_applicable
+                updatedDocs = updatedDocs.map((doc) =>
+                  doc.uploaded && !EXTRACTABLE_TYPES.includes(doc.fileType)
+                    ? { ...doc, extractionStatus: "not_applicable" as const }
+                    : doc
+                )
+                setReferenceDocuments(updatedDocs)
+              }
+
+              // Save all document metadata to DB
+              const allStoredDocs = updatedDocs.filter((doc) => doc.uploaded && doc.storageUrl).map((doc) => ({
+                id: doc.id,
+                name: doc.name,
+                mimeType: doc.mimeType,
+                storageUrl: doc.storageUrl!,
+                originalSize: doc.originalSize,
+                fileType: doc.fileType,
+                rawText: null, // rawText lives server-side only
+                extractedSpecs: doc.extractedSpecs ?? null,
+                extractionStatus: doc.extractionStatus,
+                uploadedAt: new Date().toISOString(),
+              }))
+              await saveReferenceDocumentUrls(projId, allStoredDocs)
+
+              if (docUploadRes.failed.length > 0) {
+                toast.error(`Some documents failed: ${docUploadRes.failed.join(", ")}`)
+              }
+            }
+          }
+
           // DECISION: No illustration here — wait until handleDecompose runs so the
           // system illustration is generated with full module context (names + purposes).
           // The image pipeline in handleDecompose already handles: visual style → system
@@ -2933,7 +3063,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     } finally {
       setIsResearching(false)
     }
-  }, [subject, designBrief, assumptionNotes, ensureProject, refreshProjects, addProgressLine])
+  }, [subject, designBrief, assumptionNotes, documentContext, ensureProject, refreshProjects, addProgressLine])
 
   // ── Reset ──
   const handleReset = useCallback(() => {
@@ -2992,6 +3122,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       if (img.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl)
     })
     setReferenceImages([])
+    setReferenceDocuments([])
   }, [])
 
   // ── Load a saved project ──
@@ -3175,6 +3306,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         })))
       } else {
         setReferenceImages([])
+      }
+
+      // Restore reference documents from database
+      if (p.referenceDocuments && p.referenceDocuments.length > 0) {
+        setReferenceDocuments(p.referenceDocuments.map((doc) => ({
+          id: doc.id,
+          name: doc.name,
+          mimeType: doc.mimeType,
+          fileType: doc.fileType,
+          fileData: null, // Don't reload binary data
+          originalSize: doc.originalSize,
+          uploaded: true,
+          storageUrl: doc.storageUrl,
+          extractionStatus: doc.extractionStatus,
+          extractedSpecs: doc.extractedSpecs,
+        })))
+      } else {
+        setReferenceDocuments([])
       }
 
       // Restore design revision state
@@ -4057,6 +4206,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     handleGenerateTripoPreview,
     referenceImages,
     setReferenceImages,
+    referenceDocuments,
+    setReferenceDocuments,
+    documentContext,
     initialized,
     initializeCadLab,
     handleDownload,

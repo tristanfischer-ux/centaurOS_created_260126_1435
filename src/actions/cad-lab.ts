@@ -784,6 +784,7 @@ export async function runCadLabResearch(
   options?: {
     designBrief?: CadLabDesignBrief
     assumptionNotes?: string
+    documentContext?: string
   },
 ): Promise<CadLabResearchResult> {
   // AUTH: Verify user is authenticated
@@ -920,7 +921,10 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       }
 
       const synthesisPrompt = getResearchSynthesisPrompt(domain)
-      const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}`
+      const docSection = options?.documentContext
+        ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${options.documentContext.slice(0, 15_000)}\nPrioritize these specs over web search results when there are conflicts.`
+        : ""
+      const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}${docSection}`
 
       // DECISION: Fallback chain for synthesis — Claude → OpenAI → Gemini.
       // If Anthropic credits are exhausted, fall through to alternatives.
@@ -2492,6 +2496,7 @@ export async function skeletonDecompose(
   researchReport: string,
   modelId: ClaudeModelId = "claude-opus-4-6",
   domainHint?: CadLabDomain,
+  documentContext?: string,
 ): Promise<SkeletonDecompositionResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -2513,7 +2518,10 @@ export async function skeletonDecompose(
       ? researchReport.slice(0, 12_000) + "\n\n[Report truncated — full report available in later stages]"
       : researchReport
 
-    const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
+    const docSection = documentContext
+      ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 8_000)}\nPrioritize these specs over web search results when there are conflicts.`
+      : ""
+    const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
     // DECISION: Direct call with Opus — small output (~500 tokens) but complex products with
     // 12K-char research reports need 30-60s. 60s stays well within Vercel 300s cap.
@@ -2657,6 +2665,7 @@ export async function expandModuleDetail(
   modelId: ClaudeModelId = "claude-opus-4-6",
   domainHint?: CadLabDomain,
   consistencyBrief?: string,
+  documentContext?: string,
 ): Promise<ModuleExpansionResult> {
   // AUTH: Verify user is authenticated (no separate rate limit — skeleton already rate-limited)
   const supabase = await createClient()
@@ -2681,10 +2690,13 @@ export async function expandModuleDetail(
       `- ${m.name} (${m.id}): ${m.purpose} | inputs: [${m.inputs.join(", ")}] | outputs: [${m.outputs.join(", ")}]`
     ).join("\n")
 
+    const docSection = documentContext
+      ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 5_000)}\nPrioritize these specs over web search results when there are conflicts.\n`
+      : ""
     const userPrompt = `Product: ${description}
 
 Research Report:
-${truncatedReport}
+${truncatedReport}${docSection}
 
 Full product skeleton:
 ${skeletonSummary}
@@ -3685,6 +3697,7 @@ export async function generateCadLabModelSmart(
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
   blueprintImageUrl?: string,
+  documentContext?: string,
 ): Promise<CadLabResult & { grammarUsed?: string }> {
   // ── Try grammar-based generation first ──
   console.info("[THE-FORGE] Smart generation: attempting grammar-based path...")
@@ -3724,7 +3737,11 @@ export async function generateCadLabModelSmart(
   }
 
   // ── Fallback to existing raw CadQuery pipeline ──
-  return generateCadLabModel(description, researchReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief, domainHint, blueprintImageUrl)
+  // INTENT: Inject document context into research report for code generation
+  const enrichedReport = documentContext
+    ? `${researchReport}\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 5_000)}\nPrioritize these specs over web search results when there are conflicts.`
+    : researchReport
+  return generateCadLabModel(description, enrichedReport, interfaceDefinition, modelId, checkpointContext, undefined, cachedTemplateMatch, designBrief, domainHint, blueprintImageUrl)
 }
 
 // ─── Mashup Generation ────────────────────────────────────────────────

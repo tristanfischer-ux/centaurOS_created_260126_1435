@@ -33,6 +33,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
+import type { StoredReferenceDocument } from "@/lib/cad-lab/reference-document-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -139,6 +140,9 @@ export interface CadLabProjectData {
 
   /** User-uploaded reference images (sketches, photos, drawings) */
   referenceImages: StoredReferenceImage[] | null
+
+  /** User-uploaded reference documents (spec sheets, datasheets, CAD files) */
+  referenceDocuments: StoredReferenceDocument[] | null
 
   createdAt: string
   updatedAt: string
@@ -258,6 +262,10 @@ export async function loadCadLabProject(
         reviewSkipped: (project.review_skipped as boolean) ?? false,
         providerResults: (project.provider_results as Record<string, ProviderResult> | null) ?? null,
         referenceImages: (project.reference_images as StoredReferenceImage[] | null) ?? null,
+        // INTENT: Exclude rawText from client payload to keep React Flight small
+        referenceDocuments: project.reference_documents
+          ? ((project.reference_documents as unknown as StoredReferenceDocument[]).map(d => ({ ...d, rawText: null })))
+          : null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },

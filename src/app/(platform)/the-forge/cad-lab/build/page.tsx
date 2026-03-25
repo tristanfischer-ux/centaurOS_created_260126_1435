@@ -127,6 +127,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     handleUpdateModule,
     earlyCostEstimates,
     referenceImages, setReferenceImages,
+    referenceDocuments, setReferenceDocuments,
   } = useCadLab()
 
   // Local UI state for result viewing
@@ -399,6 +400,8 @@ export default function CadLabBuildPage(): React.ReactNode {
                   isAnyLoading={isAnyLoading}
                   referenceImages={referenceImages}
                   onReferenceImagesChange={setReferenceImages}
+                  referenceDocuments={referenceDocuments}
+                  onReferenceDocumentsChange={setReferenceDocuments}
                 />
               </CollapsibleSection>
             </motion.div>

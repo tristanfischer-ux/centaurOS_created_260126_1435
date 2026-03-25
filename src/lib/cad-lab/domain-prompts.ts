@@ -271,7 +271,10 @@ RULES:
 - Round to nearest 0.5mm for sub-mm precision
 - If two sources disagree, state both and note the discrepancy
 - Never invent a dimension — mark it as Unknown
-- Include source attribution for key numbers`
+- Include source attribution for key numbers
+- If user-uploaded reference documents are provided, treat their specifications as PRIMARY context
+- Extract exact dimensions, materials, tolerances, and requirements from these documents
+- When web research conflicts with user documents, prefer the user's own data`
 
 const RESEARCH_ROLE: Record<CadLabDomain, string> = {
   electronics:

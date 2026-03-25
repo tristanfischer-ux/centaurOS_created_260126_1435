@@ -36,6 +36,8 @@ interface GenerateModuleBody {
   moduleId?: string
   /** J1/J6: Cached domain from client-side prepareDecomposition — avoids redundant Claude call */
   domainHint?: string
+  /** Extracted specs from user-uploaded reference documents */
+  documentContext?: string
 }
 
 /** Response on success */
@@ -149,6 +151,7 @@ export async function POST(request: Request): Promise<Response> {
   let projectId: string
   let moduleId: string
   let clientDomainHint: string | undefined
+  let clientDocumentContext: string | undefined
   try {
     const body = (await request.json()) as GenerateModuleBody
     if (!body.projectId || !/^[0-9a-f-]{36}$/.test(body.projectId)) {
@@ -163,6 +166,10 @@ export async function POST(request: Request): Promise<Response> {
     if (body.domainHint && typeof body.domainHint === "string" &&
         ["electronics", "mechanical", "electromechanical", "fluid"].includes(body.domainHint)) {
       clientDomainHint = body.domainHint
+    }
+    // SECURITY: Cap documentContext to prevent payload bloat in Claude API calls
+    if (body.documentContext && typeof body.documentContext === "string") {
+      clientDocumentContext = body.documentContext.slice(0, 15_000)
     }
   } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 })
@@ -337,6 +344,7 @@ export async function POST(request: Request): Promise<Response> {
           designBrief,
           detectedDomain as import("@/lib/cad-lab/domain-prompts").CadLabDomain | undefined,
           localMod.imageUrl,
+          clientDocumentContext,
         )
         cadResult = res
 

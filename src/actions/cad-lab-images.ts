@@ -364,6 +364,7 @@ export async function generateVisualStyleAction(
   modules: Array<{ name: string; purpose: string }>,
   researchExcerpt?: string,
   referenceImageUrls?: string[],
+  documentContext?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -374,7 +375,10 @@ export async function generateVisualStyleAction(
 
     const moduleList = modules.map((m) => `- ${m.name}: ${m.purpose}`).join("\n")
     const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
-    const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}`
+    const docContext = documentContext
+      ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 3_000)}\nPrioritize these specs for material and aesthetic cues.`
+      : ""
+    const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}${docContext}`
 
     // INTENT: When user-uploaded reference images are available, build multimodal
     // content so Claude can SEE the sketches while crafting visual style prompts.

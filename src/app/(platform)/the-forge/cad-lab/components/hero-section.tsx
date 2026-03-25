@@ -27,8 +27,10 @@ import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { ReferenceModelViewer } from "./reference-model-viewer"
 import { ReferenceImageUpload } from "./reference-image-upload"
+import { ReferenceDocumentUpload } from "./reference-document-upload"
 import type { ReferenceModel } from "@/actions/reference-models"
 import type { ReferenceImageFile } from "@/lib/cad-lab/reference-image-types"
+import type { ReferenceDocumentFile } from "@/lib/cad-lab/reference-document-types"
 
 // ─── Example prompt chips ────────────────────────────────────────────
 
@@ -65,6 +67,10 @@ interface HeroSectionProps {
   referenceImages?: ReferenceImageFile[]
   /** Callback to update reference images */
   onReferenceImagesChange?: (images: ReferenceImageFile[]) => void
+  /** User-uploaded reference documents */
+  referenceDocuments?: ReferenceDocumentFile[]
+  /** Callback to update reference documents */
+  onReferenceDocumentsChange?: (documents: ReferenceDocumentFile[]) => void
 }
 
 /**
@@ -83,6 +89,8 @@ export function HeroSection({
   onStartInterview,
   referenceImages,
   onReferenceImagesChange,
+  referenceDocuments,
+  onReferenceDocumentsChange,
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
   const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
@@ -185,6 +193,16 @@ export function HeroSection({
           <ReferenceImageUpload
             images={referenceImages}
             onImagesChange={onReferenceImagesChange}
+            variant="compact"
+            disabled={isResearching}
+          />
+        )}
+
+        {/* Reference document upload (compact) */}
+        {referenceDocuments && onReferenceDocumentsChange && (
+          <ReferenceDocumentUpload
+            documents={referenceDocuments}
+            onDocumentsChange={onReferenceDocumentsChange}
             variant="compact"
             disabled={isResearching}
           />

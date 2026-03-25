@@ -363,7 +363,7 @@ ${dataSummary}`
           messages: [{ role: "user", content: userPrompt }],
         }),
       },
-      60_000,
+      90_000,
     ),
     {
       maxRetries: 2,
