@@ -905,7 +905,9 @@ function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): 
     text: truncate(typeof item === 'string' ? item : String(item), 80),
     options: { fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, bullet: { type: 'bullet' as const }, paraSpaceBefore: 6 },
   }))
-  slide.addText(leftBullets, { x: leftX + 0.2, y: 1.55, w: colW - 0.4, h: 3.1, valign: 'top' as const })
+  if (leftBullets.length > 0) {
+    slide.addText(leftBullets, { x: leftX + 0.2, y: 1.55, w: colW - 0.4, h: 3.1, valign: 'top' as const })
+  }
 
   // Right column — "new way" with teal accent
   slide.addShape('roundRect', { x: rightX, y: 1.0, w: colW, h: 3.8, fill: { color: SUCCESS_BG }, line: { color: TEAL, width: 1.5 }, rectRadius: 0.1 })
@@ -1021,8 +1023,9 @@ function buildStatCalloutsSlide(pres: PptxGenJS, section: AiReportSection, slide
 
   // Stats bar
   const statsY = slideImage ? 3.8 : 2.0
-  const statW = CONTENT_W / sd.stats.length
-  sd.stats.slice(0, 4).forEach((stat, i) => {
+  const visibleStats = sd.stats.slice(0, 4)
+  const statW = CONTENT_W / visibleStats.length
+  visibleStats.forEach((stat, i) => {
     const x = MARGIN + i * statW
     slide.addShape('roundRect', { x: x + 0.1, y: statsY, w: statW - 0.2, h: 1.2, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.08 })
     slide.addText(stat.value, { x: x + 0.1, y: statsY + 0.1, w: statW - 0.2, h: 0.55, fontSize: 22, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT, align: 'center' })
@@ -1056,7 +1059,7 @@ function buildTechnicalDossiersSlide(pres: PptxGenJS, section: AiReportSection):
     // Profile text
     slide.addText(truncate(card.profile, 100), { x: x + 0.15, y: y + 0.55, w: cardW - 0.3, h: 0.6, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.2 })
     // Key-value items
-    card.items.slice(0, 5).forEach((item, j) => {
+    ;(card.items ?? []).slice(0, 5).forEach((item, j) => {
       const itemY = y + 1.25 + j * 0.4
       slide.addText(item.label + ':', { x: x + 0.15, y: itemY, w: cardW - 0.3, h: 0.18, fontSize: 8, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
       slide.addText(truncate(item.value, 60), { x: x + 0.15, y: itemY + 0.18, w: cardW - 0.3, h: 0.18, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT })
