@@ -755,7 +755,7 @@ export default function SourcePage(): React.ReactNode {
                   setTimeout(() => {
                     toast("Source stage complete", {
                       description: "Log the time you spent sourcing?",
-                      action: { label: "Log Time", onClick: () => window.open("/time", "_blank") },
+                      action: { label: "Log Time", onClick: () => { window.location.href = "/time" } },
                     })
                   }, 500)
                 }}

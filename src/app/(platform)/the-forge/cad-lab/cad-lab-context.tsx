@@ -2846,16 +2846,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setSystemIllustrationUrl(null)
     setSystemIllustrationError(null)
 
-    // INTENT: Honest progress lines that describe what's actually happening.
-    // The server action runs Gemini web search + Thingiverse search in parallel,
-    // then Claude synthesises the results with injected standards + engineering data.
-    addProgressLine("Running web search for real-world specifications (Gemini Search)...")
     const researchTimers: ReturnType<typeof setTimeout>[] = []
-    researchTimers.push(setTimeout(() => addProgressLine("Searching Thingiverse for reference CAD models..."), 3000))
-    researchTimers.push(setTimeout(() => addProgressLine("Querying design standards database (220+ standards across 19 domains)..."), 8000))
-    researchTimers.push(setTimeout(() => addProgressLine("Loading material properties and process constraints from engineering library..."), 12000))
-    researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report with Claude Opus..."), 18000))
-    researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
     try {
       // INTENT: ensureProject() early — needed for storage paths (uploads + extraction).
@@ -2921,6 +2912,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               return stored ? { ...doc, uploaded: true, storageUrl: stored.storageUrl, fileData: null } : doc
             })
             setReferenceDocuments(updatedDocs)
+            referenceDocumentsRef.current = updatedDocs // GOTCHA: useEffect ref sync won't fire mid-async
 
             // Extract text from each extractable document (parallel)
             const extractableDocs = docUploadRes.stored.filter((s) => EXTRACTABLE_TYPES.includes(s.fileType))
@@ -2934,6 +2926,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 return doc
               })
               setReferenceDocuments(updatedDocs)
+              referenceDocumentsRef.current = updatedDocs
 
               const extractResults = await Promise.allSettled(
                 extractableDocs.map((doc) =>
@@ -2963,6 +2956,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                 return doc
               })
               setReferenceDocuments(updatedDocs)
+              referenceDocumentsRef.current = updatedDocs // GOTCHA: sync ref so freshDocumentContext reads extraction results
             } else {
               // Mark CAD-only docs as not_applicable
               updatedDocs = updatedDocs.map((doc) =>
@@ -2971,6 +2965,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
                   : doc
               )
               setReferenceDocuments(updatedDocs)
+              referenceDocumentsRef.current = updatedDocs
             }
 
             // Save all document metadata to DB
@@ -3007,6 +3002,15 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       freshDocumentContext = specs.length > 15_000
         ? specs.slice(0, 15_000) + "\n\n[Document context truncated]"
         : specs
+
+      // INTENT: Honest progress lines that describe what's actually happening.
+      // Placed here (after upload/extraction) so messages match the actual phase.
+      addProgressLine("Running web search for real-world specifications (Gemini Search)...")
+      researchTimers.push(setTimeout(() => addProgressLine("Searching Thingiverse for reference CAD models..."), 3000))
+      researchTimers.push(setTimeout(() => addProgressLine("Querying design standards database (220+ standards across 19 domains)..."), 8000))
+      researchTimers.push(setTimeout(() => addProgressLine("Loading material properties and process constraints from engineering library..."), 12000))
+      researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report with Claude Opus..."), 18000))
+      researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
       const res = await runCadLabResearch(subject, {
         designBrief,

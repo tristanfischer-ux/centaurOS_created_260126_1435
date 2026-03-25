@@ -227,7 +227,7 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
     }
 
     // Time tracking nudge — remind if nothing logged yesterday (weekdays only)
-    const yesterdayDay = yesterday.getDay()
+    const yesterdayDay = yesterday.getUTCDay()
     if (yesterdayDay >= 1 && yesterdayDay <= 5) {
       const { count: timeYesterday } = await supabase
         .from('time_entries')

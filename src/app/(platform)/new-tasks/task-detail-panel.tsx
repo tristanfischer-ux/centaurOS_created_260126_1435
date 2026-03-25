@@ -70,9 +70,10 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
 
   if (!data || data.entryCount === 0) return null
 
-  const h = Math.floor(data.totalMinutes / 60)
-  const m = data.totalMinutes % 60
-  const display = h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
+  const mins = Math.max(data.totalMinutes, 0)
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  const display = mins === 0 ? '0h' : h > 0 ? (m > 0 ? `${h}h ${m}m` : `${h}h`) : `${m}m`
 
   return (
     <DetailRow icon={Clock} label="Time Logged">

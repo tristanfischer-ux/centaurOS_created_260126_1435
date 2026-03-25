@@ -1615,7 +1615,7 @@ export default function SpecifyPage(): React.ReactNode {
                         setTimeout(() => {
                           toast("Specify stage complete", {
                             description: "Log the time you spent specifying?",
-                            action: { label: "Log Time", onClick: () => window.open("/time", "_blank") },
+                            action: { label: "Log Time", onClick: () => { window.location.href = "/time" } },
                           })
                         }, 500)
                       }} className="gap-1.5">
