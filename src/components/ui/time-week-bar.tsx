@@ -3,17 +3,15 @@
 /**
  * @file time-week-bar.tsx — Compact weekly time progress bar for the sidebar.
  *
- * @description Self-loading widget that shows "This Week: Xh Ym / 40h" with a
+ * @description Self-loading widget that shows "This Week: Xh Ym / target" with a
  * progress bar. Uses the shared useWeeklyTime hook for request deduplication.
- * Click navigates to /time.
+ * Target is configurable per-user (defaults to 40h). Click navigates to /time.
  */
 
 import { Clock } from 'lucide-react'
 import Link from 'next/link'
 import { useWeeklyTime } from '@/hooks/use-weekly-time'
 import { formatDuration } from '@/lib/format-duration'
-
-const TARGET_MINUTES = 40 * 60 // 40h standard week
 
 /**
  * TimeWeekBarLoader — Self-loading wrapper using shared weekly time data.
@@ -28,21 +26,23 @@ interface TimeWeekBarProps {
   totalMinutes: number
   billableMinutes: number
   todayMinutes: number
+  targetMinutes: number
 }
 
-function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBarProps) {
-  const percent = Math.min((totalMinutes / TARGET_MINUTES) * 100, 100)
+function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes, targetMinutes }: TimeWeekBarProps) {
+  const percent = Math.min((totalMinutes / targetMinutes) * 100, 100)
   const barColor = percent >= 80
     ? 'bg-success'
     : percent >= 40
       ? 'bg-warning'
       : 'bg-muted-foreground/30'
+  const targetLabel = formatDuration(targetMinutes)
 
   return (
     <Link
       href="/time"
       className="block w-full text-left px-2 py-2 min-h-[44px] sm:min-h-0 rounded-md hover:bg-muted/50 transition-colors"
-      aria-label={`Time this week: ${formatDuration(totalMinutes)} of 40h`}
+      aria-label={`Time this week: ${formatDuration(totalMinutes)} of ${targetLabel}`}
     >
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1">
@@ -50,7 +50,7 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBa
           This Week
         </span>
         <span className="text-[10px] font-semibold text-foreground">
-          {formatDuration(totalMinutes)} / 40h
+          {formatDuration(totalMinutes)} / {targetLabel}
         </span>
       </div>
       <div className="h-1.5 bg-muted rounded-full overflow-hidden">
@@ -58,7 +58,7 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBa
           role="progressbar"
           aria-valuenow={totalMinutes}
           aria-valuemin={0}
-          aria-valuemax={TARGET_MINUTES}
+          aria-valuemax={targetMinutes}
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${Math.max(percent, 2)}%` }}
         />

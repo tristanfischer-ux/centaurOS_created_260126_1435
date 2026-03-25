@@ -9,19 +9,23 @@
  * piggybacks on the first request instead of firing a duplicate.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { getWeeklyTimeProgress } from '@/actions/time-tracking'
 
 export interface WeeklyTimeData {
   totalMinutes: number
   billableMinutes: number
   todayMinutes: number
+  targetMinutes: number
 }
 
 // Module-level dedup: one in-flight promise shared across all callers
 let cached: Promise<WeeklyTimeData | null> | null = null
 let cacheTimestamp = 0
 const CACHE_TTL_MS = 30_000 // 30s — stale after half a minute
+
+// Listeners to notify when cache is invalidated
+const listeners = new Set<() => void>()
 
 function fetchOnce(): Promise<WeeklyTimeData | null> {
   const now = Date.now()
@@ -42,6 +46,16 @@ function fetchOnce(): Promise<WeeklyTimeData | null> {
 }
 
 /**
+ * Invalidate the weekly time cache and notify all mounted hooks to re-fetch.
+ * Call this after stopping a timer or logging a new entry.
+ */
+export function invalidateWeeklyTimeCache() {
+  cached = null
+  cacheTimestamp = 0
+  listeners.forEach((fn) => fn())
+}
+
+/**
  * useWeeklyTime — Returns weekly time data, deduplicated across components.
  *
  * Multiple components calling this hook in the same render cycle share
@@ -50,13 +64,19 @@ function fetchOnce(): Promise<WeeklyTimeData | null> {
 export function useWeeklyTime(): WeeklyTimeData | null {
   const [data, setData] = useState<WeeklyTimeData | null>(null)
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     let cancelled = false
     fetchOnce().then((result) => {
       if (!cancelled) setData(result)
     })
     return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    const cleanup = refresh()
+    listeners.add(refresh)
+    return () => { cleanup(); listeners.delete(refresh) }
+  }, [refresh])
 
   return data
 }

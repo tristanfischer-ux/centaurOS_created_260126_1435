@@ -326,7 +326,16 @@ export async function getWeeklyTimeProgress() {
       if (row.entry_date === today) todayMinutes += mins
     }
 
-    return { totalMinutes, billableMinutes, todayMinutes }
+    // Fetch user's weekly target (fallback to 40h if column doesn't exist yet)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('weekly_target_minutes')
+      .eq('id', user.id)
+      .single()
+
+    const targetMinutes = (profile as { weekly_target_minutes?: number | null } | null)?.weekly_target_minutes ?? 2400
+
+    return { totalMinutes, billableMinutes, todayMinutes, targetMinutes }
   })
 }
 
@@ -362,6 +371,135 @@ export async function getTimeForTask(taskId: string) {
     // This is intentional — tasks are collaborative, time visibility aids estimation.
     const totalMinutes = (data ?? []).reduce((sum, row) => sum + (row.duration_minutes ?? 0), 0)
     return { totalMinutes, entryCount: data?.length ?? 0 }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Timer actions (Phase 2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Start a timer. Creates a time_entry with started_at = now, ended_at = null.
+ * The unique constraint prevents multiple active timers per user/foundry.
+ */
+export async function startTimer(taskId?: string | null, description?: string) {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const today = todayUTC()
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .insert({
+        foundry_id: foundryId,
+        user_id: user.id,
+        entry_date: today,
+        duration_minutes: 1, // placeholder — computed on stop
+        started_at: new Date().toISOString(),
+        description: description?.slice(0, 5000) ?? '',
+        task_id: taskId || null,
+        is_billable: true,
+        status: 'draft',
+      })
+      .select('id, started_at, description, task_id')
+      .single()
+
+    if (error) {
+      // Unique constraint violation = already have an active timer
+      if (error.code === '23505') return { error: 'A timer is already running. Stop it before starting a new one.' }
+      return { error: error.message }
+    }
+
+    return data
+  })
+}
+
+/**
+ * Stop the active timer. Computes duration from started_at → now.
+ */
+export async function stopTimer() {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    // Find the active timer
+    const { data: active, error: findErr } = await supabase
+      .from('time_entries')
+      .select('id, started_at')
+      .eq('foundry_id', foundryId)
+      .eq('user_id', user.id)
+      .is('ended_at', null)
+      .not('started_at', 'is', null)
+      .single()
+
+    if (findErr || !active) return { error: 'No active timer found' }
+
+    const startedAt = new Date(active.started_at!)
+    const now = new Date()
+    const durationMinutes = Math.max(1, Math.round((now.getTime() - startedAt.getTime()) / 60000))
+
+    // Use the start date for entry_date (handles midnight crossing)
+    const entryDate = startedAt.toISOString().split('T')[0]
+
+    const { data, error } = await supabase
+      .from('time_entries')
+      .update({
+        ended_at: now.toISOString(),
+        duration_minutes: Math.min(durationMinutes, 1440),
+        entry_date: entryDate,
+      })
+      .eq('id', active.id)
+      .select('id, duration_minutes, entry_date, description, task_id')
+      .single()
+
+    if (error) return { error: error.message }
+
+    return data
+  })
+}
+
+/**
+ * Get the currently active timer (if any). Lightweight — called on layout mount.
+ */
+export async function getActiveTimer() {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const { data, error } = await supabase
+      .from('time_entries')
+      .select('id, started_at, description, task_id, tasks(title)')
+      .eq('foundry_id', foundryId)
+      .eq('user_id', user.id)
+      .is('ended_at', null)
+      .not('started_at', 'is', null)
+      .maybeSingle()
+
+    if (error) return { error: error.message }
+    if (!data) return { active: false as const }
+
+    return {
+      active: true as const,
+      id: data.id,
+      startedAt: data.started_at!,
+      description: data.description,
+      taskTitle: (data.tasks as { title: string } | null)?.title ?? null,
+    }
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Weekly target
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Update the user's weekly time target (in minutes).
+ */
+export async function updateWeeklyTarget(targetMinutes: number) {
+  return withAuth(async ({ supabase, user }) => {
+    if (!Number.isInteger(targetMinutes) || targetMinutes < 60 || targetMinutes > 10080) {
+      return { error: 'Target must be between 1h and 168h per week' }
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ weekly_target_minutes: targetMinutes })
+      .eq('id', user.id)
+
+    if (error) return { error: error.message }
+    return { success: true }
   })
 }
 
