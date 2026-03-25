@@ -4,33 +4,23 @@
  * @file time-week-bar.tsx — Compact weekly time progress bar for the sidebar.
  *
  * @description Self-loading widget that shows "This Week: Xh Ym / 40h" with a
- * progress bar. Mirrors the AICreditsBarLoader pattern. Click navigates to /time.
+ * progress bar. Uses the shared useWeeklyTime hook for request deduplication.
+ * Click navigates to /time.
  */
 
-import { useState, useEffect } from 'react'
 import { Clock } from 'lucide-react'
 import Link from 'next/link'
-import { getWeeklyTimeProgress } from '@/actions/time-tracking'
-import { formatDuration } from '@/components/time/time-entry-card'
+import { useWeeklyTime } from '@/hooks/use-weekly-time'
+import { formatDuration } from '@/lib/format-duration'
 
 const TARGET_MINUTES = 40 * 60 // 40h standard week
 
 /**
- * TimeWeekBarLoader — Self-loading wrapper that fetches weekly time data.
+ * TimeWeekBarLoader — Self-loading wrapper using shared weekly time data.
  */
 export function TimeWeekBarLoader() {
-  const [data, setData] = useState<{ totalMinutes: number; billableMinutes: number; todayMinutes: number } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    getWeeklyTimeProgress().then((result) => {
-      if (!cancelled && !('error' in result)) setData(result)
-    }).catch((err) => console.warn('[TIME] Sidebar fetch failed:', err))
-    return () => { cancelled = true }
-  }, [])
-
+  const data = useWeeklyTime()
   if (!data) return null
-
   return <TimeWeekBar {...data} />
 }
 

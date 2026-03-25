@@ -4,33 +4,25 @@
  * @file today-time-card.tsx — Self-loading time card for the Today dashboard.
  *
  * @description Shows today's logged hours + weekly total. When nothing is logged
- * today, shows a gentle nudge with a "Log Time" CTA. Fits in the quick stats grid.
+ * today, shows a gentle nudge with a "Log Time" CTA. Uses shared useWeeklyTime
+ * hook for request deduplication with the sidebar bar.
  */
 
-import { useState, useEffect } from 'react'
 import { Clock, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { getWeeklyTimeProgress } from '@/actions/time-tracking'
-import { formatDuration } from '@/components/time/time-entry-card'
+import { useWeeklyTime } from '@/hooks/use-weekly-time'
+import { formatDuration } from '@/lib/format-duration'
 
 /**
- * TodayTimeCard — Self-loading card for the Today dashboard stats grid.
+ * TodayTimeCard — Self-loading card for the Today dashboard.
  *
  * Shows today's logged time + weekly total. Nudges if nothing logged today.
  */
 export function TodayTimeCard() {
-  const [data, setData] = useState<{ totalMinutes: number; billableMinutes: number; todayMinutes: number } | null>(null)
+  const data = useWeeklyTime()
 
-  useEffect(() => {
-    let cancelled = false
-    getWeeklyTimeProgress().then((result) => {
-      if (!cancelled && !('error' in result)) setData(result)
-    }).catch((err) => console.warn('[TIME] Dashboard fetch failed:', err))
-    return () => { cancelled = true }
-  }, [])
-
-  // Skeleton placeholder to avoid layout shift in the stats grid
+  // Skeleton placeholder to avoid layout shift
   if (!data) {
     return <div className="h-[76px] rounded-xl border border-border bg-card animate-pulse" />
   }

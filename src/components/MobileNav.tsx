@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/drawer"
 import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
+import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
 import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 
@@ -360,6 +361,11 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                                     <span className="text-sm font-medium">Settings</span>
                                 </Link>
                             </DrawerClose>
+
+                            {/* Time Progress */}
+                            <div className="mx-2 mb-2 border-t border-border pt-2">
+                                <TimeWeekBarLoader />
+                            </div>
 
                             {/* Sign Out */}
                             <form action={signOut} className="mx-2 mb-4">

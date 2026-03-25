@@ -27,7 +27,7 @@ import {
   MessageSquare, Paperclip, Shield, Eye, Pencil, Waypoints, ChevronRight,
   Sparkles, Send, Loader2, Flame, ListChecks, Plus, CheckCircle2,
 } from 'lucide-react'
-import { formatDuration } from '@/components/time/time-entry-card'
+import { formatDuration } from '@/lib/format-duration'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { useRelevantSpecialist } from '@/hooks/use-relevant-specialist'
 import type { SpecialistContext } from '@/components/specialists/types'

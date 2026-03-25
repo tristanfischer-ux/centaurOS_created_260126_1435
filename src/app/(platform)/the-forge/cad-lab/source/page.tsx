@@ -549,6 +549,22 @@ export default function SourcePage(): React.ReactNode {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Show time-logging toast when arriving from a completed stage
+  useEffect(() => {
+    const from = searchParams.get("from")
+    if (from === "specify") {
+      toast("Specify stage complete", {
+        description: "Log the time you spent specifying?",
+        action: { label: "Log Time", onClick: () => { window.location.href = "/time" } },
+      })
+      // Clean up the URL param
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("from")
+      router.replace(`?${params.toString()}`, { scroll: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleTabClick = useCallback(
     (tabId: string) => {
       setActiveTab(tabId)
@@ -751,13 +767,7 @@ export default function SourcePage(): React.ReactNode {
                 nextSpecialistId={nextSource?.specialistId}
                 nextStageName={nextSource?.stageLabel}
                 onProceed={() => {
-                  router.push(FORGE_ROUTES.cadLabAssemble)
-                  setTimeout(() => {
-                    toast("Source stage complete", {
-                      description: "Log the time you spent sourcing?",
-                      action: { label: "Log Time", onClick: () => { window.location.href = "/time" } },
-                    })
-                  }, 500)
+                  router.push(`${FORGE_ROUTES.cadLabAssemble}?from=source`)
                 }}
                 proceedLabel="Continue to Assemble"
               />

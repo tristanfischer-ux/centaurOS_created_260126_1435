@@ -475,6 +475,21 @@ export default function AssemblePage(): React.ReactNode {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Show time-logging toast when arriving from a completed stage
+  useEffect(() => {
+    const from = searchParams.get("from")
+    if (from === "source") {
+      toast("Source stage complete", {
+        description: "Log the time you spent sourcing?",
+        action: { label: "Log Time", onClick: () => { window.location.href = "/time" } },
+      })
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete("from")
+      router.replace(`?${params.toString()}`, { scroll: false })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleTabClick = useCallback(
     (tabId: string) => {
       setActiveTab(tabId)
