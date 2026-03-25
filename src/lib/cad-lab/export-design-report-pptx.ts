@@ -726,6 +726,136 @@ async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<Bl
 
 // ─── AI Prose Presentation Builder ───────────────────────────────────
 
+// ─── Slide Data Normalization ───────────────────────────────────────
+// INTENT: Opus returns slideData with varying field names (e.g., "cards" vs "items",
+// "heading" vs "label", "axisX" vs "xAxis"). Normalize to our canonical SlideData shape
+// so builders can rely on consistent field names.
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function normalizeSlideData(layout: string, raw: any): any {
+  if (!raw || typeof raw !== 'object') return raw
+
+  switch (layout) {
+    case 'value-props': {
+      // Opus may use "cards" instead of "items", "title" instead of "label"
+      const items = raw.items ?? raw.cards ?? []
+      return {
+        ...raw,
+        heading: raw.heading ?? raw.headline ?? '',
+        items: items.map((c: any) => ({
+          label: c.label ?? c.title ?? c.heading ?? '',
+          description: c.description ?? c.detail ?? c.text ?? '',
+        })),
+      }
+    }
+
+    case 'comparison-two-col': {
+      // Opus may use "leftColumn/rightColumn" objects instead of flat fields
+      const left = raw.leftColumn ?? raw.left ?? {}
+      const right = raw.rightColumn ?? raw.right ?? {}
+      return {
+        ...raw,
+        leftTitle: raw.leftTitle ?? left.heading ?? left.title ?? 'Current',
+        leftItems: raw.leftItems ?? left.details ?? left.items ?? left.bullets ?? [],
+        rightTitle: raw.rightTitle ?? right.heading ?? right.title ?? 'Proposed',
+        rightDescription: raw.rightDescription ?? right.description ?? right.summary ?? '',
+        rightItems: raw.rightItems ?? right.details ?? right.items ?? right.bullets ?? [],
+      }
+    }
+
+    case 'quadrant-chart': {
+      // Opus may use "axisX/axisY" objects instead of flat strings, numeric x/y instead of low/mid/high
+      const xObj = raw.axisX ?? {}
+      const yObj = raw.axisY ?? {}
+      return {
+        ...raw,
+        xAxis: raw.xAxis ?? (typeof xObj === 'string' ? xObj : xObj.label ?? 'X Axis'),
+        yAxis: raw.yAxis ?? (typeof yObj === 'string' ? yObj : yObj.label ?? 'Y Axis'),
+        items: (raw.items ?? []).map((item: any) => ({
+          label: item.label ?? item.name ?? '',
+          // Convert numeric 0-1 to low/mid/high
+          x: typeof item.x === 'number' ? (item.x < 0.33 ? 'low' : item.x < 0.66 ? 'mid' : 'high') : (item.x ?? 'mid'),
+          y: typeof item.y === 'number' ? (item.y < 0.33 ? 'low' : item.y < 0.66 ? 'mid' : 'high') : (item.y ?? 'mid'),
+          color: item.color,
+        })),
+        insight: raw.insight ?? raw.summary ?? '',
+      }
+    }
+
+    case 'technical-dossiers': {
+      return {
+        ...raw,
+        heading: raw.heading ?? raw.title ?? '',
+        cards: (raw.cards ?? []).map((c: any) => ({
+          title: c.title ?? c.heading ?? c.name ?? '',
+          profile: c.profile ?? c.description ?? c.summary ?? '',
+          items: (c.items ?? []).map((item: any) => ({
+            label: item.label ?? item.part ?? item.name ?? item.key ?? '',
+            value: item.value ?? item.rationale ?? item.description ?? item.detail ?? '',
+          })),
+        })),
+      }
+    }
+
+    case 'process-flow': {
+      return {
+        ...raw,
+        heading: raw.heading ?? raw.title ?? '',
+        subtitle: raw.subtitle ?? '',
+        phases: (raw.phases ?? raw.steps ?? []).map((p: any, i: number) => ({
+          name: p.name ?? p.label ?? `Phase ${i + 1}`,
+          title: p.title ?? p.subtitle ?? p.heading ?? '',
+          description: p.description ?? p.detail ?? p.text ?? '',
+        })),
+      }
+    }
+
+    case 'architecture-diagram': {
+      return {
+        ...raw,
+        heading: raw.heading ?? raw.title ?? '',
+        annotations: (raw.annotations ?? raw.layers ?? raw.components ?? []).map((a: any) => ({
+          label: a.label ?? a.name ?? a.title ?? '',
+          description: a.description ?? a.detail ?? a.text ?? '',
+        })),
+        specs: (raw.specs ?? raw.keySpecs ?? []).map((s: any) => ({
+          label: s.label ?? s.name ?? s.key ?? '',
+          value: s.value ?? s.detail ?? '',
+        })),
+      }
+    }
+
+    case 'data-table': {
+      // Opus may return rows as flat arrays ["label", "v1", "v2"] instead of {label, values}
+      const rows = (raw.rows ?? []).map((row: any) => {
+        if (Array.isArray(row)) {
+          return { label: String(row[0] ?? ''), values: row.slice(1).map(String) }
+        }
+        return {
+          label: row.label ?? row.name ?? '',
+          values: Array.isArray(row.values) ? row.values.map(String) : [],
+        }
+      })
+      return { ...raw, heading: raw.heading ?? raw.title ?? '', rows, columns: raw.columns ?? [] }
+    }
+
+    case 'stat-callouts': {
+      // Opus may use different stat shapes
+      return {
+        ...raw,
+        stats: (raw.stats ?? []).map((s: any) => ({
+          value: String(s.value ?? s.number ?? s.metric ?? ''),
+          label: s.label ?? s.description ?? s.caption ?? '',
+        })),
+      }
+    }
+
+    default:
+      return raw
+  }
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
 // ─── Rich Slide Layout Builders ──────────────────────────────────────
 // INTENT: Each builder creates a visually distinct slide layout matching
 // the quality of NotebookLM reports. Opus chooses the layout; these render it.
@@ -1048,33 +1178,39 @@ function buildRichSlide(
   const layout = section.slideLayout
   if (!layout || layout === 'prose-section' || layout === 'hero-cover') return false
 
+  // INTENT: Normalize slideData before passing to builders. Opus uses varying
+  // field names (cards vs items, heading vs label, numeric vs enum positions).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalized = normalizeSlideData(layout, section.slideData as any)
+  const normalizedSection = { ...section, slideData: normalized }
+
   switch (layout) {
     case 'value-props':
-      buildValuePropsSlide(pres, section, slideImage)
+      buildValuePropsSlide(pres, normalizedSection, slideImage)
       return true
     case 'comparison-two-col':
-      buildComparisonTwoColSlide(pres, section)
+      buildComparisonTwoColSlide(pres, normalizedSection)
       return true
     case 'data-table':
-      buildDataTableSlide(pres, section)
+      buildDataTableSlide(pres, normalizedSection)
       return true
     case 'process-flow':
-      buildProcessFlowSlide(pres, section, slideImage)
+      buildProcessFlowSlide(pres, normalizedSection, slideImage)
       return true
     case 'stat-callouts':
-      buildStatCalloutsSlide(pres, section, slideImage)
+      buildStatCalloutsSlide(pres, normalizedSection, slideImage)
       return true
     case 'technical-dossiers':
-      buildTechnicalDossiersSlide(pres, section)
+      buildTechnicalDossiersSlide(pres, normalizedSection)
       return true
     case 'quadrant-chart':
-      buildQuadrantChartSlide(pres, section)
+      buildQuadrantChartSlide(pres, normalizedSection)
       return true
     case 'architecture-diagram':
-      buildArchitectureDiagramSlide(pres, section, slideImage)
+      buildArchitectureDiagramSlide(pres, normalizedSection, slideImage)
       return true
     case 'module-detail':
-      buildModuleDetailSlide(pres, section, slideImage, moduleImages, modules)
+      buildModuleDetailSlide(pres, normalizedSection, slideImage, moduleImages, modules)
       return true
     default:
       return false
