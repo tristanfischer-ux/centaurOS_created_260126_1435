@@ -109,7 +109,7 @@ export default function CadLabResearchPage(): React.ReactNode {
     projectId: activeProjectId,
     projectSubject: subject,
     moduleCount: modules.length,
-    enabled: modules.length > 0,
+    enabled: !!activeProjectId && !!subject,
   })
   const { briefing: exitBriefing, isLoading: exitLoading } = useStageBriefing({
     stage: "design",
@@ -419,16 +419,14 @@ export default function CadLabResearchPage(): React.ReactNode {
         onReferenceImagesChange={setReferenceImages}
       />
 
-      {/* ── Max (CTO) entry briefing — shown on return visits with existing modules ── */}
-      {modules.length > 0 && (
-        <StageSpecialistCard
-          specialistId={designMapping.specialistId}
-          variant="entry"
-          stageName="Design"
-          briefing={entryBriefing}
-          isLoading={entryLoading}
-        />
-      )}
+      {/* ── Max (CTO) entry briefing — always visible as stage owner ── */}
+      <StageSpecialistCard
+        specialistId={designMapping.specialistId}
+        variant="entry"
+        stageName="Design"
+        briefing={entryBriefing}
+        isLoading={entryLoading}
+      />
 
       {/* ── Design brief interview (Max CTO guided Q&A) ── */}
       <AnimatePresence>

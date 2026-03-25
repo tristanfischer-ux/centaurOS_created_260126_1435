@@ -94,15 +94,17 @@ export function StageSpecialistCard({
                     <div className="min-w-0 flex-1 space-y-2">
                         <p className={`text-xs font-semibold ${colors.text}`}>{headerLabel}</p>
 
-                        {/* Briefing text or loading skeleton */}
+                        {/* Briefing text or loading skeleton — ALWAYS shows text, never empty */}
                         {isLoading ? (
                             <div className="space-y-1.5">
                                 <Skeleton className="h-3.5 w-full" />
                                 <Skeleton className="h-3.5 w-3/4" />
                             </div>
-                        ) : briefing ? (
-                            <p className="text-sm text-muted-foreground leading-relaxed">{briefing}</p>
-                        ) : null}
+                        ) : (
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                {briefing ?? specialist.tagline}
+                            </p>
+                        )}
 
                         {/* Exit variant: handoff section */}
                         {variant === "exit" && nextSpecialist && nextStageName && (
