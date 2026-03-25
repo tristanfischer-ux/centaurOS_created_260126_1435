@@ -320,9 +320,10 @@ export async function getWeeklyTimeProgress() {
     let billableMinutes = 0
     let todayMinutes = 0
     for (const row of data ?? []) {
-      totalMinutes += row.duration_minutes
-      if (row.is_billable) billableMinutes += row.duration_minutes
-      if (row.entry_date === today) todayMinutes += row.duration_minutes
+      const mins = row.duration_minutes ?? 0
+      totalMinutes += mins
+      if (row.is_billable) billableMinutes += mins
+      if (row.entry_date === today) todayMinutes += mins
     }
 
     return { totalMinutes, billableMinutes, todayMinutes }
@@ -357,7 +358,9 @@ export async function getTimeForTask(taskId: string) {
 
     if (error) return { error: error.message }
 
-    const totalMinutes = (data ?? []).reduce((sum, row) => sum + row.duration_minutes, 0)
+    // INTENT: Shows all team members' time on this task, not just the caller.
+    // This is intentional — tasks are collaborative, time visibility aids estimation.
+    const totalMinutes = (data ?? []).reduce((sum, row) => sum + (row.duration_minutes ?? 0), 0)
     return { totalMinutes, entryCount: data?.length ?? 0 }
   })
 }

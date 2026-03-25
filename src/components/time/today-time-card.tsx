@@ -33,8 +33,8 @@ export function TodayTimeCard() {
 
   useEffect(() => {
     getWeeklyTimeProgress().then((result) => {
-      if ('totalMinutes' in result) setData(result)
-    }).catch(() => {})
+      if (!('error' in result)) setData(result)
+    }).catch((err) => console.warn('[TIME] Dashboard fetch failed:', err))
   }, [])
 
   if (!data) return null

@@ -63,9 +63,9 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
   useEffect(() => {
     import('@/actions/time-tracking').then(({ getTimeForTask }) =>
       getTimeForTask(taskId).then((result) => {
-        if ('totalMinutes' in result) setData(result)
+        if (!('error' in result)) setData(result)
       })
-    ).catch(() => {})
+    ).catch((err) => console.warn('[TASKS] Time fetch failed:', err))
   }, [taskId])
 
   if (!data || data.entryCount === 0) return null

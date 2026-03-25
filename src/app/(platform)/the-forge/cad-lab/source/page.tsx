@@ -752,10 +752,12 @@ export default function SourcePage(): React.ReactNode {
                 nextStageName={nextSource?.stageLabel}
                 onProceed={() => {
                   router.push(FORGE_ROUTES.cadLabAssemble)
-                  toast("Source stage complete", {
-                    description: "Log the time you spent sourcing?",
-                    action: { label: "Log Time", onClick: () => router.push("/time") },
-                  })
+                  setTimeout(() => {
+                    toast("Source stage complete", {
+                      description: "Log the time you spent sourcing?",
+                      action: { label: "Log Time", onClick: () => window.open("/time", "_blank") },
+                    })
+                  }, 500)
                 }}
                 proceedLabel="Continue to Assemble"
               />

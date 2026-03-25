@@ -1611,10 +1611,13 @@ export default function SpecifyPage(): React.ReactNode {
                       </div>
                       <Button onClick={() => {
                         router.push(FORGE_ROUTES.cadLabSource)
-                        toast("Specify stage complete", {
-                          description: "Log the time you spent specifying?",
-                          action: { label: "Log Time", onClick: () => router.push("/time") },
-                        })
+                        // Delay toast so it appears on the new page after navigation settles
+                        setTimeout(() => {
+                          toast("Specify stage complete", {
+                            description: "Log the time you spent specifying?",
+                            action: { label: "Log Time", onClick: () => window.open("/time", "_blank") },
+                          })
+                        }, 500)
                       }} className="gap-1.5">
                         Continue to Source
                         <ArrowRight className="h-4 w-4" />

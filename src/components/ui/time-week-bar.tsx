@@ -32,8 +32,8 @@ export function TimeWeekBarLoader() {
 
   useEffect(() => {
     getWeeklyTimeProgress().then((result) => {
-      if ('totalMinutes' in result) setData(result)
-    }).catch(() => { /* non-critical sidebar widget */ })
+      if (!('error' in result)) setData(result)
+    }).catch((err) => console.warn('[TIME] Sidebar fetch failed:', err))
   }, [])
 
   if (!data) return null
@@ -58,7 +58,7 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes }: TimeWeekBa
   return (
     <Link
       href="/time"
-      className="block w-full text-left px-2 py-2 rounded-md hover:bg-muted/50 transition-colors"
+      className="block w-full text-left px-2 py-2 min-h-[44px] sm:min-h-0 rounded-md hover:bg-muted/50 transition-colors"
       aria-label={`Time this week: ${fmt(totalMinutes)} of 40h`}
     >
       <div className="flex items-center justify-between mb-1">
