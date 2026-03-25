@@ -181,12 +181,12 @@ export function HeroSection({
         </div>
 
         {/* Reference image upload (compact) */}
-        {referenceImages && onReferenceImagesChange && !isResearching && (
+        {referenceImages && onReferenceImagesChange && (
           <ReferenceImageUpload
             images={referenceImages}
             onImagesChange={onReferenceImagesChange}
             variant="compact"
-            disabled={isAnyLoading}
+            disabled={isResearching}
           />
         )}
 

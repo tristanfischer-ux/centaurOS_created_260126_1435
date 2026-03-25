@@ -211,15 +211,15 @@ export function ReferenceImageUpload({
             onDragLeave={handleDragLeave}
             disabled={disabled}
             className={cn(
-              "w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-dashed text-xs transition-colors",
+              "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 border-dashed text-sm transition-colors",
               isDragOver
                 ? "border-international-orange bg-international-orange/5 text-international-orange"
-                : "border-border text-muted-foreground hover:border-international-orange/40 hover:text-foreground",
+                : "border-border bg-muted/30 text-muted-foreground hover:border-international-orange/40 hover:bg-muted/50 hover:text-foreground",
               disabled && "opacity-50 cursor-not-allowed",
             )}
           >
-            <ImagePlus className="h-3.5 w-3.5 shrink-0" />
-            <span>{hasImages ? "Add more references" : "Drop a sketch or photo"}</span>
+            <ImagePlus className="h-4 w-4 shrink-0" />
+            <span>{hasImages ? "Add more references" : "Have a sketch or photo? Drop it here"}</span>
           </button>
         )}
       </div>
