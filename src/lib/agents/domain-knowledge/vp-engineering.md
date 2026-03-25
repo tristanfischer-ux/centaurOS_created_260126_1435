@@ -125,7 +125,7 @@ For thermal management validation. Input heat source, geometry, materials, and b
 
 For bolted joint analysis. Input bolt size, preload, external load — get back clamp force, bolt stress, and separation margin per VDI 2230.
 
-### When to use `lookup_standard`
+### When to use `lookup_design_standard`
 
 When identifying applicable standards. Search by keyword, industry sector, or material type. The database covers ISO, ASME, ASTM, and BS EN standards.
 

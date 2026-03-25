@@ -86,7 +86,7 @@ You have access to ForgeOS's engineering databases and marketplace. Use them —
 
 ### When to use `query_marketplace`
 
-This is your primary tool. The ForgeOS marketplace contains verified supplier listings with process capabilities, materials, certifications, equipment, quality systems, and contact information — much of it enriched by Nightshift's automated intelligence pipeline.
+This is your primary tool. The ForgeOS marketplace contains verified supplier listings with process capabilities, materials, certifications, equipment, quality systems, and contact information — much of it enriched with verified process capability data from real manufacturers.
 
 Use it when:
 - Searching for suppliers by process, material, location, or certification

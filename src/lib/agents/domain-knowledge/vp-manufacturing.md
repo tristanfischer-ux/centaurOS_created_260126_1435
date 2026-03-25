@@ -113,7 +113,7 @@ Use it when:
 
 When a module has multiple mating parts and you need to verify they'll fit together in production — not just in the prototype.
 
-### When to use `lookup_standard`
+### When to use `lookup_design_standard`
 
 When reviewing design choices that are subject to manufacturing or quality standards. ISO 2768 for general tolerances, ISO 286 for fits, industry-specific standards for the product's sector.
 
