@@ -800,7 +800,6 @@ function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
   const slide = pres.addSlide()
   addSectionTitle(slide, sd.heading || section.title)
 
-  const numCols = sd.columns.length + 1 // +1 for label column
   const labelW = 2.0
   const dataW = (CONTENT_W - labelW) / sd.columns.length
 
@@ -995,11 +994,55 @@ function buildArchitectureDiagramSlide(pres: PptxGenJS, section: AiReportSection
   }
 }
 
+function buildModuleDetailSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null, moduleImages: (string | null)[], modules: { id: string; name: string }[]): void {
+  const sd = section.slideData as Extract<SlideData, { layout: 'module-detail' }> | undefined
+  const slide = pres.addSlide()
+  addSectionTitle(slide, sd?.moduleName || section.title)
+
+  // Find the module image — try slideImage first, then module images
+  const modIdx = section.moduleId ? modules.findIndex((m) => m.id === section.moduleId) : -1
+  const imgBase64 = slideImage ?? (modIdx >= 0 ? moduleImages[modIdx] : null)
+
+  if (imgBase64) {
+    const imgData = imgBase64.startsWith('data:') ? imgBase64 : `data:image/png;base64,${imgBase64}`
+    slide.addImage({ data: imgData, x: MARGIN, y: 1.0, w: 4.0, h: 2.8, rounding: true })
+  }
+
+  const textX = imgBase64 ? 4.8 : MARGIN
+  const textW = imgBase64 ? 4.7 : CONTENT_W
+
+  // Prose
+  if (section.prose) {
+    const cleanProse = section.prose.replace(/[#*_]/g, '').trim()
+    slide.addText(truncate(cleanProse, imgBase64 ? 300 : 600), {
+      x: textX, y: 1.0, w: textW, h: 1.5,
+      fontSize: 10, fontFace: 'Helvetica Neue', color: DARK_TEXT, lineSpacingMultiple: 1.3, valign: 'top',
+    })
+  }
+
+  // Specs from slideData
+  if (sd?.specs?.length) {
+    const specRows: PptxGenJS.TableRow[] = sd.specs.slice(0, 6).map((spec) => [
+      { text: spec.label, options: { bold: true, fontSize: 9, color: DARK_TEXT } },
+      { text: spec.value, options: { fontSize: 9, color: MID_TEXT } },
+    ])
+    slide.addTable(specRows, {
+      x: textX, y: 2.7, w: textW,
+      colW: [textW * 0.4, textW * 0.6],
+      border: { type: 'solid', pt: 0.5, color: CARD_BORDER },
+      rowH: 0.3,
+      fontFace: 'Helvetica Neue',
+    })
+  }
+}
+
 /** Dispatch a section to the appropriate rich slide builder based on slideLayout */
 function buildRichSlide(
   pres: PptxGenJS,
   section: AiReportSection,
   slideImage: string | null,
+  moduleImages: (string | null)[],
+  modules: { id: string; name: string }[],
 ): boolean {
   const layout = section.slideLayout
   if (!layout || layout === 'prose-section' || layout === 'hero-cover') return false
@@ -1030,7 +1073,8 @@ function buildRichSlide(
       buildArchitectureDiagramSlide(pres, section, slideImage)
       return true
     case 'module-detail':
-      return false // Use existing module-detail rendering
+      buildModuleDetailSlide(pres, section, slideImage, moduleImages, modules)
+      return true
     default:
       return false
   }
@@ -1079,7 +1123,7 @@ async function buildAiPptx(data: DesignReportData): Promise<Blob> {
     // flow, stat callouts, etc.). Fall back to the generic text layout if no
     // rich builder matches or if slideData is missing.
     const slideImage = section.slideImageBase64 ?? null
-    const usedRichLayout = buildRichSlide(pres, section, slideImage)
+    const usedRichLayout = buildRichSlide(pres, section, slideImage, moduleImages, data.modules)
 
     if (!usedRichLayout) {
       const slide = pres.addSlide()

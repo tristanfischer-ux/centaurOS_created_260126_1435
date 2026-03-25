@@ -35,6 +35,7 @@ import {
     Hammer,
     CalendarDays,
     AppWindow,
+    Clock,
     FileOutput,
     Globe,
     Library,
@@ -73,7 +74,7 @@ import type { LucideIcon } from "lucide-react"
 const allNavHrefs = new Set([
     "/today", "/updates", "/new-tasks",
     "/my-profile", "/knowledge", "/google-apps", "/whats-new",
-    "/strategy", "/new-objectives", "/reports",
+    "/strategy", "/new-objectives", "/time", "/reports",
     "/cash-burn", "/cash-burn/cash-out", "/cash-burn/cash-in", "/cash-burn/pnl", "/investors", "/fundraise",
     "/the-forge", "/team", "/retainers", "/agents", "/agents/artifacts", "/browse", "/learn",
     "/recruits", "/guild", "/apprenticeship", "/marketplace", "/marketplace-orders",
@@ -118,6 +119,7 @@ const meMoreNavigation = [
 const planMoreNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
+    { name: "Time", href: "/time", icon: Clock },
     { name: "Reports", href: "/reports", icon: FileOutput },
 ]
 
@@ -182,6 +184,11 @@ export function MobileNav({ foundryName }: MobileNavProps) {
     const [unreadCount, setUnreadCount] = React.useState(0)
     const [drawerOpen, setDrawerOpen] = React.useState(false)
 
+    // Close drawer on route change (safety net if vaul's onOpenChange is slow)
+    React.useEffect(() => {
+        setDrawerOpen(false)
+    }, [pathname])
+
     // Fetch unread alert count on mount and route change (matches Sidebar pattern)
     React.useEffect(() => {
         const timeout = setTimeout(() => {
@@ -199,6 +206,8 @@ export function MobileNav({ foundryName }: MobileNavProps) {
         const prefillText = suggestion?.title || rawIdea
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
+
+    const isMoreActive = allMoreItems.some(item => isRouteActive(pathname, item.href))
 
     const renderDrawerItem = (item: { name: string; href: string; icon: React.ComponentType<{ className?: string }> }) => {
         const isActive = isRouteActive(pathname, item.href)
@@ -251,10 +260,7 @@ export function MobileNav({ foundryName }: MobileNavProps) {
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
                 data-testid="mobile-fab"
-                className={cn(
-                    "absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95",
-                    drawerOpen && "opacity-0 pointer-events-none"
-                )}
+                className="absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />
@@ -290,12 +296,12 @@ export function MobileNav({ foundryName }: MobileNavProps) {
                             data-testid="mobile-more-button"
                             className={cn(
                                 "flex flex-col items-center justify-center w-full min-h-[44px] min-w-[44px] h-full space-y-0.5 xs:space-y-1 touch-action-manipulation",
-                                allMoreItems.some(item => isRouteActive(pathname, item.href))
+                                isMoreActive
                                     ? "text-international-orange"
                                     : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", allMoreItems.some(item => isRouteActive(pathname, item.href)) && "fill-current")} />
+                            <MoreHorizontal className={cn("h-5 w-5 shrink-0", isMoreActive && "fill-current")} />
                             <span className="text-xs font-medium">More</span>
                         </button>
                     </DrawerTrigger>

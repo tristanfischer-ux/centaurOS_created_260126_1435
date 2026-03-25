@@ -1,10 +1,9 @@
 /**
  * @file mobile-bugfix-verification.spec.ts
  *
- * @description Verifies 3 mobile bugs are fixed:
- * 1. "Set Up Profile" link is a real <a> tag (not blocked by Radix Slot on iOS)
- * 2. Mobile nav "More" dropdown closes after selecting an item
- * 3. Marketplace listing RLS allows providers to create listings
+ * @description Verifies mobile nav bugs are fixed:
+ * 1. Mobile nav "More" Drawer closes after selecting an item
+ * 2. Drawer opens and closes correctly with controlled state
  *
  * Run: npx playwright test e2e/mobile-bugfix-verification.spec.ts --project=chromium
  */
@@ -22,17 +21,17 @@ test.use({
 
 test.describe('Mobile bug fixes', () => {
 
-  test('Bug 2: Mobile nav "More" dropdown closes after selecting an item', async ({ page }) => {
+  test('Bug 2: Mobile nav "More" Drawer closes after selecting an item', async ({ page }) => {
     await page.goto('/today')
     await page.waitForLoadState('domcontentloaded')
 
     // Find and tap the "More" button in the mobile nav
-    const moreButton = page.locator('[data-testid="mobile-nav"] button:has-text("More")')
+    const moreButton = page.getByTestId('mobile-more-button')
     await expect(moreButton).toBeVisible({ timeout: 15_000 })
     await moreButton.tap()
 
-    // Dropdown should be open — look for a menu item (e.g., "Strategy")
-    const strategyItem = page.getByRole('menuitem', { name: 'Strategy' })
+    // Drawer should be open — look for Strategy link
+    const strategyItem = page.getByTestId('drawer-item-strategy')
     await expect(strategyItem).toBeVisible({ timeout: 5_000 })
 
     // Tap a nav item
@@ -41,35 +40,35 @@ test.describe('Mobile bug fixes', () => {
     // Wait for navigation
     await page.waitForURL('**/strategy**', { timeout: 15_000 })
 
-    // The dropdown should be closed — menu should no longer be visible
-    await expect(strategyItem).not.toBeVisible({ timeout: 5_000 })
+    // The drawer should be closed — nav should no longer be visible
+    await expect(page.getByTestId('drawer-nav')).not.toBeVisible({ timeout: 5_000 })
   })
 
-  test('Bug 2b: DropdownMenu opens and closes correctly with controlled state', async ({ page }) => {
+  test('Bug 2b: Drawer opens and closes correctly with controlled state', async ({ page }) => {
     await page.goto('/today')
     await page.waitForLoadState('domcontentloaded')
 
-    const moreButton = page.locator('[data-testid="mobile-nav"] button:has-text("More")')
+    const moreButton = page.getByTestId('mobile-more-button')
     await expect(moreButton).toBeVisible({ timeout: 15_000 })
 
     // Open
     await moreButton.tap()
-    const menuContent = page.locator('[role="menu"]')
-    await expect(menuContent).toBeVisible({ timeout: 5_000 })
+    const drawerNav = page.getByTestId('drawer-nav')
+    await expect(drawerNav).toBeVisible({ timeout: 5_000 })
 
     // Press Escape to close
     await page.keyboard.press('Escape')
-    await expect(menuContent).not.toBeVisible({ timeout: 5_000 })
+    await expect(drawerNav).not.toBeVisible({ timeout: 5_000 })
 
     // Open again — should still work (state is properly managed)
     await moreButton.tap()
-    await expect(menuContent).toBeVisible({ timeout: 5_000 })
+    await expect(drawerNav).toBeVisible({ timeout: 5_000 })
 
     // Select Settings — should close and navigate
-    const settingsItem = page.getByRole('menuitem', { name: 'Settings' })
+    const settingsItem = page.getByTestId('drawer-item-settings')
     await expect(settingsItem).toBeVisible({ timeout: 3_000 })
     await settingsItem.click()
     await page.waitForURL('**/settings**', { timeout: 15_000 })
-    await expect(menuContent).not.toBeVisible({ timeout: 5_000 })
+    await expect(drawerNav).not.toBeVisible({ timeout: 5_000 })
   })
 })
