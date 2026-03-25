@@ -132,24 +132,29 @@ ${stateContext}. Summarise what was accomplished. ${handoff} Be specific, not ge
 }
 
 function buildStateContext(input: StageBriefingInput): string {
+    // VALIDATION: Coerce all numeric inputs to safe non-negative integers
+    const safeInt = (v: number | undefined | null) => Math.max(0, Math.floor(Number(v) || 0))
+    const safePct = (v: number | undefined | null) => Math.max(0, Math.min(100, Math.floor(Number(v) || 0)))
+
     const parts: string[] = []
-    parts.push(`${input.moduleCount} module${input.moduleCount !== 1 ? "s" : ""} in the design`)
+    const mc = safeInt(input.moduleCount)
+    parts.push(`${mc} module${mc !== 1 ? "s" : ""} in the design`)
 
     if (input.specifiedModuleCount != null) {
-        parts.push(`${input.specifiedModuleCount} specified`)
+        parts.push(`${safeInt(input.specifiedModuleCount)} specified`)
     }
     if (input.diagnosticCompletionPct != null) {
-        parts.push(`diagnostics ${input.diagnosticCompletionPct}% complete`)
+        parts.push(`diagnostics ${safePct(input.diagnosticCompletionPct)}% complete`)
     }
     if (input.reviewSummary) {
         const { pass, warn, fail } = input.reviewSummary
-        parts.push(`reviews: ${pass} pass, ${warn} warn, ${fail} fail`)
+        parts.push(`reviews: ${safeInt(pass)} pass, ${safeInt(warn)} warn, ${safeInt(fail)} fail`)
     }
     if (input.supplierMatchCount != null) {
-        parts.push(`${input.supplierMatchCount} supplier matches`)
+        parts.push(`${safeInt(input.supplierMatchCount)} supplier matches`)
     }
     if (input.manufacturingOrderCount != null) {
-        parts.push(`${input.manufacturingOrderCount} manufacturing orders`)
+        parts.push(`${safeInt(input.manufacturingOrderCount)} manufacturing orders`)
     }
 
     return `State: ${parts.join(", ")}`
@@ -159,19 +164,22 @@ function getFallbackBriefing(input: StageBriefingInput): string {
     const mapping = STAGE_SPECIALISTS[input.stage]
     const specialist = getSpecialistById(mapping.specialistId)
     const name = specialist?.name ?? "I"
+    // SECURITY: Sanitise user-controlled subject for fallback strings (same as AI prompt)
+    const safeSubject = (input.projectSubject || "your product").slice(0, MAX_SUBJECT_LENGTH).replace(/[<>"]/g, "")
+    const moduleCount = Math.max(0, Math.floor(input.moduleCount || 0))
 
     if (input.variant === "entry") {
         switch (input.stage) {
             case "design":
-                return input.moduleCount > 0
-                    ? `Welcome back. Your design for "${input.projectSubject}" has ${input.moduleCount} modules. Let's review the decomposition and research before moving to specification.`
-                    : `Let's design "${input.projectSubject}". ${name} will guide you through research, decomposition, and module generation.`
+                return moduleCount > 0
+                    ? `Welcome back. Your design for ${safeSubject} has ${moduleCount} modules. Let's review the decomposition and research before moving to specification.`
+                    : `Let's design ${safeSubject}. ${name} will guide you through research, decomposition, and module generation.`
             case "specify":
-                return `${input.moduleCount} modules ready for specification. I'll guide you through diagnostics, specialist reviews, and cost estimation to ensure every module is production-ready.`
+                return `${moduleCount} modules ready for specification. I'll guide you through diagnostics, specialist reviews, and cost estimation to ensure every module is production-ready.`
             case "source":
-                return `Specifications are locked. Time to match suppliers, create RFQs, and secure manufacturing for ${input.moduleCount} modules.`
+                return `Specifications are locked. Time to match suppliers, create RFQs, and secure manufacturing for ${moduleCount} modules.`
             case "assemble":
-                return `All modules sourced. Let's verify the assembled product holds together — tolerance stacks, interface fits, and qualification testing.`
+                return `All modules sourced. I'll validate the assembled product — tolerance stacks across joined modules, interface fits, fastener preloads, and qualification testing.`
         }
     } else {
         const nextInfo = getNextStageSpecialist(input.stage)
@@ -180,7 +188,7 @@ function getFallbackBriefing(input: StageBriefingInput): string {
 
         switch (input.stage) {
             case "design":
-                return `Design decomposition complete with ${input.moduleCount} modules.${handoff}`
+                return `Design decomposition complete with ${moduleCount} modules.${handoff}`
             case "specify":
                 return `All modules specified and reviewed.${handoff}`
             case "source":

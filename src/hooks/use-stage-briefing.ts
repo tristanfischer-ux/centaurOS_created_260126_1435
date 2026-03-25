@@ -40,7 +40,7 @@ function computeDataHash(opts: UseStageBriefingOptions): string {
     const key = [
         opts.stage,
         opts.variant,
-        opts.projectSubject.slice(0, 50),
+        (opts.projectSubject || "").slice(0, 50),
         opts.moduleCount,
         opts.specifiedModuleCount ?? 0,
         opts.diagnosticCompletionPct ?? 0,
@@ -68,7 +68,12 @@ const CACHE_INDEX_KEY = "forge-briefing-keys"
 function trackCacheKey(key: string): void {
     try {
         const raw = localStorage.getItem(CACHE_INDEX_KEY)
-        const keys: string[] = raw ? JSON.parse(raw) : []
+        let keys: string[] = []
+        if (raw) {
+            const parsed = JSON.parse(raw)
+            // VALIDATION: If corrupted/tampered, reset to empty array
+            keys = Array.isArray(parsed) ? parsed.filter((k): k is string => typeof k === "string") : []
+        }
         // Remove if already present (move to end)
         const idx = keys.indexOf(key)
         if (idx !== -1) keys.splice(idx, 1)
@@ -80,7 +85,8 @@ function trackCacheKey(key: string): void {
         }
         localStorage.setItem(CACHE_INDEX_KEY, JSON.stringify(keys))
     } catch {
-        // localStorage unavailable — non-fatal
+        // localStorage unavailable or corrupted — reset index
+        try { localStorage.removeItem(CACHE_INDEX_KEY) } catch { /* noop */ }
     }
 }
 

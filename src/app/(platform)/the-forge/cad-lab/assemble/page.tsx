@@ -125,8 +125,8 @@ export default function AssemblePage(): React.ReactNode {
   // ── Stage briefings — Assemble stage owned by Jian (VP Engineering) ──
   const assembleMapping = STAGE_SPECIALISTS.assemble
   const assembleEntryText = useMemo(() => {
-    const base = "I'm overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment."
-    return assemblyNotes.length > 0 ? base + " Fang's assembly notes from the Specify stage are shown below." : base
+    const base = "I'm validating your assembled product. I'll check tolerance stacks across joined modules, verify interface fits, confirm fastener preloads, and plan the qualification test sequence."
+    return assemblyNotes.length > 0 ? base + " Fang's assembly notes from the Specify stage are shown below — they define build sequence and fixture requirements." : base
   }, [assemblyNotes.length])
 
   // DECISION: Exit briefing for assemble not wired yet — no assembly completion gate exists.
