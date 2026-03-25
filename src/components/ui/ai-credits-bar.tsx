@@ -18,28 +18,53 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getMyReferralInfo, getAIUsageForCreditsBar, type ReferralInfo } from '@/actions/referrals'
+import { FoundingMemberBadge } from '@/components/ui/founding-member-badge'
 
 /**
  * AICreditsBarLoader — Self-loading wrapper that fetches AI usage data.
  */
 export function AICreditsBarLoader() {
   const [data, setData] = useState<{ currentUsage: number; limit: number; bonusCredits: number } | null>(null)
+  const [referralData, setReferralData] = useState<ReferralInfo | null>(null)
 
   useEffect(() => {
-    getAIUsageForCreditsBar().then((result) => {
-      if ('currentUsage' in result) setData(result)
+    const results = Promise.allSettled([
+      getAIUsageForCreditsBar(),
+      getMyReferralInfo(),
+    ])
+    results.then(([usageResult, referralResult]) => {
+      if (usageResult.status === 'fulfilled' && 'currentUsage' in usageResult.value) {
+        setData(usageResult.value)
+      }
+      if (referralResult.status === 'fulfilled' && 'referralLink' in referralResult.value) {
+        setReferralData(referralResult.value)
+      }
     })
   }, [])
 
   if (!data) return null
 
-  return <AICreditsBar currentUsage={data.currentUsage} limit={data.limit} bonusCredits={data.bonusCredits} />
+  return (
+    <AICreditsBar
+      currentUsage={data.currentUsage}
+      limit={data.limit}
+      bonusCredits={data.bonusCredits}
+      referralLink={referralData?.referralLink}
+      referralCount={referralData?.referralCount}
+      isFoundingMember={referralData?.isFoundingMember}
+      foundingMemberNumber={referralData?.foundingMemberNumber}
+    />
+  )
 }
 
 interface AICreditsBarProps {
   currentUsage: number
   limit: number
   bonusCredits: number
+  referralLink?: string
+  referralCount?: number
+  isFoundingMember?: boolean
+  foundingMemberNumber?: number | null
 }
 
 /**
@@ -48,7 +73,8 @@ interface AICreditsBarProps {
  * @description Shows "AI Tasks: ████░░ 42/50 (+8 bonus)" in the sidebar.
  * Green >50%, amber 80%, red 95%. Click opens referral popover.
  */
-export function AICreditsBar({ currentUsage, limit, bonusCredits }: AICreditsBarProps) {
+export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, referralCount, isFoundingMember, foundingMemberNumber }: AICreditsBarProps) {
+  const [copied, setCopied] = useState(false)
   const percentUsed = limit > 0 ? Math.min((currentUsage / limit) * 100, 100) : 0
   const remaining = Math.max(0, limit - currentUsage)
   const isNearLimit = percentUsed >= 80
@@ -62,11 +88,23 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits }: AICreditsBar
       ? 'bg-warning'
       : 'bg-success'
 
+  const handleCopyLink = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!referralLink) return
+    try {
+      await navigator.clipboard.writeText(referralLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard API unavailable
+    }
+  }
+
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
-          className="w-full text-left px-2 py-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
+          className={`w-full text-left px-2 py-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer ${isNearLimit ? 'border border-warning/40 bg-warning/5' : ''}`}
           aria-label={`AI tasks: ${currentUsage} of ${limit} used${bonusCredits > 0 ? `, ${bonusCredits} bonus` : ''}`}
         >
           <div className="flex items-center justify-between mb-1">
@@ -90,6 +128,40 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits }: AICreditsBar
             <p className="text-[9px] text-destructive mt-1 font-medium">
               Out of AI tasks — invite a friend to get 10 more
             </p>
+          )}
+
+          {/* Always-visible referral CTA */}
+          <div className="flex items-center justify-between mt-1.5">
+            <div className="flex items-center gap-1.5">
+              <Gift className="h-3 w-3 text-international-orange" />
+              <span className="text-[10px] font-semibold text-foreground">Give 10, Get 10</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="p-0.5 rounded hover:bg-muted transition-colors"
+              aria-label="Copy referral link"
+            >
+              {copied ? (
+                <Check className="h-3 w-3 text-success" />
+              ) : (
+                <Copy className="h-3 w-3 text-muted-foreground" />
+              )}
+            </button>
+          </div>
+
+          {/* Referral count */}
+          {referralCount != null && referralCount > 0 && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              {referralCount} referred
+            </p>
+          )}
+
+          {/* Founding member badge */}
+          {isFoundingMember && foundingMemberNumber != null && (
+            <div className="mt-1">
+              <FoundingMemberBadge compact memberNumber={foundingMemberNumber} />
+            </div>
           )}
         </button>
       </PopoverTrigger>

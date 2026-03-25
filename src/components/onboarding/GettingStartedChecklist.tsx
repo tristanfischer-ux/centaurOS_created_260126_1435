@@ -12,6 +12,7 @@ import {
   Users,
   Store,
   Flame,
+  Gift,
   Check,
   ChevronDown,
   ChevronUp,
@@ -22,7 +23,7 @@ import { cn } from '@/lib/utils'
 import { FORGE_ROUTES } from '@/lib/forge-routes'
 import type { OnboardingData } from '@/actions/onboarding'
 
-export const CHECKLIST_TOTAL_ITEMS = 6
+export const CHECKLIST_TOTAL_ITEMS = 7
 
 export const CHECKLIST_ITEMS: Array<{
   key: keyof OnboardingData
@@ -38,6 +39,7 @@ export const CHECKLIST_ITEMS: Array<{
   { key: 'checklist_team_member_added', label: 'Invite a team member', href: '/team', icon: Users },
   { key: 'checklist_marketplace_explored', label: 'Explore the marketplace', href: '/marketplace', icon: Store },
   { key: 'checklist_forge_project_created', label: 'Start a Forge project', href: FORGE_ROUTES.cadLab, icon: Flame },
+  { key: 'checklist_friend_invited', label: 'Share your referral link', icon: Gift },
 ]
 
 export interface GettingStartedChecklistProps {

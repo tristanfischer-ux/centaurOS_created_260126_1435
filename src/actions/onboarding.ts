@@ -269,6 +269,7 @@ export interface OnboardingData {
   checklist_team_member_added?: boolean
   checklist_marketplace_explored?: boolean
   checklist_forge_project_created?: boolean
+  checklist_friend_invited?: boolean
   /** Milestone tracking */
   milestones_shown?: string[]
 }
