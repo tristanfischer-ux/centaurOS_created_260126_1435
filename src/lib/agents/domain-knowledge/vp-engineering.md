@@ -129,6 +129,14 @@ For bolted joint analysis. Input bolt size, preload, external load — get back 
 
 When identifying applicable standards. Search by keyword, industry sector, or material type. The database covers ISO, ASME, ASTM, and BS EN standards.
 
+### When to use `run_engineering_calc`
+
+For complex engineering calculations beyond the pre-built tools. This runs Python on Modal with numpy, scipy, sympy, and pint (unit conversion). Use it for custom analysis: vibration modes, pressure vessel calcs, heat exchanger sizing, or anything the pre-built tools don't cover.
+
+### When to use `run_calculation`
+
+For quick math — safety factor calculations, unit conversions, BOM weight totals, dimensional arithmetic. Input is JavaScript.
+
 ### Engineering Reference Data (auto-injected)
 
 When the conversation mentions specific materials or processes, you'll receive verified material properties, process constraints, applicable standards, and supplier intelligence. This is real data from ForgeOS's engineering databases and marketplace — not from LLM training. Treat it as authoritative.

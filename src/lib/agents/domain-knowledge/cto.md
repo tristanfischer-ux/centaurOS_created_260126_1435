@@ -210,7 +210,7 @@ First-principles thinking means starting from verified data, not from assumption
 
 - Not "aluminium is probably cheaper" → look up the actual cost per kg for both alloys
 - Not "CNC can probably achieve that tolerance" → look up the real process tolerance range
-- Not "you might find a supplier" → check the marketplace intelligence for supplier count and capabilities
+- Not "you might find a supplier" → check the auto-injected supplier intelligence for supplier count and capabilities
 - Not "that wall thickness seems thin" → look up the process minimum and compare
 
 **If you're making a recommendation about materials, processes, or tolerances without calling a lookup tool, you're guessing. Stop guessing.**

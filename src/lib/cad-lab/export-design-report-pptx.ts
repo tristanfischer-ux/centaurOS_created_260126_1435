@@ -929,20 +929,22 @@ function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
   const sd = section.slideData as Extract<SlideData, { layout: 'data-table' }> | undefined
   if (!sd?.rows?.length) return
   // INTENT: Infer column headers from the first row's value count if Opus omitted them
-  if (!sd.columns?.length && sd.rows[0]?.values?.length) {
-    sd.columns = sd.rows[0].values.map((_: unknown, i: number) => `Col ${i + 1}`)
-  }
-  if (!sd.columns?.length) return
+  const columns = sd.columns?.length
+    ? sd.columns
+    : sd.rows[0]?.values?.length
+      ? sd.rows[0].values.map((_: unknown, i: number) => `Col ${i + 1}`)
+      : []
+  if (!columns.length) return
   const slide = pres.addSlide()
   addSectionTitle(slide, sd.heading || section.title)
 
   const labelW = 2.0
-  const dataW = (CONTENT_W - labelW) / sd.columns.length
+  const dataW = (CONTENT_W - labelW) / columns.length
 
   // Header row
   const header: PptxGenJS.TableRow = [
     { text: '', options: { bold: true, fontSize: 9, color: MID_TEXT, fill: { color: LIGHT_BG } } },
-    ...sd.columns.map((col) => ({
+    ...columns.map((col) => ({
       text: col,
       options: { bold: true, fontSize: 9, color: WHITE, fill: { color: TEAL }, align: 'center' as const },
     })),
@@ -951,7 +953,7 @@ function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
   // Data rows — alternating colors
   const rows: PptxGenJS.TableRow[] = sd.rows.slice(0, 10).map((row, i) => [
     { text: row.label, options: { bold: true, fontSize: 9, color: DARK_TEXT, fill: { color: i % 2 === 0 ? WHITE : LIGHT_BG } } },
-    ...row.values.slice(0, sd.columns.length).map((val) => ({
+    ...row.values.slice(0, columns.length).map((val) => ({
       text: val,
       options: { fontSize: 9, color: DARK_TEXT, fill: { color: i % 2 === 0 ? WHITE : LIGHT_BG }, align: 'center' as const },
     })),
@@ -959,7 +961,7 @@ function buildDataTableSlide(pres: PptxGenJS, section: AiReportSection): void {
 
   slide.addTable([header, ...rows], {
     x: MARGIN, y: 1.0, w: CONTENT_W,
-    colW: [labelW, ...Array(sd.columns.length).fill(dataW)],
+    colW: [labelW, ...Array(columns.length).fill(dataW)],
     border: { type: 'solid', pt: 0.5, color: CARD_BORDER },
     rowH: 0.4,
     fontFace: 'Helvetica Neue',
@@ -1104,23 +1106,34 @@ function buildArchitectureDiagramSlide(pres: PptxGenJS, section: AiReportSection
   const slide = pres.addSlide()
   addSectionTitle(slide, sd.heading || section.title)
 
-  // AI illustration (center)
+  // AI illustration + annotation layout depends on whether we have an image
+  const annotations = sd.annotations?.slice(0, 4) ?? []
+
   if (slideImage) {
-    slide.addImage({ data: `data:image/png;base64,${slideImage}`, x: 1.5, y: 1.0, w: 4.5, h: 3.5, rounding: true })
+    // Image center, annotations left, specs right
+    slide.addImage({ data: `data:image/png;base64,${slideImage}`, x: 2.2, y: 1.0, w: 4.0, h: 3.5, rounding: true })
+    annotations.forEach((ann, i) => {
+      const y = 1.0 + i * 0.95
+      slide.addShape('roundRect', { x: MARGIN, y, w: 1.5, h: 0.8, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.06 })
+      slide.addText(ann.label, { x: MARGIN + 0.1, y: y + 0.05, w: 1.3, h: 0.25, fontSize: 8, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+      slide.addText(truncate(ann.description, 50), { x: MARGIN + 0.1, y: y + 0.3, w: 1.3, h: 0.4, fontSize: 7, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.1 })
+    })
+  } else {
+    // No image — annotations as a 2-column grid filling the content area
+    const annW = (CONTENT_W - 0.3) / 2
+    annotations.forEach((ann, i) => {
+      const col = i % 2
+      const row = Math.floor(i / 2)
+      const ax = MARGIN + col * (annW + 0.3)
+      const ay = 1.0 + row * 1.1
+      slide.addShape('roundRect', { x: ax, y: ay, w: annW, h: 0.95, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.06 })
+      slide.addText(ann.label, { x: ax + 0.15, y: ay + 0.08, w: annW - 0.3, h: 0.3, fontSize: 10, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
+      slide.addText(truncate(ann.description, 100), { x: ax + 0.15, y: ay + 0.38, w: annW - 0.3, h: 0.5, fontSize: 8, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.2 })
+    })
   }
 
-  // Annotation cards (left side)
-  const annotations = sd.annotations?.slice(0, 4) ?? []
-  annotations.forEach((ann, i) => {
-    const y = 1.0 + i * 0.95
-    const ax = slideImage ? MARGIN - 0.2 : MARGIN
-    slide.addShape('roundRect', { x: ax, y, w: 1.8, h: 0.8, fill: { color: WHITE }, line: { color: CARD_BORDER, width: 1 }, rectRadius: 0.06 })
-    slide.addText(ann.label, { x: ax + 0.1, y: y + 0.05, w: 1.6, h: 0.25, fontSize: 9, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
-    slide.addText(truncate(ann.description, 60), { x: ax + 0.1, y: y + 0.3, w: 1.6, h: 0.4, fontSize: 7, fontFace: 'Helvetica Neue', color: MID_TEXT, lineSpacingMultiple: 1.1 })
-  })
-
-  // Key specs sidebar (right)
-  if (sd.specs?.length) {
+  // Key specs sidebar (right) — only when image present (otherwise annotations fill the space)
+  if (slideImage && sd.specs?.length) {
     const specX = 6.8
     slide.addShape('roundRect', { x: specX, y: 1.0, w: 2.7, h: 3.5, fill: { color: LIGHT_BG }, line: { color: TEAL, width: 1 }, rectRadius: 0.08 })
     slide.addText('Key Specs', { x: specX + 0.15, y: 1.1, w: 2.4, h: 0.3, fontSize: 11, fontFace: 'Helvetica Neue', bold: true, color: DARK_TEXT })
