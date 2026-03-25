@@ -61,6 +61,9 @@ import { CadLabProgress } from "@/components/cad/cad-lab-progress"
 import { DecompositionCheckpointCard } from "@/components/cad/decomposition-checkpoint-card"
 import { CheckpointRevisionDiffs } from "./components/checkpoint-revision-diffs"
 import { DesignReportDialog } from "./components/design-report-dialog"
+import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
+import { useStageBriefing } from "@/hooks/use-stage-briefing"
+import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 
 // ─── Page Component ──────────────────────────────────────────────────
 
@@ -90,11 +93,44 @@ export default function CadLabResearchPage(): React.ReactNode {
     handleReExpandModule, reExpandingModuleIds,
     tripoPreviewUrl, tripoPreviewStatus, tripoPreviewError,
     handleGenerateTripoPreview,
+    referenceImages, setReferenceImages,
   } = useCadLab()
 
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
   const [heroView, setHeroView] = useState<"2d" | "3d">("2d")
   const [overviewApproved, setOverviewApproved] = useState(false)
+
+  // Stage briefings — Design stage owned by Max (CTO)
+  const designMapping = STAGE_SPECIALISTS.design
+  const nextDesign = getNextStageSpecialist("design")
+  const { briefing: entryBriefing, isLoading: entryLoading } = useStageBriefing({
+    stage: "design",
+    variant: "entry",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    moduleCount: modules.length,
+    enabled: modules.length > 0,
+  })
+  const { briefing: exitBriefing, isLoading: exitLoading } = useStageBriefing({
+    stage: "design",
+    variant: "exit",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    moduleCount: modules.length,
+    enabled: modules.length > 0 && hasResearch,
+  })
+
+  // INTENT: Reset overviewApproved when switching projects. Then re-approve if the
+  // loaded project already has modules (skip the gate for fully-built projects).
+  // GOTCHA: handleLoadProject does NOT reset interviewPhase to "idle", so the
+  // interviewPhase-based reset (below) won't fire on project switch.
+  const prevProjectId = useRef(activeProjectId)
+  useEffect(() => {
+    if (activeProjectId !== prevProjectId.current) {
+      prevProjectId.current = activeProjectId
+      setOverviewApproved(modules.length > 0)
+    }
+  }, [activeProjectId, modules.length])
 
   // INTENT: If loading a saved project that already has modules, skip the approval gate.
   useEffect(() => {
@@ -145,6 +181,10 @@ export default function CadLabResearchPage(): React.ReactNode {
   const [showAllMaterials, setShowAllMaterials] = useState(false)
   useEffect(() => {
     if (!subject || subject.length < 3) return
+    // Clear stale rich data from previous project/subject before fetching
+    setEngReportData(null)
+    setShowAllStandards(false)
+    setShowAllMaterials(false)
     const resEngData = researchResult?.engineeringData
     if (resEngData && resEngDataPoints > 1 && resEngData.supplierTechniqueNames?.length) {
       // Cached data has everything including technique names — use it
@@ -375,7 +415,20 @@ export default function CadLabResearchPage(): React.ReactNode {
         onResearch={handleResearch}
         interviewPhase={interviewPhase}
         onStartInterview={() => setInterviewPhase("interviewing")}
+        referenceImages={referenceImages}
+        onReferenceImagesChange={setReferenceImages}
       />
+
+      {/* ── Max (CTO) entry briefing — shown on return visits with existing modules ── */}
+      {modules.length > 0 && (
+        <StageSpecialistCard
+          specialistId={designMapping.specialistId}
+          variant="entry"
+          stageName="Design"
+          briefing={entryBriefing}
+          isLoading={entryLoading}
+        />
+      )}
 
       {/* ── Design brief interview (Max CTO guided Q&A) ── */}
       <AnimatePresence>
@@ -1081,24 +1134,17 @@ export default function CadLabResearchPage(): React.ReactNode {
                 </p>
               )}
               {canContinueToSpecify && (
-                <Card className="border-international-orange/30 bg-gradient-to-r from-international-orange-light/10 to-background">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          Ready to specify
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Continue to the Specify stage for detailed specs, diagnostics, and specialist review.
-                        </p>
-                      </div>
-                      <Button onClick={() => router.push(FORGE_ROUTES.cadLabSpecify)} className="gap-1.5">
-                        Continue to Specify
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                <StageSpecialistCard
+                  specialistId={designMapping.specialistId}
+                  variant="exit"
+                  stageName="Design"
+                  briefing={exitBriefing}
+                  isLoading={exitLoading}
+                  nextSpecialistId={nextDesign?.specialistId}
+                  nextStageName={nextDesign?.stageLabel}
+                  onProceed={() => router.push(FORGE_ROUTES.cadLabSpecify)}
+                  proceedLabel="Continue to Specify"
+                />
               )}
             </motion.div>
           )}

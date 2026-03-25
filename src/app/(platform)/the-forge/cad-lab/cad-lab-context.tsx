@@ -84,6 +84,8 @@ import { requestDecompositionCheckpoints, reviseModulesFromCheckpoints, reviseMo
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Sector } from "@/types/foundry"
 import type { CadLabDomain } from "@/lib/cad-lab/domain-prompts"
+import type { ReferenceImageFile, StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
+import { uploadReferenceImages, saveReferenceImageUrls } from "@/actions/cad-lab-reference-images"
 
 // ─── Persistence key for last active project (restore on return) ─────
 
@@ -349,6 +351,10 @@ export interface CadLabContextValue {
   interviewPhase: "idle" | "interviewing" | "synthesizing" | "complete"
   setInterviewPhase: Dispatch<SetStateAction<"idle" | "interviewing" | "synthesizing" | "complete">>
 
+  // Reference images (user-uploaded sketches/photos)
+  referenceImages: ReferenceImageFile[]
+  setReferenceImages: Dispatch<SetStateAction<ReferenceImageFile[]>>
+
   // Utility
   handleDownload: (filename: string, base64Data: string, isBinary?: boolean) => void
 }
@@ -549,6 +555,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const unifiedPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const unifiedBgOpIdRef = useRef<string | null>(null)
   const { startOp, updateOp, completeOp, failOp } = useBackgroundOps()
+
+  // ── Reference images (user-uploaded sketches/photos) ──
+  const [referenceImages, setReferenceImages] = useState<ReferenceImageFile[]>([])
+  const referenceImagesRef = useRef(referenceImages)
+  useEffect(() => { referenceImagesRef.current = referenceImages }, [referenceImages])
 
   // ── Provider A/B comparison ──
   const [providerResults, setProviderResults] = useState<Record<string, ProviderResult>>({})
@@ -1397,9 +1408,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         // Images pipeline (same as before)
         const fallbackImagesPipeline = async () => {
           if (activeProjectId) { setSystemIllustrationStatus("generating"); setSystemIllustrationError(null) }
+          // Collect user reference image URLs for AI pipeline
+          const refImageUrls = referenceImagesRef.current.filter(i => i.uploaded && i.storageUrl).map(i => i.storageUrl!)
           let visualStyle: VisualStyleSpec | undefined
           try {
-            const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800))
+            const styleRes = await generateVisualStyleAction(subject, fallbackModules.map(m => ({ name: m.name, purpose: m.purpose })), extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800), refImageUrls.length > 0 ? refImageUrls : undefined)
             if (!activeProjectIdRef.current) return
             if ("visualStyle" in styleRes) { visualStyle = styleRes.visualStyle; setVisualStyle(visualStyle); if (activeProjectId) saveCadLabVisualStyle(activeProjectId, visualStyle).catch(() => {}) }
           } catch { /* Non-critical */ }
@@ -1409,7 +1422,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           const moduleCrops = new Map<string, string>()
           if (activeProjectId) {
             try {
-              const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600))
+              const illRes = await generateCadLabSystemIllustrationAction(activeProjectId, subject, fallbackModules.map(m => m.name), fallbackModules.map(m => m.purpose), visualStyle, extractExecutiveSummary(editableReport)?.slice(0, 600), undefined, refImageUrls.length > 0 ? refImageUrls : undefined)
               if (!activeProjectIdRef.current) return
               if ("url" in illRes) {
                 fallbackHeroUrl = illRes.url
@@ -1688,11 +1701,13 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
         // Fallback: use Sonnet visual style if reconciliation failed
         if (!style && activeProjectIdRef.current) {
+          const refUrls = referenceImagesRef.current.filter(i => i.uploaded && i.storageUrl).map(i => i.storageUrl!)
           try {
             const styleRes = await generateVisualStyleAction(
               subject,
               skeletonRes.modules.map((m) => ({ name: m.name, purpose: m.purpose })),
               extractExecutiveSummary(editableReport)?.slice(0, 800) ?? editableReport.slice(0, 800),
+              refUrls.length > 0 ? refUrls : undefined,
             )
             if ("visualStyle" in styleRes) {
               style = styleRes.visualStyle
@@ -1739,6 +1754,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
       // 3b: Hero image generation — uses Opus-crafted prompt when available
       let illustrationUrl: string | undefined
+      const heroRefUrls = referenceImagesRef.current.filter(i => i.uploaded && i.storageUrl).map(i => i.storageUrl!)
       if (activeProjectIdRef.current) {
         setSystemIllustrationStatus("generating"); setSystemIllustrationError(null)
         try {
@@ -1749,6 +1765,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             style,
             extractExecutiveSummary(editableReport)?.slice(0, 600),
             style?.heroImagePrompt,
+            heroRefUrls.length > 0 ? heroRefUrls : undefined,
           )
           if (!activeProjectIdRef.current) { /* stale */ }
           else if ("url" in illRes) {
@@ -2863,6 +2880,38 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
           setIsSaving(false)
           refreshProjects()
 
+          // Upload reference images if any are pending
+          // GOTCHA: Capture ref snapshot ONCE before any state mutations to avoid
+          // reading stale data after setReferenceImages calls.
+          const currentImages = referenceImagesRef.current
+          const pendingImages = currentImages.filter((img) => !img.uploaded)
+          if (pendingImages.length > 0) {
+            const uploadRes = await uploadReferenceImages(projId, pendingImages.map((img) => ({
+              id: img.id, name: img.name, mimeType: img.mimeType, base64: img.base64, originalSize: img.originalSize,
+            })))
+            if ("error" in uploadRes) {
+              console.error("[CAD-LAB] Reference image upload failed:", uploadRes.error)
+              toast.error(`Reference image upload failed: ${uploadRes.error}`)
+            } else if (uploadRes.stored.length > 0) {
+              // Merge upload results back into state
+              const storedMap = new Map(uploadRes.stored.map((s) => [s.id, s]))
+              const updated = currentImages.map((img) => {
+                const stored = storedMap.get(img.id)
+                return stored ? { ...img, uploaded: true, storageUrl: stored.storageUrl } : img
+              })
+              setReferenceImages(updated)
+              // Combine existing DB images + newly uploaded
+              const existingStored = currentImages
+                .filter((img) => img.uploaded && img.storageUrl && !storedMap.has(img.id))
+                .map((img) => ({ id: img.id, name: img.name, mimeType: img.mimeType, storageUrl: img.storageUrl!, originalSize: img.originalSize }))
+              await saveReferenceImageUrls(projId, [...existingStored, ...uploadRes.stored])
+              // Surface partial failures
+              if (uploadRes.failed.length > 0) {
+                toast.error(`Some images failed: ${uploadRes.failed.join(", ")}`)
+              }
+            }
+          }
+
           // DECISION: No illustration here — wait until handleDecompose runs so the
           // system illustration is generated with full module context (names + purposes).
           // The image pipeline in handleDecompose already handles: visual style → system
@@ -2938,6 +2987,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     setUnifiedResult(null)
     setUnifiedCode(null)
     setProviderResults({})
+    // Revoke preview URLs before clearing
+    referenceImagesRef.current.forEach((img) => {
+      if (img.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl)
+    })
+    setReferenceImages([])
   }, [])
 
   // ── Load a saved project ──
@@ -3103,6 +3157,24 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setTripoPreviewUrl(null)
         setTripoPreviewStatus("idle")
         setTripoPreviewError(null)
+      }
+
+      // Restore reference images from database
+      // INTENT: Explicit field mapping from StoredReferenceImage → ReferenceImageFile
+      // to avoid spreading DB fields that don't belong in client state.
+      if (p.referenceImages && p.referenceImages.length > 0) {
+        setReferenceImages(p.referenceImages.map((img) => ({
+          id: img.id,
+          name: img.name,
+          mimeType: img.mimeType,
+          storageUrl: img.storageUrl,
+          originalSize: img.originalSize,
+          base64: "", // Don't reload full base64 from storage
+          previewUrl: img.storageUrl, // Use storage URL as preview
+          uploaded: true,
+        })))
+      } else {
+        setReferenceImages([])
       }
 
       // Restore design revision state
@@ -3983,6 +4055,8 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     tripoPreviewStatus,
     tripoPreviewError,
     handleGenerateTripoPreview,
+    referenceImages,
+    setReferenceImages,
     initialized,
     initializeCadLab,
     handleDownload,

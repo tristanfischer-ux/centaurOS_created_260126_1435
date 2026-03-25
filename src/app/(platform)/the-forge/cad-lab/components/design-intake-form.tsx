@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Settings2,
   FileText,
+  ImagePlus,
 } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
@@ -35,6 +36,8 @@ import {
 } from "@/components/ui/select"
 import { CLAUDE_MODELS } from "@/lib/cad-lab-types"
 import type { ClaudeModelId, CadLabDesignBrief } from "@/lib/cad-lab-types"
+import { ReferenceImageUpload } from "./reference-image-upload"
+import type { ReferenceImageFile } from "@/lib/cad-lab/reference-image-types"
 
 // ─── Option constants ────────────────────────────────────────────────
 
@@ -87,6 +90,8 @@ interface DesignIntakeFormProps {
   setAssumptionNotes: (value: string) => void
   designReadinessPct: number
   isAnyLoading: boolean
+  referenceImages?: ReferenceImageFile[]
+  onReferenceImagesChange?: (images: ReferenceImageFile[]) => void
 }
 
 /**
@@ -104,6 +109,8 @@ export function DesignIntakeForm({
   setAssumptionNotes,
   designReadinessPct,
   isAnyLoading,
+  referenceImages,
+  onReferenceImagesChange,
 }: DesignIntakeFormProps): React.ReactNode {
   const [isExpanded, setIsExpanded] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -172,6 +179,21 @@ export function DesignIntakeForm({
               />
             </div>
           </div>
+
+          {/* Reference images */}
+          {referenceImages && onReferenceImagesChange && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <ImagePlus className="h-3.5 w-3.5" /> Reference images
+              </Label>
+              <ReferenceImageUpload
+                images={referenceImages}
+                onImagesChange={onReferenceImagesChange}
+                variant="grid"
+                disabled={isAnyLoading}
+              />
+            </div>
+          )}
 
           {/* Use case + Compliance */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -1160,6 +1160,7 @@ export async function generateResearchIllustration(
   visualStyle?: VisualStyleSpec,
   researchExcerpt?: string,
   customPrompt?: string,
+  referenceImageUrls?: string[],
 ): Promise<string> {
   let prompt: string
 
@@ -1209,8 +1210,22 @@ Create a clean, professional technical illustration of a ${subject}.${moduleCont
 Style: Modern technical product render on a clean white background. Show the complete system in ${hasModules ? "an exploded or semi-transparent isometric view so the internal arrangement of sub-assemblies is visible" : "a detailed isometric or three-quarter view showing its key components and overall form factor"}. Use thin, precise lines with subtle color coding to differentiate ${hasModules ? "sub-assemblies" : "major components"}. Differentiate each major ${hasModules ? "sub-assembly" : "component"} using distinct colors and visual separation. No decorative elements, borders, title blocks, or watermarks. Generous whitespace around the illustration. Remember: absolutely no text, labels, annotations, or writing of any kind in the image.${COHESIVE_STYLE_SUFFIX}`
   }
 
+  // INTENT: When user reference images are available, fetch them as base64 and
+  // pass as multimodal reference so the image model can match the visual intent.
+  let userRefBase64: string | undefined
+  if (referenceImageUrls && referenceImageUrls.length > 0) {
+    try {
+      const res = await fetch(referenceImageUrls[0])
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer())
+        userRefBase64 = buf.toString("base64")
+      }
+    } catch { /* Non-critical — generate without reference */ }
+  }
+
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",
+    referenceBase64: userRefBase64,
   })
 
   const url = await uploadToStorage(

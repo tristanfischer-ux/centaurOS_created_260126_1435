@@ -4086,6 +4086,7 @@ export type Database = {
           product_overview: string | null
           provider_results: Json | null
           quality_ratings: Json | null
+          reference_images: Json | null
           research: Json | null
           result: Json | null
           review_skipped: boolean | null
@@ -4128,6 +4129,7 @@ export type Database = {
           product_overview?: string | null
           provider_results?: Json | null
           quality_ratings?: Json | null
+          reference_images?: Json | null
           research?: Json | null
           result?: Json | null
           review_skipped?: boolean | null
@@ -4170,6 +4172,7 @@ export type Database = {
           product_overview?: string | null
           provider_results?: Json | null
           quality_ratings?: Json | null
+          reference_images?: Json | null
           research?: Json | null
           result?: Json | null
           review_skipped?: boolean | null

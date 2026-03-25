@@ -303,10 +303,11 @@ export async function generateCadLabSystemIllustrationAction(
   visualStyle?: VisualStyleSpec,
   researchExcerpt?: string,
   heroPrompt?: string,
+  referenceImageUrls?: string[],
 ): Promise<{ url: string } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
     try {
-      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt)
+      const url = await generateResearchIllustration(projectId, subject, moduleNames, modulePurposes, visualStyle, researchExcerpt, heroPrompt, referenceImageUrls)
       return { url }
     } catch (err) {
       const errorMsg = sanitizeErrorMessage(err)
@@ -362,6 +363,7 @@ export async function generateVisualStyleAction(
   subject: string,
   modules: Array<{ name: string; purpose: string }>,
   researchExcerpt?: string,
+  referenceImageUrls?: string[],
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -373,6 +375,33 @@ export async function generateVisualStyleAction(
     const moduleList = modules.map((m) => `- ${m.name}: ${m.purpose}`).join("\n")
     const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
     const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}`
+
+    // INTENT: When user-uploaded reference images are available, build multimodal
+    // content so Claude can SEE the sketches while crafting visual style prompts.
+    // Cap at 3 images for token budget.
+    let messageContent: unknown
+    if (referenceImageUrls && referenceImageUrls.length > 0) {
+      const imageBlocks: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = []
+      for (const url of referenceImageUrls.slice(0, 3)) {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) continue
+          const buf = Buffer.from(await res.arrayBuffer())
+          const contentType = res.headers.get("content-type") || "image/png"
+          imageBlocks.push({
+            type: "image",
+            source: { type: "base64", media_type: contentType, data: buf.toString("base64") },
+          })
+        } catch { /* Skip failed fetches */ }
+      }
+      if (imageBlocks.length > 0) {
+        messageContent = [...imageBlocks, { type: "text", text: userMessage }]
+      } else {
+        messageContent = userMessage
+      }
+    } else {
+      messageContent = userMessage
+    }
 
     try {
       const response = await fetchWithTimeout(
@@ -388,7 +417,7 @@ export async function generateVisualStyleAction(
             model: "claude-sonnet-4-6",
             max_tokens: 4096,
             system: getDesignSynthesisPrompt(),
-            messages: [{ role: "user", content: userMessage }],
+            messages: [{ role: "user", content: messageContent }],
           }),
         },
         60_000,
@@ -571,6 +600,7 @@ export async function generateDesignSynthesisAction(
   modules: Array<{ name: string; purpose: string; description: string; keyParts: string[]; inputs: string[]; outputs: string[] }>,
   connections?: ModuleConnection[],
   researchExcerpt?: string,
+  referenceImageUrls?: string[],
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
@@ -591,6 +621,29 @@ export async function generateDesignSynthesisAction(
 
     const userMessage = `Product: ${subject}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}`
 
+    // INTENT: Multimodal content with reference images for better visual style generation
+    let messageContent: unknown
+    if (referenceImageUrls && referenceImageUrls.length > 0) {
+      const imageBlocks: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = []
+      for (const url of referenceImageUrls.slice(0, 3)) {
+        try {
+          const res = await fetch(url)
+          if (!res.ok) continue
+          const buf = Buffer.from(await res.arrayBuffer())
+          const contentType = res.headers.get("content-type") || "image/png"
+          imageBlocks.push({
+            type: "image",
+            source: { type: "base64", media_type: contentType, data: buf.toString("base64") },
+          })
+        } catch { /* Skip failed fetches */ }
+      }
+      messageContent = imageBlocks.length > 0
+        ? [...imageBlocks, { type: "text", text: userMessage }]
+        : userMessage
+    } else {
+      messageContent = userMessage
+    }
+
     try {
       const response = await fetchWithTimeout(
         "https://api.anthropic.com/v1/messages",
@@ -605,7 +658,7 @@ export async function generateDesignSynthesisAction(
             model: "claude-opus-4-6",
             max_tokens: 4096,
             system: getDesignSynthesisPrompt(),
-            messages: [{ role: "user", content: userMessage }],
+            messages: [{ role: "user", content: messageContent }],
           }),
         },
         60_000,

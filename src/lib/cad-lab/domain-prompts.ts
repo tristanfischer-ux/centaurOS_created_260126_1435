@@ -507,6 +507,7 @@ RULES:
 - moduleGeometryMap: one entry per module, each 50-100 words of geometric description
 - heroImagePrompt: 300-500 words, the COMPLETE prompt for generating a hero image — must be self-contained (no references to other fields)
 - CRITICAL: heroImagePrompt must contain ZERO module names, part numbers, or technical labels. Describe components by their geometry, position, and function only. Image models render text/names as garbled characters.
+- If reference images (sketches, photos, drawings) are provided, use them as PRIMARY visual context. Extract visible geometry, proportions, and features. Match the overall shape and layout in your prompts.
 - Use the connections list to understand spatial relationships between modules — connected modules are physically adjacent or interfacing
 - DIMENSIONAL DATA: Use dimensions from source data when available. When dimensions are NOT in the source data, ESTIMATE reasonable engineering dimensions based on the product type, industry standards, and common component sizes. The CAD prompt MUST contain explicit mm dimensions for every feature — vague proportional descriptions produce unusable CAD output. Prefer specific numbers over ranges (write '350mm' not '300-400mm').`
 

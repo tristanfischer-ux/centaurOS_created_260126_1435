@@ -32,6 +32,7 @@ import type {
   ProviderResult,
 } from "@/lib/cad-lab-types"
 import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
+import type { StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -135,6 +136,9 @@ export interface CadLabProjectData {
 
   /** Provider A/B comparison results (keyed by provider name) */
   providerResults: Record<string, ProviderResult> | null
+
+  /** User-uploaded reference images (sketches, photos, drawings) */
+  referenceImages: StoredReferenceImage[] | null
 
   createdAt: string
   updatedAt: string
@@ -253,6 +257,7 @@ export async function loadCadLabProject(
         imagesGeneratedAtRevision: (project.images_generated_at_revision as number) ?? 1,
         reviewSkipped: (project.review_skipped as boolean) ?? false,
         providerResults: (project.provider_results as Record<string, ProviderResult> | null) ?? null,
+        referenceImages: (project.reference_images as StoredReferenceImage[] | null) ?? null,
         createdAt: project.created_at,
         updatedAt: project.updated_at,
       },

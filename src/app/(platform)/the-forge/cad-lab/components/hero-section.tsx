@@ -26,7 +26,9 @@ import {
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { ReferenceModelViewer } from "./reference-model-viewer"
+import { ReferenceImageUpload } from "./reference-image-upload"
 import type { ReferenceModel } from "@/actions/reference-models"
+import type { ReferenceImageFile } from "@/lib/cad-lab/reference-image-types"
 
 // ─── Example prompt chips ────────────────────────────────────────────
 
@@ -59,6 +61,10 @@ interface HeroSectionProps {
   interviewPhase?: "idle" | "interviewing" | "synthesizing" | "complete"
   /** Start the design brief interview (first research only) */
   onStartInterview?: () => void
+  /** User-uploaded reference images */
+  referenceImages?: ReferenceImageFile[]
+  /** Callback to update reference images */
+  onReferenceImagesChange?: (images: ReferenceImageFile[]) => void
 }
 
 /**
@@ -75,6 +81,8 @@ export function HeroSection({
   onResearch,
   interviewPhase = "idle",
   onStartInterview,
+  referenceImages,
+  onReferenceImagesChange,
 }: HeroSectionProps): React.ReactNode {
   const subjectTrimmed = subject.trim().length > 0
   const [isSpecialistOpen, setIsSpecialistOpen] = useState(false)
@@ -171,6 +179,16 @@ export function HeroSection({
             <span className="text-xs text-muted-foreground shrink-0">~30-60s</span>
           )}
         </div>
+
+        {/* Reference image upload (compact) */}
+        {referenceImages && onReferenceImagesChange && !isResearching && (
+          <ReferenceImageUpload
+            images={referenceImages}
+            onImagesChange={onReferenceImagesChange}
+            variant="compact"
+            disabled={isAnyLoading}
+          />
+        )}
 
         {/* Example prompt chips */}
         {!hasResearch && !isResearching && !subjectTrimmed && (
