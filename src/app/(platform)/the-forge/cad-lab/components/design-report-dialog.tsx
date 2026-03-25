@@ -150,7 +150,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     // journey report includes reviews regardless of which page the user exports from.
     const journeyExtras: Partial<DesignReportData> = journeyMode ? {
       moduleReviews: Object.keys(moduleReviews).length > 0 ? moduleReviews : undefined,
-      reviewSkipped: reviewSkipped || undefined,
+      reviewSkipped,
     } : {}
 
     return {
@@ -324,7 +324,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
           const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
           const uid = crypto.randomUUID().slice(0, 8)
-          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}-${uid}.${ext}`
+          storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.${ext}`
 
           const supabase = createClient()
           const { error: uploadError } = await supabase.storage

@@ -524,7 +524,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   // ── 9. Stage-specific slides ──
 
   // Specify: Reviews Summary
-  if (data.stage === 'specify' && data.moduleReviews) {
+  if ((data.stage === 'specify' || data.stage === 'journey') && data.moduleReviews) {
     const reviewModuleIds = Object.keys(data.moduleReviews)
     if (reviewModuleIds.length > 0) {
       const reviewSlide = pres.addSlide()
@@ -565,7 +565,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   }
 
   // Source: Classification Summary
-  if (data.stage === 'source' && data.classifiedParts && data.classifiedParts.length > 0) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.classifiedParts && data.classifiedParts.length > 0) {
     const clsSlide = pres.addSlide()
     addSectionTitle(clsSlide, 'Part Classification')
 
@@ -593,7 +593,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   }
 
   // Source: Top Suppliers
-  if (data.stage === 'source' && data.supplierMatches) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.supplierMatches) {
     const matchModuleIds = Object.keys(data.supplierMatches)
     if (matchModuleIds.length > 0) {
       const supplierSlide = pres.addSlide()
@@ -634,7 +634,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   }
 
   // Assemble: Assembly & Logistics
-  if (data.stage === 'assemble') {
+  if (data.stage === 'assemble' || data.stage === 'journey') {
     const hasContent = (data.assemblyPartners && data.assemblyPartners.length > 0) || data.brandingNotes || data.shippingNotes
     if (hasContent) {
       const assembleSlide = pres.addSlide()
@@ -675,7 +675,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
   }
 
   // CAD: Output Summary
-  if (data.stage === 'cad' && data.unifiedCadResult?.success) {
+  if ((data.stage === 'cad' || data.stage === 'journey') && data.unifiedCadResult?.success) {
     const cadSlide = pres.addSlide()
     addSectionTitle(cadSlide, 'CAD Output')
 

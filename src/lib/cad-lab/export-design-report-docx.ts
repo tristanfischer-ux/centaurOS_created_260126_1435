@@ -520,7 +520,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   // ── 8. Stage-specific sections ──
 
   // Specify: Specialist Reviews
-  if (data.stage === 'specify' && data.moduleReviews) {
+  if ((data.stage === 'specify' || data.stage === 'journey') && data.moduleReviews) {
     const reviewModuleIds = Object.keys(data.moduleReviews)
     if (reviewModuleIds.length > 0) {
       children.push(sectionHeading('Specialist Reviews'))
@@ -554,7 +554,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // Source: Part Classification
-  if (data.stage === 'source' && data.classifiedParts && data.classifiedParts.length > 0) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.classifiedParts && data.classifiedParts.length > 0) {
     children.push(sectionHeading('Part Classification'))
 
     const clsRows: TableRow[] = [
@@ -590,7 +590,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // Source: Supplier Matches
-  if (data.stage === 'source' && data.supplierMatches) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.supplierMatches) {
     const matchModuleIds = Object.keys(data.supplierMatches)
     if (matchModuleIds.length > 0) {
       children.push(sectionHeading('Supplier Matches'))
@@ -617,7 +617,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // Source: RFQ Quotes Received
-  if (data.stage === 'source' && data.rfqQuotes && data.rfqQuotes.quotes.length > 0) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.rfqQuotes && data.rfqQuotes.quotes.length > 0) {
     children.push(sectionHeading('Quotes Received'))
     if (data.rfqQuotes.rfqTitle) {
       children.push(textParagraph(`RFQ: ${data.rfqQuotes.rfqTitle}`, { after: 120, color: MID_TEXT }))
@@ -646,7 +646,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // Source: Technique Recommendations
-  if (data.stage === 'source' && data.techniqueRecommendations) {
+  if ((data.stage === 'source' || data.stage === 'journey') && data.techniqueRecommendations) {
     const techModuleIds = Object.keys(data.techniqueRecommendations)
     if (techModuleIds.length > 0) {
       children.push(sectionHeading('Technique Recommendations'))
@@ -675,7 +675,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // Assemble: Assembly Partners, Branding, Shipping
-  if (data.stage === 'assemble') {
+  if (data.stage === 'assemble' || data.stage === 'journey') {
     if (data.assemblyPartners && data.assemblyPartners.length > 0) {
       children.push(sectionHeading('Assembly Partners'))
 
@@ -721,7 +721,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
   }
 
   // CAD: Unified Result Summary
-  if (data.stage === 'cad' && data.unifiedCadResult) {
+  if ((data.stage === 'cad' || data.stage === 'journey') && data.unifiedCadResult) {
     const result = data.unifiedCadResult
     children.push(sectionHeading('CAD Output'))
 
