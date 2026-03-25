@@ -9,9 +9,10 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit"
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
   const { token } = await params
@@ -19,8 +20,16 @@ export async function GET(
     return NextResponse.json({ error: "Missing token" }, { status: 400 })
   }
 
+  // SECURITY: Rate limit public endpoint to prevent token enumeration
+  const ip = getClientIP(request.headers)
+  const rl = await rateLimit("preview", ip)
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 })
+  }
+
   const supabase = createAdminClient()
 
+  // SECURITY: Fetch only metadata first — check expiry BEFORE loading artifact content
   const { data: shared, error: sharedError } = await supabase
     .from("shared_artifacts")
     .select("id, artifact_id, expires_at, view_count")

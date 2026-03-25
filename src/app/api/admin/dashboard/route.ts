@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { rateLimit, getClientIP } from "@/lib/security/rate-limit"
 import { cookies } from "next/headers"
 import crypto from "crypto"
 
@@ -16,8 +17,15 @@ const COOKIE_NAME = "admin_dash_token"
 const SESSION_HOURS = 24
 const EXCLUDE_DOMAINS = ["perigee-labs.com", "fractionalforge.app"]
 
+// SECURITY: Rate limit config for admin login — strict to prevent brute-force
+const ADMIN_LOGIN_RATE_LIMIT = { limit: 5, window: 15 * 60 * 1000 } // 5 attempts per 15 minutes
+
 function getPassword(): string {
-  return process.env.ADMIN_DASHBOARD_PASSWORD || "forgeos-admin-2026"
+  const pw = process.env.ADMIN_DASHBOARD_PASSWORD
+  if (!pw) {
+    throw new Error("ADMIN_DASHBOARD_PASSWORD env var is not configured")
+  }
+  return pw
 }
 
 function makeToken(password: string): string {
@@ -25,7 +33,11 @@ function makeToken(password: string): string {
 }
 
 function isAuthed(cookieStore: Awaited<ReturnType<typeof cookies>>): boolean {
-  return cookieStore.get(COOKIE_NAME)?.value === makeToken(getPassword())
+  try {
+    return cookieStore.get(COOKIE_NAME)?.value === makeToken(getPassword())
+  } catch {
+    return false // SECURITY: If password not configured, no one is authed
+  }
 }
 
 function isExcluded(email: string): boolean {
@@ -33,10 +45,28 @@ function isExcluded(email: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // SECURITY: Rate limit login attempts to prevent brute-force
+  const ip = getClientIP(req.headers)
+  const rl = await rateLimit("adminDashboard", ip, ADMIN_LOGIN_RATE_LIMIT)
+  if (!rl.success) {
+    return new NextResponse(loginPage("Too many attempts. Try again later."), { status: 429, headers: { "Content-Type": "text/html" } })
+  }
+
+  let password: string
+  try {
+    password = getPassword()
+  } catch {
+    return new NextResponse("Admin dashboard not configured", { status: 503 })
+  }
+
   const form = await req.formData()
-  if (form.get("password") === getPassword()) {
+  // SECURITY: Constant-time comparison to prevent timing attacks
+  const passwordBuffer = Buffer.from(password)
+  const submittedStr = form.get("password")
+  const submittedBuffer = Buffer.from(typeof submittedStr === "string" ? submittedStr : "")
+  if (passwordBuffer.length === submittedBuffer.length && crypto.timingSafeEqual(passwordBuffer, submittedBuffer)) {
     const res = NextResponse.redirect(new URL("/api/admin/dashboard", req.url))
-    res.cookies.set(COOKIE_NAME, makeToken(getPassword()), {
+    res.cookies.set(COOKIE_NAME, makeToken(password), {
       httpOnly: true, secure: true, sameSite: "strict",
       maxAge: SESSION_HOURS * 3600, path: "/api/admin/dashboard",
     })
@@ -60,7 +90,9 @@ export async function GET(req: NextRequest) {
     const html = userId ? await buildUserDetail(userId) : await buildDashboard()
     return new NextResponse(html, { headers: { "Content-Type": "text/html", "Cache-Control": "private, no-cache" } })
   } catch (err) {
-    return new NextResponse(`<h1>Error</h1><pre>${esc((err as Error).message)}</pre>`, { status: 500, headers: { "Content-Type": "text/html" } })
+    // SECURITY: Log full error server-side, show generic message to client
+    console.error("[admin/dashboard] Internal error:", err)
+    return new NextResponse("<h1>Error</h1><p>An internal error occurred.</p>", { status: 500, headers: { "Content-Type": "text/html" } })
   }
 }
 

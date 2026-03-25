@@ -134,7 +134,12 @@ async function distributedRateLimit(
 ): Promise<RateLimitResult> {
     const supabase = getRateLimitClient()
     if (!supabase) {
-        console.warn('[SECURITY] Rate limiter falling back to in-memory — no Supabase client available, distributed coordination lost')
+        // SECURITY: In production, fail closed — deny requests when distributed store unavailable
+        if (process.env.NODE_ENV === 'production') {
+            console.error('[SECURITY] Rate limiter has no Supabase client in production — failing closed')
+            return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
+        }
+        console.warn('[SECURITY] Rate limiter falling back to in-memory — no Supabase client available')
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
     
@@ -153,7 +158,12 @@ async function distributedRateLimit(
         })
         
         if (error) {
-            console.warn('[SECURITY] Rate limiter falling back to in-memory — Supabase error, distributed coordination lost:', error.message)
+            // SECURITY: In production, fail closed when RPC fails
+            if (process.env.NODE_ENV === 'production') {
+                console.error('[SECURITY] Rate limit RPC failed in production — failing closed:', error.message)
+                return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
+            }
+            console.warn('[SECURITY] Rate limiter falling back to in-memory — Supabase error:', error.message)
             return inMemoryRateLimit(action, identifier, limit, windowMs)
         }
         
@@ -176,7 +186,12 @@ async function distributedRateLimit(
             resetTime: now.getTime() + windowMs
         }
     } catch (err) {
-        console.warn('[SECURITY] Rate limiter falling back to in-memory — distributed coordination lost:', err)
+        // SECURITY: In production, fail closed on unexpected errors
+        if (process.env.NODE_ENV === 'production') {
+            console.error('[SECURITY] Rate limiter unexpected error in production — failing closed:', err)
+            return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
+        }
+        console.warn('[SECURITY] Rate limiter falling back to in-memory:', err)
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
 }
