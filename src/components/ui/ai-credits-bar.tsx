@@ -157,12 +157,12 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, 
       </Popover>
 
       {/* Always-visible referral CTA — outside PopoverTrigger to avoid nested buttons */}
-      <div className="flex items-center justify-between mt-1.5">
-        <div className="flex items-center gap-1.5">
-          <Gift className="h-3 w-3 text-international-orange" />
-          <span className="text-[10px] font-semibold text-foreground">Give 10, Get 10</span>
-        </div>
-        {hasReferralLink && (
+      {hasReferralLink && (
+        <div className="flex items-center justify-between mt-1.5">
+          <div className="flex items-center gap-1.5">
+            <Gift className="h-3 w-3 text-international-orange" />
+            <span className="text-[10px] font-semibold text-foreground">Give 10, Get 10</span>
+          </div>
           <button
             type="button"
             onClick={handleCopyLink}
@@ -175,8 +175,8 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, 
               <Copy className="h-3 w-3 text-muted-foreground" />
             )}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Referral count */}
       {referralCount != null && referralCount > 0 && (

@@ -35,12 +35,14 @@ export function ReferralNudgeBanner() {
       getMyReferralInfo(),
     ])
     results.then(([usageResult, referralResult]) => {
-      if (usageResult.status === 'fulfilled' && 'currentUsage' in usageResult.value) {
-        const { currentUsage, limit } = usageResult.value
-        const percentUsed = limit > 0 ? (currentUsage / limit) * 100 : 0
-        setRemaining(Math.max(0, limit - currentUsage))
-        setIsUrgent(percentUsed >= 80)
-      }
+      // Only show banner if we successfully got usage data
+      if (usageResult.status !== 'fulfilled' || !('currentUsage' in usageResult.value)) return
+
+      const { currentUsage, limit } = usageResult.value
+      const percentUsed = limit > 0 ? (currentUsage / limit) * 100 : 0
+      setRemaining(Math.max(0, limit - currentUsage))
+      setIsUrgent(percentUsed >= 80)
+
       if (referralResult.status === 'fulfilled' && 'referralLink' in referralResult.value) {
         setReferralInfo(referralResult.value)
       }
@@ -104,7 +106,7 @@ export function ReferralNudgeBanner() {
           </p>
         )}
       </div>
-      {hasReferralLink ? (
+      {hasReferralLink && (
         <Button
           variant="outline"
           size="sm"
@@ -120,10 +122,6 @@ export function ReferralNudgeBanner() {
           ) : (
             <><Copy className="h-3.5 w-3.5 mr-1.5" /> Copy invite link</>
           )}
-        </Button>
-      ) : (
-        <Button variant="outline" size="sm" disabled className="shrink-0">
-          <Copy className="h-3.5 w-3.5 mr-1.5" /> Loading...
         </Button>
       )}
       <button
