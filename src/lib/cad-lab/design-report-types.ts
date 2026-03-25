@@ -20,7 +20,7 @@ import type { TechniqueRecommendation } from '@/lib/cad-lab/technique-recommende
 
 export type DesignReportFormat = 'docx' | 'pptx' | 'pdf'
 
-export type ReportStage = 'concept' | 'specify' | 'source' | 'assemble' | 'cad'
+export type ReportStage = 'concept' | 'specify' | 'source' | 'assemble' | 'cad' | 'journey'
 
 export interface DesignReportSource {
   title: string

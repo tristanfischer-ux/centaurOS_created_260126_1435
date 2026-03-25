@@ -19,7 +19,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from "react"
-import { FileDown, FileText, Presentation, Printer, Sparkles } from "lucide-react"
+import { FileDown, FileText, Presentation, Printer, Sparkles, Route } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -82,11 +82,13 @@ const STAGE_LABELS: Record<ReportStage, string> = {
   source: 'Sourcing',
   assemble: 'Assembly',
   cad: 'CAD',
+  journey: 'Design Journey',
 }
 
 export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stageData }: DesignReportDialogProps) {
   const [selectedFormat, setSelectedFormat] = useState<DesignReportFormat | null>(null)
   const [aiEnabled, setAiEnabled] = useState(true)
+  const [journeyMode, setJourneyMode] = useState(false)
   const exportStartedRef = useRef(false)
 
   // Reset guard when dialog reopens
@@ -137,11 +139,15 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       console.warn("[DesignReport] Engineering data fetch failed (non-fatal):", engErr)
     }
 
+    // INTENT: Journey mode overrides stage to 'journey' and includes ALL available
+    // stage data so the report covers the complete design evolution.
+    const effectiveStage = journeyMode ? 'journey' as const : stage
+
     return {
       projectName: subject || "Untitled Project",
       generatedAt: new Date().toISOString(),
       heroImageUrl: systemIllustrationUrl ?? null,
-      stage,
+      stage: effectiveStage,
       productOverview: productOverview || "",
       researchReport: editableReport || "",
       sources,
@@ -157,7 +163,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
   }, [
     subject, editableReport, researchResult, modules, diagnosticAnswers,
     aiCostEstimates, productOverview, designBrief, systemIllustrationUrl,
-    researchModelUsed, decompositionModelUsed, stage, stageData,
+    researchModelUsed, decompositionModelUsed, stage, stageData, journeyMode,
   ])
 
   const handleExport = useCallback(async () => {
@@ -169,7 +175,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       const projectId = activeProjectId
       onOpenChange(false)
       runInBackground(
-        `${STAGE_LABELS[stage]} Report (PDF)`,
+        `${journeyMode ? "Design Journey" : STAGE_LABELS[stage]} Report (PDF)`,
         async ({ update }) => {
           update({ stepLabel: "Collecting design data...", progress: 10 })
           const data = await assembleData()
@@ -238,7 +244,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     // Capture assembled data before the dialog unmounts
     // (closures over useCadLab values are stable via useCallback deps)
     runInBackground(
-      `${STAGE_LABELS[stage]} Report (${formatLabel})`,
+      `${journeyMode ? "Design Journey" : STAGE_LABELS[stage]} Report (${formatLabel})`,
       async ({ update }) => {
         // Step 1: Assemble data
         update({ stepLabel: "Collecting design data...", progress: 5 })
@@ -347,7 +353,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       },
       { successMessage: `${formatLabel} report ready — downloaded` },
     )
-  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, modules.length, stage, activeProjectId, runInBackground])
+  }, [selectedFormat, assembleData, onOpenChange, aiEnabled, journeyMode, modules.length, stage, activeProjectId, runInBackground])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -355,7 +361,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileDown className="h-5 w-5 text-international-orange" />
-            Download {STAGE_LABELS[stage]} Report
+            Download {journeyMode ? "Design Journey" : STAGE_LABELS[stage]} Report
           </DialogTitle>
           <DialogDescription>
             Export your design as a shareable document. You can navigate away — the report will generate in the background.
@@ -406,6 +412,26 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
               id="ai-narration"
               checked={aiEnabled}
               onCheckedChange={setAiEnabled}
+            />
+          </div>
+        )}
+
+        {/* Journey mode toggle — includes all stages in one report */}
+        {selectedFormat && (
+          <div className="flex items-center justify-between py-2 px-1 border-t border-border">
+            <div className="flex items-center gap-2">
+              <Route className="h-4 w-4 text-international-orange" />
+              <div>
+                <Label htmlFor="journey-mode" className="text-sm font-medium text-foreground cursor-pointer">
+                  Full Design Journey
+                </Label>
+                <p className="text-[11px] text-muted-foreground">Include all stages in a chronological narrative</p>
+              </div>
+            </div>
+            <Switch
+              id="journey-mode"
+              checked={journeyMode}
+              onCheckedChange={setJourneyMode}
             />
           </div>
         )}

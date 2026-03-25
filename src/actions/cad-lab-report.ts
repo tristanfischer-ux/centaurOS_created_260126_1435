@@ -249,6 +249,7 @@ const STAGE_CONTEXT: Record<string, string> = {
   source: "This is a sourcing report. Highlight part classification (buy vs make), supplier matching results, and technique recommendations.",
   assemble: "This is an assembly report. Focus on assembly partner selection, convergence flow, branding/packaging, and shipping logistics.",
   cad: "This is a CAD report. Emphasise the 3D model output — mass, volume, bounding box — alongside the design journey.",
+  journey: "This is a Design Journey report — a complete chronological narrative showing how this product design evolved from initial concept through to its current state. Structure the report as a timeline: start with the research findings and product vision, then show how the design was decomposed into modules, what the specialist reviews found, how sourcing decisions were made, and where the project stands now. Use comparison slides to show how the design changed (original assumptions vs final specs), process-flow slides for the stage progression, stat-callout slides for key metrics achieved, and data-table slides for decision logs. The narrative should feel like reading a project retrospective — each section naturally leads to the next.",
 }
 
 /**

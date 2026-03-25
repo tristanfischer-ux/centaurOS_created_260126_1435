@@ -134,6 +134,7 @@ function buildCoverSlide(pres: PptxGenJS, data: DesignReportData, heroBase64: st
     : data.stage === 'source' ? 'Sourcing Report'
     : data.stage === 'assemble' ? 'Assembly Report'
     : data.stage === 'cad' ? 'CAD Report'
+    : data.stage === 'journey' ? 'Design Journey Report'
     : 'Engineering Design Report'
 
   coverSlide.addText(coverSubtitle, {
