@@ -16,15 +16,9 @@ import type { TimeEntryWithRelations, TimeEntryStatus } from '@/types/time-track
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Format minutes as "Xh Ym". Returns "--" for 0 (used in summary headers). */
-export function formatDuration(minutes: number): string {
-  if (minutes === 0) return '0h'
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
-}
+// Re-export from pure utility so existing imports don't break
+export { formatDuration } from '@/lib/format-duration'
+import { formatDuration } from '@/lib/format-duration'
 
 /** Map TimeEntryStatus to StatusBadge status prop */
 function statusToVariant(status: TimeEntryStatus): 'pending' | 'info' | 'success' | 'error' {

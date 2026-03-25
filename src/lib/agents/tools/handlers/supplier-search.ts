@@ -25,32 +25,20 @@ export const handleSearchSuppliers: ToolHandler = async (args) => {
     const verifiedOnly = args.verified_only as boolean | undefined
     const limit = Math.min(Math.max((args.limit as number) ?? 10, 1), 20)
 
-    // Build query from structured inputs
+    // Build full-text query from structured inputs
+    // DECISION: Use text search rather than subcategory filtering because marketplace
+    // subcategories are business categories (Manufacturer, Machine Capacity) not process
+    // names. Process-specific matching happens via full-text search on title/description.
     const queryParts: string[] = []
     if (process) queryParts.push(process)
     if (material) queryParts.push(material)
+    if (certification) queryParts.push(certification)
     const query = queryParts.join(" ") || undefined
-
-    // Map process to subcategory for filtered search
-    const subcategories: string[] = []
-    if (process) {
-        const processLower = process.toLowerCase()
-        if (processLower.includes("cnc") || processLower.includes("machin")) subcategories.push("CNC Machining")
-        if (processLower.includes("sheet metal") || processLower.includes("bending") || processLower.includes("laser cut")) subcategories.push("Sheet Metal")
-        if (processLower.includes("injection") || processLower.includes("mould") || processLower.includes("mold")) subcategories.push("Injection Moulding")
-        if (processLower.includes("3d print") || processLower.includes("additive") || processLower.includes("fdm") || processLower.includes("sls") || processLower.includes("sla")) subcategories.push("3D Printing")
-        if (processLower.includes("cast")) subcategories.push("Casting")
-        if (processLower.includes("stamp")) subcategories.push("Stamping")
-        if (processLower.includes("weld") || processLower.includes("fabricat")) subcategories.push("Fabrication")
-        if (processLower.includes("pcb") || processLower.includes("circuit")) subcategories.push("PCB Manufacturing")
-        if (processLower.includes("finish") || processLower.includes("anodi") || processLower.includes("powder coat") || processLower.includes("plat")) subcategories.push("Surface Finishing")
-    }
 
     try {
         const result = await searchMarketplaceListings({
             query,
             categories: ["Products", "Services"],
-            subcategories: subcategories.length > 0 ? subcategories : undefined,
             pageSize: limit,
             sort: "relevance",
             advancedFilters: {

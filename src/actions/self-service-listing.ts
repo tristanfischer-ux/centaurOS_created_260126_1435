@@ -25,6 +25,10 @@ async function repairListingLink(supabase: any, providerId: string, listingId: s
     ])
 }
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_TITLE_LENGTH = 100
+const MAX_DESCRIPTION_LENGTH = 2000
+
 function revalidateListingPaths() {
     revalidatePath('/provider-portal')
     revalidatePath('/supplier-portal')
@@ -54,7 +58,17 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
         .single()
     
     if (!provider) return { success: false, error: 'Provider profile not found. Please apply first.' }
-    
+
+    // VALIDATION: Server-side input checks (UI maxLength can be bypassed)
+    const title = input.title?.trim()
+    const description = input.description?.trim() ?? ''
+    if (!title || title.length > MAX_TITLE_LENGTH) {
+        return { success: false, error: `Title is required and must be under ${MAX_TITLE_LENGTH} characters.` }
+    }
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+        return { success: false, error: `Description must be under ${MAX_DESCRIPTION_LENGTH} characters.` }
+    }
+
     // Only approved providers can create listings
     if (provider.tier === 'pending' || provider.tier === 'suspended') {
         return { success: false, error: 'Your provider account must be approved before creating listings.' }
@@ -79,10 +93,10 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
     const { data: listing, error: listingError } = await supabase
         .from('marketplace_listings')
         .insert({
-            title: input.title,
+            title,
             category: input.category as 'People' | 'Products' | 'Services',
             subcategory: input.subcategory,
-            description: input.description,
+            description,
             attributes: (input.attributes || {}) as unknown as Json,
             created_by_provider_id: provider.id,
             is_self_created: true,
@@ -112,11 +126,21 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
 
 // Update a self-service listing
 export async function updateSelfServiceListing(listingId: string, input: Partial<SelfServiceListingInput>) {
+    if (!UUID_REGEX.test(listingId)) return { success: false, error: 'Invalid listing ID' }
+
+    // VALIDATION: Server-side input checks
+    if (input.title !== undefined && (!input.title.trim() || input.title.trim().length > MAX_TITLE_LENGTH)) {
+        return { success: false, error: `Title must be between 1 and ${MAX_TITLE_LENGTH} characters.` }
+    }
+    if (input.description !== undefined && input.description.trim().length > MAX_DESCRIPTION_LENGTH) {
+        return { success: false, error: `Description must be under ${MAX_DESCRIPTION_LENGTH} characters.` }
+    }
+
     const supabase = await createClient()
-    
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
-    
+
     // Verify ownership: check that the user's provider_profiles.listing_id matches,
     // OR that created_by_provider_id points to their provider profile.
     // The !inner join fails when created_by_provider_id is NULL (Nightshift listings).
@@ -144,10 +168,10 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
     
     // SECURITY: Allowlist fields — prevent mass assignment of is_verified, approval_status, etc.
     const updateData: Record<string, unknown> = {
-        ...(input.title !== undefined && { title: input.title }),
+        ...(input.title !== undefined && { title: input.title.trim() }),
         ...(input.category !== undefined && { category: input.category }),
         ...(input.subcategory !== undefined && { subcategory: input.subcategory }),
-        ...(input.description !== undefined && { description: input.description }),
+        ...(input.description !== undefined && { description: input.description.trim() }),
         ...(input.attributes !== undefined && { attributes: input.attributes }),
         approval_status: 'pending' // Require re-approval after edit
     }
@@ -309,11 +333,14 @@ export async function previewListing(input: SelfServiceListingInput) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { preview: null, error: 'Not authenticated' }
     
-    // Get provider profile for additional data
+    // Get provider profile for additional data (select only needed fields, not *)
     const { data: provider } = await supabase
         .from('provider_profiles')
         .select(`
-            *,
+            headline,
+            day_rate,
+            currency,
+            tier,
             profiles!provider_profiles_user_id_fkey (
                 full_name,
                 avatar_url
@@ -357,8 +384,10 @@ export async function previewListing(input: SelfServiceListingInput) {
 
 // Submit listing for approval
 export async function submitListingForApproval(listingId: string) {
+    if (!UUID_REGEX.test(listingId)) return { success: false, error: 'Invalid listing ID' }
+
     const supabase = await createClient()
-    
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { success: false, error: 'Not authenticated' }
     
