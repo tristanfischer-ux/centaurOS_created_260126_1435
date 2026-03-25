@@ -56,6 +56,7 @@ import { VerificationBadge } from '@/components/marketplace/VerificationBadge'
 import type { MarketplaceListing, ProcessCapability } from '@/actions/marketplace'
 import { getSimilarListings } from '@/actions/marketplace'
 import { EndorsementSection } from '@/components/marketplace/endorsement-section'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { getEndorsementSummary, getSkillEndorsements } from '@/actions/endorsements'
 import type { EndorsementSummary, SkillEndorsement } from '@/actions/endorsements'
 
@@ -461,6 +462,16 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                                         <p className="text-sm text-muted-foreground mt-1">{headline}</p>
                                     )}
                                 </div>
+                                <AskSpecialistButton
+                                    specialistId="vp-supply-chain"
+                                    specialistName="Chase"
+                                    variant="icon"
+                                    context={{
+                                        type: 'general',
+                                        title: listing.title,
+                                        description: `Marketplace listing: ${listing.title}. Category: ${listing.category}. ${listing.description?.slice(0, 200) ?? ''}`,
+                                    }}
+                                />
                             </div>
                         </DialogHeader>
 

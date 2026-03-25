@@ -7,6 +7,7 @@
 
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -17,7 +18,11 @@ import {
   AlertTriangle, StickyNote, Calendar, Mail,
 } from 'lucide-react'
 import Link from 'next/link'
-import type { FundraiseDashboardStats, ShortlistStage, InvestorNote } from '@/actions/investors'
+import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
+import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -65,6 +70,36 @@ function relativeTime(dateStr: string): string {
 
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
+  const [insights, setInsights] = useState<AgentInsight[]>([])
+  const [briefing, setBriefing] = useState<string | null>(null)
+  const [briefingLoading, setBriefingLoading] = useState(true)
+
+  useEffect(() => {
+    if (!stats || stats.totalTracked === 0) return
+    setBriefingLoading(true)
+
+    const firmTypes = Array.from(
+      new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))
+    )
+
+    generateFundraiseInsights({
+      totalTracked: stats.totalTracked,
+      pipelineCounts: stats.pipelineCounts,
+      coverageGaps: stats.coverageGaps,
+      firmTypes,
+      recentActivityCount: stats.recentNotes.length,
+    }).then((result) => {
+      if (Array.isArray(result)) {
+        if (result.length > 0) {
+          setBriefing(result[0].body)
+          setInsights(result.slice(1))
+        }
+      }
+      setBriefingLoading(false)
+    }).catch(() => {
+      setBriefingLoading(false)
+    })
+  }, [stats])
 
   if (!stats || stats.totalTracked === 0) {
     return (
@@ -99,6 +134,15 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Fiona's pipeline briefing */}
+      <StageSpecialistCard
+        specialistId="fundraising-advisor"
+        variant="entry"
+        briefing={briefing}
+        isLoading={briefingLoading}
+        stageName="Fundraise"
+      />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {(Object.entries(STAGE_CONFIG) as [ShortlistStage, typeof STAGE_CONFIG[ShortlistStage]][]).map(([stage, config]) => {
@@ -114,6 +158,20 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
           )
         })}
       </div>
+
+      {/* Fiona's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => setInsights(prev => prev.filter(i => i.id !== insight.id))}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* Two-column: Funnel + Coverage */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

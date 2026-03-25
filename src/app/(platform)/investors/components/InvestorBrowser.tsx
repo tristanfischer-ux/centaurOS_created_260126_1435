@@ -29,6 +29,10 @@ import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScore
 import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { generateInvestorInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import type { SortOption } from './InvestorSortSelect'
 import type { AdvancedFilters } from './InvestorFilterPanel'
@@ -178,6 +182,11 @@ export function InvestorBrowser({
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
 
+  // Specialist insights state
+  const [specialistInsights, setSpecialistInsights] = useState<AgentInsight[]>([])
+  const [entryBriefing, setEntryBriefing] = useState<string | null>(null)
+  const [briefingLoading, setBriefingLoading] = useState(true)
+
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasEverFetched = useRef(hasUrlFilters)
   // SECURITY: Generation counter prevents stale load-more results from appending
@@ -228,6 +237,36 @@ export function InvestorBrowser({
     const qs = params.toString()
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [activeFirmType, activeOnly, debouncedQuery, sortBy, viewMode, advancedFilters, router, pathname])
+
+  // ---------------------------------------------------------------------------
+  // Fiona's entry briefing — generated once on load
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    setBriefingLoading(true)
+    const shortlistCount = Object.keys(shortlistIds).length
+    const shortlistTypes = Array.from(new Set(
+      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.firm_type).filter(Boolean) as string[]
+    ))
+    const shortlistLocations = Array.from(new Set(
+      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.hq_city).filter(Boolean) as string[]
+    )).slice(0, 5)
+
+    generateInvestorInsights({
+      totalFirms: initialTotal,
+      shortlistCount,
+      shortlistTypes,
+      shortlistLocations,
+      activeFilters: activeFirmType !== 'All' ? activeFirmType : '',
+    }).then((result) => {
+      if (Array.isArray(result) && result.length > 0) {
+        setEntryBriefing(result[0].body)
+        setSpecialistInsights(result.slice(1))
+      }
+      setBriefingLoading(false)
+    }).catch(() => setBriefingLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ---------------------------------------------------------------------------
   // Refetch when filters change
@@ -426,6 +465,29 @@ export function InvestorBrowser({
 
   return (
     <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
+      {/* Fiona's entry briefing */}
+      <StageSpecialistCard
+        specialistId="fundraising-advisor"
+        variant="entry"
+        briefing={entryBriefing}
+        isLoading={briefingLoading}
+        stageName="Investor Directory"
+      />
+
+      {/* Portfolio construction insights */}
+      {specialistInsights.length > 0 && (
+        <div className="space-y-3">
+          {specialistInsights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => setSpecialistInsights(prev => prev.filter(i => i.id !== insight.id))}
+              compact
+            />
+          ))}
+        </div>
+      )}
+
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}

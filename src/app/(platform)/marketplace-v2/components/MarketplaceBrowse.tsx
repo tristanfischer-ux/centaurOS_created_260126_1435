@@ -29,6 +29,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
+import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { generateMarketplaceInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { FoundryContext } from '@/actions/foundry-context'
 
@@ -105,6 +109,11 @@ export function MarketplaceBrowse({
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
+    // Chase's marketplace insights
+    const [chaseInsights, setChaseInsights] = useState<AgentInsight[]>([])
+    const [chaseBriefing, setChaseBriefing] = useState<string | null>(null)
+    const [chaseBriefingLoading, setChaseBriefingLoading] = useState(true)
+
     // Shared compare selection state (lifted from MarketplaceListingGrid)
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
 
@@ -126,6 +135,25 @@ export function MarketplaceBrowse({
 
     const clearCompareSelection = useCallback(() => {
         setSelectedForCompare(new Set())
+    }, [])
+
+    // FLOW: Chase's entry briefing — generated once on load
+    useEffect(() => {
+        setChaseBriefingLoading(true)
+        generateMarketplaceInsights({
+            totalListings: initialListings.length,
+            activeCategory: state.activeCategory,
+            compareCount: 0,
+            savedCount: initialSavedIds.length,
+            hasActiveCadProject: false,
+        }).then((result) => {
+            if (Array.isArray(result) && result.length > 0) {
+                setChaseBriefing(result[0].body)
+                setChaseInsights(result.slice(1))
+            }
+            setChaseBriefingLoading(false)
+        }).catch(() => setChaseBriefingLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Handle recommendation click
@@ -328,6 +356,29 @@ export function MarketplaceBrowse({
                     </p>
                 </div>
             </div>
+
+            {/* Chase's marketplace briefing */}
+            <StageSpecialistCard
+                specialistId="vp-supply-chain"
+                variant="entry"
+                briefing={chaseBriefing}
+                isLoading={chaseBriefingLoading}
+                stageName="Marketplace"
+            />
+
+            {/* Chase's proactive insights */}
+            {chaseInsights.length > 0 && (
+                <div className="space-y-3">
+                    {chaseInsights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => setChaseInsights(prev => prev.filter(i => i.id !== insight.id))}
+                            compact
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* Tab navigation */}
             <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">

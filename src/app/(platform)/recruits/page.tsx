@@ -22,6 +22,7 @@ import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
+import { HarperRoleBriefing } from './harper-role-briefing'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
 import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
@@ -128,8 +129,16 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
         }
     }
 
+    const categories = Array.from(new Set(listings.map(l => l.subcategory).filter(Boolean)))
+
     return (
         <div className="space-y-6">
+            {/* Harper's pre-search role briefing */}
+            <HarperRoleBriefing
+                totalListings={listings.length}
+                categories={categories}
+            />
+
             {/* AI Talent Finder - the "aha moment" */}
             <TalentFinderWrapper />
 

@@ -41,6 +41,8 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/outreach", specialistId: "sales-lead" },
   { pattern: "/knowledge", specialistId: "strategist" },
   { pattern: "/recruits", specialistId: "hiring-team" },
+  { pattern: "/investors", specialistId: "fundraising-advisor" },
+  { pattern: "/fundraise", specialistId: "fundraising-advisor" },
   { pattern: "/apprenticeship", specialistId: "hiring-team" },
   // Prefix patterns (more specific before broader)
   { pattern: "/the-forge/cad-lab/specify", specialistId: "vp-manufacturing" },
@@ -50,7 +52,7 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/the-forge", specialistId: "product-lead" },
   { pattern: "/strategic-planner", specialistId: "strategist" },
   { pattern: "/team", specialistId: "hiring-team" },
-  { pattern: "/marketplace", specialistId: "sales-lead" },
+  { pattern: "/marketplace", specialistId: "vp-supply-chain" },
   { pattern: "/pitch-prep", specialistId: "fundraising-advisor" },
   { pattern: "/guild", specialistId: "hiring-team" },
   { pattern: "/retainers", specialistId: "legal-counsel" },

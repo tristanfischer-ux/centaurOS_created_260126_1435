@@ -12,6 +12,7 @@ import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getFundraiseDashboardStats } from '@/actions/investors'
 import { FundraiseView } from './fundraise-view'
+import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 
 export const revalidate = 60
 
@@ -38,11 +39,24 @@ export default async function FundraisePage() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">Fundraise Dashboard</h1>
-        <p className="text-muted-foreground">
-          Track your investor pipeline, coverage, and outreach activity
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold text-foreground">Fundraise Dashboard</h1>
+          <p className="text-muted-foreground">
+            Track your investor pipeline, coverage, and outreach activity
+          </p>
+        </div>
+        <AskSpecialistButton
+          specialistId="fundraising-advisor"
+          specialistName="Fiona"
+          variant="chip"
+          context={{
+            type: 'general',
+            title: 'Fundraise Pipeline',
+            description: 'Full fundraise dashboard with pipeline stats and coverage analysis.',
+          }}
+          label="Ask Fiona"
+        />
       </div>
 
       <Suspense fallback={<FundraiseDashboardLoading />}>

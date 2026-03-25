@@ -57,6 +57,10 @@ import { OrbitalView } from './components/orbital-view'
 import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
 import { SmartInsights } from './smart-insights'
+import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { generateTeamInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import { QuickAssignDialog } from './quick-assign-dialog'
 import { InviteMemberDialog } from './invite-member-dialog'
 import { PendingInvitations } from './pending-invitations'
@@ -267,6 +271,39 @@ export function TeamPageView({
         ],
     }), [founders, executives, apprentices, teams, insights, totalMembers]))
 
+    // FLOW: Harper's team composition analysis — generated once on load
+    useEffect(() => {
+        setHarperBriefingLoading(true)
+        const totalPeople = founders.length + executives.length + apprentices.length
+        const avgCap = totalPeople > 0
+            ? Math.round(
+                [...founders, ...executives, ...apprentices].reduce((sum, m) => {
+                    const total = m.activeTasks + m.completedTasks + m.pendingTasks
+                    return sum + Math.max(0, 100 - total * 10)
+                }, 0) / totalPeople
+              )
+            : 100
+
+        generateTeamInsights({
+            totalMembers: totalPeople,
+            founders: founders.length,
+            executives: executives.length,
+            apprentices: apprentices.length,
+            teamCount: teams.length,
+            avgCapacity: avgCap,
+            overloadedMembers: insights?.overloadedMembers?.map(m => m.name) ?? [],
+            idleMembers: insights?.idleMembers?.map(m => m.name) ?? [],
+            unassignedTasks: insights?.unassignedTaskCount ?? 0,
+        }).then((result) => {
+            if (Array.isArray(result) && result.length > 0) {
+                setHarperBriefing(result[0].body)
+                setHarperInsights(result.slice(1))
+            }
+            setHarperBriefingLoading(false)
+        }).catch(() => setHarperBriefingLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     // Quick assign
     const [showQuickAssign, setShowQuickAssign] = useState(false)
 
@@ -282,6 +319,11 @@ export function TeamPageView({
     const [quickTeamMemberIds, setQuickTeamMemberIds] = useState<string[]>([])
     const [teamName, setTeamName] = useState('')
     const [teamError, setTeamError] = useState<string | null>(null)
+
+    // Specialist insights
+    const [harperInsights, setHarperInsights] = useState<AgentInsight[]>([])
+    const [harperBriefing, setHarperBriefing] = useState<string | null>(null)
+    const [harperBriefingLoading, setHarperBriefingLoading] = useState(true)
 
     // Team management
     const [teamToEdit, setTeamToEdit] = useState<{ id: string; name: string } | null>(null)
@@ -1031,6 +1073,31 @@ export function TeamPageView({
                     </div>
                 </div>
             </div>
+
+            {/* Harper's team composition briefing */}
+            {!isOrbitActive && (
+                <StageSpecialistCard
+                    specialistId="hiring-team"
+                    variant="entry"
+                    briefing={harperBriefing}
+                    isLoading={harperBriefingLoading}
+                    stageName="Team"
+                />
+            )}
+
+            {/* Harper's proactive insights */}
+            {!isOrbitActive && harperInsights.length > 0 && (
+                <div className="space-y-3">
+                    {harperInsights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => setHarperInsights(prev => prev.filter(i => i.id !== insight.id))}
+                            compact
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* ── Stats & Insights Pills (hidden in orbit mode — shown in bottom bar) ── */}
             {!isOrbitActive && (
