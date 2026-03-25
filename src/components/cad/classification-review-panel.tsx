@@ -422,7 +422,16 @@ export function ClassificationReviewPanel({
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setIsCollapsed(true)}
+                className="min-h-[44px] sm:min-h-0"
+                onClick={() => {
+                  // Lock in current classifications for all unreviewed parts
+                  for (const part of classifiedParts) {
+                    if (part.confidence !== "high" && !part.isOverridden) {
+                      onOverride(part.partKey, { type: part.type })
+                    }
+                  }
+                  setIsCollapsed(true)
+                }}
               >
                 Accept All & Continue
               </Button>

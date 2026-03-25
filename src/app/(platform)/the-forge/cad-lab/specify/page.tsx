@@ -94,6 +94,9 @@ import { getToleranceMm } from "@/lib/cad-lab/diagnostic-to-technique"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
 import { SpecialistIntroCard } from "@/components/cad/specialist-intro-card"
+import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
+import { useStageBriefing } from "@/hooks/use-stage-briefing"
+import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -323,7 +326,8 @@ export default function SpecifyPage(): React.ReactNode {
       return updated
     })
 
-    if (mirrorCount > 0) {
+    if (mirrorCount > 0 && Date.now() - lastMirrorToastRef.current > 3000) {
+      lastMirrorToastRef.current = Date.now()
       toast.info(`Synced diagnostics to ${mirrorCount} mirror module${mirrorCount !== 1 ? "s" : ""}`)
     }
   }, [modules, designBrief, setDiagnosticAnswers])
@@ -384,6 +388,42 @@ export default function SpecifyPage(): React.ReactNode {
   // ── Gate: can proceed to Source? ──
   // INTENT: Full pipeline — diagnostics + reviews done before sourcing. Costings live in Source/Assemble.
   const canProceedToSource = allDiagnosticsComplete && (allModulesReviewed || reviewSkipped)
+
+  // ── Stage briefings — Specify stage owned by Fang (VP Manufacturing) ──
+  const specifyMapping = STAGE_SPECIALISTS.specify
+  const nextSpecify = getNextStageSpecialist("specify")
+  const reviewSummary = useMemo(() => {
+    let pass = 0, warn = 0, fail = 0
+    for (const reviews of Object.values(moduleReviews)) {
+      for (const r of reviews) {
+        if (r.verdict === "pass") pass++
+        else if (r.verdict === "warn") warn++
+        else if (r.verdict === "fail") fail++
+      }
+    }
+    return { pass, warn, fail }
+  }, [moduleReviews])
+
+  const { briefing: specifyEntryBriefing, isLoading: specifyEntryLoading } = useStageBriefing({
+    stage: "specify",
+    variant: "entry",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    moduleCount: modules.length,
+    diagnosticCompletionPct: diagStats.completionPct,
+    reviewSummary,
+    enabled: true,
+  })
+  const { briefing: specifyExitBriefing, isLoading: specifyExitLoading } = useStageBriefing({
+    stage: "specify",
+    variant: "exit",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    moduleCount: modules.length,
+    diagnosticCompletionPct: diagStats.completionPct,
+    reviewSummary,
+    enabled: canProceedToSource,
+  })
 
   // ── Batch review orchestrator ──
   // INTENT: Parallel auto-review of all unreviewed modules (up to BATCH_CONCURRENCY at once).
@@ -556,6 +596,30 @@ export default function SpecifyPage(): React.ReactNode {
           )}
         </div>
       </div>
+
+      {/* ── Fang (VP Manufacturing) entry briefing ── */}
+      <StageSpecialistCard
+        specialistId={specifyMapping.specialistId}
+        variant="entry"
+        stageName="Specify"
+        briefing={specifyEntryBriefing}
+        isLoading={specifyEntryLoading}
+      />
+
+      {/* ── Fang exit briefing — shown when ready to proceed to Source ── */}
+      {canProceedToSource && (
+        <StageSpecialistCard
+          specialistId={specifyMapping.specialistId}
+          variant="exit"
+          stageName="Specify"
+          briefing={specifyExitBriefing}
+          isLoading={specifyExitLoading}
+          nextSpecialistId={nextSpecify?.specialistId}
+          nextStageName={nextSpecify?.stageLabel}
+          onProceed={() => router.push(FORGE_ROUTES.cadLabSource)}
+          proceedLabel="Continue to Source"
+        />
+      )}
 
       {/* ── Progress bar — tracks diagnostics completion ── */}
       <div className="space-y-1.5">

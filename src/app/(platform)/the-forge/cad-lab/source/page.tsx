@@ -18,12 +18,9 @@ import { motion, AnimatePresence } from "framer-motion"
 import {
   ShoppingCart,
   ArrowLeft,
-  ArrowRight,
-  Package,
   AlertCircle,
   RefreshCw,
   FileDown,
-  Truck,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -50,8 +47,9 @@ import { DesignReportDialog } from "../components/design-report-dialog"
 import { classifyPart } from "@/lib/part-classification"
 import { GetQuoteButton } from "@/components/cad/get-quote-button"
 import { SourceSpecialistInsights } from "@/components/cad/source-specialist-insights"
-import Image from "next/image"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
+import { useStageBriefing } from "@/hooks/use-stage-briefing"
+import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 
 // ─── Shortlisted supplier type ──────────────────────────────────────
 
@@ -450,18 +448,19 @@ export default function SourcePage(): React.ReactNode {
 
   const handleRefreshActiveTab = useCallback(() => {
     if (activeTab === "suppliers") {
-      setSupplierMatchesRaw(new Map())
+      // Use wrapper to sync localStorage
+      setSupplierMatches(() => new Map())
       handleMatchAll()
       toast.info("Refreshing supplier matches…")
     } else if (activeTab === "shortlist") {
-      setSupplierMatchesRaw(new Map())
-      setShortlistedSuppliersRaw(new Map())
-      setCategoryRankingsRaw(new Map())
+      setSupplierMatches(() => new Map())
+      setShortlistedSuppliers(() => new Map())
+      setCategoryRankings(() => new Map())
       autoSelectKeyRef.current = ""
       handleMatchAll()
       toast.info("Refreshing shortlist…")
     } else if (activeTab === "costs") {
-      setBuyPartResultsRaw([])
+      setBuyPartResults([])
       // GOTCHA: Do NOT reset buySearchTriggeredRef — we call handleSearchBuyParts
       // directly below. Resetting the ref would let the auto-trigger effect fire
       // a duplicate search when the first one returns zero results.
@@ -471,7 +470,7 @@ export default function SourcePage(): React.ReactNode {
       }
       toast.info("Refreshing cost data…")
     }
-  }, [activeTab, handleMatchAll, handleSearchBuyParts, buyPartNames, reEstimateCosts])
+  }, [activeTab, handleMatchAll, handleSearchBuyParts, buyPartNames, reEstimateCosts, setSupplierMatches, setShortlistedSuppliers, setCategoryRankings, setBuyPartResults])
 
   // ── Auto-select top 3 suppliers after matching ──
   const autoSelectKeyRef = useRef<string>("")
@@ -583,40 +582,40 @@ export default function SourcePage(): React.ReactNode {
     }), [subject, eligibleModules.length, supplierMatches.size]),
   )
 
+  // ── Stage briefings — Source stage owned by Chase (VP Supply Chain) ──
+  const sourceMapping = STAGE_SPECIALISTS.source
+  const nextSource = getNextStageSpecialist("source")
+  const matchedCount = [...supplierMatches.values()].filter(v => v.length > 0).length
+  const sourceEntryBriefingText = useMemo(() => {
+    const total = eligibleModules.length
+    if (matchedCount === 0) return "Match suppliers for each module to start building your supply chain. I'll validate dual-sourcing and flag single-source risks."
+    if (matchedCount < total) return `${matchedCount} of ${total} modules matched. Keep going — match all modules before proceeding to assembly.`
+    if (manufacturingOrderCount > 0) return `All ${total} modules matched with ${manufacturingOrderCount} manufacturing order${manufacturingOrderCount !== 1 ? "s" : ""} created. Ready to proceed to assembly.`
+    return `All ${total} modules matched. Create RFQs and manufacturing orders to proceed to assembly.`
+  }, [matchedCount, eligibleModules.length, manufacturingOrderCount])
+
+  const { briefing: sourceExitBriefing, isLoading: sourceExitLoading } = useStageBriefing({
+    stage: "source",
+    variant: "exit",
+    projectId: activeProjectId,
+    projectSubject: subject,
+    moduleCount: modules.length,
+    supplierMatchCount: matchedCount,
+    manufacturingOrderCount,
+    enabled: manufacturingOrderCount > 0,
+  })
+
   if (!hasResearch || specifiedModuleCount === 0) return null
 
   return (
     <div className="space-y-6">
-      {/* ── Chase (VP Supply Chain) Sourcing Review ── */}
-      <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            {(() => {
-              const chase = getSpecialistById("vp-supply-chain")
-              return chase?.avatarImage ? (
-                <Image src={chase.avatarImage} alt={chase.name} width={32} height={32} className="rounded-full flex-shrink-0" />
-              ) : (
-                <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-                  <Truck className="h-4 w-4 text-info" />
-                </div>
-              )
-            })()}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Sourcing Review</p>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {(() => {
-                  const matched = [...supplierMatches.values()].filter(v => v.length > 0).length
-                  const total = eligibleModules.length
-                  if (matched === 0) return "Match suppliers for each module to start building your supply chain. I'll validate dual-sourcing and flag single-source risks."
-                  if (matched < total) return `${matched} of ${total} modules matched. Keep going — match all modules before proceeding to assembly.`
-                  if (manufacturingOrderCount > 0) return `All ${total} modules matched with ${manufacturingOrderCount} manufacturing order${manufacturingOrderCount !== 1 ? "s" : ""} created. Ready to proceed to assembly.`
-                  return `All ${total} modules matched. Create RFQs and manufacturing orders to proceed to assembly.`
-                })()}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Chase (VP Supply Chain) entry briefing ── */}
+      <StageSpecialistCard
+        specialistId={sourceMapping.specialistId}
+        variant="entry"
+        stageName="Source"
+        briefing={sourceEntryBriefingText}
+      />
 
       {/* ── Unresolved specialist warnings from Specify reviews ── */}
       <SourceSpecialistInsights
@@ -733,21 +732,17 @@ export default function SourcePage(): React.ReactNode {
 
             {/* Forward navigation — visible when manufacturing orders exist */}
             {manufacturingOrderCount > 0 && (
-              <Card>
-                <CardContent className="pt-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Sourcing complete</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {manufacturingOrderCount} manufacturing order{manufacturingOrderCount !== 1 ? "s" : ""} created. Continue to assembly.
-                    </p>
-                  </div>
-                  <Button size="sm" onClick={() => router.push(FORGE_ROUTES.cadLabAssemble)}>
-                    <Package className="h-4 w-4 mr-1.5" />
-                    Continue to Assemble
-                    <ArrowRight className="h-4 w-4 ml-1.5" />
-                  </Button>
-                </CardContent>
-              </Card>
+              <StageSpecialistCard
+                specialistId={sourceMapping.specialistId}
+                variant="exit"
+                stageName="Source"
+                briefing={sourceExitBriefing}
+                isLoading={sourceExitLoading}
+                nextSpecialistId={nextSource?.specialistId}
+                nextStageName={nextSource?.stageLabel}
+                onProceed={() => router.push(FORGE_ROUTES.cadLabAssemble)}
+                proceedLabel="Continue to Assemble"
+              />
             )}
           </motion.div>
         )}

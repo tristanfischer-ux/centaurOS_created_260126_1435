@@ -53,6 +53,8 @@ import type { SupplierDetail } from "@/actions/cad-lab-supplier-detail"
 import { toast } from "sonner"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { DesignReportDialog } from "../components/design-report-dialog"
+import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
+import { STAGE_SPECIALISTS } from "@/lib/cad-lab/stage-specialist-map"
 import {
   DEFAULT_BRANDING,
   DEFAULT_SHIPPING,
@@ -77,13 +79,13 @@ function loadJson<T>(key: string | null, fallback: T): T {
   try {
     const stored = localStorage.getItem(key)
     if (stored) return JSON.parse(stored) as T
-  } catch { /* ignore corrupt data */ }
+  } catch (err) { console.warn("[ASSEMBLE] loadJson parse failed:", key, err) }
   return fallback
 }
 
 function saveJson(key: string | null, value: unknown): void {
   if (!key) return
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota */ }
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch (err) { console.warn("[ASSEMBLE] saveJson quota exceeded:", key, err) }
 }
 
 // ─── Page Component ──────────────────────────────────────────────────
@@ -119,6 +121,16 @@ export default function AssemblePage(): React.ReactNode {
     }
     return notes
   }, [modules, moduleReviews])
+
+  // ── Stage briefings — Assemble stage owned by Jian (VP Engineering) ──
+  const assembleMapping = STAGE_SPECIALISTS.assemble
+  const assembleEntryText = useMemo(() => {
+    const base = "I'm overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment."
+    return assemblyNotes.length > 0 ? base + " Fang's assembly notes from the Specify stage are shown below." : base
+  }, [assemblyNotes.length])
+
+  // DECISION: Exit briefing for assemble not wired yet — no assembly completion gate exists.
+  // When the gate is added, use useStageBriefing({ stage: "assemble", variant: "exit", ... }).
 
   // Gate: redirect to Source if prerequisites are missing
   useEffect(() => {
@@ -484,30 +496,13 @@ export default function AssemblePage(): React.ReactNode {
 
   return (
     <div className="space-y-6">
-      {/* ── Chase (VP Supply Chain) Assembly Review ── */}
-      <Card className="border-info/30 bg-gradient-to-r from-info/5 to-background">
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-3">
-            {(() => {
-              const chase = getSpecialistById("vp-supply-chain")
-              return chase?.avatarImage ? (
-                <Image src={chase.avatarImage} alt={chase.name} width={32} height={32} className="rounded-full flex-shrink-0" />
-              ) : (
-                <div className="shrink-0 w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-                  <Truck className="h-4 w-4 text-info" />
-                </div>
-              )
-            })()}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-info mb-1">Chase, VP Supply Chain — Assembly & Logistics</p>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                I&apos;m overseeing your assembly convergence. Match assemblers who cover all your process requirements, configure branding and packaging, then set up shipping and fulfilment.
-                {assemblyNotes.length > 0 && " Fang's assembly notes from the Specify stage are shown below."}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Jian (VP Engineering) Assembly Review — stage owner ── */}
+      <StageSpecialistCard
+        specialistId={assembleMapping.specialistId}
+        variant="entry"
+        stageName="Assemble"
+        briefing={assembleEntryText}
+      />
 
       {/* ── Fang's Assembly Notes (from Specify specialist review) ── */}
       {assemblyNotes.length > 0 && (

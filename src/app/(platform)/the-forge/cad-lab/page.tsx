@@ -562,7 +562,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                                   </div>
                                 ))}
                                 {engReportData.standards.length > 3 && (
-                                  <button onClick={() => setShowAllStandards((p) => !p)} className="text-[11px] text-international-orange hover:underline">
+                                  <button onClick={() => setShowAllStandards((p) => !p)} className="text-[11px] text-international-orange hover:underline min-h-[44px] sm:min-h-0 py-1">
                                     {showAllStandards ? "Show less" : `View all ${engReportData.standards.length}`}
                                   </button>
                                 )}
@@ -597,7 +597,7 @@ export default function CadLabResearchPage(): React.ReactNode {
                                   </div>
                                 ))}
                                 {engReportData.materials.length > 3 && (
-                                  <button onClick={() => setShowAllMaterials((p) => !p)} className="text-[11px] text-international-orange hover:underline">
+                                  <button onClick={() => setShowAllMaterials((p) => !p)} className="text-[11px] text-international-orange hover:underline min-h-[44px] sm:min-h-0 py-1">
                                     {showAllMaterials ? "Show less" : `View all ${engReportData.materials.length}`}
                                   </button>
                                 )}
@@ -628,14 +628,8 @@ export default function CadLabResearchPage(): React.ReactNode {
                           <Wrench className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-medium text-foreground">Hardware Library</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 4762 Socket Head Bolts (M2–M24)</span>
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 4032 Hex Nuts (M3–M20)</span>
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">ISO 7089 Plain Washers (M3–M20)</span>
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-muted text-foreground">Deep Groove Ball Bearings (608–6205)</span>
-                            </div>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {engData.hardwareItemCount} items with exact clearance holes, thread pitches, load ratings
+                              {engReportData?.hardwareCount ?? engData.hardwareItemCount} standard components — bolts, nuts, washers, bearings with exact clearance holes and load ratings
                             </p>
                           </div>
                         </div>

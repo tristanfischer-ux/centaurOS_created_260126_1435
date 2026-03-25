@@ -35,6 +35,7 @@ import {
     TOOL_RUN_ENGINEERING_CALC,
     TOOL_LOOKUP_MATERIAL,
     TOOL_LOOKUP_PROCESS,
+    TOOL_LOOKUP_STANDARD,
     TOOL_CALCULATE_TOLERANCE_STACK,
     PRODUCT_TOOLS,
     PEOPLE_TOOLS,
@@ -88,6 +89,7 @@ import {
     handleScoreSuppliers,
     handleAnalyzeOutreachPerformance,
 } from "./handlers/marketplace-compute"
+import { handleLookupDesignStandard } from "./handlers/design-standards"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -158,6 +160,7 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     calculate_fastener: handleCalculateFastener,
     lookup_material: handleLookupMaterial,
     lookup_process: handleLookupProcess,
+    lookup_design_standard: handleLookupDesignStandard,
 }
 
 // ─── Specialist → Tool Definitions Map ───────────────────────────────
@@ -183,23 +186,22 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
         TOOL_CALCULATE_TOLERANCE_STACK,
     ],
 
-    // VP Engineering — engineering metrics + people context + all engineering computation tools + project analysis
+    // VP Engineering (Jian) — hardware engineering: stress, thermal, tolerance, fastener, material, process, standards
     "vp-engineering": [
         ...COMMON_TOOLS,
-        ...ENGINEERING_TOOLS,
-        ...PEOPLE_TOOLS,
         ...ENGINEERING_COMPUTE_TOOLS,
-        ...PROJECT_COMPUTE_TOOLS,
         TOOL_RUN_ENGINEERING_CALC,
         TOOL_RUN_CALCULATION,
+        TOOL_LOOKUP_STANDARD,
     ],
 
-    // VP Manufacturing — all engineering computation tools (core for DFM reviews)
+    // VP Manufacturing (Fang) — DFM reviews + engineering computation + standards
     "vp-manufacturing": [
         ...COMMON_TOOLS,
         ...ENGINEERING_COMPUTE_TOOLS,
         TOOL_RUN_ENGINEERING_CALC,
         TOOL_RUN_CALCULATION,
+        TOOL_LOOKUP_STANDARD,
     ],
 
     // VP Supply Chain — marketplace + material/process lookups + tolerance analysis + supplier scoring

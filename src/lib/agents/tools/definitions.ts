@@ -745,6 +745,34 @@ export const TOOL_LOOKUP_PROCESS: ToolDefinition = {
     },
 }
 
+export const TOOL_LOOKUP_STANDARD: ToolDefinition = {
+    name: "lookup_design_standard",
+    description:
+        "Query the design standards database (ISO, ASME, ASTM, BS EN, DIN). Search by code, domain, or keyword. Returns standard name, issuing body, summary, design rules, material specs, and dimensional constraints. Use this when checking compliance, recommending standards for a product, or looking up specific engineering requirements.",
+    parameters: {
+        type: "object",
+        properties: {
+            standard_code: {
+                type: "string",
+                description: "Standard code (e.g., 'ISO 2768', 'ASTM B209'). Exact match on code.",
+            },
+            domain: {
+                type: "string",
+                description: "Industry domain filter (e.g., 'automotive', 'aerospace', 'medical', 'general_engineering').",
+            },
+            query: {
+                type: "string",
+                description: "Free-text search across code, name, and summary.",
+            },
+            limit: {
+                type: "number",
+                description: "Max results. Default 5.",
+            },
+        },
+        required: [],
+    },
+}
+
 /** All engineering computation tools. */
 export const ENGINEERING_COMPUTE_TOOLS: ToolDefinition[] = [
     TOOL_CALCULATE_STRESS,
