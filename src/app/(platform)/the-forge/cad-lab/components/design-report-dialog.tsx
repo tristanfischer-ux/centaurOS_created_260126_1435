@@ -109,6 +109,8 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     researchModelUsed,
     decompositionModelUsed,
     activeProjectId,
+    moduleReviews,
+    reviewSkipped,
   } = useCadLab()
 
   const { runInBackground } = useBackgroundOp()
@@ -143,6 +145,14 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
     // stage data so the report covers the complete design evolution.
     const effectiveStage = journeyMode ? 'journey' as const : stage
 
+    // INTENT: In journey mode, include context-level data (moduleReviews, reviewSkipped)
+    // that isn't in stageData unless we're on the Specify page. This ensures the
+    // journey report includes reviews regardless of which page the user exports from.
+    const journeyExtras: Partial<DesignReportData> = journeyMode ? {
+      moduleReviews: Object.keys(moduleReviews).length > 0 ? moduleReviews : undefined,
+      reviewSkipped: reviewSkipped || undefined,
+    } : {}
+
     return {
       projectName: subject || "Untitled Project",
       generatedAt: new Date().toISOString(),
@@ -158,12 +168,14 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
       researchModelUsed: researchModelUsed ?? null,
       decompositionModelUsed: decompositionModelUsed ?? null,
       engineeringIntelligence,
+      ...journeyExtras,
       ...stageData,
     }
   }, [
     subject, editableReport, researchResult, modules, diagnosticAnswers,
     aiCostEstimates, productOverview, designBrief, systemIllustrationUrl,
     researchModelUsed, decompositionModelUsed, stage, stageData, journeyMode,
+    moduleReviews, reviewSkipped,
   ])
 
   const handleExport = useCallback(async () => {
@@ -191,7 +203,7 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
             const safeName = data.projectName.replace(/[^a-zA-Z0-9]/g, "-") || "report"
             const dateStr = new Date(data.generatedAt).toISOString().split("T")[0]
             const uid = crypto.randomUUID().slice(0, 8)
-            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${stage}-${dateStr}-${uid}.pdf`
+            storagePath = `reports/${projectId ?? "unknown"}/${safeName}-${journeyMode ? "journey" : stage}-${dateStr}-${uid}.pdf`
 
             const supabase = createClient()
             const { error: uploadError } = await supabase.storage

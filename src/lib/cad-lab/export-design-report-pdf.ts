@@ -38,7 +38,8 @@ function buildReportHTML(data: DesignReportData): string {
 
   // Cover
   sections.push(`<h1>${escapeHtml(data.projectName)}</h1>`)
-  sections.push(`<p class="meta">Generated ${new Date(data.generatedAt).toLocaleDateString()} — Stage: ${data.stage}</p>`)
+  const stageLabel = data.stage === 'journey' ? 'Design Journey' : data.stage === 'concept' ? 'Concept' : data.stage === 'specify' ? 'Specification' : data.stage === 'source' ? 'Sourcing' : data.stage === 'assemble' ? 'Assembly' : data.stage === 'cad' ? 'CAD' : data.stage
+  sections.push(`<p class="meta">Generated ${new Date(data.generatedAt).toLocaleDateString()} — ${stageLabel} Report</p>`)
 
   // Product Overview
   if (data.productOverview && !data.productOverview.includes("synthesis failed")) {

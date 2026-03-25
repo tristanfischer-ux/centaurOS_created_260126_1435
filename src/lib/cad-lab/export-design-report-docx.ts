@@ -1045,6 +1045,7 @@ async function buildCoverPage(data: DesignReportData): Promise<DocChild[]> {
         : data.stage === 'source' ? 'Sourcing Report'
         : data.stage === 'assemble' ? 'Assembly Report'
         : data.stage === 'cad' ? 'CAD Report'
+        : data.stage === 'journey' ? 'Design Journey Report'
         : 'Engineering Design Report',
       { after: 200, color: MID_TEXT, size: 24 },
     ),
