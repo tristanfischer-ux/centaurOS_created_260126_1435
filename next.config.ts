@@ -133,8 +133,6 @@ const nextConfig: NextConfig = {
               // The iframe uses sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               // to restrict embedded page capabilities (no top-navigation, no pointer-lock).
               "frame-src 'self' https://*.stripe.com https:",
-              // SECURITY: worker-src allows Three.js Web Workers for 3D rendering (blob: URLs)
-              "worker-src 'self' blob:",
               "frame-ancestors 'self'",
               "form-action 'self'",
               "base-uri 'self'",

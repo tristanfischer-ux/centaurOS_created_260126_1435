@@ -34,7 +34,26 @@ export async function createSelfServiceListing(input: SelfServiceListingInput) {
     if (provider.tier === 'pending' || provider.tier === 'suspended') {
         return { success: false, error: 'Your provider account must be approved before creating listings.' }
     }
-    
+
+    // GOTCHA: Check if this provider already has a listing (orphaned from a previous
+    // attempt where listing_id FK wasn't set, or pushed via Nightshift).
+    // Without this guard, the INSERT succeeds but creates duplicates.
+    const { data: existingListing } = await supabase
+        .from('marketplace_listings')
+        .select('id')
+        .eq('created_by_provider_id', provider.id)
+        .limit(1)
+        .maybeSingle()
+
+    if (existingListing) {
+        // Repair the FK and redirect to update flow
+        await supabase
+            .from('provider_profiles')
+            .update({ listing_id: existingListing.id })
+            .eq('id', provider.id)
+        return { success: false, error: 'You already have a listing. Please refresh the page to edit it.' }
+    }
+
     // Create the listing with pending approval status
     const { data: listing, error: listingError } = await supabase
         .from('marketplace_listings')
@@ -116,14 +135,15 @@ export async function updateSelfServiceListing(listingId: string, input: Partial
 // Get provider's listing
 export async function getProviderListing() {
     const supabase = await createClient()
-    
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { listing: null, error: 'Not authenticated' }
-    
-    // Get provider profile with listing
+
+    // Get provider profile with listing via FK
     const { data: provider, error: providerError } = await supabase
         .from('provider_profiles')
         .select(`
+            id,
             listing_id,
             marketplace_listings (
                 id,
@@ -135,16 +155,43 @@ export async function getProviderListing() {
                 is_verified,
                 approval_status,
                 approval_notes,
-                created_at,
-                updated_at
+                created_at
             )
         `)
         .eq('user_id', user.id)
         .single()
-    
+
     if (providerError) return { listing: null, error: sanitizeErrorMessage(providerError) }
-    
-    return { listing: provider?.marketplace_listings || null, error: null }
+
+    // If FK join found the listing, return it
+    if (provider?.marketplace_listings) {
+        return { listing: provider.marketplace_listings, error: null }
+    }
+
+    // GOTCHA: listing_id FK may not be set even though a listing exists for this
+    // provider (e.g. created via Nightshift claim, or a previous create where the
+    // UPDATE of listing_id failed). Fall back to searching by created_by_provider_id.
+    if (provider?.id) {
+        const { data: orphanedListing } = await supabase
+            .from('marketplace_listings')
+            .select('id, title, category, subcategory, description, attributes, is_verified, approval_status, approval_notes, created_at')
+            .eq('created_by_provider_id', provider.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+        if (orphanedListing) {
+            // Repair the FK so future lookups use the fast path
+            await supabase
+                .from('provider_profiles')
+                .update({ listing_id: orphanedListing.id })
+                .eq('id', provider.id)
+
+            return { listing: orphanedListing, error: null }
+        }
+    }
+
+    return { listing: null, error: null }
 }
 
 // Get all subcategories for a category
