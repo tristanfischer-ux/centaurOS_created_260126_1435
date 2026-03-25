@@ -28,7 +28,6 @@ const LIGHT_BG = 'F8FAFC'
 const WHITE = 'FFFFFF'
 const CARD_BORDER = 'E2E8F0'
 const SUCCESS_BG = 'ECFDF5'
-const WARN_BG = 'FEF3C7'
 
 // ─── Layout Constants ───────────────────────────────────────────────
 // INTENT: LAYOUT_16x9 = 10" × 5.625". Keep all content within bounds.
@@ -760,7 +759,7 @@ function buildValuePropsSlide(pres: PptxGenJS, section: AiReportSection, slideIm
 
 function buildComparisonTwoColSlide(pres: PptxGenJS, section: AiReportSection): void {
   const sd = section.slideData as Extract<SlideData, { layout: 'comparison-two-col' }> | undefined
-  if (!sd) return
+  if (!sd?.leftTitle || !sd?.rightTitle) return
   const slide = pres.addSlide()
   addSectionTitle(slide, section.title)
 
@@ -964,7 +963,7 @@ function buildQuadrantChartSlide(pres: PptxGenJS, section: AiReportSection): voi
 
 function buildArchitectureDiagramSlide(pres: PptxGenJS, section: AiReportSection, slideImage: string | null): void {
   const sd = section.slideData as Extract<SlideData, { layout: 'architecture-diagram' }> | undefined
-  if (!sd) return
+  if (!sd?.heading) return
   const slide = pres.addSlide()
   addSectionTitle(slide, sd.heading || section.title)
 

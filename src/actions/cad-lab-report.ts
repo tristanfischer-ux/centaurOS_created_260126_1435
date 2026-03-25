@@ -356,7 +356,7 @@ ${dataSummary}`
         },
         body: JSON.stringify({
           model: "claude-opus-4-6",
-          max_tokens: 4096,
+          max_tokens: 12288,
           temperature: 0.3,
           system: systemPrompt,
           messages: [{ role: "user", content: userPrompt }],
@@ -805,7 +805,7 @@ export async function generateSlideImages(
 
       const fullPrompt = job.prompt + NO_TEXT_SUFFIX
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key=${apiKey}`
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`
 
       const response = await fetchWithTimeout(
         url,

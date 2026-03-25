@@ -249,18 +249,24 @@ export function DesignReportDialog({ open, onOpenChange, stage = 'concept', stag
           let aiFailed = false
           try {
             update({ stepLabel: `AI: Structuring outline (${moduleCount} modules)...`, progress: 15 })
-            const { structureReportOutline, writeReportSections } = await import("@/actions/cad-lab-report")
+            const { structureReportOutline, writeReportSections, generateSlideImages } = await import("@/actions/cad-lab-report")
             const { outline, tokensIn, tokensOut } = await structureReportOutline(data)
 
             update({ stepLabel: `AI: Writing ${moduleCount} sections...`, progress: 35 })
             let aiContent = await writeReportSections(outline, data, { in: tokensIn, out: tokensOut })
 
             // Phase 2.5: Generate custom slide illustrations
+            // GOTCHA: Server actions return data via React Flight — large base64 images
+            // can exceed serialization limits. Wrap in try-catch so image failure doesn't
+            // kill the entire report. Reports still work without slide illustrations.
             const imageCount = outline.sections.filter((s) => s.imagePrompt && s.imagePrompt.length > 20).length
-            if (imageCount > 0) {
-              update({ stepLabel: `Generating ${imageCount} slide illustrations...`, progress: 60 })
-              const { generateSlideImages } = await import("@/actions/cad-lab-report")
-              aiContent = await generateSlideImages(outline, aiContent)
+            if (imageCount > 0 && selectedFormat === "pptx") {
+              try {
+                update({ stepLabel: `Generating ${imageCount} slide illustrations...`, progress: 60 })
+                aiContent = await generateSlideImages(outline, aiContent)
+              } catch (imgErr) {
+                console.warn("[DesignReport] Slide image generation failed (non-fatal):", imgErr)
+              }
             }
 
             data.aiContent = aiContent
