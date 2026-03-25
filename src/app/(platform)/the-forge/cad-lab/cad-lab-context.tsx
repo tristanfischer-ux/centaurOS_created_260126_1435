@@ -2853,6 +2853,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       // Idempotent: returns cached ID if project already exists.
       const projId = await ensureProject()
 
+      // GOTCHA: If project creation fails but user uploaded files, warn them
+      // that their uploads won't be included in research.
+      if (!projId) {
+        const hasPendingImages = referenceImagesRef.current.some(img => !img.uploaded)
+        const hasPendingDocs = referenceDocumentsRef.current.some(doc => !doc.uploaded && doc.fileData)
+        if (hasPendingImages || hasPendingDocs) {
+          console.warn("[CAD-LAB] ensureProject() returned null — pending uploads will not be included in research")
+          toast.error("Could not create project — uploaded files will not be included in research")
+        }
+      }
+
       // ── Upload reference images before research (no extraction needed) ──
       // GOTCHA: Capture ref snapshot ONCE before any state mutations to avoid
       // reading stale data after setReferenceImages calls.
@@ -2874,6 +2885,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
               return stored ? { ...img, uploaded: true, storageUrl: stored.storageUrl } : img
             })
             setReferenceImages(updated)
+            referenceImagesRef.current = updated // GOTCHA: useEffect ref sync won't fire mid-async
             const existingStored = currentImages
               .filter((img) => img.uploaded && img.storageUrl && !storedMap.has(img.id))
               .map((img) => ({ id: img.id, name: img.name, mimeType: img.mimeType, storageUrl: img.storageUrl!, originalSize: img.originalSize }))
@@ -2881,6 +2893,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             if (uploadRes.failed.length > 0) {
               toast.error(`Some images failed: ${uploadRes.failed.join(", ")}`)
             }
+          } else if (uploadRes.failed.length > 0) {
+            // All images failed — stored is empty but failed is populated
+            toast.error(`All image uploads failed: ${uploadRes.failed.join(", ")}`)
           }
         }
       }
@@ -2986,6 +3001,9 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
             if (docUploadRes.failed.length > 0) {
               toast.error(`Some documents failed: ${docUploadRes.failed.join(", ")}`)
             }
+          } else if (docUploadRes.failed.length > 0) {
+            // All documents failed — stored is empty but failed is populated
+            toast.error(`All document uploads failed: ${docUploadRes.failed.join(", ")}`)
           }
         }
       }
@@ -3082,6 +3100,17 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         sources: [],
         referenceModels: [],
         researchTime: 0,
+      })
+      // GOTCHA: If error occurred during extraction, docs may be stuck in "extracting"
+      // status with a perpetual spinner. Reset them to "failed" so the UI reflects reality.
+      setReferenceDocuments(prev => {
+        const hasStuck = prev.some(d => d.extractionStatus === "extracting")
+        if (!hasStuck) return prev
+        const fixed = prev.map(d =>
+          d.extractionStatus === "extracting" ? { ...d, extractionStatus: "failed" as const } : d
+        )
+        referenceDocumentsRef.current = fixed
+        return fixed
       })
     } finally {
       setIsResearching(false)
