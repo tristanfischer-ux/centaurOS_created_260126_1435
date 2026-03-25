@@ -458,6 +458,44 @@ export const TOOL_ANALYZE_OUTREACH: ToolDefinition = {
     },
 }
 
+// ─── Supplier Search Tool ────────────────────────────────────────────
+
+export const TOOL_SEARCH_SUPPLIERS: ToolDefinition = {
+    name: "search_suppliers",
+    description:
+        "Search the ForgeOS marketplace for suppliers by manufacturing process, material, location, and certification. Returns real supplier listings with verification status, ratings, capabilities, equipment, certifications, lead times, and minimum orders. Use this when the founder needs to find suppliers for a specific component or process.",
+    parameters: {
+        type: "object",
+        properties: {
+            process: {
+                type: "string",
+                description: "Manufacturing process to search for (e.g., 'CNC machining', 'injection moulding', 'sheet metal', '3D printing', 'casting'). Maps to marketplace subcategories.",
+            },
+            material: {
+                type: "string",
+                description: "Material the supplier should work with (e.g., 'aluminium 6061', 'stainless steel 316', 'ABS', 'nylon'). Searched in listing text and materials field.",
+            },
+            location: {
+                type: "string",
+                description: "Country or region to filter by (e.g., 'UK', 'Germany', 'United States').",
+            },
+            certification: {
+                type: "string",
+                description: "Required certification (e.g., 'ISO 9001', 'AS9100', 'ISO 13485').",
+            },
+            verified_only: {
+                type: "boolean",
+                description: "Only return verified suppliers. Defaults to false.",
+            },
+            limit: {
+                type: "number",
+                description: "Maximum results to return (1-20). Defaults to 10.",
+            },
+        },
+        required: [],
+    },
+}
+
 // ─── Web Search Tool (for non-Claude providers) ─────────────────────
 
 export const TOOL_WEB_SEARCH: ToolDefinition = {

@@ -37,6 +37,7 @@ import {
     TOOL_LOOKUP_PROCESS,
     TOOL_LOOKUP_STANDARD,
     TOOL_CALCULATE_TOLERANCE_STACK,
+    TOOL_SEARCH_SUPPLIERS,
     PRODUCT_TOOLS,
     PEOPLE_TOOLS,
     STRATEGY_TOOLS,
@@ -90,6 +91,7 @@ import {
     handleAnalyzeOutreachPerformance,
 } from "./handlers/marketplace-compute"
 import { handleLookupDesignStandard } from "./handlers/design-standards"
+import { handleSearchSuppliers } from "./handlers/supplier-search"
 
 // ─── Tool Name → Handler Map ─────────────────────────────────────────
 
@@ -161,6 +163,7 @@ const TOOL_HANDLERS: Record<string, ToolHandler> = {
     lookup_material: handleLookupMaterial,
     lookup_process: handleLookupProcess,
     lookup_design_standard: handleLookupDesignStandard,
+    search_suppliers: handleSearchSuppliers,
 }
 
 // ─── Specialist → Tool Definitions Map ───────────────────────────────
@@ -204,9 +207,10 @@ const SPECIALIST_TOOLS: Record<SpecialistId, ToolDefinition[]> = {
         TOOL_LOOKUP_STANDARD,
     ],
 
-    // VP Supply Chain — marketplace + material/process lookups + tolerance analysis + supplier scoring
+    // VP Supply Chain — supplier search + marketplace intel + material/process lookups + tolerance + scoring
     "vp-supply-chain": [
         ...COMMON_TOOLS,
+        TOOL_SEARCH_SUPPLIERS,
         TOOL_QUERY_MARKETPLACE,
         TOOL_SCORE_SUPPLIERS,
         TOOL_LOOKUP_MATERIAL,
