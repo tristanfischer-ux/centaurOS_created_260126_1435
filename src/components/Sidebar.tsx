@@ -112,6 +112,7 @@ const todayNavItem = { name: "Today", href: "/today", icon: CalendarDays, toolti
 const meNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle, tooltip: "Your profile, companies, and marketplace presence" },
     { name: "Comms", href: "/updates", icon: MessageCircle, tooltip: "Activity feed, conversations, and direct messages" },
+    { name: "Time", href: "/time", icon: Clock, tooltip: "Track hours across your projects and tasks" },
     { name: "Knowledge", href: "/knowledge", icon: Brain, tooltip: "Your organizational second brain — decisions, insights, and lessons" },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow, tooltip: "Your Google Drive, Docs, Calendar, and Email" },
 ]
@@ -123,7 +124,6 @@ const planNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints, tooltip: "Your strategic direction — pillars, progress, and health at a glance" },
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
-    { name: "Time", href: "/time", icon: Clock, tooltip: "Track hours across your projects and tasks" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
 ]
 

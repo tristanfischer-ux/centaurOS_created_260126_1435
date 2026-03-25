@@ -110,6 +110,7 @@ const mainNavigation = [
 // Drawer — Me section
 const meMoreNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle },
+    { name: "Time", href: "/time", icon: Clock },
     { name: "Knowledge", href: "/knowledge", icon: Library },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow },
     { name: "What's New", href: "/whats-new", icon: Sparkles },
@@ -119,7 +120,6 @@ const meMoreNavigation = [
 const planMoreNavigation = [
     { name: "Strategy", href: "/strategy", icon: Waypoints },
     { name: "Objectives", href: "/new-objectives", icon: Target },
-    { name: "Time", href: "/time", icon: Clock },
     { name: "Reports", href: "/reports", icon: FileOutput },
 ]
 
