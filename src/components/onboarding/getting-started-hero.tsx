@@ -5,7 +5,7 @@
  *
  * @description Full-width hero version of the Getting Started checklist,
  * shown as the first card on the Today page for new users. Displays a
- * large progress ring and all 6 checklist items in a 2-column grid.
+ * large progress ring and all checklist items in a 2-column grid.
  */
 
 import { useMemo, useCallback, useState } from 'react'

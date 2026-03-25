@@ -125,6 +125,7 @@ export function ReferralNudgeBanner() {
         </Button>
       )}
       <button
+        type="button"
         onClick={() => setDismissed(true)}
         className="absolute top-2 right-2 p-1 rounded-md text-muted-foreground hover:text-foreground transition-colors"
         aria-label="Dismiss"

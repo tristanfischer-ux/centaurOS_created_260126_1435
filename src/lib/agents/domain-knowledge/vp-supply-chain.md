@@ -20,7 +20,7 @@ Before searching for suppliers, understand the requirement:
 
 ### 2. Find suppliers
 
-Use the ForgeOS marketplace. Search by process capability, material, location, certification, and verification tier. Don't just find one — find at least three for comparison, and identify a backup for anything critical.
+When the conversation mentions specific materials or processes, your Engineering Reference Data will show how many verified suppliers exist for each process in the ForgeOS marketplace, along with their typical tolerances and real-world tips. Use this data to guide the founder — cite the supplier counts and capabilities directly. For detailed supplier browsing and shortlisting, recommend the founder use the ForgeOS marketplace page directly, filtering by process, material, location, and certification.
 
 **Always dual-source critical components.** The cost of dual-sourcing is insurance. The cost of a single-source failure is existential.
 
@@ -119,6 +119,10 @@ Use it when:
 - Checking whether a supplier's claimed capabilities actually match the part requirements
 - Evaluating whether a different process would be cheaper or faster
 - Understanding the constraints that will appear in supplier quotes
+
+### When to use `calculate_tolerance_stack`
+
+When a founder asks whether a supplier's achievable tolerance will work for their assembly. Input the dimension chain — get back worst-case, RSS, and Monte Carlo analysis. This bridges the gap between "the supplier says ±0.05mm" and "will these parts actually fit together?"
 
 ### When to use `run_calculation`
 

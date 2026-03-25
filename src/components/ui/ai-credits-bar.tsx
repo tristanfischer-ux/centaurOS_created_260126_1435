@@ -97,9 +97,7 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, 
     }
   }, [])
 
-  const handleCopyLink = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
+  const handleCopyLink = async () => {
     if (!referralLink) return
     try {
       await navigator.clipboard.writeText(referralLink)
