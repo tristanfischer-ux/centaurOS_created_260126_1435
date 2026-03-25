@@ -54,6 +54,7 @@ import { toast } from "sonner"
 import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
 import { DesignReportDialog } from "../components/design-report-dialog"
 import { StageSpecialistCard } from "@/components/cad/stage-specialist-card"
+import { AssemblerFitnessReview } from "@/components/cad/assembler-fitness-review"
 import { STAGE_SPECIALISTS } from "@/lib/cad-lab/stage-specialist-map"
 import {
   DEFAULT_BRANDING,
@@ -502,6 +503,16 @@ export default function AssemblePage(): React.ReactNode {
         variant="entry"
         stageName="Assemble"
         briefing={assembleEntryText}
+      />
+
+      {/* ── Assembler fitness checks + AI company review ── */}
+      <AssemblerFitnessReview
+        assemblerMatches={assemblerMatches}
+        modules={eligibleModules}
+        diagnosticAnswers={diagnosticAnswers}
+        assemblyNotes={assemblyNotes}
+        activeProjectId={pid}
+        subject={subject}
       />
 
       {/* ── Fang's Assembly Notes (from Specify specialist review) ── */}
