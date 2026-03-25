@@ -20,6 +20,7 @@ const STORAGE_BUCKET = "xray-images"
 const ALLOWED_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const
 const MAX_IMAGES_PER_REQUEST = 5
 const MAX_IMAGES_PER_PROJECT = 10
+const MAX_NAME_LENGTH = 255
 /** Server-side base64 size limit: ~15MB base64 ≈ ~11MB raw (after client resize, images are usually <2MB) */
 const MAX_BASE64_LENGTH = 20_000_000
 // SECURITY: Prevent path traversal via crafted image IDs
@@ -41,6 +42,7 @@ export async function uploadReferenceImages(
   return withAuth(async ({ supabase }) => {
     // VALIDATION: Input checks
     if (!projectId) return { error: "Project ID required" }
+    if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (!images.length) return { error: "No images to upload" }
     if (images.length > MAX_IMAGES_PER_REQUEST) return { error: `Maximum ${MAX_IMAGES_PER_REQUEST} images per upload` }
 
@@ -113,7 +115,7 @@ export async function uploadReferenceImages(
 
         stored.push({
           id: img.id,
-          name: img.name,
+          name: img.name.slice(0, MAX_NAME_LENGTH),
           mimeType: img.mimeType,
           storageUrl: urlData.publicUrl,
           originalSize: img.originalSize,
@@ -147,6 +149,7 @@ export async function saveReferenceImageUrls(
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId) return { error: "Project ID required" }
+    if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (images.length > MAX_IMAGES_PER_PROJECT) return { error: `Maximum ${MAX_IMAGES_PER_PROJECT} images` }
 
     // SECURITY: Verify project exists AND belongs to caller's foundry
@@ -162,11 +165,23 @@ export async function saveReferenceImageUrls(
       return { error: "Project not found or access denied" }
     }
 
-    // SECURITY: Validate each storageUrl points to our Supabase domain
+    // SECURITY: Fail-closed URL validation — reject if env var is missing
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseHost) {
+      console.error("[REF-IMAGES] NEXT_PUBLIC_SUPABASE_URL not configured — rejecting save")
+      return { error: "Server configuration error" }
+    }
     for (const img of images) {
-      if (supabaseHost && !img.storageUrl.startsWith(supabaseHost)) {
+      if (!img.storageUrl.startsWith(supabaseHost)) {
         return { error: "Invalid storage URL detected" }
+      }
+      // SECURITY: Validate img.id is a UUID (prevents crafted JSONB payloads)
+      if (!UUID_RE.test(img.id)) {
+        return { error: "Invalid image ID in payload" }
+      }
+      // SECURITY: Cap name length to prevent JSONB bloat / log poisoning
+      if (img.name.length > MAX_NAME_LENGTH) {
+        return { error: "Image name too long" }
       }
     }
 

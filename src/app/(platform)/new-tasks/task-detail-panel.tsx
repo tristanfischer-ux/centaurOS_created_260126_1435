@@ -71,14 +71,37 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
     return () => { cancelled = true }
   }, [taskId])
 
-  if (!data || data.entryCount === 0) return null
+  const handleStartTimer = async () => {
+    const { startTimer } = await import('@/actions/time-tracking')
+    const result = await startTimer(taskId)
+    if ('error' in result) {
+      toast.error(result.error)
+    } else {
+      toast.success('Timer started')
+      window.location.reload()
+    }
+  }
 
   return (
     <DetailRow icon={Clock} label="Time Logged">
-      {formatDuration(Math.max(data.totalMinutes, 0))}
-      <span className="text-muted-foreground ml-1">
-        ({data.entryCount} {data.entryCount === 1 ? 'entry' : 'entries'})
-      </span>
+      <div className="flex items-center gap-2">
+        {data && data.entryCount > 0 ? (
+          <span>
+            {formatDuration(Math.max(data.totalMinutes, 0))}
+            <span className="text-muted-foreground ml-1">
+              ({data.entryCount} {data.entryCount === 1 ? 'entry' : 'entries'})
+            </span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+        <button
+          onClick={handleStartTimer}
+          className="text-[10px] font-medium text-international-orange hover:underline"
+        >
+          Start Timer
+        </button>
+      </div>
     </DetailRow>
   )
 }

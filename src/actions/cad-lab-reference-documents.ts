@@ -24,7 +24,11 @@ const MAX_DOCS_PER_REQUEST = 10
 /** Server-side base64 size limit: ~27MB base64 ≈ ~20MB raw */
 const MAX_BASE64_LENGTH = 27_000_000
 const MAX_RAW_TEXT_CHARS = 50_000
+const MAX_NAME_LENGTH = 255
+/** Timeout for text extraction libraries (pdf-parse, mammoth, officeparser) — prevents DoS via malformed files */
+const EXTRACTION_TIMEOUT_MS = 30_000
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const BASE64_RE = /^[A-Za-z0-9+/]*={0,2}$/
 
 const ALLOWED_MIME_TYPES = [
   "application/pdf",
@@ -68,6 +72,7 @@ export async function uploadReferenceDocuments(
 ): Promise<{ stored: Array<{ id: string; name: string; mimeType: string; storageUrl: string; originalSize: number; fileType: DocumentFileType }>; failed: string[] } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId) return { error: "Project ID required" }
+    if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (!documents.length) return { error: "No documents to upload" }
     if (documents.length > MAX_DOCS_PER_REQUEST) return { error: `Maximum ${MAX_DOCS_PER_REQUEST} documents per upload` }
 
@@ -124,6 +129,12 @@ export async function uploadReferenceDocuments(
           continue
         }
 
+        // SECURITY: Validate base64 content (prevents garbage binary uploads)
+        if (!BASE64_RE.test(doc.base64Data)) {
+          failed.push(`${doc.name}: invalid file data`)
+          continue
+        }
+
         const ext = FILE_TYPE_TO_EXT[doc.fileType]
         const storagePath = `cad-lab/${projectId}/documents/${doc.id}.${ext}`
 
@@ -146,7 +157,7 @@ export async function uploadReferenceDocuments(
 
         stored.push({
           id: doc.id,
-          name: doc.name,
+          name: doc.name.slice(0, MAX_NAME_LENGTH),
           mimeType: doc.mimeType,
           storageUrl: urlData.publicUrl,
           originalSize: doc.originalSize,
@@ -228,20 +239,30 @@ export async function extractDocumentText(
       const buffer = Buffer.from(await fileData.arrayBuffer())
       let rawText = ""
 
+      // SECURITY: Wrap extraction in timeout to prevent DoS via malformed files
+      // (e.g., PDFs with circular references that cause pdf-parse to hang)
+      const extractWithTimeout = <T,>(promise: Promise<T>): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Extraction timed out")), EXTRACTION_TIMEOUT_MS)
+          ),
+        ])
+
       // FLOW: Extract text based on file type — same libraries used in analyze.ts
       if (fileType === "pdf") {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const pdfParse = require("pdf-parse")
-        const data = await pdfParse(buffer)
+        const data = await extractWithTimeout(pdfParse(buffer) as Promise<{ text: string }>)
         rawText = data.text || ""
       } else if (fileType === "docx") {
         const mammoth = await import("mammoth")
-        const result = await mammoth.extractRawText({ buffer })
+        const result = await extractWithTimeout(mammoth.extractRawText({ buffer }))
         rawText = result.value || ""
       } else if (fileType === "pptx" || fileType === "xlsx") {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const officeparser = require("officeparser") as { parseOffice: (buffer: Buffer) => Promise<string> }
-        rawText = await officeparser.parseOffice(buffer)
+        rawText = await extractWithTimeout(officeparser.parseOffice(buffer))
       }
 
       if (!rawText || rawText.trim().length < 20) {
@@ -311,6 +332,7 @@ export async function saveReferenceDocumentUrls(
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId) return { error: "Project ID required" }
+    if (!UUID_RE.test(projectId)) return { error: "Invalid project ID format" }
     if (documents.length > MAX_DOCUMENTS_PER_PROJECT) return { error: `Maximum ${MAX_DOCUMENTS_PER_PROJECT} documents` }
 
     // SECURITY: Verify project exists AND belongs to caller's foundry
@@ -324,11 +346,23 @@ export async function saveReferenceDocumentUrls(
       return { error: "Project not found or access denied" }
     }
 
-    // SECURITY: Validate each storageUrl points to our Supabase domain
+    // SECURITY: Fail-closed URL validation — reject if env var is missing
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseHost) {
+      console.error("[REF-DOCS] NEXT_PUBLIC_SUPABASE_URL not configured — rejecting save")
+      return { error: "Server configuration error" }
+    }
     for (const doc of documents) {
-      if (supabaseHost && !doc.storageUrl.startsWith(supabaseHost)) {
+      if (!doc.storageUrl.startsWith(supabaseHost)) {
         return { error: "Invalid storage URL detected" }
+      }
+      // SECURITY: Validate doc.id is a UUID (prevents crafted JSONB payloads)
+      if (!UUID_RE.test(doc.id)) {
+        return { error: "Invalid document ID in payload" }
+      }
+      // SECURITY: Cap name length to prevent JSONB bloat / log poisoning
+      if (doc.name.length > MAX_NAME_LENGTH) {
+        return { error: "Document name too long" }
       }
     }
 

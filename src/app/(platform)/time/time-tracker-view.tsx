@@ -26,7 +26,9 @@ import {
   createTimeEntry,
   updateTimeEntry,
   deleteTimeEntry,
+  startTimer,
 } from '@/actions/time-tracking'
+import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Clock, Plus, AlertCircle } from 'lucide-react'
 import type {
   TimeEntryWithRelations,
@@ -146,7 +148,27 @@ export function TimeTrackerView({
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [formError, setFormError] = React.useState<string | null>(null)
 
+  const [timerStarting, setTimerStarting] = React.useState(false)
+
   const summary = React.useMemo(() => buildSummary(weekStart, entries), [weekStart, entries])
+
+  const handleStartTimer = React.useCallback(async () => {
+    setTimerStarting(true)
+    try {
+      const result = await startTimer()
+      if ('error' in result) {
+        toast.error(result.error)
+      } else {
+        toast.success('Timer started')
+        // Reload page so ActiveTimerBar picks up the new timer
+        window.location.reload()
+      }
+    } catch {
+      toast.error('Failed to start timer')
+    } finally {
+      setTimerStarting(false)
+    }
+  }, [])
 
   // M-1 fix: Request counter to discard stale responses from rapid navigation
   const fetchSeqRef = React.useRef(0)
@@ -330,7 +352,11 @@ export function TimeTrackerView({
           <p className="text-xs text-muted-foreground">Entries</p>
           <p className="font-semibold text-foreground tabular-nums">{entries.length}</p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={handleStartTimer} disabled={timerStarting}>
+            <Clock className="h-3.5 w-3.5 mr-1.5" />
+            {timerStarting ? 'Starting…' : 'Start Timer'}
+          </Button>
           <Button size="sm" onClick={() => handleAddEntry(todayUTC())}>
             <Plus className="h-3.5 w-3.5 mr-1.5" />
             Log Time

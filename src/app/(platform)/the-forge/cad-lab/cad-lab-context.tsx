@@ -997,6 +997,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // Only set to true at the end of handleResearch — never during handleLoadProject.
   const freshResearchRef = useRef(false)
 
+  // SECURITY: Prevents concurrent research calls from causing duplicate uploads + state corruption.
+  // React's setIsResearching(true) doesn't flush synchronously — a second call can slip through
+  // between setState and the next render. This ref is synchronous and blocks immediately.
+  const researchInFlightRef = useRef(false)
+
   const savePendingRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const debouncedSaveModules = useCallback(() => {
@@ -2833,6 +2838,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Research ──
   const handleResearch = useCallback(async () => {
+    // SECURITY: Synchronous guard prevents concurrent research calls (React batching window)
+    if (researchInFlightRef.current) {
+      console.warn("[CAD-LAB] Research already in flight — ignoring duplicate call")
+      return
+    }
+    researchInFlightRef.current = true
     setIsResearching(true)
     setResearchResult(null)
     setEditableReport("")
@@ -3131,6 +3142,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       })
     } finally {
       setIsResearching(false)
+      researchInFlightRef.current = false
     }
   }, [subject, designBrief, assumptionNotes, documentContext, ensureProject, refreshProjects, addProgressLine])
 
@@ -3358,6 +3370,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
         setTripoPreviewStatus("idle")
         setTripoPreviewError(null)
       }
+
+      // INTENT: Revoke old blob URLs before loading new project's images to prevent memory leak.
+      // handleReset does this too, but handleLoadProject doesn't call handleReset.
+      referenceImagesRef.current.forEach((img) => {
+        if (img.previewUrl?.startsWith("blob:")) URL.revokeObjectURL(img.previewUrl)
+      })
 
       // Restore reference images from database
       // INTENT: Explicit field mapping from StoredReferenceImage → ReferenceImageFile
