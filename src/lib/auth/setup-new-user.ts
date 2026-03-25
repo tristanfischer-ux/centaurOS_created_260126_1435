@@ -100,10 +100,13 @@ export async function setupNewUser({
     const uniqueSlug = `${baseSlug}-${userId.slice(0, 6)}`;
 
     // Step 1: Create foundry with NULL owner (no profile FK dependency)
+    // INTENT: foundries.id is text NOT NULL with no default — must generate explicitly.
+    const foundryUniqueId = uniqueSlug;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let { data: foundry, error: foundryError } = await (supabase as any)
       .from("foundries")
       .insert({
+        id: foundryUniqueId,
         name: companyName,
         slug: uniqueSlug,
         industry: industry || null,
@@ -120,6 +123,7 @@ export async function setupNewUser({
       const retry = await (supabase as any)
         .from("foundries")
         .insert({
+          id: retrySlug,
           name: companyName,
           slug: retrySlug,
           industry: industry || null,
@@ -190,8 +194,10 @@ export async function setupNewUser({
     }
   }
 
-  // --- Create profile for non-founders (founders already have one) ---
-  if (role !== "founder") {
+  // --- Create profile for non-founders AND founders without company (OAuth edge case) ---
+  // GOTCHA: Founders with companyName already created their profile above (step 2).
+  // Founders WITHOUT companyName fall through to the else branch and need a profile here.
+  if (role !== "founder" || !companyName) {
     const { error: profileError } = await supabase.from("profiles").insert({
       id: userId,
       email,
