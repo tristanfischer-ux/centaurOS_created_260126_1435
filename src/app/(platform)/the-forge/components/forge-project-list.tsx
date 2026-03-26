@@ -33,7 +33,6 @@ import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
 import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
-import { SampleProjectPreview } from "./sample-project-preview"
 import { ForgeScreenContext } from "./forge-screen-context"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -134,7 +133,6 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
       <div data-tour="forge-projects">
         {!hasRecent ? (
           <div className="space-y-8">
-            <SampleProjectPreview />
             <div className="rounded-xl bg-muted/30 py-12 px-8 flex flex-col items-center text-center">
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-international-orange-light mb-5">
                 <PenTool className="h-7 w-7 text-international-orange" />
