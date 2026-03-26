@@ -406,6 +406,20 @@ export function StrategyDashboard({
       {/* ── Dashboard View ── */}
       {viewMode === 'dashboard' && (
         <div className="space-y-8">
+          {/* Sage's Strategy Overview — top of page */}
+          <StrategyHealthReview
+            pillars={pillars.map(p => ({
+              title: p.title,
+              health: p.health,
+              progress: p.progress,
+              overdueTasks: p.overdueTasks,
+              objectiveCount: p.objectiveCount,
+            }))}
+            purposeSummary={purposeData?.purpose}
+            totalObjectives={totalObjectives}
+            unlinkedObjectiveCount={unlinkedObjectiveCount}
+          />
+
           {/* Company Purpose Hero */}
           <div data-tour="strategy-purpose">
           <CompanyPurposeWrapper
@@ -459,17 +473,6 @@ export function StrategyDashboard({
               />
             </div>
           )}
-
-          {/* Sage's Strategy Health Review */}
-          <StrategyHealthReview
-            pillars={pillars.map(p => ({
-              title: p.title,
-              health: p.health,
-              progress: p.progress,
-              overdueTasks: p.overdueTasks,
-            }))}
-            purposeSummary={purposeData?.purpose}
-          />
 
           {/* Strategic Pillars */}
           <div data-tour="strategy-pillars">

@@ -3,20 +3,19 @@
 /**
  * @file strategy-health-review.tsx
  *
- * @description A compact card that shows Sage's (Strategy specialist) proactive
- * assessment of the company's strategic health. Renders as a summary card
- * with a one-click "Discuss with Sage" button to dive deeper.
- *
- * This doesn't call the AI API -- it generates a local summary from
- * pillar data and invites the user to start a conversation for deeper analysis.
+ * @description Sage's strategic overview card. Shows an immediate local-logic
+ * insight, then fetches a 1-2 paragraph AI overview in the background.
+ * The AI overview replaces the local insight when ready.
  */
 
-import { useMemo } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
-import { AlertTriangle, TrendingUp, CheckCircle2, ArrowRight } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react"
 import { AskSpecialistButton } from "./ask-specialist-button"
+import { generateStrategyOverview } from "@/actions/specialist-page-insights"
 import type { SpecialistContext } from "./types"
 
 interface StrategyPillarSummary {
@@ -27,8 +26,10 @@ interface StrategyPillarSummary {
 }
 
 interface StrategyHealthReviewProps {
-  pillars: StrategyPillarSummary[]
+  pillars: (StrategyPillarSummary & { objectiveCount?: number })[]
   purposeSummary?: string | null
+  totalObjectives?: number
+  unlinkedObjectiveCount?: number
   className?: string
 }
 
@@ -82,13 +83,47 @@ function generateInsight(pillars: StrategyPillarSummary[]): {
 }
 
 /**
- * StrategyHealthReview -- Sage's proactive strategy assessment card.
+ * StrategyHealthReview -- Sage's proactive strategy overview.
  *
- * @description Shows a brief insight based on pillar data with a
- * one-click button to start a deeper conversation with Sage.
+ * @description Shows an immediate local insight, then fetches an AI-powered
+ * 1-2 paragraph overview in the background. Falls back to local insight if
+ * AI is unavailable.
  */
-export function StrategyHealthReview({ pillars, purposeSummary, className }: StrategyHealthReviewProps) {
+export function StrategyHealthReview({
+  pillars,
+  purposeSummary,
+  totalObjectives,
+  unlinkedObjectiveCount,
+  className,
+}: StrategyHealthReviewProps) {
   const insight = useMemo(() => generateInsight(pillars), [pillars])
+  const [aiOverview, setAiOverview] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const fetchedRef = useRef(false)
+
+  // Fetch AI overview in background
+  useEffect(() => {
+    if (fetchedRef.current) return
+    fetchedRef.current = true
+    setIsLoading(true)
+
+    generateStrategyOverview({
+      purposeSummary: purposeSummary ?? undefined,
+      pillars: pillars.map(p => ({
+        title: p.title,
+        health: p.health,
+        progress: p.progress,
+        overdueTasks: p.overdueTasks,
+        objectiveCount: (p as StrategyPillarSummary & { objectiveCount?: number }).objectiveCount ?? 0,
+      })),
+      totalObjectives: totalObjectives ?? 0,
+      unlinkedObjectiveCount: unlinkedObjectiveCount ?? 0,
+    }).then((result) => {
+      if (result) setAiOverview(result)
+    }).catch(() => { /* Non-critical — local insight remains */ })
+      .finally(() => setIsLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const context: SpecialistContext = {
     type: 'strategy',
@@ -101,7 +136,7 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
         health: p.health,
         progress: p.progress,
       })),
-      notes: insight.message,
+      notes: aiOverview ?? insight.message,
     },
   }
 
@@ -147,14 +182,32 @@ export function StrategyHealthReview({ pillars, purposeSummary, className }: Str
           <div className="flex-1 min-w-0 space-y-2">
             {/* Header */}
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">Sage&apos;s Take</span>
+              <span className="text-sm font-semibold text-foreground">Sage&apos;s Overview</span>
               <SeverityIcon className={cn('h-3.5 w-3.5', config.iconColor)} />
             </div>
 
-            {/* Insight */}
-            <p className="text-sm text-foreground leading-relaxed">
-              {insight.message}
-            </p>
+            {/* Overview content */}
+            {isLoading && !aiOverview ? (
+              <div className="space-y-2">
+                <p className="text-sm text-foreground leading-relaxed">
+                  {insight.message}
+                </p>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            ) : aiOverview ? (
+              <div className="space-y-2">
+                {aiOverview.split('\n\n').filter(Boolean).map((paragraph, i) => (
+                  <p key={i} className="text-sm text-foreground leading-relaxed">
+                    {paragraph}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground leading-relaxed">
+                {insight.message}
+              </p>
+            )}
 
             {/* CTA */}
             <AskSpecialistButton
