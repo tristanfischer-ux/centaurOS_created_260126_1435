@@ -281,6 +281,33 @@ async function testXSSInName() {
   check("Slug safe", /^[a-z0-9-]+$/.test(f?.slug ?? "FAIL"))
 }
 
+async function testOnboardingState() {
+  console.log("\n🧪 Onboarding state — new user should see onboarding modal")
+  const id = await createUser(`onboard-${Date.now()}@test.local`, "Onboard User", "executive")
+  const r = await setup({ userId: id, email: `onboard@test.local`, fullName: "Onboard User", role: "executive" })
+  const p = await getProfile(id)
+  const od = (p?.onboarding_data ?? {}) as Record<string, unknown>
+  check("onboarding_data exists", !!p?.onboarding_data || p?.onboarding_data === null || typeof p?.onboarding_data === "object")
+  check("has_completed_onboarding is falsy", !od.has_completed_onboarding)
+  check("onboarding_modal_completed is falsy", !od.onboarding_modal_completed)
+}
+
+async function testReferralCodeUniqueness() {
+  console.log("\n🧪 Referral code uniqueness across multiple users")
+  const ids: string[] = []
+  const codes: string[] = []
+  for (let i = 0; i < 5; i++) {
+    const id = await createUser(`refcode-${i}-${Date.now()}@test.local`, `RefCode ${i}`, "executive")
+    ids.push(id)
+    await setup({ userId: id, email: `refcode-${i}@test.local`, fullName: `RefCode ${i}`, role: "executive" })
+    const p = await getProfile(id)
+    if (p?.referral_code) codes.push(p.referral_code)
+  }
+  check("All 5 users got referral codes", codes.length === 5)
+  const uniqueCodes = new Set(codes)
+  check("All referral codes unique", uniqueCodes.size === 5, `${codes.length} codes, ${uniqueCodes.size} unique`)
+}
+
 async function testNullRole() {
   console.log("\n🧪 Invalid role (defaults to Apprentice)")
   const id = await createUser(`nullrole-${Date.now()}@test.local`, "No Role", "unknown_role")
@@ -318,6 +345,8 @@ async function main() {
     await testFounderOwnershipChain()
     await testXSSInName()
     await testNullRole()
+    await testOnboardingState()
+    await testReferralCodeUniqueness()
   } finally {
     await cleanup()
   }

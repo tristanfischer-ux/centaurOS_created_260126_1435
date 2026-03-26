@@ -92,10 +92,15 @@ export async function setupNewUser({
   let accountType: "team_builder" | "supplier" | null = null;
 
   // --- Ensure shared foundries exist BEFORE any profile creation ---
-  // INTENT: Moved to top because the founder fallback path (foundry creation fails →
-  // foundryId = "forge-guild") creates the profile BEFORE the old ensureFoundry check.
-  // If forge-guild doesn't exist in DB, the profile INSERT fails with FK violation.
-  for (const sharedId of ["forge-guild", "forge-suppliers"] as const) {
+  // INTENT: The founder fallback path (foundry creation fails → foundryId = "forge-guild")
+  // creates the profile referencing forge-guild. If it doesn't exist, FK violation.
+  // Only check foundries the user might actually need to avoid unnecessary queries.
+  // Founders need forge-guild (fallback), suppliers need forge-suppliers, others need forge-guild.
+  const neededFoundries = role === "supplier"
+    ? ["forge-suppliers"] as const
+    : ["forge-guild"] as const;
+
+  for (const sharedId of neededFoundries) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: exists } = await (supabase as any).from("foundries").select("id").eq("id", sharedId).single();
     if (!exists) {
