@@ -408,12 +408,13 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* Section 3b: "Cash Burn" — Runway planning           */}
                 {/* ══════════════════════════════════════════════════ */}
                 <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
-                <div className="px-3 pt-2 pb-0.5">
-                    <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                        Cash Burn
-                    </p>
-                </div>
-                {cashBurnNavigation.map(renderNavItem)}
+
+                <SectionHeader label="Cash Burn" introRoute="/cash-burn" isOpen={openSections.cashBurn} onToggle={() => toggleSection("cashBurn")} />
+                <Collapsible open={openSections.cashBurn}>
+                    <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                        {cashBurnNavigation.map(renderNavItem)}
+                    </CollapsibleContent>
+                </Collapsible>
 
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 4: "Workshop" — Where the work happens     */}
@@ -454,101 +455,37 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 </Collapsible>
             </nav>
 
-            {/* Footer — Settings, What's New, Sign Out, Zoom, Feedback, Version */}
-            <div className="p-4 mt-auto space-y-3 border-t border-slate-100">
-                {/* Settings */}
-                <Link
-                    href="/settings"
-                    className={cn(
-                        isRouteActive(pathname, "/settings")
-                            ? "text-international-orange font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        "flex items-center gap-2 px-2 py-1.5 text-xs transition-colors rounded-md"
-                    )}
-                >
-                    <Settings className="h-3.5 w-3.5" />
-                    Settings
-                </Link>
-
-                {/* What's New link */}
-                <Link
-                    href="/whats-new"
-                    className={cn(
-                        isRouteActive(pathname, "/whats-new")
-                            ? "text-international-orange font-semibold"
-                            : "text-muted-foreground hover:text-foreground",
-                        "flex items-center gap-2 px-2 py-1.5 text-xs transition-colors rounded-md"
-                    )}
-                >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    What&apos;s New
-                </Link>
-
-                {/* Sign Out */}
-                <form action={signOut}>
-                    <button
-                        type="submit"
-                        className="flex items-center gap-2 w-full px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md"
+            {/* Footer — Compact: Settings + Sign Out row, then status bars */}
+            <div className="p-3 mt-auto space-y-2 border-t border-slate-100">
+                {/* Settings + Sign Out on one row */}
+                <div className="flex items-center justify-between">
+                    <Link
+                        href="/settings"
+                        className={cn(
+                            isRouteActive(pathname, "/settings")
+                                ? "text-international-orange font-semibold"
+                                : "text-muted-foreground hover:text-foreground",
+                            "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors rounded-md"
+                        )}
                     >
-                        <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                        Sign Out
-                    </button>
-                </form>
+                        <Settings className="h-3.5 w-3.5" />
+                        Settings
+                    </Link>
+                    <form action={signOut}>
+                        <button
+                            type="submit"
+                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md"
+                        >
+                            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+                            Sign Out
+                        </button>
+                    </form>
+                </div>
 
-                {/* Time + AI Bars */}
-                <div className="border-t border-slate-100 pt-2 space-y-1">
+                {/* Status bars — daily accountability */}
+                <div className="space-y-1">
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
-                </div>
-
-                {/* Getting Started Checklist */}
-                {onboardingData && !(onboardingData as OnboardingData).checklist_dismissed && !(onboardingData as OnboardingData).checklist_completed_at && (
-                    <div className="border-t border-slate-100 pt-3">
-                        <GettingStartedChecklist
-                            userRole={userRole}
-                            onboardingData={onboardingData as OnboardingData}
-                            onItemComplete={async (key: string) => {
-                                await updateOnboardingData({ [key]: true })
-                            }}
-                            onDismiss={async () => {
-                                await updateOnboardingData({ checklist_dismissed: true })
-                            }}
-                            onPlayVideo={VIDEOS.platformOverview.videoUrl ? () => setIsVideoModalOpen(true) : undefined}
-                        />
-                    </div>
-                )}
-
-                {/* Zoom Control */}
-                <div className="flex justify-center">
-                    <ZoomControl onZoomChange={setZoom} />
-                </div>
-
-                {/* Early Access badge + Feedback + Version */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-center gap-2">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-international-orange/10 text-international-orange text-[10px] font-semibold tracking-wide">
-                            <span className="w-1.5 h-1.5 rounded-full bg-international-orange animate-pulse" />
-                            Early Access
-                        </span>
-                        <span className="text-[10px] text-muted-foreground font-mono opacity-60">
-                            v{APP_VERSION}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground">
-                        <button
-                            onClick={() => openFeedback()}
-                            className="inline-flex items-center gap-1 hover:text-international-orange transition-colors cursor-pointer"
-                            aria-label="Share feedback"
-                        >
-                            <MessageSquarePlus className="h-3 w-3" />
-                            <span>Feedback</span>
-                        </button>
-                        <span className="opacity-30">·</span>
-                        <span className="opacity-50">
-                            <kbd className="px-1 py-0.5 bg-muted text-[9px]">⌘K</kbd> search
-                        </span>
-                    </div>
                 </div>
             </div>
 

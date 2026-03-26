@@ -24,6 +24,7 @@ const ALL_OPEN: OpenSections = {
     me: true,
     plan: true,
     finance: true,
+    cashBurn: true,
     workshop: true,
     marketplace: true,
 }
@@ -46,6 +47,10 @@ const SECTION_ROUTES: { sectionId: SectionId; routes: string[] }[] = [
     {
         sectionId: "finance",
         routes: ["/finance"],
+    },
+    {
+        sectionId: "cashBurn",
+        routes: ["/cash-burn", "/cash-out", "/cash-in", "/pnl", "/investors", "/fundraise"],
     },
     {
         sectionId: "workshop",
@@ -86,7 +91,7 @@ function readStorage(): OpenSections | null {
         if (!raw) return null
         const parsed = JSON.parse(raw) as OpenSections
         // Validate shape — must have all 5 section keys
-        const ids: SectionId[] = ["me", "plan", "finance", "workshop", "marketplace"]
+        const ids: SectionId[] = ["me", "plan", "finance", "cashBurn", "workshop", "marketplace"]
         if (ids.every((id) => typeof parsed[id] === "boolean")) {
             return parsed
         }
@@ -144,6 +149,7 @@ export function useSidebarCollapse(pathname: string): {
                 me: activeSection === "me",
                 plan: activeSection === "plan",
                 finance: activeSection === "finance",
+                cashBurn: activeSection === "cashBurn",
                 workshop: activeSection === "workshop",
                 marketplace: activeSection === "marketplace",
             }

@@ -81,6 +81,7 @@ export function useSectionNewBadges(): {
         me: false,
         plan: false,
         finance: false,
+        cashBurn: false,
         workshop: false,
         marketplace: false,
     })
@@ -91,6 +92,7 @@ export function useSectionNewBadges(): {
             me: hasUnseenFeatures("me"),
             plan: hasUnseenFeatures("plan"),
             finance: hasUnseenFeatures("finance"),
+            cashBurn: hasUnseenFeatures("cashBurn"),
             workshop: hasUnseenFeatures("workshop"),
             marketplace: hasUnseenFeatures("marketplace"),
         })
