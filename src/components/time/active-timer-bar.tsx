@@ -84,6 +84,11 @@ export function ActiveTimerBar() {
     if ('error' in result) {
       toast.error(typeof result.error === 'string' ? result.error : 'Failed to stop timer')
       setStopping(false)
+      // Restart the tick interval (was eagerly cleared above)
+      if (timer) {
+        const tick = () => setElapsed(Math.floor((Date.now() - new Date(timer.startedAt).getTime()) / 1000))
+        intervalRef.current = setInterval(tick, 1000)
+      }
       return
     }
     setTimer(null)
