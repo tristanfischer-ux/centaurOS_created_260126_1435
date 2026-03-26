@@ -11,9 +11,8 @@
  */
 
 import { withAIGate } from '@/lib/ai/with-ai-gate'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { logInsights, formatRecentInsightsForPrompt } from '@/lib/intelligence/insight-logger'
-import { ensureFreshProfile, formatProfileForAI } from '@/lib/intelligence/profile-builder'
+import { logInsights } from '@/lib/intelligence/insight-logger'
+import { ensureFreshProfile } from '@/lib/intelligence/profile-builder'
 import { inferInsightFeedback } from '@/lib/intelligence/feedback-tracker'
 import type { InsightEntry } from '@/lib/intelligence/insight-logger'
 
@@ -229,14 +228,17 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
     // Time tracking nudge — remind if nothing logged yesterday (weekdays only)
     const yesterdayDay = yesterday.getUTCDay()
     if (yesterdayDay >= 1 && yesterdayDay <= 5) {
-      const { count: timeYesterday } = await supabase
+      // Exclude active timers (placeholder entries) — only count completed entries
+      const { count: timeYesterday, error: timeError } = await supabase
         .from('time_entries')
         .select('*', { count: 'exact', head: true })
         .eq('foundry_id', foundryId)
         .eq('user_id', user.id)
         .eq('entry_date', yesterdayStr)
+        .or('started_at.is.null,ended_at.not.is.null')
 
-      if ((timeYesterday ?? 0) === 0) {
+      // Skip nudge if query failed (e.g. table not migrated yet)
+      if (!timeError && (timeYesterday ?? 0) === 0) {
         nudges.push({
           type: 'stale',
           message: 'You didn\'t log any time yesterday — catch up now?',
@@ -267,33 +269,17 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
 
     const userName = profile?.full_name?.split(' ')[0] || 'there'
 
-    // 9b. Fetch yesterday's completed task titles (up to 5)
-    const { data: yesterdayTasks } = await supabase
-      .from('tasks')
-      .select('title')
-      .eq('foundry_id', foundryId)
-      .eq('status', 'Completed')
-      .gte('updated_at', `${yesterdayStr}T00:00:00`)
-      .lt('updated_at', `${yesterdayStr}T23:59:59`)
-      .limit(5)
-
-    const yesterdayCompletedTitles = (yesterdayTasks || []).map((t) => t.title)
-
-    // 9c. Build user intelligence context for personalized narrative
-    let profileContext = ''
-    let insightHistoryContext = ''
+    // 9b. Build user intelligence context (productivity patterns, velocity)
     let intelligenceDaysOfData = 0
     let bestProductivityDay: string | null = null
     let velocityTrend = 0
     try {
       const profile = await ensureFreshProfile(user.id, foundryId)
       if (profile) {
-        profileContext = formatProfileForAI(profile)
         intelligenceDaysOfData = profile.daysOfData
         bestProductivityDay = profile.productivityPatterns.bestDay
         velocityTrend = profile.productivityPatterns.velocityTrend
       }
-      insightHistoryContext = await formatRecentInsightsForPrompt(user.id, foundryId)
     } catch {
       // Non-blocking — intelligence context is optional
     }
@@ -303,65 +289,9 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
       // Silently ignore — feedback tracking is best-effort
     })
 
-    // 9e. Call Gemini Flash to generate a personalized narrative
-    let narrative = greeting // Fallback to template greeting if AI call fails
-
-    try {
-      const apiKey = process.env.GEMINI_API_KEY?.trim()
-      if (apiKey) {
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-lite-preview' })
-
-        const topTaskSummaries = topTasks.map((t) =>
-          `"${t.title}"${t.dueDate ? ` (due ${t.dueDate})` : ''}`
-        )
-        const atRiskSummaries = atRiskObjectives.map((o) =>
-          `"${o.title}" (${o.progress}% complete)`
-        )
-
-        const userPrompt = [
-          `User name: ${userName}`,
-          yesterdayCompletedTitles.length > 0
-            ? `Yesterday completed: ${yesterdayCompletedTitles.join(', ')}`
-            : 'No tasks completed yesterday.',
-          topTaskSummaries.length > 0
-            ? `Top upcoming tasks: ${topTaskSummaries.join(', ')}`
-            : 'No urgent tasks today.',
-          atRiskSummaries.length > 0
-            ? `At-risk objectives: ${atRiskSummaries.join(', ')}`
-            : 'No at-risk objectives.',
-          `Completion streak: ${streak} day${streak !== 1 ? 's' : ''}`,
-          `Overdue tasks: ${overdueTasks.length}`,
-          profileContext,
-          insightHistoryContext,
-        ].filter(Boolean).join('\n')
-
-        const result = await model.generateContent({
-          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-          systemInstruction: {
-            role: 'system',
-            parts: [{
-              text: 'You are a concise executive briefing writer. Write 2-4 sentences summarizing the user\'s day ahead. Reference specific task names and objective names. Be warm but efficient. Use the user\'s first name. Never mention AI or that you are an AI. Never use emojis. If productivity patterns are provided, reference them naturally (e.g. "You typically do your best work on Wednesdays"). If previous insights are listed, do NOT repeat them — build on them or provide new perspective.',
-            }],
-          },
-          generationConfig: {
-            maxOutputTokens: 200,
-            temperature: 0.7,
-          },
-        })
-
-        const generatedText = result.response.text()?.trim()
-        if (generatedText) {
-          narrative = generatedText
-        }
-      }
-    } catch (error) {
-      // Fallback to template greeting — narrative already set above
-      console.error('[Nudges] Narrative generation failed:', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        userId: user.id,
-      })
-    }
+    // DECISION: Narrative generation moved to Cal (Haiku) via generateTodayBriefing.
+    // This server action now returns the DB-driven greeting as the narrative fallback.
+    const narrative = greeting
 
     // 10. Log insights for deduplication and feedback tracking
     const insightsToLog: InsightEntry[] = []

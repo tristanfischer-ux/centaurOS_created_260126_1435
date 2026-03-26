@@ -85,6 +85,8 @@ import { useSidebarCollapse } from "@/hooks/useSidebarCollapse"
 import { isRouteAlpha, isRouteBeta, isRouteDemo } from "@/lib/features/registry"
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
+import { getMyReferralInfo } from "@/actions/referrals"
+import { toast } from "sonner"
 import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
@@ -256,6 +258,22 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
         const prefillText = suggestion?.title || rawIdea
         router.push(`/new-tasks?prefill=${encodeURIComponent(prefillText)}`)
     }
+
+    const handleShareReferral = React.useCallback(async () => {
+        try {
+            const info = await getMyReferralInfo()
+            if ('error' in info) {
+                toast.error('Could not load your referral link.')
+                return
+            }
+            const url = `${window.location.origin}/join?ref=${info.referralCode}`
+            await navigator.clipboard.writeText(url)
+            toast.success('Referral link copied to clipboard!')
+            await updateOnboardingData({ checklist_friend_invited: true })
+        } catch {
+            toast.error('Failed to copy referral link.')
+        }
+    }, [])
 
     /**
      * Renders a single navigation item with optional tooltip.
@@ -454,6 +472,22 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     </CollapsibleContent>
                 </Collapsible>
             </nav>
+
+            {/* Getting Started Checklist — shown for new users */}
+            {onboardingData && (
+                <GettingStartedChecklist
+                    userRole={userRole}
+                    onboardingData={onboardingData as OnboardingData}
+                    onItemComplete={(key) => {
+                        updateOnboardingData({ [key]: true }).catch(() => {})
+                    }}
+                    onDismiss={() => {
+                        updateOnboardingData({ checklist_dismissed: true }).catch(() => {})
+                    }}
+                    onPlayVideo={() => setIsVideoModalOpen(true)}
+                    onShareReferral={handleShareReferral}
+                />
+            )}
 
             {/* Footer — Compact: Settings + Sign Out row, then status bars */}
             <div className="p-3 mt-auto space-y-2 border-t border-slate-100">

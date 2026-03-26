@@ -146,7 +146,7 @@ export default async function PlatformLayout({
                         {!needsProfileRepair && (
                             <>
                                 <UnifiedOnboarding userRole={profile?.role ?? undefined} accountType={profile?.account_type} onboardingData={profile?.onboarding_data && typeof profile.onboarding_data === 'object' ? (profile.onboarding_data as import('@/actions/onboarding').OnboardingData) : null} />
-                                <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} />
+                                <ExecutiveProfilePrompt userRole={profile?.role ?? undefined} onboardingCompleted={!!(profile?.onboarding_data && typeof profile.onboarding_data === 'object' && (profile.onboarding_data as Record<string, unknown>).onboarding_modal_completed)} />
                             </>
                         )}
                         <Suspense fallback={null}>

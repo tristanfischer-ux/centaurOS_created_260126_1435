@@ -32,6 +32,8 @@ export const CHECKLIST_ITEMS: Array<{
   icon: LucideIcon
   /** Video item - triggers modal instead of navigation */
   isVideo?: boolean
+  /** Referral share item - triggers clipboard copy */
+  isShareReferral?: boolean
 }> = [
   { key: 'checklist_profile_completed', label: 'Complete your profile', href: '/my-profile', icon: UserCircle },
   { key: 'checklist_video_watched', label: 'Watch the overview', icon: Play, isVideo: true },
@@ -39,7 +41,7 @@ export const CHECKLIST_ITEMS: Array<{
   { key: 'checklist_team_member_added', label: 'Invite a team member', href: '/team', icon: Users },
   { key: 'checklist_marketplace_explored', label: 'Explore the marketplace', href: '/marketplace', icon: Store },
   { key: 'checklist_forge_project_created', label: 'Start a Forge project', href: FORGE_ROUTES.cadLab, icon: Flame },
-  { key: 'checklist_friend_invited', label: 'Share your referral link', icon: Gift },
+  { key: 'checklist_friend_invited', label: 'Share your referral link', icon: Gift, isShareReferral: true },
 ]
 
 export interface GettingStartedChecklistProps {
@@ -53,6 +55,8 @@ export interface GettingStartedChecklistProps {
   onDismiss?: () => void
   /** Callback when "Watch the overview" is clicked - opens video modal */
   onPlayVideo?: () => void
+  /** Callback when "Share your referral link" is clicked - copies link to clipboard */
+  onShareReferral?: () => void
 }
 
 /**
@@ -70,6 +74,7 @@ export function GettingStartedChecklist({
   onItemComplete,
   onDismiss,
   onPlayVideo,
+  onShareReferral,
 }: GettingStartedChecklistProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const hasCelebratedRef = useRef(false)
@@ -231,6 +236,14 @@ export function GettingStartedChecklist({
                               className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded mt-0.5"
                             >
                               Watch
+                            </button>
+                          ) : item.isShareReferral && onShareReferral ? (
+                            <button
+                              type="button"
+                              onClick={onShareReferral}
+                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded mt-0.5"
+                            >
+                              Share
                             </button>
                           ) : item.href ? (
                             <Link

@@ -37,6 +37,7 @@ import {
     Waypoints,
 } from "lucide-react"
 
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -58,10 +59,14 @@ import { GettingStartedHero } from "@/components/onboarding/getting-started-hero
 import { PageTour } from "@/components/guidance/page-tour"
 
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
-import type { OnboardingData } from "@/actions/onboarding"
+import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
+import { getMyReferralInfo } from "@/actions/referrals"
 import { TodayTimeCard } from "@/components/time/today-time-card"
-import { CalDailySummary } from "./cal-daily-summary"
+import { useCalBriefing } from "./use-cal-briefing"
+import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
+import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
+import Image from "next/image"
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -166,6 +171,23 @@ export function TodayView({
         setIsLoading(false)
     }, [])
 
+    const handleShareReferral = useCallback(async () => {
+        try {
+            const info = await getMyReferralInfo()
+            if ('error' in info) {
+                toast.error('Could not load your referral link.')
+                return
+            }
+            const url = `${window.location.origin}/join?ref=${info.referralCode}`
+            await navigator.clipboard.writeText(url)
+            toast.success('Referral link copied to clipboard!')
+            // Mark checklist item complete
+            await updateOnboardingData({ checklist_friend_invited: true })
+        } catch {
+            toast.error('Failed to copy referral link.')
+        }
+    }, [])
+
     // Register screen context so specialists know what the user is viewing
     useRegisterScreenContext(useMemo(() => {
         if (isLoading) return null
@@ -238,7 +260,7 @@ export function TodayView({
 
                 {/* Getting Started Hero — shown for new users even in empty state */}
                 {initialOnboardingData && (
-                    <GettingStartedHero onboardingData={initialOnboardingData} userRole={userRole} />
+                    <GettingStartedHero onboardingData={initialOnboardingData} userRole={userRole} onShareReferral={handleShareReferral} />
                 )}
 
                 <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03]">
@@ -337,12 +359,17 @@ export function TodayView({
 
     // ─── Hero greeting text ───────────────────────────────────────
 
-    const heroNarrative = briefing?.narrative || pulse?.summary || briefing?.greeting || ""
     const greetingLabel = briefing?.userName
         ? getTimeGreeting(briefing.userName)
         : briefing?.greeting ?? "Welcome back"
 
-    // ─── Cal's daily briefing input ─────────────────────────────
+    // ─── Cal's daily briefing ───────────────────────────────────
+
+    const isNewUser = !!initialOnboardingData && !initialOnboardingData.checklist_dismissed
+    const onboardingStepsRemaining = isNewUser
+        ? CHECKLIST_ITEMS.filter(item => !initialOnboardingData?.[item.key]).map(item => item.label)
+        : undefined
+
     const calInput: TodayInsightInput | null = useMemo(() => {
         if (!briefing) return null
         const atRiskCount = briefing.atRiskObjectives?.length ?? 0
@@ -365,6 +392,11 @@ export function TodayView({
         }
     }, [briefing, pulse, strategyHealth, unreadCount])
 
+    const { calNarrative, calInsights, isCalLoading } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
+
+    // FLOW: Cal's narrative replaces the old Gemini narrative. DB greeting is the instant fallback.
+    const heroNarrative = calNarrative || briefing?.narrative || briefing?.greeting || ""
+
     // ─── Main render ──────────────────────────────────────────────
 
     return (
@@ -373,7 +405,7 @@ export function TodayView({
 
             {/* Getting Started Hero Checklist — shown for new users */}
             {initialOnboardingData && (
-                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} />
+                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
             )}
 
             {/* Running Low on AI Tasks — Referral Nudge */}
@@ -388,21 +420,42 @@ export function TodayView({
             >
                 <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03] overflow-hidden">
                     <CardContent className="pt-6 pb-5">
-                        {/* Greeting + Streak */}
+                        {/* Cal identity + Greeting + Streak */}
                         <div className="flex items-start justify-between gap-3 mb-5">
                             <div className="flex items-start gap-3 min-w-0">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-amber-50 shrink-0">
-                                    {getTimeIcon()}
+                                <div className="relative shrink-0">
+                                    <Image
+                                        src="/images/specialists/chief-of-staff.png"
+                                        alt="Cal"
+                                        width={40}
+                                        height={40}
+                                        className="rounded-xl"
+                                    />
+                                    <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-status-warning-light border border-background">
+                                        {getTimeIcon()}
+                                    </div>
                                 </div>
                                 <div className="min-w-0">
+                                    <p className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wide">
+                                        Cal, Chief of Staff
+                                    </p>
                                     <p className="text-sm font-medium text-muted-foreground">
                                         {greetingLabel}
                                     </p>
-                                    {heroNarrative && (
-                                        <p className="text-base font-semibold text-foreground leading-relaxed mt-1">
-                                            {heroNarrative}
+                                    {isCalLoading ? (
+                                        <p className="text-sm italic text-muted-foreground/60 mt-1">
+                                            Scanning your workstreams...
                                         </p>
-                                    )}
+                                    ) : heroNarrative ? (
+                                        <motion.p
+                                            className="text-base font-semibold text-foreground leading-relaxed mt-1"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ duration: 0.4, ease: EASE_CURVE }}
+                                        >
+                                            {heroNarrative}
+                                        </motion.p>
+                                    ) : null}
                                 </div>
                             </div>
                             {briefing && <StreakBadge streak={briefing.streak} className="shrink-0" />}
@@ -535,8 +588,24 @@ export function TodayView({
                 </Card>
             </motion.div>
 
-            {/* Cal's Daily Executive Summary */}
-            {calInput && <CalDailySummary input={calInput} />}
+            {/* Cal's Urgency-Triaged Insights */}
+            {calInsights.length > 0 && (
+                <motion.div
+                    className="space-y-3"
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: EASE_CURVE }}
+                >
+                    {calInsights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => {/* Insights are ephemeral — dismiss is visual only */}}
+                            compact
+                        />
+                    ))}
+                </motion.div>
+            )}
 
             {/* Focus Tasks Section */}
             <motion.div

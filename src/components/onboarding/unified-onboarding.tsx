@@ -407,32 +407,6 @@ export function UnifiedOnboarding({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={() => handleIntentSelection('supplier')}
-                    disabled={isSavingIntent}
-                    className={cn(
-                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      selectedIntent === 'supplier'
-                        ? 'border-international-orange bg-international-orange/5'
-                        : 'border-muted bg-card hover:border-international-orange/50',
-                      isSavingIntent && 'opacity-50 cursor-not-allowed',
-                    )}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-4">
-                      <Package className="w-6 h-6 text-international-orange" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      I sell products or services
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      List your offerings, respond to requests, and manage orders.
-                    </p>
-                  </motion.button>
-
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
                     onClick={() => handleIntentSelection('team_builder')}
                     disabled={isSavingIntent}
                     className={cn(
@@ -447,10 +421,36 @@ export function UnifiedOnboarding({
                       <Building2 className="w-6 h-6 text-electric-blue" />
                     </div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">
-                      I build and manage teams
+                      I am a founder
                     </h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">
-                      Define objectives, assign tasks, and collaborate with intelligent workflows.
+                      Build your team, set objectives, and bring your product to life with expert support.
+                    </p>
+                  </motion.button>
+
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
+                    onClick={() => handleIntentSelection('supplier')}
+                    disabled={isSavingIntent}
+                    className={cn(
+                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
+                      selectedIntent === 'supplier'
+                        ? 'border-international-orange bg-international-orange/5'
+                        : 'border-muted bg-card hover:border-international-orange/50',
+                      isSavingIntent && 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-4">
+                      <Package className="w-6 h-6 text-international-orange" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      I am a supplier
+                    </h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                      List your manufacturing capabilities, respond to RFQs, and win new customers.
                     </p>
                   </motion.button>
                 </div>

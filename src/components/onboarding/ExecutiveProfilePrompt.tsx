@@ -11,20 +11,25 @@ interface ExecutiveProfilePromptProps {
   userRole?: string
   hasCompletedProfile?: boolean
   onComplete?: () => void
+  /** When false, the nudge is suppressed until the onboarding modal finishes */
+  onboardingCompleted?: boolean
 }
 
 /**
  * Banner that prompts executives and apprentices to complete their marketplace profile.
  * Replaces the old modal approach - redirects to /my-profile for a guided experience.
  */
-export function ExecutiveProfilePrompt({ 
+export function ExecutiveProfilePrompt({
   userRole,
   hasCompletedProfile = false,
+  onboardingCompleted,
 }: ExecutiveProfilePromptProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
 
   useEffect(() => {
+    // Don't show until the onboarding modal is finished
+    if (onboardingCompleted === false) return
     // Only show for Executives and Apprentices
     if (userRole !== 'Executive' && userRole !== 'Apprentice') return
     // Don't show if profile is already completed
@@ -46,7 +51,7 @@ export function ExecutiveProfilePrompt({
     // Show after a brief delay
     const timer = setTimeout(() => setIsVisible(true), 2000)
     return () => clearTimeout(timer)
-  }, [userRole, hasCompletedProfile])
+  }, [userRole, hasCompletedProfile, onboardingCompleted])
 
   function handleDismiss() {
     setIsDismissed(true)

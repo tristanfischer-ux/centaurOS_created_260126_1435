@@ -21,11 +21,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { updateOnboardingData } from '@/actions/onboarding'
 import { CHECKLIST_ITEMS, CHECKLIST_TOTAL_ITEMS } from '@/components/onboarding/GettingStartedChecklist'
+import { VIDEOS } from '@/lib/video-urls'
 import type { OnboardingData } from '@/actions/onboarding'
 
 interface GettingStartedHeroProps {
   onboardingData: OnboardingData
   userRole?: string
+  /** Callback when "Share your referral link" is clicked */
+  onShareReferral?: () => void
 }
 
 /**
@@ -35,7 +38,7 @@ interface GettingStartedHeroProps {
  * first-run experience. Shows when < 3 checklist items are completed
  * and the user hasn't dismissed it.
  */
-export function GettingStartedHero({ onboardingData, userRole }: GettingStartedHeroProps) {
+export function GettingStartedHero({ onboardingData, userRole, onShareReferral }: GettingStartedHeroProps) {
   const completedCount = useMemo(
     () => CHECKLIST_ITEMS.filter((item) => onboardingData[item.key] === true).length,
     [onboardingData],
@@ -44,15 +47,23 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
   const [localDismissed, setLocalDismissed] = useState(false)
   const isDismissed = localDismissed || onboardingData.checklist_dismissed === true
 
+  // Filter out video item when no video URL is available
+  const filteredItems = useMemo(() => {
+    return CHECKLIST_ITEMS.filter((item) => {
+      if (item.isVideo && !VIDEOS.platformOverview.videoUrl) return false
+      return true
+    })
+  }, [])
+
   // Sort: for Executives/Apprentices, profile first; otherwise keep original order
   const sortedItems = useMemo(() => {
     if (userRole === 'Executive' || userRole === 'Apprentice') {
-      const profile = CHECKLIST_ITEMS.find((i) => i.key === 'checklist_profile_completed')
-      const rest = CHECKLIST_ITEMS.filter((i) => i.key !== 'checklist_profile_completed')
-      return profile ? [profile, ...rest] : CHECKLIST_ITEMS
+      const profile = filteredItems.find((i) => i.key === 'checklist_profile_completed')
+      const rest = filteredItems.filter((i) => i.key !== 'checklist_profile_completed')
+      return profile ? [profile, ...rest] : filteredItems
     }
-    return CHECKLIST_ITEMS
-  }, [userRole])
+    return filteredItems
+  }, [userRole, filteredItems])
 
   const handleDismiss = useCallback(() => {
     setLocalDismissed(true)
@@ -135,6 +146,27 @@ export function GettingStartedHero({ onboardingData, userRole }: GettingStartedH
                         Go
                       </span>
                     </Link>
+                  ) : item.isShareReferral && onShareReferral ? (
+                    <button
+                      type="button"
+                      onClick={onShareReferral}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-3 px-3 py-2.5 rounded-lg',
+                        'hover:bg-muted/50 transition-colors group text-left',
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-international-orange/10">
+                          <Icon className="h-4 w-4 text-international-orange" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">
+                          {item.label}
+                        </span>
+                      </div>
+                      <span className="text-xs font-medium text-international-orange sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
+                        Share
+                      </span>
+                    </button>
                   ) : (
                     <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg">
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-international-orange/10">
