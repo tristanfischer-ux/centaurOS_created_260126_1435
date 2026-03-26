@@ -197,12 +197,16 @@ export async function setupNewUser({
       // profile (FK violation). The check_foundry_owner trigger allows NULL on INSERT
       // for system foundries listed in v_system_ids.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (supabase as any).from("foundries").insert({
+      const { error: sharedErr } = await (supabase as any).from("foundries").insert({
         id: foundryId,
         name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
         slug: foundryId,
         owner_id: null,
       });
+      // 23505 = unique violation (concurrent creation) — safe to ignore.
+      if (sharedErr && sharedErr.code !== "23505") {
+        console.error(`[setupNewUser] Shared foundry creation failed:`, sharedErr.message);
+      }
     }
   }
 
@@ -222,7 +226,7 @@ export async function setupNewUser({
 
     if (profileError) {
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
-      return { foundryId, redirectPath: "/today" };
+      return { foundryId, redirectPath: role === "supplier" ? "/supplier-portal" : "/today" };
     }
   }
 
@@ -257,35 +261,27 @@ export async function setupNewUser({
       "seed_demo_drone_motor_mount",
     ] as const;
 
+    // INTENT: supabase.rpc() returns { error } instead of throwing — must check .error.
     for (const rpc of conceptRpcs) {
-      try {
-        await supabase.rpc(rpc, {
-          p_foundry_id: foundryId,
-          p_user_id: userId,
-        });
-      } catch (e) {
-        console.warn(`[setupNewUser] ${rpc} failed:`, e);
-      }
+      const { error: rpcErr } = await supabase.rpc(rpc, {
+        p_foundry_id: foundryId,
+        p_user_id: userId,
+      });
+      if (rpcErr) console.warn(`[setupNewUser] ${rpc} failed:`, rpcErr.message);
     }
 
     // Founder-only: demo objectives and tasks
-    try {
-      await supabase.rpc("seed_founder_demo_data", {
-        p_foundry_id: foundryId,
-        p_user_id: userId,
-      });
-    } catch (e) {
-      console.warn("[setupNewUser] seed_founder_demo_data failed:", e);
-    }
+    const { error: demoErr1 } = await supabase.rpc("seed_founder_demo_data", {
+      p_foundry_id: foundryId,
+      p_user_id: userId,
+    });
+    if (demoErr1) console.warn("[setupNewUser] seed_founder_demo_data failed:", demoErr1.message);
 
-    try {
-      await supabase.rpc("seed_founder_demo_data_expanded", {
-        p_foundry_id: foundryId,
-        p_user_id: userId,
-      });
-    } catch (e) {
-      console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", e);
-    }
+    const { error: demoErr2 } = await supabase.rpc("seed_founder_demo_data_expanded", {
+      p_foundry_id: foundryId,
+      p_user_id: userId,
+    });
+    if (demoErr2) console.warn("[setupNewUser] seed_founder_demo_data_expanded failed:", demoErr2.message);
   }
 
   // --- Provider profile for trial roles ---
