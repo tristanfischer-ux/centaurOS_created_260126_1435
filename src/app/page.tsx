@@ -255,10 +255,10 @@ export default function MarketingPage() {
 
       <main id="main-content">
         <HeroSection />
-        <ProblemSection />
+        <HowItWorksStrip />
         <WhyNowStrip />
         <SolutionSection />
-        <HowItWorksStrip />
+        <ProblemSection />
         <ProductShowcase />
         <WhoItsForSection />
         <TrustStrip />
@@ -443,12 +443,17 @@ function HeroSection() {
           </motion.span>
         </motion.h1>
 
+        {/* INTENT: Vision-first, not problem-first (Adrian's feedback + Patrick Winston's
+            "empowerment promise"). Lead with what the world looks like WITH Fractional Forge.
+            Activates Positive Emotional Attractor (PEA) — openness and willingness to act.
+            Problem-first activates Task Positive Network (TPN) → narrowed attention, risk aversion. */}
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
-          Go from product idea to manufactured reality — without owning a factory, hiring a full team, or raising millions first.
+          Imagine describing your product and having engineered, manufacturer-ready parts arrive in weeks — not months.
+          No factory lease. No full-time team. Just your idea, turned real.
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          For companies that need manufacturing — and factories that have spare capacity. Connected by fractional experts and AI-powered engineering.
+          We connect companies that need manufacturing with factories that have spare capacity — through fractional experts and AI-powered engineering.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
@@ -497,14 +502,12 @@ function ProblemSection() {
     <section id="the-gap" className="py-12 sm:py-16 md:py-28 bg-muted/30 border-t border-muted scroll-mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">The Problem</span>
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">The Old Way</span>
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Your Designs Move at <span className="text-status-success">Software Speed.</span>
-            <br />
-            Your Factory Moves at <span className="text-destructive">Physical Speed.</span>
+            This Is What We&apos;re <span className="text-international-orange">Replacing.</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-3xl mx-auto leading-relaxed">
-            CAD designs iterate in hours. But leasing premises, buying equipment, and hiring engineers takes months. By the time your physical infrastructure catches up, your ideas have moved on — forcing you to ship an outdated product or delay again.
+            Hardware companies have always had to lease premises, buy equipment, and hire full teams before building the first prototype. By the time your physical infrastructure catches up, your ideas have moved on.
           </p>
         </AnimatedSection>
 
