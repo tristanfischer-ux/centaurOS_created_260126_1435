@@ -177,10 +177,15 @@ export async function saveReferenceImageUrls(
       console.error("[REF-IMAGES] NEXT_PUBLIC_SUPABASE_URL not configured — rejecting save")
       return { error: "Server configuration error" }
     }
+    // SECURITY: Parse hostname to prevent subdomain collision bypass
+    let expectedHostname: string
+    try { expectedHostname = new URL(supabaseHost).hostname } catch { return { error: "Server configuration error" } }
     for (const img of images) {
-      if (!img.storageUrl.startsWith(supabaseHost)) {
-        return { error: "Invalid storage URL detected" }
-      }
+      try {
+        if (new URL(img.storageUrl).hostname !== expectedHostname) {
+          return { error: "Invalid storage URL detected" }
+        }
+      } catch { return { error: "Malformed storage URL" } }
       // SECURITY: Validate img.id is a UUID (prevents crafted JSONB payloads)
       if (!UUID_RE.test(img.id)) {
         return { error: "Invalid image ID in payload" }

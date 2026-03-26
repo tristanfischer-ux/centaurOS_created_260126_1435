@@ -356,10 +356,16 @@ export async function saveReferenceDocumentUrls(
       console.error("[REF-DOCS] NEXT_PUBLIC_SUPABASE_URL not configured — rejecting save")
       return { error: "Server configuration error" }
     }
+    // SECURITY: Parse hostname to prevent subdomain collision bypass
+    // (e.g., "https://project.supabase.co.attacker.com" passes .startsWith() but not hostname check)
+    let expectedHostname: string
+    try { expectedHostname = new URL(supabaseHost).hostname } catch { return { error: "Server configuration error" } }
     for (const doc of documents) {
-      if (!doc.storageUrl.startsWith(supabaseHost)) {
-        return { error: "Invalid storage URL detected" }
-      }
+      try {
+        if (new URL(doc.storageUrl).hostname !== expectedHostname) {
+          return { error: "Invalid storage URL detected" }
+        }
+      } catch { return { error: "Malformed storage URL" } }
       // SECURITY: Validate doc.id is a UUID (prevents crafted JSONB payloads)
       if (!UUID_RE.test(doc.id)) {
         return { error: "Invalid document ID in payload" }

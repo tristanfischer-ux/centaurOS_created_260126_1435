@@ -208,8 +208,7 @@ export async function loadCadLabProject(
   projectId: string,
 ): Promise<{ project: CadLabProjectData } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    // VALIDATION: Check UUID format
-    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    if (!projectId || !UUID_RE.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 
@@ -393,6 +392,7 @@ export async function saveCadLabInterface(
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    if (interfaceDefinition.length > 50_000) return { error: "Interface definition too long (max 50,000 characters)" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -481,6 +481,7 @@ export async function saveCadLabModules(
       return { error: "Invalid modules JSON" }
     }
     if (!Array.isArray(modules)) return { error: "Modules must be an array" }
+    if (modules.length === 0) return { error: "At least one module required" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -513,6 +514,7 @@ export async function saveCadLabProductOverview(
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
+    if (overview.length > 10_000) return { error: "Product overview too long (max 10,000 characters)" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -1051,7 +1053,7 @@ export async function pollUnifiedResultAction(
   | { error: string }
 > {
   return withAuth(async ({ supabase }) => {
-    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    if (!projectId || !UUID_RE.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 
@@ -1100,11 +1102,11 @@ export async function rateModuleQuality(
   notes?: string,
 ): Promise<{ success: boolean; error?: string }> {
   return withAuth(async ({ supabase, user }) => {
-    // VALIDATION: UUID check
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    // VALIDATION: UUID check on both IDs
+    if (!projectId || !UUID_RE.test(projectId)) {
       return { success: false, error: "Invalid projectId" }
     }
-    if (!moduleId || typeof moduleId !== "string") {
+    if (!moduleId || !UUID_RE.test(moduleId)) {
       return { success: false, error: "Invalid moduleId" }
     }
 
@@ -1223,7 +1225,7 @@ export async function saveCadLabReviewSkipped(
   skipped: boolean,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    if (!projectId || !UUID_RE.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 
