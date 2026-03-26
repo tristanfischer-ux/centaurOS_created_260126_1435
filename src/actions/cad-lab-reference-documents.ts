@@ -370,9 +370,14 @@ export async function saveReferenceDocumentUrls(
       }
     }
 
+    // SECURITY: Strip rawText before JSONB write — large text bodies bloat the DB
+    // and rawText is only needed transiently during extraction, not for persistence.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const sanitizedDocs = documents.map(({ rawText, ...rest }) => ({ ...rest, rawText: null }))
+
     const { error } = await supabase
       .from("cad_lab_projects")
-      .update({ reference_documents: documents as unknown as Json })
+      .update({ reference_documents: sanitizedDocs as unknown as Json })
       .eq("id", projectId)
 
     if (error) {

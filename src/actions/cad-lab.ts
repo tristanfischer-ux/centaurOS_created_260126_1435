@@ -305,13 +305,14 @@ async function callGeminiWithSearch(
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
+  // SECURITY: API key in header, not URL — prevents leaking in fetch error messages and server logs
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
 
   const response = await fetchWithTimeout(
     url,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         tools: [{ google_search: {} }],
@@ -376,13 +377,14 @@ async function callGemini(
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`
+  // SECURITY: API key in header, not URL — prevents leaking in fetch error messages and server logs
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
 
   const response = await fetchWithTimeout(
     url,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         system_instruction: { parts: [{ text: systemPrompt }] },
         contents: [{ parts: [{ text: userPrompt }] }],
@@ -795,6 +797,11 @@ export async function runCadLabResearch(
   // SECURITY: Rate limit AI calls to prevent cost abuse
   const rateLimitError = await checkRateLimit("aiCadLab", `ai:${user.id}`)
   if (rateLimitError) return { error: rateLimitError } as unknown as CadLabResearchResult
+
+  // SECURITY: Cap input lengths to prevent token/cost abuse
+  if (!description || description.length > 5000) {
+    return { error: "Description required (max 5000 characters)" } as unknown as CadLabResearchResult
+  }
 
   const start = Date.now()
 

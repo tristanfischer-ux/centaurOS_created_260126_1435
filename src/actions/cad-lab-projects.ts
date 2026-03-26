@@ -35,6 +35,9 @@ import type { DiagnosticEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import type { StoredReferenceImage } from "@/lib/cad-lab/reference-image-types"
 import type { StoredReferenceDocument } from "@/lib/cad-lab/reference-document-types"
 
+// SECURITY: Shared UUID regex — enforces 8-4-4-4-12 group structure (not just 36 hex+hyphen chars)
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 // ─── Types ───────────────────────────────────────────────────────────
 
 /** Summary returned in project list (excludes large data) */
@@ -345,7 +348,7 @@ export async function saveCadLabResearch(
   research: CadLabResearchResult,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const researchData = {
       report: research.report,
@@ -389,7 +392,7 @@ export async function saveCadLabInterface(
   interfaceDefinition: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -426,7 +429,7 @@ export async function saveCadLabResult(
   result: CadLabResult,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     // Strip large binary data before persisting to JSONB
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -468,9 +471,17 @@ export async function saveCadLabModules(
   // limit ("Maximum array nesting exceeded") when passing deeply nested
   // CadLabModule[] through server action argument serialization.
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
-    const modules = JSON.parse(modulesJson)
+    // SECURITY: Validate JSON from client — saveCadLabModules accepts a raw string
+    let modules: unknown
+    try {
+      modules = JSON.parse(modulesJson)
+    } catch {
+      return { error: "Invalid modules JSON" }
+    }
+    if (!Array.isArray(modules)) return { error: "Modules must be an array" }
+
     const { error } = await supabase
       .from("cad_lab_projects")
       .update({
@@ -501,7 +512,7 @@ export async function saveCadLabProductOverview(
   overview: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -531,7 +542,7 @@ export async function saveCadLabDiagnosticAnswers(
   answers: Record<string, Record<string, string>>,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -561,7 +572,7 @@ export async function saveCadLabDiagnosticEnrichment(
   enrichment: DiagnosticEnrichment,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -591,7 +602,7 @@ export async function saveCadLabSystemIllustration(
   url: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -621,7 +632,7 @@ export async function saveCadLabVisualStyle(
   style: VisualStyleSpec,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -655,7 +666,7 @@ export async function saveCadLabIntegratedAssembly(
   assemblyCode?: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -691,7 +702,7 @@ export async function saveCadLabUnifiedResult(
   code: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -724,7 +735,7 @@ export async function saveCadLabInterfaceContracts(
   contracts: InterfaceContractResult,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -754,7 +765,7 @@ export async function saveCadLabDecompositionConnections(
   connections: ModuleConnection[],
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -786,7 +797,7 @@ export async function saveCadLabDesignRevision(
   imagesGeneratedAtRevision: number,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -819,7 +830,7 @@ export async function saveCadLabProjectRfq(
   rfqId: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     if (!rfqId.trim()) return { error: "RFQ ID required" }
 
     const { data: current, error: loadError } = await supabase
@@ -877,7 +888,7 @@ export async function updateCadLabBatchStatus(
   batchStatus: "idle" | "running" | "done" | "error",
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const updateData: Record<string, unknown> = { batch_status: batchStatus }
     if (batchStatus === "running") {
@@ -923,7 +934,7 @@ export async function loadCadLabBatchStatus(
   | { error: string }
 > {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { data: project, error } = await supabase
       .from("cad_lab_projects")
@@ -965,7 +976,7 @@ export async function renameCadLabProject(
   name: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
     if (!name.trim()) return { error: "Name is required" }
     if (name.length > 200) return { error: "Name must be 200 characters or less" }
 
@@ -998,7 +1009,7 @@ export async function deleteCadLabProject(
   projectId: string,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase, user }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -1153,7 +1164,7 @@ export async function saveCadLabAiCostEstimates(
   estimates: Record<string, AiCostEstimate>,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
@@ -1183,7 +1194,7 @@ export async function saveCadLabPartCategoryOverrides(
   overrides: Record<string, PartCategoryOverride>,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId) return { error: "Project ID required" }
+    if (!projectId || !UUID_RE.test(projectId)) return { error: "Invalid project ID" }
 
     const { error } = await supabase
       .from("cad_lab_projects")
