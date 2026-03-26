@@ -103,13 +103,11 @@ export async function setupNewUser({
     const uniqueSlug = `${baseSlug}-${userId.slice(0, 6)}`;
 
     // Step 1: Create foundry with NULL owner (no profile FK dependency)
-    // INTENT: foundries.id is text NOT NULL with no default — must generate explicitly.
-    const foundryUniqueId = uniqueSlug;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let { data: foundry, error: foundryError } = await (supabase as any)
       .from("foundries")
       .insert({
-        id: foundryUniqueId,
+        id: uniqueSlug,
         name: companyName,
         slug: uniqueSlug,
         industry: industry || null,
@@ -169,7 +167,12 @@ export async function setupNewUser({
 
     // Step 3: Set the foundry owner now that profile exists
     if (foundryId !== "forge-guild") {
-      await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      if (ownerError) {
+        // Non-fatal: foundry works without owner (membership-based access).
+        // But founder can't manage foundry settings. Repair RPC can fix.
+        console.error("[setupNewUser] Failed to set foundry owner:", ownerError.message);
+      }
     }
   } else if (role === "supplier") {
     accountType = "supplier";
@@ -224,18 +227,19 @@ export async function setupNewUser({
   }
 
   // --- Foundry membership ---
+  // INTENT: Upsert (onConflict) instead of plain insert — if the repair RPC already
+  // created a membership before setupNewUser runs (race condition), a plain insert
+  // would fail with 23505 unique violation. Upsert is idempotent.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error: membershipError } = await (supabase as any).from("foundry_memberships").insert({
+  const { error: membershipError } = await (supabase as any).from("foundry_memberships").upsert({
     user_id: userId,
     foundry_id: foundryId,
     role: memberRole,
     is_primary: true,
     joined_at: new Date().toISOString(),
-  });
+  }, { onConflict: "user_id,foundry_id" });
   if (membershipError) {
-    // INTENT: Log but don't fail — the repair RPC can create memberships later.
-    // Without a membership, RLS via get_my_foundry_id() blocks data access.
-    console.error("[setupNewUser] Membership creation failed:", membershipError.message);
+    console.error("[setupNewUser] Membership upsert failed:", membershipError.message);
   }
 
   // --- Demo data for founders (own isolated foundry) ---
@@ -304,11 +308,16 @@ export async function setupNewUser({
 
   // --- Supplier business info ---
   if (role === "supplier" && businessName) {
+    // INTENT: Merge into existing onboarding_data rather than replacing it.
+    // Other code (referral system, onboarding modal) may have already written fields.
+    const { data: current } = await supabase.from("profiles").select("onboarding_data").eq("id", userId).single();
+    const existing = (current?.onboarding_data ?? {}) as Record<string, unknown>;
     await supabase
       .from("profiles")
       .update({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onboarding_data: {
+          ...existing,
           business_name: businessName,
           business_type: businessType,
           is_supplier_signup: true,
