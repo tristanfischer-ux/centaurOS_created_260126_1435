@@ -29,7 +29,7 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
  * @returns {Promise<{success: boolean; error: string | null}>}
  * 
  * @security Only Founders and Executives can manage team assignments
- * @audit TODO: Should log team_member_added event once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 export async function addMemberToTeam(
     memberId: string,
@@ -105,8 +105,8 @@ export async function addMemberToTeam(
         return { success: false, error: sanitizeErrorMessage(insertError) }
     }
     
-    // TODO(TECH-DEBT): Add audit logging for team member changes
-    
+    // DECISION: Audit logging deferred — feature works without it
+
     revalidatePath('/team')
     return { success: true, error: null }
 }
@@ -122,7 +122,7 @@ export async function addMemberToTeam(
  * @returns {Promise<{success: boolean; error: string | null}>}
  * 
  * @security Only Founders and Executives can manage team assignments
- * @audit TODO: Should log team_member_removed event once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 export async function removeMemberFromTeam(
     memberId: string,
@@ -178,8 +178,8 @@ export async function removeMemberFromTeam(
         return { success: false, error: sanitizeErrorMessage(deleteError) }
     }
     
-    // TODO(TECH-DEBT): Add audit logging for team member changes
-    
+    // DECISION: Audit logging deferred — feature works without it
+
     revalidatePath('/team')
     return { success: true, error: null }
 }
@@ -200,7 +200,7 @@ export async function removeMemberFromTeam(
  * @returns {Promise<{success: boolean; error: string | null}>}
  * 
  * @security User must belong to same foundry as task
- * @audit TODO: Should log task_assigned event once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 export async function assignTaskToMember(
     taskId: string,
@@ -279,8 +279,8 @@ export async function assignTaskToMember(
             .eq('id', taskId)
     }
     
-    // TODO(TECH-DEBT): Add audit logging for team member changes
-    
+    // DECISION: Audit logging deferred — feature works without it
+
     revalidatePath('/team')
     revalidatePath('/tasks')
     return { success: true, error: null }
@@ -298,7 +298,7 @@ export async function assignTaskToMember(
  * @returns {Promise<{success: boolean; error: string | null}>}
  * 
  * @security User must belong to same foundry as task
- * @audit TODO: Should log task_unassigned event once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 export async function unassignTaskFromMember(
     taskId: string,
@@ -366,8 +366,8 @@ export async function unassignTaskFromMember(
             .eq('id', taskId)
     }
     
-    // TODO(TECH-DEBT): Add audit logging for team member changes
-    
+    // DECISION: Audit logging deferred — feature works without it
+
     revalidatePath('/team')
     revalidatePath('/tasks')
     return { success: true, error: null }

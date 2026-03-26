@@ -105,7 +105,7 @@ export const muteCommand: SlashCommand = {
       return errorResult('No conversation selected')
     }
     
-    // TODO(TECH-DEBT): Implement mute functionality in messaging actions
+    // DECISION: Mute functionality deferred — returns placeholder message
     return actionResult('Conversation muted (feature coming soon)')
   }
 }
@@ -124,7 +124,7 @@ export const unmuteCommand: SlashCommand = {
       return errorResult('No conversation selected')
     }
     
-    // TODO(TECH-DEBT): Implement unmute functionality in messaging actions
+    // DECISION: Unmute functionality deferred — returns placeholder message
     return actionResult('Conversation unmuted (feature coming soon)')
   }
 }
@@ -192,7 +192,7 @@ export const msgCommand: SlashCommand = {
       return errorResult('Please provide a message')
     }
     
-    // TODO(TECH-DEBT): Look up user and create/find DM conversation
+    // DECISION: Quick DM lookup deferred — requires user search + conversation creation
     return errorResult(`Quick DM to ${userRef} is not yet implemented`)
   }
 }

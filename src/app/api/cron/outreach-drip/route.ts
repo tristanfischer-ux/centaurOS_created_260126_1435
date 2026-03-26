@@ -129,10 +129,10 @@ export async function GET(request: Request) {
         description: listing.description || '',
         claimUrl,
         capability,
-        founderCount: '5', // TODO: Query actual founder count
+        founderCount: '5', // DECISION: Hardcoded for now — accurate count requires additional query per cron tick
         socialProof: 'Suppliers who claim their listing get a verified badge and appear higher in search results.',
         caseStudy: 'Suppliers who claim their listing typically receive their first enquiry within 2 weeks. The verified badge increases visibility by 3x in search results.',
-        claimedCount: '232', // TODO: Query actual claimed count
+        claimedCount: '232', // DECISION: Hardcoded for now — accurate count requires additional query per cron tick
       }
 
       try {

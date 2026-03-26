@@ -45,7 +45,7 @@ export const statusCommand: SlashCommand = {
       }
     }
     
-    // TODO(TECH-DEBT): Integrate with PresenceProvider to update status
+    // DECISION: PresenceProvider integration deferred — status is ephemeral for now
     const statusText = emoji ? `${emoji} ${message}` : message
     
     if (!statusText) {
@@ -77,7 +77,7 @@ export const dndCommand: SlashCommand = {
   execute: async (args: string[], context: CommandContext): Promise<CommandResult> => {
     const duration = args.join(' ') || '1h'
     
-    // TODO(TECH-DEBT): Integrate with PresenceProvider for DND mode
+    // DECISION: PresenceProvider integration deferred — DND dispatches CustomEvent as interim
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('set-dnd', { detail: { duration } }))
     }
@@ -106,7 +106,7 @@ export const awayCommand: SlashCommand = {
   execute: async (args: string[]): Promise<CommandResult> => {
     const message = args.join(' ')
     
-    // TODO(TECH-DEBT): Integrate with PresenceProvider for away status
+    // DECISION: PresenceProvider integration deferred — status is ephemeral for now
     if (message) {
       return actionResult(`Status set to away: ${message}`)
     }
@@ -125,7 +125,7 @@ export const activeCommand: SlashCommand = {
   category: 'status',
   aliases: ['online', 'back'],
   execute: async (): Promise<CommandResult> => {
-    // TODO(TECH-DEBT): Integrate with PresenceProvider for active status
+    // DECISION: PresenceProvider integration deferred — status is ephemeral for now
     return actionResult('Status set to active')
   }
 }

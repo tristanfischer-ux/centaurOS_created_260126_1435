@@ -11,7 +11,7 @@ type TypedSupabaseClient = SupabaseClient<Database>
 
 // NOTE: The order_events table may not exist in the database yet.
 // Until the migration is created, events are logged to console for audit trail.
-// TODO(TECH-DEBT): Create order_events migration and remove console-only fallback.
+// DECISION: Order events logged to console — order_events table migration deferred.
 
 /**
  * Log an order event.

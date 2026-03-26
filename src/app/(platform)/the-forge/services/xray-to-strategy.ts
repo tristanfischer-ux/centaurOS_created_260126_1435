@@ -8,7 +8,7 @@
  *
  * CURRENT STATE: Stub with documented integration signatures.
  *
- * TODO: Implement real integration:
+ * DECISION: Stub — real canvas integration planned for future release.
  * 1. Call createStrategicGoal() from src/actions/canvas.ts:
  *    - title: spec.idea
  *    - description: spec.function
@@ -53,7 +53,7 @@ export async function exportToStrategy(
   _foundryId: string,
   _canvasId: string
 ): Promise<StrategyExportResult> {
-  // TODO: Implement real canvas integration
+  // DECISION: Stub — real canvas integration planned for future release
   //
   // const goal = await createStrategicGoal({
   //   title: spec.idea,

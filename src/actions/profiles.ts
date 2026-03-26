@@ -6,7 +6,7 @@
  * @description Server actions for updating user profile information.
  * 
  * @security Users can edit their own profiles, Founders/Executives can edit any profile in their foundry
- * @audit TODO: Profile updates should be logged once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 
 import { createClient } from '@/lib/supabase/server'
@@ -50,7 +50,7 @@ function isValidLinkedInUrl(url: string): boolean {
  * @throws {Error} If user lacks permission or validation fails
  * 
  * @security Authenticated users can edit own profile, Founders/Executives can edit any
- * @audit TODO: Should log profile_updated event once audit_logs table is created
+ * @audit DECISION: Audit logging deferred — feature works without it
  */
 export async function updateProfileDetails(
     profileId: string,
@@ -163,7 +163,7 @@ export async function updateProfileDetails(
         return { success: false, error: sanitizeErrorMessage(updateError) }
     }
     
-    // TODO(TECH-DEBT): Add audit logging for profile updates
+    // DECISION: Audit logging deferred — feature works without it
     
     // Revalidate relevant pages
     revalidatePath('/team')

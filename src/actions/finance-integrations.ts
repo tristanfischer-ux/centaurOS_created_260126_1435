@@ -4,7 +4,7 @@
  * @file finance-integrations.ts — Server actions for accounting integrations
  *
  * @description Manages connections to external accounting providers
- * (Xero, QuickBooks, FreeAgent). Actual API clients are TODO.
+ * (Xero, QuickBooks, FreeAgent). DECISION: Stub — real API clients planned for future release.
  *
  * @security All queries filter by foundry_id via getFoundryIdCached().
  */

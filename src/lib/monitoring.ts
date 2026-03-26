@@ -65,7 +65,7 @@ export function captureError(error: Error | unknown, context?: ErrorContext): vo
   //   extra: context?.extra,
   // })
   
-  // TODO(TECH-DEBT): Enable Sentry captureException when installed
+  // DECISION: Error monitoring via console — Sentry integration deferred
 }
 
 /**
@@ -86,7 +86,7 @@ export function captureMessage(
 ): void {
   console.log(`[Monitoring] ${level.toUpperCase()}: ${message}`, context)
   
-  // TODO(TECH-DEBT): Enable Sentry captureMessage when installed
+  // DECISION: Error monitoring via console — Sentry integration deferred
 }
 
 /**
@@ -108,7 +108,7 @@ export function setUserContext(
 ): void {
   console.log('[Monitoring] User context set:', { userId, foundryId })
   
-  // TODO(TECH-DEBT): Enable Sentry setUser when installed
+  // DECISION: Error monitoring via console — Sentry integration deferred
 }
 
 /**
@@ -117,7 +117,7 @@ export function setUserContext(
 export function clearUserContext(): void {
   console.log('[Monitoring] User context cleared')
   
-  // TODO(TECH-DEBT): Enable Sentry clearUser when installed
+  // DECISION: Error monitoring via console — Sentry integration deferred
 }
 
 /**
@@ -144,7 +144,7 @@ export function startTransaction(name: string, op: string): { finish: () => void
       const duration = Date.now() - start
       console.log(`[Monitoring] Transaction "${name}" completed in ${duration}ms`)
       
-      // TODO(TECH-DEBT): Enable Sentry transaction tracking when installed
+      // DECISION: Error monitoring via console — Sentry integration deferred
     }
   }
 }

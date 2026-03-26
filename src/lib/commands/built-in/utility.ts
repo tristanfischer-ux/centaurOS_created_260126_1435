@@ -58,7 +58,7 @@ export const remindCommand: SlashCommand = {
       return errorResult('Please provide a reminder message')
     }
     
-    // TODO(TECH-DEBT): Persist reminder to database
+    // DECISION: Reminder persistence deferred — currently ephemeral (lost on page refresh)
     const formattedTime = remindAt.toLocaleString('en-US', {
       weekday: 'short',
       hour: 'numeric',

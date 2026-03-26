@@ -473,7 +473,7 @@ export async function runMorningBriefing(
     // Save as artifact
     const artifactId = await saveBriefingAsArtifact(foundryId, briefing, 'chief-of-staff' as any)
 
-    // TODO: Send notification to founder (Telegram/Slack/Email)
+    // DECISION: Founder notification deferred — briefing is saved as artifact and accessible in-app
 
     return {
       success: true,

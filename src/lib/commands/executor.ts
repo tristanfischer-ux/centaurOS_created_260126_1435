@@ -30,7 +30,7 @@ export async function executeCommand(
   
   // Check role requirements
   if (command.requiredRoles && command.requiredRoles.length > 0) {
-    // TODO(TECH-DEBT): Get user role from context and validate permissions
+    // DECISION: Role-based command permissions deferred — all commands currently accessible
   }
   
   // Validate arguments

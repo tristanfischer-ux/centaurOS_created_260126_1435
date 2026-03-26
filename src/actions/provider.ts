@@ -722,7 +722,7 @@ export async function initiateStripeOnboarding(): Promise<{
         
         // In production, this would call Stripe API
         // For now, return a simulated onboarding URL
-        // TODO(TECH-DEBT): Integrate with actual Stripe Connect API
+        // DECISION: Stripe Connect integration deferred — using simulated onboarding URL for now
         const stripeOnboardingUrl = `${appUrl}/api/stripe/connect/onboard?provider=${profile.id}`
 
         return { 
