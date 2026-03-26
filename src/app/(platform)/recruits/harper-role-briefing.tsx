@@ -47,16 +47,16 @@ export function HarperRoleBriefing({ totalListings, categories }: HarperRoleBrie
     }).then((result) => {
       if (Array.isArray(result) && result.length > 0) {
         setBriefing(result[0].body)
+        // INTENT: Only mark as visited when we got a real briefing
+        try {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(VISITED_KEY, '1')
+          }
+        } catch {
+          // Non-critical — worst case is briefing shows expanded every visit
+        }
       }
       setIsLoading(false)
-
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(VISITED_KEY, '1')
-        }
-      } catch {
-        // Non-critical — worst case is briefing shows expanded every visit
-      }
     }).catch(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

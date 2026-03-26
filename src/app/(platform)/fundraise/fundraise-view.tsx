@@ -18,7 +18,6 @@ import {
   AlertTriangle, StickyNote, Calendar, Mail,
 } from 'lucide-react'
 import Link from 'next/link'
-import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -71,19 +70,17 @@ function relativeTime(dateStr: string): string {
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
   const [insights, setInsights] = useState<AgentInsight[]>([])
-  const [briefing, setBriefing] = useState<string | null>(null)
-  const [briefingLoading, setBriefingLoading] = useState(true)
+  const [insightsLoading, setInsightsLoading] = useState(true)
   const insightsFetched = useRef(false)
 
   useEffect(() => {
     if (!stats || stats.totalTracked === 0) {
-      setBriefingLoading(false)
+      setInsightsLoading(false)
       return
     }
     // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
     if (insightsFetched.current) return
     insightsFetched.current = true
-    setBriefingLoading(true)
 
     const firmTypes = Array.from(
       new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))
@@ -96,15 +93,12 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
       firmTypes,
       recentActivityCount: stats.recentNotes.length,
     }).then((result) => {
-      if (Array.isArray(result)) {
-        if (result.length > 0) {
-          setBriefing(result[0].body)
-          setInsights(result.slice(1))
-        }
+      if (Array.isArray(result) && result.length > 0) {
+        setInsights(result)
       }
-      setBriefingLoading(false)
+      setInsightsLoading(false)
     }).catch(() => {
-      setBriefingLoading(false)
+      setInsightsLoading(false)
     })
   }, [stats])
 
@@ -141,15 +135,6 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   return (
     <div className="space-y-6">
-      {/* Fiona's pipeline briefing */}
-      <StageSpecialistCard
-        specialistId="fundraising-advisor"
-        variant="entry"
-        briefing={briefing}
-        isLoading={briefingLoading}
-        stageName="Fundraise"
-      />
-
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {(Object.entries(STAGE_CONFIG) as [ShortlistStage, typeof STAGE_CONFIG[ShortlistStage]][]).map(([stage, config]) => {

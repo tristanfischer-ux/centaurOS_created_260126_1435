@@ -29,7 +29,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
-import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { generateMarketplaceInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -114,8 +113,6 @@ export function MarketplaceBrowse({
 
     // Chase's marketplace insights
     const [chaseInsights, setChaseInsights] = useState<AgentInsight[]>([])
-    const [chaseBriefing, setChaseBriefing] = useState<string | null>(null)
-    const [chaseBriefingLoading, setChaseBriefingLoading] = useState(true)
     const chaseFetched = useRef(false)
 
     // Shared compare selection state (lifted from MarketplaceListingGrid)
@@ -141,16 +138,11 @@ export function MarketplaceBrowse({
         setSelectedForCompare(new Set())
     }, [])
 
-    // FLOW: Chase's entry briefing — generated once on load (skipped when parent provides its own specialist)
+    // FLOW: Chase's insights — generated once on load (skipped when parent provides its own specialist)
     useEffect(() => {
-        if (hideSpecialistBriefing) {
-            setChaseBriefingLoading(false)
-            return
-        }
-        // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+        if (hideSpecialistBriefing) return
         if (chaseFetched.current) return
         chaseFetched.current = true
-        setChaseBriefingLoading(true)
         generateMarketplaceInsights({
             totalListings: initialListings.length,
             activeCategory: state.activeCategory,
@@ -159,11 +151,9 @@ export function MarketplaceBrowse({
             hasActiveCadProject: false,
         }).then((result) => {
             if (Array.isArray(result) && result.length > 0) {
-                setChaseBriefing(result[0].body)
-                setChaseInsights(result.slice(1))
+                setChaseInsights(result)
             }
-            setChaseBriefingLoading(false)
-        }).catch(() => setChaseBriefingLoading(false))
+        }).catch(() => { /* Non-critical */ })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -367,17 +357,6 @@ export function MarketplaceBrowse({
                     </p>
                 </div>
             </div>
-
-            {/* Chase's marketplace briefing (hidden when parent provides its own specialist) */}
-            {!hideSpecialistBriefing && (
-                <StageSpecialistCard
-                    specialistId="vp-supply-chain"
-                    variant="entry"
-                    briefing={chaseBriefing}
-                    isLoading={chaseBriefingLoading}
-                    stageName="Marketplace"
-                />
-            )}
 
             {/* Chase's proactive insights */}
             {!hideSpecialistBriefing && chaseInsights.length > 0 && (

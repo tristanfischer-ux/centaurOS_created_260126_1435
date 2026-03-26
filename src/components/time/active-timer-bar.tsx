@@ -8,8 +8,9 @@
  * optional task name, and a Stop button. Updates every second via setInterval.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Clock, Square } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { getActiveTimer, stopTimer } from '@/actions/time-tracking'
 import { invalidateWeeklyTimeCache } from '@/hooks/use-weekly-time'
@@ -28,22 +29,33 @@ export function ActiveTimerBar() {
   const [stopping, setStopping] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Check for active timer on mount
-  useEffect(() => {
-    let cancelled = false
+  // Check for active timer — on mount, tab focus, and timer-started events
+  const checkTimer = useCallback(() => {
     getActiveTimer().then((result) => {
-      if (cancelled) return
+      if ('error' in result) {
+        console.warn('[TIMER] Active timer check failed:', result.error)
+        setTimer(null)
+        return
+      }
       if ('active' in result && result.active) {
-        setTimer({
-          id: result.id,
-          startedAt: result.startedAt,
-          description: result.description,
-          taskTitle: result.taskTitle,
-        })
+        setTimer({ id: result.id, startedAt: result.startedAt, description: result.description, taskTitle: result.taskTitle })
+      } else {
+        setTimer(null)
       }
     }).catch((err) => console.warn('[TIMER] Failed to check active timer:', err))
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    checkTimer()
+    const onTimerStarted = () => checkTimer()
+    const onVisibility = () => { if (document.visibilityState === 'visible') checkTimer() }
+    window.addEventListener('timer-started', onTimerStarted)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('timer-started', onTimerStarted)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [checkTimer])
 
   // Tick elapsed every second when timer is active
   useEffect(() => {
@@ -62,15 +74,25 @@ export function ActiveTimerBar() {
 
   const handleStop = async () => {
     setStopping(true)
+    // Eagerly clear interval to prevent stale ticks during async stop
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
     const result = await stopTimer()
     if ('error' in result) {
-      console.warn('[TIMER] Stop failed:', result.error)
+      toast.error(typeof result.error === 'string' ? result.error : 'Failed to stop timer')
       setStopping(false)
       return
     }
     setTimer(null)
     setStopping(false)
     invalidateWeeklyTimeCache()
+    // Show how much time was logged
+    if ('duration_minutes' in result) {
+      const dur = formatDuration(result.duration_minutes ?? 0)
+      toast.success(`Timer stopped — ${dur} logged`)
+    }
+    if ('wasCapped' in result && result.wasCapped) {
+      toast.warning('Timer ran 24+ hours — duration capped at 24h. Adjust the entry if needed.')
+    }
   }
 
   if (!timer) return null

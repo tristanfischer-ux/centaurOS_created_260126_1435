@@ -57,7 +57,6 @@ import { OrbitalView } from './components/orbital-view'
 import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
 import { SmartInsights } from './smart-insights'
-import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { generateTeamInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -276,13 +275,13 @@ export function TeamPageView({
         // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
         if (harperFetched.current) return
         harperFetched.current = true
-        setHarperBriefingLoading(true)
         const totalPeople = founders.length + executives.length + apprentices.length
+        // INTENT: Capacity based on active workload only (not completed tasks)
         const avgCap = totalPeople > 0
             ? Math.round(
                 [...founders, ...executives, ...apprentices].reduce((sum, m) => {
-                    const total = m.activeTasks + m.completedTasks + m.pendingTasks
-                    return sum + Math.max(0, 100 - total * 10)
+                    const activeWorkload = m.activeTasks + m.pendingTasks
+                    return sum + Math.max(0, 100 - activeWorkload * 10)
                 }, 0) / totalPeople
               )
             : 100
@@ -299,11 +298,9 @@ export function TeamPageView({
             unassignedTasks: insights?.unassignedTaskCount ?? 0,
         }).then((result) => {
             if (Array.isArray(result) && result.length > 0) {
-                setHarperBriefing(result[0].body)
-                setHarperInsights(result.slice(1))
+                setHarperInsights(result)
             }
-            setHarperBriefingLoading(false)
-        }).catch(() => setHarperBriefingLoading(false))
+        }).catch(() => { /* Non-critical */ })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -325,8 +322,6 @@ export function TeamPageView({
 
     // Specialist insights
     const [harperInsights, setHarperInsights] = useState<AgentInsight[]>([])
-    const [harperBriefing, setHarperBriefing] = useState<string | null>(null)
-    const [harperBriefingLoading, setHarperBriefingLoading] = useState(true)
     const harperFetched = useRef(false)
 
     // Team management
@@ -1077,17 +1072,6 @@ export function TeamPageView({
                     </div>
                 </div>
             </div>
-
-            {/* Harper's team composition briefing */}
-            {!isOrbitActive && (
-                <StageSpecialistCard
-                    specialistId="hiring-team"
-                    variant="entry"
-                    briefing={harperBriefing}
-                    isLoading={harperBriefingLoading}
-                    stageName="Team"
-                />
-            )}
 
             {/* Harper's proactive insights */}
             {!isOrbitActive && harperInsights.length > 0 && (

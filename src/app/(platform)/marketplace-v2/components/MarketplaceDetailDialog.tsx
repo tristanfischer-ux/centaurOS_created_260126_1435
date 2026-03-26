@@ -463,8 +463,8 @@ export function MarketplaceDetailDialog({ listing, onClose, isSelectedForCompare
                                     )}
                                 </div>
                                 <AskSpecialistButton
-                                    specialistId="vp-supply-chain"
-                                    specialistName="Chase"
+                                    specialistId={listing.category === 'People' ? 'hiring-team' : 'vp-supply-chain'}
+                                    specialistName={listing.category === 'People' ? 'Harper' : 'Chase'}
                                     variant="icon"
                                     context={{
                                         type: 'general',

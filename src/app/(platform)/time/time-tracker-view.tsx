@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { WeeklyTimesheetGrid } from '@/components/time/weekly-timesheet-grid'
 import { TimeEntryForm } from '@/components/time/time-entry-form'
-import { formatDuration } from '@/components/time/time-entry-card'
+import { formatDuration } from '@/lib/format-duration'
 import {
   getMyTimeEntries,
   createTimeEntry,
@@ -28,6 +28,7 @@ import {
   deleteTimeEntry,
   startTimer,
 } from '@/actions/time-tracking'
+import { invalidateWeeklyTimeCache } from '@/hooks/use-weekly-time'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Clock, Plus, AlertCircle } from 'lucide-react'
 import type {
@@ -160,8 +161,7 @@ export function TimeTrackerView({
         toast.error(result.error)
       } else {
         toast.success('Timer started')
-        // Reload page so ActiveTimerBar picks up the new timer
-        window.location.reload()
+        window.dispatchEvent(new Event('timer-started'))
       }
     } catch {
       toast.error('Failed to start timer')
@@ -239,6 +239,7 @@ export function TimeTrackerView({
         return
       }
       setEntries((prev) => prev.filter((e) => e.id !== id))
+      invalidateWeeklyTimeCache()
     } catch {
       setError('Failed to delete time entry. Please try again.')
     }
@@ -278,6 +279,7 @@ export function TimeTrackerView({
         }
       }
       setFormOpen(false)
+      invalidateWeeklyTimeCache()
     } catch {
       setFormError('An unexpected error occurred. Please try again.')
     } finally {

@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { TimeEntryCard, formatDuration } from '@/components/time/time-entry-card'
+import { TimeEntryCard } from '@/components/time/time-entry-card'
+import { formatDuration } from '@/lib/format-duration'
 import type { TimeEntryWithRelations, WeekSummary } from '@/types/time-tracking'
 
 // ─────────────────────────────────────────────────────────────────────────────

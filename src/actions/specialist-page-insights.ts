@@ -32,14 +32,8 @@ export interface PageInsight {
 
 const MAX_CONTEXT_LENGTH = 2000
 
-// SECURITY: Sanitise user-controlled strings for AI prompt injection.
-// Strips XML-like tags and truncates. Uses XML delimiters in prompts
-// to separate system instructions from user data (same pattern as stage-briefings.ts).
-function sanitise(s: string): string {
-  return s.slice(0, MAX_CONTEXT_LENGTH).replace(/[<>]/g, "")
-}
-
 // SECURITY: Wrap user-controlled values in XML tags so the model treats them as data, not instructions.
+// Strips XML-like tags and truncates (same pattern as stage-briefings.ts).
 function wrapUserData(label: string, value: string): string {
   const safe = value.slice(0, 500).replace(/[<>]/g, "")
   return `<${label}>${safe}</${label}>`
@@ -267,7 +261,7 @@ export async function generateMarketplaceInsights(
   return withAIGate('page_insights', async () => {
     const context = `Help this founder evaluate suppliers on the marketplace:
 Total listings: ${input.totalListings}
-Browsing category: ${sanitise(input.activeCategory)}
+Browsing category: ${wrapUserData("category", input.activeCategory)}
 Items in compare: ${input.compareCount}
 Saved items: ${input.savedCount}
 Has active CAD Lab project: ${input.hasActiveCadProject}

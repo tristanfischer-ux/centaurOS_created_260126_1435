@@ -29,7 +29,6 @@ import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScore
 import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { StageSpecialistCard } from '@/components/cad/stage-specialist-card'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -184,8 +183,6 @@ export function InvestorBrowser({
 
   // Specialist insights state
   const [specialistInsights, setSpecialistInsights] = useState<AgentInsight[]>([])
-  const [entryBriefing, setEntryBriefing] = useState<string | null>(null)
-  const [briefingLoading, setBriefingLoading] = useState(true)
   const insightsFetched = useRef(false)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -247,7 +244,6 @@ export function InvestorBrowser({
     // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
     if (insightsFetched.current) return
     insightsFetched.current = true
-    setBriefingLoading(true)
     const shortlistCount = Object.keys(shortlistIds).length
     const shortlistTypes = Array.from(new Set(
       initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string')
@@ -264,11 +260,9 @@ export function InvestorBrowser({
       activeFilters: activeFirmType !== 'All' ? activeFirmType : '',
     }).then((result) => {
       if (Array.isArray(result) && result.length > 0) {
-        setEntryBriefing(result[0].body)
-        setSpecialistInsights(result.slice(1))
+        setSpecialistInsights(result)
       }
-      setBriefingLoading(false)
-    }).catch(() => setBriefingLoading(false))
+    }).catch(() => { /* Non-critical */ })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -469,29 +463,6 @@ export function InvestorBrowser({
 
   return (
     <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
-      {/* Fiona's entry briefing */}
-      <StageSpecialistCard
-        specialistId="fundraising-advisor"
-        variant="entry"
-        briefing={entryBriefing}
-        isLoading={briefingLoading}
-        stageName="Investor Directory"
-      />
-
-      {/* Portfolio construction insights */}
-      {specialistInsights.length > 0 && (
-        <div className="space-y-3">
-          {specialistInsights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => setSpecialistInsights(prev => prev.filter(i => i.id !== insight.id))}
-              compact
-            />
-          ))}
-        </div>
-      )}
-
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}
@@ -611,6 +582,20 @@ export function InvestorBrowser({
           </Button>
         )}
       </div>
+
+      {/* Portfolio construction insights — below filters so they don't push controls off-screen */}
+      {specialistInsights.length > 0 && (
+        <div className="space-y-3">
+          {specialistInsights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => setSpecialistInsights(prev => prev.filter(i => i.id !== insight.id))}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* Grid / Board / Map views */}
       {viewMode === 'grid' && (

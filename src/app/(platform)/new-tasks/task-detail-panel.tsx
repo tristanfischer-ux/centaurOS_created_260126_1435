@@ -71,14 +71,23 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
     return () => { cancelled = true }
   }, [taskId])
 
+  const [timerStarting, setTimerStarting] = useState(false)
+
   const handleStartTimer = async () => {
-    const { startTimer } = await import('@/actions/time-tracking')
-    const result = await startTimer(taskId)
-    if ('error' in result) {
-      toast.error(result.error)
-    } else {
-      toast.success('Timer started')
-      window.location.reload()
+    setTimerStarting(true)
+    try {
+      const { startTimer } = await import('@/actions/time-tracking')
+      const result = await startTimer(taskId)
+      if ('error' in result) {
+        toast.error(typeof result.error === 'string' ? result.error : 'Failed to start timer')
+      } else {
+        toast.success('Timer started')
+        window.dispatchEvent(new Event('timer-started'))
+      }
+    } catch {
+      toast.error('Failed to start timer')
+    } finally {
+      setTimerStarting(false)
     }
   }
 
@@ -97,9 +106,10 @@ function TimeLoggedRow({ taskId }: { taskId: string }) {
         )}
         <button
           onClick={handleStartTimer}
-          className="text-[10px] font-medium text-international-orange hover:underline"
+          disabled={timerStarting}
+          className="text-[10px] font-medium text-international-orange hover:underline disabled:opacity-50 min-h-[44px] sm:min-h-0 py-1"
         >
-          Start Timer
+          {timerStarting ? 'Starting…' : 'Start Timer'}
         </button>
       </div>
     </DetailRow>

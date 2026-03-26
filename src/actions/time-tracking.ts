@@ -1,11 +1,13 @@
 /**
- * @file time-tracking.ts — Server actions for time entry CRUD (Phase 1).
+ * @file time-tracking.ts — Server actions for time entry CRUD + start/stop timer.
  *
- * @description Handles manual time logging: create, read, update, delete entries
- * and weekly summary aggregation. All actions use withAuth() for multi-tenant isolation.
+ * @description Handles manual time logging (Phase 1) and start/stop timer (Phase 2).
+ * CRUD: create, read, update, delete entries + weekly summary aggregation.
+ * Timer: startTimer, stopTimer, getActiveTimer with DB-enforced unique constraint.
+ * All actions use withAuth() for multi-tenant isolation.
  *
- * Phase 2 will add: startTimer, stopTimer, submitForApproval, approveEntry, rejectEntry.
- * Phase 3 will add: getTeamTimeReport, getBillableHoursSummary.
+ * Phase 3 will add: submitForApproval, approveEntry, rejectEntry,
+ * getTeamTimeReport, getBillableHoursSummary.
  *
  * @security All queries filter by foundry_id. RLS enforces row-level access.
  * Input validation: date format, integer duration, description length, weekStart Monday check.
@@ -306,6 +308,8 @@ export async function getWeeklyTimeProgress() {
     const weekStart = getCurrentMondayUTC()
     const weekEnd = addDays(weekStart, 6)
 
+    // Exclude active timers (started_at set + ended_at NULL) — they have placeholder duration_minutes.
+    // Include: manual entries (started_at IS NULL) and completed timers (ended_at IS NOT NULL).
     const { data, error } = await supabase
       .from('time_entries')
       .select('duration_minutes, is_billable, entry_date')
@@ -313,6 +317,7 @@ export async function getWeeklyTimeProgress() {
       .eq('user_id', user.id)
       .gte('entry_date', weekStart)
       .lte('entry_date', weekEnd)
+      .or('started_at.is.null,ended_at.not.is.null')
 
     if (error) return { error: error.message }
 
@@ -333,7 +338,7 @@ export async function getWeeklyTimeProgress() {
       .eq('id', user.id)
       .single()
 
-    const targetMinutes = (profile as { weekly_target_minutes?: number | null } | null)?.weekly_target_minutes ?? 2400
+    const targetMinutes = profile?.weekly_target_minutes ?? 2400
 
     return { totalMinutes, billableMinutes, todayMinutes, targetMinutes }
   })
@@ -359,11 +364,13 @@ export async function getTimeForTask(taskId: string) {
   return withAuth(async ({ supabase, foundryId }) => {
     if (!taskId) return { error: 'taskId required' }
 
+    // Exclude active timers (placeholder duration_minutes: 1)
     const { data, error } = await supabase
       .from('time_entries')
       .select('duration_minutes')
       .eq('foundry_id', foundryId)
       .eq('task_id', taskId)
+      .or('started_at.is.null,ended_at.not.is.null')
 
     if (error) return { error: error.message }
 
@@ -385,6 +392,16 @@ export async function getTimeForTask(taskId: string) {
 export async function startTimer(taskId?: string | null, description?: string) {
   return withAuth(async ({ supabase, user, foundryId }) => {
     const today = todayUTC()
+
+    // SECURITY: Validate taskId belongs to caller's foundry (prevents cross-foundry binding)
+    if (taskId) {
+      const { count } = await supabase
+        .from('tasks')
+        .select('*', { count: 'exact', head: true })
+        .eq('id', taskId)
+        .eq('foundry_id', foundryId)
+      if (!count) return { error: 'Task not found in your workspace' }
+    }
 
     const { data, error } = await supabase
       .from('time_entries')
