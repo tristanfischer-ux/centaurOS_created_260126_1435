@@ -21,7 +21,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { updateOnboardingData } from '@/actions/onboarding'
 import { CHECKLIST_ITEMS, CHECKLIST_TOTAL_ITEMS } from '@/components/onboarding/GettingStartedChecklist'
-import { VIDEOS } from '@/lib/video-urls'
 import type { OnboardingData } from '@/actions/onboarding'
 
 interface GettingStartedHeroProps {
@@ -47,13 +46,7 @@ export function GettingStartedHero({ onboardingData, userRole, onShareReferral }
   const [localDismissed, setLocalDismissed] = useState(false)
   const isDismissed = localDismissed || onboardingData.checklist_dismissed === true
 
-  // Filter out video item when no video URL is available
-  const filteredItems = useMemo(() => {
-    return CHECKLIST_ITEMS.filter((item) => {
-      if (item.isVideo && !VIDEOS.platformOverview.videoUrl) return false
-      return true
-    })
-  }, [])
+  const filteredItems = useMemo(() => CHECKLIST_ITEMS, [])
 
   // Sort: for Executives/Apprentices, profile first; otherwise keep original order
   const sortedItems = useMemo(() => {

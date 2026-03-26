@@ -91,8 +91,6 @@ import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import { getUnreadAlertCount } from "@/actions/match-alerts"
 import { GettingStartedChecklist } from "@/components/onboarding/GettingStartedChecklist"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
-import { VIDEOS } from "@/lib/video-urls"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 /**
  * Determines if a navigation item should be marked as active.
@@ -222,7 +220,6 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
     const [feedbackFeatureName, setFeedbackFeatureName] = React.useState<string | undefined>(undefined)
     const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
-    const [isVideoModalOpen, setIsVideoModalOpen] = React.useState(false)
 
     // Unread alert count for sidebar badge
     const [unreadAlertCount, setUnreadAlertCount] = React.useState(0)
@@ -484,7 +481,6 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     onDismiss={() => {
                         updateOnboardingData({ checklist_dismissed: true }).catch(() => {})
                     }}
-                    onPlayVideo={() => setIsVideoModalOpen(true)}
                     onShareReferral={handleShareReferral}
                 />
             )}
@@ -538,29 +534,6 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 onCreateTask={handleCaptureTask}
             />
 
-            {/* Platform Overview Video Modal */}
-            <Dialog open={isVideoModalOpen} onOpenChange={setIsVideoModalOpen}>
-                <DialogContent size="lg" className="gap-0 p-0 overflow-hidden" aria-describedby={undefined}>
-                    <DialogHeader className="sr-only">
-                        <DialogTitle>Platform Overview</DialogTitle>
-                    </DialogHeader>
-                    <div className="relative aspect-video w-full">
-                        {VIDEOS.platformOverview.videoUrl ? (
-                            <video
-                                src={VIDEOS.platformOverview.videoUrl}
-                                poster={VIDEOS.platformOverview.thumbnailUrl}
-                                controls
-                                playsInline
-                                autoPlay
-                                className="absolute inset-0 h-full w-full object-contain bg-foreground/5"
-                                aria-label="Platform Overview"
-                            >
-                                <track kind="captions" />
-                            </video>
-                        ) : null}
-                    </div>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }

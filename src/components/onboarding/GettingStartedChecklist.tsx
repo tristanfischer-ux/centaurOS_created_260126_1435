@@ -7,7 +7,6 @@ import confetti from 'canvas-confetti'
 import { toast } from 'sonner'
 import {
   UserCircle,
-  Play,
   Target,
   Users,
   Store,
@@ -23,20 +22,17 @@ import { cn } from '@/lib/utils'
 import { FORGE_ROUTES } from '@/lib/forge-routes'
 import type { OnboardingData } from '@/actions/onboarding'
 
-export const CHECKLIST_TOTAL_ITEMS = 7
+export const CHECKLIST_TOTAL_ITEMS = 6
 
 export const CHECKLIST_ITEMS: Array<{
   key: keyof OnboardingData
   label: string
   href?: string
   icon: LucideIcon
-  /** Video item - triggers modal instead of navigation */
-  isVideo?: boolean
   /** Referral share item - triggers clipboard copy */
   isShareReferral?: boolean
 }> = [
   { key: 'checklist_profile_completed', label: 'Complete your profile', href: '/my-profile', icon: UserCircle },
-  { key: 'checklist_video_watched', label: 'Watch the overview', icon: Play, isVideo: true },
   { key: 'checklist_objective_created', label: 'Create your first objective', href: '/new-objectives', icon: Target },
   { key: 'checklist_team_member_added', label: 'Invite a team member', href: '/team', icon: Users },
   { key: 'checklist_marketplace_explored', label: 'Explore the marketplace', href: '/marketplace', icon: Store },
@@ -53,8 +49,6 @@ export interface GettingStartedChecklistProps {
   onItemComplete?: (itemKey: string) => void
   /** Callback when checklist is dismissed */
   onDismiss?: () => void
-  /** Callback when "Watch the overview" is clicked - opens video modal */
-  onPlayVideo?: () => void
   /** Callback when "Share your referral link" is clicked - copies link to clipboard */
   onShareReferral?: () => void
 }
@@ -73,7 +67,6 @@ export function GettingStartedChecklist({
   onboardingData = {},
   onItemComplete,
   onDismiss,
-  onPlayVideo,
   onShareReferral,
 }: GettingStartedChecklistProps) {
   const [isExpanded, setIsExpanded] = useState(false)
@@ -110,10 +103,6 @@ export function GettingStartedChecklist({
   const handleDismiss = useCallback(() => {
     onDismiss?.()
   }, [onDismiss])
-
-  const handlePlayVideo = useCallback(() => {
-    onPlayVideo?.()
-  }, [onPlayVideo])
 
   // Completion celebration: confetti + congratulatory message + auto-dismiss
   useEffect(() => {
@@ -229,15 +218,7 @@ export function GettingStartedChecklist({
                       </button>
                       {!isComplete && (
                         <>
-                          {item.isVideo && onPlayVideo ? (
-                            <button
-                              type="button"
-                              onClick={handlePlayVideo}
-                              className="shrink-0 text-xs font-medium text-international-orange hover:text-international-orange-hover hover:underline transition-colors px-2 py-1 rounded mt-0.5"
-                            >
-                              Watch
-                            </button>
-                          ) : item.isShareReferral && onShareReferral ? (
+                          {item.isShareReferral && onShareReferral ? (
                             <button
                               type="button"
                               onClick={onShareReferral}

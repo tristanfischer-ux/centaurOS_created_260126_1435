@@ -404,7 +404,7 @@ function HeroSection() {
         </motion.div>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
-          Manufacturing-as-a-Service for hardware startups
+          Manufacturing-as-a-Service for hardware companies
         </motion.p>
 
         {memberCount !== null && memberCount > 0 ? (
@@ -444,7 +444,7 @@ function HeroSection() {
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          Fractional experts, AI-powered engineering, and on-demand manufacturing capacity — all through one platform.
+          For companies that need manufacturing — and factories that have spare capacity. Connected by fractional experts and AI-powered engineering.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">

@@ -825,7 +825,6 @@ export function TodayView({
                 const dismissed = d.checklist_dismissed === true
                 const completed = [
                     d.checklist_profile_completed,
-                    d.checklist_video_watched,
                     d.checklist_objective_created,
                     d.checklist_team_member_added,
                     d.checklist_marketplace_explored,
