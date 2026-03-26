@@ -39,7 +39,10 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
     // Profile doesn't exist yet — create it with the account type
     console.warn('[Onboarding] Profile missing during setAccountType, creating profile for user:', user.id)
     const userRole = (user.user_metadata?.role as 'Founder' | 'Executive' | 'Apprentice') ?? 'Apprentice'
-    const fallbackFoundryId = userRole === 'Founder' ? `foundry_${user.id.slice(0, 8)}` : 'forge-guild'
+    // INTENT: Always use forge-guild as fallback. The old `foundry_${userId}` pattern
+    // created a non-existent foundry ID → FK violation on profiles.foundry_id.
+    // setupNewUser is responsible for creating real founder foundries.
+    const fallbackFoundryId = 'forge-guild'
     const { error: insertError } = await supabase
       .from('profiles')
       .insert({

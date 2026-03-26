@@ -3,8 +3,8 @@
 /**
  * @file specialist-page-insights.ts
  *
- * @description Generates on-load specialist insights for 5 platform pages:
- * Fundraise, Investors, Team, Recruits, and Marketplace. Each function
+ * @description Generates on-load specialist insights for 6 platform pages:
+ * Today, Fundraise, Investors, Team, Recruits, and Marketplace. Each function
  * takes page-specific data, calls Haiku with the relevant specialist
  * personality, and returns structured insights for SpecialistInsightCard display.
  *
@@ -133,6 +133,54 @@ Respond ONLY with the JSON array, no markdown fences.`
     clearTimeout(timeout)
     return []
   }
+}
+
+// ─── Today Briefing (Cal — Chief of Staff) ─────────────────────────
+
+export interface TodayInsightInput {
+  userName: string
+  overdueCount: number
+  dueToday: number
+  completedToday: number
+  blockerCount: number
+  pendingApprovalCount: number
+  atRiskObjectiveCount: number
+  strategyAtRisk: number
+  strategyOffTrack: number
+  unreadMessages: number
+  streak: number
+  nudgeSummary: string
+}
+
+/**
+ * Generates Cal's daily executive summary for the Today page.
+ * Returns 1-3 insights with urgency triage (act now / decide this week / awareness).
+ *
+ * @param input - Aggregated Today page data
+ * @returns AgentInsight[] for SpecialistInsightCard display
+ */
+export async function generateTodayBriefing(
+  input: TodayInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Daily executive triage for ${wrapUserData("user_name", input.userName)}:
+Overdue tasks: ${input.overdueCount}
+Tasks due today: ${input.dueToday}
+Completed today: ${input.completedToday}
+Active blockers: ${input.blockerCount}
+Pending approvals: ${input.pendingApprovalCount}
+At-risk objectives: ${input.atRiskObjectiveCount}
+Strategy pillars at risk: ${input.strategyAtRisk}
+Strategy pillars off track: ${input.strategyOffTrack}
+Unread messages: ${input.unreadMessages}
+Productivity streak: ${input.streak} days
+Nudge summary: ${wrapUserData("nudges", input.nudgeSummary || "none")}
+
+Triage these into: act now (critical), decide this week (important), awareness only (informational). Connect dots — e.g. if overdue tasks and blockers overlap with at-risk objectives, call that out. Lead with the single most important thing.`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
 }
 
 // ─── Fundraise Insights ─────────────────────────────────────────────

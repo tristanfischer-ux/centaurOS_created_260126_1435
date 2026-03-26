@@ -60,6 +60,8 @@ import { PageTour } from "@/components/guidance/page-tour"
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 import type { OnboardingData } from "@/actions/onboarding"
 import { TodayTimeCard } from "@/components/time/today-time-card"
+import { CalDailySummary } from "./cal-daily-summary"
+import type { TodayInsightInput } from "@/actions/specialist-page-insights"
 
 // ─── Props ────────────────────────────────────────────────────────
 
@@ -340,6 +342,29 @@ export function TodayView({
         ? getTimeGreeting(briefing.userName)
         : briefing?.greeting ?? "Welcome back"
 
+    // ─── Cal's daily briefing input ─────────────────────────────
+    const calInput: TodayInsightInput | null = useMemo(() => {
+        if (!briefing) return null
+        const atRiskCount = briefing.atRiskObjectives?.length ?? 0
+        const atRisk = strategyHealth.filter(s => s.health === "at-risk").length
+        const offTrack = strategyHealth.filter(s => s.health === "off-track").length
+        const nudgeSummary = (briefing.nudges ?? []).map(n => n.message).join("; ")
+        return {
+            userName: briefing.userName,
+            overdueCount: briefing.overdueCount ?? 0,
+            dueToday: pulseData?.personal?.tasks_due_today ?? briefing.topTasks?.length ?? 0,
+            completedToday: pulseData?.personal?.tasks_completed_count ?? 0,
+            blockerCount: pulseData?.blockers?.length ?? 0,
+            pendingApprovalCount: pulseData?.pending_approvals?.length ?? 0,
+            atRiskObjectiveCount: atRiskCount,
+            strategyAtRisk: atRisk,
+            strategyOffTrack: offTrack,
+            unreadMessages: unreadCount,
+            streak: briefing.streak ?? 0,
+            nudgeSummary,
+        }
+    }, [briefing, pulse, strategyHealth, unreadCount])
+
     // ─── Main render ──────────────────────────────────────────────
 
     return (
@@ -509,6 +534,9 @@ export function TodayView({
                     </CardContent>
                 </Card>
             </motion.div>
+
+            {/* Cal's Daily Executive Summary */}
+            {calInput && <CalDailySummary input={calInput} />}
 
             {/* Focus Tasks Section */}
             <motion.div
