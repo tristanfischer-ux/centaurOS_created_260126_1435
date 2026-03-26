@@ -175,33 +175,40 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free',
         </PopoverContent>
       </Popover>
 
-      {/* Always-visible referral CTA — outside PopoverTrigger to avoid nested buttons */}
+      {/* Referral invite — self-explanatory inline section */}
       {hasReferralLink && (
-        <div className="flex items-center justify-between mt-1.5">
+        <div className="mt-2 pt-2 border-t border-border space-y-1.5">
           <div className="flex items-center gap-1.5">
-            <Gift className="h-3 w-3 text-international-orange" />
-            <span className="text-[10px] font-semibold text-foreground">Give 10, Get 10</span>
+            <Gift className="h-3 w-3 text-international-orange shrink-0" />
+            <span className="text-[10px] font-semibold text-foreground">Invite a friend</span>
           </div>
+          <p className="text-[9px] text-muted-foreground leading-relaxed">
+            Share your link — you both get +10 AI tasks.
+          </p>
           <button
             type="button"
             onClick={handleCopyLink}
-            className="p-0.5 rounded hover:bg-muted transition-colors"
-            aria-label="Copy referral link"
+            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md bg-muted/50 hover:bg-muted transition-colors group"
+            aria-label="Copy your invite link"
           >
+            <span className="text-[9px] text-muted-foreground truncate">
+              {referralLink}
+            </span>
             {copied ? (
-              <Check className="h-3 w-3 text-success" />
+              <Check className="h-3 w-3 text-success shrink-0" />
             ) : (
-              <Copy className="h-3 w-3 text-muted-foreground" />
+              <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
             )}
           </button>
+          {copied && (
+            <p className="text-[9px] text-success font-medium">Link copied!</p>
+          )}
+          {referralCount != null && referralCount > 0 && (
+            <p className="text-[9px] text-muted-foreground">
+              {referralCount} friend{referralCount !== 1 ? 's' : ''} joined
+            </p>
+          )}
         </div>
-      )}
-
-      {/* Referral count */}
-      {referralCount != null && referralCount > 0 && (
-        <p className="text-[9px] text-muted-foreground mt-0.5">
-          {referralCount} referred
-        </p>
       )}
 
       {/* Founding member badge */}
