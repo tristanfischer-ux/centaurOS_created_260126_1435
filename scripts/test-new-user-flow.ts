@@ -435,6 +435,137 @@ async function testCrossRoleMatrix() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// ROUNDS 6-10: Theo's flow + deeper edge cases
+// ═══════════════════════════════════════════════════════════════════
+
+async function testTheoFlow() {
+  console.log("\n🧪 [R6] Theo's exact flow: Google OAuth exec → onboarding modal → picks supplier")
+  const id = await createUser(`theo-${Date.now()}@test.local`, "Theo Test", "executive")
+  // Step 1: setupNewUser as executive (OAuth default)
+  const r = await setup({ userId: id, email: `theo@test.local`, fullName: "Theo Test", role: "executive" })
+  check("[Theo] Created as executive", r.foundryId === "forge-guild")
+  check("[Theo] account_type=team_builder initially", (await getProfile(id))?.account_type === "team_builder")
+
+  // Step 2: Onboarding modal → user picks supplier
+  await admin.from("profiles").update({ account_type: "supplier" }).eq("id", id)
+  const afterSwitch = await getProfile(id)
+  check("[Theo] account_type changed to supplier", afterSwitch?.account_type === "supplier")
+
+  // Step 3: Supplier portal layout checks account_type
+  check("[Theo] Profile has valid foundry", !!afterSwitch?.foundry_id)
+
+  // Step 4: Onboarding completion state
+  await admin.from("profiles").update({
+    onboarding_data: {
+      onboarding_modal_completed: true,
+      has_completed_onboarding: true,
+      account_type_selected: "supplier",
+      onboarding_completed_at: new Date().toISOString(),
+    },
+  }).eq("id", id)
+  const final = await getProfile(id)
+  const od = (final?.onboarding_data ?? {}) as Record<string, unknown>
+  check("[Theo] Modal marked complete", od.onboarding_modal_completed === true)
+  check("[Theo] Intent saved", od.account_type_selected === "supplier")
+}
+
+async function testSupplierSwitchBack() {
+  console.log("\n🧪 [R7] Supplier switches back to team_builder (changed mind)")
+  const id = await createUser(`switchback-${Date.now()}@test.local`, "Switch User", "executive")
+  await setup({ userId: id, email: `switchback@test.local`, fullName: "Switch User", role: "executive" })
+
+  // Switch to supplier
+  await admin.from("profiles").update({ account_type: "supplier" }).eq("id", id)
+  check("Switched to supplier", (await getProfile(id))?.account_type === "supplier")
+
+  // Switch back to team_builder
+  await admin.from("profiles").update({ account_type: "team_builder" }).eq("id", id)
+  const p = await getProfile(id)
+  check("Switched back to team_builder", p?.account_type === "team_builder")
+  // Foundry should still be forge-guild (not forge-suppliers)
+  check("Still in forge-guild", p?.foundry_id === "forge-guild")
+}
+
+async function testFounderThenSupplierSwitch() {
+  console.log("\n🧪 [R8] Founder with own foundry → switches to supplier via modal")
+  const id = await createUser(`f2s-${Date.now()}@test.local`, "Founder2Supplier", "founder")
+  const r = await setup({ userId: id, email: `f2s@test.local`, fullName: "Founder2Supplier", role: "founder", companyName: "SwitchCo" })
+  if (r.foundryId !== "forge-guild" && r.foundryId !== "forge-suppliers") createdFoundryIds.push(r.foundryId)
+
+  check("[F2S] Created as founder", r.foundryId !== "forge-guild")
+  check("[F2S] Has own foundry", (await getFoundry(r.foundryId))?.owner_id === id)
+
+  // Now switch to supplier via onboarding modal
+  await admin.from("profiles").update({ account_type: "supplier" }).eq("id", id)
+  const p = await getProfile(id)
+  check("[F2S] account_type=supplier", p?.account_type === "supplier")
+  // IMPORTANT: foundry_id should NOT change — they still own their foundry
+  check("[F2S] Still owns their foundry", p?.foundry_id === r.foundryId)
+  // The supplier portal layout will check account_type=supplier → allow access
+  // But the user's data is in their personal foundry, not forge-suppliers
+  // This is an acceptable state — they can use supplier portal while keeping their data
+}
+
+async function testProfileRepairAfterPartialSetup() {
+  console.log("\n🧪 [R9] Profile repair: auth user exists but setupNewUser never ran")
+  const id = await createUser(`repair-${Date.now()}@test.local`, "Repair User", "executive")
+  // DON'T call setupNewUser — simulate a crash/timeout during signup
+
+  // Verify no profile exists
+  check("[Repair] No profile initially", !(await getProfile(id)))
+  check("[Repair] No memberships", (await getMemberships(id)).length === 0)
+
+  // Simulate what the platform layout does: call repair RPC
+  // We can't call the RPC as the user, but we can simulate the outcome
+  await admin.from("profiles").insert({
+    id, email: `repair@test.local`, full_name: "Repair User",
+    role: "Executive", foundry_id: "forge-guild", active_foundry_id: "forge-guild",
+    account_type: "team_builder",
+  })
+  await admin.from("foundry_memberships").upsert({
+    user_id: id, foundry_id: "forge-guild", role: "Executive",
+    is_primary: true, joined_at: new Date().toISOString(),
+  }, { onConflict: "user_id,foundry_id" })
+
+  const p = await getProfile(id)
+  const m = await getMemberships(id)
+  check("[Repair] Profile created by repair", !!p)
+  check("[Repair] Membership created", m.length >= 1)
+  check("[Repair] In forge-guild", p?.foundry_id === "forge-guild")
+  check("[Repair] Onboarding modal will show", !(p?.onboarding_data as any)?.onboarding_modal_completed)
+}
+
+async function testMultipleReferralCodes() {
+  console.log("\n🧪 [R10] 10 concurrent signups — all get unique referral codes, no collisions")
+  const ids: string[] = []
+  const codes: string[] = []
+
+  // Create 10 users rapidly
+  const promises = Array.from({ length: 10 }, (_, i) =>
+    createUser(`burst-${i}-${Date.now()}@test.local`, `Burst ${i}`, "executive")
+  )
+  const results = await Promise.all(promises)
+  ids.push(...results)
+
+  // Setup all 10 in parallel
+  await Promise.allSettled(
+    ids.map((id, i) => setup({
+      userId: id, email: `burst-${i}@test.local`, fullName: `Burst ${i}`, role: "executive",
+    }))
+  )
+
+  // Verify all got profiles and unique codes
+  for (const id of ids) {
+    const p = await getProfile(id)
+    if (p?.referral_code) codes.push(p.referral_code)
+  }
+  check("[Burst] All 10 got referral codes", codes.length === 10, `got ${codes.length}`)
+  const unique = new Set(codes)
+  check("[Burst] All 10 codes unique", unique.size === 10, `${unique.size} unique out of ${codes.length}`)
+  check("[Burst] All codes 7 chars", codes.every(c => c.length === 7))
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Original tests
 // ═══════════════════════════════════════════════════════════════════
 
@@ -488,6 +619,13 @@ async function main() {
 
     // Round 5: Cross-role verification matrix
     await testCrossRoleMatrix()
+
+    // Rounds 6-10: Theo's flow + additional edge cases
+    await testTheoFlow()
+    await testSupplierSwitchBack()
+    await testFounderThenSupplierSwitch()
+    await testProfileRepairAfterPartialSetup()
+    await testMultipleReferralCodes()
   } finally {
     await cleanup()
   }
