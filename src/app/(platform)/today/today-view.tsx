@@ -245,6 +245,39 @@ export function TodayView({
     const pulseData = pulse?.data as DailyPulseData | undefined
     const bothFailed = briefingError && pulseError
 
+    // ─── Cal's daily briefing ───────────────────────────────────
+    // CRITICAL: All hooks must be called before any early returns
+    // to satisfy React's Rules of Hooks (same order every render).
+
+    const isNewUser = !!initialOnboardingData && !initialOnboardingData.checklist_dismissed
+    const onboardingStepsRemaining = isNewUser
+        ? CHECKLIST_ITEMS.filter(item => !initialOnboardingData?.[item.key]).map(item => item.label)
+        : undefined
+
+    const calInput: TodayInsightInput | null = useMemo(() => {
+        if (!briefing) return null
+        const atRiskCount = briefing.atRiskObjectives?.length ?? 0
+        const atRisk = strategyHealth.filter(s => s.health === "at-risk").length
+        const offTrack = strategyHealth.filter(s => s.health === "off-track").length
+        const nudgeSummary = (briefing.nudges ?? []).map(n => n.message).join("; ")
+        return {
+            userName: briefing.userName,
+            overdueCount: briefing.overdueCount ?? 0,
+            dueToday: pulseData?.personal?.tasks_due_today ?? briefing.topTasks?.length ?? 0,
+            completedToday: pulseData?.personal?.tasks_completed_count ?? 0,
+            blockerCount: pulseData?.blockers?.length ?? 0,
+            pendingApprovalCount: pulseData?.pending_approvals?.length ?? 0,
+            atRiskObjectiveCount: atRiskCount,
+            strategyAtRisk: atRisk,
+            strategyOffTrack: offTrack,
+            unreadMessages: unreadCount,
+            streak: briefing.streak ?? 0,
+            nudgeSummary,
+        }
+    }, [briefing, pulse, strategyHealth, unreadCount])
+
+    const { calNarrative, calInsights, isCalLoading, dismissInsight } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
+
     // ─── Loading state ────────────────────────────────────────────
 
     if (isLoading) {
@@ -364,37 +397,6 @@ export function TodayView({
         ? getTimeGreeting(briefing.userName)
         : briefing?.greeting ?? "Welcome back"
 
-    // ─── Cal's daily briefing ───────────────────────────────────
-
-    const isNewUser = !!initialOnboardingData && !initialOnboardingData.checklist_dismissed
-    const onboardingStepsRemaining = isNewUser
-        ? CHECKLIST_ITEMS.filter(item => !initialOnboardingData?.[item.key]).map(item => item.label)
-        : undefined
-
-    const calInput: TodayInsightInput | null = useMemo(() => {
-        if (!briefing) return null
-        const atRiskCount = briefing.atRiskObjectives?.length ?? 0
-        const atRisk = strategyHealth.filter(s => s.health === "at-risk").length
-        const offTrack = strategyHealth.filter(s => s.health === "off-track").length
-        const nudgeSummary = (briefing.nudges ?? []).map(n => n.message).join("; ")
-        return {
-            userName: briefing.userName,
-            overdueCount: briefing.overdueCount ?? 0,
-            dueToday: pulseData?.personal?.tasks_due_today ?? briefing.topTasks?.length ?? 0,
-            completedToday: pulseData?.personal?.tasks_completed_count ?? 0,
-            blockerCount: pulseData?.blockers?.length ?? 0,
-            pendingApprovalCount: pulseData?.pending_approvals?.length ?? 0,
-            atRiskObjectiveCount: atRiskCount,
-            strategyAtRisk: atRisk,
-            strategyOffTrack: offTrack,
-            unreadMessages: unreadCount,
-            streak: briefing.streak ?? 0,
-            nudgeSummary,
-        }
-    }, [briefing, pulse, strategyHealth, unreadCount])
-
-    const { calNarrative, calInsights, isCalLoading, dismissInsight } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
-
     // FLOW: Cal's narrative replaces the old Gemini narrative. DB greeting is the instant fallback.
     const heroNarrative = calNarrative || briefing?.narrative || briefing?.greeting || ""
 
@@ -436,7 +438,7 @@ export function TodayView({
                                         {getTimeIcon("h-2.5 w-2.5")}
                                     </div>
                                 </div>
-                                <div className="min-w-0">
+                                <div className="min-w-0" aria-live="polite">
                                     <p className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wide">
                                         Cal, Chief of Staff
                                     </p>
@@ -444,7 +446,7 @@ export function TodayView({
                                         {greetingLabel}
                                     </p>
                                     {isCalLoading ? (
-                                        <p className="text-sm italic text-muted-foreground/60 mt-1">
+                                        <p className="text-sm italic text-muted-foreground/60 mt-1" aria-label="Loading Cal's briefing">
                                             Scanning your workstreams...
                                         </p>
                                     ) : heroNarrative ? (
