@@ -19,7 +19,7 @@
  * - Specialist definitions: src/app/(platform)/agents/specialists-data.ts
  */
 
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 import type {
 	EthicalPrinciple,
 	EthicalPrincipleId,

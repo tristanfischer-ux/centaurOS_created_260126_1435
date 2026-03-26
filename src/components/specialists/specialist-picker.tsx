@@ -20,8 +20,8 @@ import {
   Compass, Package, Crown, Megaphone, Handshake,
   TrendingUp, Calculator, UserPlus, Scale, Cpu, Code2, Factory, Route,
 } from "lucide-react"
-import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import { SPECIALISTS } from "@/lib/agents/specialists-config"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 /** Map icon string names to Lucide components */
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {

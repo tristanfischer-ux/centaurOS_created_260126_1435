@@ -32,7 +32,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import { getSpecialistById } from "./specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import type { HuddleConfig } from "./huddle-config"
 import { getHuddleParticipantIds } from "./huddle-config"
 import type { AgentInsight } from "@/actions/agent-insights"

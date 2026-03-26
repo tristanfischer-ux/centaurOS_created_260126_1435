@@ -10,7 +10,7 @@
  * - Specialists data: src/app/(platform)/agents/specialists-data.ts
  */
 
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 /** Default specialist when no route matches (general operations, coordination) */
 const DEFAULT_SPECIALIST: SpecialistId = "chief-of-staff"

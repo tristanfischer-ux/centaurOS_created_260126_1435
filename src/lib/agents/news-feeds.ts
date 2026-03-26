@@ -10,7 +10,7 @@
  * - src/app/(platform)/agents/specialists-data.ts - SpecialistId type and definitions
  */
 
-import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
+import type { SpecialistId } from '@/lib/agents/specialists-config'
 
 /** Single RSS feed source with optional label for display */
 export interface NewsFeedSource {

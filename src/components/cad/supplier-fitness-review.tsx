@@ -18,7 +18,7 @@ import { AlertTriangle, XCircle, CheckCircle2, Info, Loader2, ShieldAlert } from
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { computeSupplierFitness } from "@/lib/cad-lab/supplier-fitness"
 import { useCompanyReview } from "@/hooks/use-company-review"
 import type { CadLabSupplierMatch } from "@/actions/cad-lab-supplier-match"

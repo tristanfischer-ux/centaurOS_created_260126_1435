@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import { updateDecisionOutcome } from '@/actions/decision-outcomes'
 import type { OutcomeStatus } from '@/lib/agents/decision-journal'
 import { cn } from '@/lib/utils'
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import type { AgentInsight } from '@/actions/agent-insights'
 
 // ─── Props ──────────────────────────────────────────────────────────

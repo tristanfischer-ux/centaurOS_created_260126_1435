@@ -31,7 +31,7 @@ import type {
     CheckpointSentiment,
 } from "@/lib/cad-lab-types"
 import { buildCadLabReviewContext } from "@/lib/ai-context/cad-lab-context"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { getToolsForSpecialist, executeToolCall } from "@/lib/agents/tools/registry"
 import { loadDomainKnowledge } from "@/lib/agents/domain-knowledge"

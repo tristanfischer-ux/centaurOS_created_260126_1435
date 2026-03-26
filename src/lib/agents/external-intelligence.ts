@@ -15,7 +15,7 @@
  * - Proactive outreach: src/lib/telegram/proactive-outreach.ts
  */
 
-import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
+import type { SpecialistId } from '@/lib/agents/specialists-config'
 
 // ─── Types ──────────────────────────────────────────────────────────
 

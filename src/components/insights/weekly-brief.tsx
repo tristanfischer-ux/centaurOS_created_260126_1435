@@ -36,7 +36,7 @@ import {
   markInsightRead,
   type AgentInsight,
 } from "@/actions/agent-insights"
-import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
+import { SPECIALISTS } from "@/lib/agents/specialists-config"
 
 // ─── Component ──────────────────────────────────────────────────────
 

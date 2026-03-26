@@ -79,14 +79,14 @@ import { getProactiveOpener, markInsightRead, getSpecialistGreetingContext } fro
 import { createArtifact, exportArtifactToGoogleDocs, updateArtifactContent } from "@/actions/agent-artifacts"
 import type { ArtifactContentType } from "@/actions/agent-artifacts"
 import { detectWorkflowTrigger } from "@/lib/agents/specialist-workflows"
-import type { SpecialistId } from "./specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 import { persistSpecialistHandoff } from "@/actions/agent-handoffs"
 import { recordSpecialistFeedback } from "@/actions/specialist-feedback"
 import { findRelatedPendingDecisions } from "@/actions/decision-outcomes"
 import { DecisionOutcomePrompt } from "@/components/specialists/decision-outcome-prompt"
 import type { DecisionEntry } from "@/lib/agents/decision-journal"
 import { exportAsPDF } from "@/lib/export-utils"
-import { getSpecialistById, SPECIALISTS } from "./specialists-data"
+import { getSpecialistById, SPECIALISTS } from "@/lib/agents/specialists-config"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { useScreenContext } from "@/contexts/screen-context"
 import { useBrowseContext } from "@/contexts/browse-context"
@@ -101,7 +101,7 @@ import { ExternalActionCard } from "@/components/specialists/external-action-car
 import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard"
 import { PageActionCard } from "@/components/specialists/page-action-card"
 import type { ProposedPageAction } from "@/lib/agents/tools/page-action-types"
-import type { Specialist } from "./specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Presentation Intent Detection ───────────────────────────────────────────
 // When the user's message contains presentation-related keywords, we switch

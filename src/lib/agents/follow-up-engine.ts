@@ -20,8 +20,8 @@
  * - Specialist definitions: src/app/(platform)/agents/specialists-data.ts
  */
 
-import { getSpecialistById, SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById, SPECIALISTS } from "@/lib/agents/specialists-config"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

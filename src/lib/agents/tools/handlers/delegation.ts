@@ -21,7 +21,7 @@
  */
 
 import type { ToolHandler, ToolHandlerContext } from "./common"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
 import { getOpenAIClient } from "@/lib/ai/openai-lazy"
 import { executeToolCall } from "../registry"

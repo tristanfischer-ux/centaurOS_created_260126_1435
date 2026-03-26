@@ -18,7 +18,7 @@ import { ArrowRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { getSpecialistById, type SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById, type SpecialistId } from "@/lib/agents/specialists-config"
 
 // DECISION: Color tokens per specialist for consistent visual identity across stages.
 // Matches existing patterns: Chase=info, Fang=warning.

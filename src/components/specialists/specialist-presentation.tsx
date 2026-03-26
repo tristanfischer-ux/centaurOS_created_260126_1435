@@ -21,7 +21,7 @@ import Image from "next/image"
 import { AlertCircle, Loader2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ConversationMode, SpecialistState } from "@/lib/agents/conversation-engine"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

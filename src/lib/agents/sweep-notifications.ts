@@ -19,7 +19,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { pushNotificationToTelegram } from '@/lib/telegram/notification-bridge'
-import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
+import { SPECIALISTS } from '@/lib/agents/specialists-config'
 import type { AgentInsight } from '@/actions/agent-insights'
 
 // ─── Types ──────────────────────────────────────────────────────────

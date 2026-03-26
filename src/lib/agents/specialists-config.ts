@@ -30,7 +30,7 @@
  * - Archetypes: src/lib/agents/archetypes.ts
  */
 
-import type { PromptCategory } from "./lib/agent-types"
+import type { PromptCategory } from "@/app/(platform)/agents/lib/agent-types"
 import type { AgentPersonality, AgentWritingStyle, AgentCelebrationStyle, StrongOpinion, SpecialistRelationship } from "@/lib/agents/personality"
 import { loadSpecialistOverrides, applyOverrides } from "@/lib/agents/specialist-config"
 

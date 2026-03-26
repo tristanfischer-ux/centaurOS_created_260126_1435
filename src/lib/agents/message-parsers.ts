@@ -31,7 +31,7 @@ import { validateExternalAction } from "@/lib/agents/tools/permission-guard"
 import type { ProposedExternalAction } from "@/lib/agents/tools/permission-guard"
 import { validatePageAction } from "@/lib/agents/tools/page-action-types"
 import type { ProposedPageAction } from "@/lib/agents/tools/page-action-types"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 import type { SlideDeckContent } from "@/lib/ai-providers/types"
 
 // ─── Types ──────────────────────────────────────────────────────────────────

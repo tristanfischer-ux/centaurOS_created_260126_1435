@@ -48,7 +48,7 @@ import { createConversationEngine, resolveConversationMode } from "@/lib/agents/
 import { compilePersonalityPrompt } from "@/lib/agents/personality"
 // Register all engines on import
 import "@/lib/agents/engines"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

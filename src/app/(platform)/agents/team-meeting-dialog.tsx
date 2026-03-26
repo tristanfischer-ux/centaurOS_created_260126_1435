@@ -53,7 +53,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Markdown } from "@/components/ui/markdown"
 import { getOrCreateSpecialistThread } from "@/actions/agent-memory"
-import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "./specialists-data"
+import { SPECIALISTS, getSpecialistById, getSpecialistDisplayName } from "@/lib/agents/specialists-config"
 import { compileInterSpecialistDynamics } from "@/lib/agents/relationship-matrix"
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition"
 import { AiDisclaimer } from "@/components/ui/ai-disclaimer"
@@ -62,7 +62,7 @@ import { HuddleReport } from "./huddle-report"
 import { createArtifact } from "@/actions/agent-artifacts"
 import { parseProposedActions, stripProposedActionsBlock } from "@/lib/agents/message-parsers"
 import { ProposedActionsCard } from "@/components/specialists/proposed-actions-card"
-import type { Specialist } from "./specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 import type { ProposedAction } from "@/lib/agents/message-parsers"
 
 // ─── Types ────────────────────────────────────────────────────────────────────

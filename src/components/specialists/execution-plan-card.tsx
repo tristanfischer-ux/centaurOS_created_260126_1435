@@ -15,8 +15,8 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
+import type { Specialist } from "@/lib/agents/specialists-config"
 import type { ExecutionPlan, StepStatus } from "@/lib/agents/execution-plan-types"
 import { countCompletedSteps } from "@/lib/agents/execution-plan-types"
 

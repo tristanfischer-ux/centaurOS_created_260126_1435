@@ -12,8 +12,8 @@
  * - Daily Pulse: src/lib/reports/daily-pulse.ts
  */
 
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
-import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
+import type { SpecialistId } from '@/lib/agents/specialists-config'
 
 // ─── Types ──────────────────────────────────────────────────────────
 

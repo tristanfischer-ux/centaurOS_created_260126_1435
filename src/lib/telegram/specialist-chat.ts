@@ -20,8 +20,8 @@
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { SPECIALISTS, getSpecialistById } from '@/app/(platform)/agents/specialists-data'
-import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
+import { SPECIALISTS, getSpecialistById } from '@/lib/agents/specialists-config'
+import type { SpecialistId } from '@/lib/agents/specialists-config'
 import { sendMessage, editMessage, escapeHtml, deleteMessage } from './bot'
 import { getTextProvider } from '@/lib/ai-providers/registry'
 import { compilePersonalityPrompt, compileRelationshipContext } from '@/lib/agents/personality'

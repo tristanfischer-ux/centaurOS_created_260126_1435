@@ -4,7 +4,7 @@ import { escapeHtml } from '@/lib/security/sanitize'
 import { buildAIContext } from '@/lib/ai-context/builder'
 import { compilePersonalityPrompt, compileArchetypePrompt } from '@/lib/agents/personality'
 import { getRelevantSpecialist } from '@/hooks/use-relevant-specialist'
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { compileTemporalPrompt } from '@/lib/agents/temporal-context'
 import type { ArchetypeId } from '@/lib/agents/archetypes'
 

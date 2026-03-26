@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { updateDecisionOutcome } from '@/actions/decision-outcomes'
 import type { DecisionEntry, OutcomeStatus } from '@/lib/agents/decision-journal'
 

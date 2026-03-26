@@ -16,8 +16,8 @@
  * - Team meeting: src/app/(platform)/agents/team-meeting-dialog.tsx
  */
 
-import { getSpecialistById, SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById, SPECIALISTS } from "@/lib/agents/specialists-config"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 /**
  * Compiles the relationship context for a specialist in a multi-specialist

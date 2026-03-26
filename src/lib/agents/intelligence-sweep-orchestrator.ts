@@ -26,7 +26,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getOpenAIClient } from '@/lib/ai/openai-lazy'
 
 import type { IntelligenceReport, IntelligenceSource } from './external-intelligence'
-import type { SpecialistId } from '@/app/(platform)/agents/specialists-data'
+import type { SpecialistId } from '@/lib/agents/specialists-config'
 import {
     INTELLIGENCE_SOURCES,
     getDueIntelligenceSources,

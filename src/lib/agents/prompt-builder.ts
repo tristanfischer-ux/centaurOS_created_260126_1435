@@ -34,8 +34,8 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 import {
     getFounderPreferences,
     getSpecialistRelationship,
@@ -53,7 +53,7 @@ import { searchKnowledgeForSpecialist } from "@/lib/knowledge-vault"
 import { compileTemporalPrompt } from "@/lib/agents/temporal-context"
 import { compileEmotionalPrompt } from "@/lib/agents/emotional-context"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { SPECIALISTS } from "@/app/(platform)/agents/specialists-data"
+import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import { buildHandoffContext } from "@/lib/agents/handoff-context"
 import { isEngineeringRelevant, buildEngineeringReferenceLayer } from "@/lib/agents/engineering-context"
 

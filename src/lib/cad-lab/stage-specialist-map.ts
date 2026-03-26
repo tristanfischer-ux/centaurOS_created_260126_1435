@@ -11,7 +11,7 @@
  * - Stage pages: src/app/(platform)/the-forge/cad-lab/
  */
 
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 export type CadLabStage = "design" | "specify" | "source" | "assemble"
 

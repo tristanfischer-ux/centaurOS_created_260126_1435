@@ -14,7 +14,7 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { STAGE_SPECIALISTS, getNextStageSpecialist, type CadLabStage } from "@/lib/cad-lab/stage-specialist-map"
 
 // SECURITY: Valid stage and variant values — reject anything else

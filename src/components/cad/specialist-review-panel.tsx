@@ -37,7 +37,7 @@ import {
     HoverCardContent,
     HoverCardTrigger,
 } from "@/components/ui/hover-card"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { requestSpecialistReview, quickSpecialistVerdict } from "@/actions/cad-lab-reviews"
 import type { ReviewRequest, QuickVerdictResult } from "@/actions/cad-lab-reviews"
 import type { SpecialistReview, ReviewVerdict, CadLabModule, CadLabDesignBrief } from "@/lib/cad-lab-types"

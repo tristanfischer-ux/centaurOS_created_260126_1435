@@ -19,7 +19,7 @@
 
 import { Lightbulb, Cpu, Scale, TrendingUp } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
-import type { SpecialistId } from "./specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 export interface HuddleConfig {
     /** Unique identifier for URL params and storage */

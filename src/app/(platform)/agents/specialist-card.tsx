@@ -24,7 +24,7 @@ import {
     Route,
 } from "lucide-react"
 import { Clock, MessageSquare, Zap } from "lucide-react"
-import type { Specialist, SpecialistId } from "./specialists-data"
+import type { Specialist, SpecialistId } from "@/lib/agents/specialists-config"
 import type { SpecialistActivity } from "@/actions/agent-memory"
 
 /**

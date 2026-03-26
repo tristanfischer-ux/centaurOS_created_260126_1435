@@ -15,7 +15,7 @@ import { ArrowRight, SkipForward } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { InputWithSpeech } from "@/components/ui/input-with-speech"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { getNextInterviewQuestion, synthesizeDesignBrief } from "@/actions/cad-lab-interview"
 import type { CadLabDesignBrief } from "@/lib/cad-lab-types"
 

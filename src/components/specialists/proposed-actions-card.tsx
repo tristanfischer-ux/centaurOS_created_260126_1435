@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils"
 import { scheduleTaskDates, addWorkingDays } from "@/lib/schedule-task-dates"
 import { isDestructiveAction } from "@/lib/agents/message-parsers"
 import type { ProposedAction } from "@/lib/agents/message-parsers"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 /** Maximum number of days into the future we allow for proposed dates (2 years). */
 const MAX_DATE_HORIZON_DAYS = 730

@@ -15,7 +15,7 @@
  */
 
 import type { ToolDefinition } from "@/lib/ai-providers/types"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 import type { ToolHandler, ToolHandlerContext } from "./handlers/common"
 
 import {

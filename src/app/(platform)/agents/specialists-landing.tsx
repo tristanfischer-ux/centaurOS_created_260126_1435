@@ -28,7 +28,7 @@ import { ArrowRight, Layers, Users, ChevronDown, ChevronRight, Sparkles, X, Shie
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { SPECIALISTS, getSpecialistById } from "./specialists-data"
+import { SPECIALISTS, getSpecialistById } from "@/lib/agents/specialists-config"
 import { BriefSpecialistDialog } from "./brief-specialist-dialog"
 import { TeamMeetingDialog } from "./team-meeting-dialog"
 import { MeetingHistory } from "./meeting-history"
@@ -40,7 +40,7 @@ import { getInsightFeed } from "@/actions/agent-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import type { HandoffTrailEntry } from "@/contexts/advisor-panel-context"
-import type { SpecialistId } from "./specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 function formatTimeAgo(dateStr: string): string {
     const date = new Date(dateStr)

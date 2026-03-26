@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getClientIP, rateLimit } from '@/lib/security/rate-limit'
 import { verifyCronSecret } from '@/lib/security/cron-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { SPECIALISTS } from '@/app/(platform)/agents/specialists-data'
+import { SPECIALISTS } from '@/lib/agents/specialists-config'
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
     const ip = getClientIP(req.headers)

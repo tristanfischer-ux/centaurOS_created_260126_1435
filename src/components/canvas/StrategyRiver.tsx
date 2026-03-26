@@ -650,6 +650,21 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
             const soDone = so.objectives.reduce((s, o) => s + o.tasks.filter((t) => t.status === 'done').length, 0)
             const pct = soTotal > 0 ? Math.round((soDone / soTotal) * 100) : 0
 
+            // DECISION: Collision avoidance for milestone + endpoint labels.
+            // Collect all label X positions, sort, and compute extra vertical nudge
+            // when adjacent labels are closer than MIN_LABEL_DIST pixels.
+            const MIN_LABEL_DIST = 80
+            const labelItems: Array<{ cx: number; id: string }> = objs.map((o) => ({ cx: o.cx, id: o.id }))
+            labelItems.push({ cx: eX, id: '__end__' })
+            labelItems.sort((a, b) => a.cx - b.cx)
+            const labelNudge = new Map<string, number>()
+            for (let i = 1; i < labelItems.length; i++) {
+              if (Math.abs(labelItems[i].cx - labelItems[i - 1].cx) < MIN_LABEL_DIST) {
+                const prevNudge = labelNudge.get(labelItems[i - 1].id) ?? 0
+                labelNudge.set(labelItems[i].id, prevNudge + 24)
+              }
+            }
+
             return (
               <g key={so.id}>
                 {laneIdx > 0 && (
@@ -762,7 +777,7 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                 {aft.map((s, i) => <path key={`aft-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rd-${so.id})`} pointerEvents="none" />)}
                 {bef.map((s, i) => <path key={`bef-${i}`} d={riverSegPath(s.x1, ry, s.w1, s.x2, s.w2)} fill={`url(#rg-${so.id})`} pointerEvents="none" />)}
 
-                {/* Milestones */}
+                {/* Milestones — with collision avoidance for labels */}
                 {objs.map((obj) => {
                   const isMsDragged = dragState?.isDragging && dragState.type === 'milestone' && dragState.id === obj.id
                   const isH = hovObj === obj.id || isMsDragged
@@ -771,7 +786,8 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                   const tp = obj.tasks.length > 0 ? Math.round((td / obj.tasks.length) * 100) : 0
                   const dir = obj.side === 'above' ? 1 : -1
                   const rH = obj.rw / 2
-                  const gap = Math.max(rH + 20, 26)
+                  const msNudge = labelNudge.get(obj.id) ?? 0
+                  const gap = Math.max(rH + 20, 26) + msNudge
                   const canDragMs = !!onMilestoneDateChange
 
                   // Visual position during drag
@@ -835,12 +851,17 @@ const StrategyRiver: FC<StrategyRiverProps> = ({ strategicObjectives, today, onT
                 <circle cx={eX} cy={ry} r={12} fill={so.color + '08'} stroke={so.color} strokeWidth="2" />
                 <circle cx={eX} cy={ry} r={7} fill="white" stroke={so.color} strokeWidth="1.5" filter="url(#strategy-ds)" />
                 <text x={eX} y={ry + 1} textAnchor="middle" dominantBaseline="central" fill={so.color} fontSize="8" fontFamily={FONT} fontWeight="900">◆</text>
-                <g tabIndex={0} role="button" aria-label={`Strategic goal: ${so.title}`} onClick={() => onGoalClick?.(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGoalClick?.(so.id) } }} style={{ cursor: 'pointer' }}>
-                  <text x={eX} y={ry - 18} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800"><title>{so.title}</title>{truncText(so.title, 28)}</text>
-                  <text x={eX} y={ry + 22} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
-                    {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </text>
-                </g>
+                {(() => {
+                  const endNudge = labelNudge.get('__end__') ?? 0
+                  return (
+                    <g tabIndex={0} role="button" aria-label={`Strategic goal: ${so.title}`} onClick={() => onGoalClick?.(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onGoalClick?.(so.id) } }} style={{ cursor: 'pointer' }}>
+                      <text x={eX} y={ry - 18 - endNudge} textAnchor="middle" fill="#0F172A" fontSize="10" fontFamily={FONT} fontWeight="800"><title>{so.title}</title>{truncText(so.title, 28)}</text>
+                      <text x={eX} y={ry + 22 + endNudge} textAnchor="middle" fill={so.color} fontSize="9" fontFamily={FONT} fontWeight="700">
+                        {new Date(so.targetDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </text>
+                    </g>
+                  )
+                })()}
 
                 {/* SO title (left column) — click toggles expand/collapse of all milestones in this SO */}
                 <g tabIndex={0} role="button" aria-label={`Toggle milestones for ${so.title}`} onClick={() => toggleExpand(so.id)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(so.id) } }} style={{ cursor: 'pointer' }}>

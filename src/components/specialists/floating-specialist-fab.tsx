@@ -22,12 +22,12 @@ import { MessageSquare, Sparkles, HelpCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { useScreenContext } from "@/contexts/screen-context"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { getSpecialistForRoute } from "@/lib/route-specialist-map"
 import { serializeContext } from "./types"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 /** Handoff state when switching specialists from within the mobile dialog */
 interface HandoffState {

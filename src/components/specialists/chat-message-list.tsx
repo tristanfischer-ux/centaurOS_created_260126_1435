@@ -36,7 +36,7 @@ import { StructuredOutputRenderer } from "@/components/specialists/structured-ou
 import { SpecialistChatAvatar } from "@/components/specialists/specialist-presentation"
 import { MessageExportMenu } from "@/app/(platform)/agents/message-export-menu"
 import type { ChatMessage } from "@/lib/agents/message-parsers"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

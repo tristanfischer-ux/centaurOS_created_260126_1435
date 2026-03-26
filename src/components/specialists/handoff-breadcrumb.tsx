@@ -10,7 +10,7 @@
 import Image from 'next/image'
 import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import type { HandoffTrailEntry } from '@/contexts/advisor-panel-context'
 
 interface HandoffBreadcrumbProps {

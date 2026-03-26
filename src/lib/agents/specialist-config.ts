@@ -15,8 +15,8 @@
  * - Specialists data: src/app/(platform)/agents/specialists-data.ts (sole consumer)
  */
 
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 /**
  * A partial override for one or more specialists.

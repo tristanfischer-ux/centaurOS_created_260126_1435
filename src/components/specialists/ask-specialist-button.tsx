@@ -18,12 +18,12 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { MessageSquare, ChevronDown } from "lucide-react"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { SpecialistPicker } from "./specialist-picker"
 import { serializeContext } from "./types"
 import type { SpecialistContext, SpecialistButtonVariant } from "./types"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

@@ -25,8 +25,8 @@ import {
   useEffect,
   type ReactNode,
 } from "react"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
-import type { Specialist } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
+import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

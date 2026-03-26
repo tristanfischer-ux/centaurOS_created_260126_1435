@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { PanZoomCanvas } from './pan-zoom-canvas'
 import { OrbitSVG } from './orbit-svg'
 import { OrbitSidePanel } from './orbit-side-panel'
-import { SPECIALISTS } from '../../agents/specialists-data'
+import { SPECIALISTS } from '@/lib/agents/specialists-config'
 import type { FunctionId, BusinessFunction, SpecialistNode } from '../types'
 import type { TeamDataResult } from '../hooks/use-team-data'
 

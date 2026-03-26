@@ -16,7 +16,7 @@
  */
 
 import { withAIGate } from '@/lib/ai/with-ai-gate'
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import type { AgentInsight } from '@/actions/agent-insights'
 
 // ─── Types ──────────────────────────────────────────────────────────

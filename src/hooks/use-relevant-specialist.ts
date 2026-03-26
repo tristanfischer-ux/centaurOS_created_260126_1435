@@ -11,7 +11,7 @@
 
 import { useMemo } from 'react'
 
-import type { SpecialistId } from "@/app/(platform)/agents/specialists-data"
+import type { SpecialistId } from "@/lib/agents/specialists-config"
 
 // ─── Domain-to-specialist mapping ────────────────────────────────────────────
 

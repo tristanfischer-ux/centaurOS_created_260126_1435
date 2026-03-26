@@ -16,7 +16,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 
 /**
  * Builds a deep handoff context block from a source specialist's recent activity.

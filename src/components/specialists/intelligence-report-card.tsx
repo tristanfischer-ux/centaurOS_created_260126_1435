@@ -35,7 +35,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-import { getSpecialistById } from '@/app/(platform)/agents/specialists-data'
+import { getSpecialistById } from '@/lib/agents/specialists-config'
 import { AiDisclaimer } from '@/components/ui/ai-disclaimer'
 import { markReportRead } from '@/actions/intelligence'
 

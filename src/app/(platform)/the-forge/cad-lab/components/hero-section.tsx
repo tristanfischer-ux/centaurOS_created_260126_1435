@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { BriefSpecialistDialog } from "@/app/(platform)/agents/brief-specialist-dialog"
-import { getSpecialistById } from "@/app/(platform)/agents/specialists-data"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { ReferenceModelViewer } from "./reference-model-viewer"
 import { ReferenceImageUpload } from "./reference-image-upload"
 import { ReferenceDocumentUpload } from "./reference-document-upload"
