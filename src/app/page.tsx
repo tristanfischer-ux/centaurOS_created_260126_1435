@@ -159,6 +159,9 @@ export default function MarketingPage() {
             <a href="#for-you" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Who It&apos;s For
             </a>
+            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              Pricing
+            </Link>
             <a href="#faq" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               FAQ
             </a>
@@ -255,6 +258,7 @@ export default function MarketingPage() {
         <ProblemSection />
         <WhyNowStrip />
         <SolutionSection />
+        <HowItWorksStrip />
         <ProductShowcase />
         <WhoItsForSection />
         <TrustStrip />
@@ -451,7 +455,7 @@ function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
               <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
-                Join the Forge <ArrowRight className="h-4 w-4" />
+                Get Started Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
             <a href="#the-gap" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
@@ -575,7 +579,7 @@ function WhyNowStrip() {
         <AnimatedSection className="text-center mb-6 sm:mb-8">
           <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-2">Why Now</h2>
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
-            Factories already have the capacity. They just need the work. We connect startups who need manufacturing with suppliers who have machines sitting idle.
+            Factories already have the capacity. They just need the work. We connect companies who need manufacturing with suppliers who have machines sitting idle.
           </p>
         </AnimatedSection>
 
@@ -585,6 +589,43 @@ function WhyNowStrip() {
               <p className="text-2xl sm:text-3xl font-black text-international-orange mb-1">{stat.value}</p>
               <p className="text-xs sm:text-sm text-foreground font-medium mb-1">{stat.label}</p>
               <p className="text-[10px] text-muted-foreground font-mono">{stat.source}</p>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * HOW IT WORKS — 3-step process walkthrough
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+function HowItWorksStrip() {
+  const steps = [
+    { number: "1", title: "Describe Your Product", detail: "Tell us what you want to build. Upload CAD files, sketches, or just describe your idea in plain English." },
+    { number: "2", title: "Get Your Engineering Package", detail: "Our AI generates research, 3D models, engineering drawings, material specs, and a full bill of materials." },
+    { number: "3", title: "Match With Manufacturers", detail: "We connect you with vetted UK suppliers who have the right equipment and spare capacity to make your parts." },
+  ]
+
+  return (
+    <section className="py-12 sm:py-16 md:py-24 border-t border-muted scroll-mt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-10 sm:mb-12">
+          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4">How It Works</h2>
+          <p className="text-2xl sm:text-3xl md:text-4xl font-black mb-4 leading-tight">
+            Three Steps to <span className="text-international-orange">Manufactured Parts.</span>
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+          {steps.map((step) => (
+            <AnimatedCard key={step.number} className="text-center">
+              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-white text-xl font-black mb-4">
+                {step.number}
+              </div>
+              <h3 className="text-base sm:text-lg font-black text-foreground mb-2">{step.title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">{step.detail}</p>
             </AnimatedCard>
           ))}
         </StaggerContainer>
@@ -748,7 +789,7 @@ function SolutionSection() {
               <div className="mt-6 sm:mt-8 text-center">
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
                   <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-                    Join the Forge <ArrowRight className="h-4 w-4" />
+                    Get Started Free <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
               </div>
