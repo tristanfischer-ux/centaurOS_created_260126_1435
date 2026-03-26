@@ -112,7 +112,7 @@ const mainNavigation = [
 const meMoreNavigation = [
     { name: "My Profile", href: "/my-profile", icon: UserCircle },
     { name: "Time", href: "/time", icon: Clock },
-    { name: "Knowledge", href: "/knowledge", icon: Library },
+    // { name: "Knowledge", href: "/knowledge", icon: Library },
     { name: "Google Apps", href: "/google-apps", icon: AppWindow },
     { name: "What's New", href: "/whats-new", icon: Sparkles },
 ]
