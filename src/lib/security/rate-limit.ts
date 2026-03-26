@@ -134,19 +134,16 @@ async function distributedRateLimit(
 ): Promise<RateLimitResult> {
     const supabase = getRateLimitClient()
     if (!supabase) {
-        // SECURITY: In production, fail closed — deny requests when distributed store unavailable
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] Rate limiter has no Supabase client in production — failing closed')
-            return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
-        }
-        console.warn('[SECURITY] Rate limiter falling back to in-memory — no Supabase client available')
+        // SECURITY: Fall back to in-memory rate limiting. Per-instance counters are imperfect
+        // but vastly better than blocking all users (fail-closed) or no limiting at all.
+        console.error('[SECURITY] Rate limiter has no Supabase client — falling back to in-memory (per-instance only)')
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
-    
+
     const key = `${action}:${identifier}`
     const now = new Date()
     const windowStart = new Date(now.getTime() - windowMs)
-    
+
     try {
         // Use a database function for atomic rate limiting
         // First, clean up old entries and count recent ones
@@ -156,19 +153,16 @@ async function distributedRateLimit(
             p_window_start: windowStart.toISOString(),
             p_now: now.toISOString()
         })
-        
+
         if (error) {
-            // SECURITY: In production, fail closed when RPC fails
-            if (process.env.NODE_ENV === 'production') {
-                console.error('[SECURITY] Rate limit RPC failed in production — failing closed:', error.message)
-                return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
-            }
-            console.warn('[SECURITY] Rate limiter falling back to in-memory — Supabase error:', error.message)
+            // SECURITY: Fall back to in-memory. Logging at error level so monitoring catches
+            // distributed-coordination loss. In-memory still provides per-instance protection.
+            console.error('[SECURITY] Rate limit RPC failed — falling back to in-memory (per-instance only):', error.message)
             return inMemoryRateLimit(action, identifier, limit, windowMs)
         }
-        
+
         const result = data as { allowed: boolean; count: number; reset_at: string }
-        
+
         if (!result.allowed) {
             const resetTime = new Date(result.reset_at).getTime()
             const secondsUntilReset = Math.ceil((resetTime - now.getTime()) / 1000)
@@ -179,19 +173,15 @@ async function distributedRateLimit(
                 error: `Rate limit exceeded. Try again in ${secondsUntilReset} seconds.`
             }
         }
-        
+
         return {
             success: true,
             remaining: limit - result.count,
             resetTime: now.getTime() + windowMs
         }
     } catch (err) {
-        // SECURITY: In production, fail closed on unexpected errors
-        if (process.env.NODE_ENV === 'production') {
-            console.error('[SECURITY] Rate limiter unexpected error in production — failing closed:', err)
-            return { success: false, remaining: 0, resetTime: Date.now() + windowMs, error: 'Rate limiting unavailable. Try again later.' }
-        }
-        console.warn('[SECURITY] Rate limiter falling back to in-memory:', err)
+        // SECURITY: Fall back to in-memory on unexpected errors
+        console.error('[SECURITY] Rate limiter unexpected error — falling back to in-memory (per-instance only):', err)
         return inMemoryRateLimit(action, identifier, limit, windowMs)
     }
 }
