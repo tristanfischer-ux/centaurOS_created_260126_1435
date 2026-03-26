@@ -403,6 +403,10 @@ function HeroSection() {
           </span>
         </motion.div>
 
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
+          Manufacturing-as-a-Service for hardware startups
+        </motion.p>
+
         {memberCount !== null && memberCount > 0 ? (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.5 }} className="mb-6 md:mb-8">
             <div className="inline-flex flex-col items-center gap-2">
@@ -427,10 +431,6 @@ function HeroSection() {
             </p>
           </motion.div>
         )}
-
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
-          Manufacturing-as-a-Service for hardware startups
-        </motion.p>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
           We build atoms at the{" "}
@@ -565,7 +565,7 @@ function ProblemSection() {
 const WHY_NOW_STATS = [
   { value: "72%", label: "Average UK manufacturing capacity utilisation", source: "ONS, 2024" },
   { value: "140,000+", label: "SME manufacturers in the UK alone", source: "Make UK" },
-  { value: "£6.7B", label: "Annual value of idle machine time", source: "Industry estimate" },
+  { value: "28%", label: "Of UK factory capacity sits idle on average", source: "ONS capacity utilisation survey" },
 ] as const
 
 function WhyNowStrip() {
@@ -573,7 +573,7 @@ function WhyNowStrip() {
     <section className="py-8 sm:py-12 bg-international-orange/5 border-y border-international-orange/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-6 sm:mb-8">
-          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-2 block">Why Now</span>
+          <h2 className="text-xs text-international-orange font-mono uppercase tracking-widest mb-2">Why Now</h2>
           <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
             Factories already have the capacity. They just need the work. We connect startups who need manufacturing with suppliers who have machines sitting idle.
           </p>
