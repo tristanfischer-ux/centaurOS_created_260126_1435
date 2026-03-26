@@ -253,6 +253,7 @@ export default function MarketingPage() {
       <main id="main-content">
         <HeroSection />
         <ProblemSection />
+        <WhyNowStrip />
         <SolutionSection />
         <ProductShowcase />
         <WhoItsForSection />
@@ -427,6 +428,10 @@ function HeroSection() {
           </motion.div>
         )}
 
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
+          Manufacturing-as-a-Service for hardware startups
+        </motion.p>
+
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
           We build atoms at the{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
@@ -435,11 +440,11 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
-          Access fractional experts, AI-enabled execution, and on-demand manufacturing capacity — all through one platform. No factory required.
+          Go from product idea to manufactured reality — without owning a factory, hiring a full team, or raising millions first.
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          We help hardware startups design, prototype, and manufacture physical products — without hiring a full team or leasing a factory.
+          Fractional experts, AI-powered engineering, and on-demand manufacturing capacity — all through one platform.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
@@ -548,6 +553,41 @@ function ProblemSection() {
             </div>
           </div>
         </AnimatedSection>
+      </div>
+    </section>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * WHY NOW — Evidence strip backing the supply-side thesis
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+const WHY_NOW_STATS = [
+  { value: "72%", label: "Average UK manufacturing capacity utilisation", source: "ONS, 2024" },
+  { value: "140,000+", label: "SME manufacturers in the UK alone", source: "Make UK" },
+  { value: "£6.7B", label: "Annual value of idle machine time", source: "Industry estimate" },
+] as const
+
+function WhyNowStrip() {
+  return (
+    <section className="py-8 sm:py-12 bg-international-orange/5 border-y border-international-orange/10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <AnimatedSection className="text-center mb-6 sm:mb-8">
+          <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-2 block">Why Now</span>
+          <p className="text-sm sm:text-base text-muted-foreground max-w-2xl mx-auto">
+            Factories already have the capacity. They just need the work. We connect startups who need manufacturing with suppliers who have machines sitting idle.
+          </p>
+        </AnimatedSection>
+
+        <StaggerContainer className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          {WHY_NOW_STATS.map((stat) => (
+            <AnimatedCard key={stat.label} className="text-center p-4 sm:p-5 rounded-xl border bg-card">
+              <p className="text-2xl sm:text-3xl font-black text-international-orange mb-1">{stat.value}</p>
+              <p className="text-xs sm:text-sm text-foreground font-medium mb-1">{stat.label}</p>
+              <p className="text-[10px] text-muted-foreground font-mono">{stat.source}</p>
+            </AnimatedCard>
+          ))}
+        </StaggerContainer>
       </div>
     </section>
   )
@@ -727,49 +767,49 @@ function SolutionSection() {
 const AUDIENCES = [
   {
     icon: Rocket,
-    role: "Founders",
-    value: "Launch without the overhead",
-    description: "Validate fast, risk less, and retain maximum equity. No standing army required.",
+    role: "I need to get a product manufactured",
+    value: "Startups & product companies",
+    description: "Go from CAD to manufactured product without leasing a factory or hiring a full engineering team. AI handles the engineering package; vetted suppliers handle production.",
     cta: "Start Building",
     href: "/join?role=founder",
   },
   {
+    icon: Building2,
+    role: "I have spare factory capacity",
+    value: "Manufacturers & job shops",
+    description: "List your available capacity on the marketplace. We send you qualified RFQs from startups ready to manufacture — with complete engineering packages and material specs.",
+    cta: "List Your Capacity",
+    href: "/join?role=executive",
+  },
+  {
     icon: Briefcase,
-    role: "Fractional Experts",
-    value: "Monetize your expertise",
-    description: "Join as a fractional executive to accelerate deep-tech startups. Then invest in them or launch your own.",
+    role: "I have engineering expertise to offer",
+    value: "Fractional executives & specialists",
+    description: "Join as a fractional expert to accelerate deep-tech startups. Share your manufacturing, design, or supply chain knowledge — on your schedule.",
     cta: "Join as Expert",
     href: "/join?role=executive",
   },
   {
-    icon: GraduationCap,
-    role: "Apprentices",
-    value: "Become a Founder-in-Training",
-    description: "Pair with a seasoned executive, learn cutting-edge AI workflows, and multiply your output.",
-    cta: "Start Apprenticeship",
-    href: "/join?role=apprentice",
-  },
-  {
     icon: LineChart,
-    role: "Venture Capital",
-    value: "More bets, same fund",
-    description: "Compressed validation cycles mean you can validate cheaper, kill failures faster, and place more winning bets.",
+    role: "I invest in hardware startups",
+    value: "VCs & accelerators",
+    description: "Compressed validation cycles mean portfolio companies can validate cheaper, kill failures faster, and get to market with less capital.",
     cta: "Partner With Us",
     href: "/join",
   },
   {
-    icon: Building2,
-    role: "Factory Partners",
-    value: "Fill your spare capacity",
-    description: "List available capacity on the marketplace. Every company your experts advise is a potential manufacturing order.",
-    cta: "List Your Factory",
-    href: "/join?role=executive",
+    icon: GraduationCap,
+    role: "I want to learn hardware",
+    value: "Apprentices & graduates",
+    description: "Pair with a seasoned executive, learn AI-powered engineering workflows, and build real products — not just prototypes.",
+    cta: "Start Apprenticeship",
+    href: "/join?role=apprentice",
   },
   {
     icon: Beaker,
-    role: "Universities",
-    value: "Commercialize research",
-    description: "Turn IP-rich research into venture-backed startups. Transform students into Apprentices with real-world experience.",
+    role: "I want to commercialise research",
+    value: "Universities & research labs",
+    description: "Turn IP-rich research into venture-backed products. Your researchers get access to manufacturing infrastructure without leaving the lab.",
     cta: "Partner",
     href: "/join",
   },
@@ -781,13 +821,13 @@ function WhoItsForSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <AnimatedSection className="text-center mb-10 sm:mb-12 md:mb-16">
           <span className="text-xs text-international-orange font-mono uppercase tracking-widest mb-3 sm:mb-4 block">
-            Everyone Has a Role
+            Find Your Role
           </span>
           <h2 className="text-2xl sm:text-4xl md:text-5xl font-black mb-4 sm:mb-6 leading-tight">
-            Who It&apos;s <span className="text-international-orange">For.</span>
+            What Do You <span className="text-international-orange">Need?</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Whether you&apos;re building a product, lending your expertise, or providing capacity — there&apos;s a place for you in the Forge.
+            Startups needing manufacturing. Factories with spare capacity. Experts wanting to help. Each side of the marketplace makes the other stronger.
           </p>
         </AnimatedSection>
 
