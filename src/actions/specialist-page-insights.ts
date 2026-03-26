@@ -30,8 +30,6 @@ export interface PageInsight {
 
 // ─── Internal helpers ───────────────────────────────────────────────
 
-const MAX_CONTEXT_LENGTH = 2000
-
 // SECURITY: Wrap user-controlled values in XML tags so the model treats them as data, not instructions.
 // Strips XML-like tags and truncates (same pattern as stage-briefings.ts).
 function wrapUserData(label: string, value: string): string {

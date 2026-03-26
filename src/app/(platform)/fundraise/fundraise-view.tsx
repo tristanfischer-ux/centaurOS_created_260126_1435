@@ -70,14 +70,10 @@ function relativeTime(dateStr: string): string {
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
   const [insights, setInsights] = useState<AgentInsight[]>([])
-  const [insightsLoading, setInsightsLoading] = useState(true)
   const insightsFetched = useRef(false)
 
   useEffect(() => {
-    if (!stats || stats.totalTracked === 0) {
-      setInsightsLoading(false)
-      return
-    }
+    if (!stats || stats.totalTracked === 0) return
     // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
     if (insightsFetched.current) return
     insightsFetched.current = true
@@ -96,11 +92,9 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
       if (Array.isArray(result) && result.length > 0) {
         setInsights(result)
       }
-      setInsightsLoading(false)
-    }).catch(() => {
-      setInsightsLoading(false)
-    })
-  }, [stats])
+    }).catch(() => { /* Non-critical */ })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   if (!stats || stats.totalTracked === 0) {
     return (

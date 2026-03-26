@@ -358,20 +358,6 @@ export function MarketplaceBrowse({
                 </div>
             </div>
 
-            {/* Chase's proactive insights */}
-            {!hideSpecialistBriefing && chaseInsights.length > 0 && (
-                <div className="space-y-3">
-                    {chaseInsights.map((insight) => (
-                        <SpecialistInsightCard
-                            key={insight.id}
-                            insight={insight}
-                            onDismiss={() => setChaseInsights(prev => prev.filter(i => i.id !== insight.id))}
-                            compact
-                        />
-                    ))}
-                </div>
-            )}
-
             {/* Tab navigation */}
             <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">
                 {TABS.map((tab) => {
@@ -417,6 +403,20 @@ export function MarketplaceBrowse({
                     </div>
                 )}
             </nav>
+
+            {/* Chase's proactive insights — below tabs so they don't push nav off-screen */}
+            {!hideSpecialistBriefing && chaseInsights.length > 0 && (
+                <div className="space-y-3">
+                    {chaseInsights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => setChaseInsights(prev => prev.filter(i => i.id !== insight.id))}
+                            compact
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* Browse tab content */}
             {activeTab === 'browse' && (
