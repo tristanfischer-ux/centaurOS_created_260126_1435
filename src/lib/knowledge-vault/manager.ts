@@ -60,6 +60,7 @@ export async function queryKnowledgeNotes(
     pageSize = 20,
   } = params
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   let query = (supabase as any)
       .from('knowledge_notes')
     .select(SUMMARY_FIELDS, { count: 'exact' })
@@ -138,6 +139,7 @@ export async function getKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { data, error } = await (supabase as any)
       .from('knowledge_notes')
     .select('*')
@@ -169,6 +171,7 @@ export async function getKnowledgeNoteWithLinks(
   const supabase = await createClient()
 
   // Fetch note
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { data: note, error: noteError } = await (supabase as any)
       .from('knowledge_notes')
     .select('*')
@@ -184,6 +187,7 @@ export async function getKnowledgeNoteWithLinks(
   }
 
   // Fetch outgoing links (this note -> others)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_links missing from generated DB types
   const { data: outgoing } = await (supabase as any)
       .from('knowledge_links')
     .select(`
@@ -194,6 +198,7 @@ export async function getKnowledgeNoteWithLinks(
     .eq('source_note_id', noteId)
 
   // Fetch incoming links (others -> this note)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_links missing from generated DB types
   const { data: incoming } = await (supabase as any)
       .from('knowledge_links')
     .select(`
@@ -240,9 +245,10 @@ export async function getKnowledgeNoteWithLinks(
   }
 
   // Increment view count (fire and forget)
-(supabase as any)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
+  ;(supabase as any)
       .from('knowledge_notes')
-    .update({ view_count: (note.view_count as number) + 1 })
+    .update({ view_count: ((note as Record<string, unknown>).view_count as number) + 1 })
     .eq('id', noteId)
     .then(() => { /* intentionally fire-and-forget */ })
 
@@ -282,6 +288,7 @@ export async function createKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { data: note, error } = await (supabase as any)
       .from('knowledge_notes')
     .insert({
@@ -332,6 +339,7 @@ export async function updateKnowledgeNote(
 ): Promise<KnowledgeNote | null> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { data: note, error } = await (supabase as any)
       .from('knowledge_notes')
     .update(data)
@@ -366,6 +374,7 @@ export async function archiveKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_notes')
     .update({ is_archived: archived })
@@ -392,6 +401,7 @@ export async function archiveKnowledgeNote(
 export async function deleteKnowledgeNote(noteId: string): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_notes')
     .delete()
@@ -424,6 +434,7 @@ export async function pinKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_notes')
     .update({ is_pinned: pinned })
@@ -460,6 +471,7 @@ export async function verifyKnowledgeNote(
 ): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_notes')
     .update({
@@ -505,6 +517,7 @@ export async function createKnowledgeLink(
 ): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_links missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_links')
     .insert({
@@ -542,6 +555,7 @@ export async function createKnowledgeLink(
 export async function removeKnowledgeLink(linkId: string): Promise<boolean> {
   const supabase = await createClient()
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_links missing from generated DB types
   const { error } = await (supabase as any)
       .from('knowledge_links')
     .delete()
@@ -676,6 +690,7 @@ export async function searchKnowledgeForSpecialist(
   }
 
   // Full-text search with ranking
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   let searchQuery = (supabase as any)
       .from('knowledge_notes')
     .select('title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at')

@@ -68,7 +68,7 @@ export async function createCompanyFoundry(params: {
 
     // RATE LIMIT: Max 3 foundry creations per user
     // SECURITY: Treat query failure as error (not as "count is 0")
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries.owner_id not in generated types
     const { count: existingCount, error: countError } = await (supabase as any)
       .from("foundries")
       .select("id", { count: "exact", head: true })
@@ -87,7 +87,7 @@ export async function createCompanyFoundry(params: {
     const baseSlug = generateSlug(companyName)
     const uniqueSlug = `${baseSlug}-${user.id.slice(0, 6)}`
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries columns (industry, stage, owner_id) not in generated types
     let foundryResult = await (supabase as any)
       .from("foundries")
       .insert({
@@ -103,7 +103,7 @@ export async function createCompanyFoundry(params: {
     // Retry with timestamp slug on conflict
     if (foundryResult.error) {
       const retrySlug = `${baseSlug}-${Date.now().toString(36)}`
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries columns not in generated types
       foundryResult = await (supabase as any)
         .from("foundries")
         .insert({
@@ -125,7 +125,7 @@ export async function createCompanyFoundry(params: {
     const foundryId = foundryResult.data.id as string
 
     // Create foundry membership with Founder role
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundry_memberships table not in generated types
     const { error: membershipError } = await (supabase as any).from("foundry_memberships").insert({
       user_id: user.id,
       foundry_id: foundryId,
@@ -139,7 +139,7 @@ export async function createCompanyFoundry(params: {
       // SECURITY: User's RLS client may not have DELETE policy on foundries
       console.error("[createCompanyFoundry] Membership creation failed:", membershipError)
       const adminClient = createAdminClient()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- admin client type doesn't match user client type
       await (adminClient as any).from("foundries").delete().eq("id", foundryId)
       return { success: false as const, error: "Failed to set up workspace membership" }
     }

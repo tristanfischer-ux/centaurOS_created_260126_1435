@@ -4,7 +4,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
-import { Database } from '@/types/database.types'
+import type { Database, Json } from '@/types/database.types'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 
 type AccountType = Database['public']['Enums']['account_type']
@@ -322,8 +322,7 @@ export async function updateOnboardingData(
   const { error } = await supabase
     .from('profiles')
     .update({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onboarding_data: updatedData as any,
+      onboarding_data: updatedData as unknown as Json,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id)
@@ -422,9 +421,8 @@ export async function completeMarketplaceOnboarding(skipped: boolean = false) {
 
   const { error } = await supabase
     .from('profiles')
-    .update({ 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onboarding_data: updatedData as any,
+    .update({
+      onboarding_data: updatedData as unknown as Json,
       updated_at: new Date().toISOString()
     })
     .eq('id', user.id)
@@ -531,7 +529,7 @@ export async function repairProfile(): Promise<{ success: true; foundryId: strin
  * @param displayName - Name to use for new foundry (Founders only)
  * @returns The foundry ID and whether it was newly created, or an error
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries insert requires columns (name, slug, owner_id) not in generated types
 async function resolveOrCreateFoundry(
   supabase: any,
   userId: string,
@@ -595,7 +593,7 @@ async function resolveOrCreateFoundry(
 /**
  * Ensure a foundry_memberships row exists for the user.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundry_memberships role param is string, not member_role enum
 async function ensureMembership(supabase: any, userId: string, foundryId: string, role: string): Promise<void> {
   const { data: existing } = await supabase
     .from('foundry_memberships')
@@ -742,9 +740,8 @@ export async function recordMarketplaceAction(
 
   const { error } = await supabase
     .from('profiles')
-    .update({ 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      onboarding_data: updatedData as any,
+    .update({
+      onboarding_data: updatedData as unknown as Json,
       updated_at: new Date().toISOString()
     })
     .eq('id', user.id)

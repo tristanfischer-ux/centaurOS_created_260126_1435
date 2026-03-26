@@ -246,7 +246,7 @@ async function notifyHighScoreMatches(
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     const listingIds = matches.map(m => m.id).filter(id => uuidRegex.test(id))
     if (listingIds.length === 0) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- admin client type doesn't expose marketplace_listings
     const { data: listings } = await (adminSupabase as any)
         .from('marketplace_listings')
         .select('id, created_by_provider_id')
@@ -254,10 +254,13 @@ async function notifyHighScoreMatches(
 
     if (!listings || listings.length === 0) return
 
+    type ListingWithProvider = { id: string; created_by_provider_id: string }
+    type ProviderWithUser = { id: string; user_id: string }
+
     // Get user_ids from provider_profiles
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const providerIds = (listings as any[]).map((l: any) => l.created_by_provider_id).filter(Boolean)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const typedListings = listings as ListingWithProvider[]
+    const providerIds = typedListings.map(l => l.created_by_provider_id).filter(Boolean)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- admin client type doesn't expose provider_profiles
     const { data: providers } = await (adminSupabase as any)
         .from('provider_profiles')
         .select('id, user_id')
@@ -266,14 +269,12 @@ async function notifyHighScoreMatches(
     if (!providers || providers.length === 0) return
 
     const providerToUser = new Map<string, string>()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const p of providers as any[]) {
+    for (const p of providers as ProviderWithUser[]) {
         providerToUser.set(p.id, p.user_id)
     }
 
     const listingToUser = new Map<string, string>()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const l of listings as any[]) {
+    for (const l of typedListings) {
         const userId = providerToUser.get(l.created_by_provider_id)
         if (userId) listingToUser.set(l.id, userId)
     }

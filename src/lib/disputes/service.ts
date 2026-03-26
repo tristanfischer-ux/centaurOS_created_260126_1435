@@ -251,7 +251,7 @@ export async function getDispute(
   }
 
   // Get dispute events/timeline
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dispute_events table not in generated types
   const { data: events } = await (supabase as any)
     .from("dispute_events")
     .select("*")
@@ -302,7 +302,7 @@ export async function updateDisputeStatus(
   }
 
   // Update status
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DisputeStatus enum includes 'cancelled' not in DB enum
   const { error: updateError } = await (supabase as any)
     .from("disputes")
     .update({ status: newStatus as string })
@@ -530,10 +530,10 @@ export async function resolveDispute(
     newEscrowStatus = buyerRefundAmount ? 'refunded' : 'released'
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- order status values not in generated DB enum
   await (supabase as any)
     .from("orders")
-    .update({ 
+    .update({
       status: newOrderStatus,
       escrow_status: newEscrowStatus,
     })
@@ -710,7 +710,7 @@ export async function getUserDisputes(
     .range(offset, offset + limit - 1)
 
   if (status && status.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DisputeStatus[] not assignable to DB enum array
     query = query.in("status", status as any)
   }
 
@@ -772,7 +772,7 @@ export async function checkAutoResolution(
       .single()
 
     if (sellerProfile) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dispute_events table not in generated types
       const { count: sellerResponses } = await (supabase as any)
         .from("dispute_events")
         .select("*", { count: "exact", head: true })
@@ -896,7 +896,7 @@ async function logDisputeEvent(
 
   // The dispute_events table may not exist yet - try to insert
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dispute_events table not in generated types
     await (supabase as any).from("dispute_events").insert({
       dispute_id: disputeId,
       event_type: eventType,

@@ -711,8 +711,10 @@ async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<Bl
 
   // INTENT: Use write() to get a blob instead of writeFile() which triggers
   // a direct download we can't capture. We trigger the download manually.
+  // GOTCHA: PptxGenJS write() returns Promise<string | ArrayBuffer | Blob | Uint8Array>
   const output = await pres.write({ outputType: 'blob' })
-  const blob = output as Blob
+  if (!(output instanceof Blob)) throw new Error('Expected Blob from PptxGenJS')
+  const blob = output
 
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -731,8 +733,8 @@ async function downloadPptx(pres: PptxGenJS, data: DesignReportData): Promise<Bl
 // "heading" vs "label", "axisX" vs "xAxis"). Normalize to our canonical SlideData shape
 // so builders can rely on consistent field names.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function normalizeSlideData(layout: string, raw: any): any {
+/* eslint-disable @typescript-eslint/no-explicit-any -- normalizes arbitrary LLM output with varying field names into canonical SlideData shape; any is unavoidable here */
+function normalizeSlideData(layout: string, raw: any): SlideData | any {
   if (!raw || typeof raw !== 'object') return raw
 
   switch (layout) {
@@ -1203,7 +1205,7 @@ function buildRichSlide(
 
   // INTENT: Normalize slideData before passing to builders. Opus uses varying
   // field names (cards vs items, heading vs label, numeric vs enum positions).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- slideData may have non-canonical field names from Opus LLM output
   const normalized = normalizeSlideData(layout, section.slideData as any)
   const normalizedSection = { ...section, slideData: normalized }
 

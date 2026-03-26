@@ -68,8 +68,7 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
     }
 
     // Build query for original objective_packs table
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let originalQuery: any = supabase
+    let originalQuery = supabase
         .from('objective_packs')
         .select('*, items:pack_items(*)')
     
@@ -131,8 +130,7 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
     }
 
     // Transform subsystem packs to match ObjectivePack format
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const transformedSubsystemPacks: ObjectivePack[] = ((subsystemPacks || []) as any[]).map((pack: {
+    const transformedSubsystemPacks: ObjectivePack[] = ((subsystemPacks || []) as Array<{
         id: string
         title: string
         summary: string | null
@@ -141,7 +139,7 @@ export async function getObjectivePacks(options?: GetObjectivePacksOptions): Pro
         estimated_duration: string | null
         tasks: SubsystemTask[]
         subsystem: { category: string | null; icon_name: string | null } | null
-    }) => {
+    }>).map((pack) => {
         // Transform tasks JSONB array to PackItem format
         const items: PackItem[] = (pack.tasks || []).map((task: SubsystemTask, index: number) => ({
             id: `${pack.id}-task-${index}`,
@@ -251,7 +249,7 @@ export async function savePack(packId: string): Promise<{
         }
 
         // Insert saved pack
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- saved_packs table not in generated types
         const { error } = await (supabase as any)
             .from('saved_packs')
             .insert({
@@ -340,7 +338,7 @@ export async function getUsedPackIds(): Promise<{ usedIds: Set<string>, error: s
         if (!profile?.foundry_id) return { usedIds: new Set(), error: null }
 
         // Get objectives with source_pack_id and titles for fallback matching
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- source_pack_id column not in generated types
         const { data: objectives } = await (supabase as any)
             .from('objectives')
             .select('title, source_pack_id')
@@ -351,16 +349,14 @@ export async function getUsedPackIds(): Promise<{ usedIds: Set<string>, error: s
         const usedIds = new Set<string>()
 
         // Primary: collect source_pack_ids (reliable tracking)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const obj of objectives as any[]) {
+        for (const obj of objectives as Array<{ title: string; source_pack_id?: string }>) {
             if (obj.source_pack_id) {
                 usedIds.add(obj.source_pack_id)
             }
         }
 
         // Fallback: title matching for older objectives without source_pack_id
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const objectiveTitles = new Set((objectives as any[]).map((o: { title: string }) => o.title?.toLowerCase()))
+        const objectiveTitles = new Set((objectives as Array<{ title: string; source_pack_id?: string }>).map(o => o.title?.toLowerCase()))
 
         const { data: packs } = await supabase
             .from('objective_packs')

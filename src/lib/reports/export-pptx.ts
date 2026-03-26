@@ -141,9 +141,9 @@ function buildCoverSlide(
   const slide = pres.addSlide()
   const accentColor = templateId === 'board-pack' ? NAVY_ACCENT : ORANGE
 
-  if ((data as any).coverImageUrl) {
+  if (data.coverImageUrl) {
     slide.addImage({
-      path: (data as any).coverImageUrl,
+      path: data.coverImageUrl,
       x: 0, y: 0, w: '100%', h: '100%',
       sizing: { type: 'cover', w: 10, h: 5.63 },
     })
@@ -262,9 +262,9 @@ function buildKeyMetricsSlide(
   data: KeyMetricsSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
-  if ((data as any).chartImageUrl) {
+  if (data.chartImageUrl) {
     slide.addImage({
-      path: (data as any).chartImageUrl,
+      path: data.chartImageUrl,
       x: 6.5, y: 0.3, w: 3, h: 1.7,
       rounding: true,
     })
@@ -341,9 +341,9 @@ function buildObjectivesProgressSlide(
   data: ObjectivesProgressSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
-  if ((data as any).chartImageUrl) {
+  if (data.chartImageUrl) {
     slide.addImage({
-      path: (data as any).chartImageUrl,
+      path: data.chartImageUrl,
       x: 6.5, y: 0.3, w: 3, h: 1.7,
       rounding: true,
     })
@@ -492,9 +492,9 @@ function buildCompletionTrendSlide(
   data: CompletionTrendSectionData
 ): PptxGenJS.Slide {
   const slide = pres.addSlide()
-  if ((data as any).chartImageUrl) {
+  if (data.chartImageUrl) {
     slide.addImage({
-      path: (data as any).chartImageUrl,
+      path: data.chartImageUrl,
       x: 6.5, y: 0.3, w: 3, h: 1.7,
       rounding: true,
     })

@@ -6,6 +6,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Json } from "@/types/database.types";
 
 type SignupRole = "founder" | "executive" | "apprentice" | "supplier";
 
@@ -187,6 +188,7 @@ export async function setupNewUser({
       // INTENT: Clean up orphaned foundry — it has NULL owner and no profile pointing to it.
       // Without this, retries create additional orphans via slug collision → retry slug.
       if (foundryId !== "forge-guild") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries table type constraints require cast
         await (supabase as any).from("foundries").delete().eq("id", foundryId);
       }
       return { foundryId: "forge-guild", redirectPath: "/today" };
@@ -310,13 +312,12 @@ export async function setupNewUser({
     await supabase
       .from("profiles")
       .update({
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onboarding_data: {
           ...existing,
           business_name: businessName,
           business_type: businessType,
           is_supplier_signup: true,
-        } as any,
+        } as Json,
       })
       .eq("id", userId);
   }

@@ -147,15 +147,15 @@ export async function getSavedResources() {
                     headline: listing.description || '',
                     category: listing.category,
                     subcategory: listing.subcategory || '',
-                    tags: (listing.attributes as any)?.tags || [],
-                    hourly_rate_min: (listing.attributes as any)?.hourly_rate_min || null,
-                    hourly_rate_max: (listing.attributes as any)?.hourly_rate_max || null,
-                    delivery_time_days: (listing.attributes as any)?.delivery_time_days || null,
-                    certification_level: (listing.attributes as any)?.certification_level || null,
-                    rating_average: (listing.attributes as any)?.rating_average || null,
-                    total_reviews: (listing.attributes as any)?.total_reviews || null,
-                    total_bookings: (listing.attributes as any)?.total_bookings || null,
-                    response_time_hours: (listing.attributes as any)?.response_time_hours || null,
+                    tags: (listing.attributes as Record<string, unknown>)?.tags ?? [],
+                    hourly_rate_min: (listing.attributes as Record<string, unknown>)?.hourly_rate_min ?? null,
+                    hourly_rate_max: (listing.attributes as Record<string, unknown>)?.hourly_rate_max ?? null,
+                    delivery_time_days: (listing.attributes as Record<string, unknown>)?.delivery_time_days ?? null,
+                    certification_level: (listing.attributes as Record<string, unknown>)?.certification_level ?? null,
+                    rating_average: (listing.attributes as Record<string, unknown>)?.rating_average ?? null,
+                    total_reviews: (listing.attributes as Record<string, unknown>)?.total_reviews ?? null,
+                    total_bookings: (listing.attributes as Record<string, unknown>)?.total_bookings ?? null,
+                    response_time_hours: (listing.attributes as Record<string, unknown>)?.response_time_hours ?? null,
                 } : null
             }
         })
@@ -189,8 +189,7 @@ export interface MarketplaceListing {
     subcategory: string
     title: string
     description: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attributes: Record<string, any>
+    attributes: Record<string, unknown>
     image_url: string | null
     is_verified: boolean
     /** Three-tier verification: unverified → claimed → verified */
@@ -511,8 +510,7 @@ export async function searchMarketplaceListings(
         const wanted = new Set(af.industries.map(i => i.toLowerCase()))
         listings = listings.filter((l) => {
             const attrs = l.attributes as Record<string, unknown> | null
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const industries = (l as any).industries ?? attrs?.industries
+            const industries = l.industries ?? attrs?.industries
             if (!Array.isArray(industries)) return false
             return industries.some((ind: unknown) =>
                 typeof ind === 'string' && wanted.has(ind.toLowerCase())
@@ -524,8 +522,7 @@ export async function searchMarketplaceListings(
         const wanted = new Set(af.certifications.map(c => c.toLowerCase()))
         listings = listings.filter((l) => {
             const attrs = l.attributes as Record<string, unknown> | null
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const certs = (l as any).certifications ?? attrs?.certifications
+            const certs = l.certifications ?? attrs?.certifications
             if (!Array.isArray(certs)) return false
             return certs.some((cert: unknown) =>
                 typeof cert === 'string' && wanted.has(cert.toLowerCase())

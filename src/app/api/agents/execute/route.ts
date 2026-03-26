@@ -462,8 +462,7 @@ export async function POST(request: Request) {
             if (cadProject) {
                 const cadContextParts: string[] = ["\n\n## Active CAD Lab Project Context"]
                 cadContextParts.push(`**Product:** ${cadProject.subject}`)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const mods = cadProject.modules as any[]
+                const mods = cadProject.modules as Array<{ name: string; purpose: string; status: string; result?: { bbox?: { xLen: number; yLen: number; zLen: number } } }> | null
                 if (mods && mods.length > 0) {
                     cadContextParts.push(`**Modules (${mods.length}):**`)
                     for (const m of mods) {
@@ -1683,8 +1682,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
 
                     // Add web search tool if enabled
                     const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const allTools: any[] = [...anthropicTools]
+                    const allTools: Array<Record<string, unknown>> = [...anthropicTools]
                     const betas: string[] = []
                     if (enableWebSearch) {
                         allTools.push({
@@ -1717,7 +1715,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                     let loopCount = 0
 
                     while (loopCount <= MAX_TOOL_LOOPS) {
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete
                         const response = await client.beta.messages.create(createParams as any) as any
 
                         // Handle pause_turn (web search continuation)
@@ -1730,21 +1728,19 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                                 { role: "assistant" as const, content: finalResponse.content },
                                 { role: "user" as const, content: "Continue." },
                             ]
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- beta API types incomplete
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete for pause_turn
                             finalResponse = await client.beta.messages.create({
                                 ...createParams,
                                 messages: continueMessages,
                             } as any) as any
                         }
 
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const content: any[] = finalResponse.content ?? []
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta response content blocks have variable shape
+                        const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; citations?: Array<{ url?: string; title?: string; cited_text?: string }> }> = finalResponse.content ?? []
 
                         // Check if the model wants to use tools
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const toolUseBlocks = content.filter((b: any) => b.type === "tool_use")
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        const textBlocks = content.filter((b: any) => b.type === "text")
+                        const toolUseBlocks = content.filter(b => b.type === "tool_use")
+                        const textBlocks = content.filter(b => b.type === "text")
 
                         // Stream any intermediate text the model produced before tool calls
                         for (const block of textBlocks) {
@@ -1807,15 +1803,15 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
 
                         // Execute all tool calls in parallel for lower latency
                         const toolResults = await Promise.all(
-                            toolUseBlocks.map(async (toolBlock: { name: string; input?: Record<string, unknown>; id: string }) => {
+                            toolUseBlocks.map(async (toolBlock) => {
                                 const result = await executeToolCall(
-                                    toolBlock.name,
+                                    toolBlock.name!,
                                     (toolBlock.input ?? {}) as Record<string, unknown>,
                                     { foundryId, specialistId, userId, threadId },
                                 )
                                 return {
                                     type: "tool_result" as const,
-                                    tool_use_id: toolBlock.id,
+                                    tool_use_id: toolBlock.id!,
                                     content: result,
                                 }
                             })

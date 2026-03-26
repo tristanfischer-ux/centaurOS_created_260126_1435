@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// Note: Using 'any' type assertions because provider tables are not in generated database types
+/* eslint-disable @typescript-eslint/no-explicit-any -- provider_badges, provider_ratings tables not in generated database types */
 
 /**
  * Badge eligibility rules and evaluation logic

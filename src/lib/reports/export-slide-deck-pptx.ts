@@ -53,9 +53,9 @@ function buildTitleSlide(
   // Orange background
   s.background = { fill: ORANGE }
 
-  if ((slide as any).imageUrl) {
+  if (slide.imageUrl) {
     s.addImage({
-      path: (slide as any).imageUrl,
+      path: slide.imageUrl,
       x: 0, y: 0, w: '100%', h: '100%',
       sizing: { type: 'cover', w: 10, h: 5.63 },
     })
@@ -143,9 +143,9 @@ function buildHeroInsightSlide(
 ): PptxGenJS.Slide {
   const s = pres.addSlide()
 
-  if ((slide as any).imageUrl) {
+  if (slide.imageUrl) {
     s.addImage({
-      path: (slide as any).imageUrl,
+      path: slide.imageUrl,
       x: 6, y: 0.5, w: 3.5, h: 4.5,
       rounding: true,
     })
@@ -607,9 +607,9 @@ function buildSectionDividerSlide(
   const s = pres.addSlide()
   s.background = { fill: DARK_TEXT }
 
-  if ((slide as any).imageUrl) {
+  if (slide.imageUrl) {
     s.addImage({
-      path: (slide as any).imageUrl,
+      path: slide.imageUrl,
       x: 0, y: 0, w: '100%', h: '100%',
       sizing: { type: 'cover', w: 10, h: 5.63 },
     })

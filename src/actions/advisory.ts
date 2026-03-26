@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { generateAdvisoryAnswer } from './generate-advisory-answer'
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
+import type { AdvisoryCategory } from '@/types/advisory'
+import type { Json } from '@/types/database.types'
 
 // Types
 export interface AdvisoryQuestion {
@@ -122,8 +124,7 @@ export async function createAdvisoryQuestion(data: {
             const aiResult = await generateAdvisoryAnswer({
                 question_title: data.title,
                 question_body: data.body,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                category: data.category as any,
+                category: data.category as AdvisoryCategory | undefined,
                 foundry_context: {
                     foundry_id: foundryId,
                     user_id: user.id,
@@ -399,15 +400,14 @@ export async function createAdvisoryAnswer(data: {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return { data: null, error: 'Not authenticated' }
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: answer, error } = await (supabase as any)
+        const { data: answer, error } = await supabase
             .from('advisory_answers')
             .insert({
                 question_id: data.questionId,
                 author_id: user.id,
                 author_type: data.authorType || 'human',
                 body: data.body.trim(),
-                marketplace_suggestions: data.marketplaceSuggestions || []
+                marketplace_suggestions: (data.marketplaceSuggestions || []) as unknown as Json
             })
             .select()
             .single()
@@ -493,8 +493,7 @@ export async function acceptAdvisoryAnswer(answerId: string): Promise<{ success:
             .eq('id', answerId)
             .single()
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const question = (answer as any)?.question
+        const question = (answer as Record<string, unknown> | null)?.question as { asked_by?: string; foundry_id?: string; visibility?: string } | undefined
         if (!question || question.asked_by !== user.id) {
             return { success: false, error: 'Not authorized to accept this answer' }
         }
@@ -539,8 +538,7 @@ export async function verifyAdvisoryAnswer(
             .eq('id', answerId)
             .single()
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const question = (answer as any)?.question
+        const question = (answer as Record<string, unknown> | null)?.question as { asked_by?: string; foundry_id?: string; visibility?: string } | undefined
         if (!question || question.foundry_id !== foundryId) {
             return { success: false, error: 'Answer not found' }
         }
@@ -627,8 +625,7 @@ export async function getAdvisoryComments(answerId: string): Promise<{ data: Adv
             .eq('id', answerId)
             .single()
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const question = (answer as any)?.question
+        const question = (answer as Record<string, unknown> | null)?.question as { asked_by?: string; foundry_id?: string; visibility?: string } | undefined
         if (!question || (question.foundry_id !== foundryId && question.visibility !== 'network')) {
             return { data: [], error: 'Answer not found' }
         }
