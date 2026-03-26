@@ -60,11 +60,12 @@ export async function POST(req: NextRequest) {
   }
 
   const form = await req.formData()
-  // SECURITY: Constant-time comparison to prevent timing attacks
-  const passwordBuffer = Buffer.from(password)
+  // SECURITY: Hash both sides before comparing so lengths are always equal (32 bytes).
+  // This prevents leaking password length via the timing of a short-circuit length check.
   const submittedStr = form.get("password")
-  const submittedBuffer = Buffer.from(typeof submittedStr === "string" ? submittedStr : "")
-  if (passwordBuffer.length === submittedBuffer.length && crypto.timingSafeEqual(passwordBuffer, submittedBuffer)) {
+  const expectedHash = crypto.createHash("sha256").update(password).digest()
+  const submittedHash = crypto.createHash("sha256").update(typeof submittedStr === "string" ? submittedStr : "").digest()
+  if (crypto.timingSafeEqual(expectedHash, submittedHash)) {
     const res = NextResponse.redirect(new URL("/api/admin/dashboard", req.url))
     res.cookies.set(COOKIE_NAME, makeToken(password), {
       httpOnly: true, secure: true, sameSite: "strict",
@@ -100,7 +101,7 @@ function loginPage(error?: string): string {
   return `<!DOCTYPE html><html><head><title>ForgeOS Admin</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}.card{background:#fff;border-radius:12px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:360px;width:100%}h1{font-size:20px;margin:0 0 8px}p{color:#64748b;font-size:14px;margin:0 0 24px}input{display:block;width:100%;padding:10px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;margin-bottom:16px;box-sizing:border-box}button{display:block;width:100%;padding:10px;background:#ff4500;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}.err{color:#ef4444;font-size:13px;margin-bottom:12px}</style>
-</head><body><div class="card"><h1>ForgeOS Admin</h1><p>Enter password to continue.</p>${error ? `<div class="err">${error}</div>` : ""}<form method="POST"><input type="password" name="password" placeholder="Password" autofocus required><button>Sign In</button></form></div></body></html>`
+</head><body><div class="card"><h1>ForgeOS Admin</h1><p>Enter password to continue.</p>${error ? `<div class="err">${esc(error)}</div>` : ""}<form method="POST"><input type="password" name="password" placeholder="Password" autofocus required><button>Sign In</button></form></div></body></html>`
 }
 
 // ── Main Dashboard ─────────────────────────────────────────────────
