@@ -240,14 +240,18 @@ export async function extractDocumentText(
       let rawText = ""
 
       // SECURITY: Wrap extraction in timeout to prevent DoS via malformed files
-      // (e.g., PDFs with circular references that cause pdf-parse to hang)
-      const extractWithTimeout = <T,>(promise: Promise<T>): Promise<T> =>
-        Promise.race([
-          promise,
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Extraction timed out")), EXTRACTION_TIMEOUT_MS)
-          ),
+      // (e.g., PDFs with circular references that cause pdf-parse to hang).
+      // GOTCHA: Must clear timer on success — otherwise the rejection fires into a
+      // settled Promise, producing an unhandled rejection that can crash Node.js.
+      const extractWithTimeout = <T,>(promise: Promise<T>): Promise<T> => {
+        let timer: ReturnType<typeof setTimeout>
+        return Promise.race([
+          promise.then((v) => { clearTimeout(timer); return v }),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("Extraction timed out")), EXTRACTION_TIMEOUT_MS)
+          }),
         ])
+      }
 
       // FLOW: Extract text based on file type — same libraries used in analyze.ts
       if (fileType === "pdf") {

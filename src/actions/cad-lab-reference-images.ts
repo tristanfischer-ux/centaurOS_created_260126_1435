@@ -81,6 +81,12 @@ export async function uploadReferenceImages(
           continue
         }
 
+        // SECURITY: Reject empty payloads
+        if (!img.base64 || img.base64.length === 0) {
+          failed.push(`${img.name}: empty image data`)
+          continue
+        }
+
         // SECURITY: Validate base64 size server-side (prevents bypass of client 10MB limit)
         if (img.base64.length > MAX_BASE64_LENGTH) {
           failed.push(`${img.name}: file too large`)

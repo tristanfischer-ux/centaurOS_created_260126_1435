@@ -206,7 +206,7 @@ export async function loadCadLabProject(
 ): Promise<{ project: CadLabProjectData } | { error: string }> {
   return withAuth(async ({ supabase }) => {
     // VALIDATION: Check UUID format
-    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 
@@ -1040,7 +1040,7 @@ export async function pollUnifiedResultAction(
   | { error: string }
 > {
   return withAuth(async ({ supabase }) => {
-    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 
@@ -1090,7 +1090,7 @@ export async function rateModuleQuality(
 ): Promise<{ success: boolean; error?: string }> {
   return withAuth(async ({ supabase, user }) => {
     // VALIDATION: UUID check
-    if (!/^[0-9a-f-]{36}$/.test(projectId)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
       return { success: false, error: "Invalid projectId" }
     }
     if (!moduleId || typeof moduleId !== "string") {
@@ -1212,7 +1212,7 @@ export async function saveCadLabReviewSkipped(
   skipped: boolean,
 ): Promise<{ success: true } | { error: string }> {
   return withAuth(async ({ supabase }) => {
-    if (!projectId || !/^[0-9a-f-]{36}$/.test(projectId)) {
+    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
       return { error: "Invalid project ID" }
     }
 

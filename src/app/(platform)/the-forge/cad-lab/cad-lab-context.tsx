@@ -581,7 +581,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   // Exposed on context so pipeline stages can inject into prompts.
   const documentContext = useMemo(() => {
     const specs = referenceDocuments
-      .filter(d => d.extractionStatus === "complete" && d.extractedSpecs)
+      .filter(d => d.extractionStatus === "complete" && d.extractedSpecs?.trim())
       .map(d => `### ${d.name}\n${d.extractedSpecs}`)
       .join("\n\n")
     return specs.length > 15_000 ? specs.slice(0, 15_000) + "\n\n[Document context truncated]" : specs
