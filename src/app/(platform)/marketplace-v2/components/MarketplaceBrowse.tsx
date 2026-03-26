@@ -113,6 +113,7 @@ export function MarketplaceBrowse({
     const [chaseInsights, setChaseInsights] = useState<AgentInsight[]>([])
     const [chaseBriefing, setChaseBriefing] = useState<string | null>(null)
     const [chaseBriefingLoading, setChaseBriefingLoading] = useState(true)
+    const chaseFetched = useRef(false)
 
     // Shared compare selection state (lifted from MarketplaceListingGrid)
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
@@ -139,6 +140,9 @@ export function MarketplaceBrowse({
 
     // FLOW: Chase's entry briefing — generated once on load
     useEffect(() => {
+        // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+        if (chaseFetched.current) return
+        chaseFetched.current = true
         setChaseBriefingLoading(true)
         generateMarketplaceInsights({
             totalListings: initialListings.length,

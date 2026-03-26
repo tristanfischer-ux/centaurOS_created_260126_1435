@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -73,9 +73,16 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const [insights, setInsights] = useState<AgentInsight[]>([])
   const [briefing, setBriefing] = useState<string | null>(null)
   const [briefingLoading, setBriefingLoading] = useState(true)
+  const insightsFetched = useRef(false)
 
   useEffect(() => {
-    if (!stats || stats.totalTracked === 0) return
+    if (!stats || stats.totalTracked === 0) {
+      setBriefingLoading(false)
+      return
+    }
+    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+    if (insightsFetched.current) return
+    insightsFetched.current = true
     setBriefingLoading(true)
 
     const firmTypes = Array.from(

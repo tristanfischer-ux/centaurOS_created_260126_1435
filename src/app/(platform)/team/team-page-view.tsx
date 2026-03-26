@@ -11,7 +11,7 @@
  * is managed here and passed down.
  */
 
-import { useState, useCallback, useTransition, useMemo, useEffect } from 'react'
+import { useState, useCallback, useTransition, useMemo, useEffect, useRef } from 'react'
 import {
     Plus, Search, LayoutGrid, List, Users,
     BarChart3, ShieldCheck, Zap, MoreHorizontal, Loader2,
@@ -273,6 +273,9 @@ export function TeamPageView({
 
     // FLOW: Harper's team composition analysis — generated once on load
     useEffect(() => {
+        // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+        if (harperFetched.current) return
+        harperFetched.current = true
         setHarperBriefingLoading(true)
         const totalPeople = founders.length + executives.length + apprentices.length
         const avgCap = totalPeople > 0
@@ -324,6 +327,7 @@ export function TeamPageView({
     const [harperInsights, setHarperInsights] = useState<AgentInsight[]>([])
     const [harperBriefing, setHarperBriefing] = useState<string | null>(null)
     const [harperBriefingLoading, setHarperBriefingLoading] = useState(true)
+    const harperFetched = useRef(false)
 
     // Team management
     const [teamToEdit, setTeamToEdit] = useState<{ id: string; name: string } | null>(null)

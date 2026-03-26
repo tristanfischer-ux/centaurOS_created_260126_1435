@@ -107,8 +107,9 @@ Respond ONLY with the JSON array, no markdown fences.`
     const text = (data.content?.[0]?.text ?? "").trim()
     if (!text) return []
 
-    // VALIDATION: Parse and validate structure
-    const parsed = JSON.parse(text)
+    // VALIDATION: Strip markdown fences (Haiku sometimes wraps JSON in ```json...```)
+    const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "")
+    const parsed = JSON.parse(cleaned)
     if (!Array.isArray(parsed)) return []
 
     return parsed

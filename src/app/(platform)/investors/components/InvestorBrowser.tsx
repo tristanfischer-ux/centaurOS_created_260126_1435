@@ -186,6 +186,7 @@ export function InvestorBrowser({
   const [specialistInsights, setSpecialistInsights] = useState<AgentInsight[]>([])
   const [entryBriefing, setEntryBriefing] = useState<string | null>(null)
   const [briefingLoading, setBriefingLoading] = useState(true)
+  const insightsFetched = useRef(false)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasEverFetched = useRef(hasUrlFilters)
@@ -243,6 +244,9 @@ export function InvestorBrowser({
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
+    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+    if (insightsFetched.current) return
+    insightsFetched.current = true
     setBriefingLoading(true)
     const shortlistCount = Object.keys(shortlistIds).length
     const shortlistTypes = Array.from(new Set(
