@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { generateTodayBriefing, type TodayInsightInput, type CalBriefingResult } from "@/actions/specialist-page-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 
@@ -17,6 +17,7 @@ interface UseCalBriefingResult {
   calNarrative: string | null
   calInsights: AgentInsight[]
   isCalLoading: boolean
+  dismissInsight: (id: string) => void
 }
 
 /**
@@ -38,6 +39,9 @@ export function useCalBriefing(
 
   useEffect(() => {
     // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+    // GOTCHA: input can start null if briefing wasn't SSR'd — including input in
+    // deps lets the effect re-fire when data arrives. The ref guard prevents
+    // double-calls once we've successfully started a fetch.
     if (fetched.current || !input) return
 
     // For returning users, skip if there's no meaningful data to triage
@@ -67,7 +71,11 @@ export function useCalBriefing(
       .catch(() => { /* Non-critical — hero card falls back to DB greeting */ })
       .finally(() => setIsCalLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input])
+
+  const dismissInsight = useCallback((id: string) => {
+    setCalInsights(prev => prev.filter(i => i.id !== id))
   }, [])
 
-  return { calNarrative, calInsights, isCalLoading }
+  return { calNarrative, calInsights, isCalLoading, dismissInsight }
 }

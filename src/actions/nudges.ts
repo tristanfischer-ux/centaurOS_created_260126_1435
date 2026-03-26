@@ -293,29 +293,17 @@ export async function getMorningBriefing(): Promise<{ data?: MorningBriefing; er
     // This server action now returns the DB-driven greeting as the narrative fallback.
     const narrative = greeting
 
-    // 10. Log insights for deduplication and feedback tracking
-    const insightsToLog: InsightEntry[] = []
+    // 10. Log nudges for deduplication and feedback tracking
+    const insightsToLog: InsightEntry[] = nudges.map(nudge => ({
+      insightType: 'nudge' as const,
+      contentSummary: nudge.message,
+    }))
 
-    // Log the narrative briefing
-    if (narrative !== greeting) {
-      insightsToLog.push({
-        insightType: 'briefing_narrative',
-        contentSummary: narrative,
+    if (insightsToLog.length > 0) {
+      logInsights(user.id, foundryId, insightsToLog).catch(() => {
+        // Silently ignore — logging should never break the main flow
       })
     }
-
-    // Log each nudge
-    for (const nudge of nudges) {
-      insightsToLog.push({
-        insightType: 'nudge',
-        contentSummary: nudge.message,
-      })
-    }
-
-    // Non-blocking: log insights
-    logInsights(user.id, foundryId, insightsToLog).catch(() => {
-      // Silently ignore — logging should never break the main flow
-    })
 
     return {
       data: {

@@ -93,13 +93,14 @@ const EASE_CURVE = [0.22, 1, 0.36, 1] as const
 /**
  * Returns the appropriate icon for the current time of day.
  *
+ * @param size - Tailwind size class (default "h-5 w-5")
  * @returns Sun (5–12), CloudSun (12–17), or Moon (17–5)
  */
-function getTimeIcon(): React.ReactElement {
+function getTimeIcon(size = "h-5 w-5"): React.ReactElement {
     const hour = new Date().getHours()
-    if (hour >= 5 && hour < 12) return <Sun className="h-5 w-5 text-status-warning" />
-    if (hour >= 12 && hour < 17) return <CloudSun className="h-5 w-5 text-status-warning" />
-    return <Moon className="h-5 w-5 text-electric-blue" />
+    if (hour >= 5 && hour < 12) return <Sun className={`${size} text-status-warning`} />
+    if (hour >= 12 && hour < 17) return <CloudSun className={`${size} text-status-warning`} />
+    return <Moon className={`${size} text-electric-blue`} />
 }
 
 /**
@@ -392,7 +393,7 @@ export function TodayView({
         }
     }, [briefing, pulse, strategyHealth, unreadCount])
 
-    const { calNarrative, calInsights, isCalLoading } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
+    const { calNarrative, calInsights, isCalLoading, dismissInsight } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
 
     // FLOW: Cal's narrative replaces the old Gemini narrative. DB greeting is the instant fallback.
     const heroNarrative = calNarrative || briefing?.narrative || briefing?.greeting || ""
@@ -432,7 +433,7 @@ export function TodayView({
                                         className="rounded-xl"
                                     />
                                     <div className="absolute -bottom-0.5 -right-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-status-warning-light border border-background">
-                                        {getTimeIcon()}
+                                        {getTimeIcon("h-2.5 w-2.5")}
                                     </div>
                                 </div>
                                 <div className="min-w-0">
@@ -600,7 +601,7 @@ export function TodayView({
                         <SpecialistInsightCard
                             key={insight.id}
                             insight={insight}
-                            onDismiss={() => {/* Insights are ephemeral — dismiss is visual only */}}
+                            onDismiss={() => dismissInsight(insight.id)}
                             compact
                         />
                     ))}
