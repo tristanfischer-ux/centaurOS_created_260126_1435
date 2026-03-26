@@ -300,7 +300,7 @@ ${CSS}
 
 // ── Helpers ─────────────────────────────────────────────────────────
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;")
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;")
 }
 
 function fmt(iso: string): string {
