@@ -200,7 +200,7 @@ ${CSS}
       ${userRows.map(u => `<tr>
         <td><strong>${esc(u.full_name || "—")}</strong></td>
         <td>${esc(u.email)}</td>
-        <td><span class="badge badge-${u.role?.toLowerCase()}">${esc(u.role)}</span></td>
+        <td><span class="badge badge-${(u.role || "").toLowerCase().replace(/[^a-z0-9_-]/g, "")}">${esc(u.role)}</span></td>
         <td>${fmt(u.created_at)}</td>
         <td>${u.lastSignIn ? fmt(u.lastSignIn.toISOString()) : "<span style='color:#94a3b8'>Never</span>"}</td>
         <td style="text-align:center">${u.daysSinceActive > 900 ? "—" : u.daysSinceActive + "d"}</td>
