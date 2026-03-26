@@ -91,6 +91,28 @@ export async function setupNewUser({
   let foundryId: string;
   let accountType: "team_builder" | "supplier" | null = null;
 
+  // --- Ensure shared foundries exist BEFORE any profile creation ---
+  // INTENT: Moved to top because the founder fallback path (foundry creation fails →
+  // foundryId = "forge-guild") creates the profile BEFORE the old ensureFoundry check.
+  // If forge-guild doesn't exist in DB, the profile INSERT fails with FK violation.
+  for (const sharedId of ["forge-guild", "forge-suppliers"] as const) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: exists } = await (supabase as any).from("foundries").select("id").eq("id", sharedId).single();
+    if (!exists) {
+      console.error(`[setupNewUser] Shared foundry "${sharedId}" missing. Creating.`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: sharedErr } = await (supabase as any).from("foundries").insert({
+        id: sharedId,
+        name: sharedId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
+        slug: sharedId,
+        owner_id: null,
+      });
+      if (sharedErr && sharedErr.code !== "23505") {
+        console.error(`[setupNewUser] Shared foundry creation failed:`, sharedErr.message);
+      }
+    }
+  }
+
   // --- Foundry creation / assignment ---
   if (role === "founder" && companyName) {
     accountType = "team_builder";
@@ -180,34 +202,6 @@ export async function setupNewUser({
   } else {
     accountType = "team_builder";
     foundryId = "forge-guild";
-  }
-
-  // --- Ensure shared foundry exists ---
-  if (foundryId === "forge-guild" || foundryId === "forge-suppliers") {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: foundryExists } = await (supabase as any)
-      .from("foundries")
-      .select("id")
-      .eq("id", foundryId)
-      .single();
-
-    if (!foundryExists) {
-      console.error(`[setupNewUser] Shared foundry "${foundryId}" missing. Creating.`);
-      // SECURITY: Use NULL owner for shared foundries — system UUID doesn't have a
-      // profile (FK violation). The check_foundry_owner trigger allows NULL on INSERT
-      // for system foundries listed in v_system_ids.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: sharedErr } = await (supabase as any).from("foundries").insert({
-        id: foundryId,
-        name: foundryId === "forge-guild" ? "ForgeOS Guild" : "ForgeOS Suppliers",
-        slug: foundryId,
-        owner_id: null,
-      });
-      // 23505 = unique violation (concurrent creation) — safe to ignore.
-      if (sharedErr && sharedErr.code !== "23505") {
-        console.error(`[setupNewUser] Shared foundry creation failed:`, sharedErr.message);
-      }
-    }
   }
 
   // --- Create profile for non-founders AND founders without company (OAuth edge case) ---
