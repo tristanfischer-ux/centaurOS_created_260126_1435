@@ -123,10 +123,18 @@ export async function GET(request: Request) {
         // Read referral code from cookie (set via ?ref= on join page)
         const referralCode = cookieStore.get('forge_ref')?.value || null
 
+        // SECURITY: Reject OAuth users without an email — profile with empty email
+        // breaks RLS on updates and prevents password reset. All major OAuth providers
+        // (Google, GitHub) require email, but edge cases exist.
+        if (!user.email) {
+          console.error('[Auth Callback] OAuth user has no email, cannot create profile:', user.id)
+          return NextResponse.redirect(new URL('/login?error=invalid-credentials', requestUrl.origin))
+        }
+
         const { redirectPath } = await setupNewUser({
           supabase,
           userId: user.id,
-          email: user.email || '',
+          email: user.email,
           fullName,
           role: signupRole,
           companyName: sanitizedCompany,

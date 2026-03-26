@@ -308,6 +308,136 @@ async function testReferralCodeUniqueness() {
   check("All referral codes unique", uniqueCodes.size === 5, `${codes.length} codes, ${uniqueCodes.size} unique`)
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// ROUND 2: Post-signup state — onboarding modal should trigger
+// ═══════════════════════════════════════════════════════════════════
+
+async function testAccountTypeChange() {
+  console.log("\n🧪 [R2] setAccountType — switch from null to supplier")
+  const id = await createUser(`actype-${Date.now()}@test.local`, "AccType User", "executive")
+  await setup({ userId: id, email: `actype@test.local`, fullName: "AccType User", role: "executive" })
+
+  // Profile starts with account_type=team_builder
+  let p = await getProfile(id)
+  check("Initial account_type=team_builder", p?.account_type === "team_builder")
+
+  // Simulate onboarding modal selecting "supplier"
+  await admin.from("profiles").update({ account_type: "supplier" }).eq("id", id)
+  p = await getProfile(id)
+  check("account_type changed to supplier", p?.account_type === "supplier")
+
+  // Change back
+  await admin.from("profiles").update({ account_type: "team_builder" }).eq("id", id)
+  p = await getProfile(id)
+  check("account_type reverted to team_builder", p?.account_type === "team_builder")
+}
+
+async function testOnboardingDataPersistence() {
+  console.log("\n🧪 [R2] Onboarding data — partial updates merge correctly")
+  const id = await createUser(`odmerge-${Date.now()}@test.local`, "OD Merge", "executive")
+  await setup({ userId: id, email: `odmerge@test.local`, fullName: "OD Merge", role: "executive" })
+
+  // Write first field
+  const { data: p1 } = await admin.from("profiles").select("onboarding_data").eq("id", id).single()
+  const od1 = (p1?.onboarding_data ?? {}) as Record<string, unknown>
+  await admin.from("profiles").update({ onboarding_data: { ...od1, step_one_done: true } }).eq("id", id)
+
+  // Write second field — should NOT overwrite first
+  const { data: p2 } = await admin.from("profiles").select("onboarding_data").eq("id", id).single()
+  const od2 = (p2?.onboarding_data ?? {}) as Record<string, unknown>
+  await admin.from("profiles").update({ onboarding_data: { ...od2, step_two_done: true } }).eq("id", id)
+
+  // Verify both fields present
+  const { data: p3 } = await admin.from("profiles").select("onboarding_data").eq("id", id).single()
+  const od3 = (p3?.onboarding_data ?? {}) as Record<string, unknown>
+  check("step_one_done preserved", od3.step_one_done === true)
+  check("step_two_done present", od3.step_two_done === true)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ROUND 3: Onboarding modal edge cases
+// ═══════════════════════════════════════════════════════════════════
+
+async function testModalSkipState() {
+  console.log("\n🧪 [R3] Modal skip — sets onboarding_modal_completed but not account_type_selected")
+  const id = await createUser(`skip-${Date.now()}@test.local`, "Skip User", "executive")
+  await setup({ userId: id, email: `skip@test.local`, fullName: "Skip User", role: "executive" })
+
+  // Simulate skip: modal marks complete but doesn't set intent
+  await admin.from("profiles").update({
+    onboarding_data: { onboarding_modal_completed: true, has_completed_onboarding: true },
+  }).eq("id", id)
+
+  const p = await getProfile(id)
+  const od = (p?.onboarding_data ?? {}) as Record<string, unknown>
+  check("Modal marked complete", od.onboarding_modal_completed === true)
+  check("account_type_selected NOT set (skipped)", !od.account_type_selected)
+  // account_type on profile should still be team_builder (from signup)
+  check("account_type still team_builder", p?.account_type === "team_builder")
+}
+
+async function testModalAlreadyCompleted() {
+  console.log("\n🧪 [R3] Modal already completed — verify it won't re-show")
+  const id = await createUser(`done-${Date.now()}@test.local`, "Done User", "executive")
+  await setup({ userId: id, email: `done@test.local`, fullName: "Done User", role: "executive" })
+
+  // Mark as completed
+  await admin.from("profiles").update({
+    onboarding_data: {
+      onboarding_modal_completed: true,
+      has_completed_onboarding: true,
+      account_type_selected: "team_builder",
+      onboarding_completed_at: new Date().toISOString(),
+    },
+  }).eq("id", id)
+
+  const p = await getProfile(id)
+  const od = (p?.onboarding_data ?? {}) as Record<string, unknown>
+  check("Modal won't re-show (completed=true)", od.onboarding_modal_completed === true)
+  check("Intent recorded", od.account_type_selected === "team_builder")
+  check("Completion timestamp set", !!od.onboarding_completed_at)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ROUND 5: Cross-role verification matrix
+// ═══════════════════════════════════════════════════════════════════
+
+async function testCrossRoleMatrix() {
+  console.log("\n🧪 [R5] Cross-role verification matrix")
+  const roles = [
+    { role: "founder" as const, companyName: "Matrix Co", expectedFoundry: "matrix-co-", expectedType: "team_builder", hasProvider: true, redirect: "/today" },
+    { role: "executive" as const, expectedFoundry: "forge-guild", expectedType: "team_builder", hasProvider: true, redirect: "/today" },
+    { role: "apprentice" as const, expectedFoundry: "forge-guild", expectedType: "team_builder", hasProvider: true, redirect: "/today" },
+    { role: "supplier" as const, expectedFoundry: "forge-suppliers", expectedType: "supplier", hasProvider: false, redirect: "/supplier-portal" },
+  ]
+
+  for (const cfg of roles) {
+    const id = await createUser(`matrix-${cfg.role}-${Date.now()}@test.local`, `Matrix ${cfg.role}`, cfg.role)
+    const r = await setup({
+      userId: id, email: `matrix-${cfg.role}@test.local`, fullName: `Matrix ${cfg.role}`,
+      role: cfg.role, companyName: cfg.companyName,
+    })
+    if (r.foundryId !== "forge-guild" && r.foundryId !== "forge-suppliers") createdFoundryIds.push(r.foundryId)
+
+    const p = await getProfile(id)
+    const m = await getMemberships(id)
+    const pp = await getProviderProfile(id)
+
+    check(`[${cfg.role}] profile exists`, !!p)
+    check(`[${cfg.role}] foundry starts with ${cfg.expectedFoundry}`, r.foundryId.startsWith(cfg.expectedFoundry))
+    check(`[${cfg.role}] account_type=${cfg.expectedType}`, p?.account_type === cfg.expectedType)
+    check(`[${cfg.role}] membership exists`, m.length >= 1)
+    check(`[${cfg.role}] referral code`, !!p?.referral_code && p.referral_code.length === 7)
+    check(`[${cfg.role}] provider=${cfg.hasProvider}`, cfg.hasProvider ? !!pp : !pp)
+    check(`[${cfg.role}] redirect=${cfg.redirect}`, r.redirectPath === cfg.redirect)
+    check(`[${cfg.role}] onboarding_modal_completed falsy`, !(p?.onboarding_data as any)?.onboarding_modal_completed)
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Original tests
+// ═══════════════════════════════════════════════════════════════════
+
 async function testNullRole() {
   console.log("\n🧪 Invalid role (defaults to Apprentice)")
   const id = await createUser(`nullrole-${Date.now()}@test.local`, "No Role", "unknown_role")
@@ -347,6 +477,17 @@ async function main() {
     await testNullRole()
     await testOnboardingState()
     await testReferralCodeUniqueness()
+
+    // Round 2: Post-signup state
+    await testAccountTypeChange()
+    await testOnboardingDataPersistence()
+
+    // Round 3: Onboarding modal edge cases
+    await testModalSkipState()
+    await testModalAlreadyCompleted()
+
+    // Round 5: Cross-role verification matrix
+    await testCrossRoleMatrix()
   } finally {
     await cleanup()
   }
