@@ -163,20 +163,9 @@ export async function createCompanyFoundry(params: {
     // Clear foundry cache
     clearFoundryCache(user.id)
 
-    // Seed demo data
-    const demoRpcs = [
-      "seed_demo_forge_concept",
-      "seed_demo_air_quality_sensor",
-      "seed_demo_drone_motor_mount",
-    ] as const
-
-    // GOTCHA: Supabase JS client returns { data, error } — it does NOT throw.
-    // Must check .error, not use try/catch.
-    for (const rpc of demoRpcs) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: rpcError } = await (supabase as any).rpc(rpc, { p_foundry_id: foundryId, p_user_id: user.id })
-      if (rpcError) console.warn(`[createCompanyFoundry] ${rpc} failed:`, rpcError.message)
-    }
+    // DECISION: Demo forge products (weather station, air quality sensor, drone mount)
+    // removed — pre-canned text walls with no images or CAD were hurting first impressions
+    // more than helping. Clean empty state + "What do you want to build?" hero is better.
 
     {
       const { error: e } = await supabase.rpc("seed_founder_demo_data", { p_foundry_id: foundryId, p_user_id: user.id })
