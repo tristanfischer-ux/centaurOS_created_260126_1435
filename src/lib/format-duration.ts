@@ -5,11 +5,12 @@
  * import it without pulling in the entire component tree.
  */
 
-/** Format minutes as "Xh Ym". Returns "0h" for 0. */
+/** Format minutes as "Xh Ym". Returns "0h" for 0, NaN, Infinity. */
 export function formatDuration(minutes: number): string {
-  if (minutes <= 0) return '0h'
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
+  if (!Number.isFinite(minutes) || minutes <= 0) return '0h'
+  const rounded = Math.floor(minutes) // guard fractional inputs
+  const h = Math.floor(rounded / 60)
+  const m = rounded % 60
   if (h === 0) return `${m}m`
   if (m === 0) return `${h}h`
   return `${h}h ${m}m`

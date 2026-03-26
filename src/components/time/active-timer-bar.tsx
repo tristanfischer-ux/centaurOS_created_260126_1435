@@ -30,7 +30,10 @@ export function ActiveTimerBar() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   // Check for active timer — on mount, tab focus, and timer-started events
+  const checkingRef = useRef(false)
   const checkTimer = useCallback(() => {
+    if (checkingRef.current) return // dedup rapid calls (visibilitychange can fire multiple times)
+    checkingRef.current = true
     getActiveTimer().then((result) => {
       if ('error' in result) {
         console.warn('[TIMER] Active timer check failed:', result.error)
@@ -43,6 +46,7 @@ export function ActiveTimerBar() {
         setTimer(null)
       }
     }).catch((err) => console.warn('[TIMER] Failed to check active timer:', err))
+      .finally(() => { checkingRef.current = false })
   }, [])
 
   useEffect(() => {

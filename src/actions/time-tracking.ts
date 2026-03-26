@@ -434,39 +434,58 @@ export async function startTimer(taskId?: string | null, description?: string) {
  */
 export async function stopTimer() {
   return withAuth(async ({ supabase, user, foundryId }) => {
-    // Find the active timer
-    const { data: active, error: findErr } = await supabase
+    // Find the active timer — search current foundry first, then any foundry
+    // DECISION: User may have switched workspaces since starting the timer.
+    // Search their current foundry first; if not found, search all their foundries.
+    let { data: active, error: findErr } = await supabase // eslint-disable-line prefer-const
       .from('time_entries')
-      .select('id, started_at')
+      .select('id, started_at, foundry_id')
       .eq('foundry_id', foundryId)
       .eq('user_id', user.id)
       .is('ended_at', null)
       .not('started_at', 'is', null)
-      .single()
+      .maybeSingle()
+
+    if (!active) {
+      // Check other foundries this user belongs to (handles workspace switch)
+      const fallback = await supabase
+        .from('time_entries')
+        .select('id, started_at, foundry_id')
+        .eq('user_id', user.id)
+        .is('ended_at', null)
+        .not('started_at', 'is', null)
+        .maybeSingle()
+      if (fallback.data) active = fallback.data
+    }
 
     if (findErr || !active) return { error: 'No active timer found' }
 
     const startedAt = new Date(active.started_at!)
     const now = new Date()
-    const durationMinutes = Math.max(1, Math.round((now.getTime() - startedAt.getTime()) / 60000))
+    const rawMinutes = Math.max(1, Math.round((now.getTime() - startedAt.getTime()) / 60000))
+    const cappedMinutes = Math.min(rawMinutes, 1440)
+    const wasCapped = rawMinutes > 1440
 
     // Use the start date for entry_date (handles midnight crossing)
     const entryDate = startedAt.toISOString().split('T')[0]
 
+    // SECURITY: defense-in-depth — re-validate ownership on UPDATE
     const { data, error } = await supabase
       .from('time_entries')
       .update({
         ended_at: now.toISOString(),
-        duration_minutes: Math.min(durationMinutes, 1440),
+        duration_minutes: cappedMinutes,
         entry_date: entryDate,
       })
       .eq('id', active.id)
+      .eq('user_id', user.id)
+      .is('ended_at', null)
       .select('id, duration_minutes, entry_date, description, task_id')
       .single()
 
     if (error) return { error: error.message }
 
-    return data
+    return { ...data, wasCapped }
   })
 }
 

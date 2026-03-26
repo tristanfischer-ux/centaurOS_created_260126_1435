@@ -30,7 +30,8 @@ interface TimeWeekBarProps {
 }
 
 function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes, targetMinutes }: TimeWeekBarProps) {
-  const percent = Math.min((totalMinutes / targetMinutes) * 100, 100)
+  const safeTarget = targetMinutes || 2400 // guard against 0/NaN
+  const percent = Math.min((totalMinutes / safeTarget) * 100, 100)
   const barColor = percent >= 80
     ? 'bg-success'
     : percent >= 40
@@ -58,7 +59,7 @@ function TimeWeekBar({ totalMinutes, billableMinutes, todayMinutes, targetMinute
           role="progressbar"
           aria-valuenow={totalMinutes}
           aria-valuemin={0}
-          aria-valuemax={targetMinutes}
+          aria-valuemax={safeTarget}
           className={`h-full rounded-full transition-all duration-500 ${barColor}`}
           style={{ width: `${Math.max(percent, 2)}%` }}
         />
