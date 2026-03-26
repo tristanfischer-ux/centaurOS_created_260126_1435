@@ -282,6 +282,8 @@ export interface OnboardingData {
   checklist_friend_invited?: boolean
   /** Milestone tracking */
   milestones_shown?: string[]
+  /** Plan selected during onboarding (actual checkout happens from /settings/billing) */
+  selected_plan?: 'free' | 'starter' | 'professional'
 }
 
 /**

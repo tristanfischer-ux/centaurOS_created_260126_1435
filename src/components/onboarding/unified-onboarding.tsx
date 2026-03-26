@@ -19,6 +19,9 @@ import {
   Hammer,
   Shield,
   Scale,
+  Check,
+  Users,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
@@ -26,15 +29,24 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { GuidedTour } from './guided-tour'
+import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
 
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
 // DECISION: Added 'how-it-works' step between welcome and intent to pre-empt
 // IP/risk/clarity concerns before the user commits to an intent path.
-type OnboardingStep = 'welcome' | 'how-it-works' | 'intent'
+// DECISION: Added 'plan' step after intent for founders to see pricing options.
+type OnboardingStep = 'welcome' | 'how-it-works' | 'intent' | 'plan'
 
-const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent']
+const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent', 'plan']
+
+/** Plan cards shown during onboarding — skip Enterprise (sales-led) */
+const ONBOARDING_PLANS: { tier: 'free' | 'starter' | 'professional'; icon: typeof Zap }[] = [
+  { tier: 'free', icon: Sparkles },
+  { tier: 'starter', icon: Users },
+  { tier: 'professional', icon: Zap },
+]
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -75,6 +87,7 @@ export function UnifiedOnboarding({
   const [direction, setDirection] = useState(1)
   const [isSavingIntent, setIsSavingIntent] = useState(false)
   const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
+  const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'professional'>('free')
   const [showGuidedTour, setShowGuidedTour] = useState(false)
   const migrationRanRef = useRef(false)
   const router = useRouter()
@@ -151,9 +164,9 @@ export function UnifiedOnboarding({
           return
         }
 
-        // DECISION: Launch Cal's guided tour instead of marketplace aha moment.
-        // The tour walks users through the 5 most compelling features.
-        setShowGuidedTour(true)
+        // DECISION: Show plan selection before launching guided tour.
+        // Founders see pricing options; actual Stripe checkout happens from /settings/billing.
+        goToStep('plan')
       } else {
         toast.error('Failed to save your selection. Please try again.')
       }
@@ -178,6 +191,16 @@ export function UnifiedOnboarding({
       console.error('[UnifiedOnboarding] Failed to persist completion:', error)
     }
     setOpen(false)
+  }
+
+  const handlePlanContinue = async () => {
+    try {
+      await updateOnboardingData({ selected_plan: selectedPlan })
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to save plan selection:', error)
+    }
+    // Launch guided tour regardless of save outcome
+    setShowGuidedTour(true)
   }
 
   const handleSkip = useCallback(() => {
@@ -463,6 +486,95 @@ export function UnifiedOnboarding({
               </div>
             )}
 
+            {/* STEP 4: Plan Selection (founders only) */}
+            {currentStep === 'plan' && (
+              <div className="space-y-8">
+                <div className="space-y-4">
+                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
+                    Choose your plan
+                  </h2>
+                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
+                    Start free and upgrade any time. No credit card required.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                  {ONBOARDING_PLANS.map((p, i) => {
+                    const plan = SUBSCRIPTION_PLANS[p.tier]
+                    const isSelected = selectedPlan === p.tier
+                    const isPopular = p.tier === 'starter'
+                    const Icon = p.icon
+                    const price = plan.priceMonthlyGBP === 0
+                      ? '£0'
+                      : `£${(plan.priceMonthlyGBP / 100).toFixed(0)}`
+
+                    return (
+                      <motion.button
+                        key={p.tier}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.15 * i }}
+                        whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
+                        onClick={() => setSelectedPlan(p.tier)}
+                        className={cn(
+                          'relative p-5 rounded-xl border-2 transition-all duration-200 text-left',
+                          isSelected
+                            ? 'border-international-orange bg-international-orange/5 ring-1 ring-international-orange/30'
+                            : 'border-muted bg-card hover:border-international-orange/50',
+                        )}
+                      >
+                        {isPopular && (
+                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-wider bg-international-orange text-white px-2.5 py-0.5 rounded-full">
+                            Most popular
+                          </span>
+                        )}
+                        <div className="w-10 h-10 rounded-full bg-international-orange/10 flex items-center justify-center mb-3">
+                          <Icon className="w-5 h-5 text-international-orange" />
+                        </div>
+                        <h3 className="text-base font-semibold text-foreground mb-0.5">
+                          {plan.name}
+                        </h3>
+                        <p className="text-2xl font-bold text-foreground mb-1">
+                          {price}
+                          {plan.priceMonthlyGBP > 0 && (
+                            <span className="text-xs font-normal text-muted-foreground">/mo</span>
+                          )}
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
+                          {plan.bestFor}
+                        </p>
+                        <div className="space-y-1.5">
+                          <PlanFeature label={`${plan.limits.maxAiTasksPerMonth} AI tasks/mo`} />
+                          <PlanFeature label={`${plan.limits.maxTeamMembers ?? 'Unlimited'} team member${(plan.limits.maxTeamMembers ?? 2) !== 1 ? 's' : ''}`} />
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-international-orange flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                      </motion.button>
+                    )
+                  })}
+                </div>
+
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    onClick={handlePlanContinue}
+                    className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
+                  >
+                    Continue with {SUBSCRIPTION_PLANS[selectedPlan].name}
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </motion.div>
+              </div>
+            )}
+
           </motion.div>
         </AnimatePresence>
       </div>
@@ -484,5 +596,14 @@ export function UnifiedOnboarding({
         ))}
       </div>
     </motion.div>
+  )
+}
+
+function PlanFeature({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      <Check className="w-3 h-3 text-international-orange shrink-0" />
+      <span>{label}</span>
+    </div>
   )
 }

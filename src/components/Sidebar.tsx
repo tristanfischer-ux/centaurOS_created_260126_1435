@@ -346,7 +346,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
     }
 
     return (
-        <div className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background border-r border-slate-100 text-foreground">
+        <div className="hidden sm:flex h-screen w-64 shrink-0 flex-col bg-background border-r border-border text-foreground">
             {/* App Header — ForgeOS Branding */}
             <div className="px-5 pt-8 pb-2">
                 <div className="flex items-center justify-between">
@@ -409,7 +409,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 2: "Plan" — Strategy and execution         */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
 
                 <SectionHeader label="Plan" introRoute="/plan" hasNew={badges.plan} isOpen={openSections.plan} onToggle={() => toggleSection("plan")} />
                 <Collapsible open={openSections.plan}>
@@ -425,7 +425,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 3b: "Cash Burn" — Runway planning           */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
 
                 <SectionHeader label="Cash Burn" introRoute="/cash-burn" isOpen={openSections.cashBurn} onToggle={() => toggleSection("cashBurn")} />
                 <Collapsible open={openSections.cashBurn}>
@@ -437,7 +437,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 4: "Workshop" — Where the work happens     */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
 
                 <SectionHeader label="Workshop" introRoute="/workshop" hasNew={badges.workshop} isOpen={openSections.workshop} onToggle={() => toggleSection("workshop")} />
                 <Collapsible open={openSections.workshop}>
@@ -449,7 +449,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                 {/* ══════════════════════════════════════════════════ */}
                 {/* Section 5: "Marketplace" — Recruits and supplies   */}
                 {/* ══════════════════════════════════════════════════ */}
-                <div className="mt-1.5 mb-0.5 border-t border-slate-100" />
+                <div className="mt-1.5 mb-0.5 border-t border-border" />
 
                 <SectionHeader label="Marketplace" introRoute="/marketplace-hub" hasNew={badges.marketplace} isOpen={openSections.marketplace} onToggle={() => toggleSection("marketplace")} />
                 <Collapsible open={openSections.marketplace}>
@@ -490,7 +490,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
             )}
 
             {/* Footer — Compact: Settings + Sign Out row, then status bars */}
-            <div className="p-3 mt-auto space-y-2 border-t border-slate-100">
+            <div className="p-3 mt-auto space-y-2 border-t border-border">
                 {/* Settings + Sign Out on one row */}
                 <div className="flex items-center justify-between">
                     <Link

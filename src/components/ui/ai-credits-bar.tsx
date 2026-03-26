@@ -9,6 +9,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import Link from 'next/link'
 import { Copy, Check, Gift, Users } from 'lucide-react'
 import {
   Popover,
@@ -19,12 +20,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { getMyReferralInfo, getAIUsageForCreditsBar, type ReferralInfo } from '@/actions/referrals'
 import { FoundingMemberBadge } from '@/components/ui/founding-member-badge'
+import { SUBSCRIPTION_PLANS, type SubscriptionTier } from '@/lib/billing/plans'
 
 /**
  * AICreditsBarLoader — Self-loading wrapper that fetches AI usage data.
  */
 export function AICreditsBarLoader() {
-  const [data, setData] = useState<{ currentUsage: number; limit: number; bonusCredits: number } | null>(null)
+  const [data, setData] = useState<{ currentUsage: number; limit: number; bonusCredits: number; tier: SubscriptionTier } | null>(null)
   const [referralData, setReferralData] = useState<ReferralInfo | null>(null)
 
   useEffect(() => {
@@ -49,6 +51,7 @@ export function AICreditsBarLoader() {
       currentUsage={data.currentUsage}
       limit={data.limit}
       bonusCredits={data.bonusCredits}
+      tier={data.tier}
       referralLink={referralData?.referralLink}
       referralCount={referralData?.referralCount}
       isFoundingMember={referralData?.isFoundingMember}
@@ -61,6 +64,7 @@ interface AICreditsBarProps {
   currentUsage: number
   limit: number
   bonusCredits: number
+  tier?: SubscriptionTier
   referralLink?: string
   referralCount?: number
   isFoundingMember?: boolean
@@ -73,7 +77,7 @@ interface AICreditsBarProps {
  * @description Shows "AI Tasks: ████░░ 42/50 (+8 bonus)" in the sidebar.
  * Green >50%, amber 80%, red 95%. Click opens referral popover.
  */
-export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, referralCount, isFoundingMember, foundingMemberNumber }: AICreditsBarProps) {
+export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free', referralLink, referralCount, isFoundingMember, foundingMemberNumber }: AICreditsBarProps) {
   const [copied, setCopied] = useState(false)
   const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const percentUsed = limit > 0 ? Math.min((currentUsage / limit) * 100, 100) : 0
@@ -109,8 +113,25 @@ export function AICreditsBar({ currentUsage, limit, bonusCredits, referralLink, 
     }
   }
 
+  const tierName = SUBSCRIPTION_PLANS[tier].name
+  const isFree = tier === 'free'
+
   return (
     <div className={`w-full text-left px-2 py-2 rounded-md ${isNearLimit ? 'border border-warning/40 bg-warning/5' : ''}`}>
+      {/* Tier indicator */}
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[10px] font-semibold text-foreground">
+          {isFree ? `${tierName} — Free` : tierName}
+        </span>
+        {isFree && (
+          <Link
+            href="/settings/billing"
+            className="text-[10px] font-medium text-international-orange hover:underline"
+          >
+            Upgrade
+          </Link>
+        )}
+      </div>
       <Popover>
         <PopoverTrigger asChild>
           <button

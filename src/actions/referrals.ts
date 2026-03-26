@@ -15,6 +15,7 @@
 import { unstable_cache } from 'next/cache'
 import { withAuth } from '@/lib/server-action-utils'
 import { createAdminClient } from '@/lib/supabase/admin'
+import type { SubscriptionTier } from '@/lib/billing/plans'
 
 /** VALIDATION: Referral codes are exactly 7 uppercase alphanumeric chars */
 const REFERRAL_CODE_REGEX = /^[A-Z0-9]{7}$/
@@ -148,7 +149,7 @@ export async function getBonusCredits(): Promise<number> {
  * @returns Current usage, limit, and bonus credits for the credits bar
  */
 export async function getAIUsageForCreditsBar(): Promise<
-  { currentUsage: number; limit: number; bonusCredits: number } | { error: string }
+  { currentUsage: number; limit: number; bonusCredits: number; tier: SubscriptionTier } | { error: string }
 > {
   return withAuth(async ({ supabase, foundryId }) => {
     // Import dynamically to avoid circular deps
@@ -160,6 +161,7 @@ export async function getAIUsageForCreditsBar(): Promise<
 
     // Get tier limit
     let limit = 50 // free tier default
+    let tier: SubscriptionTier = 'free'
     try {
       const { data: foundry } = await supabase
         .from('foundries')
@@ -176,7 +178,8 @@ export async function getAIUsageForCreditsBar(): Promise<
           .single()
 
         if (subscription?.tier && subscription.tier in SUBSCRIPTION_PLANS) {
-          limit = SUBSCRIPTION_PLANS[subscription.tier as keyof typeof SUBSCRIPTION_PLANS].limits.maxAiTasksPerMonth
+          tier = subscription.tier as SubscriptionTier
+          limit = SUBSCRIPTION_PLANS[tier].limits.maxAiTasksPerMonth
         }
       }
     } catch {
@@ -192,6 +195,7 @@ export async function getAIUsageForCreditsBar(): Promise<
       currentUsage: usage.totalAiTasks,
       limit,
       bonusCredits: bonusCredits || 0,
+      tier,
     }
   })
 }
