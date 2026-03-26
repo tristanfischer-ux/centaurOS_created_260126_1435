@@ -61,7 +61,8 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
       return { error: `Failed to create profile: ${sanitizeErrorMessage(insertError)}` }
     }
 
-    revalidatePath('/')
+    revalidatePath('/', 'layout')
+    revalidatePath('/supplier-portal', 'layout')
     return { success: true }
   }
 
@@ -93,7 +94,13 @@ export async function setAccountType(accountType: AccountType): Promise<{ succes
     return { error: `Failed to save selection: ${sanitizeErrorMessage(error)}` }
   }
   
-  revalidatePath('/')
+  // INTENT: Revalidate BOTH platform and supplier-portal layouts.
+  // Without revalidating supplier-portal, the layout cache serves stale
+  // account_type → redirects user to login with "not_supplier_account" error.
+  // This was Theo's exact bug: Google OAuth → onboarding modal → pick supplier
+  // → redirect to /supplier-portal → stale cache → bounced to login.
+  revalidatePath('/', 'layout')
+  revalidatePath('/supplier-portal', 'layout')
   return { success: true }
 }
 
