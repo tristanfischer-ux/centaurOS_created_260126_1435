@@ -250,10 +250,10 @@ export function InvestorBrowser({
     setBriefingLoading(true)
     const shortlistCount = Object.keys(shortlistIds).length
     const shortlistTypes = Array.from(new Set(
-      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.firm_type).filter(Boolean) as string[]
+      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string')
     ))
     const shortlistLocations = Array.from(new Set(
-      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.hq_city).filter(Boolean) as string[]
+      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.hq_city).filter((c): c is string => typeof c === 'string')
     )).slice(0, 5)
 
     generateInvestorInsights({

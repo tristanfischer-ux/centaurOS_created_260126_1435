@@ -64,6 +64,8 @@ interface MarketplaceBrowseProps {
     statsDefaultExpanded?: boolean
     /** Optional transform applied to listings after each server fetch (e.g. People trust enrichment). */
     postFetchTransform?: (listings: MarketplaceListing[]) => Promise<MarketplaceListing[]>
+    /** Hide specialist briefing cards (e.g. when a parent page provides its own specialist). */
+    hideSpecialistBriefing?: boolean
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -95,6 +97,7 @@ export function MarketplaceBrowse({
     statsLabels,
     statsDefaultExpanded,
     postFetchTransform,
+    hideSpecialistBriefing = false,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -138,8 +141,12 @@ export function MarketplaceBrowse({
         setSelectedForCompare(new Set())
     }, [])
 
-    // FLOW: Chase's entry briefing — generated once on load
+    // FLOW: Chase's entry briefing — generated once on load (skipped when parent provides its own specialist)
     useEffect(() => {
+        if (hideSpecialistBriefing) {
+            setChaseBriefingLoading(false)
+            return
+        }
         // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
         if (chaseFetched.current) return
         chaseFetched.current = true
@@ -361,17 +368,19 @@ export function MarketplaceBrowse({
                 </div>
             </div>
 
-            {/* Chase's marketplace briefing */}
-            <StageSpecialistCard
-                specialistId="vp-supply-chain"
-                variant="entry"
-                briefing={chaseBriefing}
-                isLoading={chaseBriefingLoading}
-                stageName="Marketplace"
-            />
+            {/* Chase's marketplace briefing (hidden when parent provides its own specialist) */}
+            {!hideSpecialistBriefing && (
+                <StageSpecialistCard
+                    specialistId="vp-supply-chain"
+                    variant="entry"
+                    briefing={chaseBriefing}
+                    isLoading={chaseBriefingLoading}
+                    stageName="Marketplace"
+                />
+            )}
 
             {/* Chase's proactive insights */}
-            {chaseInsights.length > 0 && (
+            {!hideSpecialistBriefing && chaseInsights.length > 0 && (
                 <div className="space-y-3">
                     {chaseInsights.map((insight) => (
                         <SpecialistInsightCard

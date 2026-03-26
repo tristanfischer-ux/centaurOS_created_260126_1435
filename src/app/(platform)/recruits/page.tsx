@@ -161,6 +161,7 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
                 statsLabels={RECRUITS_STATS_LABELS}
                 statsDefaultExpanded={false}
                 postFetchTransform={enrichPeopleListingsBatch}
+                hideSpecialistBriefing
             />
         </div>
     )
