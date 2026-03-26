@@ -218,7 +218,7 @@ Nudge summary: ${wrapUserData("nudges", input.nudgeSummary || "none")}
 Triage these into: act now (critical), decide this week (important), awareness only (informational). Connect dots — e.g. if overdue tasks and blockers overlap with at-risk objectives, call that out. Lead with the single most important thing.`
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8_000)
+    const timeout = setTimeout(() => controller.abort(), 15_000)
 
     try {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -229,7 +229,10 @@ Triage these into: act now (critical), decide this week (important), awareness o
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          // DECISION: Sonnet 4.6 for Cal's hero briefing — it's the first thing
+          // users see each day, needs sharp triage across multiple data sources.
+          // Haiku was too generic. Timeout bumped 8s→15s to accommodate.
+          model: "claude-sonnet-4-6",
           max_tokens: 768,
           system: systemPrompt,
           messages: [{ role: "user", content: context }],
