@@ -16,6 +16,10 @@ import { syncTaskToCalendar } from '@/actions/google-calendar'
 import { withAuth } from '@/lib/server-action-utils'
 import { logAudit } from '@/actions/audit'
 
+// Re-exports from extracted modules (so existing imports don't break)
+export { createSubtask, toggleSubtaskComplete, getSubtasks, getSubtaskCounts, getTaskShares } from '@/actions/tasks-subtasks'
+export { uploadTaskAttachment, deleteTaskAttachment, getTaskAttachments, getTaskComments } from '@/actions/tasks-attachments'
+
 // Nudge cooldown duration (1 hour)
 const NUDGE_COOLDOWN_MS = 60 * 60 * 1000
 
@@ -29,7 +33,7 @@ type RiskLevel = Database["public"]["Enums"]["risk_level"]
  * User must be: task creator, assignee, or have Executive/Founder role
  * AND task must belong to user's foundry
  */
-async function canModifyTask(
+export async function canModifyTask(
     supabase: Awaited<ReturnType<typeof createClient>>,
     taskId: string,
     userId: string,
@@ -83,7 +87,7 @@ async function canModifyTask(
     return { allowed: false, error: 'Unauthorized: You do not have permission to modify this task' }
 }
 
-async function logSystemEvent(supabase: Awaited<ReturnType<typeof createClient>>, foundryId: string, taskId: string, message: string, userId: string) {
+export async function logSystemEvent(supabase: Awaited<ReturnType<typeof createClient>>, foundryId: string, taskId: string, message: string, userId: string) {
     await supabase.from('task_comments').insert({
         task_id: taskId,
         foundry_id: foundryId,
@@ -118,7 +122,7 @@ async function logSystemEvent(supabase: Awaited<ReturnType<typeof createClient>>
  * @param taskId - The task whose status just changed (used to find its objective)
  * @param foundryId - Foundry scope for security
  */
-async function recalculateObjectiveProgress(
+export async function recalculateObjectiveProgress(
     supabase: Awaited<ReturnType<typeof createClient>>,
     taskId: string,
     foundryId: string
@@ -2034,213 +2038,6 @@ export async function updateTaskStatus(
     })
 }
 
-/**
- * Uploads a file attachment to a task.
- *
- * @description Verifies modify permissions, validates file size (max 25MB), sanitizes
- * the filename to prevent path traversal, uploads to Supabase Storage, and records
- * the file metadata in the task_files table.
- *
- * @param {string} taskId - The ID of the task to attach the file to
- * @param {FormData} formData - Form data containing the 'file' field
- * @returns {Promise<{ success: true } | { error: string }>} Success or error
- *
- * @security Requires task modify permission via canModifyTask. Filename is sanitized
- *   to prevent path traversal attacks. File size limited to 25MB.
- * @audit Logs attachment event to task_comments (system log)
- */
-export async function uploadTaskAttachment(taskId: string, formData: FormData) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        // Security: Verify user has permission to modify this task
-        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { error: authCheck.error || 'Unauthorized' }
-        }
-
-        const file = formData.get('file') as File
-        if (!file) return { error: 'No file provided' }
-
-        // Security: Validate file size (max 25MB)
-        const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
-        if (file.size > MAX_FILE_SIZE) {
-            return { error: 'File size exceeds maximum limit of 25MB' }
-        }
-
-        // Security: Sanitize filename to prevent path traversal
-        const safeFileName = sanitizeFileName(file.name)
-        const filePath = `${foundryId}/${taskId}/${Date.now()}_${safeFileName}`
-        const { error: uploadError } = await supabase.storage
-            .from('task-files')
-            .upload(filePath, file)
-
-        if (uploadError) return { error: sanitizeErrorMessage(uploadError) }
-
-        const { error: dbError } = await supabase.from('task_files').insert({
-            task_id: taskId,
-            file_name: file.name,
-            file_path: filePath,
-            file_size: file.size,
-            mime_type: file.type,
-            uploaded_by: user.id
-        })
-
-        if (dbError) return { error: sanitizeErrorMessage(dbError) }
-
-        try {
-            await logSystemEvent(supabase, foundryId, taskId, `Attachment added: ${file.name}`, user.id)
-        } catch (logError) {
-            console.error('[TaskService] Failed to log system event:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
-        }
-        revalidatePath('/tasks')
-        revalidatePath('/new-tasks')
-        return { success: true }
-    })
-}
-
-/**
- * Deletes a file attachment from a task (both storage and database record).
- *
- * @description Verifies modify permissions, removes the file from Supabase Storage,
- * and deletes the task_files record. Storage deletion failures are logged but do not
- * block the database record cleanup.
- *
- * @param {string} fileId - The task_files record ID
- * @param {string} filePath - The storage path for the file
- * @param {string} taskId - The ID of the task the file belongs to
- * @returns {Promise<{ success: true } | { error: string }>} Success or error
- *
- * @security Requires task modify permission via canModifyTask.
- * @audit Logs attachment removal to task_comments (system log)
- */
-export async function deleteTaskAttachment(fileId: string, filePath: string, taskId: string) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        // Security: Verify user has permission to modify this task
-        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { error: authCheck.error || 'Unauthorized' }
-        }
-
-        // SECURITY: Verify the file record belongs to the specified task before
-        // deleting. Use the DB-stored path, not the user-supplied filePath, to
-        // prevent cross-foundry file deletion via path traversal.
-        const { data: fileRecord, error: lookupError } = await supabase
-            .from('task_files')
-            .select('file_path')
-            .eq('id', fileId)
-            .eq('task_id', taskId)
-            .single()
-        if (lookupError || !fileRecord) {
-            return { error: 'File not found' }
-        }
-
-        // Delete from Storage using the verified DB path
-        const { error: storageError } = await supabase.storage
-            .from('task-files')
-            .remove([fileRecord.file_path])
-
-        if (storageError) {
-            console.warn("Storage delete failed", storageError)
-        }
-
-        // Delete from DB (scoped to task for defense-in-depth)
-        const { error: dbError } = await supabase.from('task_files')
-            .delete()
-            .eq('id', fileId)
-            .eq('task_id', taskId)
-
-        if (dbError) return { error: sanitizeErrorMessage(dbError) }
-
-        // Log requires task ID. If we don't have it explicitly passed, we'd need to fetch before delete. 
-        // Assuming taskId passed correctly.
-        try {
-            await logSystemEvent(supabase, foundryId, taskId, `Attachment removed`, user.id)
-        } catch (logError) {
-            console.error('[TaskService] Failed to log system event:', { error: logError instanceof Error ? logError.message : 'Unknown error' })
-        }
-
-        revalidatePath('/tasks')
-        revalidatePath('/new-tasks')
-        return { success: true }
-    })
-}
-
-/**
- * Fetches comments for a task from the server.
- * 
- * @description Retrieves all comments (notes and system logs) for a task.
- * Uses server-side auth to ensure consistent RLS behavior with addTaskComment.
- * 
- * @param taskId - The task ID to fetch comments for
- * @returns Comments array with user info, or error
- * 
- * @security Requires authenticated user with foundry membership
- */
-export async function getTaskComments(taskId: string) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        // AUTH: Check user can access this task
-        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { data: null, error: authCheck.error || 'Unauthorized' }
-        }
-
-        const { data, error } = await supabase
-            .from('task_comments')
-            .select('id, content, is_system_log, created_at, user_id, user:user_id(full_name, role)')
-            .eq('task_id', taskId)
-            .order('created_at', { ascending: false })
-            .limit(50)
-
-        if (error) {
-            console.error('[TaskActions] Failed to fetch comments:', { taskId, error: error.message })
-            return { data: null, error: sanitizeErrorMessage(error) }
-        }
-        
-        return { data }
-    })
-}
-
-/**
- * Retrieves all file attachments for a task.
- *
- * @description Verifies the user has access to the task via canModifyTask, then
- * fetches all task_files records ordered by creation date (newest first).
- *
- * @param {string} taskId - The ID of the task to get attachments for
- * @returns {Promise<{ data: object[] } | { error: string }>} Array of attachment records or error
- *
- * @security Requires task access permission via canModifyTask.
- */
-export async function getTaskAttachments(taskId: string) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        // Security: Verify user has permission to view this task
-        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { error: authCheck.error || 'Unauthorized' }
-        }
-
-        const { data, error } = await supabase
-            .from('task_files')
-            .select('id, task_id, file_name, file_path, file_size, mime_type, uploaded_by, created_at')
-            .eq('task_id', taskId)
-            .order('created_at', { ascending: false })
-
-        if (error) return { error: sanitizeErrorMessage(error) }
-        return { data }
-    })
-}
-
-/**
- * Retrieves the audit history for a task.
- *
- * @description Verifies the user has access to the task via canModifyTask, then
- * fetches all task_history records with user profile info, ordered by creation
- * date (newest first).
- *
- * @param {string} taskId - The ID of the task to get history for
- * @returns {Promise<{ data: object[] } | { error: string }>} Array of history records or error
- *
- * @security Requires task access permission via canModifyTask.
- */
 export async function getTaskHistory(taskId: string) {
     return withAuth(async ({ supabase, user, foundryId }) => {
         // Security: Verify user has permission to view this task
@@ -2634,212 +2431,4 @@ export async function updateTaskPrivacy(
     })
 }
 
-/**
- * Gets share targets for a task (users and teams it's shared with).
- *
- * @param taskId - The task to get shares for
- * @returns Array of share targets with names for display
- */
-// ─── Subtask / Checklist Actions ─────────────────────────────────
 
-/**
- * Creates a subtask under a parent task.
- *
- * @description Inherits foundry_id and objective_id from the parent task.
- * The subtask is a regular task with parent_task_id set.
- *
- * @param parentTaskId - The parent task ID
- * @param title - Subtask title
- * @returns The created subtask or error
- *
- * @security Requires permission to modify the parent task via canModifyTask.
- */
-export async function createSubtask(parentTaskId: string, title: string) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        if (!title?.trim()) return { error: 'Title is required' }
-
-        // AUTH: Check user can modify the parent task
-        const authCheck = await canModifyTask(supabase, parentTaskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { error: authCheck.error || 'Unauthorized' }
-        }
-
-        // Fetch parent to inherit objective_id
-        const { data: parent, error: parentError } = await supabase
-            .from('tasks')
-            .select('objective_id, foundry_id')
-            .eq('id', parentTaskId)
-            .eq('foundry_id', foundryId)
-            .single()
-
-        if (parentError || !parent) return { error: 'Parent task not found' }
-
-        const { data, error } = await supabase
-            .from('tasks')
-            .insert({
-                title: title.trim(),
-                foundry_id: foundryId,
-                objective_id: parent.objective_id,
-                creator_id: user.id,
-                parent_task_id: parentTaskId,
-                status: 'Pending',
-                risk_level: 'Low',
-            })
-            .select('id, title, status, assignee_id, end_date, parent_task_id, assignee:profiles!assignee_id(id, full_name, role)')
-            .single()
-
-        if (error) return { error: sanitizeErrorMessage(error) }
-
-        revalidatePath('/new-tasks')
-        return { data }
-    })
-}
-
-/**
- * Toggles a subtask between 'Completed' and 'Pending' status.
- *
- * @param taskId - The subtask ID to toggle
- * @returns Updated status or error
- *
- * @security Requires permission to modify the task via canModifyTask.
- */
-export async function toggleSubtaskComplete(taskId: string) {
-    return withAuth(async ({ supabase, user, foundryId }) => {
-        const authCheck = await canModifyTask(supabase, taskId, user.id, foundryId)
-        if (!authCheck.allowed) {
-            return { error: authCheck.error || 'Unauthorized' }
-        }
-
-        const { data: task, error: fetchError } = await supabase
-            .from('tasks')
-            .select('status, parent_task_id')
-            .eq('id', taskId)
-            .eq('foundry_id', foundryId)
-            .single()
-
-        if (fetchError || !task) return { error: 'Task not found' }
-
-        const newStatus = task.status === 'Completed' ? 'Pending' : 'Completed'
-        const updates: Record<string, unknown> = { status: newStatus }
-        if (newStatus === 'Completed') {
-            updates.end_date = new Date().toISOString()
-        }
-
-        const { error: updateError } = await supabase
-            .from('tasks')
-            .update(updates)
-            .eq('id', taskId)
-            .eq('foundry_id', foundryId)
-
-        if (updateError) return { error: sanitizeErrorMessage(updateError) }
-
-        // Recalculate objective progress
-        try {
-            await recalculateObjectiveProgress(supabase, taskId, foundryId)
-        } catch (e) {
-            console.error('[TaskService] Failed to recalculate after subtask toggle:', e)
-        }
-
-        revalidatePath('/new-tasks')
-        return { data: { status: newStatus } }
-    })
-}
-
-/**
- * Fetches all subtasks for a parent task.
- *
- * @param parentTaskId - The parent task ID
- * @returns Array of subtasks with assignee info
- *
- * @security Scoped to user's foundry via withAuth.
- */
-export async function getSubtasks(parentTaskId: string) {
-    return withAuth(async ({ supabase, foundryId }) => {
-        const { data, error } = await supabase
-            .from('tasks')
-            .select('id, title, status, assignee_id, end_date, parent_task_id, assignee:profiles!assignee_id(id, full_name, role)')
-            .eq('parent_task_id', parentTaskId)
-            .eq('foundry_id', foundryId)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: true })
-
-        if (error) return { data: null, error: sanitizeErrorMessage(error) }
-        return { data }
-    })
-}
-
-/**
- * Gets subtask counts for multiple parent tasks in a single query.
- * Used by the kanban board to show progress indicators on cards.
- *
- * @param taskIds - Array of task IDs to check for subtasks
- * @returns Map of taskId -> { total, completed }
- *
- * @security Scoped to user's foundry via withAuth.
- */
-export async function getSubtaskCounts(taskIds: string[]) {
-    return withAuth(async ({ supabase, foundryId }) => {
-        if (!taskIds.length) return { data: {} }
-
-        const { data, error } = await supabase
-            .from('tasks')
-            .select('parent_task_id, status')
-            .in('parent_task_id', taskIds)
-            .eq('foundry_id', foundryId)
-            .is('deleted_at', null)
-
-        if (error) return { data: null, error: sanitizeErrorMessage(error) }
-
-        const counts: Record<string, { total: number; completed: number }> = {}
-        for (const row of data || []) {
-            if (!row.parent_task_id) continue
-            if (!counts[row.parent_task_id]) {
-                counts[row.parent_task_id] = { total: 0, completed: 0 }
-            }
-            counts[row.parent_task_id].total++
-            if (row.status === 'Completed') {
-                counts[row.parent_task_id].completed++
-            }
-        }
-
-        return { data: counts }
-    })
-}
-
-export async function getTaskShares(taskId: string) {
-    return withAuth(async ({ supabase, foundryId }) => {
-        // AUTH: Verify task belongs to user's foundry before returning shares
-        const { data: task, error: taskError } = await supabase
-            .from('tasks')
-            .select('id')
-            .eq('id', taskId)
-            .eq('foundry_id', foundryId)
-            .single()
-
-        if (taskError || !task) return { data: [], error: 'Task not found or access denied' }
-
-        const { data: shares, error } = await supabase
-            .from('task_shares')
-            .select(`
-                shared_with_user_id,
-                shared_with_team_id,
-                user:profiles!shared_with_user_id(id, full_name),
-                team:teams!shared_with_team_id(id, name)
-            `)
-            .eq('task_id', taskId)
-
-        if (error) return { data: [], error: 'Failed to fetch shares' }
-
-        const targets = (shares || []).map(s => {
-            if (s.shared_with_user_id && s.user) {
-                return { type: 'user' as const, id: s.shared_with_user_id, name: (s.user as { full_name: string }).full_name || 'Unknown' }
-            }
-            if (s.shared_with_team_id && s.team) {
-                return { type: 'team' as const, id: s.shared_with_team_id, name: (s.team as { name: string }).name || 'Unknown' }
-            }
-            return null
-        }).filter(Boolean) as { type: 'user' | 'team'; id: string; name: string }[]
-
-        return { data: targets }
-    })
-}
