@@ -20,6 +20,9 @@ import { CashInSetupWizard } from '@/components/cash-burn/cash-in-setup-wizard'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { generateCashInInsights } from '@/actions/specialist-page-insights'
 import { generateCashInGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -126,6 +129,25 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
       }
     })
   }, [cashInGrid])
+
+  // Specialist insights from Finn
+  const { insights, dismissInsight } = usePageInsights(
+    () => {
+      const revenueWeekly = (groupedItems['revenue'] ?? []).reduce((s, i) => s + i.weeklyAmount, 0)
+      const nonRevenueWeekly = weeklyTotal - revenueWeekly
+      const sourceTypeCount = SOURCE_TYPE_CONFIG.filter(cfg => (groupedItems[cfg.type] ?? []).length > 0).length
+      return generateCashInInsights({
+        weeklyTotal,
+        openingBalance: defaultScenario?.openingBalance ?? 0,
+        revenueWeekly,
+        nonRevenueWeekly,
+        sourceTypeCount,
+        itemCount: items.length,
+        revenuePct: weeklyTotal > 0 ? (revenueWeekly / weeklyTotal) * 100 : 0,
+      })
+    },
+    items.length > 0,
+  )
 
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
@@ -260,6 +282,20 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {/* Finn's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              compact
+            />
+          ))}
+        </div>
       )}
 
       {/* Starting Cash Balance */}

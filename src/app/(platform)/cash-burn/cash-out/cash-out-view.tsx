@@ -20,6 +20,9 @@ import { CashOutSetupWizard } from '@/components/cash-burn/cash-out-setup-wizard
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { generateCashOutInsights } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -76,6 +79,25 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     variable: row.variableCosts,
     total: row.totalOut,
   })), [cashOutGrid])
+
+  // Specialist insights from Finn
+  const { insights, dismissInsight } = usePageInsights(
+    () => {
+      const sorted = [...items].sort((a, b) => b.weeklyAmount - a.weeklyAmount)
+      const topThree = sorted.slice(0, 3).map(i => i.name)
+      const total = weeklyFixedTotal + weeklyVariableTotal
+      return generateCashOutInsights({
+        weeklyFixedTotal,
+        weeklyVariableTotal,
+        fixedCostPct: total > 0 ? (weeklyFixedTotal / total) * 100 : 0,
+        itemCount: items.length,
+        topThreeItems: topThree,
+        monthlyTotal,
+        annualTotal,
+      })
+    },
+    items.length > 0,
+  )
 
   const handleAdd = useCallback((costType?: string) => {
     setEditingItem(null)
@@ -180,6 +202,20 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
+      )}
+
+      {/* Finn's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              compact
+            />
+          ))}
+        </div>
       )}
 
       {/* Summary Charts */}

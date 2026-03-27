@@ -18,6 +18,9 @@ import { IncomeStatementTable } from '@/components/cash-burn/income-statement-ta
 import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { generatePnlInsights } from '@/actions/specialist-page-insights'
 import { buildIncomeStatement, buildBalanceSheet } from '@/lib/cash-burn/pnl-builder'
 import type { CashOutItem, CashInItem, IncomeStatementRow } from '@/types/cash-burn'
 
@@ -74,6 +77,28 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
     [cashOut, cashIn, openingBalance, balanceSheetDate]
   )
 
+  // Specialist insights from Finn
+  const { insights, dismissInsight } = usePageInsights(
+    () => {
+      const rev = totals.revenue
+      const grossMarginPct = rev > 0 ? (totals.grossProfit / rev) * 100 : 0
+      const ebitdaMarginPct = rev > 0 ? (totals.ebitda / rev) * 100 : 0
+      const rndPct = rev > 0 ? (totals.rnd / rev) * 100 : 0
+      return generatePnlInsights({
+        annualRevenue: rev,
+        annualCogs: totals.cogs,
+        annualGrossProfit: totals.grossProfit,
+        annualOpex: totals.opex,
+        annualRnd: totals.rnd,
+        annualEbitda: totals.ebitda,
+        grossMarginPct,
+        ebitdaMarginPct,
+        rndPct,
+      })
+    },
+    cashOut.length > 0 || cashIn.length > 0,
+  )
+
   if (hasError || !initialData) {
     return (
       <div className="space-y-6">
@@ -111,6 +136,20 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
           </p>
         </div>
       </div>
+
+      {/* Finn's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {cashOut.length === 0 && cashIn.length === 0 && (
         <Card>

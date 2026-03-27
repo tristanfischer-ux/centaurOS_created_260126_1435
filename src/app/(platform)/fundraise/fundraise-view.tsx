@@ -7,7 +7,6 @@
 
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -19,8 +18,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
 import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
@@ -69,32 +68,23 @@ function relativeTime(dateStr: string): string {
 
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
-  const [insights, setInsights] = useState<AgentInsight[]>([])
-  const insightsFetched = useRef(false)
 
-  useEffect(() => {
-    if (!stats || stats.totalTracked === 0) return
-    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
-    if (insightsFetched.current) return
-    insightsFetched.current = true
-
-    const firmTypes = Array.from(
-      new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))
-    )
-
-    generateFundraiseInsights({
-      totalTracked: stats.totalTracked,
-      pipelineCounts: stats.pipelineCounts,
-      coverageGaps: stats.coverageGaps,
-      firmTypes,
-      recentActivityCount: stats.recentNotes.length,
-    }).then((result) => {
-      if (Array.isArray(result) && result.length > 0) {
-        setInsights(result)
-      }
-    }).catch(() => { /* Non-critical */ })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const { insights, dismissInsight } = usePageInsights(
+    () => {
+      if (!stats) return Promise.resolve([])
+      const firmTypes = Array.from(
+        new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))
+      )
+      return generateFundraiseInsights({
+        totalTracked: stats.totalTracked,
+        pipelineCounts: stats.pipelineCounts,
+        coverageGaps: stats.coverageGaps,
+        firmTypes,
+        recentActivityCount: stats.recentNotes.length,
+      })
+    },
+    !!stats && stats.totalTracked > 0,
+  )
 
   if (!stats || stats.totalTracked === 0) {
     return (
@@ -152,7 +142,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
             <SpecialistInsightCard
               key={insight.id}
               insight={insight}
-              onDismiss={() => setInsights(prev => prev.filter(i => i.id !== insight.id))}
+              onDismiss={() => dismissInsight(insight.id)}
               compact
             />
           ))}

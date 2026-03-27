@@ -22,6 +22,9 @@ import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { generateCashBurnInsights } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid, generateCashInGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
@@ -128,6 +131,29 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       balance: w.cumulativeBalance,
     }))
   }, [projection.weeks])
+
+  // Specialist insights from Finn
+  const { insights, dismissInsight } = usePageInsights(
+    () => {
+      const totalOut = cashOut.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
+      const totalIn = cashIn.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
+      const topCategory = expenseBreakdown.length > 0 ? expenseBreakdown[0].name : 'none'
+      const gapPct = totalOut > 0 ? ((totalOut - totalIn) / totalOut) * 100 : 0
+
+      return generateCashBurnInsights({
+        weeklyBurnRate: Math.round(projection.monthlyBurnRate * 12 / 52),
+        runwayWeeks: projection.runwayWeeks,
+        openingBalance: activeScenario.openingBalance,
+        monthlyBurnRate: projection.monthlyBurnRate,
+        cashOutItemCount: cashOut.length,
+        cashInItemCount: cashIn.length,
+        topExpenseCategory: topCategory,
+        revenueVsCostGapPct: gapPct,
+        scenarioCount: scenarios.length,
+      })
+    },
+    cashOut.length > 0 || cashIn.length > 0,
+  )
 
   // Scenario handlers
   const handleScenarioChange = useCallback((scenario: BurnScenario) => {
@@ -269,6 +295,20 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           detail: cashZeroDate ? undefined : 'Cash positive throughout',
         },
       ]} />
+
+      {/* Finn's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {cashOut.length === 0 && cashIn.length === 0 && (
         <Card>
