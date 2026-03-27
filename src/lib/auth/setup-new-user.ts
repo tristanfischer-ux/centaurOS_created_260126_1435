@@ -352,6 +352,30 @@ export async function setupNewUser({
     if (providerError) {
       console.warn("[setupNewUser] Provider profile failed:", providerError);
     }
+
+    // INTENT: Create a marketplace People listing so executives are discoverable
+    // via the Recruits page (marketplace_listings WHERE category='People').
+    // Without this, executives only have provider_profiles but no marketplace
+    // presence — they're invisible to companies looking for fractional talent.
+    if (role === "executive") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error: listingError } = await (supabase as any).from("marketplace_listings").insert({
+        category: "People",
+        subcategory: "Executive",
+        title: fullName,
+        description: "Fractional Executive available for engagements.",
+        attributes: {
+          role: "Fractional Executive",
+          availability: "Available",
+          profile_id: userId,
+          function_category: "operations",
+        },
+        is_verified: false,
+      });
+      if (listingError) {
+        console.warn("[setupNewUser] Marketplace listing failed:", listingError);
+      }
+    }
   }
 
   // --- Supplier business info ---
