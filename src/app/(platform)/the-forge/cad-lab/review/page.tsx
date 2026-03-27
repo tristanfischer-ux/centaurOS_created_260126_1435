@@ -43,6 +43,7 @@ import { CadLabAnalysisDashboard } from "@/components/cad/cad-lab-analysis-dashb
 import { CadLabDiagnostics } from "@/components/cad/cad-lab-diagnostics"
 import { CadLabSupplyChain } from "@/components/cad/cad-lab-supply-chain"
 import { CadLabCostEstimate } from "@/components/cad/cad-lab-cost-estimate"
+import { CostOptimisationPanel } from "@/components/cad/cost-optimisation-panel"
 import { CadLabContracting } from "@/components/cad/cad-lab-contracting"
 import { CadLabFactoryGuide } from "@/components/cad/cad-lab-factory-guide"
 import { CadLabRequirementsMap } from "@/components/cad/cad-lab-requirements-map"
@@ -237,6 +238,22 @@ export default function CadLabReviewPage(): React.ReactNode {
     await Promise.allSettled(modules.map((mod) => handleMatchModule(mod)))
     setMatchAllLoading(false)
   }, [modules, handleMatchModule])
+
+  // INTENT: When user applies a cost alternative, update that module's diagnostics.
+  // The context auto-saves and re-triggers cost estimation via debounced effect.
+  const handleApplyAlternative = useCallback(
+    (moduleId: string, process: string, material: string) => {
+      setDiagnosticAnswers((prev) => ({
+        ...prev,
+        [moduleId]: {
+          ...prev[moduleId],
+          mfg_process: process,
+          material,
+        },
+      }))
+    },
+    [setDiagnosticAnswers],
+  )
 
   const handleTabClick = useCallback((group: string) => {
     setActiveTab(group)
@@ -603,6 +620,14 @@ export default function CadLabReviewPage(): React.ReactNode {
             <motion.div key="Commercial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
               <div id="cost-estimate">
                 <CadLabCostEstimate modules={modules} diagnosticAnswers={diagnosticAnswers} aiCostEstimates={aiCostEstimates} isEstimatingCosts={isEstimatingCosts} />
+              </div>
+              <div id="cost-alternatives">
+                <CostOptimisationPanel
+                  modules={modules}
+                  diagnosticAnswers={diagnosticAnswers}
+                  aiCostEstimates={aiCostEstimates}
+                  onApplyAlternative={handleApplyAlternative}
+                />
               </div>
               <div id="supply-chain">
                 <CadLabSupplyChain
