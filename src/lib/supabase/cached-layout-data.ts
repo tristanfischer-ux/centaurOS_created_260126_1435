@@ -86,7 +86,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
   let foundryName = 'Forge Foundry'
   let foundryId = 'Unknown'
   let foundryLogoUrl: string | null = null
-  // eslint-disable-next-line prefer-const -- reassigned conditionally inside if block
+  // eslint-disable-next-line prefer-const
   let foundryIsSandbox = false
   let hasAdminAccess = false
 
