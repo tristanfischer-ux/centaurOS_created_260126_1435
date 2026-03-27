@@ -265,6 +265,7 @@ export default function BrowsePage(): React.ReactElement {
           specialistId="strategist"
           specialistName="Sage"
           specialistTitle="Strategy"
+          firstVisitOnly
           tip="Research competitors, suppliers, and market trends. Sage can discuss anything you find — just click the specialist panel."
         />
       </div>

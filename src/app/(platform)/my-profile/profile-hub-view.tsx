@@ -16,6 +16,7 @@ import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateProfileInsights } from '@/actions/specialist-page-insights'
@@ -104,7 +105,7 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'My Profile' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => generateProfileInsights({
       taskCompletedThisWeek: enrichment?.completedThisWeek ?? 0,
       taskCompletedLastWeek: enrichment?.completedLastWeek ?? 0,
@@ -183,6 +184,7 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
       />
 
       {/* Cal's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

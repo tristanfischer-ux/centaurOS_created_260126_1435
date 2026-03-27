@@ -21,6 +21,7 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateCashInInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
@@ -155,7 +156,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash In' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     async () => {
       const revenueWeekly = (groupedItems['revenue'] ?? []).reduce((s, i) => s + i.weeklyAmount, 0)
       const nonRevenueWeekly = weeklyTotal - revenueWeekly
@@ -312,6 +313,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
       )}
 
       {/* Finn's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

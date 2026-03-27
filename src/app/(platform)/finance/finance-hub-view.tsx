@@ -10,6 +10,7 @@
 import { useCallback } from 'react'
 import { PoundSterling } from 'lucide-react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateFinanceHubInsights } from '@/actions/specialist-page-insights'
@@ -96,7 +97,7 @@ export function FinanceHubView({
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Finance' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => generateFinanceHubInsights({
       monthlyRevenue: current.monthlyRevenue,
       monthlyExpenses: current.monthlyExpenses,
@@ -126,6 +127,7 @@ export function FinanceHubView({
       <QuickActionsBar />
 
       {/* Finn's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

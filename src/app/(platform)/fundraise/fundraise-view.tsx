@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
@@ -94,7 +95,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Fundraise' })
   }
 
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => {
       if (!stats) return Promise.resolve([])
       const firmTypes = Array.from(
@@ -162,6 +163,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
       </div>
 
       {/* Fiona's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

@@ -13,7 +13,7 @@
  * - SpecialistInsightCard: src/components/specialists/specialist-insight-card.tsx (API-driven variant)
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
@@ -28,6 +28,8 @@ interface SpecialistCoachingTipProps {
   specialistTitle?: string
   /** The coaching tip text */
   tip: string
+  /** When true, tip only shows on first visit then permanently dismisses */
+  firstVisitOnly?: boolean
   className?: string
 }
 
@@ -44,6 +46,19 @@ function getInitialCollapsed(key: string): boolean {
   }
 }
 
+function getDismissKey(key: string): string {
+  return `forgeos-tip-dismissed-${key}`
+}
+
+function isDismissed(key: string): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return localStorage.getItem(getDismissKey(key)) === "true"
+  } catch {
+    return false
+  }
+}
+
 /**
  * SpecialistCoachingTip — lightweight specialist strip for section intros.
  *
@@ -55,9 +70,23 @@ export function SpecialistCoachingTip({
   specialistName,
   specialistTitle,
   tip,
+  firstVisitOnly = false,
   className,
 }: SpecialistCoachingTipProps) {
   const [collapsed, setCollapsed] = useState(() => getInitialCollapsed(specialistId))
+  const [hidden, setHidden] = useState(() => firstVisitOnly && isDismissed(specialistId))
+
+  // INTENT: For first-visit-only tips, mark as seen on mount so next visit hides it
+  useEffect(() => {
+    if (!firstVisitOnly) return
+    if (isDismissed(specialistId)) return
+    // Mark as seen — will be hidden on next visit
+    try {
+      localStorage.setItem(getDismissKey(specialistId), "true")
+    } catch { /* non-critical */ }
+  }, [firstVisitOnly, specialistId])
+
+  if (hidden) return null
 
   const toggleCollapse = useCallback(() => {
     setCollapsed(prev => {

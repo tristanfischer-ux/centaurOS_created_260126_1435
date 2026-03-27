@@ -23,6 +23,7 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateCashBurnInsights } from '@/actions/specialist-page-insights'
@@ -158,7 +159,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Burn' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => {
       const totalOut = cashOut.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
       const totalIn = cashIn.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
@@ -323,6 +324,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       ]} />
 
       {/* Finn's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

@@ -14,6 +14,7 @@
 
 import { useCallback } from 'react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
@@ -54,7 +55,7 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Investor Directory' })
   }, [openPanel])
 
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => generateInvestorInsights({
       totalFirms: stats.total,
       shortlistCount,
@@ -66,6 +67,7 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
     { cacheKey: 'fiona-investors', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
+  if (insightsLoading) return <InsightCardSkeleton />
   if (insights.length === 0) return null
 
   return (

@@ -17,6 +17,7 @@
 
 import * as React from 'react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateTimeInsights } from '@/actions/specialist-page-insights'
@@ -188,7 +189,7 @@ export function TimeTrackerView({
     const daysWithEntries = new Set(initialEntries.map(e => e.entryDate)).size
     return { hoursThisWeek, entryCount: initialEntries.length, projectCount: projectIds.size, daysWithEntries }
   }, [initialEntries])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     () => generateTimeInsights(timeInsightData),
     initialEntries.length > 0,
     { cacheKey: 'cal-time', emptyInsight: EMPTY_STATE_INSIGHT },
@@ -368,6 +369,7 @@ export function TimeTrackerView({
       </div>
 
       {/* Cal's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

@@ -7,7 +7,7 @@
  * and empty state. Entry point to the outreach workflow.
  */
 
-import { useState, useEffect, useCallback, useTransition } from 'react'
+import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Plus, Users, Mail, Megaphone, Database, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -20,7 +20,8 @@ import { OutreachDashboard } from './outreach-dashboard'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
+// DECISION: Not using usePageInsights here because campaigns load async after mount.
+// Inline useEffect with isLoading dependency instead.
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateOutreachInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -104,20 +105,36 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
     const totalSequenced = campaigns.reduce((sum, c) => sum + (c.sequenced_count || 0), 0)
 
     // Sal's proactive insights
+    // INTENT: Campaigns load async after mount, so we use !isLoading as the trigger
+    // instead of campaigns.length > 0. When loading completes with 0 campaigns,
+    // the empty coaching insight shows. When campaigns exist, the API call fires.
     const { openPanel } = useAdvisorPanel()
     const handleDiscuss = useCallback((specialistId: string, context: string) => {
         openPanel(specialistId, { handoffContext: context, contextLabel: 'Outreach' })
     }, [openPanel])
     const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'draft').length
-    const { insights, dismissInsight } = usePageInsights(
-        () => generateOutreachInsights({
+    const [salInsights, setSalInsights] = useState<AgentInsight[]>([])
+    const salFetched = useRef(false)
+    useEffect(() => {
+        if (isLoading) return
+        if (salFetched.current) return
+        salFetched.current = true
+        if (campaigns.length === 0) {
+            setSalInsights([EMPTY_STATE_INSIGHT])
+            return
+        }
+        generateOutreachInsights({
             campaignCount: campaigns.length,
             activeCampaigns,
             totalContacts,
-        }),
-        campaigns.length > 0,
-        { cacheKey: 'sal-outreach', emptyInsight: EMPTY_STATE_INSIGHT },
-    )
+        }).then((result) => {
+            if (Array.isArray(result) && result.length > 0) setSalInsights(result)
+        }).catch(() => { /* Non-critical */ })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isLoading])
+    const dismissSalInsight = useCallback((id: string) => {
+        setSalInsights(prev => prev.filter(i => i.id !== id))
+    }, [])
 
     return (
         <div className="space-y-8">
@@ -172,13 +189,13 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
             </div>
 
             {/* Sal's proactive insights */}
-            {insights.length > 0 && (
+            {salInsights.length > 0 && (
                 <div className="space-y-3">
-                    {insights.map((insight) => (
+                    {salInsights.map((insight) => (
                         <SpecialistInsightCard
                             key={insight.id}
                             insight={insight}
-                            onDismiss={() => dismissInsight(insight.id)}
+                            onDismiss={() => dismissSalInsight(insight.id)}
                             onDiscuss={handleDiscuss}
                             compact
                         />

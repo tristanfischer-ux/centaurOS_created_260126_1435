@@ -19,6 +19,7 @@ import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generatePnlInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
@@ -102,7 +103,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'P&L' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     async () => {
       const rev = totals.revenue
       const grossMarginPct = rev > 0 ? (totals.grossProfit / rev) * 100 : 0
@@ -165,6 +166,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
       </div>
 
       {/* Finn's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (

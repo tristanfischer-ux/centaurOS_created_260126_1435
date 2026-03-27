@@ -21,6 +21,7 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateCashOutInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
@@ -105,7 +106,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const handleDiscuss = useCallback((specialistId: string, context: string) => {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Out' })
   }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
+  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
     async () => {
       const sorted = [...items].sort((a, b) => b.weeklyAmount - a.weeklyAmount)
       const topThree = sorted.slice(0, 3).map(i => i.name)
@@ -232,6 +233,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
       )}
 
       {/* Finn's proactive insights */}
+      {insightsLoading && <InsightCardSkeleton />}
       {insights.length > 0 && (
         <div className="space-y-3">
           {insights.map((insight) => (
