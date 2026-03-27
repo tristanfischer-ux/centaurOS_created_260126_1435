@@ -26,6 +26,7 @@ export interface CachedLayoutData {
   foundryName: string
   foundryId: string
   foundryLogoUrl: string | null
+  foundryIsSandbox: boolean
   hasAdminAccess: boolean
   userFoundries: FoundryInfo[]
 }
@@ -69,6 +70,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
     member_count: number
     joined_at: string
     logo_url: string | null
+    is_sandbox: boolean
   }) => ({
     foundryId: f.foundry_id,
     foundryName: f.foundry_name,
@@ -78,11 +80,14 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
     memberCount: Number(f.member_count),
     joinedAt: f.joined_at,
     logoUrl: f.logo_url || null,
+    isSandbox: f.is_sandbox ?? false,
   }))
 
   let foundryName = 'Forge Foundry'
   let foundryId = 'Unknown'
   let foundryLogoUrl: string | null = null
+  // eslint-disable-next-line prefer-const -- reassigned conditionally inside if block
+  let foundryIsSandbox = false
   let hasAdminAccess = false
 
   if (profile?.foundry_id) {
@@ -93,7 +98,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
     const [foundryResult, adminPermResult] = await Promise.all([
       supabase
         .from('foundries')
-        .select('name, logo_url')
+        .select('name, logo_url, is_sandbox')
         .eq('id', profile.foundry_id)
         .maybeSingle(),
       needsAdminCheck
@@ -109,6 +114,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
     if (foundryResult.data) {
       foundryName = foundryResult.data.name
       foundryLogoUrl = foundryResult.data.logo_url || null
+      foundryIsSandbox = foundryResult.data.is_sandbox ?? false
     }
 
     hasAdminAccess = !!adminPermResult.data
@@ -119,6 +125,7 @@ const fetchLayoutData = async (userId: string): Promise<CachedLayoutData> => {
     foundryName,
     foundryId,
     foundryLogoUrl,
+    foundryIsSandbox,
     hasAdminAccess,
     userFoundries,
   }

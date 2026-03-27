@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { typography } from '@/lib/design-system'
@@ -13,8 +13,10 @@ import {
   ChevronRight, ChevronDown, Flag, AlertTriangle, Plus, Waypoints, MessageSquare,
 } from 'lucide-react'
 import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
 import type { SpecialistContext } from '@/components/specialists/types'
+import { generateObjectivesBriefing, type SpecialistBriefingResult } from '@/actions/specialist-page-insights'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import {
@@ -184,6 +186,75 @@ export function ObjectivesBoard({
     const completed = objectives.filter(o => o.health === 'completed').length
     return { total, onTrack, atRisk, offTrack, completed }
   }, [objectives])
+
+  // ── Sage's objectives briefing ──────────────────────────────────
+  const [sageBriefing, setSageBriefing] = useState<SpecialistBriefingResult>({ narrative: null, severity: 'success' })
+  const [isSageLoading, setIsSageLoading] = useState(false)
+  const sageFetched = useRef(false)
+
+  const totalOverdueTasks = useMemo(
+    () => objectives.reduce((sum, o) => sum + o.overdueTasks, 0),
+    [objectives],
+  )
+  const unlinkedCount = useMemo(
+    () => objectives.filter(o => !o.parent_objective_id).length,
+    [objectives],
+  )
+  const avgProgress = useMemo(
+    () => objectives.length > 0
+      ? Math.round(objectives.reduce((sum, o) => sum + (o.progress ?? 0), 0) / objectives.length)
+      : 0,
+    [objectives],
+  )
+
+  // Local fallback insight
+  const sageFallback = useMemo(() => {
+    if (stats.total === 0) return "No objectives defined yet. Setting clear objectives is the first step to a focused strategy."
+    if (stats.offTrack > 0) return `${stats.offTrack} objective${stats.offTrack > 1 ? 's are' : ' is'} off track.${totalOverdueTasks > 0 ? ` ${totalOverdueTasks} overdue tasks need attention.` : ''} Let's talk about what to reprioritize.`
+    if (stats.atRisk > 0) return `${stats.atRisk} objective${stats.atRisk > 1 ? 's are' : ' is'} at risk with ${avgProgress}% average progress. Worth a check-in to prevent slippage.`
+    return `${stats.total} objectives tracking at ${avgProgress}% average progress. Momentum looks solid.`
+  }, [stats, totalOverdueTasks, avgProgress])
+
+  const sageSeverity = useMemo((): 'success' | 'warning' | 'error' => {
+    if (stats.offTrack > 0) return 'error'
+    if (stats.atRisk > 0 || totalOverdueTasks > 3) return 'warning'
+    return 'success'
+  }, [stats, totalOverdueTasks])
+
+  useEffect(() => {
+    if (sageFetched.current || objectives.length === 0) return
+    sageFetched.current = true
+    setIsSageLoading(true)
+
+    generateObjectivesBriefing({
+      totalObjectives: stats.total,
+      atRiskCount: stats.atRisk,
+      offTrackCount: stats.offTrack,
+      completedCount: stats.completed,
+      overdueTaskCount: totalOverdueTasks,
+      unlinkedCount,
+      avgProgress,
+      pillarCount: strategicObjectives.length,
+    }).then((result) => {
+      if (result) setSageBriefing(result)
+    }).catch(() => { /* Non-critical — local fallback remains */ })
+      .finally(() => setIsSageLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const sageContext: SpecialistContext = useMemo(() => ({
+    type: 'objective' as const,
+    title: 'Objectives Overview',
+    description: 'Sage is reviewing the health of your objectives.',
+    metadata: {
+      objectives: objectives.map(o => ({
+        title: o.title,
+        health: o.health,
+        progress: o.progress ?? undefined,
+      })),
+      notes: sageBriefing.narrative ?? sageFallback,
+    },
+  }), [objectives, sageBriefing, sageFallback])
 
   // Register screen context so specialists know what the user is viewing
   useRegisterScreenContext(useMemo(() => ({
@@ -390,6 +461,19 @@ export function ObjectivesBoard({
           members={members.map(m => ({ id: m.id, full_name: m.full_name, role: m.role ?? '' }))}
         />
       )}
+
+      {/* Sage's Objectives Briefing */}
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategy"
+        narrative={sageBriefing.narrative}
+        fallbackMessage={sageFallback}
+        isLoading={isSageLoading}
+        loadingMessage="Reviewing your objectives..."
+        severity={sageSeverity}
+        context={sageContext}
+      />
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

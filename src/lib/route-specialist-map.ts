@@ -49,7 +49,7 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/the-forge/cad-lab/source", specialistId: "vp-supply-chain" },
   { pattern: "/the-forge/cad-lab/assemble", specialistId: "vp-engineering" },
   { pattern: "/the-forge/cad-lab", specialistId: "cto" },
-  { pattern: "/the-forge", specialistId: "product-lead" },
+  { pattern: "/the-forge", specialistId: "cto" },
   { pattern: "/strategic-planner", specialistId: "strategist" },
   { pattern: "/team", specialistId: "hiring-team" },
   { pattern: "/marketplace", specialistId: "vp-supply-chain" },

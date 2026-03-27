@@ -26,6 +26,9 @@ import dynamic from 'next/dynamic'
 import { EditTaskDialog } from '@/components/tasks/edit-task-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useRegisterScreenContext } from '@/contexts/screen-context'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { generateTasksBriefing, type SpecialistBriefingResult } from '@/actions/specialist-page-insights'
+import type { SpecialistContext } from '@/components/specialists/types'
 import { PageTour } from '@/components/guidance/page-tour'
 
 const TasksGanttView = dynamic(
@@ -153,6 +156,63 @@ export function TasksCommandCenter({
     }
   }, [tasks, currentUserId])
 
+  // ── Cal's tasks briefing ──────────────────────────────────────
+  const [calBriefing, setCalBriefing] = useState<SpecialistBriefingResult>({ narrative: null, severity: 'success' })
+  const [isCalLoading, setIsCalLoading] = useState(false)
+  const calFetched = useRef(false)
+
+  const completedCount = useMemo(
+    () => tasks.filter(t => t.status === 'Completed').length,
+    [tasks],
+  )
+  const blockerCount = useMemo(
+    () => tasks.filter(t => t.risk_level === 'blocker').length,
+    [tasks],
+  )
+
+  const calFallback = useMemo(() => {
+    if (stats.totalTasks === 0) return "No tasks in the system yet. Once you start adding tasks, I'll keep an eye on what needs attention."
+    if (stats.overdue > 5) return `${stats.overdue} overdue tasks need attention. Let's triage what to tackle first and what to reschedule.`
+    if (stats.overdue > 0) return `${stats.overdue} overdue task${stats.overdue > 1 ? 's' : ''} and ${stats.dueToday} due today. ${stats.myActiveTasks} active on your plate.`
+    if (stats.dueToday > 0) return `${stats.dueToday} task${stats.dueToday > 1 ? 's' : ''} due today with ${stats.myActiveTasks} active. Looking manageable.`
+    return `${stats.myActiveTasks} active tasks, nothing overdue. Execution is clean.`
+  }, [stats])
+
+  const calSeverity = useMemo((): 'success' | 'warning' | 'error' => {
+    if (stats.overdue > 5 || blockerCount > 2) return 'error'
+    if (stats.overdue > 0 || blockerCount > 0) return 'warning'
+    return 'success'
+  }, [stats, blockerCount])
+
+  useEffect(() => {
+    if (calFetched.current || tasks.length === 0) return
+    calFetched.current = true
+    setIsCalLoading(true)
+
+    generateTasksBriefing({
+      totalTasks: stats.totalTasks,
+      overdueCount: stats.overdue,
+      dueTodayCount: stats.dueToday,
+      completedCount,
+      needsReviewCount: stats.needsReview,
+      myActiveCount: stats.myActiveTasks,
+      blockerCount,
+    }).then((result) => {
+      if (result) setCalBriefing(result)
+    }).catch(() => { /* Non-critical — local fallback remains */ })
+      .finally(() => setIsCalLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const calContext: SpecialistContext = useMemo(() => ({
+    type: 'task' as const,
+    title: 'Tasks Overview',
+    description: 'Cal is reviewing your task execution health.',
+    metadata: {
+      notes: calBriefing.narrative ?? calFallback,
+    },
+  }), [calBriefing, calFallback])
+
   // Strategic context — how tasks connect to the bigger picture
   const strategicContext = useMemo(() => {
     const uniqueObjectives = new Set(tasks.filter(t => t.objective).map(t => t.objective!.id))
@@ -255,6 +315,19 @@ export function TasksCommandCenter({
 
   return (
     <div className="space-y-6">
+      {/* Cal's Tasks Briefing */}
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={calBriefing.narrative}
+        fallbackMessage={calFallback}
+        isLoading={isCalLoading}
+        loadingMessage="Scanning your tasks..."
+        severity={calSeverity}
+        context={calContext}
+      />
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">

@@ -6,16 +6,13 @@
  * @description Sage's strategic overview card. Shows an immediate local-logic
  * insight, then fetches a 1-2 paragraph AI overview in the background.
  * The AI overview replaces the local insight when ready.
+ *
+ * Uses the shared SpecialistBriefingHero component for consistent rendering.
  */
 
 import { useMemo, useState, useEffect, useRef } from "react"
-import Image from "next/image"
-import { cn } from "@/lib/utils"
-import { Card, CardContent } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react"
-import { AskSpecialistButton } from "./ask-specialist-button"
 import { generateStrategyOverview } from "@/actions/specialist-page-insights"
+import { SpecialistBriefingHero } from "./specialist-briefing-hero"
 import type { SpecialistContext } from "./types"
 
 interface StrategyPillarSummary {
@@ -140,86 +137,18 @@ export function StrategyHealthReview({
     },
   }
 
-  const severityConfig = {
-    success: {
-      bg: 'bg-status-success/5',
-      border: 'border-status-success/20',
-      icon: CheckCircle2,
-      iconColor: 'text-status-success',
-    },
-    warning: {
-      bg: 'bg-status-warning/5',
-      border: 'border-status-warning/20',
-      icon: AlertTriangle,
-      iconColor: 'text-status-warning',
-    },
-    error: {
-      bg: 'bg-status-error/5',
-      border: 'border-status-error/20',
-      icon: AlertTriangle,
-      iconColor: 'text-status-error',
-    },
-  } as const
-
-  const config = severityConfig[insight.severity]
-  const SeverityIcon = config.icon
-
   return (
-    <Card className={cn('rounded-xl border', config.bg, config.border, className)}>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-start gap-4">
-          {/* Sage's avatar */}
-          <div className="relative h-10 w-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
-            <Image
-              src="/images/specialists/strategist.png"
-              alt="Sage"
-              fill
-              className="object-cover"
-              sizes="40px"
-            />
-          </div>
-
-          <div className="flex-1 min-w-0 space-y-2">
-            {/* Header */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">Sage&apos;s Overview</span>
-              <SeverityIcon className={cn('h-3.5 w-3.5', config.iconColor)} />
-            </div>
-
-            {/* Overview content */}
-            {isLoading && !aiOverview ? (
-              <div className="space-y-2">
-                <p className="text-sm text-foreground leading-relaxed">
-                  {insight.message}
-                </p>
-                <Skeleton className="h-4 w-full" />
-                <Skeleton className="h-4 w-3/4" />
-              </div>
-            ) : aiOverview ? (
-              <div className="space-y-2">
-                {aiOverview.split('\n\n').filter(Boolean).map((paragraph, i) => (
-                  <p key={i} className="text-sm text-foreground leading-relaxed">
-                    {paragraph}
-                  </p>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-foreground leading-relaxed">
-                {insight.message}
-              </p>
-            )}
-
-            {/* CTA */}
-            <AskSpecialistButton
-              context={context}
-              specialistId="strategist"
-              specialistName="Sage"
-              variant="chip"
-              label="Discuss with Sage"
-            />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <SpecialistBriefingHero
+      specialistId="strategist"
+      specialistName="Sage"
+      specialistTitle="Strategy"
+      narrative={aiOverview}
+      fallbackMessage={insight.message}
+      isLoading={isLoading}
+      loadingMessage="Reviewing your strategy..."
+      severity={insight.severity}
+      context={context}
+      className={className}
+    />
   )
 }

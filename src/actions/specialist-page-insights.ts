@@ -608,7 +608,9 @@ Strategic pillars defined: ${input.pillarCount}`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          // DECISION: Sonnet for page-top briefings — these are the first thing
+          // users see, needs sharp analysis. Same reasoning as Cal's Today briefing.
+          model: "claude-sonnet-4-6",
           max_tokens: 300,
           system: systemPrompt,
           messages: [{ role: "user", content: context }],
@@ -699,7 +701,7 @@ Active blockers: ${input.blockerCount}`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          model: "claude-sonnet-4-6",
           max_tokens: 300,
           system: systemPrompt,
           messages: [{ role: "user", content: context }],
