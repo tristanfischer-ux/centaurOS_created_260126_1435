@@ -8,10 +8,30 @@
  * used on Fundraise, Investors, Team, and Marketplace pages.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback } from 'react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateRecruitsInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
+
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'harper-recruits-empty',
+  foundry_id: '',
+  specialist_id: 'hiring-team',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Find the right talent',
+  body: "Browse the talent marketplace to find specialists for your team. I can help you identify skill gaps and prioritise your first hires.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface HarperRoleBriefingProps {
   totalListings: number
@@ -19,24 +39,20 @@ interface HarperRoleBriefingProps {
 }
 
 export function HarperRoleBriefing({ totalListings, categories }: HarperRoleBriefingProps) {
-  const [insights, setInsights] = useState<AgentInsight[]>([])
-  const fetched = useRef(false)
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Recruits' })
+  }, [openPanel])
 
-  useEffect(() => {
-    if (fetched.current) return
-    fetched.current = true
-
-    generateRecruitsInsights({
+  const { insights, dismissInsight } = usePageInsights(
+    () => generateRecruitsInsights({
       totalListings,
       categories,
       teamGaps: [],
-    }).then((result) => {
-      if (Array.isArray(result) && result.length > 0) {
-        setInsights(result)
-      }
-    }).catch(() => { /* Non-critical */ })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    }),
+    totalListings > 0,
+    { cacheKey: 'harper-recruits', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
 
   if (insights.length === 0) return null
 
@@ -46,7 +62,8 @@ export function HarperRoleBriefing({ totalListings, categories }: HarperRoleBrie
         <SpecialistInsightCard
           key={insight.id}
           insight={insight}
-          onDismiss={() => setInsights(prev => prev.filter(i => i.id !== insight.id))}
+          onDismiss={() => dismissInsight(insight.id)}
+          onDiscuss={handleDiscuss}
           compact
         />
       ))}

@@ -30,10 +30,16 @@ const ROUTE_SPECIALIST_MAP: Array<{
 }> = [
   // Exact and specific paths first
   { pattern: "/today", specialistId: "chief-of-staff" },
+  { pattern: "/my-profile", specialistId: "chief-of-staff" },
+  { pattern: "/updates", specialistId: "chief-of-staff" },
+  { pattern: "/time", specialistId: "chief-of-staff" },
+  { pattern: "/google-apps", specialistId: "chief-of-staff" },
   { pattern: "/strategy", specialistId: "strategist" },
   { pattern: "/new-objectives", specialistId: "strategist" },
   { pattern: "/new-tasks", specialistId: "chief-of-staff" },
+  { pattern: "/reports", specialistId: "chief-of-staff" },
   { pattern: "/analytics", specialistId: "finance-lead" },
+  { pattern: "/finance", specialistId: "finance-lead" },
   { pattern: "/org-blueprint", specialistId: "chief-of-staff" },
   { pattern: "/playbooks", specialistId: "strategist" },
   { pattern: "/learn", specialistId: "strategist" },
@@ -44,6 +50,9 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/investors", specialistId: "fundraising-advisor" },
   { pattern: "/fundraise", specialistId: "fundraising-advisor" },
   { pattern: "/apprenticeship", specialistId: "hiring-team" },
+  { pattern: "/agents", specialistId: "chief-of-staff" },
+  { pattern: "/whats-new", specialistId: "chief-of-staff" },
+  { pattern: "/help", specialistId: "chief-of-staff" },
   // Prefix patterns (more specific before broader)
   { pattern: "/the-forge/cad-lab/specify", specialistId: "vp-manufacturing" },
   { pattern: "/the-forge/cad-lab/source", specialistId: "vp-supply-chain" },
@@ -52,6 +61,8 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/the-forge", specialistId: "cto" },
   { pattern: "/strategic-planner", specialistId: "strategist" },
   { pattern: "/team", specialistId: "hiring-team" },
+  { pattern: "/marketplace-orders", specialistId: "vp-supply-chain" },
+  { pattern: "/marketplace-hub", specialistId: "vp-supply-chain" },
   { pattern: "/marketplace", specialistId: "vp-supply-chain" },
   { pattern: "/pitch-prep", specialistId: "fundraising-advisor" },
   { pattern: "/guild", specialistId: "hiring-team" },
@@ -59,8 +70,12 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/provider-portal", specialistId: "sales-lead" },
   { pattern: "/buyer", specialistId: "vp-supply-chain" },
   { pattern: "/orders", specialistId: "vp-supply-chain" },
+  { pattern: "/cash-burn", specialistId: "finance-lead" },
   { pattern: "/settings", specialistId: "chief-of-staff" },
   { pattern: "/browse", specialistId: "strategist" },
+  { pattern: "/me", specialistId: "chief-of-staff" },
+  { pattern: "/plan", specialistId: "strategist" },
+  { pattern: "/workshop", specialistId: "cto" },
 ]
 
 export interface RouteSpecialistResult {

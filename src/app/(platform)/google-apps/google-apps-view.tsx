@@ -13,6 +13,7 @@
 import React, { useState, useCallback, useRef } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
+import { SpecialistCoachingTip } from '@/components/specialists/specialist-coaching-tip'
 import { HardDrive, FileText, Calendar, Mail } from 'lucide-react'
 import { DriveTab } from './tabs/drive-tab'
 import { DocsTab } from './tabs/docs-tab'
@@ -53,6 +54,13 @@ export function GoogleAppsView({ googleEmail, features }: GoogleAppsViewProps) {
 
     return (
         <div className="space-y-6">
+            <SpecialistCoachingTip
+                specialistId="chief-of-staff"
+                specialistName="Cal"
+                specialistTitle="Chief of Staff"
+                tip="Connect Google Workspace to sync your calendar, documents, and email. This helps me coordinate your schedule and surface relevant files."
+            />
+
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">

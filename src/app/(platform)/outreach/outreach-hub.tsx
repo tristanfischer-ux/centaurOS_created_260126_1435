@@ -19,7 +19,31 @@ import { CreateCampaignDialog } from './create-campaign-dialog'
 import { OutreachDashboard } from './outreach-dashboard'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateOutreachInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import type { Campaign } from '@/types/outreach'
+
+// INTENT: Static coaching insight when no campaigns yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+    id: 'sal-outreach-empty',
+    foundry_id: '',
+    specialist_id: 'sales-lead',
+    insight_type: 'recommendation',
+    urgency: 'informational',
+    title: 'Start your outreach',
+    body: "Set up your first outreach campaign to start connecting with potential customers. I'll help you craft sequences that convert.",
+    domain_data: {},
+    suggested_actions: [],
+    is_read: false,
+    is_dismissed: false,
+    acted_on: false,
+    acted_on_at: null,
+    created_at: new Date().toISOString(),
+    expires_at: null,
+}
 
 interface OutreachHubProps {
     foundryId: string
@@ -79,6 +103,22 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
     const totalContacts = campaigns.reduce((sum, c) => sum + (c.contact_count || 0), 0)
     const totalSequenced = campaigns.reduce((sum, c) => sum + (c.sequenced_count || 0), 0)
 
+    // Sal's proactive insights
+    const { openPanel } = useAdvisorPanel()
+    const handleDiscuss = useCallback((specialistId: string, context: string) => {
+        openPanel(specialistId, { handoffContext: context, contextLabel: 'Outreach' })
+    }, [openPanel])
+    const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'draft').length
+    const { insights, dismissInsight } = usePageInsights(
+        () => generateOutreachInsights({
+            campaignCount: campaigns.length,
+            activeCampaigns,
+            totalContacts,
+        }),
+        campaigns.length > 0,
+        { cacheKey: 'sal-outreach', emptyInsight: EMPTY_STATE_INSIGHT },
+    )
+
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -130,6 +170,21 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                     Campaigns
                 </button>
             </div>
+
+            {/* Sal's proactive insights */}
+            {insights.length > 0 && (
+                <div className="space-y-3">
+                    {insights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => dismissInsight(insight.id)}
+                            onDiscuss={handleDiscuss}
+                            compact
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* Dashboard tab */}
             {activeTab === 'dashboard' && (

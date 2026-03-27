@@ -16,6 +16,11 @@
 'use client'
 
 import * as React from 'react'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateTimeInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { WeeklyTimesheetGrid } from '@/components/time/weekly-timesheet-grid'
@@ -127,6 +132,25 @@ interface TimeTrackerViewProps {
   projects: ProjectOption[]
 }
 
+// INTENT: Static coaching insight when no time logged yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'cal-time-empty',
+  foundry_id: '',
+  specialist_id: 'chief-of-staff',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Start tracking your time',
+  body: 'Track your time to understand where your hours go. Consistent logging helps me spot productivity patterns.',
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -152,6 +176,23 @@ export function TimeTrackerView({
   const [timerStarting, setTimerStarting] = React.useState(false)
 
   const summary = React.useMemo(() => buildSummary(weekStart, entries), [weekStart, entries])
+
+  // Cal's proactive insights
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = React.useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Time Tracking' })
+  }, [openPanel])
+  const timeInsightData = React.useMemo(() => {
+    const hoursThisWeek = initialEntries.reduce((sum, e) => sum + e.durationMinutes / 60, 0)
+    const projectIds = new Set(initialEntries.map(e => e.financeProjectId).filter(Boolean))
+    const daysWithEntries = new Set(initialEntries.map(e => e.entryDate)).size
+    return { hoursThisWeek, entryCount: initialEntries.length, projectCount: projectIds.size, daysWithEntries }
+  }, [initialEntries])
+  const { insights, dismissInsight } = usePageInsights(
+    () => generateTimeInsights(timeInsightData),
+    initialEntries.length > 0,
+    { cacheKey: 'cal-time', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
 
   const handleStartTimer = React.useCallback(async () => {
     setTimerStarting(true)
@@ -325,6 +366,21 @@ export function TimeTrackerView({
           )}
         </div>
       </div>
+
+      {/* Cal's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* Error banner (H-1 fix) */}
       {error && (

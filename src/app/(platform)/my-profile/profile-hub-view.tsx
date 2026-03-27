@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
@@ -15,6 +15,11 @@ import { toast } from 'sonner'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateProfileInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 
 import type { ProfileHubData } from '@/actions/profile-hub'
 
@@ -36,6 +41,25 @@ export interface ProfileEnrichment {
   completedThisWeek: number
   /** Tasks completed last week (for comparison) */
   completedLastWeek: number
+}
+
+// INTENT: Static coaching insight when profile is sparse — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'cal-profile-empty',
+  foundry_id: '',
+  specialist_id: 'chief-of-staff',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Complete your profile',
+  body: 'Complete your profile to help your team and specialists understand your role and priorities.',
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
 }
 
 interface ProfileHubViewProps {
@@ -74,6 +98,24 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [switchingTo, setSwitchingTo] = useState<string | null>(null)
+
+  // Cal's proactive insights
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'My Profile' })
+  }, [openPanel])
+  const { insights, dismissInsight } = usePageInsights(
+    () => generateProfileInsights({
+      taskCompletedThisWeek: enrichment?.completedThisWeek ?? 0,
+      taskCompletedLastWeek: enrichment?.completedLastWeek ?? 0,
+      foundryCount: foundries.length,
+      role: data.profile?.role ?? 'Member',
+      hasMarketplaceBio: !!data.providerProfile?.bio,
+      hasTelegramLinked: !!telegramLink,
+    }),
+    !!data.profile,
+    { cacheKey: 'cal-profile', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
 
   /**
    * Handles clicking a company tile — switches foundry (if needed) and navigates to dashboard.
@@ -139,6 +181,21 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         isProvider={isProvider}
         onEditClick={() => setIsEditProfileOpen(true)}
       />
+
+      {/* Cal's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* Company Switcher */}
       <CompanySwitcher

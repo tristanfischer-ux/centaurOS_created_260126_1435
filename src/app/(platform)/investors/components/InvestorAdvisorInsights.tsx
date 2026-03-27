@@ -18,6 +18,25 @@ import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
 import type { InvestorStats, ShortlistStage } from '@/actions/investors'
+import type { AgentInsight } from '@/actions/agent-insights'
+
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'fiona-investors-empty',
+  foundry_id: '',
+  specialist_id: 'fundraising-advisor',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Build your investor shortlist',
+  body: "Browse the directory and shortlist investors that match your stage, sector, and cheque size. I'll help you prioritise and craft your outreach.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface InvestorAdvisorInsightsProps {
   stats: InvestorStats
@@ -44,7 +63,7 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
       activeFilters: '',
     }),
     stats.total > 0,
-    'fiona-investors',
+    { cacheKey: 'fiona-investors', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
   if (insights.length === 0) return null

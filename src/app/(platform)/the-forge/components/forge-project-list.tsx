@@ -35,6 +35,7 @@ import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
 import { ForgeCtoBanner } from "./forge-cto-banner"
+import { ForgeAdvisorInsights } from "./forge-advisor-insights"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
@@ -126,6 +127,8 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
           Some recent projects couldn&apos;t be loaded. Your starting paths still work — you can create a new design below.
         </div>
       )}
+
+      <ForgeAdvisorInsights projects={projects} />
 
       {inProgressProject && <ContinueCard project={inProgressProject} />}
       <div data-tour="forge-start">

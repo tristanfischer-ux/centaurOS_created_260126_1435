@@ -7,7 +7,13 @@
 
 'use client'
 
+import { useCallback } from 'react'
 import { PoundSterling } from 'lucide-react'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateFinanceHubInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import { FinanceKpiCards } from '@/components/finance/kpi-cards'
 import { RevenueTrendChart } from '@/components/finance/revenue-trend-chart'
 import { ExpenseBreakdownChart } from '@/components/finance/expense-breakdown-chart'
@@ -22,6 +28,25 @@ import type {
   OutstandingInvoice,
   ExpenseCategory,
 } from '@/types/finance'
+
+// INTENT: Static coaching insight when no finance data yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'finn-finance-hub-empty',
+  foundry_id: '',
+  specialist_id: 'finance-lead',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Your finance dashboard',
+  body: 'Your finance dashboard brings together revenue, expenses, and cash flow. Connect an accounting integration for real-time data.',
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface FinanceHubViewProps {
   initialDashboard: { current: FinanceDashboardData; comparison: FinanceDashboardComparison } | null
@@ -66,6 +91,24 @@ export function FinanceHubView({
 
   const { current, comparison } = initialDashboard
 
+  // Finn's proactive insights
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Finance' })
+  }, [openPanel])
+  const { insights, dismissInsight } = usePageInsights(
+    () => generateFinanceHubInsights({
+      monthlyRevenue: current.monthlyRevenue,
+      monthlyExpenses: current.monthlyExpenses,
+      outstandingInvoiceCount: current.outstandingInvoicesCount,
+      outstandingAmount: current.outstandingInvoicesAmount,
+      overdueAmount: current.overdueAmount,
+      cashPosition: current.cashPosition,
+    }),
+    true,
+    { cacheKey: 'finn-finance-hub', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
       {/* Header */}
@@ -81,6 +124,21 @@ export function FinanceHubView({
 
       {/* Quick Actions */}
       <QuickActionsBar />
+
+      {/* Finn's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* KPI Cards */}
       <FinanceKpiCards data={current} comparison={comparison} />

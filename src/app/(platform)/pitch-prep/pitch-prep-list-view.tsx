@@ -1,5 +1,6 @@
 'use client'
 
+import { useCallback } from 'react'
 import Link from 'next/link'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -16,8 +17,32 @@ import {
   ChevronRight,
   TrendingUp,
 } from 'lucide-react'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generatePitchPrepInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import { PitchPrepRequest, PitchPrepStatus } from '@/types/pitch-prep'
 import { formatDistanceToNow } from 'date-fns'
+
+// INTENT: Static coaching insight when no pitch prep requests yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'fiona-pitch-prep-empty',
+  foundry_id: '',
+  specialist_id: 'fundraising-advisor',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Prepare your pitch',
+  body: "Prepare your pitch with guided exercises. I'll help you craft a narrative that resonates with investors and practice your delivery.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface PitchPrepListViewProps {
   requests: PitchPrepRequest[]
@@ -34,6 +59,23 @@ const STATUS_COLORS: Record<PitchPrepStatus, { variant: 'default' | 'secondary' 
 }
 
 export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
+  // Fiona's proactive insights
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Pitch Prep' })
+  }, [openPanel])
+  const completedCount = requests.filter(r => r.status === 'completed').length
+  const activeCount = requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled').length
+  const { insights, dismissInsight } = usePageInsights(
+    () => generatePitchPrepInsights({
+      requestCount: requests.length,
+      completedCount,
+      activeCount,
+    }),
+    requests.length > 0,
+    { cacheKey: 'fiona-pitch-prep', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -63,6 +105,21 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
           We do not provide investment advice or facilitate securities transactions.
         </AlertDescription>
       </Alert>
+
+      {/* Fiona's proactive insights */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* Requests List */}
       {requests.length === 0 ? (

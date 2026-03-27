@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateMarketplaceInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
@@ -114,6 +115,10 @@ export function MarketplaceBrowse({
     // Chase's marketplace insights
     const [chaseInsights, setChaseInsights] = useState<AgentInsight[]>([])
     const chaseFetched = useRef(false)
+    const { openPanel } = useAdvisorPanel()
+    const handleChaseDiscuss = useCallback((specialistId: string, context: string) => {
+        openPanel(specialistId, { handoffContext: context, contextLabel: 'Marketplace' })
+    }, [openPanel])
 
     // Shared compare selection state (lifted from MarketplaceListingGrid)
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
@@ -412,6 +417,7 @@ export function MarketplaceBrowse({
                             key={insight.id}
                             insight={insight}
                             onDismiss={() => setChaseInsights(prev => prev.filter(i => i.id !== insight.id))}
+                            onDiscuss={handleChaseDiscuss}
                             compact
                         />
                     ))}

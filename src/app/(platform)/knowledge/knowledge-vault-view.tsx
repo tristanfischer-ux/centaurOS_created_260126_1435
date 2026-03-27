@@ -70,6 +70,11 @@ import {
   batchVerifyNotes,
   batchArchiveNotes,
 } from '@/actions/knowledge'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateKnowledgeInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
@@ -81,6 +86,25 @@ import type {
   KnowledgeSortBy,
   VaultStats,
 } from '@/lib/knowledge-vault/types'
+
+// INTENT: Static coaching insight when vault is empty — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'sage-knowledge-empty',
+  foundry_id: '',
+  specialist_id: 'strategist',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Build your knowledge vault',
+  body: 'Build your knowledge vault with notes, decisions, and lessons learned. A strong institutional memory compounds over time.',
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 // ─── Note Type Icons ─────────────────────────────────────────────────
 
@@ -318,6 +342,21 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
   const hasActiveFilters = searchQuery || selectedDomain || selectedTypes.length > 0 || activeTab !== 'all'
 
+  // Sage's proactive insights
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Knowledge' })
+  }, [openPanel])
+  const pinnedCount = useMemo(() => notes.filter(n => n.is_pinned).length, [notes])
+  const { insights, dismissInsight } = usePageInsights(
+    () => generateKnowledgeInsights({
+      noteCount: totalNotes,
+      pinnedCount: pinnedCount,
+    }),
+    totalNotes > 0,
+    { cacheKey: 'sage-knowledge', emptyInsight: EMPTY_STATE_INSIGHT },
+  )
+
   // ─── Render ──────────────────────────────────────────────────────
 
   if (isLoading) {
@@ -368,6 +407,21 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
           </Button>
         </div>
       </div>
+
+      {/* ── Sage's Proactive Insights ─────────────────────────────── */}
+      {insights.length > 0 && (
+        <div className="space-y-3">
+          {insights.map((insight) => (
+            <SpecialistInsightCard
+              key={insight.id}
+              insight={insight}
+              onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
+              compact
+            />
+          ))}
+        </div>
+      )}
 
       {/* ── Empty State ──────────────────────────────────────────── */}
       {isVaultEmpty ? (

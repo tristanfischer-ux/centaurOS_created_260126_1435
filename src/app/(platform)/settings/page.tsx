@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
 import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
+import { SpecialistCoachingTip } from '@/components/specialists/specialist-coaching-tip'
 import {
     User,
     ArrowRight,
@@ -44,6 +45,13 @@ export default async function SettingsPage() {
 
     return (
         <div className="space-y-6 max-w-3xl">
+            <SpecialistCoachingTip
+                specialistId="chief-of-staff"
+                specialistName="Cal"
+                specialistTitle="Chief of Staff"
+                tip="Keep your profile, integrations, and notification preferences up to date. The more connected your workspace, the better I can coordinate your team."
+            />
+
             {/* Profile summary card */}
             <Card>
                 <CardContent className="pt-6">

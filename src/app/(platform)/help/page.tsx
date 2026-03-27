@@ -24,6 +24,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { typography } from "@/lib/design-system/typography"
+import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
 import { VIDEOS, VIDEO_LIBRARY_ORDER } from "@/lib/video-urls"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 
@@ -196,6 +197,13 @@ function SectionHeader({
 export default function HelpCenterPage() {
   return (
     <div className="space-y-16 pb-12">
+      <SpecialistCoachingTip
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        tip="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
+      />
+
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">

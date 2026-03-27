@@ -937,3 +937,344 @@ ${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not y
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TIER A PAGE INSIGHTS — Data-rich pages with live Haiku calls
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ─── Profile Insights (Cal — Chief of Staff) ────────────────────────
+
+export interface ProfileInsightInput {
+  taskCompletedThisWeek: number
+  taskCompletedLastWeek: number
+  foundryCount: number
+  role: string
+  hasMarketplaceBio: boolean
+  hasTelegramLinked: boolean
+}
+
+export async function generateProfileInsights(
+  input: ProfileInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const weekChange = input.taskCompletedLastWeek > 0
+      ? Math.round(((input.taskCompletedThisWeek - input.taskCompletedLastWeek) / input.taskCompletedLastWeek) * 100)
+      : 0
+    const context = `Analyse this user profile and give specific productivity advice:
+Role: ${wrapUserData("role", input.role)}
+Tasks completed this week: ${input.taskCompletedThisWeek}
+Tasks completed last week: ${input.taskCompletedLastWeek}
+Week-over-week change: ${weekChange}%
+Foundry memberships: ${input.foundryCount}
+Has marketplace bio: ${input.hasMarketplaceBio ? "yes" : "no"}
+Has Telegram linked: ${input.hasTelegramLinked ? "yes" : "no"}`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Updates / Activity Feed Insights (Cal — Chief of Staff) ────────
+
+export interface UpdatesInsightInput {
+  activityCount: number
+  memberCount: number
+  daysSinceOldestUnread: number
+}
+
+export async function generateUpdatesInsights(
+  input: UpdatesInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this activity feed and advise on communication health:
+Recent activity items: ${input.activityCount}
+Team members: ${input.memberCount}
+Days since oldest unread activity: ${input.daysSinceOldestUnread}`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Time Tracking Insights (Cal — Chief of Staff) ──────────────────
+
+export interface TimeInsightInput {
+  hoursThisWeek: number
+  entryCount: number
+  projectCount: number
+  daysWithEntries: number
+}
+
+export async function generateTimeInsights(
+  input: TimeInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this time tracking data and advise on productivity and time allocation:
+Hours logged this week: ${input.hoursThisWeek.toFixed(1)}
+Time entries this week: ${input.entryCount}
+Projects worked on: ${input.projectCount}
+Days with time entries (out of 5): ${input.daysWithEntries}`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Reports Insights (Cal — Chief of Staff) ────────────────────────
+
+export interface ReportsInsightInput {
+  reportCount: number
+  lastReportDate: string | null
+}
+
+export async function generateReportsInsights(
+  input: ReportsInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Advise this founder on report generation and sharing:
+Reports generated: ${input.reportCount}
+Last report generated: ${input.lastReportDate ?? "never"}`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── The Forge / CAD Lab Landing Insights (Max — CTO) ───────────────
+
+export interface ForgeInsightInput {
+  projectCount: number
+  draftCount: number
+  inProgressCount: number
+  completedCount: number
+  moduleTotal: number
+}
+
+export async function generateForgeInsights(
+  input: ForgeInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this hardware engineering workspace and give specific guidance:
+Total projects: ${input.projectCount}
+Draft (not started): ${input.draftCount}
+In progress: ${input.inProgressCount}
+Completed: ${input.completedCount}
+Total modules across projects: ${input.moduleTotal}`
+
+    const insights = await callHaikuForInsights("cto", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Agents / Specialists Directory Insights (Cal — Chief of Staff) ─
+
+export interface AgentsInsightInput {
+  workflowCount: number
+  customPromptCount: number
+}
+
+export async function generateAgentsInsights(
+  input: AgentsInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Advise on how this team is using their specialist roster:
+Team workflows created: ${input.workflowCount}
+Custom prompts configured: ${input.customPromptCount}
+There are 13 specialists available covering strategy, engineering, finance, legal, HR, marketing, sales, and operations.`
+
+    const insights = await callHaikuForInsights("chief-of-staff", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Guild / Community Insights (Harper — Hiring Team) ──────────────
+
+export interface GuildInsightInput {
+  memberCount: number
+  apprenticeCount: number
+  executiveCount: number
+  founderCount: number
+}
+
+export async function generateGuildInsights(
+  input: GuildInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this community guild and advise on team building:
+Total guild members: ${input.memberCount}
+Apprentices: ${input.apprenticeCount}
+Executives: ${input.executiveCount}
+Founders: ${input.founderCount}`
+
+    const insights = await callHaikuForInsights("hiring-team", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Apprenticeship Insights (Harper — Hiring Team) ─────────────────
+
+export interface ApprenticeshipInsightInput {
+  enrollmentCount: number
+  avgProgress: number
+  onTrackCount: number
+  atRiskCount: number
+}
+
+export async function generateApprenticeshipInsights(
+  input: ApprenticeshipInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this apprenticeship programme and give specific coaching advice:
+Active enrolments: ${input.enrollmentCount}
+Average OTJT progress: ${input.avgProgress.toFixed(0)}%
+On track: ${input.onTrackCount}
+At risk: ${input.atRiskCount}`
+
+    const insights = await callHaikuForInsights("hiring-team", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Marketplace Orders Insights (Chase — VP Supply Chain) ──────────
+
+export interface OrdersInsightInput {
+  activeCount: number
+  completedCount: number
+  cancelledCount: number
+}
+
+export async function generateOrdersInsights(
+  input: OrdersInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const total = input.activeCount + input.completedCount + input.cancelledCount
+    const fulfillmentPct = total > 0 ? Math.round((input.completedCount / total) * 100) : 0
+    const context = `Analyse this order pipeline and advise on supply chain operations:
+Active orders: ${input.activeCount}
+Completed orders: ${input.completedCount}
+Cancelled orders: ${input.cancelledCount}
+Fulfilment rate: ${fulfillmentPct}%`
+
+    const insights = await callHaikuForInsights("vp-supply-chain", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Finance Hub Insights (Finn — Finance Lead) ─────────────────────
+
+export interface FinanceHubInsightInput {
+  monthlyRevenue: number
+  monthlyExpenses: number
+  outstandingInvoiceCount: number
+  outstandingAmount: number
+  overdueAmount: number
+  cashPosition: number
+}
+
+export async function generateFinanceHubInsights(
+  input: FinanceHubInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const netMargin = input.monthlyRevenue > 0
+      ? Math.round(((input.monthlyRevenue - input.monthlyExpenses) / input.monthlyRevenue) * 100)
+      : 0
+    const context = `Analyse this finance dashboard and flag the most important actions:
+Monthly revenue: £${(input.monthlyRevenue / 100).toFixed(0)}
+Monthly expenses: £${(input.monthlyExpenses / 100).toFixed(0)}
+Net margin: ${netMargin}%
+Cash position: £${(input.cashPosition / 100).toFixed(0)}
+Outstanding invoices: ${input.outstandingInvoiceCount} (£${(input.outstandingAmount / 100).toFixed(0)})
+Overdue amount: £${(input.overdueAmount / 100).toFixed(0)}`
+
+    const insights = await callHaikuForInsights("finance-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Knowledge Vault Insights (Sage — Strategist) ───────────────────
+
+export interface KnowledgeInsightInput {
+  noteCount: number
+  pinnedCount: number
+}
+
+export async function generateKnowledgeInsights(
+  input: KnowledgeInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Advise on this knowledge vault and how to build institutional memory:
+Total notes: ${input.noteCount}
+Pinned notes: ${input.pinnedCount}`
+
+    const insights = await callHaikuForInsights("strategist", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Outreach Insights (Sal — Sales Lead) ───────────────────────────
+
+export interface OutreachInsightInput {
+  campaignCount: number
+  activeCampaigns: number
+  totalContacts: number
+}
+
+export async function generateOutreachInsights(
+  input: OutreachInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this outreach programme and advise on sales pipeline:
+Total campaigns: ${input.campaignCount}
+Active campaigns: ${input.activeCampaigns}
+Total contacts across campaigns: ${input.totalContacts}`
+
+    const insights = await callHaikuForInsights("sales-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Pitch Prep Insights (Fiona — Fundraising Advisor) ──────────────
+
+export interface PitchPrepInsightInput {
+  requestCount: number
+  completedCount: number
+  activeCount: number
+}
+
+export async function generatePitchPrepInsights(
+  input: PitchPrepInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this pitch preparation activity and advise on fundraising readiness:
+Total pitch requests: ${input.requestCount}
+Completed: ${input.completedCount}
+Active/in-progress: ${input.activeCount}`
+
+    const insights = await callHaikuForInsights("fundraising-advisor", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Strategic Planner Insights (Sage — Strategist) ─────────────────
+
+export interface PlannerInsightInput {
+  goalCount: number
+  completedGoals: number
+  atRiskGoals: number
+  avgProgress: number
+}
+
+export async function generatePlannerInsights(
+  input: PlannerInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse these strategic goals and advise on execution priorities:
+Total strategic goals: ${input.goalCount}
+Completed: ${input.completedGoals}
+At risk (overdue or behind): ${input.atRiskGoals}
+Average progress: ${input.avgProgress.toFixed(0)}%`
+
+    const insights = await callHaikuForInsights("strategist", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}

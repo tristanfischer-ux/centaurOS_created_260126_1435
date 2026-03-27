@@ -26,6 +26,7 @@ import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
 
 const section = getSectionById("workshop")!
 
@@ -89,6 +90,16 @@ export function WorkshopSectionIntro(): React.ReactElement {
                         </div>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Max's coaching tip */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-6">
+                <SpecialistCoachingTip
+                    specialistId="cto"
+                    specialistName="Max"
+                    specialistTitle="CTO"
+                    tip="The Forge takes your product idea from concept to manufacturing-ready. Start a project, and I'll guide you through design, specification, and supplier sourcing."
+                />
             </div>
 
             {/* The Forge Showcase — examples of what it produces */}

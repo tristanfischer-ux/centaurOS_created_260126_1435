@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,30 @@ import { getMyAssignments } from "@/actions/project-assignments"
 import { getGuildEvents, getEventRSVPStatuses, getGuildEventsSummary, type GuildEvent } from "@/actions/guild-events"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
+import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
+import { usePageInsights } from "@/hooks/use-page-insights"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
+import { generateGuildInsights } from "@/actions/specialist-page-insights"
+import type { AgentInsight } from "@/actions/agent-insights"
+
+// INTENT: Static coaching insight when no members in guild yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+    id: 'harper-guild-empty',
+    foundry_id: '',
+    specialist_id: 'hiring-team',
+    insight_type: 'recommendation',
+    urgency: 'informational',
+    title: 'Welcome to the Guild',
+    body: 'The Guild connects apprentices with mentors and companies. Build your network to find and develop talent.',
+    domain_data: {},
+    suggested_actions: [],
+    is_read: false,
+    is_dismissed: false,
+    acted_on: false,
+    acted_on_at: null,
+    created_at: new Date().toISOString(),
+    expires_at: null,
+}
 
 // ==========================================
 // TYPES
@@ -179,6 +203,35 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
         tabsRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [])
 
+    // Harper's proactive insights
+    const { openPanel } = useAdvisorPanel()
+    const handleDiscuss = useCallback((specialistId: string, context: string) => {
+        openPanel(specialistId, { handoffContext: context, contextLabel: 'Guild' })
+    }, [openPanel])
+
+    const roleCounts = useMemo(() => {
+        let apprenticeCount = 0
+        let executiveCount = 0
+        let founderCount = 0
+        for (const m of members) {
+            if (m.role === 'Apprentice') apprenticeCount++
+            else if (m.role === 'Executive') executiveCount++
+            else if (m.role === 'Founder') founderCount++
+        }
+        return { apprenticeCount, executiveCount, founderCount }
+    }, [members])
+
+    const { insights, dismissInsight } = usePageInsights(
+        () => generateGuildInsights({
+            memberCount: members.length,
+            apprenticeCount: roleCounts.apprenticeCount,
+            executiveCount: roleCounts.executiveCount,
+            founderCount: roleCounts.founderCount,
+        }),
+        members.length > 0,
+        { cacheKey: 'harper-guild', emptyInsight: EMPTY_STATE_INSIGHT },
+    )
+
     // Split events: first goes to Hero, rest to EventsSection
     const featuredEvent = events.length > 0 ? events[0] : null
     const remainingEvents = events.length > 1 ? events.slice(1) : []
@@ -243,6 +296,21 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         </Button>
                     )}
                 </div>
+
+                {/* Harper's proactive insights */}
+                {insights.length > 0 && (
+                    <div className="space-y-3">
+                        {insights.map((insight) => (
+                            <SpecialistInsightCard
+                                key={insight.id}
+                                insight={insight}
+                                onDismiss={() => dismissInsight(insight.id)}
+                                onDiscuss={handleDiscuss}
+                                compact
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Events-first layout */}
                 {loading ? (
@@ -320,6 +388,21 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         </p>
                     </div>
                 </div>
+
+                {/* Harper's proactive insights */}
+                {insights.length > 0 && (
+                    <div className="space-y-3">
+                        {insights.map((insight) => (
+                            <SpecialistInsightCard
+                                key={insight.id}
+                                insight={insight}
+                                onDismiss={() => dismissInsight(insight.id)}
+                                onDiscuss={handleDiscuss}
+                                compact
+                            />
+                        ))}
+                    </div>
+                )}
 
                 {/* Events-first layout */}
                 {loading ? (

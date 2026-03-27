@@ -22,6 +22,25 @@ import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
 import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
+import type { AgentInsight } from '@/actions/agent-insights'
+
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'fiona-fundraise-empty',
+  foundry_id: '',
+  specialist_id: 'fundraising-advisor',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Start building your fundraise pipeline',
+  body: "Head to the Investor Directory and shortlist your first targets. I'll track your pipeline here and help you prioritise outreach.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -90,7 +109,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
       })
     },
     !!stats && stats.totalTracked > 0,
-    'fiona-fundraise',
+    { cacheKey: 'fiona-fundraise', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
   if (!stats || stats.totalTracked === 0) {

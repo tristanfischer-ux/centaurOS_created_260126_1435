@@ -28,6 +28,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
 
 const section = getSectionById("marketplace")
 
@@ -147,6 +148,16 @@ export function MarketplaceSectionIntro(): React.ReactElement | null {
                         </form>
                     </CardContent>
                 </Card>
+            </div>
+
+            {/* Chase's coaching tip */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-6">
+                <SpecialistCoachingTip
+                    specialistId="vp-supply-chain"
+                    specialistName="Chase"
+                    specialistTitle="Supply Chain"
+                    tip="Find suppliers, hire talent, or discover playbooks. I'll help you compare options and match suppliers to your technical requirements."
+                />
             </div>
 
             {/* Category Quick-Links */}

@@ -21,6 +21,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { OneSentencePlanner } from "./one-sentence-planner"
 import { TemplateGallery } from "./template-gallery"
+import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
 
 const section = getSectionById("plan")!
 
@@ -159,6 +160,16 @@ export function PlanSectionIntro(): React.ReactElement {
                 <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-6">
                     Quick start
                 </p>
+            </div>
+
+            {/* Sage's coaching tip */}
+            <div className="px-4 sm:px-6 lg:px-8 pt-2 pb-4">
+                <SpecialistCoachingTip
+                    specialistId="strategist"
+                    specialistName="Sage"
+                    specialistTitle="Strategy"
+                    tip="Start with your company purpose, then break it into strategic pillars. I'll help you cascade those into objectives and tasks your team can execute."
+                />
             </div>
 
             {/* One Sentence Planner — the "magic moment" */}

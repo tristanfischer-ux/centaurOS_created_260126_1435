@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
     ShoppingBag,
@@ -27,7 +27,31 @@ import {
 import { OrderSummaryCard } from '@/components/buyer/OrderSummaryCard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { toast } from 'sonner'
+import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateOrdersInsights } from '@/actions/specialist-page-insights'
+import type { AgentInsight } from '@/actions/agent-insights'
 import type { OrderSummary } from '@/types/booking'
+
+// INTENT: Static coaching insight when no orders yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+    id: 'chase-orders-empty',
+    foundry_id: '',
+    specialist_id: 'vp-supply-chain',
+    insight_type: 'recommendation',
+    urgency: 'informational',
+    title: 'Your order pipeline',
+    body: "Your orders will appear here as you purchase from the marketplace. I'll track fulfilment and flag any delays.",
+    domain_data: {},
+    suggested_actions: [],
+    is_read: false,
+    is_dismissed: false,
+    acted_on: false,
+    acted_on_at: null,
+    created_at: new Date().toISOString(),
+    expires_at: null,
+}
 
 // ==========================================
 // PROPS
@@ -173,6 +197,21 @@ export function MarketplaceOrdersView({
         return `${currency} ${amount.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
     }
 
+    // Chase's proactive insights
+    const { openPanel } = useAdvisorPanel()
+    const handleDiscuss = useCallback((specialistId: string, context: string) => {
+        openPanel(specialistId, { handoffContext: context, contextLabel: 'Orders' })
+    }, [openPanel])
+    const { insights, dismissInsight } = usePageInsights(
+        () => generateOrdersInsights({
+            activeCount: activeOrders.length,
+            completedCount: completedOrders.length,
+            cancelledCount: cancelledOrders.length,
+        }),
+        totalOrders > 0,
+        { cacheKey: 'chase-orders', emptyInsight: EMPTY_STATE_INSIGHT },
+    )
+
     return (
         <div className="space-y-6">
             {/* Error Banner */}
@@ -186,6 +225,21 @@ export function MarketplaceOrdersView({
                         }
                     </AlertDescription>
                 </Alert>
+            )}
+
+            {/* Chase's proactive insights */}
+            {insights.length > 0 && (
+                <div className="space-y-3">
+                    {insights.map((insight) => (
+                        <SpecialistInsightCard
+                            key={insight.id}
+                            insight={insight}
+                            onDismiss={() => dismissInsight(insight.id)}
+                            onDiscuss={handleDiscuss}
+                            compact
+                        />
+                    ))}
+                </div>
             )}
 
             {/* Summary Stats */}

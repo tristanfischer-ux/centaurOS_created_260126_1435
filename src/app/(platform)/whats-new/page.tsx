@@ -11,6 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { typography } from "@/lib/design-system"
+import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
 import { 
     Sparkles, 
     Calendar,
@@ -155,6 +156,13 @@ export default function WhatsNewPage() {
     
     return (
         <div className="max-w-5xl space-y-6 -mt-2">
+            <SpecialistCoachingTip
+                specialistId="chief-of-staff"
+                specialistName="Cal"
+                specialistTitle="Chief of Staff"
+                tip="Check recent updates for features that could improve your workflow. New capabilities are released regularly."
+            />
+
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
