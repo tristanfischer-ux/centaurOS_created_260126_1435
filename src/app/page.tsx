@@ -448,8 +448,7 @@ function HeroSection() {
             Activates Positive Emotional Attractor (PEA) — openness and willingness to act.
             Problem-first activates Task Positive Network (TPN) → narrowed attention, risk aversion. */}
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-3 sm:mb-4">
-          Imagine describing your product and having engineered, manufacturer-ready parts arrive in weeks — not months.
-          No factory lease. No full-time team. Just your idea, turned real.
+          Imagine describing your product and receiving a complete engineering package — 3D CAD files, engineering drawings, material specs, and matched suppliers — in hours, not months.
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
@@ -607,8 +606,8 @@ function WhyNowStrip() {
 function HowItWorksStrip() {
   const steps = [
     { number: "1", title: "Describe Your Product", detail: "Tell us what you want to build. Upload CAD files, sketches, or just describe your idea in plain English." },
-    { number: "2", title: "Get Your Engineering Package", detail: "Our AI generates research, 3D models, engineering drawings, material specs, and a full bill of materials." },
-    { number: "3", title: "Match With Manufacturers", detail: "We connect you with vetted UK suppliers who have the right equipment and spare capacity to make your parts." },
+    { number: "2", title: "Get Your Engineering Package", detail: "Receive STEP files, 7 engineering drawings, material specs, a bill of materials, DFM analysis, and cost estimates — grounded in 220+ ISO/DIN/BS standards and real supplier data." },
+    { number: "3", title: "Match With Manufacturers", detail: "Our 6-factor matching algorithm scores UK suppliers on capability, process, material, quality, and relevance — then generates RFQ packs ready to send." },
   ]
 
   return (
@@ -653,9 +652,9 @@ const SOLUTION_PILLARS = [
     imageAlt: "Experienced engineering executive",
     quote: "Don't burn seed capital on a standing army. Launch with a fractional team — seasoned engineers, marketers, and operators with decades of experience. No full-time hires, no six-figure salaries before your first prototype.",
     highlights: [
-      "Experienced professionals across engineering disciplines",
-      "Flexible engagement — matched to your needs",
-      "Specialists in mechanical, electrical, manufacturing, and more",
+      "Manufacturing, design, supply chain, and commercial specialists",
+      "Downloadable engineering reports in PPTX, Word, and PDF",
+      "Cost estimation with parts-level breakdown and buy/make classification",
     ],
   },
   {
@@ -666,9 +665,9 @@ const SOLUTION_PILLARS = [
     imageAlt: "Young engineers working with AI tools",
     quote: "Ambitious apprentices — digital natives fresh from university — execute tasks using AI tools at remarkable speed. Senior experts review and verify every output. You aren't hiring juniors. You're deploying Founders-in-Training.",
     highlights: [
-      "Senior directs. Junior executes with AI. Senior verifies.",
-      "Every output grounded in real-world experience",
-      "More output, lower cost than traditional hiring",
+      "13 AI specialists with engineering calculation tools",
+      "4-stage design review: manufacturability, engineering, integration, supply chain",
+      "Every output grounded in 220+ design standards and real supplier data",
     ],
   },
   {
@@ -677,11 +676,11 @@ const SOLUTION_PILLARS = [
     headline: "Factories Without the Factory",
     image: "/images/marketing/factory-partner.png",
     imageAlt: "Factory floor with manufacturing equipment",
-    quote: "Across the UK and Europe, factories have spare capacity waiting to be filled. We identify the right facilities, generate automated RFQ packs, and get your products built — without you leasing a single square metre.",
+    quote: "Across the UK, factories have spare capacity waiting to be filled. We identify the right facilities, generate automated RFQ packs, and get your products built — without you leasing a single square metre.",
     highlights: [
-      "Access a growing network of manufacturing partners",
-      "Automated RFQ generation from your designs",
-      "Real factories, real equipment, zero overhead",
+      "9,900+ UK manufacturers and suppliers on the marketplace",
+      "Automated RFQ packs with engineering specs, materials, and tolerances",
+      "6-factor supplier matching: capability, process, material, quality, and more",
     ],
   },
 ] as const
