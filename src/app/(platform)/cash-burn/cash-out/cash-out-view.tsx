@@ -22,7 +22,8 @@ import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
-import { generateCashOutInsights } from '@/actions/specialist-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generateCashOutInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -32,6 +33,25 @@ import {
 } from '@/actions/cash-burn-out'
 import type { CashOutItem, CreateCashOutInput } from '@/types/cash-burn'
 import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
+import type { AgentInsight } from '@/actions/agent-insights'
+
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'finn-cash-out-empty',
+  foundry_id: '',
+  specialist_id: 'finance-lead',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Map your cost structure',
+  body: "Start with your fixed costs — salaries, rent, subscriptions. Then add variable costs like materials and shipping. I need both to model your burn rate accurately.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface CashOutViewProps {
   initialItems: CashOutItem[]
@@ -81,11 +101,16 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   })), [cashOutGrid])
 
   // Specialist insights from Finn
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Out' })
+  }, [openPanel])
   const { insights, dismissInsight } = usePageInsights(
-    () => {
+    async () => {
       const sorted = [...items].sort((a, b) => b.weeklyAmount - a.weeklyAmount)
       const topThree = sorted.slice(0, 3).map(i => i.name)
       const total = weeklyFixedTotal + weeklyVariableTotal
+      const snapshot = await getFinancialSnapshot() ?? undefined
       return generateCashOutInsights({
         weeklyFixedTotal,
         weeklyVariableTotal,
@@ -94,9 +119,11 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         topThreeItems: topThree,
         monthlyTotal,
         annualTotal,
+        snapshot,
       })
     },
     items.length > 0,
+    { cacheKey: 'finn-cash-out', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
   const handleAdd = useCallback((costType?: string) => {
@@ -212,6 +239,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
               key={insight.id}
               insight={insight}
               onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
               compact
             />
           ))}

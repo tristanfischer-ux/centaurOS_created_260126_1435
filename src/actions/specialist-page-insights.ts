@@ -748,6 +748,67 @@ function computeTasksSeverity(input: TasksBriefingInput): 'success' | 'warning' 
   return 'success'
 }
 
+// ─── Shared Financial Snapshot (cross-page context for Finn) ────────
+
+/**
+ * Optional financial context passed to sub-page insight generators so Finn
+ * can reference the bigger picture (runway, total burn, balance) even when
+ * advising on a single page like Cash Out or Cash In.
+ */
+export interface FinancialSnapshot {
+  openingBalance: number
+  weeklyTotalOut: number
+  weeklyTotalIn: number
+  runwayWeeks: number | null
+}
+
+/**
+ * Fetches a lightweight financial snapshot for cross-page context.
+ * Called client-side from Cash Out, Cash In, and P&L views.
+ */
+export async function getFinancialSnapshot(): Promise<FinancialSnapshot | null> {
+  try {
+    const { getCashOutItems } = await import('@/actions/cash-burn-out')
+    const { getCashInItems } = await import('@/actions/cash-burn-in')
+    const { getDefaultScenario } = await import('@/actions/cash-burn-scenarios')
+
+    const [outResult, inResult, scenarioResult] = await Promise.all([
+      getCashOutItems(),
+      getCashInItems(),
+      getDefaultScenario(),
+    ])
+
+    const cashOut = outResult.data ?? []
+    const cashIn = inResult.data ?? []
+    const openingBalance = scenarioResult.data?.openingBalance ?? 0
+
+    const weeklyTotalOut = cashOut.reduce((s, i) => s + i.weeklyAmount, 0)
+    const weeklyTotalIn = cashIn.reduce((s, i) => s + i.weeklyAmount, 0)
+    const weeklyNet = weeklyTotalOut - weeklyTotalIn
+
+    const runwayWeeks = weeklyNet > 0
+      ? Math.floor(openingBalance / weeklyNet)
+      : null // sustainable
+
+    return { openingBalance, weeklyTotalOut, weeklyTotalIn, runwayWeeks }
+  } catch {
+    return null
+  }
+}
+
+function formatSnapshot(snapshot: FinancialSnapshot | undefined): string {
+  if (!snapshot) return ''
+  const runway = snapshot.runwayWeeks != null
+    ? `${snapshot.runwayWeeks} weeks (~${Math.round(snapshot.runwayWeeks / 4.33)} months)`
+    : 'sustainable (net positive)'
+  return `\n\nBROADER FINANCIAL CONTEXT (from the Cash Burn page):
+Opening balance: £${(snapshot.openingBalance / 100).toFixed(0)}
+Total weekly outgoings: £${(snapshot.weeklyTotalOut / 100).toFixed(0)}
+Total weekly income: £${(snapshot.weeklyTotalIn / 100).toFixed(0)}
+Runway: ${runway}
+Use this context to connect your advice to the company's overall financial position.`
+}
+
 // ─── Cash Burn Insights (Finn — Finance Lead) ───────────────────────
 
 export interface CashBurnInsightInput {
@@ -792,6 +853,7 @@ export interface CashOutInsightInput {
   topThreeItems: string[]
   monthlyTotal: number
   annualTotal: number
+  snapshot?: FinancialSnapshot
 }
 
 export async function generateCashOutInsights(
@@ -805,7 +867,7 @@ Fixed cost ratio: ${input.fixedCostPct.toFixed(0)}% of total
 Total cost items: ${input.itemCount}
 Top 3 costs: ${wrapUserData("top_costs", input.topThreeItems.join(", ") || "none")}
 Monthly total: £${(input.monthlyTotal / 100).toFixed(0)}
-Annual total: £${(input.annualTotal / 100).toFixed(0)}`
+Annual total: £${(input.annualTotal / 100).toFixed(0)}${formatSnapshot(input.snapshot)}`
 
     const insights = await callHaikuForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
@@ -822,6 +884,7 @@ export interface CashInInsightInput {
   sourceTypeCount: number
   itemCount: number
   revenuePct: number
+  snapshot?: FinancialSnapshot
 }
 
 export async function generateCashInInsights(
@@ -835,7 +898,7 @@ Weekly revenue (earned): £${(input.revenueWeekly / 100).toFixed(0)}
 Weekly non-revenue (loans/equity/grants/other): £${(input.nonRevenueWeekly / 100).toFixed(0)}
 Revenue as % of total income: ${input.revenuePct.toFixed(0)}%
 Distinct income source types: ${input.sourceTypeCount}
-Total income items: ${input.itemCount}`
+Total income items: ${input.itemCount}${formatSnapshot(input.snapshot)}`
 
     const insights = await callHaikuForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
@@ -854,6 +917,7 @@ export interface PnlInsightInput {
   grossMarginPct: number
   ebitdaMarginPct: number
   rndPct: number
+  snapshot?: FinancialSnapshot
 }
 
 export async function generatePnlInsights(
@@ -867,7 +931,7 @@ Gross profit: £${(input.annualGrossProfit / 100).toFixed(0)} (margin: ${input.g
 Annual OpEx: £${(input.annualOpex / 100).toFixed(0)}
 Annual R&D: £${(input.annualRnd / 100).toFixed(0)} (${input.rndPct.toFixed(1)}% of revenue)
 EBITDA: £${(input.annualEbitda / 100).toFixed(0)} (margin: ${input.ebitdaMarginPct.toFixed(1)}%)
-${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not yet profitable." : "EBITDA is positive."}`
+${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not yet profitable." : "EBITDA is positive."}${formatSnapshot(input.snapshot)}`
 
     const insights = await callHaikuForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))

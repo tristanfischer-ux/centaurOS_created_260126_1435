@@ -19,6 +19,7 @@ import {
 import Link from 'next/link'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateFundraiseInsights } from '@/actions/specialist-page-insights'
 import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
 
@@ -69,6 +70,11 @@ function relativeTime(dateStr: string): string {
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
 
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = (specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Fundraise' })
+  }
+
   const { insights, dismissInsight } = usePageInsights(
     () => {
       if (!stats) return Promise.resolve([])
@@ -84,6 +90,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
       })
     },
     !!stats && stats.totalTracked > 0,
+    'fiona-fundraise',
   )
 
   if (!stats || stats.totalTracked === 0) {
@@ -143,6 +150,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
               key={insight.id}
               insight={insight}
               onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
               compact
             />
           ))}

@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,9 +20,29 @@ import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
-import { generatePnlInsights } from '@/actions/specialist-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
+import { generatePnlInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
 import { buildIncomeStatement, buildBalanceSheet } from '@/lib/cash-burn/pnl-builder'
 import type { CashOutItem, CashInItem, IncomeStatementRow } from '@/types/cash-burn'
+import type { AgentInsight } from '@/actions/agent-insights'
+
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'finn-pnl-empty',
+  foundry_id: '',
+  specialist_id: 'finance-lead',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Build your financial statements',
+  body: "Your P&L and Balance Sheet are projected from your Cash Out and Cash In data. Add your costs and revenue first, then come back here for the full financial picture.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface PnlViewProps {
   initialData: {
@@ -78,12 +98,17 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
   )
 
   // Specialist insights from Finn
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'P&L' })
+  }, [openPanel])
   const { insights, dismissInsight } = usePageInsights(
-    () => {
+    async () => {
       const rev = totals.revenue
       const grossMarginPct = rev > 0 ? (totals.grossProfit / rev) * 100 : 0
       const ebitdaMarginPct = rev > 0 ? (totals.ebitda / rev) * 100 : 0
       const rndPct = rev > 0 ? (totals.rnd / rev) * 100 : 0
+      const snapshot = await getFinancialSnapshot() ?? undefined
       return generatePnlInsights({
         annualRevenue: rev,
         annualCogs: totals.cogs,
@@ -94,9 +119,11 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         grossMarginPct,
         ebitdaMarginPct,
         rndPct,
+        snapshot,
       })
     },
     cashOut.length > 0 || cashIn.length > 0,
+    { cacheKey: 'finn-pnl', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
   if (hasError || !initialData) {
@@ -145,6 +172,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
               key={insight.id}
               insight={insight}
               onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
               compact
             />
           ))}

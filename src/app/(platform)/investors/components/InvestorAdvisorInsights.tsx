@@ -12,8 +12,10 @@
 
 'use client'
 
+import { useCallback } from 'react'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
 import type { InvestorStats, ShortlistStage } from '@/actions/investors'
 
@@ -28,6 +30,11 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
   const shortlistTypes = stats.subcategoryBreakdown.slice(0, 5).map(s => s.name)
   const shortlistLocations = stats.regionBreakdown.slice(0, 5).map(r => r.name)
 
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Investor Directory' })
+  }, [openPanel])
+
   const { insights, dismissInsight } = usePageInsights(
     () => generateInvestorInsights({
       totalFirms: stats.total,
@@ -37,6 +44,7 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
       activeFilters: '',
     }),
     stats.total > 0,
+    'fiona-investors',
   )
 
   if (insights.length === 0) return null
@@ -48,6 +56,7 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
           key={insight.id}
           insight={insight}
           onDismiss={() => dismissInsight(insight.id)}
+          onDiscuss={handleDiscuss}
           compact
         />
       ))}

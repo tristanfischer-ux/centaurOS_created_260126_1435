@@ -24,6 +24,7 @@ import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateCashBurnInsights } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid, generateCashInGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
@@ -40,6 +41,26 @@ import type {
   CashInItem,
   CreateScenarioInput,
 } from '@/types/cash-burn'
+import type { AgentInsight } from '@/actions/agent-insights'
+
+// INTENT: Static coaching insight when no data entered yet — no API call needed
+const EMPTY_STATE_INSIGHT: AgentInsight = {
+  id: 'finn-cash-burn-empty',
+  foundry_id: '',
+  specialist_id: 'finance-lead',
+  insight_type: 'recommendation',
+  urgency: 'informational',
+  title: 'Get started with your burn model',
+  body: "Start by adding your three biggest costs on the Cash Out page — usually salaries, office, and materials. Then add your revenue streams on Cash In. I'll calculate your runway automatically.",
+  domain_data: {},
+  suggested_actions: [],
+  is_read: false,
+  is_dismissed: false,
+  acted_on: false,
+  acted_on_at: null,
+  created_at: new Date().toISOString(),
+  expires_at: null,
+}
 
 interface CashBurnViewProps {
   initialData: {
@@ -133,6 +154,10 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   }, [projection.weeks])
 
   // Specialist insights from Finn
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = useCallback((specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Burn' })
+  }, [openPanel])
   const { insights, dismissInsight } = usePageInsights(
     () => {
       const totalOut = cashOut.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
@@ -153,6 +178,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       })
     },
     cashOut.length > 0 || cashIn.length > 0,
+    { cacheKey: 'finn-cash-burn', emptyInsight: EMPTY_STATE_INSIGHT },
   )
 
   // Scenario handlers
@@ -304,6 +330,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
               key={insight.id}
               insight={insight}
               onDismiss={() => dismissInsight(insight.id)}
+              onDiscuss={handleDiscuss}
               compact
             />
           ))}
