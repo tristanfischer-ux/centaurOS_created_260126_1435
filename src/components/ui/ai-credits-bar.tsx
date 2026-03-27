@@ -3,14 +3,14 @@
 /**
  * @file ai-credits-bar.tsx
  *
- * @description Compact AI usage bar for the sidebar. Shows current usage
- * against subscription limit, plus bonus referral credits. Includes
- * a popover with referral invite CTA when clicked.
+ * @description Compact account pill for the sidebar footer. Shows tier name
+ * and a mini AI tasks progress bar. Click opens a popover with full detail:
+ * usage stats, upgrade link, referral invite, and founding member badge.
  */
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { Copy, Check, Gift, Users } from 'lucide-react'
+import { Copy, Check, Gift, Users, ChevronRight } from 'lucide-react'
 import {
   Popover,
   PopoverContent,
@@ -72,167 +72,107 @@ interface AICreditsBarProps {
 }
 
 /**
- * AICreditsBar — Compact usage indicator with referral CTA popover.
+ * AICreditsBar — Compact account pill with popover for full detail.
  *
- * @description Shows "AI Tasks: ████░░ 42/50 (+8 bonus)" in the sidebar.
- * Green >50%, amber 80%, red 95%. Click opens referral popover.
+ * @description Shows tier name + mini progress bar in the sidebar footer.
+ * Click opens a popover with: usage stats, upgrade link, referral invite,
+ * founding member badge. Replaces the old multi-section inline layout.
  */
 export function AICreditsBar({ currentUsage, limit, bonusCredits, tier = 'free', referralLink, referralCount, isFoundingMember, foundingMemberNumber }: AICreditsBarProps) {
-  const [copied, setCopied] = useState(false)
-  const copyTimerRef = useRef<ReturnType<typeof setTimeout>>(null)
   const percentUsed = limit > 0 ? Math.min((currentUsage / limit) * 100, 100) : 0
   const remaining = Math.max(0, limit - currentUsage)
   const isNearLimit = percentUsed >= 80
   const isAtLimit = percentUsed >= 95
   const isExhausted = currentUsage >= limit && bonusCredits === 0
-  const hasReferralLink = !!referralLink
 
-  // Progress bar color
   const barColor = isAtLimit
     ? 'bg-destructive'
     : isNearLimit
       ? 'bg-warning'
       : 'bg-success'
 
-  // Cleanup copy timer on unmount
-  useEffect(() => {
-    return () => {
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
-    }
-  }, [])
-
-  const handleCopyLink = async () => {
-    if (!referralLink) return
-    try {
-      await navigator.clipboard.writeText(referralLink)
-      setCopied(true)
-      if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
-      copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Clipboard API unavailable
-    }
-  }
-
   const tierName = SUBSCRIPTION_PLANS[tier].name
   const isFree = tier === 'free'
 
   return (
-    <div className={`w-full text-left px-2 py-2 rounded-md ${isNearLimit ? 'border border-warning/40 bg-warning/5' : ''}`}>
-      {/* Tier indicator */}
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[10px] font-semibold text-foreground">
-          {isFree ? `${tierName} — Free` : tierName}
-        </span>
-        {isFree && (
-          <Link
-            href="/settings/billing"
-            className="text-[10px] font-medium text-international-orange hover:underline"
-          >
-            Upgrade
-          </Link>
-        )}
-      </div>
-      <Popover>
-        <PopoverTrigger asChild>
-          <button
-            className="w-full text-left hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
-            aria-label={`AI tasks: ${currentUsage} of ${limit} used${bonusCredits > 0 ? `, ${bonusCredits} bonus` : ''}`}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                AI Tasks
-              </span>
-              <span className="text-[10px] font-semibold text-foreground">
-                {currentUsage}/{limit}
-                {bonusCredits > 0 && (
-                  <span className="text-international-orange ml-1">(+{bonusCredits} bonus)</span>
-                )}
-              </span>
-            </div>
-            <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-                style={{ width: `${percentUsed}%` }}
-              />
-            </div>
-            {isExhausted && (
-              <p className="text-[9px] text-destructive mt-1 font-medium">
-                Out of AI tasks — invite a friend to get 10 more
-              </p>
-            )}
-          </button>
-        </PopoverTrigger>
-        <PopoverContent align="start" side="right" className="w-72 p-4">
-          <ReferralPopoverContent
-            remaining={remaining}
-            bonusCredits={bonusCredits}
-            isExhausted={isExhausted}
-            referralLink={referralLink}
-            referralCount={referralCount}
-            isFoundingMember={isFoundingMember}
-            foundingMemberNumber={foundingMemberNumber}
-          />
-        </PopoverContent>
-      </Popover>
-
-      {/* Referral invite — self-explanatory inline section */}
-      {hasReferralLink && (
-        <div className="mt-2 pt-2 border-t border-border space-y-1.5">
-          <div className="flex items-center gap-1.5">
-            <Gift className="h-3 w-3 text-international-orange shrink-0" />
-            <span className="text-[10px] font-semibold text-foreground">Invite a friend</span>
-          </div>
-          <p className="text-[9px] text-muted-foreground leading-relaxed">
-            Share your link — you both get +10 AI tasks.
-          </p>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md bg-muted/50 hover:bg-muted transition-colors group"
-            aria-label="Copy your invite link"
-          >
-            <span className="text-[9px] text-muted-foreground truncate">
-              {referralLink}
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          className={`w-full text-left px-2 py-2 rounded-md hover:bg-muted/50 transition-colors cursor-pointer ${isNearLimit ? 'border border-warning/40 bg-warning/5' : ''}`}
+          aria-label={`${tierName}: ${currentUsage} of ${limit} AI tasks used${bonusCredits > 0 ? `, ${bonusCredits} bonus` : ''}`}
+        >
+          {/* Row 1: Tier + usage count */}
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-semibold text-foreground">
+              {isFree ? `${tierName} — Free` : tierName}
             </span>
-            {copied ? (
-              <Check className="h-3 w-3 text-success shrink-0" />
-            ) : (
-              <Copy className="h-3 w-3 text-muted-foreground group-hover:text-foreground shrink-0" />
-            )}
-          </button>
-          {copied && (
-            <p className="text-[9px] text-success font-medium">Link copied!</p>
-          )}
-          {referralCount != null && referralCount > 0 && (
-            <p className="text-[9px] text-muted-foreground">
-              {referralCount} friend{referralCount !== 1 ? 's' : ''} joined
+            <span className="text-[10px] font-semibold text-foreground flex items-center gap-1">
+              {currentUsage}/{limit}
+              {bonusCredits > 0 && (
+                <span className="text-international-orange">(+{bonusCredits})</span>
+              )}
+              <ChevronRight className="h-2.5 w-2.5 text-muted-foreground" />
+            </span>
+          </div>
+          {/* Row 2: Mini progress bar */}
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+              style={{ width: `${percentUsed}%` }}
+            />
+          </div>
+          {isExhausted && (
+            <p className="text-[9px] text-destructive mt-1 font-medium">
+              Out of AI tasks — click for options
             </p>
           )}
-        </div>
-      )}
-
-      {/* Founding member badge */}
-      {isFoundingMember && foundingMemberNumber != null && (
-        <div className="mt-1">
-          <FoundingMemberBadge compact memberNumber={foundingMemberNumber} />
-        </div>
-      )}
-    </div>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" side="right" className="w-72 p-4">
+        <AccountPopoverContent
+          currentUsage={currentUsage}
+          limit={limit}
+          remaining={remaining}
+          bonusCredits={bonusCredits}
+          percentUsed={percentUsed}
+          barColor={barColor}
+          isExhausted={isExhausted}
+          isFree={isFree}
+          tierName={tierName}
+          referralLink={referralLink}
+          referralCount={referralCount}
+          isFoundingMember={isFoundingMember}
+          foundingMemberNumber={foundingMemberNumber}
+        />
+      </PopoverContent>
+    </Popover>
   )
 }
 
-function ReferralPopoverContent({
+function AccountPopoverContent({
+  currentUsage,
+  limit,
   remaining,
   bonusCredits,
+  percentUsed,
+  barColor,
   isExhausted,
+  isFree,
+  tierName,
   referralLink,
   referralCount,
   isFoundingMember,
   foundingMemberNumber,
 }: {
+  currentUsage: number
+  limit: number
   remaining: number
   bonusCredits: number
+  percentUsed: number
+  barColor: string
   isExhausted: boolean
+  isFree: boolean
+  tierName: string
   referralLink?: string
   referralCount?: number
   isFoundingMember?: boolean
@@ -255,27 +195,63 @@ function ReferralPopoverContent({
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current)
       copyTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
-      // Clipboard API unavailable (e.g. non-HTTPS context)
+      // Clipboard API unavailable
     }
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
-        <Gift className="h-4 w-4 text-international-orange" />
-        <h4 className="text-sm font-semibold text-foreground">
-          {isExhausted ? 'Get more AI tasks' : 'Invite a friend'}
-        </h4>
+      {/* Tier + Upgrade */}
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-semibold text-foreground">{tierName}</h4>
+        {isFree && (
+          <Link
+            href="/settings/billing"
+            className="text-xs font-medium text-international-orange hover:underline"
+          >
+            Upgrade
+          </Link>
+        )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        {isExhausted
-          ? 'You\'ve used all your AI tasks this month. Invite a friend and you both get 10 more.'
-          : `You have ${remaining} tasks remaining${bonusCredits > 0 ? ` + ${bonusCredits} bonus` : ''}. Invite a friend — you both get +10 AI tasks.`}
-      </p>
+      {/* Usage detail */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-xs text-muted-foreground">AI Tasks</span>
+          <span className="text-xs font-semibold text-foreground">
+            {currentUsage}/{limit}
+            {bonusCredits > 0 && (
+              <span className="text-international-orange ml-1">(+{bonusCredits} bonus)</span>
+            )}
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${percentUsed}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-muted-foreground mt-1">
+          {remaining} remaining this month
+        </p>
+      </div>
 
+      {/* Referral invite */}
       {referralLink && (
-        <>
+        <div className="pt-2 border-t border-border space-y-2">
+          <div className="flex items-center gap-2">
+            <Gift className="h-4 w-4 text-international-orange" />
+            <h4 className="text-sm font-semibold text-foreground">
+              {isExhausted ? 'Get more AI tasks' : 'Invite a friend'}
+            </h4>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            {isExhausted
+              ? 'You\'ve used all your AI tasks this month. Invite a friend and you both get 10 more.'
+              : 'Share your link — you both get +10 AI tasks.'}
+          </p>
+
           <div className="flex gap-2">
             <Input
               readOnly
@@ -294,13 +270,14 @@ function ReferralPopoverContent({
               <span>{referralCount} friend{referralCount !== 1 ? 's' : ''} referred</span>
             </div>
           )}
+        </div>
+      )}
 
-          {isFoundingMember && foundingMemberNumber != null && (
-            <div className="mt-1">
-              <FoundingMemberBadge compact memberNumber={foundingMemberNumber} />
-            </div>
-          )}
-        </>
+      {/* Founding member badge */}
+      {isFoundingMember && foundingMemberNumber != null && (
+        <div className="pt-2 border-t border-border">
+          <FoundingMemberBadge compact memberNumber={foundingMemberNumber} />
+        </div>
       )}
     </div>
   )
