@@ -273,6 +273,11 @@ export function TodayView({
             unreadMessages: unreadCount,
             streak: briefing.streak ?? 0,
             nudgeSummary,
+            strategyPillars: strategyHealth.map(s => ({ title: s.title, health: s.health, progress: s.progress })),
+            totalPillarCount: strategyHealth.length,
+            completedYesterday: briefing.completedYesterday ?? 0,
+            velocityTrend: briefing.velocityTrend ?? 0,
+            teamCompletionRate: pulseData?.team?.completion_rate ?? 0,
         }
     }, [briefing, pulse, strategyHealth, unreadCount])
 
@@ -450,14 +455,39 @@ export function TodayView({
                                             Scanning your workstreams...
                                         </p>
                                     ) : heroNarrative ? (
-                                        <motion.p
-                                            className="text-base font-semibold text-foreground leading-relaxed mt-1"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ duration: 0.4, ease: EASE_CURVE }}
-                                        >
-                                            {heroNarrative}
-                                        </motion.p>
+                                        <>
+                                            <motion.p
+                                                className="text-base font-semibold text-foreground leading-relaxed mt-1"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.4, ease: EASE_CURVE }}
+                                            >
+                                                {heroNarrative}
+                                            </motion.p>
+                                            <motion.div
+                                                className="mt-2"
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                transition={{ duration: 0.3, delay: 0.3, ease: EASE_CURVE }}
+                                            >
+                                                <AskSpecialistButton
+                                                    context={{
+                                                        type: 'general',
+                                                        title: 'Daily Briefing Follow-up',
+                                                        description: `Cal's briefing: "${heroNarrative}" — continue this conversation.`,
+                                                        metadata: {
+                                                            notes: calInput
+                                                                ? `Overdue: ${calInput.overdueCount}, Due today: ${calInput.dueToday}, Completed: ${calInput.completedToday}, Blockers: ${calInput.blockerCount}, Strategy pillars: ${calInput.totalPillarCount ?? 0}`
+                                                                : undefined,
+                                                        },
+                                                    }}
+                                                    specialistId="chief-of-staff"
+                                                    specialistName="Cal"
+                                                    variant="chip"
+                                                    label="Reply to Cal"
+                                                />
+                                            </motion.div>
+                                        </>
                                     ) : null}
                                 </div>
                             </div>

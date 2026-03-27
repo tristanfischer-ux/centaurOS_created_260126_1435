@@ -44,14 +44,6 @@ export function useCalBriefing(
     // double-calls once we've successfully started a fetch.
     if (fetched.current || !input) return
 
-    // For returning users, skip if there's no meaningful data to triage
-    if (!isNewUser) {
-      const hasData = input.overdueCount > 0 || input.dueToday > 0 || input.completedToday > 0
-        || input.blockerCount > 0 || input.pendingApprovalCount > 0 || input.atRiskObjectiveCount > 0
-        || input.strategyAtRisk > 0 || input.strategyOffTrack > 0 || input.unreadMessages > 0
-      if (!hasData) return
-    }
-
     fetched.current = true
     setIsCalLoading(true)
 
