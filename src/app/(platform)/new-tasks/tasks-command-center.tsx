@@ -204,14 +204,32 @@ export function TasksCommandCenter({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const calContext: SpecialistContext = useMemo(() => ({
-    type: 'task' as const,
-    title: 'Tasks Overview',
-    description: 'Cal is reviewing your task execution health.',
-    metadata: {
-      notes: calBriefing.narrative ?? calFallback,
-    },
-  }), [calBriefing, calFallback])
+  // Build rich context for "Discuss with Cal" — top overdue + blockers
+  const calContext: SpecialistContext = useMemo(() => {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    const overdueTasks = tasks
+      .filter(t => t.end_date && t.status !== 'Completed' && t.status !== 'Rejected' && new Date(t.end_date) < today)
+      .sort((a, b) => new Date(a.end_date!).getTime() - new Date(b.end_date!).getTime())
+      .slice(0, 5)
+      .map(t => ({ title: t.title, status: t.status ?? 'Unknown' }))
+
+    const blockers = tasks
+      .filter(t => t.risk_level === 'blocker' && t.status !== 'Completed' && t.status !== 'Rejected')
+      .slice(0, 5)
+      .map(t => ({ title: t.title, status: t.status ?? 'Unknown' }))
+
+    return {
+      type: 'task' as const,
+      title: 'Tasks Overview',
+      description: `Cal is reviewing task execution: ${stats.overdue} overdue, ${stats.dueToday} due today, ${blockerCount} blockers.`,
+      metadata: {
+        tasks: [...overdueTasks, ...blockers],
+        notes: calBriefing.narrative ?? calFallback,
+      },
+    }
+  }, [tasks, stats, blockerCount, calBriefing, calFallback])
 
   // Strategic context — how tasks connect to the bigger picture
   const strategicContext = useMemo(() => {
@@ -326,6 +344,7 @@ export function TasksCommandCenter({
         loadingMessage="Scanning your tasks..."
         severity={calSeverity}
         context={calContext}
+        storageKey="tasks"
       />
 
       {/* Page Header */}

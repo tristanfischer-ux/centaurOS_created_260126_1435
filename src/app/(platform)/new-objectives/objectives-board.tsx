@@ -473,6 +473,7 @@ export function ObjectivesBoard({
         loadingMessage="Reviewing your objectives..."
         severity={sageSeverity}
         context={sageContext}
+        storageKey="objectives"
       />
 
       {/* Page Header */}

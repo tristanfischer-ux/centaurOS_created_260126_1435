@@ -94,7 +94,10 @@ export function StrategyHealthReview({
   className,
 }: StrategyHealthReviewProps) {
   const insight = useMemo(() => generateInsight(pillars), [pillars])
-  const [aiOverview, setAiOverview] = useState<string | null>(null)
+  const [briefing, setBriefing] = useState<{ narrative: string | null; severity: 'success' | 'warning' | 'error' }>({
+    narrative: null,
+    severity: insight.severity,
+  })
   const [isLoading, setIsLoading] = useState(false)
   const fetchedRef = useRef(false)
 
@@ -116,7 +119,7 @@ export function StrategyHealthReview({
       totalObjectives: totalObjectives ?? 0,
       unlinkedObjectiveCount: unlinkedObjectiveCount ?? 0,
     }).then((result) => {
-      if (result) setAiOverview(result)
+      if (result) setBriefing(result)
     }).catch(() => { /* Non-critical — local insight remains */ })
       .finally(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,7 +136,7 @@ export function StrategyHealthReview({
         health: p.health,
         progress: p.progress,
       })),
-      notes: aiOverview ?? insight.message,
+      notes: briefing.narrative ?? insight.message,
     },
   }
 
@@ -142,12 +145,13 @@ export function StrategyHealthReview({
       specialistId="strategist"
       specialistName="Sage"
       specialistTitle="Strategy"
-      narrative={aiOverview}
+      narrative={briefing.narrative}
       fallbackMessage={insight.message}
       isLoading={isLoading}
       loadingMessage="Reviewing your strategy..."
-      severity={insight.severity}
+      severity={briefing.severity}
       context={context}
+      storageKey="strategy"
       className={className}
     />
   )

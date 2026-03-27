@@ -475,17 +475,18 @@ export interface StrategyOverviewInput {
 
 /**
  * Generates a 1-2 paragraph strategic overview from Sage.
- * Returns a plain string (not insight cards) for display as a briefing.
+ * Returns narrative + severity for the SpecialistBriefingHero component.
  */
 export async function generateStrategyOverview(
   input: StrategyOverviewInput,
-): Promise<string | null> {
+): Promise<SpecialistBriefingResult> {
   return withAIGate('page_insights', async () => {
+    const severity = computeStrategySeverity(input)
     const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return null
+    if (!apiKey) return { narrative: null, severity }
 
     const specialist = getSpecialistById("strategist")
-    if (!specialist) return null
+    if (!specialist) return { narrative: null, severity }
 
     const pillarSummary = input.pillars.length > 0
       ? input.pillars.map(p =>
@@ -521,7 +522,9 @@ ${pillarSummary}`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
+          // DECISION: Sonnet for strategy overview — page-top hero briefing,
+          // same reasoning as Cal's Today briefing and the other two page heroes.
+          model: "claude-sonnet-4-6",
           max_tokens: 300,
           system: systemPrompt,
           messages: [{ role: "user", content: context }],
@@ -533,17 +536,25 @@ ${pillarSummary}`
 
       if (!response.ok) {
         console.error("[strategy-overview] API error:", response.status)
-        return null
+        return { narrative: null, severity }
       }
 
       const data = await response.json()
       const text = (data.content?.[0]?.text ?? "").trim()
-      return text || null
+      return { narrative: text || null, severity }
     } catch {
       clearTimeout(timeout)
-      return null
+      return { narrative: null, severity }
     }
   })
+}
+
+function computeStrategySeverity(input: StrategyOverviewInput): 'success' | 'warning' | 'error' {
+  const offTrack = input.pillars.filter(p => p.health === 'off-track').length
+  const atRisk = input.pillars.filter(p => p.health === 'at-risk').length
+  if (offTrack > 0) return 'error'
+  if (atRisk > 0 || input.unlinkedObjectiveCount > 3) return 'warning'
+  return 'success'
 }
 
 // ─── Objectives Briefing (Sage — Strategist) ────────────────────────

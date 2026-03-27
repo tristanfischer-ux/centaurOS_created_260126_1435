@@ -7,15 +7,17 @@
  * Shows the specialist's avatar, name/title, a loading state while the AI
  * narrative is being generated, the narrative text, and a "Discuss with" chip.
  * Severity-aware styling tints the card based on health status.
+ * Collapsible with localStorage persistence per page.
  *
  * Used on: Strategy (Sage), Objectives (Sage), Tasks (Cal).
  */
 
+import { useState, useCallback, useEffect } from "react"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, TrendingUp, CheckCircle2 } from "lucide-react"
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from "lucide-react"
 import { AskSpecialistButton } from "./ask-specialist-button"
 import type { SpecialistContext } from "./types"
 
@@ -42,6 +44,8 @@ interface SpecialistBriefingHeroProps {
   severity: BriefingSeverity
   /** Context passed to the "Discuss with" button */
   context: SpecialistContext
+  /** Unique key for localStorage collapse state (defaults to specialistId) */
+  storageKey?: string
   className?: string
 }
 
@@ -68,6 +72,21 @@ const severityConfig = {
   },
 } as const
 
+// ─── LocalStorage helpers ───────────────────────────────────────────
+
+function getCollapseKey(key: string): string {
+  return `forgeos-briefing-collapsed-${key}`
+}
+
+function getInitialCollapsed(key: string): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return localStorage.getItem(getCollapseKey(key)) === "true"
+  } catch {
+    return false
+  }
+}
+
 // ─── Component ──────────────────────────────────────────────────────
 
 /**
@@ -75,6 +94,7 @@ const severityConfig = {
  *
  * @description Shows a specialist's avatar, title, and AI-generated narrative
  * with a local-logic fallback. Matches the Today page's Cal hero card pattern.
+ * Collapsible — state persisted to localStorage per storageKey.
  */
 export function SpecialistBriefingHero({
   specialistId,
@@ -86,14 +106,28 @@ export function SpecialistBriefingHero({
   loadingMessage = "Reviewing...",
   severity,
   context,
+  storageKey,
   className,
 }: SpecialistBriefingHeroProps) {
+  const key = storageKey ?? specialistId
+  const [collapsed, setCollapsed] = useState(() => getInitialCollapsed(key))
+
   const config = severityConfig[severity]
   const SeverityIcon = config.icon
 
+  const toggleCollapse = useCallback(() => {
+    setCollapsed(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem(getCollapseKey(key), String(next))
+      } catch { /* localStorage full or unavailable */ }
+      return next
+    })
+  }, [key])
+
   return (
-    <Card className={cn("rounded-xl border", config.bg, config.border, className)}>
-      <CardContent className="pt-5 pb-4">
+    <Card className={cn("rounded-xl border transition-all duration-200", config.bg, config.border, className)}>
+      <CardContent className={cn("pt-5", collapsed ? "pb-3" : "pb-4")}>
         <div className="flex items-start gap-4">
           {/* Specialist avatar */}
           <div className="relative h-10 w-10 rounded-full overflow-hidden bg-muted flex-shrink-0">
@@ -107,47 +141,64 @@ export function SpecialistBriefingHero({
           </div>
 
           <div className="flex-1 min-w-0 space-y-2">
-            {/* Header */}
-            <div className="flex items-center gap-2">
+            {/* Header — clickable to collapse/expand */}
+            <button
+              onClick={toggleCollapse}
+              className="flex items-center gap-2 group cursor-pointer w-full text-left"
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? `Expand ${specialistName}'s briefing` : `Collapse ${specialistName}'s briefing`}
+            >
               <span className="text-sm font-semibold text-foreground">
                 {specialistName}, {specialistTitle}
               </span>
               <SeverityIcon className={cn("h-3.5 w-3.5", config.iconColor)} />
-            </div>
+              <span className="ml-auto text-muted-foreground/50 group-hover:text-muted-foreground transition-colors">
+                {collapsed ? (
+                  <ChevronRight className="h-3.5 w-3.5" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+              </span>
+            </button>
 
-            {/* Narrative content */}
-            {isLoading && !narrative ? (
-              <div className="space-y-2">
-                <p className="text-sm text-foreground leading-relaxed">
-                  {fallbackMessage}
-                </p>
-                <div className="flex items-center gap-2">
-                  <Skeleton className="h-4 w-full" />
-                </div>
-                <Skeleton className="h-4 w-3/4" />
-              </div>
-            ) : narrative ? (
-              <div className="space-y-2">
-                {narrative.split("\n\n").filter(Boolean).map((paragraph, i) => (
-                  <p key={i} className="text-sm text-foreground leading-relaxed">
-                    {paragraph}
+            {/* Collapsible content */}
+            {!collapsed && (
+              <>
+                {/* Narrative content */}
+                {isLoading && !narrative ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-foreground leading-relaxed">
+                      {fallbackMessage}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-full" />
+                    </div>
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : narrative ? (
+                  <div className="space-y-2">
+                    {narrative.split("\n\n").filter(Boolean).map((paragraph, i) => (
+                      <p key={i} className="text-sm text-foreground leading-relaxed">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {fallbackMessage}
                   </p>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-foreground leading-relaxed">
-                {fallbackMessage}
-              </p>
-            )}
+                )}
 
-            {/* CTA */}
-            <AskSpecialistButton
-              context={context}
-              specialistId={specialistId}
-              specialistName={specialistName}
-              variant="chip"
-              label={`Discuss with ${specialistName}`}
-            />
+                {/* CTA */}
+                <AskSpecialistButton
+                  context={context}
+                  specialistId={specialistId}
+                  specialistName={specialistName}
+                  variant="chip"
+                  label={`Discuss with ${specialistName}`}
+                />
+              </>
+            )}
           </div>
         </div>
       </CardContent>
