@@ -147,6 +147,7 @@ function ModuleExplorer({
           mod.name,
           diagnosticAnswers,
           mod.estimatedMassKg,
+          aiCostPerUnit,
         )
         if ("error" in result) {
           console.error("[CostOpt]", result.error)
@@ -155,7 +156,7 @@ function ModuleExplorer({
         setData(result)
       })
     }
-  }, [expanded, data, mod.id, mod.name, mod.estimatedMassKg, diagnosticAnswers])
+  }, [expanded, data, mod.id, mod.name, mod.estimatedMassKg, diagnosticAnswers, aiCostPerUnit])
 
   const handleApply = useCallback(
     (alt: CostAlternative) => {
@@ -224,9 +225,9 @@ function ModuleExplorer({
           )}
 
           {data && data.alternatives.length > 1 && (
-            <div className="space-y-1">
-              {/* Header */}
-              <div className="grid grid-cols-[1fr_1fr_auto_auto_auto_auto_auto] gap-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <div className="space-y-1.5">
+              {/* Desktop header (hidden on mobile) */}
+              <div className="hidden sm:grid sm:grid-cols-[1fr_1fr_5rem_5.5rem_3.5rem_2.5rem_4rem] gap-2 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                 <span>Process</span>
                 <span>Material</span>
                 <span className="text-right">Est. Cost</span>
@@ -236,7 +237,7 @@ function ModuleExplorer({
                 <span />
               </div>
 
-              {/* Rows */}
+              {/* Rows — stacked on mobile, grid on desktop */}
               {data.alternatives.map((alt) => {
                 const key = `${alt.process}|${alt.material}`
                 const isApplied = appliedKey === key
@@ -244,54 +245,59 @@ function ModuleExplorer({
                   <div
                     key={key}
                     className={cn(
-                      "grid grid-cols-[1fr_1fr_auto_auto_auto_auto_auto] items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors",
+                      "rounded-lg px-3 py-2.5 transition-colors",
                       alt.isBaseline
                         ? "bg-international-orange/5 border border-international-orange/20"
                         : "hover:bg-muted/40",
+                      // Desktop: grid row
+                      "sm:grid sm:grid-cols-[1fr_1fr_5rem_5.5rem_3.5rem_2.5rem_4rem] sm:items-center sm:gap-2 sm:py-2",
                     )}
                   >
-                    <span className="truncate text-xs font-medium">
-                      {alt.process}
-                    </span>
-                    <span className="truncate text-xs">
-                      {alt.material}
-                    </span>
-                    <span className="text-right text-xs font-semibold tabular-nums whitespace-nowrap">
-                      £{alt.estimatedCostPerUnit.toFixed(2)}
-                    </span>
-                    <div className="flex justify-center">
-                      <CostDeltaBadge delta={alt.costDeltaPercent} />
-                    </div>
-                    <div className="flex justify-center">
-                      <StrengthIndicator
-                        ratio={alt.tradeoffs.strengthRatio}
-                      />
-                    </div>
-                    <div className="flex justify-center">
-                      <ToleranceIndicator
-                        capable={alt.tradeoffs.toleranceCapable}
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      {alt.isBaseline ? (
-                        <span className="text-[10px] text-muted-foreground">
-                          Current
+                    {/* Mobile: stacked layout */}
+                    <div className="flex items-center justify-between sm:contents">
+                      <div className="min-w-0 sm:contents">
+                        <span className="block truncate text-xs font-medium sm:block">
+                          {alt.process}
                         </span>
-                      ) : isApplied ? (
-                        <Badge variant="success" className="text-[10px]">
-                          <Check className="mr-1 h-3 w-3" />
-                          Applied
-                        </Badge>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => handleApply(alt)}
-                        >
-                          Apply
-                        </Button>
-                      )}
+                        <span className="block truncate text-xs text-muted-foreground sm:text-foreground">
+                          {alt.material}
+                        </span>
+                      </div>
+                      <span className="text-sm font-semibold tabular-nums whitespace-nowrap sm:text-right sm:text-xs">
+                        £{alt.estimatedCostPerUnit.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Mobile: badges row / Desktop: inline */}
+                    <div className="mt-1.5 flex items-center gap-2 sm:mt-0 sm:contents">
+                      <CostDeltaBadge delta={alt.costDeltaPercent} />
+                      <div className="sm:flex sm:justify-center">
+                        <StrengthIndicator ratio={alt.tradeoffs.strengthRatio} />
+                      </div>
+                      <div className="sm:flex sm:justify-center">
+                        <ToleranceIndicator capable={alt.tradeoffs.toleranceCapable} />
+                      </div>
+                      <div className="ml-auto sm:ml-0 sm:flex sm:justify-end">
+                        {alt.isBaseline ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            Current
+                          </span>
+                        ) : isApplied ? (
+                          <Badge variant="success" className="text-[10px]">
+                            <Check className="mr-1 h-3 w-3" />
+                            Applied
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() => handleApply(alt)}
+                          >
+                            Apply
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )

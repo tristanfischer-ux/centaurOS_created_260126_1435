@@ -189,6 +189,9 @@ function generateReasoning(
  * @param diagnosticAnswers - The 6 diagnostic dimensions for this module
  * @param estimatedMassKg - Estimated module mass (defaults to 0.5kg)
  * @param supplierCounts - Optional supplier count per process from technique enrichments
+ * @param aiBaselineCost - Optional Haiku AI estimate for the baseline. When provided,
+ *   all alternatives are scaled so the baseline matches this value, keeping delta
+ *   percentages relative to what the user actually sees in the cost estimate panel.
  * @returns Ranked alternatives including the baseline, sorted by cost
  */
 export function generateAlternatives(
@@ -197,6 +200,7 @@ export function generateAlternatives(
   diagnosticAnswers: Record<string, string>,
   estimatedMassKg: number = 0.5,
   supplierCounts?: SupplierCountMap,
+  aiBaselineCost?: number,
 ): CostOptimisationResult {
   const baseProcess = diagnosticAnswers.mfg_process ?? "Other"
   const baseMaterial = diagnosticAnswers.material ?? "Other"
@@ -274,13 +278,22 @@ export function generateAlternatives(
     }
   }
 
+  // INTENT: When the Haiku AI estimate is available, scale all deterministic costs
+  // so the baseline matches the AI value. This keeps the alternatives panel consistent
+  // with the cost estimate the user already sees. Delta percentages stay the same
+  // (they're relative), but absolute values align with the AI estimate.
+  const scaleFactor =
+    aiBaselineCost != null && aiBaselineCost > 0 && baseCost > 0
+      ? aiBaselineCost / baseCost
+      : 1
+
   // Score and rank
   const alternatives: CostAlternative[] = []
 
   for (const [, candidate] of candidates) {
     const isBaseline =
       candidate.process === baseProcess && candidate.material === baseMaterial
-    const cost = computeCost(
+    const rawCost = computeCost(
       candidate.process,
       candidate.material,
       estimatedMassKg,
@@ -289,7 +302,8 @@ export function generateAlternatives(
       finish,
       environment,
     )
-    const costDelta = baseCost > 0 ? ((cost - baseCost) / baseCost) * 100 : 0
+    const cost = rawCost * scaleFactor
+    const costDelta = baseCost > 0 ? ((rawCost - baseCost) / baseCost) * 100 : 0
 
     // Strength comparison
     const altStrength = getMaterialStrength(candidate.material)
@@ -355,7 +369,7 @@ export function generateAlternatives(
   return {
     moduleId,
     moduleName,
-    baselineCostPerUnit: baseCost,
+    baselineCostPerUnit: Math.round(baseCost * scaleFactor * 100) / 100,
     alternatives: capped,
   }
 }

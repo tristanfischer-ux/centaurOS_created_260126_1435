@@ -35,36 +35,59 @@ export async function generateCostAlternatives(
   moduleName: string,
   diagnosticAnswers: Record<string, string>,
   estimatedMassKg?: number,
+  /** Haiku AI cost estimate for this module — used as baseline for delta calculations */
+  aiCostPerUnit?: number,
 ): Promise<
   | { alternatives: CostAlternative[]; baselineCostPerUnit: number }
   | { error: string }
 > {
   try {
-    // Fetch real supplier counts for the current process (non-blocking enrichment)
+    // First pass: generate alternatives to discover all distinct processes
+    const preliminary = generateAlternatives(
+      moduleId,
+      moduleName,
+      diagnosticAnswers,
+      estimatedMassKg,
+    )
+
+    // Fetch supplier counts for ALL distinct processes in the alternatives
+    const distinctProcesses = [
+      ...new Set(preliminary.alternatives.map((a) => a.process)),
+    ]
     let supplierCounts: SupplierCountMap | undefined
-    const process = diagnosticAnswers.mfg_process
-    if (process) {
-      try {
-        const insights = await getTechniqueInsightsByProcess(process)
-        if (insights && typeof insights.totalSupplierCount === "number") {
-          supplierCounts = { [process]: insights.totalSupplierCount }
+    try {
+      const results = await Promise.allSettled(
+        distinctProcesses.map(async (proc) => {
+          const insights = await getTechniqueInsightsByProcess(proc)
+          return insights && typeof insights.totalSupplierCount === "number"
+            ? { process: proc, count: insights.totalSupplierCount }
+            : null
+        }),
+      )
+      const counts: SupplierCountMap = {}
+      for (const r of results) {
+        if (r.status === "fulfilled" && r.value) {
+          counts[r.value.process] = r.value.count
         }
-      } catch {
-        // Non-critical — engine works without supplier counts
       }
+      if (Object.keys(counts).length > 0) supplierCounts = counts
+    } catch {
+      // Non-critical — engine works without supplier counts
     }
 
+    // Second pass: re-generate with supplier counts populated
     const result = generateAlternatives(
       moduleId,
       moduleName,
       diagnosticAnswers,
       estimatedMassKg,
       supplierCounts,
+      aiCostPerUnit,
     )
 
     return {
       alternatives: result.alternatives,
-      baselineCostPerUnit: result.baselineCostPerUnit,
+      baselineCostPerUnit: aiCostPerUnit ?? result.baselineCostPerUnit,
     }
   } catch (err) {
     console.error("[CostOptimisation] Error generating alternatives:", err)
