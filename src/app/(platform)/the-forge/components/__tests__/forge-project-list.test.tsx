@@ -1,5 +1,6 @@
 import React from "react"
 import { render, screen } from "@testing-library/react"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 import { ForgeProjectList } from "../forge-project-list"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
@@ -43,7 +44,7 @@ describe("ForgeProjectList", () => {
   it("shows empty state when no projects exist", async () => {
     mockedListCadLabProjects.mockResolvedValue({ projects: [] })
 
-    render(await ForgeProjectList())
+    render(<TooltipProvider>{await ForgeProjectList()}</TooltipProvider>)
 
     expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "No designs yet" })).toBeInTheDocument()
@@ -54,7 +55,7 @@ describe("ForgeProjectList", () => {
   it("renders project cards when projects exist", async () => {
     mockedListCadLabProjects.mockResolvedValue({ projects: [sampleProject] })
 
-    render(await ForgeProjectList())
+    render(<TooltipProvider>{await ForgeProjectList()}</TooltipProvider>)
 
     expect(screen.getByRole("heading", { name: "The Forge" })).toBeInTheDocument()
     expect(screen.getByText("Bracket fixture")).toBeInTheDocument()
