@@ -57,7 +57,7 @@ function insightToAgentInsight(insight: PageInsight, index: number): AgentInsigh
   }
 }
 
-async function callHaikuForInsights(
+async function callSonnetForInsights(
   specialistId: string,
   context: string,
 ): Promise<PageInsight[]> {
@@ -79,8 +79,11 @@ Respond with a JSON array of 1-3 insight objects. Each has:
 Use "critical" sparingly (only genuine risks). Be specific to the data, not generic.
 Respond ONLY with the JSON array, no markdown fences.`
 
+  // DECISION: Sonnet for page insights — sharper, more opinionated advice that
+  // connects the dots across data points. Haiku was too generic. Timeout bumped
+  // 8s→15s and max_tokens 512→768 to accommodate Sonnet's richer output.
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8_000)
+  const timeout = setTimeout(() => controller.abort(), 15_000)
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -91,8 +94,8 @@ Respond ONLY with the JSON array, no markdown fences.`
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 512,
+        model: "claude-sonnet-4-6",
+        max_tokens: 768,
         system: systemPrompt,
         messages: [{ role: "user", content: context }],
       }),
@@ -344,7 +347,7 @@ Investor types in pipeline: ${wrapUserData("firm_types", input.firmTypes.join(",
 Coverage gaps: ${wrapUserData("coverage_gaps", input.coverageGaps.join("; ") || "none identified")}
 Recent activity count: ${input.recentActivityCount}`
 
-    const insights = await callHaikuForInsights("fundraising-advisor", context)
+    const insights = await callSonnetForInsights("fundraising-advisor", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -370,7 +373,7 @@ Shortlist investor types: ${wrapUserData("firm_types", input.shortlistTypes.join
 Shortlist locations: ${wrapUserData("locations", input.shortlistLocations.join(", ") || "mixed")}
 Active filters: ${input.activeFilters || "none"}`
 
-    const insights = await callHaikuForInsights("fundraising-advisor", context)
+    const insights = await callSonnetForInsights("fundraising-advisor", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -401,7 +404,7 @@ Overloaded members: ${wrapUserData("overloaded", input.overloadedMembers.join(",
 Idle members: ${wrapUserData("idle", input.idleMembers.join(", ") || "none")}
 Unassigned tasks: ${input.unassignedTasks}`
 
-    const insights = await callHaikuForInsights("hiring-team", context)
+    const insights = await callSonnetForInsights("hiring-team", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -425,7 +428,7 @@ Specialization categories: ${wrapUserData("categories", input.categories.join(",
 Team gaps to fill: ${wrapUserData("gaps", input.teamGaps.join(", ") || "not specified")}
 ${input.searchQuery ? `Current search: ${wrapUserData("query", input.searchQuery)}` : "No active search"}`
 
-    const insights = await callHaikuForInsights("hiring-team", context)
+    const insights = await callSonnetForInsights("hiring-team", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -453,7 +456,7 @@ Saved items: ${input.savedCount}
 Has active CAD Lab project: ${input.hasActiveCadProject}
 ${input.cadProjectSpecs ? `CAD project specs: ${wrapUserData("specs", input.cadProjectSpecs)}` : ""}`
 
-    const insights = await callHaikuForInsights("vp-supply-chain", context)
+    const insights = await callSonnetForInsights("vp-supply-chain", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -838,7 +841,7 @@ Highest cost category: ${wrapUserData("category", input.topExpenseCategory || "n
 Revenue vs cost gap: ${input.revenueVsCostGapPct.toFixed(1)}% (positive = spending exceeds income)
 Scenarios modelled: ${input.scenarioCount}`
 
-    const insights = await callHaikuForInsights("finance-lead", context)
+    const insights = await callSonnetForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -869,7 +872,7 @@ Top 3 costs: ${wrapUserData("top_costs", input.topThreeItems.join(", ") || "none
 Monthly total: £${(input.monthlyTotal / 100).toFixed(0)}
 Annual total: £${(input.annualTotal / 100).toFixed(0)}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callHaikuForInsights("finance-lead", context)
+    const insights = await callSonnetForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -900,7 +903,7 @@ Revenue as % of total income: ${input.revenuePct.toFixed(0)}%
 Distinct income source types: ${input.sourceTypeCount}
 Total income items: ${input.itemCount}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callHaikuForInsights("finance-lead", context)
+    const insights = await callSonnetForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -933,7 +936,7 @@ Annual R&D: £${(input.annualRnd / 100).toFixed(0)} (${input.rndPct.toFixed(1)}%
 EBITDA: £${(input.annualEbitda / 100).toFixed(0)} (margin: ${input.ebitdaMarginPct.toFixed(1)}%)
 ${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not yet profitable." : "EBITDA is positive."}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callHaikuForInsights("finance-lead", context)
+    const insights = await callSonnetForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -969,7 +972,7 @@ Foundry memberships: ${input.foundryCount}
 Has marketplace bio: ${input.hasMarketplaceBio ? "yes" : "no"}
 Has Telegram linked: ${input.hasTelegramLinked ? "yes" : "no"}`
 
-    const insights = await callHaikuForInsights("chief-of-staff", context)
+    const insights = await callSonnetForInsights("chief-of-staff", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -991,7 +994,7 @@ Recent activity items: ${input.activityCount}
 Team members: ${input.memberCount}
 Days since oldest unread activity: ${input.daysSinceOldestUnread}`
 
-    const insights = await callHaikuForInsights("chief-of-staff", context)
+    const insights = await callSonnetForInsights("chief-of-staff", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1015,7 +1018,7 @@ Time entries this week: ${input.entryCount}
 Projects worked on: ${input.projectCount}
 Days with time entries (out of 5): ${input.daysWithEntries}`
 
-    const insights = await callHaikuForInsights("chief-of-staff", context)
+    const insights = await callSonnetForInsights("chief-of-staff", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1035,7 +1038,7 @@ export async function generateReportsInsights(
 Reports generated: ${input.reportCount}
 Last report generated: ${input.lastReportDate ?? "never"}`
 
-    const insights = await callHaikuForInsights("chief-of-staff", context)
+    const insights = await callSonnetForInsights("chief-of-staff", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1061,7 +1064,7 @@ In progress: ${input.inProgressCount}
 Completed: ${input.completedCount}
 Total modules across projects: ${input.moduleTotal}`
 
-    const insights = await callHaikuForInsights("cto", context)
+    const insights = await callSonnetForInsights("cto", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1082,7 +1085,7 @@ Team workflows created: ${input.workflowCount}
 Custom prompts configured: ${input.customPromptCount}
 There are 13 specialists available covering strategy, engineering, finance, legal, HR, marketing, sales, and operations.`
 
-    const insights = await callHaikuForInsights("chief-of-staff", context)
+    const insights = await callSonnetForInsights("chief-of-staff", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1106,7 +1109,7 @@ Apprentices: ${input.apprenticeCount}
 Executives: ${input.executiveCount}
 Founders: ${input.founderCount}`
 
-    const insights = await callHaikuForInsights("hiring-team", context)
+    const insights = await callSonnetForInsights("hiring-team", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1130,7 +1133,7 @@ Average OTJT progress: ${input.avgProgress.toFixed(0)}%
 On track: ${input.onTrackCount}
 At risk: ${input.atRiskCount}`
 
-    const insights = await callHaikuForInsights("hiring-team", context)
+    const insights = await callSonnetForInsights("hiring-team", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1155,7 +1158,7 @@ Completed orders: ${input.completedCount}
 Cancelled orders: ${input.cancelledCount}
 Fulfilment rate: ${fulfillmentPct}%`
 
-    const insights = await callHaikuForInsights("vp-supply-chain", context)
+    const insights = await callSonnetForInsights("vp-supply-chain", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1186,7 +1189,7 @@ Cash position: £${(input.cashPosition / 100).toFixed(0)}
 Outstanding invoices: ${input.outstandingInvoiceCount} (£${(input.outstandingAmount / 100).toFixed(0)})
 Overdue amount: £${(input.overdueAmount / 100).toFixed(0)}`
 
-    const insights = await callHaikuForInsights("finance-lead", context)
+    const insights = await callSonnetForInsights("finance-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1206,7 +1209,7 @@ export async function generateKnowledgeInsights(
 Total notes: ${input.noteCount}
 Pinned notes: ${input.pinnedCount}`
 
-    const insights = await callHaikuForInsights("strategist", context)
+    const insights = await callSonnetForInsights("strategist", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1228,7 +1231,7 @@ Total campaigns: ${input.campaignCount}
 Active campaigns: ${input.activeCampaigns}
 Total contacts across campaigns: ${input.totalContacts}`
 
-    const insights = await callHaikuForInsights("sales-lead", context)
+    const insights = await callSonnetForInsights("sales-lead", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1250,7 +1253,7 @@ Total pitch requests: ${input.requestCount}
 Completed: ${input.completedCount}
 Active/in-progress: ${input.activeCount}`
 
-    const insights = await callHaikuForInsights("fundraising-advisor", context)
+    const insights = await callSonnetForInsights("fundraising-advisor", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1274,7 +1277,7 @@ Completed: ${input.completedGoals}
 At risk (overdue or behind): ${input.atRiskGoals}
 Average progress: ${input.avgProgress.toFixed(0)}%`
 
-    const insights = await callHaikuForInsights("strategist", context)
+    const insights = await callSonnetForInsights("strategist", context)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
