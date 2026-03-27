@@ -110,7 +110,13 @@ export function SpecialistBriefingHero({
   className,
 }: SpecialistBriefingHeroProps) {
   const key = storageKey ?? specialistId
-  const [collapsed, setCollapsed] = useState(() => getInitialCollapsed(key))
+  const [collapsed, setCollapsed] = useState(false)
+
+  // INTENT: Sync from localStorage after mount to avoid hydration mismatch.
+  // Server always renders expanded; client corrects on first paint.
+  useEffect(() => {
+    setCollapsed(getInitialCollapsed(key))
+  }, [key])
 
   const config = severityConfig[severity]
   const SeverityIcon = config.icon
