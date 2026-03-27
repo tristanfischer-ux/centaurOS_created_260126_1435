@@ -6,6 +6,9 @@
  * @description Prominent Harper (HR specialist) analysis panel shown at the top
  * of the Team page. Combines team stats on the left with Harper's AI-generated
  * instant analysis on the right. Visible in all view modes including orbit.
+ *
+ * In compact mode (orbit view), shows a single-line summary instead of the
+ * full bullet list to preserve vertical space for the orbital visualization.
  */
 
 import { Users, ShieldCheck, BarChart3, X } from 'lucide-react'
@@ -33,6 +36,8 @@ interface HarperAnalysisPanelProps {
     harperInsights: AgentInsight[]
     isLoading: boolean
     onDismissInsight?: (id: string) => void
+    /** Compact mode for orbit view — single-line summary instead of bullet list */
+    compact?: boolean
     /** Context passed to AskSpecialistButton for follow-up */
     specialistContext: {
         totalPeople: number
@@ -54,26 +59,33 @@ export function HarperAnalysisPanel({
     harperInsights,
     isLoading,
     onDismissInsight,
+    compact = false,
     specialistContext,
 }: HarperAnalysisPanelProps) {
+    // INTENT: In compact mode, show only the most urgent insight as a single line
+    const topInsight = harperInsights[0] ?? null
+
     return (
-        <Card className="p-4 border-border bg-card">
-            <div className="flex flex-col sm:flex-row gap-4">
+        <Card className={cn('border-border bg-card', compact ? 'p-3' : 'p-4')}>
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-3">
                 {/* ── Left: Team Stats ── */}
-                <div className="flex sm:flex-col gap-4 sm:gap-3 shrink-0 sm:min-w-[120px]">
+                <div className={cn(
+                    'flex gap-4 shrink-0',
+                    compact ? 'sm:gap-4 items-center' : 'sm:flex-col sm:gap-3 sm:min-w-[120px]',
+                )}>
                     <div className="flex items-center gap-2">
                         <Users className="h-4 w-4 text-international-orange shrink-0" />
-                        <span className="text-lg font-bold text-foreground leading-none">{totalPeople}</span>
+                        <span className={cn('font-bold text-foreground leading-none', compact ? 'text-sm' : 'text-lg')}>{totalPeople}</span>
                         <span className="text-xs text-muted-foreground">People</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <ShieldCheck className="h-4 w-4 text-electric-blue shrink-0" />
-                        <span className="text-lg font-bold text-foreground leading-none">{totalTeams}</span>
+                        <span className={cn('font-bold text-foreground leading-none', compact ? 'text-sm' : 'text-lg')}>{totalTeams}</span>
                         <span className="text-xs text-muted-foreground">Teams</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <BarChart3 className="h-4 w-4 text-success shrink-0" />
-                        <span className="text-lg font-bold text-foreground leading-none">{avgCapacity}%</span>
+                        <span className={cn('font-bold text-foreground leading-none', compact ? 'text-sm' : 'text-lg')}>{avgCapacity}%</span>
                         <span className="text-xs text-muted-foreground">Capacity</span>
                     </div>
                 </div>
@@ -85,17 +97,40 @@ export function HarperAnalysisPanel({
                 {/* ── Right: Harper's Analysis ── */}
                 <div className="flex-1 min-w-0">
                     {/* Harper identity row */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className={cn(
+                        'flex items-center justify-between gap-2',
+                        !compact && 'mb-2',
+                    )}>
                         <div className="flex items-center gap-2">
                             <UserAvatar
                                 name="Harper"
                                 role="AI_Agent"
-                                size="sm"
+                                size="xs"
                             />
-                            <div>
-                                <span className="text-sm font-semibold text-foreground">Harper</span>
-                                <span className="text-xs text-muted-foreground ml-1.5">HR</span>
-                            </div>
+                            <span className="text-sm font-semibold text-foreground">Harper</span>
+                            <span className="text-xs text-muted-foreground">HR</span>
+
+                            {/* Compact mode: single-line insight inline */}
+                            {compact && !isLoading && topInsight && (
+                                <>
+                                    <span className="text-muted-foreground">—</span>
+                                    <div
+                                        className={cn(
+                                            'h-1.5 w-1.5 rounded-full shrink-0',
+                                            urgencyDot[topInsight.urgency],
+                                        )}
+                                    />
+                                    <span className="text-sm text-muted-foreground truncate">
+                                        {topInsight.title}
+                                    </span>
+                                </>
+                            )}
+                            {compact && isLoading && (
+                                <>
+                                    <span className="text-muted-foreground">—</span>
+                                    <Skeleton className="h-3.5 w-40 rounded" />
+                                </>
+                            )}
                         </div>
                         <AskSpecialistButton
                             context={{
@@ -113,8 +148,8 @@ export function HarperAnalysisPanel({
                         />
                     </div>
 
-                    {/* Loading skeleton */}
-                    {isLoading && (
+                    {/* Full mode: loading skeleton */}
+                    {!compact && isLoading && (
                         <div className="space-y-2">
                             <p className="text-xs text-muted-foreground italic">Analysing your team composition...</p>
                             <Skeleton className="h-4 w-full rounded" />
@@ -122,8 +157,8 @@ export function HarperAnalysisPanel({
                         </div>
                     )}
 
-                    {/* Insights list */}
-                    {!isLoading && harperInsights.length > 0 && (
+                    {/* Full mode: insights list */}
+                    {!compact && !isLoading && harperInsights.length > 0 && (
                         <ul className="space-y-1.5">
                             {harperInsights.map((insight) => (
                                 <li key={insight.id} className="flex items-start gap-2 group">
@@ -155,8 +190,8 @@ export function HarperAnalysisPanel({
                         </ul>
                     )}
 
-                    {/* Empty state — no insights and not loading */}
-                    {!isLoading && harperInsights.length === 0 && (
+                    {/* Full mode: empty state */}
+                    {!compact && !isLoading && harperInsights.length === 0 && (
                         <p className="text-sm text-muted-foreground">
                             No immediate concerns. Your team looks healthy.
                         </p>

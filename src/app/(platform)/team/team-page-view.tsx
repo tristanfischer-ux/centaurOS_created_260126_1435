@@ -56,6 +56,7 @@ import { HiringTimeline } from './hiring-timeline'
 import { OrbitalView } from './components/orbital-view'
 import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
+import { SmartInsights } from './smart-insights'
 import { HarperAnalysisPanel } from './components/harper-analysis-panel'
 import { generateTeamInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
@@ -1064,6 +1065,7 @@ export function TeamPageView({
                 avgCapacity={avgCapacity}
                 harperInsights={harperInsights}
                 isLoading={harperLoading}
+                compact={isOrbitActive}
                 onDismissInsight={(id) => setHarperInsights(prev => prev.filter(i => i.id !== id))}
                 specialistContext={{
                     totalPeople,
@@ -1077,6 +1079,15 @@ export function TeamPageView({
                         : undefined,
                 }}
             />
+
+            {/* ── Smart Insights action pills (non-orbit modes only) ── */}
+            {!isOrbitActive && insights && (
+                <SmartInsights
+                    insights={insights}
+                    onMemberClick={(id) => setSelectedMemberId(id)}
+                    onQuickAssignClick={() => setShowQuickAssign(true)}
+                />
+            )}
 
             {/* ── Search + Quick Assign (non-orbit modes only) ──── */}
             {!isOrbitActive && (
@@ -1115,7 +1126,7 @@ export function TeamPageView({
             {/* Members Tab — Orbit View (hero layout) */}
             {isOrbitActive && (
                 <div className="relative -mx-4 sm:-mx-6 lg:-mx-8">
-                    <div className="h-[calc(100vh-12rem)] md:h-[calc(100vh-7rem)] overflow-hidden flex">
+                    <div className="h-[calc(100vh-15rem)] md:h-[calc(100vh-10rem)] overflow-hidden flex">
                         <OrbitalView
                             teamData={teamData}
                             functions={orbitFunctions}
