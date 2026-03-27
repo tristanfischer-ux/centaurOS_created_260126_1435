@@ -281,7 +281,7 @@ export function TodayView({
         }
     }, [briefing, pulse, strategyHealth, unreadCount])
 
-    const { calNarrative, calInsights, isCalLoading, dismissInsight } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
+    const { calNarrative, calInsights, isCalLoading, dismissInsight, refreshBriefing } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
 
     // ─── Loading state ────────────────────────────────────────────
 
@@ -494,7 +494,20 @@ export function TodayView({
                                     ) : null}
                                 </div>
                             </div>
-                            {briefing && <StreakBadge streak={briefing.streak} className="shrink-0" />}
+                            <div className="flex items-center gap-2 shrink-0">
+                                {briefing && <StreakBadge streak={briefing.streak} className="shrink-0" />}
+                                {calNarrative && (
+                                    <button
+                                        onClick={refreshBriefing}
+                                        disabled={isCalLoading}
+                                        className="p-1.5 rounded-lg text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted/50 transition-colors disabled:opacity-30"
+                                        title="Refresh briefing"
+                                        aria-label="Refresh Cal's briefing"
+                                    >
+                                        <RefreshCw className={cn("h-3.5 w-3.5", isCalLoading && "animate-spin")} />
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Quick Stats with Trends */}

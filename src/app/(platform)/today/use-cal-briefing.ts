@@ -1,8 +1,9 @@
 /**
  * @file use-cal-briefing.ts
  *
- * @description Hook that calls Cal's (Chief of Staff) AI briefing on mount.
- * Returns a narrative string for the hero card and urgency-triaged insights.
+ * @description Hook that calls Cal's (Chief of Staff) AI briefing on mount
+ * and refreshes when the user returns to the page. Returns a narrative string
+ * for the hero card, urgency-triaged insights, and a manual refresh function.
  * Gracefully degrades — if the API call fails, narrative stays null and the
  * hero card falls back to the DB-driven greeting.
  */
@@ -13,15 +14,20 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { generateTodayBriefing, type TodayInsightInput, type CalBriefingResult } from "@/actions/specialist-page-insights"
 import type { AgentInsight } from "@/actions/agent-insights"
 
+// DECISION: Minimum 5 minutes between auto-refreshes to avoid burning API
+// credits when users rapidly switch tabs. Manual refresh has no cooldown.
+const AUTO_REFRESH_COOLDOWN_MS = 5 * 60 * 1000
+
 interface UseCalBriefingResult {
   calNarrative: string | null
   calInsights: AgentInsight[]
   isCalLoading: boolean
   dismissInsight: (id: string) => void
+  refreshBriefing: () => void
 }
 
 /**
- * Fires a single Haiku call to generate Cal's daily briefing.
+ * Fires Cal's AI briefing on mount and auto-refreshes on page revisit.
  *
  * @param input - Aggregated Today page data (null skips the call)
  * @param isNewUser - Whether this is a new user who hasn't dismissed onboarding
@@ -36,19 +42,19 @@ export function useCalBriefing(
   const [calInsights, setCalInsights] = useState<AgentInsight[]>([])
   const [isCalLoading, setIsCalLoading] = useState(false)
   const fetched = useRef(false)
+  const lastFetchedAt = useRef(0)
+  const inputRef = useRef(input)
+  inputRef.current = input
 
-  useEffect(() => {
-    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
-    // GOTCHA: input can start null if briefing wasn't SSR'd — including input in
-    // deps lets the effect re-fire when data arrives. The ref guard prevents
-    // double-calls once we've successfully started a fetch.
-    if (fetched.current || !input) return
+  const fetchBriefing = useCallback(() => {
+    const currentInput = inputRef.current
+    if (!currentInput) return
 
-    fetched.current = true
+    lastFetchedAt.current = Date.now()
     setIsCalLoading(true)
 
     const enrichedInput: TodayInsightInput = {
-      ...input,
+      ...currentInput,
       isNewUser,
       onboardingStepsRemaining: onboardingSteps,
     }
@@ -62,12 +68,40 @@ export function useCalBriefing(
       })
       .catch(() => { /* Non-critical — hero card falls back to DB greeting */ })
       .finally(() => setIsCalLoading(false))
+  }, [isNewUser, onboardingSteps])
+
+  // Initial fetch on mount
+  useEffect(() => {
+    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
+    if (fetched.current || !input) return
+    fetched.current = true
+    fetchBriefing()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input])
+
+  // Auto-refresh when user returns to the page (tab becomes visible)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== "visible") return
+      if (!fetched.current) return // initial fetch hasn't happened yet
+      if (isCalLoading) return
+      if (Date.now() - lastFetchedAt.current < AUTO_REFRESH_COOLDOWN_MS) return
+      fetchBriefing()
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility)
+    return () => document.removeEventListener("visibilitychange", handleVisibility)
+  }, [fetchBriefing, isCalLoading])
 
   const dismissInsight = useCallback((id: string) => {
     setCalInsights(prev => prev.filter(i => i.id !== id))
   }, [])
 
-  return { calNarrative, calInsights, isCalLoading, dismissInsight }
+  // Manual refresh — no cooldown
+  const refreshBriefing = useCallback(() => {
+    if (isCalLoading) return
+    fetchBriefing()
+  }, [fetchBriefing, isCalLoading])
+
+  return { calNarrative, calInsights, isCalLoading, dismissInsight, refreshBriefing }
 }
