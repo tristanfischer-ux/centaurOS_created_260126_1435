@@ -247,6 +247,10 @@ export async function setupNewUser({
     }
 
     if (sandboxError || !sandboxFoundry) {
+      // FALLBACK: forge-guild is a last-resort safety net. The intended path is
+      // always a personal sandbox. This only fires if both insert attempts fail
+      // (e.g., transient DB error). The user lands in a shared workspace but
+      // can create their own company later from the sidebar.
       console.error("[setupNewUser] Sandbox foundry creation failed after retry:", sandboxError);
       foundryId = "forge-guild";
     } else {
@@ -368,7 +372,6 @@ export async function setupNewUser({
           role: "Fractional Executive",
           availability: "Available",
           profile_id: userId,
-          function_category: "operations",
         },
         is_verified: false,
       });
