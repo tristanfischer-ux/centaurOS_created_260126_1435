@@ -14,7 +14,7 @@
 
 "use client"
 
-import { useState, useCallback, useTransition } from "react"
+import { useState, useCallback, useTransition, useRef, useEffect } from "react"
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -118,6 +118,18 @@ function SupplierBadge({
 
 // ─── Module Row ──────────────────────────────────────────────────────
 
+/** Shorten long process names for compact display */
+const SHORT_PROCESS: Record<string, string> = {
+  "Injection Molding": "Injection Mold",
+  "Manual/Assembly": "Manual",
+  "SLA/Resin Print": "SLA Print",
+  "SLS/Powder Print": "SLS Print",
+}
+
+function shortProcess(name: string): string {
+  return SHORT_PROCESS[name] ?? name
+}
+
 function ModuleExplorer({
   module: mod,
   diagnosticAnswers,
@@ -133,6 +145,52 @@ function ModuleExplorer({
   const [data, setData] = useState<ModuleAlternatives | null>(null)
   const [isPending, startTransition] = useTransition()
   const [appliedKey, setAppliedKey] = useState<string | null>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  // Smooth height animation on expand/collapse
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    if (expanded) {
+      // Expand: animate from 0 to scrollHeight
+      el.style.height = "0px"
+      el.style.opacity = "0"
+      requestAnimationFrame(() => {
+        el.style.transition = "height 200ms ease-out, opacity 200ms ease-out"
+        el.style.height = `${el.scrollHeight}px`
+        el.style.opacity = "1"
+      })
+      const onEnd = () => { el.style.height = "auto" }
+      el.addEventListener("transitionend", onEnd, { once: true })
+      return () => el.removeEventListener("transitionend", onEnd)
+    } else {
+      // Collapse: animate from current height to 0
+      el.style.height = `${el.scrollHeight}px`
+      el.style.opacity = "1"
+      requestAnimationFrame(() => {
+        el.style.transition = "height 150ms ease-in, opacity 150ms ease-in"
+        el.style.height = "0px"
+        el.style.opacity = "0"
+      })
+    }
+  }, [expanded, data])
+
+  const fetchAlternatives = useCallback(() => {
+    startTransition(async () => {
+      const result = await generateCostAlternatives(
+        mod.id,
+        mod.name,
+        diagnosticAnswers,
+        mod.estimatedMassKg,
+        aiCostPerUnit,
+      )
+      if ("error" in result) {
+        console.error("[CostOpt]", result.error)
+        return
+      }
+      setData(result)
+    })
+  }, [mod.id, mod.name, mod.estimatedMassKg, diagnosticAnswers, aiCostPerUnit])
 
   const handleExpand = useCallback(() => {
     if (expanded) {
@@ -140,28 +198,21 @@ function ModuleExplorer({
       return
     }
     setExpanded(true)
-    if (!data) {
-      startTransition(async () => {
-        const result = await generateCostAlternatives(
-          mod.id,
-          mod.name,
-          diagnosticAnswers,
-          mod.estimatedMassKg,
-          aiCostPerUnit,
-        )
-        if ("error" in result) {
-          console.error("[CostOpt]", result.error)
-          return
-        }
-        setData(result)
-      })
-    }
-  }, [expanded, data, mod.id, mod.name, mod.estimatedMassKg, diagnosticAnswers, aiCostPerUnit])
+    // Always re-fetch when expanding — diagnostics may have changed since last view
+    fetchAlternatives()
+  }, [expanded, fetchAlternatives])
 
   const handleApply = useCallback(
     (alt: CostAlternative) => {
       onApplyAlternative(mod.id, alt.process, alt.material)
       setAppliedKey(`${alt.process}|${alt.material}`)
+      // Collapse after apply — data is now stale (baseline changed).
+      // Re-expanding will fetch fresh alternatives with the new diagnostics.
+      setTimeout(() => {
+        setExpanded(false)
+        setData(null)
+        setAppliedKey(null)
+      }, 600)
     },
     [mod.id, onApplyAlternative],
   )
@@ -204,7 +255,7 @@ function ModuleExplorer({
         </button>
       </CardHeader>
 
-      {expanded && (
+      <div ref={contentRef} className="overflow-hidden" style={{ height: expanded ? undefined : 0, opacity: expanded ? 1 : 0 }}>
         <CardContent className="px-4 pb-4 pt-0">
           {isPending && !data && (
             <div className="space-y-2">
@@ -256,10 +307,10 @@ function ModuleExplorer({
                     {/* Mobile: stacked layout */}
                     <div className="flex items-center justify-between sm:contents">
                       <div className="min-w-0 sm:contents">
-                        <span className="block truncate text-xs font-medium sm:block">
-                          {alt.process}
+                        <span className="block truncate text-xs font-medium sm:block" title={alt.process}>
+                          {shortProcess(alt.process)}
                         </span>
-                        <span className="block truncate text-xs text-muted-foreground sm:text-foreground">
+                        <span className="block truncate text-xs text-muted-foreground sm:text-foreground" title={alt.material}>
                           {alt.material}
                         </span>
                       </div>
@@ -283,9 +334,9 @@ function ModuleExplorer({
                             Current
                           </span>
                         ) : isApplied ? (
-                          <Badge variant="success" className="text-[10px]">
+                          <Badge variant="success" className="text-[10px] animate-pulse">
                             <Check className="mr-1 h-3 w-3" />
-                            Applied
+                            Updating costs…
                           </Badge>
                         ) : (
                           <Button
@@ -311,7 +362,7 @@ function ModuleExplorer({
             </div>
           )}
         </CardContent>
-      )}
+      </div>
     </Card>
   )
 }
