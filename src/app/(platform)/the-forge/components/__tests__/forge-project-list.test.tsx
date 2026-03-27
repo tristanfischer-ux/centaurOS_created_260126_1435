@@ -8,6 +8,19 @@ jest.mock("@/actions/cad-lab-projects", () => ({
   listCadLabProjects: jest.fn(),
 }))
 
+jest.mock("@/contexts/advisor-panel-context", () => ({
+  useAdvisorPanel: () => ({
+    openPanel: jest.fn(),
+    closePanel: jest.fn(),
+    togglePanel: jest.fn(),
+    switchSpecialist: jest.fn(),
+    clearTrail: jest.fn(),
+    toggleFullscreen: jest.fn(),
+    setFullscreen: jest.fn(),
+    state: { isOpen: false, specialistId: null, isFullscreen: false },
+  }),
+}))
+
 const mockedListCadLabProjects = listCadLabProjects as jest.MockedFunction<typeof listCadLabProjects>
 
 const sampleProject = {

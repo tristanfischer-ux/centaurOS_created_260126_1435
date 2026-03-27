@@ -11,12 +11,12 @@ describe("Forge route consistency", () => {
 
   it("maps Forge entrypoint and cad-lab routes to expected specialists", () => {
     expect(getSpecialistForRoute("/the-forge")).toEqual({
-      specialistId: "product-lead",
+      specialistId: "cto",
       isDefault: false,
     })
 
     expect(getSpecialistForRoute("/the-forge/new")).toEqual({
-      specialistId: "product-lead",
+      specialistId: "cto",
       isDefault: false,
     })
 

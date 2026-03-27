@@ -206,7 +206,7 @@ Respond ONLY with the JSON object, no markdown fences.`
 
 ${xmlSafe}
 
-This is a quiet day — no urgent tasks or blockers. Your job is to coach the user toward their next strategic move. Reference specific strategy pillars by name and progress percentage. If all pillars are at 0%, guide them to pick one and break it into objectives. If no pillars exist, nudge them to create their first strategy. If pillars have progress, celebrate momentum and suggest the next step. Never mention AI or that you are an AI.
+This is a quiet day — no urgent tasks or blockers. Your job is to coach the user toward their next strategic move. Reference specific strategy pillars by name and progress percentage. If all pillars are at 0%, guide them to pick one and break it into objectives. If no pillars exist, nudge them to create their first strategy. If pillars have progress, celebrate momentum and suggest the next step. Never mention AI or that you are an AI. Do NOT open with a greeting — the greeting is already shown separately above your message. Jump straight into the briefing.
 
 Respond with JSON: { "narrative": "2-3 sentences. Be warm, specific to their strategy pillars. Coach toward the single most impactful next action.", "insights": [0-1 objects with "urgency" ("informational"), "title" (max 10 words), "body" (max 50 words)] }
 
@@ -733,4 +733,130 @@ function computeTasksSeverity(input: TasksBriefingInput): 'success' | 'warning' 
   if (input.overdueCount > 5 || input.blockerCount > 2) return 'error'
   if (input.overdueCount > 0 || input.blockerCount > 0) return 'warning'
   return 'success'
+}
+
+// ─── Cash Burn Insights (Finn — Finance Lead) ───────────────────────
+
+export interface CashBurnInsightInput {
+  weeklyBurnRate: number
+  runwayWeeks: number | null
+  openingBalance: number
+  monthlyBurnRate: number
+  cashOutItemCount: number
+  cashInItemCount: number
+  topExpenseCategory: string
+  revenueVsCostGapPct: number
+  scenarioCount: number
+}
+
+export async function generateCashBurnInsights(
+  input: CashBurnInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this cash burn projection and flag the most important financial risks or next steps:
+Weekly net burn rate: £${(input.weeklyBurnRate / 100).toFixed(0)}/week
+Monthly burn rate: £${(input.monthlyBurnRate / 100).toFixed(0)}/month
+Runway: ${input.runwayWeeks != null ? `${input.runwayWeeks} weeks (${Math.round(input.runwayWeeks / 4.33)} months)` : "sustainable (net positive)"}
+Opening balance: £${(input.openingBalance / 100).toFixed(0)}
+Expense line items: ${input.cashOutItemCount}
+Revenue line items: ${input.cashInItemCount}
+Highest cost category: ${wrapUserData("category", input.topExpenseCategory || "none")}
+Revenue vs cost gap: ${input.revenueVsCostGapPct.toFixed(1)}% (positive = spending exceeds income)
+Scenarios modelled: ${input.scenarioCount}`
+
+    const insights = await callHaikuForInsights("finance-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Cash Out Insights (Finn — Finance Lead) ────────────────────────
+
+export interface CashOutInsightInput {
+  weeklyFixedTotal: number
+  weeklyVariableTotal: number
+  fixedCostPct: number
+  itemCount: number
+  topThreeItems: string[]
+  monthlyTotal: number
+  annualTotal: number
+}
+
+export async function generateCashOutInsights(
+  input: CashOutInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this cost structure and identify expense optimisation opportunities or structural risks:
+Weekly fixed costs: £${(input.weeklyFixedTotal / 100).toFixed(0)}
+Weekly variable costs: £${(input.weeklyVariableTotal / 100).toFixed(0)}
+Fixed cost ratio: ${input.fixedCostPct.toFixed(0)}% of total
+Total cost items: ${input.itemCount}
+Top 3 costs: ${wrapUserData("top_costs", input.topThreeItems.join(", ") || "none")}
+Monthly total: £${(input.monthlyTotal / 100).toFixed(0)}
+Annual total: £${(input.annualTotal / 100).toFixed(0)}`
+
+    const insights = await callHaikuForInsights("finance-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── Cash In Insights (Finn — Finance Lead) ─────────────────────────
+
+export interface CashInInsightInput {
+  weeklyTotal: number
+  openingBalance: number
+  revenueWeekly: number
+  nonRevenueWeekly: number
+  sourceTypeCount: number
+  itemCount: number
+  revenuePct: number
+}
+
+export async function generateCashInInsights(
+  input: CashInInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this income structure and advise on revenue concentration risk, funding dependency, and income diversification:
+Weekly total inflow: £${(input.weeklyTotal / 100).toFixed(0)}
+Opening cash balance: £${(input.openingBalance / 100).toFixed(0)}
+Weekly revenue (earned): £${(input.revenueWeekly / 100).toFixed(0)}
+Weekly non-revenue (loans/equity/grants/other): £${(input.nonRevenueWeekly / 100).toFixed(0)}
+Revenue as % of total income: ${input.revenuePct.toFixed(0)}%
+Distinct income source types: ${input.sourceTypeCount}
+Total income items: ${input.itemCount}`
+
+    const insights = await callHaikuForInsights("finance-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
+}
+
+// ─── P&L Insights (Finn — Finance Lead) ─────────────────────────────
+
+export interface PnlInsightInput {
+  annualRevenue: number
+  annualCogs: number
+  annualGrossProfit: number
+  annualOpex: number
+  annualRnd: number
+  annualEbitda: number
+  grossMarginPct: number
+  ebitdaMarginPct: number
+  rndPct: number
+}
+
+export async function generatePnlInsights(
+  input: PnlInsightInput,
+): Promise<AgentInsight[]> {
+  return withAIGate('page_insights', async () => {
+    const context = `Analyse this projected P&L and identify the most important profitability insights for an early-stage hardware startup:
+Annual revenue: £${(input.annualRevenue / 100).toFixed(0)}
+Annual COGS: £${(input.annualCogs / 100).toFixed(0)}
+Gross profit: £${(input.annualGrossProfit / 100).toFixed(0)} (margin: ${input.grossMarginPct.toFixed(1)}%)
+Annual OpEx: £${(input.annualOpex / 100).toFixed(0)}
+Annual R&D: £${(input.annualRnd / 100).toFixed(0)} (${input.rndPct.toFixed(1)}% of revenue)
+EBITDA: £${(input.annualEbitda / 100).toFixed(0)} (margin: ${input.ebitdaMarginPct.toFixed(1)}%)
+${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not yet profitable." : "EBITDA is positive."}`
+
+    const insights = await callHaikuForInsights("finance-lead", context)
+    return insights.map((i, idx) => insightToAgentInsight(i, idx))
+  })
 }
