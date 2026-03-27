@@ -54,7 +54,7 @@ function generateSlug(name: string): string {
 /**
  * Sets up a new user's profile, foundry, memberships, and demo data.
  * Handles Founder (own foundry), Supplier (forge-suppliers), and
- * Executive/Apprentice (forge-guild) paths.
+ * Executive/Apprentice (personal sandbox foundry) paths.
  *
  * @returns foundryId and redirectPath for the new user
  */
@@ -93,10 +93,8 @@ export async function setupNewUser({
   let accountType: "team_builder" | "supplier" | null = null;
 
   // --- Ensure shared foundries exist BEFORE any profile creation ---
-  // INTENT: The founder fallback path (foundry creation fails → foundryId = "forge-guild")
-  // creates the profile referencing forge-guild. If it doesn't exist, FK violation.
-  // Only check foundries the user might actually need to avoid unnecessary queries.
-  // Founders need forge-guild (fallback), suppliers need forge-suppliers, others need forge-guild.
+  // INTENT: Suppliers need forge-suppliers. Founders/executives need forge-guild as a
+  // fallback only (if personal foundry creation fails). Ensure it exists for FK safety.
   const neededFoundries = role === "supplier"
     ? ["forge-suppliers"] as const
     : ["forge-guild"] as const;
@@ -207,8 +205,53 @@ export async function setupNewUser({
     accountType = "supplier";
     foundryId = "forge-suppliers";
   } else {
+    // INTENT: Every executive/apprentice gets their own isolated sandbox foundry.
+    // Previously all were dumped into shared forge-guild, causing cross-user data
+    // pollution (users appearing on each other's Team pages, seeing each other's
+    // objectives, etc.). Personal sandbox = full isolation from day one.
     accountType = "team_builder";
-    foundryId = "forge-guild";
+
+    const firstName = fullName.split(" ")[0] || "My";
+    const sandboxSlug = `sandbox-${userId.slice(0, 8)}`;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let { data: sandboxFoundry, error: sandboxError } = await (supabase as any)
+      .from("foundries")
+      .insert({
+        id: sandboxSlug,
+        name: `${firstName}'s Workspace`,
+        slug: sandboxSlug,
+        owner_id: null,
+        is_sandbox: true,
+      })
+      .select("id")
+      .single();
+
+    if (sandboxError) {
+      // Retry with more unique slug (unlikely collision but safety net)
+      const retrySlug = `sandbox-${Date.now().toString(36)}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const retry = await (supabase as any)
+        .from("foundries")
+        .insert({
+          id: retrySlug,
+          name: `${firstName}'s Workspace`,
+          slug: retrySlug,
+          owner_id: null,
+          is_sandbox: true,
+        })
+        .select("id")
+        .single();
+      sandboxFoundry = retry.data;
+      sandboxError = retry.error;
+    }
+
+    if (sandboxError || !sandboxFoundry) {
+      console.error("[setupNewUser] Sandbox foundry creation failed after retry:", sandboxError);
+      foundryId = "forge-guild";
+    } else {
+      foundryId = sandboxFoundry.id;
+    }
   }
 
   // --- Create profile for non-founders AND founders without company (OAuth edge case) ---
@@ -229,6 +272,14 @@ export async function setupNewUser({
       console.error("[setupNewUser] Profile creation failed:", profileError.message);
       return { foundryId, redirectPath: role === "supplier" ? "/supplier-portal" : "/today" };
     }
+
+    // Set owner on sandbox foundries (same circular FK pattern as founders)
+    if (foundryId.startsWith("sandbox-")) {
+      const { error: ownerError } = await supabase.from("foundries").update({ owner_id: userId }).eq("id", foundryId);
+      if (ownerError) {
+        console.error("[setupNewUser] Failed to set sandbox owner:", ownerError.message);
+      }
+    }
   }
 
   // --- Foundry membership ---
@@ -247,14 +298,14 @@ export async function setupNewUser({
     console.error("[setupNewUser] Membership upsert failed:", membershipError.message);
   }
 
-  // --- Demo data for founders (own isolated foundry) ---
-  // DECISION: Only seed demo data for founders who get their own foundry (RT-03).
-  // Executives/Apprentices share forge-guild — seeding per-user demo concepts into
-  // a shared foundry causes data pollution (N signups = 3N demo entries visible to
-  // everyone). The guided tour still shows them what The Forge looks like.
-  // GOTCHA: Founders without companyName (OAuth edge case) fall through to
-  // forge-guild. Guard against seeding into shared foundries (RT2-04).
-  if (role === "founder" && foundryId && foundryId !== "forge-guild") {
+  // --- Demo data for users with their own isolated foundry ---
+  // DECISION: Seed demo data for any user with their own foundry (founders or
+  // sandbox users). Previously only founders got demo data because executives
+  // shared forge-guild and seeding would pollute shared data. Now that every
+  // user gets their own workspace, all isolated foundries get demo data.
+  // GOTCHA: Guard against seeding into shared foundries (forge-guild, forge-suppliers).
+  const isIsolatedFoundry = foundryId && foundryId !== "forge-guild" && foundryId !== "forge-suppliers";
+  if (isIsolatedFoundry) {
     // Demo forge concepts — 3 products showing breadth of The Forge
     const conceptRpcs = [
       "seed_demo_forge_concept",

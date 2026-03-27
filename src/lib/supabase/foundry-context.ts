@@ -95,6 +95,7 @@ export interface FoundryInfo {
   memberCount: number
   joinedAt: string
   logoUrl: string | null
+  isSandbox: boolean
 }
 
 export interface GetUserFoundriesResult {
@@ -139,6 +140,7 @@ export async function getUserFoundries(): Promise<GetUserFoundriesResult> {
     member_count: number
     joined_at: string
     logo_url: string | null
+    is_sandbox: boolean
   }) => ({
     foundryId: f.foundry_id,
     foundryName: f.foundry_name,
@@ -148,6 +150,7 @@ export async function getUserFoundries(): Promise<GetUserFoundriesResult> {
     memberCount: Number(f.member_count),
     joinedAt: f.joined_at,
     logoUrl: f.logo_url || null,
+    isSandbox: f.is_sandbox ?? false,
   }))
 
   return { foundries, error: null }

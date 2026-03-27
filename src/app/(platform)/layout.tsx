@@ -58,7 +58,7 @@ export default async function PlatformLayout({
     const layoutData = await getCachedLayoutData(user.id);
 
     let { profile } = layoutData;
-    const { foundryName, foundryId, foundryLogoUrl, hasAdminAccess, userFoundries } = layoutData;
+    const { foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, hasAdminAccess, userFoundries } = layoutData;
 
     // GOTCHA: The cached path uses the admin client (bypasses RLS), so profile
     // will only be null if the row truly doesn't exist — not due to RLS failures.
@@ -114,7 +114,7 @@ export default async function PlatformLayout({
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
                         <MobileZoomControl />
-                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
+                        <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} />
                         <MainContentArea>
                             <ActiveTimerBar />
                             <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">

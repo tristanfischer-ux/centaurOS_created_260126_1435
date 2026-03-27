@@ -39,6 +39,8 @@ interface Foundry {
   memberCount: number
   /** URL to the foundry's logo image, if uploaded */
   logoUrl?: string | null
+  /** Whether this is a personal sandbox workspace */
+  isSandbox?: boolean
 }
 
 interface FoundrySwitcherProps {
@@ -47,6 +49,8 @@ interface FoundrySwitcherProps {
   currentFoundryName?: string
   /** URL to the active foundry's logo image */
   currentFoundryLogoUrl?: string | null
+  /** Whether the active foundry is a personal sandbox */
+  currentFoundryIsSandbox?: boolean
   userName?: string
   userRole?: string
 }
@@ -91,6 +95,7 @@ export function FoundrySwitcher({
   currentFoundryId,
   currentFoundryName,
   currentFoundryLogoUrl,
+  currentFoundryIsSandbox,
   userName,
   userRole,
 }: FoundrySwitcherProps): React.ReactElement {
@@ -143,7 +148,7 @@ export function FoundrySwitcher({
                 {activeName}
               </div>
               <div className="text-[10px] text-muted-foreground font-mono mt-0.5 tracking-wide">
-                {isPending ? 'Switching...' : (activeFoundry?.foundryId || currentFoundryId)}
+                {isPending ? 'Switching...' : (activeFoundry?.isSandbox || currentFoundryIsSandbox) ? 'Personal Workspace' : (activeFoundry?.foundryId || currentFoundryId)}
               </div>
             </div>
             <ChevronsUpDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />

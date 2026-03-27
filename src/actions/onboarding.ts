@@ -284,6 +284,8 @@ export interface OnboardingData {
   milestones_shown?: string[]
   /** Plan selected during onboarding (actual checkout happens from /settings/billing) */
   selected_plan?: 'free' | 'starter' | 'professional'
+  /** Intent selected during onboarding 3-way fork */
+  intent_selection?: 'setup_company' | 'join_company' | 'exploring'
 }
 
 /**

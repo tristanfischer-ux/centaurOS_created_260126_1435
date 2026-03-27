@@ -196,6 +196,8 @@ interface FoundryInfo {
     memberCount: number
     /** URL to the foundry's logo image, if uploaded */
     logoUrl?: string | null
+    /** Whether this is a personal sandbox workspace */
+    isSandbox?: boolean
 }
 
 interface SidebarProps {
@@ -203,6 +205,8 @@ interface SidebarProps {
     foundryId?: string
     /** URL to the active foundry's logo image */
     foundryLogoUrl?: string | null
+    /** Whether the active foundry is a personal sandbox */
+    foundryIsSandbox?: boolean
     userName?: string
     userRole?: string
     isCompanyAdmin?: boolean
@@ -211,7 +215,7 @@ interface SidebarProps {
     onboardingData?: Record<string, unknown>
 }
 
-export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, userRole, userFoundries, onboardingData }: SidebarProps) {
+export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandbox, userName, userRole, userFoundries, onboardingData }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
     const { setZoom } = useZoomContext()
@@ -381,6 +385,7 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, userName, user
                     currentFoundryId={foundryId}
                     currentFoundryName={foundryName}
                     currentFoundryLogoUrl={foundryLogoUrl}
+                    currentFoundryIsSandbox={foundryIsSandbox}
                     userName={userName}
                     userRole={userRole}
                 />

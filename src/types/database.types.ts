@@ -7032,6 +7032,7 @@ export type Database = {
           created_at: string | null
           id: string
           industry: string | null
+          is_sandbox: boolean
           logo_url: string | null
           name: string
           owner_id: string | null
@@ -7048,6 +7049,7 @@ export type Database = {
           created_at?: string | null
           id: string
           industry?: string | null
+          is_sandbox?: boolean
           logo_url?: string | null
           name: string
           owner_id?: string | null
@@ -7064,6 +7066,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           industry?: string | null
+          is_sandbox?: boolean
           logo_url?: string | null
           name?: string
           owner_id?: string | null
@@ -19066,6 +19069,7 @@ export type Database = {
           foundry_name: string
           is_active: boolean
           is_primary: boolean
+          is_sandbox: boolean
           joined_at: string
           logo_url: string
           member_count: number

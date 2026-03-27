@@ -3,9 +3,10 @@
 /**
  * @file unified-onboarding.tsx
  *
- * @description 2-step unified onboarding modal (Welcome → Intent) that hands
- * off to Cal's guided tour for team_builders or redirects suppliers to
- * /supplier-portal.
+ * @description 3-step unified onboarding modal (Welcome → How It Works → Intent)
+ * with a 3-way fork: set up a company, join an existing one, or explore.
+ * "Set up a company" opens CreateCompanyDialog. Others complete onboarding
+ * in their personal sandbox workspace.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -13,15 +14,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import {
   ArrowRight,
-  Package,
   Building2,
   Sparkles,
   Hammer,
   Shield,
   Scale,
-  Check,
   Users,
-  Zap,
+  Compass,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
@@ -29,24 +28,16 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { GuidedTour } from './guided-tour'
-import { SUBSCRIPTION_PLANS } from '@/lib/billing/plans'
+import { CreateCompanyDialog } from '@/components/create-company-dialog'
 
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
-// DECISION: Added 'how-it-works' step between welcome and intent to pre-empt
-// IP/risk/clarity concerns before the user commits to an intent path.
-// DECISION: Added 'plan' step after intent for founders to see pricing options.
-type OnboardingStep = 'welcome' | 'how-it-works' | 'intent' | 'plan'
+// DECISION: 3-step flow: Welcome → How It Works → Intent (3-way fork).
+// Plan selection removed from onboarding — accessible from Settings > Billing.
+type OnboardingStep = 'welcome' | 'how-it-works' | 'intent'
 
-const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent', 'plan']
-
-/** Plan cards shown during onboarding — skip Enterprise (sales-led) */
-const ONBOARDING_PLANS: { tier: 'free' | 'starter' | 'professional'; icon: typeof Zap }[] = [
-  { tier: 'free', icon: Sparkles },
-  { tier: 'starter', icon: Users },
-  { tier: 'professional', icon: Zap },
-]
+const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -87,8 +78,8 @@ export function UnifiedOnboarding({
   const [direction, setDirection] = useState(1)
   const [isSavingIntent, setIsSavingIntent] = useState(false)
   const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
-  const [selectedPlan, setSelectedPlan] = useState<'free' | 'starter' | 'professional'>('free')
   const [showGuidedTour, setShowGuidedTour] = useState(false)
+  const [showCreateCompany, setShowCreateCompany] = useState(false)
   const migrationRanRef = useRef(false)
   const router = useRouter()
 
@@ -164,9 +155,9 @@ export function UnifiedOnboarding({
           return
         }
 
-        // DECISION: Show plan selection before launching guided tour.
-        // Founders see pricing options; actual Stripe checkout happens from /settings/billing.
-        goToStep('plan')
+        // Team builder — complete onboarding and launch guided tour
+        await handleComplete()
+        setShowGuidedTour(true)
       } else {
         toast.error('Failed to save your selection. Please try again.')
       }
@@ -176,6 +167,62 @@ export function UnifiedOnboarding({
     } finally {
       setIsSavingIntent(false)
     }
+  }
+
+  // INTENT: 3-way fork handlers for the new intent step
+
+  const handleSetupCompany = async () => {
+    setIsSavingIntent(true)
+    try {
+      await setAccountType('team_builder')
+      await updateOnboardingData({
+        onboarding_modal_completed: true,
+        has_completed_onboarding: true,
+        onboarding_completed_at: new Date().toISOString(),
+        intent_selection: 'setup_company',
+      })
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to persist setup_company intent:', error)
+    }
+    setOpen(false)
+    setShowCreateCompany(true)
+    setIsSavingIntent(false)
+  }
+
+  const handleJoinCompany = async () => {
+    setIsSavingIntent(true)
+    try {
+      await setAccountType('team_builder')
+      await updateOnboardingData({
+        onboarding_modal_completed: true,
+        has_completed_onboarding: true,
+        onboarding_completed_at: new Date().toISOString(),
+        intent_selection: 'join_company',
+      })
+      toast.success('Your personal workspace is ready. Ask your company admin to invite you when ready.')
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to persist join_company intent:', error)
+    }
+    setOpen(false)
+    setIsSavingIntent(false)
+  }
+
+  const handleExplore = async () => {
+    setIsSavingIntent(true)
+    try {
+      await setAccountType('team_builder')
+      await updateOnboardingData({
+        onboarding_modal_completed: true,
+        has_completed_onboarding: true,
+        onboarding_completed_at: new Date().toISOString(),
+        intent_selection: 'exploring',
+      })
+      toast.success('Your workspace is ready with sample data. Create a company any time from the sidebar.')
+    } catch (error) {
+      console.error('[UnifiedOnboarding] Failed to persist exploring intent:', error)
+    }
+    setOpen(false)
+    setIsSavingIntent(false)
   }
 
   const handleComplete = async () => {
@@ -191,16 +238,6 @@ export function UnifiedOnboarding({
       console.error('[UnifiedOnboarding] Failed to persist completion:', error)
     }
     setOpen(false)
-  }
-
-  const handlePlanContinue = async () => {
-    try {
-      await updateOnboardingData({ selected_plan: selectedPlan })
-    } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to save plan selection:', error)
-    }
-    // Launch guided tour regardless of save outcome
-    setShowGuidedTour(true)
   }
 
   const handleSkip = useCallback(() => {
@@ -230,11 +267,24 @@ export function UnifiedOnboarding({
   // re-registering keyboard handlers on every parent render (RT2-06).
   const handleTourComplete = useCallback(() => setOpen(false), [])
 
-  if (!open) return null
+  if (!open && !showCreateCompany) return null
 
   // FLOW: When team_builder is selected, hand off to Cal's guided tour
   if (showGuidedTour) {
     return <GuidedTour onComplete={handleTourComplete} />
+  }
+
+  // FLOW: "Setting up a company" opens the create company dialog after closing the overlay
+  if (showCreateCompany) {
+    return (
+      <CreateCompanyDialog
+        open={showCreateCompany}
+        onOpenChange={(v) => {
+          setShowCreateCompany(v)
+          if (!v) router.refresh()
+        }}
+      />
+    )
   }
 
   return (
@@ -412,7 +462,7 @@ export function UnifiedOnboarding({
               </div>
             )}
 
-            {/* STEP 3: Intent */}
+            {/* STEP 3: Intent — 3-way fork */}
             {currentStep === 'intent' && (
               <div className="space-y-8">
                 <div className="space-y-4">
@@ -420,158 +470,120 @@ export function UnifiedOnboarding({
                     What brings you here?
                   </h2>
                   <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                    This helps us personalise your experience from the start.
+                    This helps us set up the right workspace for you.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-lg mx-auto">
+                <div className="grid grid-cols-1 gap-4 max-w-lg mx-auto">
+                  {/* Option 1: Setting up a company */}
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                     whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={() => handleIntentSelection('team_builder')}
+                    onClick={handleSetupCompany}
                     disabled={isSavingIntent}
                     className={cn(
                       'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      selectedIntent === 'team_builder'
-                        ? 'border-electric-blue bg-electric-blue/5'
-                        : 'border-muted bg-card hover:border-electric-blue/50',
+                      'border-muted bg-card hover:border-electric-blue/50',
                       isSavingIntent && 'opacity-50 cursor-not-allowed',
                     )}
                   >
-                    <div className="w-12 h-12 rounded-full bg-electric-blue/10 flex items-center justify-center mb-4">
-                      <Building2 className="w-6 h-6 text-electric-blue" />
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
+                        <Building2 className="w-6 h-6 text-electric-blue" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">
+                          I&apos;m setting up a company
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Create your company workspace, build your team, and bring your product to life.
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      I am a founder
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      Build your team, set objectives, and bring your product to life with expert support.
-                    </p>
                   </motion.button>
 
+                  {/* Option 2: Joining an existing company */}
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
                     whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={() => handleIntentSelection('supplier')}
+                    onClick={handleJoinCompany}
                     disabled={isSavingIntent}
                     className={cn(
                       'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      selectedIntent === 'supplier'
-                        ? 'border-international-orange bg-international-orange/5'
-                        : 'border-muted bg-card hover:border-international-orange/50',
+                      'border-muted bg-card hover:border-muted-foreground/30',
                       isSavingIntent && 'opacity-50 cursor-not-allowed',
                     )}
                   >
-                    <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center mb-4">
-                      <Package className="w-6 h-6 text-international-orange" />
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <Users className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">
+                          I&apos;m joining an existing company
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Your company admin will invite you. You&apos;ll have a personal workspace to explore in the meantime.
+                        </p>
+                      </div>
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      I am a supplier
-                    </h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      List your manufacturing capabilities, respond to RFQs, and win new customers.
-                    </p>
                   </motion.button>
+
+                  {/* Option 3: Just exploring */}
+                  <motion.button
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
+                    onClick={handleExplore}
+                    disabled={isSavingIntent}
+                    className={cn(
+                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
+                      'border-muted bg-card hover:border-international-orange/50',
+                      isSavingIntent && 'opacity-50 cursor-not-allowed',
+                    )}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
+                        <Compass className="w-6 h-6 text-international-orange" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-foreground mb-1">
+                          I&apos;m just exploring
+                        </h3>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Take a look around with sample data. You can create a company any time.
+                        </p>
+                      </div>
+                    </div>
+                  </motion.button>
+
+                  {/* Supplier link — secondary, not a card */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="text-center pt-2"
+                  >
+                    <button
+                      onClick={() => handleIntentSelection('supplier')}
+                      disabled={isSavingIntent}
+                      className="text-sm text-muted-foreground hover:text-international-orange transition-colors underline underline-offset-4"
+                    >
+                      I&apos;m a supplier looking to list my capabilities
+                    </button>
+                  </motion.div>
                 </div>
 
                 {isSavingIntent && (
                   <p className="text-sm text-muted-foreground animate-pulse">
-                    Personalising your experience...
+                    Setting up your workspace...
                   </p>
                 )}
-              </div>
-            )}
-
-            {/* STEP 4: Plan Selection (founders only) */}
-            {currentStep === 'plan' && (
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
-                    Choose your plan
-                  </h2>
-                  <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                    Start free and upgrade any time. No credit card required.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
-                  {ONBOARDING_PLANS.map((p, i) => {
-                    const plan = SUBSCRIPTION_PLANS[p.tier]
-                    const isSelected = selectedPlan === p.tier
-                    const isPopular = p.tier === 'starter'
-                    const Icon = p.icon
-                    const price = plan.priceMonthlyGBP === 0
-                      ? '£0'
-                      : `£${(plan.priceMonthlyGBP / 100).toFixed(0)}`
-
-                    return (
-                      <motion.button
-                        key={p.tier}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 * i }}
-                        whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                        onClick={() => setSelectedPlan(p.tier)}
-                        className={cn(
-                          'relative p-5 rounded-xl border-2 transition-all duration-200 text-left',
-                          isSelected
-                            ? 'border-international-orange bg-international-orange/5 ring-1 ring-international-orange/30'
-                            : 'border-muted bg-card hover:border-international-orange/50',
-                        )}
-                      >
-                        {isPopular && (
-                          <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 text-[10px] font-semibold uppercase tracking-wider bg-international-orange text-white px-2.5 py-0.5 rounded-full">
-                            Most popular
-                          </span>
-                        )}
-                        <div className="w-10 h-10 rounded-full bg-international-orange/10 flex items-center justify-center mb-3">
-                          <Icon className="w-5 h-5 text-international-orange" />
-                        </div>
-                        <h3 className="text-base font-semibold text-foreground mb-0.5">
-                          {plan.name}
-                        </h3>
-                        <p className="text-2xl font-bold text-foreground mb-1">
-                          {price}
-                          {plan.priceMonthlyGBP > 0 && (
-                            <span className="text-xs font-normal text-muted-foreground">/mo</span>
-                          )}
-                        </p>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                          {plan.bestFor}
-                        </p>
-                        <div className="space-y-1.5">
-                          <PlanFeature label={`${plan.limits.maxAiTasksPerMonth} AI tasks/mo`} />
-                          <PlanFeature label={`${plan.limits.maxTeamMembers ?? 'Unlimited'} team member${(plan.limits.maxTeamMembers ?? 2) !== 1 ? 's' : ''}`} />
-                        </div>
-                        {isSelected && (
-                          <div className="absolute top-3 right-3 w-5 h-5 rounded-full bg-international-orange flex items-center justify-center">
-                            <Check className="w-3 h-3 text-white" />
-                          </div>
-                        )}
-                      </motion.button>
-                    )
-                  })}
-                </div>
-
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    onClick={handlePlanContinue}
-                    className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
-                  >
-                    Continue with {SUBSCRIPTION_PLANS[selectedPlan].name}
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </motion.div>
               </div>
             )}
 
@@ -596,14 +608,5 @@ export function UnifiedOnboarding({
         ))}
       </div>
     </motion.div>
-  )
-}
-
-function PlanFeature({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <Check className="w-3 h-3 text-international-orange shrink-0" />
-      <span>{label}</span>
-    </div>
   )
 }

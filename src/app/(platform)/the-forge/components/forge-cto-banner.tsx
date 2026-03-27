@@ -25,9 +25,85 @@ import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
 const CTO_SPECIALIST_ID = "cto"
 const CTO_NAME = "Max"
-const CTO_TITLE = "Chief Technology Officer"
-const CTO_TAGLINE = "First principles. Delete before you optimize. The best part is no part."
 const CTO_AVATAR = "/images/specialists/cto.png"
+
+const STAGE_LABELS: Record<string, string> = {
+  draft: "Draft",
+  researched: "Research",
+  interface_ready: "Build",
+  generated: "Generation",
+  complete: "Complete",
+}
+
+// ─── Greeting Logic ──────────────────────────────────────────────────
+
+function getTimeOfDayGreeting(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return "Morning"
+  if (hour < 17) return "Afternoon"
+  return "Evening"
+}
+
+function getStalledProject(
+  projects: CadLabProjectSummary[],
+): CadLabProjectSummary | null {
+  const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000
+  return (
+    projects.find(
+      (p) =>
+        p.status !== "complete" &&
+        p.status !== "rfq_created" &&
+        new Date(p.updatedAt).getTime() < threeDaysAgo,
+    ) ?? null
+  )
+}
+
+interface BannerContent {
+  greeting: string
+  message: string
+}
+
+function getBannerContent(projects: CadLabProjectSummary[]): BannerContent {
+  const timeGreeting = getTimeOfDayGreeting()
+  const inProgress = projects.filter(
+    (p) => p.status !== "complete" && p.status !== "rfq_created",
+  )
+
+  // Proactive nudge: stalled project (3+ days idle)
+  const stalled = getStalledProject(projects)
+  if (stalled) {
+    const name = stalled.subject || stalled.name
+    return {
+      greeting: `${timeGreeting}.`,
+      message: `Your ${name} design hasn\u2019t moved in a few days \u2014 stuck on something?`,
+    }
+  }
+
+  // New user: no projects at all
+  if (projects.length === 0) {
+    return {
+      greeting: `${timeGreeting}.`,
+      message: "Ready to build something? Tell me what you\u2019re working on.",
+    }
+  }
+
+  // Has active in-progress project
+  if (inProgress.length > 0) {
+    const latest = inProgress[0] // pre-sorted by updatedAt DESC from server
+    const name = latest.subject || latest.name
+    const stage = STAGE_LABELS[latest.stage] ?? latest.stage
+    return {
+      greeting: `${timeGreeting}.`,
+      message: `Your ${name} is in ${stage} \u2014 want to talk through next steps?`,
+    }
+  }
+
+  // All projects complete — returning builder
+  return {
+    greeting: `Welcome back.`,
+    message: "All your designs are wrapped up. What are we building next?",
+  }
+}
 
 // ─── Component ───────────────────────────────────────────────────────
 
@@ -37,6 +113,7 @@ interface ForgeCtoBannerProps {
 
 export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
   const { openPanel } = useAdvisorPanel()
+  const { greeting, message } = getBannerContent(projects)
 
   const handleTalk = () => {
     const inProgress = projects.filter(
@@ -52,6 +129,12 @@ export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
     } else {
       contextParts.push(
         `They have ${total} project${total !== 1 ? "s" : ""}${inProgress > 0 ? ` (${inProgress} in progress)` : ""}.`,
+      )
+    }
+    const stalled = getStalledProject(projects)
+    if (stalled) {
+      contextParts.push(
+        `Their "${stalled.subject || stalled.name}" project has been idle for several days and may be stalled.`,
       )
     }
     contextParts.push(
@@ -80,10 +163,10 @@ export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
       {/* Text */}
       <div className="min-w-0 flex-1">
         <p className="text-sm font-semibold text-foreground">
-          {CTO_NAME}, {CTO_TITLE}
+          {CTO_NAME} <span className="font-normal text-muted-foreground">\u00b7 {greeting}</span>
         </p>
         <p className="hidden text-xs text-muted-foreground line-clamp-1 sm:block">
-          {CTO_TAGLINE}
+          {message}
         </p>
       </div>
 
