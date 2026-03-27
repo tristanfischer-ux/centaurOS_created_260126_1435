@@ -56,8 +56,7 @@ import { HiringTimeline } from './hiring-timeline'
 import { OrbitalView } from './components/orbital-view'
 import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
-import { SmartInsights } from './smart-insights'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { HarperAnalysisPanel } from './components/harper-analysis-panel'
 import { generateTeamInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import { QuickAssignDialog } from './quick-assign-dialog'
@@ -80,7 +79,6 @@ const TeamAnalytics = dynamic(
 )
 
 import { useTeamData } from './hooks/use-team-data'
-import { AskSpecialistButton } from '@/components/specialists/ask-specialist-button'
 import { PageTour } from '@/components/guidance/page-tour'
 import { RetainerCard } from '@/components/retainers'
 import type { RetainerWithDetails, RetainerStats } from '@/types/retainers'
@@ -301,6 +299,7 @@ export function TeamPageView({
                 setHarperInsights(result)
             }
         }).catch(() => { /* Non-critical */ })
+        .finally(() => setHarperLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
@@ -322,6 +321,7 @@ export function TeamPageView({
 
     // Specialist insights
     const [harperInsights, setHarperInsights] = useState<AgentInsight[]>([])
+    const [harperLoading, setHarperLoading] = useState(true)
     const harperFetched = useRef(false)
 
     // Team management
@@ -954,22 +954,6 @@ export function TeamPageView({
                                     Functions
                                 </Button>
                             )}
-                            <AskSpecialistButton
-                                context={{
-                                    type: 'general',
-                                    title: 'Team & Hiring',
-                                    description: `Team overview: ${totalPeople} members (${founders.length} founders, ${executives.length} executives, ${apprentices.length} apprentices), ${totalTeams} teams, ${avgCapacity}% avg capacity remaining.`,
-                                    metadata: {
-                                        notes: insights?.overloadedMembers?.length
-                                            ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
-                                            : undefined,
-                                    },
-                                }}
-                                specialistId="hiring-team"
-                                specialistName="Harper"
-                                variant="chip"
-                                label="Ask Harper"
-                            />
                             <RefreshButton />
                         </div>
                         <div data-tour="team-invite">
@@ -1073,50 +1057,26 @@ export function TeamPageView({
                 </div>
             </div>
 
-            {/* Harper's proactive insights */}
-            {!isOrbitActive && harperInsights.length > 0 && (
-                <div className="space-y-3">
-                    {harperInsights.map((insight) => (
-                        <SpecialistInsightCard
-                            key={insight.id}
-                            insight={insight}
-                            onDismiss={() => setHarperInsights(prev => prev.filter(i => i.id !== insight.id))}
-                            compact
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* ── Stats & Insights Pills (hidden in orbit mode — shown in bottom bar) ── */}
-            {!isOrbitActive && (
-                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-thin">
-                    {/* Stat pills — same size as insight pills */}
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
-                        <Users className="h-4 w-4 text-international-orange shrink-0" />
-                        <span className="text-sm font-semibold text-foreground">{totalPeople}</span>
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">People</span>
-                    </div>
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
-                        <ShieldCheck className="h-4 w-4 text-electric-blue shrink-0" />
-                        <span className="text-sm font-semibold text-foreground">{totalTeams}</span>
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">Teams</span>
-                    </div>
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-muted bg-card shrink-0 transition-all">
-                        <BarChart3 className="h-4 w-4 text-status-success shrink-0" />
-                        <span className="text-sm font-semibold text-foreground">{avgCapacity}%</span>
-                        <span className="text-sm text-muted-foreground whitespace-nowrap">Avg Capacity</span>
-                    </div>
-                    {/* Insight pills — rendered inline via display:contents */}
-                    {insights && (
-                        <SmartInsights
-                            insights={insights}
-                            onMemberClick={(id) => setSelectedMemberId(id)}
-                            onQuickAssignClick={() => setShowQuickAssign(true)}
-                            className="contents"
-                        />
-                    )}
-                </div>
-            )}
+            {/* ── Harper Analysis Panel (visible in all modes) ── */}
+            <HarperAnalysisPanel
+                totalPeople={totalPeople}
+                totalTeams={totalTeams}
+                avgCapacity={avgCapacity}
+                harperInsights={harperInsights}
+                isLoading={harperLoading}
+                onDismissInsight={(id) => setHarperInsights(prev => prev.filter(i => i.id !== id))}
+                specialistContext={{
+                    totalPeople,
+                    founders: founders.length,
+                    executives: executives.length,
+                    apprentices: apprentices.length,
+                    totalTeams,
+                    avgCapacity,
+                    overloadedNote: insights?.overloadedMembers?.length
+                        ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
+                        : undefined,
+                }}
+            />
 
             {/* ── Search + Quick Assign (non-orbit modes only) ──── */}
             {!isOrbitActive && (

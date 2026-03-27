@@ -215,9 +215,11 @@ Respond ONLY with the JSON object, no markdown fences.`
 
 ${xmlSafe}
 
+Do NOT open with a greeting — the greeting is already shown separately above your message. Jump straight into the briefing.
+
 Respond with JSON: { "narrative": "2-4 sentence executive summary. Lead with the single most important thing. Reference specific numbers. Be warm but direct. Never mention AI or that you are an AI.", "insights": [1-3 objects with "urgency" ("critical"|"important"|"informational"), "title" (max 10 words), "body" (max 50 words)] }
 
-Use "critical" sparingly (only genuine risks). Be specific to the data, not generic.
+Use "critical" sparingly (only genuine risks). Be specific to the data, not generic. Reference strategy pillars by name when relevant.
 Respond ONLY with the JSON object, no markdown fences.`
 
     const pillarSummary = (input.strategyPillars ?? []).length > 0
@@ -246,13 +248,13 @@ Completed today: ${input.completedToday}
 Active blockers: ${input.blockerCount}
 Pending approvals: ${input.pendingApprovalCount}
 At-risk objectives: ${input.atRiskObjectiveCount}
-Strategy pillars at risk: ${input.strategyAtRisk}
-Strategy pillars off track: ${input.strategyOffTrack}
+Strategy pillars (${input.totalPillarCount ?? 0} total):
+${pillarSummary}
 Unread messages: ${input.unreadMessages}
 Productivity streak: ${input.streak} days
 Nudge summary: ${wrapUserData("nudges", input.nudgeSummary || "none")}
 
-Triage these into: act now (critical), decide this week (important), awareness only (informational). Connect dots — e.g. if overdue tasks and blockers overlap with at-risk objectives, call that out. Lead with the single most important thing.`
+Triage these into: act now (critical), decide this week (important), awareness only (informational). Connect dots — e.g. if overdue tasks block an at-risk pillar, call that out by name. Lead with the single most important thing.`
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 15_000)

@@ -477,7 +477,10 @@ export function TodayView({
                                                         description: `Cal's briefing: "${heroNarrative}" — continue this conversation.`,
                                                         metadata: {
                                                             notes: calInput
-                                                                ? `Overdue: ${calInput.overdueCount}, Due today: ${calInput.dueToday}, Completed: ${calInput.completedToday}, Blockers: ${calInput.blockerCount}, Strategy pillars: ${calInput.totalPillarCount ?? 0}`
+                                                                ? [
+                                                                    `Overdue: ${calInput.overdueCount}, Due today: ${calInput.dueToday}, Completed: ${calInput.completedToday}, Blockers: ${calInput.blockerCount}`,
+                                                                    ...(calInput.strategyPillars ?? []).map(p => `Pillar "${p.title}": ${p.health}, ${p.progress}%`),
+                                                                ].join('. ')
                                                                 : undefined,
                                                         },
                                                     }}
