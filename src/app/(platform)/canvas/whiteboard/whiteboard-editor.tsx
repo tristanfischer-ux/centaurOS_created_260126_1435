@@ -18,8 +18,9 @@ import type { WhiteboardRow } from "@/actions/whiteboards"
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Excalidraw: any = dynamic(
   async () => {
-    // @ts-expect-error -- CSS module import, no type declarations
-    await import("@excalidraw/excalidraw/index.css")
+    // DECISION: Excalidraw v0.18+ moved CSS to dist/prod/. Turbopack can't resolve
+    // nested dist paths, so we skip the explicit CSS import. Excalidraw injects
+    // its own styles when the component mounts.
     const mod = await import("@excalidraw/excalidraw")
     return mod.Excalidraw
   },
