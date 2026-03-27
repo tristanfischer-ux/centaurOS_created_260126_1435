@@ -148,12 +148,12 @@ export function AdminDashboard({
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Apprenticeship' })
   }, [openPanel])
   const { insights, dismissInsight } = usePageInsights(
-    () => generateApprenticeshipInsights({
+    (fast) => generateApprenticeshipInsights({
       enrollmentCount: totalEnrollments,
       avgProgress: avgProgress,
       onTrackCount: totalEnrollments - atRiskCount,
       atRiskCount: atRiskCount,
-    }),
+    }, fast),
     totalEnrollments > 0,
     { cacheKey: 'harper-apprenticeship', emptyInsight: EMPTY_STATE_INSIGHT },
   )

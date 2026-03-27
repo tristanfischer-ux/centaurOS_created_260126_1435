@@ -57,15 +57,26 @@ function insightToAgentInsight(insight: PageInsight, index: number): AgentInsigh
   }
 }
 
-async function callSonnetForInsights(
+// DECISION: Dual-stream insight generation. Haiku fires first for a fast ~1-2s
+// response, then Sonnet upgrades with sharper analysis ~5-8s later. The hook
+// calls the same server action twice with fast=true and fast=false.
+const MODEL_CONFIG = {
+  fast: { model: "claude-haiku-4-5-20251001", maxTokens: 512, timeout: 8_000 },
+  deep: { model: "claude-sonnet-4-6", maxTokens: 768, timeout: 15_000 },
+} as const
+
+async function callModelForInsights(
   specialistId: string,
   context: string,
+  tier: 'fast' | 'deep' = 'deep',
 ): Promise<PageInsight[]> {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
   if (!apiKey) return []
 
   const specialist = getSpecialistById(specialistId)
   if (!specialist) return []
+
+  const config = MODEL_CONFIG[tier]
 
   const systemPrompt = `You are ${specialist.name}, ${specialist.title} at Fractional Forge. You speak in first person, concisely and confidently. Your personality: ${specialist.tagline}
 
@@ -76,14 +87,11 @@ Respond with a JSON array of 1-3 insight objects. Each has:
 - "title": short headline (max 10 words)
 - "body": 1-2 sentence insight (max 50 words)
 
-Use "critical" sparingly (only genuine risks). Be specific to the data, not generic.
+Use "critical" sparingly (only genuine risks). Be specific to the data, not generic.${tier === 'deep' ? ' Connect dots across data points — don\'t just state the obvious.' : ''}
 Respond ONLY with the JSON array, no markdown fences.`
 
-  // DECISION: Sonnet for page insights — sharper, more opinionated advice that
-  // connects the dots across data points. Haiku was too generic. Timeout bumped
-  // 8s→15s and max_tokens 512→768 to accommodate Sonnet's richer output.
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15_000)
+  const timeout = setTimeout(() => controller.abort(), config.timeout)
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -94,8 +102,8 @@ Respond ONLY with the JSON array, no markdown fences.`
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 768,
+        model: config.model,
+        max_tokens: config.maxTokens,
         system: systemPrompt,
         messages: [{ role: "user", content: context }],
       }),
@@ -105,7 +113,7 @@ Respond ONLY with the JSON array, no markdown fences.`
     clearTimeout(timeout)
 
     if (!response.ok) {
-      console.error("[page-insights] API error:", response.status)
+      console.error(`[page-insights] ${tier} API error:`, response.status)
       return []
     }
 
@@ -113,7 +121,7 @@ Respond ONLY with the JSON array, no markdown fences.`
     const text = (data.content?.[0]?.text ?? "").trim()
     if (!text) return []
 
-    // VALIDATION: Strip markdown fences (Haiku sometimes wraps JSON in ```json...```)
+    // VALIDATION: Strip markdown fences
     const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "")
     const parsed = JSON.parse(cleaned)
     if (!Array.isArray(parsed)) return []
@@ -136,6 +144,10 @@ Respond ONLY with the JSON array, no markdown fences.`
     clearTimeout(timeout)
     return []
   }
+}
+
+function callInsights(specialistId: string, context: string, fast?: boolean): Promise<PageInsight[]> {
+  return callModelForInsights(specialistId, context, fast ? 'fast' : 'deep')
 }
 
 // ─── Today Briefing (Cal — Chief of Staff) ─────────────────────────
@@ -338,6 +350,7 @@ export interface FundraiseInsightInput {
 
 export async function generateFundraiseInsights(
   input: FundraiseInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this fundraise pipeline and give specific insights:
@@ -347,7 +360,7 @@ Investor types in pipeline: ${wrapUserData("firm_types", input.firmTypes.join(",
 Coverage gaps: ${wrapUserData("coverage_gaps", input.coverageGaps.join("; ") || "none identified")}
 Recent activity count: ${input.recentActivityCount}`
 
-    const insights = await callSonnetForInsights("fundraising-advisor", context)
+    const insights = await callInsights("fundraising-advisor", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -364,6 +377,7 @@ export interface InvestorInsightInput {
 
 export async function generateInvestorInsights(
   input: InvestorInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this investor shortlist portfolio and give specific guidance:
@@ -373,7 +387,7 @@ Shortlist investor types: ${wrapUserData("firm_types", input.shortlistTypes.join
 Shortlist locations: ${wrapUserData("locations", input.shortlistLocations.join(", ") || "mixed")}
 Active filters: ${input.activeFilters || "none"}`
 
-    const insights = await callSonnetForInsights("fundraising-advisor", context)
+    const insights = await callInsights("fundraising-advisor", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -394,6 +408,7 @@ export interface TeamInsightInput {
 
 export async function generateTeamInsights(
   input: TeamInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this team composition and give specific hiring/management insights:
@@ -404,7 +419,7 @@ Overloaded members: ${wrapUserData("overloaded", input.overloadedMembers.join(",
 Idle members: ${wrapUserData("idle", input.idleMembers.join(", ") || "none")}
 Unassigned tasks: ${input.unassignedTasks}`
 
-    const insights = await callSonnetForInsights("hiring-team", context)
+    const insights = await callInsights("hiring-team", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -420,6 +435,7 @@ export interface RecruitsInsightInput {
 
 export async function generateRecruitsInsights(
   input: RecruitsInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Guide this founder on talent search priorities:
@@ -428,7 +444,7 @@ Specialization categories: ${wrapUserData("categories", input.categories.join(",
 Team gaps to fill: ${wrapUserData("gaps", input.teamGaps.join(", ") || "not specified")}
 ${input.searchQuery ? `Current search: ${wrapUserData("query", input.searchQuery)}` : "No active search"}`
 
-    const insights = await callSonnetForInsights("hiring-team", context)
+    const insights = await callInsights("hiring-team", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -446,6 +462,7 @@ export interface MarketplaceInsightInput {
 
 export async function generateMarketplaceInsights(
   input: MarketplaceInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Help this founder evaluate suppliers on the marketplace:
@@ -456,7 +473,7 @@ Saved items: ${input.savedCount}
 Has active CAD Lab project: ${input.hasActiveCadProject}
 ${input.cadProjectSpecs ? `CAD project specs: ${wrapUserData("specs", input.cadProjectSpecs)}` : ""}`
 
-    const insights = await callSonnetForInsights("vp-supply-chain", context)
+    const insights = await callInsights("vp-supply-chain", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -828,6 +845,7 @@ export interface CashBurnInsightInput {
 
 export async function generateCashBurnInsights(
   input: CashBurnInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this cash burn projection and flag the most important financial risks or next steps:
@@ -841,7 +859,7 @@ Highest cost category: ${wrapUserData("category", input.topExpenseCategory || "n
 Revenue vs cost gap: ${input.revenueVsCostGapPct.toFixed(1)}% (positive = spending exceeds income)
 Scenarios modelled: ${input.scenarioCount}`
 
-    const insights = await callSonnetForInsights("finance-lead", context)
+    const insights = await callInsights("finance-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -861,6 +879,7 @@ export interface CashOutInsightInput {
 
 export async function generateCashOutInsights(
   input: CashOutInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this cost structure and identify expense optimisation opportunities or structural risks:
@@ -872,7 +891,7 @@ Top 3 costs: ${wrapUserData("top_costs", input.topThreeItems.join(", ") || "none
 Monthly total: £${(input.monthlyTotal / 100).toFixed(0)}
 Annual total: £${(input.annualTotal / 100).toFixed(0)}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callSonnetForInsights("finance-lead", context)
+    const insights = await callInsights("finance-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -892,6 +911,7 @@ export interface CashInInsightInput {
 
 export async function generateCashInInsights(
   input: CashInInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this income structure and advise on revenue concentration risk, funding dependency, and income diversification:
@@ -903,7 +923,7 @@ Revenue as % of total income: ${input.revenuePct.toFixed(0)}%
 Distinct income source types: ${input.sourceTypeCount}
 Total income items: ${input.itemCount}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callSonnetForInsights("finance-lead", context)
+    const insights = await callInsights("finance-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -925,6 +945,7 @@ export interface PnlInsightInput {
 
 export async function generatePnlInsights(
   input: PnlInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this projected P&L and identify the most important profitability insights for an early-stage hardware startup:
@@ -936,7 +957,7 @@ Annual R&D: £${(input.annualRnd / 100).toFixed(0)} (${input.rndPct.toFixed(1)}%
 EBITDA: £${(input.annualEbitda / 100).toFixed(0)} (margin: ${input.ebitdaMarginPct.toFixed(1)}%)
 ${input.annualEbitda < 0 ? "WARNING: EBITDA is negative — the company is not yet profitable." : "EBITDA is positive."}${formatSnapshot(input.snapshot)}`
 
-    const insights = await callSonnetForInsights("finance-lead", context)
+    const insights = await callInsights("finance-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -958,6 +979,7 @@ export interface ProfileInsightInput {
 
 export async function generateProfileInsights(
   input: ProfileInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const weekChange = input.taskCompletedLastWeek > 0
@@ -972,7 +994,7 @@ Foundry memberships: ${input.foundryCount}
 Has marketplace bio: ${input.hasMarketplaceBio ? "yes" : "no"}
 Has Telegram linked: ${input.hasTelegramLinked ? "yes" : "no"}`
 
-    const insights = await callSonnetForInsights("chief-of-staff", context)
+    const insights = await callInsights("chief-of-staff", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -987,6 +1009,7 @@ export interface UpdatesInsightInput {
 
 export async function generateUpdatesInsights(
   input: UpdatesInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this activity feed and advise on communication health:
@@ -994,7 +1017,7 @@ Recent activity items: ${input.activityCount}
 Team members: ${input.memberCount}
 Days since oldest unread activity: ${input.daysSinceOldestUnread}`
 
-    const insights = await callSonnetForInsights("chief-of-staff", context)
+    const insights = await callInsights("chief-of-staff", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1010,6 +1033,7 @@ export interface TimeInsightInput {
 
 export async function generateTimeInsights(
   input: TimeInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this time tracking data and advise on productivity and time allocation:
@@ -1018,7 +1042,7 @@ Time entries this week: ${input.entryCount}
 Projects worked on: ${input.projectCount}
 Days with time entries (out of 5): ${input.daysWithEntries}`
 
-    const insights = await callSonnetForInsights("chief-of-staff", context)
+    const insights = await callInsights("chief-of-staff", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1032,13 +1056,14 @@ export interface ReportsInsightInput {
 
 export async function generateReportsInsights(
   input: ReportsInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Advise this founder on report generation and sharing:
 Reports generated: ${input.reportCount}
 Last report generated: ${input.lastReportDate ?? "never"}`
 
-    const insights = await callSonnetForInsights("chief-of-staff", context)
+    const insights = await callInsights("chief-of-staff", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1055,6 +1080,7 @@ export interface ForgeInsightInput {
 
 export async function generateForgeInsights(
   input: ForgeInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this hardware engineering workspace and give specific guidance:
@@ -1064,7 +1090,7 @@ In progress: ${input.inProgressCount}
 Completed: ${input.completedCount}
 Total modules across projects: ${input.moduleTotal}`
 
-    const insights = await callSonnetForInsights("cto", context)
+    const insights = await callInsights("cto", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1078,6 +1104,7 @@ export interface AgentsInsightInput {
 
 export async function generateAgentsInsights(
   input: AgentsInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Advise on how this team is using their specialist roster:
@@ -1085,7 +1112,7 @@ Team workflows created: ${input.workflowCount}
 Custom prompts configured: ${input.customPromptCount}
 There are 13 specialists available covering strategy, engineering, finance, legal, HR, marketing, sales, and operations.`
 
-    const insights = await callSonnetForInsights("chief-of-staff", context)
+    const insights = await callInsights("chief-of-staff", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1101,6 +1128,7 @@ export interface GuildInsightInput {
 
 export async function generateGuildInsights(
   input: GuildInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this community guild and advise on team building:
@@ -1109,7 +1137,7 @@ Apprentices: ${input.apprenticeCount}
 Executives: ${input.executiveCount}
 Founders: ${input.founderCount}`
 
-    const insights = await callSonnetForInsights("hiring-team", context)
+    const insights = await callInsights("hiring-team", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1125,6 +1153,7 @@ export interface ApprenticeshipInsightInput {
 
 export async function generateApprenticeshipInsights(
   input: ApprenticeshipInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this apprenticeship programme and give specific coaching advice:
@@ -1133,7 +1162,7 @@ Average OTJT progress: ${input.avgProgress.toFixed(0)}%
 On track: ${input.onTrackCount}
 At risk: ${input.atRiskCount}`
 
-    const insights = await callSonnetForInsights("hiring-team", context)
+    const insights = await callInsights("hiring-team", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1148,6 +1177,7 @@ export interface OrdersInsightInput {
 
 export async function generateOrdersInsights(
   input: OrdersInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const total = input.activeCount + input.completedCount + input.cancelledCount
@@ -1158,7 +1188,7 @@ Completed orders: ${input.completedCount}
 Cancelled orders: ${input.cancelledCount}
 Fulfilment rate: ${fulfillmentPct}%`
 
-    const insights = await callSonnetForInsights("vp-supply-chain", context)
+    const insights = await callInsights("vp-supply-chain", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1176,6 +1206,7 @@ export interface FinanceHubInsightInput {
 
 export async function generateFinanceHubInsights(
   input: FinanceHubInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const netMargin = input.monthlyRevenue > 0
@@ -1189,7 +1220,7 @@ Cash position: £${(input.cashPosition / 100).toFixed(0)}
 Outstanding invoices: ${input.outstandingInvoiceCount} (£${(input.outstandingAmount / 100).toFixed(0)})
 Overdue amount: £${(input.overdueAmount / 100).toFixed(0)}`
 
-    const insights = await callSonnetForInsights("finance-lead", context)
+    const insights = await callInsights("finance-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1203,13 +1234,14 @@ export interface KnowledgeInsightInput {
 
 export async function generateKnowledgeInsights(
   input: KnowledgeInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Advise on this knowledge vault and how to build institutional memory:
 Total notes: ${input.noteCount}
 Pinned notes: ${input.pinnedCount}`
 
-    const insights = await callSonnetForInsights("strategist", context)
+    const insights = await callInsights("strategist", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1224,6 +1256,7 @@ export interface OutreachInsightInput {
 
 export async function generateOutreachInsights(
   input: OutreachInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this outreach programme and advise on sales pipeline:
@@ -1231,7 +1264,7 @@ Total campaigns: ${input.campaignCount}
 Active campaigns: ${input.activeCampaigns}
 Total contacts across campaigns: ${input.totalContacts}`
 
-    const insights = await callSonnetForInsights("sales-lead", context)
+    const insights = await callInsights("sales-lead", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1246,6 +1279,7 @@ export interface PitchPrepInsightInput {
 
 export async function generatePitchPrepInsights(
   input: PitchPrepInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse this pitch preparation activity and advise on fundraising readiness:
@@ -1253,7 +1287,7 @@ Total pitch requests: ${input.requestCount}
 Completed: ${input.completedCount}
 Active/in-progress: ${input.activeCount}`
 
-    const insights = await callSonnetForInsights("fundraising-advisor", context)
+    const insights = await callInsights("fundraising-advisor", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }
@@ -1269,6 +1303,7 @@ export interface PlannerInsightInput {
 
 export async function generatePlannerInsights(
   input: PlannerInsightInput,
+fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
     const context = `Analyse these strategic goals and advise on execution priorities:
@@ -1277,7 +1312,7 @@ Completed: ${input.completedGoals}
 At risk (overdue or behind): ${input.atRiskGoals}
 Average progress: ${input.avgProgress.toFixed(0)}%`
 
-    const insights = await callSonnetForInsights("strategist", context)
+    const insights = await callInsights("strategist", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))
   })
 }

@@ -222,12 +222,12 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
     }, [members])
 
     const { insights, dismissInsight } = usePageInsights(
-        () => generateGuildInsights({
+        (fast) => generateGuildInsights({
             memberCount: members.length,
             apprenticeCount: roleCounts.apprenticeCount,
             executiveCount: roleCounts.executiveCount,
             founderCount: roleCounts.founderCount,
-        }),
+        }, fast),
         members.length > 0,
         { cacheKey: 'harper-guild', emptyInsight: EMPTY_STATE_INSIGHT },
     )

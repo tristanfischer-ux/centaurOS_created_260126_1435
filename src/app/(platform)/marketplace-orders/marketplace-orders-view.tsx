@@ -203,11 +203,11 @@ export function MarketplaceOrdersView({
         openPanel(specialistId, { handoffContext: context, contextLabel: 'Orders' })
     }, [openPanel])
     const { insights, dismissInsight } = usePageInsights(
-        () => generateOrdersInsights({
+        (fast) => generateOrdersInsights({
             activeCount: activeOrders.length,
             completedCount: completedOrders.length,
             cancelledCount: cancelledOrders.length,
-        }),
+        }, fast),
         totalOrders > 0,
         { cacheKey: 'chase-orders', emptyInsight: EMPTY_STATE_INSIGHT },
     )

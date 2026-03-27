@@ -67,11 +67,11 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
   const completedCount = requests.filter(r => r.status === 'completed').length
   const activeCount = requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled').length
   const { insights, dismissInsight } = usePageInsights(
-    () => generatePitchPrepInsights({
+    (fast) => generatePitchPrepInsights({
       requestCount: requests.length,
       completedCount,
       activeCount,
-    }),
+    }, fast),
     requests.length > 0,
     { cacheKey: 'fiona-pitch-prep', emptyInsight: EMPTY_STATE_INSIGHT },
   )

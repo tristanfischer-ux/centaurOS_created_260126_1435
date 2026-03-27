@@ -123,12 +123,12 @@ export function ApprenticeDashboard({
   }, [openPanel])
   const completedModules = moduleProgress.modules.filter(m => m.status === 'completed').length
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateApprenticeshipInsights({
+    (fast) => generateApprenticeshipInsights({
       enrollmentCount: 1,
       avgProgress: otjtProgress.progressPercent,
       onTrackCount: otjtProgress.onTrack ? 1 : 0,
       atRiskCount: otjtProgress.onTrack ? 0 : 1,
-    }),
+    }, fast),
     completedModules > 0 || otjtProgress.hoursLogged > 0,
     { cacheKey: 'harper-apprentice-self', emptyInsight: EMPTY_STATE_INSIGHT },
   )

@@ -107,7 +107,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Out' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    async () => {
+    async (fast) => {
       const sorted = [...items].sort((a, b) => b.weeklyAmount - a.weeklyAmount)
       const topThree = sorted.slice(0, 3).map(i => i.name)
       const total = weeklyFixedTotal + weeklyVariableTotal
@@ -121,7 +121,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         monthlyTotal,
         annualTotal,
         snapshot,
-      })
+      }, fast)
     },
     items.length > 0,
     { cacheKey: 'finn-cash-out', emptyInsight: EMPTY_STATE_INSIGHT },

@@ -56,13 +56,13 @@ export function InvestorAdvisorInsights({ stats, shortlistIds }: InvestorAdvisor
   }, [openPanel])
 
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateInvestorInsights({
+    (fast) => generateInvestorInsights({
       totalFirms: stats.total,
       shortlistCount,
       shortlistTypes,
       shortlistLocations,
       activeFilters: '',
-    }),
+    }, fast),
     stats.total > 0,
     { cacheKey: 'fiona-investors', emptyInsight: EMPTY_STATE_INSIGHT },
   )

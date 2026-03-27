@@ -1,22 +1,15 @@
 /**
  * @file use-page-insights.ts — Shared hook for specialist page insights
  *
- * @description Extracts the common pattern of fetching AI specialist insights
- * on page load: state management, StrictMode double-mount guard, async fetch,
- * graceful error handling, localStorage caching, empty-state coaching,
- * loading state, and dismiss logic.
+ * @description Dual-stream specialist insights: fires Haiku (fast, ~1-2s) and
+ * Sonnet (deep, ~5-8s) in parallel. Shows Haiku result immediately, then
+ * silently upgrades to Sonnet's sharper analysis when it resolves.
  *
- * Caching: On successful fetch, insights are cached in localStorage keyed by
- * `cacheKey`. On next visit, cached insights are shown instantly while a fresh
- * fetch happens in the background. Cache expires after 1 hour.
+ * Caching: Sonnet result is cached in localStorage (1-hour TTL). On return
+ * visits, cached Sonnet result shows instantly — no loading, no API calls.
  *
  * Empty state: When `enabled` is false and `emptyInsight` is provided, the hook
- * returns that static insight so the specialist can coach the user on what to
- * enter first — no API call needed.
- *
- * Loading: `isLoading` is true when an API call is in flight and no cached
- * insights are available. When cache is available, `isLoading` stays false
- * (stale-while-revalidate pattern).
+ * returns that static insight with no API call.
  *
  * @related
  * - Server actions: src/actions/specialist-page-insights.ts
@@ -67,29 +60,32 @@ interface UsePageInsightsOptions {
 interface UsePageInsightsResult {
   insights: AgentInsight[]
   dismissInsight: (id: string) => void
-  /** True when an API call is in flight and no cached insights are available */
+  /** True when no insights are available yet (no cache, Haiku hasn't returned) */
   isLoading: boolean
 }
 
 /**
- * Fetches specialist insights on mount and provides dismiss logic.
+ * Dual-stream specialist insights hook.
  *
- * @param fetchFn - Async function that calls the relevant server action
- * @param enabled - Whether to fetch (false skips the call, e.g. when data is empty)
+ * Fires the fetch function twice in parallel — once with `fast: true` (Haiku)
+ * and once without (Sonnet). Shows Haiku's result immediately, then upgrades
+ * to Sonnet when it resolves. Caches the Sonnet result for future visits.
+ *
+ * @param fetchFn - Async function that calls a generate*Insights server action.
+ *                  Must accept an optional `fast` boolean as second argument.
+ * @param enabled - Whether to fetch (false skips the call)
  * @param options - Cache key and/or empty state insight
- * @returns insights array, dismissInsight callback, and isLoading state
  */
 export function usePageInsights(
-  fetchFn: () => Promise<AgentInsight[]>,
+  fetchFn: (fast?: boolean) => Promise<AgentInsight[]>,
   enabled: boolean,
   options?: string | UsePageInsightsOptions,
 ): UsePageInsightsResult {
-  // INTENT: Support both string (cacheKey only) and options object for backwards compat
   const opts = typeof options === 'string' ? { cacheKey: options } : options
   const cacheKey = opts?.cacheKey
   const emptyInsight = opts?.emptyInsight
 
-  // INTENT: Determine initial state — cache hit means no loading needed
+  // INTENT: Determine initial state — cache hit means no loading, no API calls
   const [initialState] = useState(() => {
     if (!enabled && emptyInsight) return { insights: [emptyInsight], hadCache: true }
     if (cacheKey && enabled) {
@@ -101,25 +97,54 @@ export function usePageInsights(
 
   const [insights, setInsights] = useState<AgentInsight[]>(initialState.insights)
   const [isLoading, setIsLoading] = useState(enabled && !initialState.hadCache)
-  // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
   const fetched = useRef(false)
+  // INTENT: Track whether Sonnet has already resolved — if so, don't let a
+  // late-arriving Haiku response downgrade the quality
+  const sonnetResolved = useRef(false)
 
   useEffect(() => {
     if (!enabled) return
     if (fetched.current) return
     fetched.current = true
 
-    fetchFn()
+    // INTENT: When we have a cache hit, skip Haiku entirely — just fire Sonnet
+    // in the background to refresh the cache for next time
+    if (initialState.hadCache) {
+      fetchFn(false)
+        .then((result) => {
+          if (Array.isArray(result) && result.length > 0) {
+            setInsights(result)
+            if (cacheKey) setCache(`page-insights:${cacheKey}`, result)
+          }
+        })
+        .catch(() => { /* Non-critical — cached insights already showing */ })
+      return
+    }
+
+    // DUAL-STREAM: Fire Haiku (fast) and Sonnet (deep) in parallel
+    // Haiku resolves first → show immediately → Sonnet upgrades later
+    const fastPromise = fetchFn(true)
       .then((result) => {
+        if (sonnetResolved.current) return // Sonnet already won the race
         if (Array.isArray(result) && result.length > 0) {
           setInsights(result)
-          if (cacheKey) {
-            setCache(`page-insights:${cacheKey}`, result)
-          }
+          setIsLoading(false)
         }
       })
-      .catch(() => { /* Non-critical — page works without insights */ })
-      .finally(() => setIsLoading(false))
+      .catch(() => { /* Non-critical */ })
+
+    const deepPromise = fetchFn(false)
+      .then((result) => {
+        sonnetResolved.current = true
+        if (Array.isArray(result) && result.length > 0) {
+          setInsights(result)
+          if (cacheKey) setCache(`page-insights:${cacheKey}`, result)
+        }
+      })
+      .catch(() => { /* Non-critical */ })
+
+    // Clear loading after both complete (in case Haiku failed silently)
+    Promise.allSettled([fastPromise, deepPromise]).then(() => setIsLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

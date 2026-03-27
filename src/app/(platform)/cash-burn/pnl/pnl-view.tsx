@@ -104,7 +104,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'P&L' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    async () => {
+    async (fast) => {
       const rev = totals.revenue
       const grossMarginPct = rev > 0 ? (totals.grossProfit / rev) * 100 : 0
       const ebitdaMarginPct = rev > 0 ? (totals.ebitda / rev) * 100 : 0
@@ -121,7 +121,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         ebitdaMarginPct,
         rndPct,
         snapshot,
-      })
+      }, fast)
     },
     cashOut.length > 0 || cashIn.length > 0,
     { cacheKey: 'finn-pnl', emptyInsight: EMPTY_STATE_INSIGHT },

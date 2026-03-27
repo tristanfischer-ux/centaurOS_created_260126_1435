@@ -160,7 +160,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Burn' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => {
+    (fast) => {
       const totalOut = cashOut.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
       const totalIn = cashIn.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
       const topCategory = expenseBreakdown.length > 0 ? expenseBreakdown[0].name : 'none'
@@ -176,7 +176,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         topExpenseCategory: topCategory,
         revenueVsCostGapPct: gapPct,
         scenarioCount: scenarios.length,
-      })
+      }, fast)
     },
     cashOut.length > 0 || cashIn.length > 0,
     { cacheKey: 'finn-cash-burn', emptyInsight: EMPTY_STATE_INSIGHT },

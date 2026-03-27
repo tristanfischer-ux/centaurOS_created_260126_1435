@@ -62,7 +62,7 @@ export function ForgeAdvisorInsights({ projects }: ForgeAdvisorInsightsProps) {
   }, [projects])
 
   const { insights, dismissInsight } = usePageInsights(
-    () => generateForgeInsights(projectStats),
+    (fast) => generateForgeInsights(projectStats, fast),
     projects.length > 0,
     { cacheKey: 'max-forge', emptyInsight: EMPTY_STATE_INSIGHT },
   )

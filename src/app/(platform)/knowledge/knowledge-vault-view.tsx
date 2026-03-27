@@ -349,10 +349,10 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
   }, [openPanel])
   const pinnedCount = useMemo(() => notes.filter(n => n.is_pinned).length, [notes])
   const { insights, dismissInsight } = usePageInsights(
-    () => generateKnowledgeInsights({
+    (fast) => generateKnowledgeInsights({
       noteCount: totalNotes,
       pinnedCount: pinnedCount,
-    }),
+    }, fast),
     totalNotes > 0,
     { cacheKey: 'sage-knowledge', emptyInsight: EMPTY_STATE_INSIGHT },
   )

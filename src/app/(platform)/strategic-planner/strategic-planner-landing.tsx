@@ -83,12 +83,12 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
     return { completedGoals: completed, atRiskGoals: atRisk, avgProgress: avg }
   }, [goals])
   const { insights, dismissInsight } = usePageInsights(
-    () => generatePlannerInsights({
+    (fast) => generatePlannerInsights({
       goalCount: goals.length,
       completedGoals,
       atRiskGoals,
       avgProgress,
-    }),
+    }, fast),
     goals.length > 0,
     { cacheKey: 'sage-planner', emptyInsight: EMPTY_STATE_INSIGHT },
   )

@@ -98,14 +98,14 @@ export function FinanceHubView({
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Finance' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateFinanceHubInsights({
+    (fast) => generateFinanceHubInsights({
       monthlyRevenue: current.monthlyRevenue,
       monthlyExpenses: current.monthlyExpenses,
       outstandingInvoiceCount: current.outstandingInvoicesCount,
       outstandingAmount: current.outstandingInvoicesAmount,
       overdueAmount: current.overdueAmount,
       cashPosition: current.cashPosition,
-    }),
+    }, fast),
     true,
     { cacheKey: 'finn-finance-hub', emptyInsight: EMPTY_STATE_INSIGHT },
   )

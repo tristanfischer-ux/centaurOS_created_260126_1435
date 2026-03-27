@@ -96,7 +96,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
   }
 
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => {
+    (fast) => {
       if (!stats) return Promise.resolve([])
       const firmTypes = Array.from(
         new Set(stats.shortlistedFirms.map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string'))
@@ -107,7 +107,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
         coverageGaps: stats.coverageGaps,
         firmTypes,
         recentActivityCount: stats.recentNotes.length,
-      })
+      }, fast)
     },
     !!stats && stats.totalTracked > 0,
     { cacheKey: 'fiona-fundraise', emptyInsight: EMPTY_STATE_INSIGHT },

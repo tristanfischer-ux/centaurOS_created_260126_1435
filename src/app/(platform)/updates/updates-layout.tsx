@@ -101,11 +101,11 @@ export function UpdatesLayout({
     return Math.max(0, Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / (1000 * 60 * 60 * 24)))
   }, [initialItems])
   const { insights, dismissInsight } = usePageInsights(
-    () => generateUpdatesInsights({
+    (fast) => generateUpdatesInsights({
       activityCount: initialItems.length,
       memberCount: members.length,
       daysSinceOldestUnread: daysSinceOldest,
-    }),
+    }, fast),
     initialItems.length > 0,
     { cacheKey: 'cal-updates', emptyInsight: EMPTY_STATE_INSIGHT },
   )

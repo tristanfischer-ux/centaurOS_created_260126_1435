@@ -190,7 +190,7 @@ export function TimeTrackerView({
     return { hoursThisWeek, entryCount: initialEntries.length, projectCount: projectIds.size, daysWithEntries }
   }, [initialEntries])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateTimeInsights(timeInsightData),
+    (fast) => generateTimeInsights(timeInsightData, fast),
     initialEntries.length > 0,
     { cacheKey: 'cal-time', emptyInsight: EMPTY_STATE_INSIGHT },
   )

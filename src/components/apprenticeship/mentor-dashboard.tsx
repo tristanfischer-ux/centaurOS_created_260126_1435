@@ -96,12 +96,12 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
     ? mentees.reduce((s, m) => s + (m.otjt_hours_target > 0 ? (m.otjt_hours_logged / m.otjt_hours_target) * 100 : 0), 0) / mentees.length
     : 0
   const { insights: mentorInsights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateApprenticeshipInsights({
+    (fast) => generateApprenticeshipInsights({
       enrollmentCount: mentees.length,
       avgProgress,
       onTrackCount: mentees.length, // simplified — admin dashboard has precise counts
       atRiskCount: 0,
-    }),
+    }, fast),
     mentees.length > 0,
     { cacheKey: 'harper-mentor', emptyInsight: MENTOR_EMPTY_INSIGHT },
   )

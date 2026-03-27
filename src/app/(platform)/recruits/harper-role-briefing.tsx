@@ -45,11 +45,11 @@ export function HarperRoleBriefing({ totalListings, categories }: HarperRoleBrie
   }, [openPanel])
 
   const { insights, dismissInsight } = usePageInsights(
-    () => generateRecruitsInsights({
+    (fast) => generateRecruitsInsights({
       totalListings,
       categories,
       teamGaps: [],
-    }),
+    }, fast),
     totalListings > 0,
     { cacheKey: 'harper-recruits', emptyInsight: EMPTY_STATE_INSIGHT },
   )

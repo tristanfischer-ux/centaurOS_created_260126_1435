@@ -79,10 +79,10 @@ export function SpecialistsPageClient({
         openPanel(specialistId, { handoffContext: context, contextLabel: 'AI Team' })
     }, [openPanel])
     const { insights, dismissInsight } = usePageInsights(
-        () => generateAgentsInsights({
+        (fast) => generateAgentsInsights({
             workflowCount: initialWorkflows.length,
             customPromptCount: initialCustomPrompts.length,
-        }),
+        }, fast),
         true,
         { cacheKey: 'cal-agents', emptyInsight: EMPTY_STATE_INSIGHT },
     )

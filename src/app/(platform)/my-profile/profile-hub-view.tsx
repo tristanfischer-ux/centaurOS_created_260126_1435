@@ -106,14 +106,14 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
     openPanel(specialistId, { handoffContext: context, contextLabel: 'My Profile' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    () => generateProfileInsights({
+    (fast) => generateProfileInsights({
       taskCompletedThisWeek: enrichment?.completedThisWeek ?? 0,
       taskCompletedLastWeek: enrichment?.completedLastWeek ?? 0,
       foundryCount: foundries.length,
       role: data.profile?.role ?? 'Member',
       hasMarketplaceBio: !!data.providerProfile?.bio,
       hasTelegramLinked: !!telegramLink,
-    }),
+    }, fast),
     !!data.profile,
     { cacheKey: 'cal-profile', emptyInsight: EMPTY_STATE_INSIGHT },
   )

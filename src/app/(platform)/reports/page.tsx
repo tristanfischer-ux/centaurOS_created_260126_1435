@@ -366,10 +366,10 @@ export default function ReportsPage(): React.JSX.Element {
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Reports' })
   }, [openPanel])
   const { insights, dismissInsight } = usePageInsights(
-    () => generateReportsInsights({
+    (fast) => generateReportsInsights({
       reportCount: 0,
       lastReportDate: null,
-    }),
+    }, fast),
     true,
     { cacheKey: 'cal-reports', emptyInsight: EMPTY_STATE_INSIGHT },
   )

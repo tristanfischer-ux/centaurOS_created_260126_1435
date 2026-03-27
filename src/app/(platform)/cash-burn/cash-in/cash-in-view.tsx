@@ -157,7 +157,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash In' })
   }, [openPanel])
   const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    async () => {
+    async (fast) => {
       const revenueWeekly = (groupedItems['revenue'] ?? []).reduce((s, i) => s + i.weeklyAmount, 0)
       const nonRevenueWeekly = weeklyTotal - revenueWeekly
       const sourceTypeCount = SOURCE_TYPE_CONFIG.filter(cfg => (groupedItems[cfg.type] ?? []).length > 0).length
@@ -171,7 +171,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         itemCount: items.length,
         revenuePct: weeklyTotal > 0 ? (revenueWeekly / weeklyTotal) * 100 : 0,
         snapshot,
-      })
+      }, fast)
     },
     items.length > 0,
     { cacheKey: 'finn-cash-in', emptyInsight: EMPTY_STATE_INSIGHT },
@@ -359,7 +359,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                     setBalanceError(null)
                   }}
                   onFocus={() => setBalanceFocused(true)}
-                  onBlur={() => {
+                  onBlur={(fast) => {
                     setBalanceFocused(false)
                     saveOpeningBalance()
                   }}
