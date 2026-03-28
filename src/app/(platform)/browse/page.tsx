@@ -258,7 +258,7 @@ export default function BrowsePage(): React.ReactElement {
   const canGoForward = historyIndex < history.length - 1
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] -m-4 sm:-m-6 lg:-m-8 -mt-14 sm:-mt-6 lg:-mt-8">
+    <div className="flex flex-col h-[calc(100vh-6rem)] -mx-4 sm:-mx-6 lg:-mx-8 -mb-4 sm:-mb-6 lg:-mb-8">
       {/* Page header */}
       <div className="px-4 py-3 border-b bg-background">
         <div className="flex items-center gap-3">
