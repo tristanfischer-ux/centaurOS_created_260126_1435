@@ -59,6 +59,7 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
     industries: unknown
     certifications: unknown
     process_capabilities: unknown
+    country: string | null
   }[] = []
   let offset = 0
   const pageSize = 1000
@@ -66,7 +67,7 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
   while (true) {
     const { data, error } = await supabase
       .from("marketplace_listings")
-      .select("is_verified, attributes, subcategory, industries, certifications, process_capabilities")
+      .select("is_verified, attributes, subcategory, industries, certifications, process_capabilities, country")
       .in("category", ["Products", "Services"])
       .range(offset, offset + pageSize - 1)
 
@@ -169,17 +170,30 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
       sizeCounts.set(size, (sizeCounts.get(size) ?? 0) + 1)
     }
 
-    // Region — derive from postal code or keywords
+    // Region — check country first, then derive from postcode/keywords for UK
     let region: string | null = null
 
-    const chAddress = attrs.ch_registered_address as string | undefined
-    if (chAddress) {
-      const postcode = extractPostcode(chAddress)
-      if (postcode) region = deriveRegionFromPostcode(postcode)
+    // INTENT: Non-UK suppliers show their country name as the region.
+    // UK suppliers get the detailed regional breakdown (Midlands, Yorkshire, etc.).
+    const country = row.country || (attrs?.country as string | undefined)
+    const isUK = !country || ["GB", "UK", "United Kingdom", "England", "Scotland", "Wales"].includes(country)
+
+    if (!isUK && country) {
+      // European/international suppliers — use country name as region
+      region = country
+    }
+
+    // UK suppliers — derive region from postcode
+    if (!region) {
+      const chAddress = attrs?.ch_registered_address as string | undefined
+      if (chAddress) {
+        const postcode = extractPostcode(chAddress)
+        if (postcode) region = deriveRegionFromPostcode(postcode)
+      }
     }
 
     if (!region) {
-      const location = attrs.location as string | undefined
+      const location = attrs?.location as string | undefined
       if (location) {
         const postcode = extractPostcode(location)
         if (postcode) region = deriveRegionFromPostcode(postcode)
@@ -187,7 +201,7 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
     }
 
     if (!region) {
-      const hq = attrs.headquarters as string | undefined
+      const hq = attrs?.headquarters as string | undefined
       if (hq) {
         const postcode = extractPostcode(hq)
         if (postcode) region = deriveRegionFromPostcode(postcode)
@@ -195,9 +209,9 @@ const fetchMarketplaceStats = async (): Promise<MarketplaceStats | null> => {
     }
 
     if (!region) {
-      const locationText = (attrs.ch_registered_address as string)
-        ?? (attrs.location as string)
-        ?? (attrs.headquarters as string)
+      const locationText = (attrs?.ch_registered_address as string)
+        ?? (attrs?.location as string)
+        ?? (attrs?.headquarters as string)
       if (locationText) region = deriveRegionFromKeywords(locationText)
     }
 

@@ -648,7 +648,7 @@ export function RedTeamView(): React.ReactElement {
   if (compareDebates) {
     const [debateA, debateB] = compareDebates
     return (
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
@@ -1045,7 +1045,7 @@ export function RedTeamView(): React.ReactElement {
 
   if (isGenerating) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
@@ -1137,7 +1137,7 @@ export function RedTeamView(): React.ReactElement {
 
   if (awaitingInput && resumeState) {
     return (
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
@@ -1226,7 +1226,7 @@ export function RedTeamView(): React.ReactElement {
   if (!debate) return <div />
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
