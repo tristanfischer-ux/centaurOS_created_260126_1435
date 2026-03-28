@@ -513,29 +513,7 @@ export function TodayView({
         <div className="max-w-5xl space-y-8">
             <PageHeader />
 
-            {/* Getting Started Hero Checklist — shown for new users */}
-            {initialOnboardingData && (
-                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
-            )}
-
-            {/* Sandbox Welcome Banner — shown for sandbox users who haven't dismissed */}
-            {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: EASE_CURVE }}
-                >
-                    <SandboxWelcomeBanner onDismiss={handleDismissSandboxBanner} onCreateCompany={() => setShowCreateCompany(true)} isMigrated={isMigratedUser} />
-                </motion.div>
-            )}
-
-            {/* Create Company Dialog — triggered from sandbox banner */}
-            <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
-
-            {/* Running Low on AI Tasks — Referral Nudge */}
-            <ReferralNudgeBanner />
-
-            {/* Hero Narrative Card */}
+            {/* Hero Narrative Card — Cal's briefing is ALWAYS first */}
             <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -772,6 +750,28 @@ export function TodayView({
                     ))}
                 </motion.div>
             )}
+
+            {/* Getting Started Hero Checklist — shown for new users */}
+            {initialOnboardingData && (
+                <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
+            )}
+
+            {/* Sandbox Welcome Banner — shown for sandbox users who haven't dismissed */}
+            {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: EASE_CURVE }}
+                >
+                    <SandboxWelcomeBanner onDismiss={handleDismissSandboxBanner} onCreateCompany={() => setShowCreateCompany(true)} isMigrated={isMigratedUser} />
+                </motion.div>
+            )}
+
+            {/* Create Company Dialog — triggered from sandbox banner */}
+            <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
+
+            {/* Running Low on AI Tasks — Referral Nudge */}
+            <ReferralNudgeBanner />
 
             {/* Focus Tasks Section */}
             <motion.div
