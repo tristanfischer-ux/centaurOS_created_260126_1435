@@ -463,6 +463,26 @@ export function StrategyDashboard({
         </div>
       </div>
 
+      {/* Sage's Strategy Overview — always visible, right after header */}
+      <StrategyHealthReview
+        pillars={pillars.map(p => ({
+          title: p.title,
+          health: p.health,
+          progress: p.progress,
+          overdueTasks: p.overdueTasks,
+          objectiveCount: p.objectiveCount,
+        }))}
+        purposeSummary={purposeData?.purpose}
+        totalObjectives={totalObjectives}
+        unlinkedObjectiveCount={unlinkedObjectiveCount}
+      />
+
+      <DocumentUploadPrompt
+        domain="strategy"
+        suggestion="pitch deck or business plan"
+        specialistName="Sage"
+      />
+
       {/* ── Business Plan Upload Zone ── */}
       {isFounder && (
         <div>
@@ -491,29 +511,9 @@ export function StrategyDashboard({
         />
       )}
 
-      <DocumentUploadPrompt
-        domain="strategy"
-        suggestion="pitch deck or business plan"
-        specialistName="Sage"
-      />
-
       {/* ── Dashboard View ── */}
       {viewMode === 'dashboard' && (
         <div className="space-y-8">
-          {/* Sage's Strategy Overview — top of page */}
-          <StrategyHealthReview
-            pillars={pillars.map(p => ({
-              title: p.title,
-              health: p.health,
-              progress: p.progress,
-              overdueTasks: p.overdueTasks,
-              objectiveCount: p.objectiveCount,
-            }))}
-            purposeSummary={purposeData?.purpose}
-            totalObjectives={totalObjectives}
-            unlinkedObjectiveCount={unlinkedObjectiveCount}
-          />
-
           {/* Company Purpose Hero */}
           <div data-tour="strategy-purpose">
           <CompanyPurposeWrapper
