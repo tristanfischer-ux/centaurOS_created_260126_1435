@@ -41,7 +41,7 @@ export default async function ArtifactsPage(): Promise<React.JSX.Element> {
   const safeArtifacts: AgentArtifactRow[] = artifacts ?? []
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Page header with orange accent bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
