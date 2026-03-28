@@ -108,6 +108,7 @@ interface ResumeState {
   priorRounds: DebateRound[]
   priorTranscript: string
   evidencePack: string
+  evidenceItems?: { label: string; content: string }[]
   customQuestions: string[]
   userInputs: Record<number, string>
   totalCostSoFar: number
@@ -480,6 +481,7 @@ export function RedTeamView(): React.ReactElement {
       priorRounds: resumeState.priorRounds,
       priorTranscript: resumeState.priorTranscript,
       evidencePack: resumeState.evidencePack,
+      evidenceItems: resumeState.evidenceItems,
       customQuestions: resumeState.customQuestions,
       userInputs: resumeState.userInputs,
       totalCostSoFar: resumeState.totalCostSoFar,
@@ -488,9 +490,24 @@ export function RedTeamView(): React.ReactElement {
   }, [resumeState, userInterjection, topic, context, awaitingRound, startStream])
 
   const handleSkipInterjection = useCallback(() => {
+    if (!resumeState) return
     setUserInterjection("")
-    handleSubmitInterjection()
-  }, [handleSubmitInterjection])
+    // INTENT: Skip sends no user input — don't call handleSubmitInterjection
+    // because it would read the stale userInterjection state.
+    startStream({
+      topic: topic.trim(),
+      context: context.trim() || undefined,
+      resumeFromRound: awaitingRound,
+      priorRounds: resumeState.priorRounds,
+      priorTranscript: resumeState.priorTranscript,
+      evidencePack: resumeState.evidencePack,
+      evidenceItems: resumeState.evidenceItems,
+      customQuestions: resumeState.customQuestions,
+      userInputs: resumeState.userInputs,
+      totalCostSoFar: resumeState.totalCostSoFar,
+      debateId: resumeState.debateId,
+    })
+  }, [resumeState, topic, context, awaitingRound, startStream])
 
   // ─── Round Toggle ─────────────────────────────────────────────
 

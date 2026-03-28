@@ -1,12 +1,10 @@
 /**
- * @file route.ts — Red Team Debate SSE streaming endpoint
+ * @file route.ts — Red Team Debate SSE streaming endpoint (v2)
  *
  * @description Streams a multi-LLM adversarial debate via Server-Sent Events.
- * Each persona's argument streams incrementally to the client, with progress
- * events for research, fact-checking, synthesis, and action generation.
- *
- * Uses 15-second heartbeat to prevent Vercel idle timeout.
- * Saves completed debates to report_snapshots for history.
+ * Supports interactive mode (pause between rounds for user input),
+ * numbered evidence linking, adaptive round questions, cost tracking,
+ * and structured JSON tensions output.
  *
  * @security Requires authenticated user via Supabase cookie session.
  */
@@ -16,6 +14,7 @@ import { createClient } from "@/lib/supabase/server"
 import { v4 as uuidv4 } from "uuid"
 import { getTextProvider } from "@/lib/ai-providers/registry"
 import type { AIProviderId } from "@/lib/ai-providers/types"
+import { estimateAICost } from "@/lib/ai/usage-tracking"
 import {
   DEBATE_PERSONAS,
   DEBATE_ROUNDS,
@@ -27,12 +26,14 @@ import {
   getObjectivesPrompt,
   getTasksPrompt,
   getRiskMitigationsPrompt,
+  getAdaptiveQuestionsPrompt,
 } from "@/lib/red-team/prompts"
 import type {
   RedTeamDebateDocument,
   DebateRound,
   DebateArgument,
   FactCheck,
+  TensionRow,
 } from "@/lib/red-team/types"
 
 export const runtime = "nodejs"
@@ -48,47 +49,16 @@ function resolveApiKey(providerId: AIProviderId): string {
     qwen: process.env.DASHSCOPE_API_KEY?.trim(),
   }
   const key = envMap[providerId]
-  if (!key) throw new Error(`API key not configured for provider: ${providerId}`)
+  if (!key) throw new Error(`API key not configured for: ${providerId}`)
   return key
 }
 
-// ─── LLM Call (batch — collects full output) ────────────────────
-
-async function callLLMBatch(
-  providerId: AIProviderId,
-  modelId: string,
-  systemPrompt: string,
-  userPrompt: string,
-  maxTokens = 1500,
-): Promise<{ text: string; duration: number }> {
-  const streamFn = getTextProvider(providerId)
-  if (!streamFn) throw new Error(`Provider ${providerId} not available`)
-  const apiKey = resolveApiKey(providerId)
-  const start = Date.now()
-  let output = ""
-
-  await new Promise<void>((resolve, reject) => {
-    streamFn({
-      apiKey, modelId, systemPrompt, userPrompt, maxTokens,
-      onChunk: (t) => { output += t },
-      onDone: () => resolve(),
-      onError: (e) => reject(new Error(`${providerId}/${modelId}: ${e}`)),
-    }).catch(reject)
-  })
-
-  return { text: output, duration: Date.now() - start }
-}
-
-// ─── LLM Call (streaming — emits chunks via callback) ───────────
+// ─── LLM Calls ──────────────────────────────────────────────────
 
 async function callLLMStreaming(
-  providerId: AIProviderId,
-  modelId: string,
-  systemPrompt: string,
-  userPrompt: string,
-  onChunk: (text: string) => void,
-  maxTokens = 1500,
-): Promise<{ text: string; duration: number }> {
+  providerId: AIProviderId, modelId: string, systemPrompt: string, userPrompt: string,
+  onChunk: (text: string) => void, maxTokens = 1500,
+): Promise<{ text: string; duration: number; costUsd: number }> {
   const streamFn = getTextProvider(providerId)
   if (!streamFn) throw new Error(`Provider ${providerId} not available`)
   const apiKey = resolveApiKey(providerId)
@@ -104,19 +74,20 @@ async function callLLMStreaming(
     }).catch(reject)
   })
 
-  return { text: output, duration: Date.now() - start }
-}
+  // Estimate cost from token count (rough: 4 chars ≈ 1 token)
+  const promptTokens = Math.ceil((systemPrompt.length + userPrompt.length) / 4)
+  const completionTokens = Math.ceil(output.length / 4)
+  const costUsd = estimateAICost(modelId, promptTokens, completionTokens)
 
-// ─── Quick Haiku ────────────────────────────────────────────────
+  return { text: output, duration: Date.now() - start, costUsd }
+}
 
 async function callHaiku(prompt: string, maxTokens = 500): Promise<string> {
   try {
-    const { text } = await callLLMBatch("anthropic", "claude-haiku-4-5", "Be concise, factual, cite sources.", prompt, maxTokens)
-    return text
+    const result = await callLLMStreaming("anthropic", "claude-haiku-4-5", "Be concise, factual, cite sources.", prompt, () => {}, maxTokens)
+    return result.text
   } catch { return "[Research unavailable]" }
 }
-
-// ─── JSON Parser ────────────────────────────────────────────────
 
 function safeParseJSON<T>(text: string): T[] {
   try {
@@ -132,14 +103,31 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { topic, context } = await request.json() as { topic: string; context?: string }
+  const body = await request.json() as {
+    topic: string
+    context?: string
+    /** Resume from a specific round with user input (interactive mode) */
+    resumeFromRound?: number
+    userInput?: string
+    /** Prior state when resuming */
+    priorRounds?: DebateRound[]
+    priorTranscript?: string
+    evidencePack?: string
+    evidenceItems?: { label: string; content: string }[]
+    customQuestions?: string[]
+    userInputs?: Record<number, string>
+    totalCostSoFar?: number
+  }
+
+  const { topic, context } = body
   if (!topic || topic.trim().length < 10) {
     return NextResponse.json({ error: "Topic must be at least 10 characters" }, { status: 400 })
   }
 
   const encoder = new TextEncoder()
-  const debateId = uuidv4()
+  const debateId = body.resumeFromRound ? (body as Record<string, unknown>).debateId as string || uuidv4() : uuidv4()
   const startTime = Date.now()
+  const isResume = !!body.resumeFromRound
 
   const readable = new ReadableStream({
     async start(controller) {
@@ -148,27 +136,59 @@ export async function POST(request: Request) {
         catch { /* stream closed */ }
       }
 
-      // Heartbeat — prevents Vercel idle timeout
       const heartbeat = setInterval(() => {
         try { controller.enqueue(encoder.encode(": keepalive\n\n")) }
         catch { clearInterval(heartbeat) }
       }, 15_000)
 
+      let totalCostUsd = body.totalCostSoFar || 0
+
       try {
-        // ── Research Swarm ───────────────────────────────
-        emit({ phase: "research", message: "Researching market data, competitors, and analogies..." })
-        const researchPrompts = getResearchPrompts(topic)
-        const researchResults = await Promise.all(researchPrompts.map(p => callHaiku(p, 400)))
-        const labels = ["Market Size & TAM", "Competitors", "Pricing & Unit Economics", "Regulatory", "Industry Analogies", "Technology Risks"]
-        const evidencePack = labels.map((l, i) => `### ${l}\n${researchResults[i]}`).join("\n\n")
-        emit({ phase: "evidence", data: evidencePack })
+        // ── Research Swarm (skip if resuming) ────────────
+        let evidencePack = body.evidencePack || ""
+        let evidenceItems: { label: string; content: string }[] = body.evidenceItems || []
+        let customQuestions: string[] = body.customQuestions || []
+
+        if (!isResume) {
+          emit({ phase: "research", message: "Researching market data, competitors, and analogies..." })
+          const researchPrompts = getResearchPrompts(topic)
+          const researchResults = await Promise.all(researchPrompts.map(p => callHaiku(p, 400)))
+          const labels = ["Market Size & TAM", "Competitors", "Pricing & Unit Economics", "Regulatory", "Industry Analogies", "Technology Risks"]
+
+          // Number each evidence item for citation
+          evidenceItems = labels.map((l, i) => ({ label: l, content: researchResults[i] }))
+          evidencePack = evidenceItems.map((item, i) => `[R${i + 1}] ${item.label}\n${item.content}`).join("\n\n")
+          emit({ phase: "evidence", data: evidencePack, items: evidenceItems })
+
+          // ── Adaptive Questions ─────────────────────────
+          emit({ phase: "research", message: "Generating debate questions..." })
+          try {
+            const questionsRaw = await callHaiku(getAdaptiveQuestionsPrompt(topic), 300)
+            const parsed = safeParseJSON<string>(questionsRaw)
+            if (parsed.length >= 4) {
+              customQuestions = parsed.slice(0, 5)
+              emit({ phase: "custom_questions", questions: customQuestions })
+            }
+          } catch { /* use defaults */ }
+        }
+
+        const roundQuestions = customQuestions.length >= 4 ? customQuestions : DEBATE_ROUNDS
+        const rounds: DebateRound[] = body.priorRounds || []
+        let fullTranscript = body.priorTranscript || ""
+        const userInputs: Record<number, string> = body.userInputs || {}
+        const startRound = body.resumeFromRound || 0
+
+        // If resuming with user input, add it to the transcript
+        if (isResume && body.userInput && body.resumeFromRound) {
+          const roundNum = body.resumeFromRound
+          userInputs[roundNum] = body.userInput
+          fullTranscript += `\n## FOUNDER INTERJECTION (after Round ${roundNum})\n${body.userInput}\n`
+          emit({ phase: "user_input_recorded", round: roundNum, input: body.userInput })
+        }
 
         // ── Debate Rounds ────────────────────────────────
-        const rounds: DebateRound[] = []
-        let fullTranscript = ""
-
-        for (let roundIdx = 0; roundIdx < DEBATE_ROUNDS.length; roundIdx++) {
-          const question = DEBATE_ROUNDS[roundIdx]
+        for (let roundIdx = startRound; roundIdx < roundQuestions.length; roundIdx++) {
+          const question = roundQuestions[roundIdx]
           emit({ phase: "round_start", round: roundIdx + 1, question })
 
           const roundArguments: DebateArgument[] = []
@@ -178,29 +198,27 @@ export async function POST(request: Request) {
             emit({ phase: "persona_start", round: roundIdx + 1, persona: persona.role, characterName: persona.characterName, modelId: persona.modelId })
 
             const systemPrompt = getPersonaSystemPrompt(persona.role, topic)
-            const userPrompt = `## Evidence Pack\n${evidencePack}\n\n${context ? `## User Context\n${context}\n\n` : ""}## Debate History\n${fullTranscript || "(Opening — no prior arguments.)"}\n\n## Round ${roundIdx + 1}/${DEBATE_ROUNDS.length}: ${question}\n${roundText ? `### This round so far:\n${roundText}` : "(You speak first.)"}\n\nMake your argument as ${persona.label} (${persona.characterName}). Be specific, cite evidence.`
+            const userPrompt = `## Evidence Pack (cite as [R1], [R2], etc.)\n${evidencePack}\n\n${context ? `## User Context\n${context}\n\n` : ""}## Debate History\n${fullTranscript || "(Opening — no prior arguments.)"}\n\n## Round ${roundIdx + 1}/${roundQuestions.length}: ${question}\n${roundText ? `### This round so far:\n${roundText}` : "(You speak first.)"}\n\nMake your argument as ${persona.label} (${persona.characterName}). Be specific, cite evidence with [R1]-[R6] references.`
 
-            const { text, duration } = await callLLMStreaming(
-              persona.providerId,
-              persona.modelId,
-              systemPrompt,
-              userPrompt,
+            const { text, duration, costUsd } = await callLLMStreaming(
+              persona.providerId, persona.modelId, systemPrompt, userPrompt,
               (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
             )
 
-            roundArguments.push({ role: persona.role, characterName: persona.characterName, modelId: persona.modelId, content: text, duration })
+            totalCostUsd += costUsd
+            roundArguments.push({ role: persona.role, characterName: persona.characterName, modelId: persona.modelId, content: text, duration, costUsd })
             roundText += `\n### ${persona.label} (${persona.characterName})\n${text}\n`
-            emit({ phase: "persona_complete", round: roundIdx + 1, persona: persona.role, duration })
+            emit({ phase: "persona_complete", round: roundIdx + 1, persona: persona.role, duration, costUsd })
           }
 
           fullTranscript += `\n## ROUND ${roundIdx + 1}: ${question}\n${roundText}`
 
-          // Fact-check this round
+          // Fact-check
           emit({ phase: "fact_check_start", round: roundIdx + 1 })
           let factChecks: FactCheck[] = []
           try {
             const extractionResult = await callHaiku(getClaimExtractionPrompt(roundText), 500)
-            const claims: string[] = safeParseJSON<string>(extractionResult).slice(0, 5)
+            const claims = safeParseJSON<string>(extractionResult).slice(0, 5)
             if (claims.length > 0) {
               factChecks = await Promise.all(claims.map(async (claim): Promise<FactCheck> => {
                 try {
@@ -211,29 +229,60 @@ export async function POST(request: Request) {
                 } catch { return { claim, verdict: "unverified" as const, detail: "Check failed" } }
               }))
             }
-          } catch { /* claim extraction failed — continue without fact-checks */ }
+          } catch { /* continue */ }
           emit({ phase: "fact_check_complete", round: roundIdx + 1, checks: factChecks })
 
           rounds.push({ roundNumber: roundIdx + 1, question, arguments: roundArguments, factChecks })
+
+          // ── Interactive pause (after each round except the last) ──
+          if (roundIdx < roundQuestions.length - 1) {
+            emit({
+              phase: "awaiting_input",
+              round: roundIdx + 1,
+              message: "Add your thoughts before the next round, or skip to continue.",
+              // Send state so client can resume
+              state: {
+                priorRounds: rounds,
+                priorTranscript: fullTranscript,
+                evidencePack,
+                evidenceItems,
+                customQuestions: roundQuestions,
+                userInputs,
+                totalCostSoFar: totalCostUsd,
+                debateId,
+              },
+            })
+            // Close stream — client will re-POST to resume
+            clearInterval(heartbeat)
+            try { controller.close() } catch { /* already closed */ }
+            return
+          }
         }
 
         // ── Synthesis ────────────────────────────────────
         emit({ phase: "synthesis_start", message: "Writing verdict..." })
-        let synthesisText = ""
-        await callLLMStreaming(
+        const { text: synthesisText, costUsd: synthCost } = await callLLMStreaming(
           "anthropic", "claude-opus-4-6",
           "Write the authoritative final synthesis. Be measured, specific, honest.",
           getSynthesisPrompt(topic, fullTranscript),
-          (chunk) => { synthesisText += ""; emit({ phase: "synthesis_chunk", chunk }) },
+          (chunk) => emit({ phase: "synthesis_chunk", chunk }),
           3000,
-        ).then(r => { synthesisText = r.text })
+        )
+        totalCostUsd += synthCost
 
-        // Parse tensions
-        const tensionsMatch = synthesisText.match(/## KEY TENSIONS[\s\S]*?(?=## VERDICT|$)/i)
+        // Parse JSON tensions
+        let tensions: TensionRow[] = []
+        const jsonMatch = synthesisText.match(/```json\s*([\s\S]*?)```/)
+        if (jsonMatch) {
+          try { tensions = JSON.parse(jsonMatch[1]) } catch { /* fallback below */ }
+        }
+        if (tensions.length === 0) {
+          // Fallback: regex parse markdown table
+          tensions = parseTensionsTable(synthesisText)
+        }
+
         const verdictMatch = synthesisText.match(/## VERDICT[\s\S]*/i)
         const verdict = verdictMatch?.[0] || synthesisText
-
-        const tensions = parseTensionsTable(tensionsMatch?.[0] || "")
 
         // ── Actions ──────────────────────────────────────
         emit({ phase: "actions_start", message: "Generating recommended actions..." })
@@ -254,14 +303,16 @@ export async function POST(request: Request) {
 
         // ── Compose Document ─────────────────────────────
         const document: RedTeamDebateDocument = {
-          id: debateId,
-          topic, context,
+          id: debateId, topic, context,
           generatedAt: new Date().toISOString(),
           personas: DEBATE_PERSONAS,
-          evidencePack,
+          evidencePack, evidenceItems,
           rounds, tensions, verdict,
+          customQuestions: customQuestions.length > 0 ? customQuestions : undefined,
+          userInputs: Object.keys(userInputs).length > 0 ? userInputs : undefined,
           suggestedObjectives, suggestedTasks, suggestedRiskMitigations,
           totalDuration: Date.now() - startTime,
+          totalCostUsd: Number(totalCostUsd.toFixed(4)),
         }
 
         emit({ phase: "complete", document })
@@ -278,12 +329,11 @@ export async function POST(request: Request) {
           foundry_id: profileData.data?.foundry_id || "unknown",
           profile_id: user.id,
         }).then(({ error }: { error: { message: string } | null }) => {
-          if (error) console.warn("[RedTeam] Failed to save snapshot:", error.message)
-          else console.log("[RedTeam] Saved debate snapshot:", debateId)
+          if (error) console.warn("[RedTeam] Save failed:", error.message)
         })
 
       } catch (err) {
-        emit({ phase: "error", message: err instanceof Error ? err.message : "Debate generation failed" })
+        emit({ phase: "error", message: err instanceof Error ? err.message : "Debate failed" })
       } finally {
         clearInterval(heartbeat)
         try { controller.close() } catch { /* already closed */ }
@@ -292,17 +342,11 @@ export async function POST(request: Request) {
   })
 
   return new Response(readable, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-    },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "Connection": "keep-alive" },
   })
 }
 
-// ─── Helpers ────────────────────────────────────────────────────
-
-function parseTensionsTable(text: string): RedTeamDebateDocument["tensions"] {
+function parseTensionsTable(text: string): TensionRow[] {
   const rows = text.split("\n").filter(line => line.includes("|") && !line.includes("---"))
   if (rows.length < 2) return []
   return rows.slice(1).map(row => {

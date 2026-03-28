@@ -380,8 +380,8 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
   return (
     <div className="space-y-8">
-      {/* ── Page Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      {/* ── Page Header (hidden when vault is empty — onboarding has its own) ── */}
+      {!isVaultEmpty && <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-1 rounded-full bg-international-orange" />
@@ -419,7 +419,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
             <span className="hidden sm:inline">Add Knowledge</span>
           </Button>
         </div>
-      </div>
+      </div>}
 
       {/* ── Sage's Proactive Insights ─────────────────────────────── */}
       {insights.length > 0 && (

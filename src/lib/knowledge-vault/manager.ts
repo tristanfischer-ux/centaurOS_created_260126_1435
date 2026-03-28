@@ -709,7 +709,7 @@ export async function searchKnowledgeForSpecialist(
     .slice(0, 6)
 
   if (searchTerms.length === 0) {
-    return ''
+    return { promptBlock: '', noteCount: 0, noteTitles: [] }
   }
 
   // Build OR filter: each term matches title, content, or description
