@@ -108,19 +108,59 @@ export function MeetingOutputs({
     const redundantItems = useMemo(() => outputs.redundantItems ?? [], [outputs.redundantItems])
     const hasCleanupItems = redundantItems.length > 0
 
-    // ─── Fetch Strategic Objectives ───────────────────────────────────────
+    // ─── Fetch Strategic Objectives + Auto-Suggest Best Match ──────────
     useEffect(() => {
-        async function fetchStrategicObjectives(): Promise<void> {
+        async function fetchAndSuggest(): Promise<void> {
             try {
                 const result = await getStrategicObjectives()
                 if (result.data) {
                     setStrategicObjectives(result.data)
+
+                    // INTENT: Auto-suggest the best matching strategic objective for each
+                    // AI-suggested objective. Uses keyword scoring so the user doesn't have
+                    // to manually pick from a dropdown. They can still change the selection.
+                    if (result.data.length > 0 && outputs.objectives?.length) {
+                        const suggestions: Record<number, string> = {}
+                        for (let i = 0; i < outputs.objectives.length; i++) {
+                            const obj = outputs.objectives[i]
+                            const inputWords = `${obj.title} ${obj.description || ""}`.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+
+                            let bestId = ""
+                            let bestScore = 0
+
+                            for (const strategic of result.data) {
+                                const targetWords = `${strategic.title}`.toLowerCase()
+                                let score = 0
+                                for (const word of inputWords) {
+                                    if (targetWords.includes(word)) score += 10
+                                }
+                                // Boost for title word overlap
+                                const titleWords = strategic.title.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3)
+                                for (const tw of titleWords) {
+                                    if (obj.title.toLowerCase().includes(tw)) score += 15
+                                }
+                                if (score > bestScore) {
+                                    bestScore = score
+                                    bestId = strategic.id
+                                }
+                            }
+
+                            if (bestScore >= 20 && bestId) {
+                                suggestions[i] = bestId
+                            }
+                        }
+
+                        if (Object.keys(suggestions).length > 0) {
+                            setStrategicSelections(prev => ({ ...suggestions, ...prev }))
+                        }
+                    }
                 }
             } catch (err) {
                 console.error("[MeetingOutputs] Failed to fetch strategic objectives:", err)
             }
         }
-        fetchStrategicObjectives()
+        fetchAndSuggest()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const handleStrategicSelect = useCallback((objIdx: number, value: string) => {

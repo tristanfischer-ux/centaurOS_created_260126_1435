@@ -9,6 +9,7 @@
  */
 
 import { withAuth } from "@/lib/server-action-utils"
+import { suggestStrategicObjective } from "@/actions/objectives"
 import type { RedTeamDebateDocument, SuggestedObjective, SuggestedTask } from "@/lib/red-team/types"
 
 // ─── History ────────────────────────────────────────────────────
@@ -72,6 +73,19 @@ export async function createRedTeamActions(input: {
     const objectiveTitle = objectives[0]?.title || `Red Team Follow-ups: ${topic.slice(0, 80)}`
     const objectiveDesc = objectives.map(o => `- ${o.title}: ${o.description}`).join("\n")
 
+    // INTENT: Auto-link to the best matching strategic objective so tasks
+    // feed into the right strategic pillar, not orphaned.
+    let parentObjectiveId: string | null = null
+    try {
+      const match = await suggestStrategicObjective(objectiveTitle, topic)
+      if (match) {
+        parentObjectiveId = match.id
+        console.log(`[RedTeam] Auto-linked to strategic objective "${match.title}" (score: ${match.score})`)
+      }
+    } catch {
+      // Non-fatal — create without parent if matching fails
+    }
+
     const { data: objective, error: objError } = await supabase
       .from("objectives")
       .insert({
@@ -81,6 +95,7 @@ export async function createRedTeamActions(input: {
         foundry_id: foundryId,
         creator_id: user.id,
         end_date: objectives[0]?.targetDate || null,
+        parent_objective_id: parentObjectiveId,
       })
       .select("id")
       .single()

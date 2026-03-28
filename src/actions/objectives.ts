@@ -1065,6 +1065,57 @@ export async function getStrategicObjectives() {
 }
 
 /**
+ * Suggest the best matching strategic objective for a given title/description.
+ *
+ * @description Uses keyword scoring to find the most relevant strategic
+ * objective. Returns the best match with a confidence score, or null if
+ * no good match exists (score < threshold). Used by Meeting Outputs and
+ * Red Team to auto-link tasks to the right strategic pillar.
+ *
+ * @param title - The objective or task title to match
+ * @param description - Optional description for additional matching context
+ * @returns Best matching strategic objective or null
+ */
+export async function suggestStrategicObjective(title: string, description?: string): Promise<{ id: string; title: string; score: number } | null> {
+    return withAuth(async ({ supabase, foundryId }) => {
+        const { data: strategics } = await supabase
+            .from('objectives')
+            .select('id, title, description')
+            .eq('foundry_id', foundryId)
+            .eq('is_strategic_goal', true)
+            .is('deleted_at', null)
+
+        if (!strategics || strategics.length === 0) return null
+
+        const inputWords = `${title} ${description || ""}`.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+
+        let bestMatch: { id: string; title: string; score: number } | null = null
+
+        for (const obj of strategics) {
+            const targetWords = `${obj.title} ${obj.description || ""}`.toLowerCase()
+            let score = 0
+
+            for (const word of inputWords) {
+                if (targetWords.includes(word)) score += 10
+            }
+
+            // Boost for strong title overlap
+            const titleWords = obj.title.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3)
+            for (const tw of titleWords) {
+                if (title.toLowerCase().includes(tw)) score += 15
+            }
+
+            if (score > (bestMatch?.score ?? 0)) {
+                bestMatch = { id: obj.id, title: obj.title, score }
+            }
+        }
+
+        // Only return if score is meaningful (at least 2 word matches)
+        return bestMatch && bestMatch.score >= 20 ? bestMatch : null
+    })
+}
+
+/**
  * Creates a new strategic objective (high-level pillar).
  *
  * @description Creates an objective row with is_strategic_goal = true.
