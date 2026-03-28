@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -114,6 +115,18 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
             )}
           </div>
         </div>
+
+        <SpecialistBriefingHero
+          specialistId="hiring-team"
+          specialistName="Harper"
+          specialistTitle="Hiring"
+          narrative={null}
+          fallbackMessage="Review pending OTJT approvals promptly and check in with apprentices falling behind on hours. Consistent mentorship is the biggest predictor of programme success."
+          isLoading={false}
+          severity="success"
+          context={{ type: 'general', title: 'Mentor Dashboard', description: 'Harper on mentoring.', metadata: {} }}
+          storageKey="mentor-dashboard"
+        />
 
         {/* Tabs */}
         <Tabs defaultValue="mentees">

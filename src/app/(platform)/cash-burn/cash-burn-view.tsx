@@ -23,6 +23,7 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { DocumentUploadPrompt } from '@/components/knowledge/document-upload-prompt'
 import { generateCashOutGrid, generateCashInGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
@@ -227,6 +228,12 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         severity="success"
         context={{ type: 'general', title: 'Cash Burn', description: 'Finn on cash burn.', metadata: {} }}
         storageKey="cash-burn"
+      />
+
+      <DocumentUploadPrompt
+        domain="finance"
+        suggestion="financial model or P&L spreadsheet"
+        specialistName="Finn"
       />
 
       {error && (

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -130,6 +131,18 @@ export function ApprenticeDashboard({
           </Button>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="hiring-team"
+        specialistName="Harper"
+        specialistTitle="Hiring"
+        narrative={null}
+        fallbackMessage="I'm tracking your apprenticeship progress. Log your OTJT hours consistently and work through your modules — I'll flag if you're falling behind."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Apprenticeship', description: 'Harper on apprentice progress.', metadata: {} }}
+        storageKey="apprentice-dashboard"
+      />
 
       {/* Tabbed Content */}
       <Tabs defaultValue="this-week">

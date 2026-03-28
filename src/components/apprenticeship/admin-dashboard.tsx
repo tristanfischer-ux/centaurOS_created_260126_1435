@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -138,6 +139,18 @@ export function AdminDashboard({
           Enroll New Apprentice
         </Button>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="hiring-team"
+        specialistName="Harper"
+        specialistTitle="Hiring"
+        narrative={null}
+        fallbackMessage="Your apprenticeship programme overview. Monitor enrolments, track OTJT progress, and approve hours to keep the programme on track."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Apprenticeship Admin', description: 'Harper on programme management.', metadata: {} }}
+        storageKey="apprentice-admin"
+      />
 
       {/* Tabs */}
       <Tabs defaultValue="overview">
