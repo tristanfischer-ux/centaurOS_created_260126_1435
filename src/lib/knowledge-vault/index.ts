@@ -31,6 +31,7 @@ export {
   ensureDefaultDomains,
   getKnowledgeDomains,
   searchKnowledgeForSpecialist,
+  markStaleNotes,
 } from './manager'
 
 // Extraction pipeline

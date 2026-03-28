@@ -1230,6 +1230,8 @@ Overdue amount: £${(input.overdueAmount / 100).toFixed(0)}`
 export interface KnowledgeInsightInput {
   noteCount: number
   pinnedCount: number
+  domainCoverage: Array<{ name: string; count: number }>
+  staleCount: number
 }
 
 export async function generateKnowledgeInsights(
@@ -1237,9 +1239,16 @@ export async function generateKnowledgeInsights(
 fast?: boolean,
 ): Promise<AgentInsight[]> {
   return withAIGate('page_insights', async () => {
+    const domainSummary = input.domainCoverage.length > 0
+      ? input.domainCoverage.map((d) => `${d.name}: ${d.count} notes`).join(', ')
+      : 'No domains yet'
+
     const context = `Advise on this knowledge vault and how to build institutional memory:
 Total notes: ${input.noteCount}
-Pinned notes: ${input.pinnedCount}`
+Pinned notes: ${input.pinnedCount}
+Stale notes (not updated in 30+ days): ${input.staleCount}
+Domain coverage: ${domainSummary}
+Identify strong domains and blind spots. Suggest which empty or weak domains the user should focus on next.`
 
     const insights = await callInsights("strategist", context, fast)
     return insights.map((i, idx) => insightToAgentInsight(i, idx))

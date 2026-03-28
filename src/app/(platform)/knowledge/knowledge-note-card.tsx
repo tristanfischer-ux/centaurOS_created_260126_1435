@@ -22,6 +22,7 @@ import {
   Heart,
   GraduationCap,
   MoreHorizontal,
+  Clock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
@@ -152,7 +153,8 @@ export function KnowledgeNoteCard({
       className={cn(
         'group cursor-pointer border-l-4 transition-all duration-200 hover:shadow-md relative',
         typeStyle.borderClass,
-        isSelected && 'ring-2 ring-international-orange'
+        isSelected && 'ring-2 ring-international-orange',
+        note.is_stale && 'opacity-70'
       )}
       onClick={selectionMode ? onToggleSelect : onClick}
     >
@@ -192,6 +194,12 @@ export function KnowledgeNoteCard({
                 </TooltipTrigger>
                 <TooltipContent>Verified</TooltipContent>
               </Tooltip>
+            )}
+            {note.is_stale && (
+              <Badge variant="secondary" className="text-[10px] font-medium gap-1 px-1.5 py-0 text-muted-foreground">
+                <Clock className="h-2.5 w-2.5" />
+                May be outdated
+              </Badge>
             )}
           </div>
 

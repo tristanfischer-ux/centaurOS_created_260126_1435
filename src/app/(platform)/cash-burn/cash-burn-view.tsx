@@ -36,6 +36,7 @@ import {
   deleteScenario,
 } from '@/actions/cash-burn-scenarios'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { DocumentUploadPrompt } from '@/components/knowledge/document-upload-prompt'
 import type {
   BurnScenario,
   CashOutItem,
@@ -338,6 +339,12 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           ))}
         </div>
       )}
+
+      <DocumentUploadPrompt
+        domain="finance"
+        suggestion="financial model or P&L spreadsheet"
+        specialistName="Finn"
+      />
 
       {cashOut.length === 0 && cashIn.length === 0 && (
         <Card>

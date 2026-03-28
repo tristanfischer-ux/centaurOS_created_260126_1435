@@ -102,6 +102,11 @@ export interface KnowledgeNote {
   verified_by: string | null
   verified_at: string | null
 
+  /** Staleness tracking */
+  is_stale: boolean
+  stale_at: string | null
+  staleness_window_days: number | null
+
   /** System metadata */
   extraction_metadata: Record<string, unknown>
   link_count: number
@@ -121,6 +126,9 @@ export interface KnowledgeNoteSummary {
   tags: string[]
   is_pinned: boolean
   is_verified: boolean
+  is_stale: boolean
+  stale_at: string | null
+  staleness_window_days: number | null
   link_count: number
   confidence: number
   domain_id: string | null
@@ -256,6 +264,8 @@ export interface KnowledgeQueryFilters {
   verifiedOnly?: boolean
   /** Minimum confidence score */
   minConfidence?: number
+  /** Hide stale notes from results */
+  hideStale?: boolean
 }
 
 /** Sort options for knowledge notes */
@@ -293,6 +303,9 @@ export interface VaultStats {
   pinnedNotes: KnowledgeNoteSummary[]
   verifiedCount: number
   unverifiedCount: number
+  staleCount: number
+  /** Number of notes created from document uploads (non-empty extraction_metadata) */
+  documentsProcessed: number
 }
 
 // ─── Extraction Types ────────────────────────────────────────────────

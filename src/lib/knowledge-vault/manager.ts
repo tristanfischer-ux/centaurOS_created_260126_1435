@@ -708,26 +708,114 @@ export async function searchKnowledgeForSpecialist(
     .map((term) => `title.ilike.%${term}%,content.ilike.%${term}%,description.ilike.%${term}%`)
     .join(',')
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
-  let searchQuery = (supabase as any)
-    .from('knowledge_notes')
-    .select('title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at')
-    .eq('foundry_id', foundryId)
-    .eq('is_archived', false)
-    .eq('is_stale', false)
-    .or(orFilters)
-    .order('is_verified', { ascending: false })
-    .order('confidence', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(limit)
+  const selectFields = 'id, title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at, domain_id'
 
-  // Optionally exclude notes from the same specialist to get cross-specialist knowledge
-  if (specialistId) {
-    searchQuery = searchQuery.neq('source_specialist', specialistId)
+  type SpecialistSearchNote = {
+    id: string
+    title: string
+    content: string | null
+    description: string | null
+    note_type: string
+    source_specialist: string | null
+    confidence: number | null
+    is_verified: boolean | null
+    tags: string[] | null
+    created_at: string | null
+    domain_id: string | null
   }
 
-  const { data: rawNotes } = await searchQuery
-  const notes = (rawNotes ?? []) as Array<{ title: string; content: string | null; description: string | null; note_type: string; source_specialist: string | null; confidence: number | null; is_verified: boolean | null; tags: string[] | null; created_at: string | null }>
+  // DECISION: Domain-boosted two-query approach when specialist has domain mappings.
+  // Query 1 fetches notes in the specialist's domain(s) (limit 8), Query 2 fetches
+  // cross-domain notes (limit 4). This prioritizes domain-relevant knowledge while
+  // still surfacing cross-cutting insights.
+  const domainSlugs = getSpecialistDomainSlugs(specialistId ?? '')
+  let notes: SpecialistSearchNote[] = []
+
+  if (domainSlugs.length > 0) {
+    // Fetch domain IDs for the specialist's domains
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_domains may not be in generated types
+    const { data: domainRows } = await (supabase as any)
+      .from('knowledge_domains')
+      .select('id')
+      .eq('foundry_id', foundryId)
+      .in('slug', domainSlugs)
+
+    const domainIds = (domainRows ?? []).map((d: { id: string }) => d.id)
+
+    if (domainIds.length > 0) {
+      // Query 1: domain-matched notes (up to 8)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
+      let domainQuery = (supabase as any)
+        .from('knowledge_notes')
+        .select(selectFields)
+        .eq('foundry_id', foundryId)
+        .eq('is_archived', false)
+        .eq('is_stale', false)
+        .in('domain_id', domainIds)
+        .or(orFilters)
+        .order('is_verified', { ascending: false })
+        .order('confidence', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(8)
+
+      if (specialistId) {
+        domainQuery = domainQuery.neq('source_specialist', specialistId)
+      }
+
+      // Query 2: cross-domain notes (fetch enough to fill after dedup)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
+      let crossQuery = (supabase as any)
+        .from('knowledge_notes')
+        .select(selectFields)
+        .eq('foundry_id', foundryId)
+        .eq('is_archived', false)
+        .eq('is_stale', false)
+        .or(orFilters)
+        .order('is_verified', { ascending: false })
+        .order('confidence', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limit)
+
+      if (specialistId) {
+        crossQuery = crossQuery.neq('source_specialist', specialistId)
+      }
+
+      const [domainResult, crossResult] = await Promise.all([domainQuery, crossQuery])
+
+      const domainNotes = (domainResult.data ?? []) as SpecialistSearchNote[]
+      const domainNoteIds = new Set(domainNotes.map((n) => n.id))
+
+      // Merge: domain notes first, then cross-domain (excluding duplicates), capped at 4
+      const crossNotes = ((crossResult.data ?? []) as SpecialistSearchNote[])
+        .filter((n) => !domainNoteIds.has(n.id))
+        .slice(0, 4)
+
+      notes = [...domainNotes, ...crossNotes]
+    }
+  }
+
+  // Fallback: no specialist domains or no domain IDs found — use single query
+  if (notes.length === 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
+    let fallbackQuery = (supabase as any)
+      .from('knowledge_notes')
+      .select(selectFields)
+      .eq('foundry_id', foundryId)
+      .eq('is_archived', false)
+      .eq('is_stale', false)
+      .or(orFilters)
+      .order('is_verified', { ascending: false })
+      .order('confidence', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (specialistId) {
+      fallbackQuery = fallbackQuery.neq('source_specialist', specialistId)
+    }
+
+    const { data: rawNotes } = await fallbackQuery
+    notes = (rawNotes ?? []) as SpecialistSearchNote[]
+  }
 
   if (notes.length === 0) {
     return ''
@@ -787,6 +875,7 @@ export async function getVaultStats(
     domainsResult,
     recentResult,
     pinnedResult,
+    docsResult,
   ] = await Promise.allSettled([
     db
       .from('knowledge_notes')
@@ -817,6 +906,13 @@ export async function getVaultStats(
       .eq('is_pinned', true)
       .order('updated_at', { ascending: false })
       .limit(10),
+    // Count notes created from document uploads (non-empty extraction_metadata)
+    db
+      .from('knowledge_notes')
+      .select('id', { count: 'exact', head: true })
+      .eq('foundry_id', foundryId)
+      .eq('is_archived', false)
+      .neq('extraction_metadata', '{}'),
   ])
 
   const notes = (notesResult.status === 'fulfilled' ? notesResult.value.data ?? [] : []) as unknown as KnowledgeNoteStatsRow[]
@@ -830,6 +926,7 @@ export async function getVaultStats(
   const pinnedNotes = pinnedResult.status === 'fulfilled'
     ? (pinnedResult.value.data ?? []) as unknown as KnowledgeNoteSummary[]
     : []
+  const documentsProcessed = docsResult.status === 'fulfilled' ? docsResult.value.count ?? 0 : 0
 
   // Aggregate note types
   const notesByType: Record<string, number> = {}
@@ -871,6 +968,7 @@ export async function getVaultStats(
     verifiedCount,
     unverifiedCount,
     staleCount,
+    documentsProcessed,
   }
 }
 

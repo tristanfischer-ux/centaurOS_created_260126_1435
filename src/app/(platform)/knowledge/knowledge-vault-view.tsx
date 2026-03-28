@@ -41,6 +41,8 @@ import {
   Layers,
   RefreshCw,
   CheckSquare,
+  FileUp,
+  Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -79,6 +81,7 @@ import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
 import { DocumentUploadZone } from './document-upload-zone'
+import { KnowledgeOnboarding } from './knowledge-onboarding'
 import type {
   KnowledgeNoteSummary,
   KnowledgeDomain,
@@ -168,6 +171,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
   const [selectedTypes, setSelectedTypes] = useState<KnowledgeNoteType[]>([])
   const [sortBy, setSortBy] = useState<KnowledgeSortBy>('created_at')
   const [activeTab, setActiveTab] = useState<'all' | 'pinned' | 'unverified'>('all')
+  const [hideStale, setHideStale] = useState(false)
   const [page, setPage] = useState(1)
 
   // View mode
@@ -195,6 +199,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
           pinnedOnly: activeTab === 'pinned',
           verifiedOnly: false,
           includeArchived: false,
+          hideStale: hideStale || undefined,
         },
         sortBy,
         sortOrder: sortBy === 'title' ? 'asc' : 'desc',
@@ -207,7 +212,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         setTotalNotes(result.data.total)
       }
     })
-  }, [searchQuery, selectedDomain, selectedTypes, sortBy, activeTab, page])
+  }, [searchQuery, selectedDomain, selectedTypes, sortBy, activeTab, hideStale, page])
 
   const loadInitialData = useCallback(async () => {
     setIsLoading(true)
@@ -337,10 +342,11 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
     setSelectedTypes([])
     setSortBy('created_at')
     setActiveTab('all')
+    setHideStale(false)
     setPage(1)
   }
 
-  const hasActiveFilters = searchQuery || selectedDomain || selectedTypes.length > 0 || activeTab !== 'all'
+  const hasActiveFilters = searchQuery || selectedDomain || selectedTypes.length > 0 || activeTab !== 'all' || hideStale
 
   // Sage's proactive insights
   const { openPanel } = useAdvisorPanel()
@@ -348,10 +354,17 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
     openPanel(specialistId, { handoffContext: context, contextLabel: 'Knowledge' })
   }, [openPanel])
   const pinnedCount = useMemo(() => notes.filter(n => n.is_pinned).length, [notes])
+  const domainCoverage = useMemo(
+    () => domains.map((d) => ({ name: d.name, count: d.note_count })),
+    [domains],
+  )
+  const staleCount = stats?.staleCount ?? 0
   const { insights, dismissInsight } = usePageInsights(
     (fast) => generateKnowledgeInsights({
       noteCount: totalNotes,
       pinnedCount: pinnedCount,
+      domainCoverage,
+      staleCount,
     }, fast),
     totalNotes > 0,
     { cacheKey: 'sage-knowledge', emptyInsight: EMPTY_STATE_INSIGHT },
@@ -425,28 +438,12 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
       {/* ── Empty State ──────────────────────────────────────────── */}
       {isVaultEmpty ? (
-        <div className="space-y-8 py-8">
-          <EmptyState
-            title="Your knowledge vault is empty"
-            description="Knowledge accumulates automatically as you consult your specialists. You can also upload documents or add notes manually."
-            action={
-              <Button variant="default" onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Knowledge
-              </Button>
-            }
-          />
-          <div className="max-w-lg mx-auto">
-            <DocumentUploadZone
-              onExtractionComplete={() => { loadNotes(); loadInitialData() }}
-            />
-          </div>
-        </div>
+        <KnowledgeOnboarding onNoteCreated={() => { loadNotes(); loadInitialData() }} />
       ) : (
         <>
           {/* ── Stats Cards ───────────────────────────────────────── */}
           {stats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <StatCard
                 label="Total Notes"
                 value={stats.totalNotes}
@@ -468,7 +465,22 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
                 value={stats.unverifiedCount}
                 icon={<Eye className="h-4 w-4" />}
               />
+              <StatCard
+                label="Stale"
+                value={stats.staleCount}
+                icon={<Clock className="h-4 w-4" />}
+              />
+              <StatCard
+                label="Documents"
+                value={stats.documentsProcessed}
+                icon={<FileUp className="h-4 w-4" />}
+              />
             </div>
+          )}
+
+          {/* ── Knowledge Health ──────────────────────────────────── */}
+          {domains.length > 0 && (
+            <KnowledgeHealthBar domains={domains} />
           )}
 
           {/* ── Filters Bar ───────────────────────────────────────── */}
@@ -588,6 +600,16 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
               <Button variant={selectionMode ? 'default' : 'outline'} size="sm" onClick={() => { if (selectionMode) { clearSelection() } else { setSelectionMode(true) } }}>
                 <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
                 {selectionMode ? 'Cancel' : 'Select'}
+              </Button>
+
+              {/* Hide stale toggle */}
+              <Button
+                variant={hideStale ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => { setHideStale((prev) => !prev); setPage(1) }}
+              >
+                <Clock className="h-3.5 w-3.5 mr-1.5" />
+                {hideStale ? 'Showing fresh' : 'Hide stale'}
               </Button>
 
               <div className="flex flex-wrap gap-1.5">
@@ -766,6 +788,64 @@ function StatCard({
             {icon}
           </div>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Knowledge Health Bar ──────────────────────────────────────────
+
+function KnowledgeHealthBar({ domains }: { domains: KnowledgeDomain[] }) {
+  const maxCount = Math.max(1, ...domains.map((d) => d.note_count))
+  const emptyDomains = domains.filter((d) => d.note_count === 0)
+  const strongestDomain = domains.reduce((a, b) => (a.note_count >= b.note_count ? a : b), domains[0])
+
+  // INTENT: Build a contextual suggestion for the user based on coverage gaps
+  let suggestion = ''
+  if (emptyDomains.length > 0 && strongestDomain.note_count > 0) {
+    const emptyNames = emptyDomains.slice(0, 2).map((d) => d.name).join(' and ')
+    suggestion = `${strongestDomain.name} has ${strongestDomain.note_count} ${strongestDomain.note_count === 1 ? 'note' : 'notes'}, but ${emptyNames} ${emptyDomains.length === 1 ? 'is' : 'are'} empty — consider uploading relevant documents.`
+  } else if (emptyDomains.length === 0) {
+    suggestion = 'All domains have coverage — keep building depth in each area.'
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-muted-foreground" />
+          <h3 className="text-sm font-semibold text-foreground">Domain Coverage</h3>
+        </div>
+        <div className="space-y-2">
+          {domains.map((domain) => {
+            const pct = Math.max(2, (domain.note_count / maxCount) * 100)
+            const barColor =
+              domain.note_count >= 5
+                ? 'bg-success'
+                : domain.note_count >= 1
+                  ? 'bg-warning'
+                  : 'bg-destructive/30'
+            return (
+              <div key={domain.id} className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-24 truncate shrink-0">
+                  {domain.name}
+                </span>
+                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className={cn('h-full rounded-full transition-all duration-500', barColor)}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="text-xs font-mono text-muted-foreground w-8 text-right shrink-0">
+                  {domain.note_count}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+        {suggestion && (
+          <p className="text-xs text-muted-foreground leading-relaxed">{suggestion}</p>
+        )}
       </CardContent>
     </Card>
   )

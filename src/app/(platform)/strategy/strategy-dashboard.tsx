@@ -8,7 +8,7 @@
  * and optional Strategy River / Link Objectives visualization views.
  */
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -27,12 +27,15 @@ import { AddToRiverDialog } from '@/components/canvas/add-to-river-dialog'
 import {
   LayoutDashboard, Waypoints, Link2, Flag, Target, CheckCircle2,
   AlertTriangle, TrendingUp, ArrowRight, Plus, XCircle, ChevronRight,
-  MessageSquare, FileText, Copy, Sparkles,
+  MessageSquare, FileText, Copy, Sparkles, Upload,
 } from 'lucide-react'
 import { CreateStrategicGoalDialog } from '@/components/strategy/create-strategic-goal-dialog'
 import { TranscriptImportDialog } from '@/components/strategy/transcript-import-dialog'
 import { ExportStrategyDialog } from '@/components/strategy/export-strategy-dialog'
 import { BusinessPlanUpload } from '@/components/strategy/business-plan-upload'
+import { analyzeBusinessPlan } from '@/actions/analyze'
+import { saveBusinessPlanAnalysis, buildSmartMerge } from '@/actions/business-plan'
+import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '@/lib/business-plan-types'
 import { MergeReviewDialog } from '@/components/strategy/merge-review-dialog'
 import type { MergeReviewState } from '@/lib/business-plan-types'
 import { AutoGenerateMilestonesDialog } from '@/components/strategy/auto-generate-milestones-dialog'
@@ -50,6 +53,7 @@ import type { GoalBundle, MilestoneOption } from '@/types/canvas'
 import type { StrategicObjective } from '../new-objectives/types'
 import type { FoundryPurposeData } from '@/types/foundry'
 import type { RegularObjective } from '../canvas/canvas-shell'
+import { DocumentUploadPrompt } from '@/components/knowledge/document-upload-prompt'
 
 // ============================================================================
 // TYPES
@@ -149,6 +153,53 @@ export function StrategyDashboard({
   // ── Business Plan merge review ──
   const [mergeState, setMergeState] = useState<MergeReviewState | null>(null)
   const [showMergeDialog, setShowMergeDialog] = useState(false)
+  const [isAnalyzingPlan, setIsAnalyzingPlan] = useState(false)
+  const planFileInputRef = useRef<HTMLInputElement>(null)
+
+  // INTENT: Toolbar "Import Business Plan" button triggers the same flow as the
+  // drag-drop zone but via a click-to-upload file picker.
+  const handleBusinessPlanFile = useCallback(async (file: File) => {
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+    if (!ALLOWED_EXTENSIONS.includes(ext as typeof ALLOWED_EXTENSIONS[number])) {
+      toast.error(`Unsupported file type "${ext}". Use PDF, DOCX, or TXT.`)
+      return
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      toast.error(`File too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Max 20 MB.`)
+      return
+    }
+
+    setIsAnalyzingPlan(true)
+    toast.info('Analyzing your business plan...')
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const result = await analyzeBusinessPlan(formData)
+    if (result.error || !result.analysis) {
+      setIsAnalyzingPlan(false)
+      toast.error(result.error ?? 'Analysis failed')
+      return
+    }
+
+    const { analysisId, error: saveError } = await saveBusinessPlanAnalysis(result.analysis, file.name)
+    if (saveError || !analysisId) {
+      setIsAnalyzingPlan(false)
+      toast.error(saveError ?? 'Failed to save analysis')
+      return
+    }
+
+    const { mergeState: ms, error: mergeError } = await buildSmartMerge(result.analysis, analysisId)
+    setIsAnalyzingPlan(false)
+
+    if (mergeError || !ms) {
+      toast.error(mergeError ?? 'Failed to prepare review')
+      return
+    }
+
+    setMergeState(ms)
+    setShowMergeDialog(true)
+  }, [])
 
   // ── Node details dialog ──
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -349,6 +400,31 @@ export function StrategyDashboard({
                 <FileText className="h-4 w-4 mr-1.5" />
                 Import Transcript
               </Button>
+              {isFounder && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => planFileInputRef.current?.click()}
+                    disabled={isAnalyzingPlan}
+                  >
+                    <Upload className="h-4 w-4 mr-1.5" />
+                    {isAnalyzingPlan ? 'Analyzing...' : 'Import Business Plan'}
+                  </Button>
+                  <input
+                    ref={planFileInputRef}
+                    type="file"
+                    accept=".pdf,.docx,.txt"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        handleBusinessPlanFile(file)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </>
+              )}
             </div>
           </div>
           {/* Secondary actions: shown below tabs on mobile */}
@@ -371,6 +447,18 @@ export function StrategyDashboard({
               <FileText className="h-4 w-4 mr-1.5" />
               Import
             </Button>
+            {isFounder && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => planFileInputRef.current?.click()}
+                disabled={isAnalyzingPlan}
+              >
+                <Upload className="h-4 w-4 mr-1.5" />
+                {isAnalyzingPlan ? 'Analyzing...' : 'Plan'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -402,6 +490,12 @@ export function StrategyDashboard({
           }}
         />
       )}
+
+      <DocumentUploadPrompt
+        domain="strategy"
+        suggestion="pitch deck or business plan"
+        specialistName="Sage"
+      />
 
       {/* ── Dashboard View ── */}
       {viewMode === 'dashboard' && (
