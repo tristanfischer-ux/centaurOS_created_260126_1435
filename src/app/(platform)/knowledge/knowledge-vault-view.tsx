@@ -419,7 +419,8 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
             <span className="hidden sm:inline">Add Knowledge</span>
           </Button>
         </div>
-      </div>}
+      </div>
+      }
 
       {/* ── Sage's Proactive Insights ─────────────────────────────── */}
       {insights.length > 0 && (
