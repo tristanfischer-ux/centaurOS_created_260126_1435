@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useTransition, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
 import { HeroCard } from './components/hero-card'
 import { OverviewTab } from './components/overview-tab'
 import { MarketplaceTab } from './components/marketplace-tab'
 import { LinksTab } from './components/links-tab'
+import { KnowledgeVaultView } from '@/app/(platform)/knowledge/knowledge-vault-view'
 import { MarketplaceEditWizard } from './components/marketplace-edit-wizard'
 import { EditProfileDialog } from './components/edit-profile-dialog'
 import { CompanySwitcher } from './components/company-switcher'
@@ -97,6 +98,8 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
   const [isWizardOpen, setIsWizardOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialTab = searchParams.get('tab') ?? 'overview'
   const [isPending, startTransition] = useTransition()
   const [switchingTo, setSwitchingTo] = useState<string | null>(null)
 
@@ -209,12 +212,13 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
       />
 
       {/* Tabbed Content */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={initialTab}>
         <TabsList className="w-full flex-wrap">
           <TabsTrigger value="overview" className="flex-1">Overview</TabsTrigger>
           {showMarketplaceTab && (
             <TabsTrigger value="marketplace" className="flex-1">Marketplace</TabsTrigger>
           )}
+          <TabsTrigger value="knowledge" className="flex-1">Knowledge</TabsTrigger>
           <TabsTrigger value="links" className="flex-1">
             <span className="sm:hidden">Links</span>
             <span className="hidden sm:inline">Links &amp; Social</span>
@@ -253,6 +257,21 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
             )}
           </TabsContent>
         )}
+
+        {/* Knowledge Vault Tab */}
+        <TabsContent value="knowledge" className="mt-6">
+          {profile?.foundry_id ? (
+            <KnowledgeVaultView
+              foundryId={profile.foundry_id}
+              userId={profile.id}
+              userRole={profile.role ?? 'Apprentice'}
+            />
+          ) : (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              Join a company to start building your knowledge vault.
+            </div>
+          )}
+        </TabsContent>
 
         {/* Links & Social Tab */}
         <TabsContent value="links" className="mt-6">

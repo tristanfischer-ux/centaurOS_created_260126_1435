@@ -1,50 +1,11 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
-import { KnowledgeVaultView } from './knowledge-vault-view'
-import type { Metadata } from 'next'
-
-export const metadata: Metadata = {
-  title: 'Knowledge | ForgeOS',
-  description: 'Your organizational knowledge vault — everything your team has learned',
-}
-
-export const revalidate = 30
 
 /**
- * Knowledge Vault page — the organizational second brain.
+ * Knowledge page — redirects to My Profile Knowledge tab.
  *
- * @description Displays the foundry's accumulated knowledge from specialist
- * conversations. Notes are organized by domain, filterable by type and specialist,
- * and searchable. Users can browse, pin, verify, and curate knowledge.
- *
- * @security Authenticates user and scopes all data to their foundry.
+ * @description The Knowledge vault now lives inside the My Profile page
+ * as a tab. This redirect ensures old bookmarks and links still work.
  */
-export default async function KnowledgePage(): Promise<React.ReactNode> {
-  // AUTH: Verify user session
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // AUTH: Resolve foundry context
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id, foundry_id, role')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile?.foundry_id) {
-    return <ProfileSetupRequired userRole={profile?.role} />
-  }
-
-  return (
-    <KnowledgeVaultView
-      foundryId={profile.foundry_id}
-      userId={user.id}
-      userRole={profile.role ?? 'Apprentice'}
-    />
-  )
+export default function KnowledgePage(): never {
+  redirect('/my-profile?tab=knowledge')
 }
