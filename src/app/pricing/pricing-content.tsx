@@ -43,13 +43,10 @@ type BillingPeriod = 'monthly' | 'annual'
 
 /** Tooltip explanations for complex/jargon features */
 const FEATURE_TOOLTIPS: Record<string, string> = {
-  'Centaur Matcher': 'AI-powered matching that pairs you with the best human experts for your specific needs — like a talent scout that never sleeps.',
-  'Ghost Agent automation': 'Background AI agents that handle repetitive tasks automatically while you focus on strategy.',
   'AI comparison assistant': 'An AI helper that analyses and compares marketplace providers side-by-side so you can choose with confidence.',
   'Voice-to-task': 'Speak your tasks out loud and our AI converts them into structured action items instantly.',
-  'AI marketplace search': 'Natural language search across the entire marketplace — just describe what you need.',
-  'API access': 'Programmatic access to the ForgeOS platform for custom integrations and automations.',
-  'Active retainers': 'Ongoing service agreements with marketplace providers at discounted rates.',
+  'Supplier matching': 'AI-powered 6-factor matching that scores UK suppliers on capability, process, material, quality, and relevance.',
+  'AI tasks': 'AI-powered actions across ForgeOS — engineering analysis, specialist conversations, document generation, and more.',
 }
 
 /** FAQ items addressing common pricing objections */
@@ -339,7 +336,7 @@ export function PricingContent() {
                   <div>
                     <h3 className="text-xl font-semibold text-foreground">Enterprise</h3>
                     <p className="text-muted-foreground">
-                      Unlimited everything. SSO, dedicated support, custom integrations, SLA guarantees.
+                      Unlimited AI tasks and team members. Dedicated account manager, custom onboarding, and priority support.
                     </p>
                   </div>
                 </div>
@@ -548,24 +545,20 @@ function ComparisonCell({ value }: { value: boolean | string }) {
   return <div className="text-sm text-center text-foreground">{value}</div>
 }
 
-/** Feature comparison data */
+/** Feature comparison data — only features that are actually implemented */
 const COMPARISON_FEATURES = [
-  { name: 'Smart assists per month', free: '50', starter: '100', professional: '500' },
-  { name: 'Team members', free: '1', starter: '3', professional: '10' },
-  { name: 'Orders per month', free: '5', starter: '25', professional: 'Unlimited' },
-  { name: 'Active retainers', free: false as boolean | string, starter: '1', professional: 'Unlimited' },
+  { name: 'AI tasks per month', free: '50', starter: '100', professional: '500' },
   { name: 'Voice-to-task', free: true, starter: true, professional: true },
-  { name: 'AI marketplace search', free: true, starter: true, professional: true },
-  { name: 'Centaur Matcher', free: false, starter: true, professional: true },
-  { name: 'AI comparison assistant', free: false, starter: true, professional: true },
-  { name: 'Ghost Agent automation', free: false, starter: true, professional: true },
+  { name: 'AI comparison assistant', free: false as boolean | string, starter: true, professional: true },
+  { name: 'Supplier matching', free: false, starter: true, professional: true },
+  { name: '13 AI specialist conversations', free: true, starter: true, professional: true },
+  { name: 'Marketplace browse', free: true, starter: true, professional: true },
   { name: 'Investor directory browse', free: true, starter: true, professional: true },
   { name: 'Investor detail pages', free: false, starter: true, professional: true },
   { name: 'Partner contacts & LinkedIn', free: false, starter: true, professional: true },
-  { name: 'Portfolio intelligence', free: false, starter: true, professional: true },
   { name: 'Verified emails & deep profiles', free: false, starter: false, professional: true },
   { name: 'Fund performance & hardware fit', free: false, starter: false, professional: true },
-  { name: 'API access', free: false, starter: false, professional: true },
+  { name: 'Engineering reports (PDF, DOCX, PPTX)', free: true, starter: true, professional: true },
   { name: 'Priority support', free: false, starter: false, professional: true },
   { name: 'Platform fee', free: '10%', starter: '10% (0% first £10K)', professional: '5%' },
 ]

@@ -77,14 +77,15 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'free',
     name: 'Explorer',
     description: 'Get started with ForgeOS',
-    bestFor: 'For solo founders testing the waters and exploring the marketplace.',
+    bestFor: 'Explore ForgeOS with a 14-day full-access trial. Get your first engineering assessment free.',
     priceMonthlyGBP: 0,
     priceAnnualGBP: 0,
     features: [
-      'Up to 5 orders per month',
-      'Basic marketplace access',
-      '50 smart assists per month',
-      'Standard support',
+      '50 AI tasks per month',
+      'Marketplace browse',
+      'Voice-to-task',
+      'Investor directory browse',
+      'Email support',
     ],
     limits: {
       maxOrders: 5,
@@ -107,15 +108,15 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'starter',
     name: 'Startup Team',
     description: 'For growing businesses',
-    bestFor: 'Best for early-stage startups needing essential features and small team support.',
+    bestFor: 'Go from idea to first purchase order. Full supplier matching, team workspace, and 0% fee on your first £10K of orders.',
     priceMonthlyGBP: 4900, // £49/month
     priceAnnualGBP: 47000, // £470/year (save ~20%)
     features: [
-      'Up to 25 orders per month',
+      '100 AI tasks per month',
       'Full marketplace access',
-      'Up to 3 team members',
-      '1 active retainer',
-      '100 smart assists per month',
+      'AI comparison assistant',
+      'Investor detail pages + contacts',
+      'Supplier matching',
       'Email support',
     ],
     limits: {
@@ -141,18 +142,16 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     tier: 'professional',
     name: 'Professional',
     description: 'For established companies',
-    bestFor: 'Built for growing teams that need more AI power, unlimited orders, and API access.',
+    bestFor: 'Scale multiple product programs with unlimited orders, priority supplier matching, and reduced 5% marketplace fees.',
     priceMonthlyGBP: 14900, // £149/month
     priceAnnualGBP: 142800, // £1,428/year (save ~20%)
     features: [
-      'Unlimited orders',
-      'Full marketplace access',
-      'Up to 10 team members',
-      'Unlimited retainers',
-      '500 smart assists per month',
-      'API access',
+      '500 AI tasks per month',
+      'Everything in Startup Team',
+      'Verified investor emails + deep profiles',
+      'Fund performance + hardware fit scores',
+      'Reduced 5% marketplace fee',
       'Priority support',
-      '2 hours real-time voice per month',
     ],
     limits: {
       maxOrders: undefined, // unlimited
@@ -182,14 +181,10 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
     priceAnnualGBP: 478800, // £4,788/year (save ~20%)
     features: [
       'Everything in Professional',
+      'Unlimited AI tasks',
       'Unlimited team members',
-      'Unlimited smart assists',
       'Dedicated account manager',
-      'Custom integrations',
-      'SLA guarantees',
-      'SSO/SAML',
-      '10 hours real-time voice per month',
-      '1 hour avatar video per month',
+      'Custom onboarding',
     ],
     limits: {
       maxOrders: undefined,
