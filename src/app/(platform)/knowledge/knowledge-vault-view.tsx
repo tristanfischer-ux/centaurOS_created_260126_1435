@@ -380,16 +380,16 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         </div>
       </div>
 
-      {/* ── Sage's Guidance ─────────────────────────────── */}
+      {/* ── Cal's Guidance ─────────────────────────────── */}
       <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategy"
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
         narrative={null}
         fallbackMessage="Your knowledge vault feeds into every specialist conversation. The more you add — documents, decisions, lessons — the sharper their advice becomes."
         isLoading={false}
         severity="success"
-        context={{ type: 'general', title: 'Knowledge', description: 'Sage on building institutional memory.', metadata: {} }}
+        context={{ type: 'general', title: 'Knowledge', description: 'Cal on building institutional memory.', metadata: {} }}
         storageKey="knowledge"
       />
 

@@ -198,6 +198,11 @@ export function RedTeamView(): React.ReactElement {
   const [actionsCreated, setActionsCreated] = useState(false)
   const [isCreatingActions, setIsCreatingActions] = useState(false)
 
+  // File upload state
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Streaming state
   const [streamPhase, setStreamPhase] = useState("")
   const [streamMessage, setStreamMessage] = useState("")
@@ -235,9 +240,14 @@ export function RedTeamView(): React.ReactElement {
   const abortRef = useRef<AbortController | null>(null)
   const interjectionInputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Load history on mount
+  // Load history + silent health check on mount
   useEffect(() => {
     listRedTeamDebates().then(setHistory).catch(() => {})
+    // Silent health pre-check — only surfaces warning if something is down
+    fetch("/api/health/ai").then(r => r.json()).then((data: HealthCheckResult) => {
+      setHealthStatus(data)
+      setHealthChecked(true)
+    }).catch(() => {})
   }, [])
 
   // ─── Health Pre-check ─────────────────────────────────────────
@@ -344,8 +354,10 @@ export function RedTeamView(): React.ReactElement {
     setResumeState(null)
     setUserInterjection("")
 
-    startStream({ topic: topic.trim(), context: context.trim() || undefined })
-  }, [topic, context, startStream])
+    // Combine typed context with uploaded file content
+    const fullContext = [context.trim(), uploadedFile?.content].filter(Boolean).join("\n\n---\n\n") || undefined
+    startStream({ topic: topic.trim(), context: fullContext })
+  }, [topic, context, uploadedFile, startStream])
 
   const handleSSEEvent = useCallback(
     (event: Record<string, unknown>) => {
@@ -370,7 +382,7 @@ export function RedTeamView(): React.ReactElement {
         case "persona_start":
           setCurrentPersona(event.persona as string)
           setStreamMessage(
-            `${event.characterName} (${(event.persona as string).toUpperCase()}) via ${event.modelId}...`,
+            `${event.characterName} (${(event.persona as string).toUpperCase()}) is thinking...`,
           )
           break
 
@@ -730,14 +742,12 @@ export function RedTeamView(): React.ReactElement {
 
   if (!debate && !isGenerating && !awaitingInput) {
     return (
-      <div className="max-w-3xl mx-auto space-y-8">
-        <div className="flex items-start justify-between">
+      <div className="space-y-8">
+        <div className="flex items-start justify-between pb-4 border-b border-muted">
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
-              <Swords className="h-5 w-5 text-international-orange" />
-            </div>
+            <div className="flex h-8 w-1 rounded-full bg-international-orange" />
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Red Team Debate</h1>
+              <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Red Team Debate</h1>
               <p className="text-sm text-muted-foreground">
                 Stress-test decisions with 5 different AI models
               </p>
@@ -794,7 +804,8 @@ export function RedTeamView(): React.ReactElement {
           </motion.div>
         )}
 
-        {healthChecked && unhealthyProviders.length === 0 && healthStatus && (
+        {/* REMOVED: "All providers healthy" banner — only show warnings */}
+        {false && healthChecked && unhealthyProviders.length === 0 && healthStatus && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -928,6 +939,59 @@ export function RedTeamView(): React.ReactElement {
               />
             </div>
 
+            {/* File upload drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setIsDragging(false)
+                const file = e.dataTransfer.files[0]
+                if (file && (file.type === "text/plain" || file.type === "text/markdown" || file.type === "text/csv" || file.name.endsWith(".md") || file.name.endsWith(".txt"))) {
+                  file.text().then(text => {
+                    setUploadedFile({ name: file.name, content: text.slice(0, 50000) })
+                    toast.success(`Loaded ${file.name}`)
+                  })
+                } else if (file) {
+                  toast.error("Drop a .txt, .md, or .csv file — PDFs and Word docs aren't supported yet")
+                }
+              }}
+              className={cn(
+                "rounded-lg border-2 border-dashed p-4 text-center transition-colors cursor-pointer",
+                isDragging ? "border-international-orange bg-international-orange/5" : "border-muted hover:border-muted-foreground/30",
+              )}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.md,.csv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    file.text().then(text => {
+                      setUploadedFile({ name: file.name, content: text.slice(0, 50000) })
+                      toast.success(`Loaded ${file.name}`)
+                    })
+                  }
+                }}
+              />
+              {uploadedFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-success" />
+                  <span className="text-sm text-foreground font-medium">{uploadedFile.name}</span>
+                  <button onClick={(e) => { e.stopPropagation(); setUploadedFile(null) }} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Drop a document here to debate it — business plan, market research, strategy memo
+                </p>
+              )}
+            </div>
+
             <button
               onClick={() => setShowContext(!showContext)}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -937,7 +1001,7 @@ export function RedTeamView(): React.ReactElement {
               ) : (
                 <ChevronRight className="h-3.5 w-3.5" />
               )}
-              Add context
+              Add extra context
             </button>
             <AnimatePresence>
               {showContext && (
@@ -949,8 +1013,8 @@ export function RedTeamView(): React.ReactElement {
                   <textarea
                     value={context}
                     onChange={(e) => setContext(e.target.value)}
-                    placeholder="Paste relevant context..."
-                    rows={6}
+                    placeholder="Paste additional context, numbers, or background..."
+                    rows={4}
                     className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
                   />
                 </motion.div>
@@ -972,35 +1036,8 @@ export function RedTeamView(): React.ReactElement {
                   <p className="text-xs font-medium text-foreground mt-0.5">
                     {p.characterName}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {p.modelId.split("-").slice(0, 2).join("-")}
-                  </p>
                 </div>
               ))}
-            </div>
-
-            {/* Estimated cost + health check */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <DollarSign className="h-3.5 w-3.5" />
-                  <span>Estimated cost: ~$2-4</span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={runHealthCheck}
-                  disabled={healthLoading}
-                  className="text-xs h-7"
-                >
-                  {healthLoading ? (
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  ) : (
-                    <Wifi className="h-3 w-3 mr-1" />
-                  )}
-                  {healthChecked ? "Re-check" : "Check Providers"}
-                </Button>
-              </div>
             </div>
 
             <Button
@@ -1249,7 +1286,7 @@ export function RedTeamView(): React.ReactElement {
             <p className="text-sm font-semibold text-foreground mt-1">
               {p.characterName}
             </p>
-            <p className="text-[10px] text-muted-foreground">{p.modelId}</p>
+            <p className="text-[10px] text-muted-foreground">{p.characterTitle}</p>
           </div>
         ))}
       </div>
