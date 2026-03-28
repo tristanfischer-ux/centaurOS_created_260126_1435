@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
 import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
-import { SpecialistCoachingTip } from '@/components/specialists/specialist-coaching-tip'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import {
     User,
     ArrowRight,
@@ -45,11 +45,16 @@ export default async function SettingsPage() {
 
     return (
         <div className="space-y-6 max-w-3xl">
-            <SpecialistCoachingTip
+            <SpecialistBriefingHero
                 specialistId="chief-of-staff"
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
-                tip="Keep your profile, integrations, and notification preferences up to date. The more connected your workspace, the better I can coordinate your team."
+                narrative={null}
+                fallbackMessage="Keep your profile, integrations, and notification preferences up to date. The more connected your workspace, the better I can coordinate your team."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Settings', description: 'Cal on settings.', metadata: {} }}
+                storageKey="settings"
             />
 
             {/* Profile summary card */}

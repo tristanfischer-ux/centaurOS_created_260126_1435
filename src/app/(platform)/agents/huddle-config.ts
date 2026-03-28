@@ -17,7 +17,7 @@
  * - sweep-prompts.ts — Background sweep that generates discussion topics
  */
 
-import { Lightbulb, Cpu, Scale, TrendingUp } from "lucide-react"
+import { Lightbulb, Cpu, Scale, TrendingUp, Rocket, RefreshCw, Truck, Target, UserPlus, Search } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import type { SpecialistId } from "@/lib/agents/specialists-config"
 
@@ -42,10 +42,11 @@ export interface HuddleConfig {
     accentColor: string
 }
 
-// DECISION: Four huddles covering the natural business domains a founder
-// engages with. Cal sits in all of them as the operational glue — ensuring
-// cross-huddle alignment, tracking follow-ups, and doing the post-meeting
-// summarization.
+// DECISION: Ten huddles covering the natural business rhythms a hardware
+// startup founder engages with. The first four are evergreen (strategy,
+// tech, legal/finance, finance deep dive). The remaining six are
+// situational — founders jump into them at specific inflection points.
+// Cal sits in all of them as the operational glue.
 export const HUDDLES: HuddleConfig[] = [
     {
         id: "strategy",
@@ -90,6 +91,73 @@ export const HUDDLES: HuddleConfig[] = [
         insightSpecialistIds: ["finance-lead", "fundraising-advisor"],
         icon: TrendingUp,
         accentColor: "text-chart-4",
+    },
+    // ─── Situational huddles ────────────────────────────────────────
+    {
+        id: "go-to-market",
+        name: "Go-to-Market Launch",
+        description: "Launch strategy, channel selection, pricing, and early traction",
+        leadId: "strategist",
+        memberIds: ["growth-marketer", "sales-lead", "fundraising-advisor"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["strategist", "growth-marketer", "sales-lead", "fundraising-advisor"],
+        icon: Rocket,
+        accentColor: "text-success",
+    },
+    {
+        id: "product-pivot",
+        name: "Product Pivot",
+        description: "Stress-test assumptions, explore new directions, assess feasibility",
+        leadId: "strategist",
+        memberIds: ["cto", "product-lead", "finance-lead"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["strategist", "cto", "product-lead", "finance-lead"],
+        icon: RefreshCw,
+        accentColor: "text-warning",
+    },
+    {
+        id: "supply-chain",
+        name: "Supply Chain & Sourcing",
+        description: "Supplier selection, MOQ negotiation, lead times, and logistics",
+        leadId: "vp-supply-chain",
+        memberIds: ["vp-manufacturing", "cto"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["vp-supply-chain", "vp-manufacturing", "cto"],
+        icon: Truck,
+        accentColor: "text-info",
+    },
+    {
+        id: "fundraise-war-room",
+        name: "Fundraise War Room",
+        description: "Pitch prep, term sheets, cap table, and investor targeting",
+        leadId: "fundraising-advisor",
+        memberIds: ["finance-lead", "strategist", "legal-counsel"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["fundraising-advisor", "finance-lead", "strategist", "legal-counsel"],
+        icon: Target,
+        accentColor: "text-international-orange",
+    },
+    {
+        id: "hiring-sprint",
+        name: "Hiring Sprint",
+        description: "Role definition, compensation, compliance, and talent pipeline",
+        leadId: "hiring-team",
+        memberIds: ["strategist", "legal-counsel"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["hiring-team", "strategist", "legal-counsel"],
+        icon: UserPlus,
+        accentColor: "text-chart-3",
+    },
+    {
+        id: "customer-discovery",
+        name: "Customer Discovery",
+        description: "User research, problem validation, landing pages, and early feedback",
+        leadId: "product-lead",
+        memberIds: ["growth-marketer", "sales-lead"],
+        chiefOfStaffId: "chief-of-staff",
+        insightSpecialistIds: ["product-lead", "growth-marketer", "sales-lead"],
+        icon: Search,
+        accentColor: "text-chart-2",
     },
 ]
 

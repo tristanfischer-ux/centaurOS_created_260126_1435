@@ -5,13 +5,17 @@
  *
  * @description Renders concentric rings for functions, executives, apprentices,
  * and marketplace candidates using polar coordinate math. No D3 dependency.
- * viewBox is 0 0 840 840.
+ * viewBox is -40 -40 920 920 (840 + 40px padding each side for tooltip overflow).
+ *
+ * DECISION: Tooltips are rendered in a dedicated overlay <g> at the end of the
+ * SVG so they always paint on top of all nodes. Each slot component reports its
+ * hover via onHover/onLeave callbacks to a shared hoveredTooltip state.
  *
  * @param props.selected - Currently selected function id (or null)
  * @param props.onSelect - Callback when a function slice is clicked
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   CX, CY, GAP_DEG, SLICE_DEG,
   HUB_R, SPEC_R,
@@ -24,6 +28,21 @@ import type {
   FunctionId, TeamMember, MarketplaceCandidate, SpecialistNode,
   StatusColorSet, SliceData, BusinessFunction, FunctionCoverage,
 } from '../types'
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOOLTIP TYPE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface TooltipData {
+  x: number
+  y: number
+  r: number
+  type: 'person' | 'founder' | 'marketplace' | 'specialist'
+  label: string
+  sublabel?: string
+  labelColor?: string
+  sublabelColor?: string
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GEOMETRY HELPERS
@@ -79,7 +98,7 @@ function getRoleSvgColors(role: string) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SLOT COMPONENTS
+// SLOT COMPONENTS (no inline tooltips — hover state lifted to parent)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 interface OSlotProps {
@@ -91,10 +110,26 @@ interface OSlotProps {
   isFounder: boolean
   sc: StatusColorSet
   onClick: () => void
+  onHover: (tooltip: TooltipData) => void
+  onLeave: () => void
 }
 
-function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps) {
+function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick, onHover, onLeave }: OSlotProps) {
   const [isHovered, setIsHovered] = useState(false)
+
+  const handleEnter = useCallback(() => {
+    setIsHovered(true)
+    if (person) {
+      onHover({ x, y, r, type: 'person', label: person.name })
+    } else if (isFounder) {
+      onHover({ x, y, r, type: 'founder', label: 'Founder', labelColor: '#F97316' })
+    }
+  }, [x, y, r, person, isFounder, onHover])
+
+  const handleLeave = useCallback(() => {
+    setIsHovered(false)
+    onLeave()
+  }, [onLeave])
 
   // ── Filled slot: pure SVG circle with role-based colors ────
   if (person) {
@@ -102,14 +137,11 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
     return (
       <g
         onClick={onClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
         style={{ cursor: 'pointer' }}
       >
-        {/* White background ring */}
         <circle cx={x} cy={y} r={r + 3} fill="white" />
-
-        {/* Role-colored circle */}
         <circle
           cx={x} cy={y} r={r}
           fill={rc.bg} stroke={rc.stroke}
@@ -119,8 +151,6 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
             filter: isHovered ? `drop-shadow(0 2px 8px ${rc.stroke}44)` : 'none',
           }}
         />
-
-        {/* Initials text */}
         <text
           x={x} y={y + 1}
           textAnchor="middle" dominantBaseline="central"
@@ -130,20 +160,6 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         >
           {person.initials}
         </text>
-
-        {/* Tooltip on hover */}
-        {isHovered && (
-          <g>
-            <rect x={x - 52} y={y - r - 30} width={104} height={24} rx={7} fill="#1E293B" />
-            <text
-              x={x} y={y - r - 15}
-              textAnchor="middle" dominantBaseline="central"
-              fill="white" fontSize="10" fontWeight="600"
-            >
-              {person.name}
-            </text>
-          </g>
-        )}
       </g>
     )
   }
@@ -153,8 +169,8 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
     return (
       <g
         onClick={onClick}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={handleEnter}
+        onMouseLeave={handleLeave}
         style={{ cursor: 'pointer' }}
       >
         <circle cx={x} cy={y} r={r + 3} fill="white" />
@@ -172,18 +188,6 @@ function OSlot({ x, y, r, person, isEmpty, isFounder, sc, onClick }: OSlotProps)
         >
           YOU
         </text>
-        {isHovered && (
-          <g>
-            <rect x={x - 44} y={y - r - 30} width={88} height={24} rx={7} fill="#1E293B" />
-            <text
-              x={x} y={y - r - 15}
-              textAnchor="middle" dominantBaseline="central"
-              fill="#F97316" fontSize="10" fontWeight="600"
-            >
-              Founder
-            </text>
-          </g>
-        )}
       </g>
     )
   }
@@ -224,17 +228,34 @@ interface OMktSlotProps {
   r: number
   person: MarketplaceCandidate
   onClick: () => void
+  onHover: (tooltip: TooltipData) => void
+  onLeave: () => void
 }
 
-function OMktSlot({ x, y, r, person, onClick }: OMktSlotProps) {
+function OMktSlot({ x, y, r, person, onClick, onHover, onLeave }: OMktSlotProps) {
   const [isHovered, setIsHovered] = useState(false)
   const isExec = person.type === 'exec'
+
+  const handleEnter = useCallback(() => {
+    setIsHovered(true)
+    onHover({
+      x, y, r, type: 'marketplace',
+      label: person.name,
+      sublabel: `${person.role} · ★${person.rating}`,
+      sublabelColor: '#A5B4FC',
+    })
+  }, [x, y, r, person, onHover])
+
+  const handleLeave = useCallback(() => {
+    setIsHovered(false)
+    onLeave()
+  }, [onLeave])
 
   return (
     <g
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       style={{ cursor: 'pointer' }}
     >
       <circle cx={x} cy={y} r={r + 2.5} fill="white" />
@@ -254,25 +275,6 @@ function OMktSlot({ x, y, r, person, onClick }: OMktSlotProps) {
       >
         {person.initials}
       </text>
-      {isHovered && (
-        <g>
-          <rect x={x - 60} y={y - r - 40} width={120} height={34} rx={7} fill="#1E293B" />
-          <text
-            x={x} y={y - r - 28}
-            textAnchor="middle" dominantBaseline="central"
-            fill="white" fontSize="9.5" fontWeight="700"
-          >
-            {person.name}
-          </text>
-          <text
-            x={x} y={y - r - 14}
-            textAnchor="middle" dominantBaseline="central"
-            fill="#A5B4FC" fontSize="8.5" fontWeight="500"
-          >
-            {person.role} · ★{person.rating}
-          </text>
-        </g>
-      )}
     </g>
   )
 }
@@ -285,23 +287,37 @@ interface OSpecSlotProps {
   r: number
   specialist: SpecialistNode
   onClick: () => void
+  onHover: (tooltip: TooltipData) => void
+  onLeave: () => void
 }
 
-function OSpecSlot({ x, y, r, specialist, onClick }: OSpecSlotProps) {
+function OSpecSlot({ x, y, r, specialist, onClick, onHover, onLeave }: OSpecSlotProps) {
   const [isHovered, setIsHovered] = useState(false)
   const rc = SVG_ROLE_COLORS.SPECIALIST
+
+  const handleEnter = useCallback(() => {
+    setIsHovered(true)
+    onHover({
+      x, y, r, type: 'specialist',
+      label: specialist.name,
+      sublabel: specialist.title,
+      sublabelColor: '#C4B5FD',
+    })
+  }, [x, y, r, specialist, onHover])
+
+  const handleLeave = useCallback(() => {
+    setIsHovered(false)
+    onLeave()
+  }, [onLeave])
 
   return (
     <g
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       style={{ cursor: 'pointer' }}
     >
-      {/* White background ring */}
       <circle cx={x} cy={y} r={r + 2.5} fill="white" />
-
-      {/* Specialist-colored circle */}
       <circle
         cx={x} cy={y} r={r}
         fill={isHovered ? '#EDE9FE' : rc.bg}
@@ -312,8 +328,6 @@ function OSpecSlot({ x, y, r, specialist, onClick }: OSpecSlotProps) {
           filter: isHovered ? `drop-shadow(0 2px 6px ${rc.stroke}44)` : 'none',
         }}
       />
-
-      {/* Initials text */}
       <text
         x={x} y={y + 1}
         textAnchor="middle" dominantBaseline="central"
@@ -322,27 +336,56 @@ function OSpecSlot({ x, y, r, specialist, onClick }: OSpecSlotProps) {
       >
         {specialist.initials}
       </text>
+    </g>
+  )
+}
 
-      {/* Tooltip on hover */}
-      {isHovered && (
-        <g>
-          <rect x={x - 52} y={y - r - 38} width={104} height={32} rx={7} fill="#1E293B" />
+// ═══════════════════════════════════════════════════════════════════════════════
+// TOOLTIP OVERLAY — rendered last so it's always on top
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function TooltipOverlay({ tooltip }: { tooltip: TooltipData | null }) {
+  if (!tooltip) return null
+  const { x, y, r, type, label, sublabel, labelColor, sublabelColor } = tooltip
+
+  if (type === 'marketplace' || type === 'specialist') {
+    const h = 32
+    const w = type === 'marketplace' ? 120 : 104
+    return (
+      <g style={{ pointerEvents: 'none' }}>
+        <rect x={x - w / 2} y={y - r - h - 8} width={w} height={h} rx={7} fill="#1E293B" />
+        <text
+          x={x} y={y - r - h + 5 - 8}
+          textAnchor="middle" dominantBaseline="central"
+          fill={labelColor || 'white'} fontSize="9.5" fontWeight="700"
+        >
+          {label}
+        </text>
+        {sublabel && (
           <text
-            x={x} y={y - r - 27}
+            x={x} y={y - r - h + 19 - 8}
             textAnchor="middle" dominantBaseline="central"
-            fill="white" fontSize="9.5" fontWeight="700"
+            fill={sublabelColor || '#94A3B8'} fontSize="8.5" fontWeight="500"
           >
-            {specialist.name}
+            {sublabel}
           </text>
-          <text
-            x={x} y={y - r - 13}
-            textAnchor="middle" dominantBaseline="central"
-            fill="#C4B5FD" fontSize="8" fontWeight="500"
-          >
-            {specialist.title}
-          </text>
-        </g>
-      )}
+        )}
+      </g>
+    )
+  }
+
+  // Single-line tooltip (person, founder)
+  const w = type === 'founder' ? 88 : 104
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <rect x={x - w / 2} y={y - r - 30} width={w} height={24} rx={7} fill="#1E293B" />
+      <text
+        x={x} y={y - r - 15}
+        textAnchor="middle" dominantBaseline="central"
+        fill={labelColor || 'white'} fontSize="10" fontWeight="600"
+      >
+        {label}
+      </text>
     </g>
   )
 }
@@ -379,6 +422,9 @@ export function OrbitSVG({
   onSpecialistClick,
 }: OrbitSVGProps) {
   const [hoveredFn, setHoveredFn] = useState<string | null>(null)
+  const [hoveredTooltip, setHoveredTooltip] = useState<TooltipData | null>(null)
+
+  const clearTooltip = useCallback(() => setHoveredTooltip(null), [])
 
   const sliceData: SliceData[] = useMemo(
     () =>
@@ -404,7 +450,6 @@ export function OrbitSVG({
 
   // ── Specialist node positions (aligned to their function slice) ──────
   const specPositions = useMemo(() => {
-    // Group specialists by their functionId
     const byFunction: Record<string, SpecialistNode[]> = {}
     specialists.forEach((spec) => {
       const fid = spec.functionId
@@ -412,7 +457,6 @@ export function OrbitSVG({
       byFunction[fid].push(spec)
     })
 
-    // Position each group at the mid angle of its function slice
     const result: { spec: SpecialistNode; x: number; y: number }[] = []
     sliceData.forEach(({ fn, mid }) => {
       const group = byFunction[fn.id]
@@ -426,7 +470,7 @@ export function OrbitSVG({
   }, [specialists, sliceData])
 
   return (
-    <svg viewBox="0 0 840 840" style={{ width: '100%', height: '100%' }}>
+    <svg viewBox="-40 -40 920 920" overflow="visible" style={{ width: '100%', height: '100%' }}>
       <defs>
         <radialGradient id="cg" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#FFF" />
@@ -567,6 +611,8 @@ export function OrbitSVG({
                 isFounder={!comp.execs[ei] && comp.founderCovering && ei === 0}
                 sc={sc}
                 onClick={() => onSelect(fn.id)}
+                onHover={setHoveredTooltip}
+                onLeave={clearTooltip}
               />
             ))}
 
@@ -580,6 +626,8 @@ export function OrbitSVG({
                 isFounder={false}
                 sc={sc}
                 onClick={() => onSelect(fn.id)}
+                onHover={setHoveredTooltip}
+                onLeave={clearTooltip}
               />
             ))}
 
@@ -590,6 +638,8 @@ export function OrbitSVG({
                 x={mp.x} y={mp.y} r={14}
                 person={mktShow[mi]}
                 onClick={() => onSelect(fn.id)}
+                onHover={setHoveredTooltip}
+                onLeave={clearTooltip}
               />
             ))}
           </g>
@@ -603,6 +653,8 @@ export function OrbitSVG({
           x={x} y={y} r={12}
           specialist={spec}
           onClick={() => onSpecialistClick?.(spec.id)}
+          onHover={setHoveredTooltip}
+          onLeave={clearTooltip}
         />
       ))}
 
@@ -695,6 +747,9 @@ export function OrbitSVG({
           )
         })
       })()}
+
+      {/* ── Tooltip overlay — always on top of everything ── */}
+      <TooltipOverlay tooltip={hoveredTooltip} />
     </svg>
   )
 }
