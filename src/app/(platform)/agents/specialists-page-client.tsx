@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -50,6 +52,18 @@ export function SpecialistsPageClient({
     const [isMobile, setIsMobile] = useState<boolean | null>(null)
     const [showBuilderAnyway, setShowBuilderAnyway] = useState(false)
 
+    const briefingContext = useMemo(() =>
+      `Workflows: ${initialWorkflows.length}, Custom prompts: ${initialCustomPrompts.length}, 13 specialists available`,
+      [initialWorkflows.length, initialCustomPrompts.length]
+    )
+
+    const briefing = usePageBriefing(
+      () => generatePageBriefing('chief-of-staff', briefingContext, 'success'),
+      'success',
+      true,
+      'briefing-agents',
+    )
+
     useEffect(() => {
         const check = () => setIsMobile(window.innerWidth < 768)
         check()
@@ -95,10 +109,10 @@ export function SpecialistsPageClient({
                     specialistId="chief-of-staff"
                     specialistName="Cal"
                     specialistTitle="Chief of Staff"
-                    narrative={null}
+                    narrative={briefing.narrative}
                     fallbackMessage="Your specialist team is ready to help. Each one brings deep expertise in their domain — just click to start a conversation."
-                    isLoading={false}
-                    severity="success"
+                    isLoading={briefing.isLoading}
+                    severity={briefing.severity}
                     context={{ type: 'general', title: 'AI Team', description: 'Cal on specialists.', metadata: {} }}
                     storageKey="specialists"
                 />

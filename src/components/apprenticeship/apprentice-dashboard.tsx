@@ -1,7 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -93,6 +95,23 @@ export function ApprenticeDashboard({
   const [otjtLoggerOpen, setOtjtLoggerOpen] = useState(false)
   const [documentsOpen, setDocumentsOpen] = useState(false)
 
+  const briefingSeverity = useMemo(() =>
+    otjtProgress.onTrack ? 'success' as const : 'warning' as const,
+    [otjtProgress.onTrack]
+  )
+
+  const briefingContext = useMemo(() =>
+    `OTJT progress: ${otjtProgress.progressPercent.toFixed(0)}%, Hours: ${otjtProgress.hoursLogged}/${otjtProgress.hoursTarget}, Modules completed: ${moduleProgress.summary.completed}`,
+    [otjtProgress.progressPercent, otjtProgress.hoursLogged, otjtProgress.hoursTarget, moduleProgress.summary.completed]
+  )
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('hiring-team', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    'briefing-apprentice',
+  )
+
   const daysRemaining = Math.ceil(
     (new Date(enrollment.expected_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
@@ -136,10 +155,10 @@ export function ApprenticeDashboard({
         specialistId="hiring-team"
         specialistName="Harper"
         specialistTitle="Hiring"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="I'm tracking your apprenticeship progress. Log your OTJT hours consistently and work through your modules — I'll flag if you're falling behind."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Apprenticeship', description: 'Harper on apprentice progress.', metadata: {} }}
         storageKey="apprentice-dashboard"
       />

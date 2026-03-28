@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { typography } from '@/lib/design-system'
@@ -17,6 +17,8 @@ import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 
 import type { ProfileHubData } from '@/actions/profile-hub'
 
@@ -101,6 +103,19 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
     })
   }
 
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    const hasMarketplaceBio = !!data.providerProfile?.headline
+    return `Role: ${profile?.role ?? 'Member'}, Tasks this week: ${enrichment?.completedThisWeek ?? 0}, Tasks last week: ${enrichment?.completedLastWeek ?? 0}, Foundries: ${foundries.length}, Has marketplace bio: ${hasMarketplaceBio ? 'yes' : 'no'}`
+  }, [profile?.role, enrichment, foundries.length, data.providerProfile?.headline])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('chief-of-staff', briefingContext, 'success'),
+    'success',
+    !!profile,
+    'briefing-profile',
+  )
+
   // Determine if user is an Apprentice (can access marketplace even without provider profile)
   const isApprentice = profile?.role === 'Apprentice'
   const showMarketplaceTab = isProvider || isApprentice
@@ -132,10 +147,10 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
         specialistId="chief-of-staff"
         specialistName="Cal"
         specialistTitle="Chief of Staff"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Your profile is how other people on the platform discover you. Keep it complete and up to date — the more visible you are, the more opportunities find you."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'My Profile', description: 'Cal on profile.', metadata: {} }}
         storageKey="my-profile"
       />

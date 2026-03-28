@@ -8,6 +8,8 @@
 "use client"
 
 import { useMemo } from "react"
+import { usePageBriefing } from "@/hooks/use-page-briefing"
+import { generatePageBriefing } from "@/actions/specialist-page-insights"
 import { SpecialistBriefingHero, type BriefingSeverity } from "@/components/specialists/specialist-briefing-hero"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
@@ -94,6 +96,18 @@ interface ForgeCtoBannerProps {
 export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
   const { message, severity } = useMemo(() => getBannerContent(projects), [projects])
 
+  // Live AI briefing
+  const draftCount = projects.filter(p => p.status === 'draft').length
+  const inProgressCount = projects.filter(p => p.status !== 'draft' && p.status !== 'complete' && p.status !== 'rfq_created').length
+  const completedCount = projects.filter(p => p.status === 'complete' || p.status === 'rfq_created').length
+  const briefingContext = `Projects: ${projects.length} (${draftCount} draft, ${inProgressCount} in progress, ${completedCount} completed)`
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('cto', briefingContext, 'success'),
+    'success',
+    projects.length > 0,
+    'briefing-forge',
+  )
+
   const context = useMemo(() => {
     const inProgress = projects.filter(
       (p) => p.status !== "complete" && p.status !== "rfq_created",
@@ -130,10 +144,10 @@ export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
       specialistId="cto"
       specialistName="Max"
       specialistTitle="CTO"
-      narrative={null}
+      narrative={briefing.narrative}
       fallbackMessage={message}
-      isLoading={false}
-      severity={severity}
+      isLoading={briefing.isLoading}
+      severity={briefing.severity}
       context={context}
       storageKey="forge-cto"
     />

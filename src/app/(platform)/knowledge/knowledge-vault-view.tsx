@@ -72,6 +72,8 @@ import {
   batchVerifyNotes,
   batchArchiveNotes,
 } from '@/actions/knowledge'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
@@ -165,6 +167,24 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
   // Dialogs
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
+  // ─── Briefing ──────────────────────────────────────────────────
+  const briefingSeverity = useMemo(() => {
+    if (!stats) return 'success' as const
+    return stats.unverifiedCount > stats.verifiedCount ? 'warning' as const : 'success' as const
+  }, [stats])
+
+  const briefingContext = useMemo(() => {
+    if (!stats) return ''
+    return `Notes: ${stats.totalNotes}, Connections: ${stats.totalLinks}, Verified: ${stats.verifiedCount}, Needs review: ${stats.unverifiedCount}, Documents: ${stats.documentsProcessed}`
+  }, [stats])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('chief-of-staff', briefingContext, briefingSeverity),
+    briefingSeverity,
+    !isLoading && stats != null && stats.totalNotes > 0,
+    'briefing-knowledge',
+  )
 
   // ─── Data Fetching ───────────────────────────────────────────────
 
@@ -385,10 +405,10 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
         specialistId="chief-of-staff"
         specialistName="Cal"
         specialistTitle="Chief of Staff"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Your knowledge vault feeds into every specialist conversation. The more you add — documents, decisions, lessons — the sharper their advice becomes."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Knowledge', description: 'Cal on building institutional memory.', metadata: {} }}
         storageKey="knowledge"
       />

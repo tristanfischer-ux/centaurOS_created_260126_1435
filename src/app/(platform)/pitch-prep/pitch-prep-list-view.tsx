@@ -1,6 +1,9 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -35,6 +38,21 @@ const STATUS_COLORS: Record<PitchPrepStatus, { variant: 'default' | 'secondary' 
 }
 
 export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
+  const activeCount = useMemo(() => requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled').length, [requests])
+  const completedCount = useMemo(() => requests.filter(r => r.status === 'completed').length, [requests])
+
+  const briefingContext = useMemo(() =>
+    `Pitch requests: ${requests.length} (${activeCount} active, ${completedCount} completed)`,
+    [requests.length, activeCount, completedCount]
+  )
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('fundraising-advisor', briefingContext, 'success'),
+    'success',
+    true,
+    'briefing-pitch-prep',
+  )
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -61,10 +79,10 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
         specialistId="fundraising-advisor"
         specialistName="Fiona"
         specialistTitle="Fundraising Advisor"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Prepare your pitch with guided exercises. I'll help you craft a narrative that resonates with investors."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Pitch Preparation', description: 'Investor pitch prep and coaching', metadata: {} }}
         storageKey="pitch-prep"
       />

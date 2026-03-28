@@ -8,6 +8,8 @@
 'use client'
 
 import { useState, useMemo, useCallback, useRef } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -136,6 +138,27 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
       }
     })
   }, [cashInGrid])
+
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    const revenueItems = items.filter(i => i.sourceType === 'revenue')
+    const nonRevenueTotal = items.filter(i => i.sourceType !== 'revenue').reduce((s, i) => s + i.weeklyAmount, 0)
+    const revenueTotal = revenueItems.reduce((s, i) => s + i.weeklyAmount, 0)
+    const sourceTypes = new Set(items.map(i => i.sourceType)).size
+    return `Weekly total: £${weeklyTotal / 100}, Revenue: £${revenueTotal / 100}, Non-revenue: £${nonRevenueTotal / 100}, Source types: ${sourceTypes}`
+  }, [weeklyTotal, items])
+
+  const briefingSeverity = useMemo(() => {
+    const hasRevenue = items.some(i => i.sourceType === 'revenue')
+    return hasRevenue ? 'success' as const : 'warning' as const
+  }, [items])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    items.length > 0,
+    'briefing-cash-in',
+  )
 
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
@@ -269,10 +292,10 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         specialistId="finance-lead"
         specialistName="Finn"
         specialistTitle="Finance"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Add your revenue streams, grants, and funding here. I'll show you how they stack up against your costs and what your income mix looks like."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Cash In', description: 'Finn on cash in.', metadata: {} }}
         storageKey="cash-in"
       />

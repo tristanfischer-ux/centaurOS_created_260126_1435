@@ -7,7 +7,10 @@
 
 'use client'
 
+import { useMemo } from 'react'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { typography } from '@/lib/design-system'
 import { FinanceKpiCards } from '@/components/finance/kpi-cards'
 import { RevenueTrendChart } from '@/components/finance/revenue-trend-chart'
@@ -65,6 +68,22 @@ export function FinanceHubView({
 
   const { current, comparison } = initialDashboard
 
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    return `Revenue: £${current.monthlyRevenue / 100}, Expenses: £${current.monthlyExpenses / 100}, Outstanding invoices: ${current.outstandingInvoicesCount} (£${current.outstandingInvoicesAmount / 100}), Overdue: £${current.overdueAmount / 100}`
+  }, [current])
+
+  const briefingSeverity = useMemo(() => {
+    return current.overdueAmount > 0 ? 'warning' as const : 'success' as const
+  }, [current.overdueAmount])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    'briefing-finance-hub',
+  )
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-8">
       {/* Header */}
@@ -81,10 +100,10 @@ export function FinanceHubView({
         specialistId="finance-lead"
         specialistName="Finn"
         specialistTitle="Finance Lead"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Your finance dashboard brings together revenue, expenses, and cash flow. The more data you connect, the sharper my advice becomes."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Finance Hub', description: 'Financial overview and insights', metadata: {} }}
         storageKey="finance-hub"
       />

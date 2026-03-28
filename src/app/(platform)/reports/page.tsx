@@ -23,6 +23,8 @@
  */
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { useSearchParams } from 'next/navigation'
 
@@ -250,6 +252,13 @@ export default function ReportsPage(): React.JSX.Element {
   const defaultDateRange = getDateRangeFromPreset(defaultTemplate.defaultDateRange)
   const defaultSections = new Set(
     defaultTemplate.defaultSections.filter(s => s.enabled).map(s => s.type)
+  )
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('chief-of-staff', 'Reports page. The user generates polished reports from live data for their team, board, or investors.', 'success'),
+    'success',
+    true,
+    'briefing-reports',
   )
 
   const reportRef = useRef<HTMLDivElement>(null)
@@ -964,10 +973,10 @@ export default function ReportsPage(): React.JSX.Element {
         specialistId="chief-of-staff"
         specialistName="Cal"
         specialistTitle="Chief of Staff"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Generate polished reports from your live data — ready to share with your team, board, or investors. Pick a template to get started."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Reports', description: 'Cal on reports.', metadata: {} }}
         storageKey="reports"
       />

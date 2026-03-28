@@ -18,6 +18,8 @@ import {
   Heart, Users, Phone, MessageSquare, CheckCircle2, XCircle,
   AlertTriangle, StickyNote, Calendar, Mail, ChevronRight,
 } from 'lucide-react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
 
@@ -67,6 +69,17 @@ function relativeTime(dateStr: string): string {
 
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
+
+  // Live AI briefing
+  const briefingContext = stats
+    ? `Total tracked: ${stats.totalTracked}, Pipeline: ${Object.entries(stats.pipelineCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}, Coverage gaps: ${stats.coverageGaps.length}, Recent activity: ${stats.recentNotes.length} notes`
+    : ''
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('fundraising-advisor', briefingContext, 'success'),
+    'success',
+    !!stats && stats.totalTracked > 0,
+    'briefing-fundraise',
+  )
 
   if (!stats || stats.totalTracked === 0) {
     return (
@@ -148,10 +161,10 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
         specialistId="fundraising-advisor"
         specialistName="Fiona"
         specialistTitle="Fundraising"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Your fundraising command centre. I'll help you track your pipeline, prepare materials, and time your outreach for maximum impact."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
         storageKey="fundraise"
       />

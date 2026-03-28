@@ -8,6 +8,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
 import { BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -61,6 +63,23 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
       { period: 'Total', revenue: 0, cogs: 0, grossProfit: 0, opex: 0, rnd: 0, ebitda: 0 }
     )
   }, [incomeStatementRows])
+
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    const grossMarginPct = totals.revenue > 0 ? Math.round((totals.grossProfit / totals.revenue) * 100) : 0
+    return `Revenue: £${totals.revenue / 100}, COGS: £${totals.cogs / 100}, Gross margin: ${grossMarginPct}%, EBITDA: £${totals.ebitda / 100}`
+  }, [totals])
+
+  const briefingSeverity = useMemo(() => {
+    return totals.ebitda < 0 ? 'error' as const : 'success' as const
+  }, [totals.ebitda])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    cashOut.length > 0 || cashIn.length > 0,
+    'briefing-pnl',
+  )
 
   // Balance sheet at selected week
   const balanceSheetDate = useMemo(() => {
@@ -116,10 +135,10 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         specialistId="finance-lead"
         specialistName="Finn"
         specialistTitle="Finance"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Your projected profit and loss — revenue, cost of goods, operating expenses, and EBITDA. I'll flag margins that need attention."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'P&L', description: 'Finn on P&L.', metadata: {} }}
         storageKey="pnl"
       />

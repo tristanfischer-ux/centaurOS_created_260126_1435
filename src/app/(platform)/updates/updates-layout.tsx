@@ -20,6 +20,8 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { cn } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -67,6 +69,19 @@ export function UpdatesLayout({
   bannerSlot,
   members = [],
 }: UpdatesLayoutProps) {
+  // ── Briefing ────────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() =>
+    `Activity items: ${initialItems.length}, Team members: ${members.length}`,
+    [initialItems.length, members.length]
+  )
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('chief-of-staff', briefingContext, 'success'),
+    'success',
+    true,
+    'briefing-updates',
+  )
+
   // ── View state ──────────────────────────────────────────────────────────
   const [activeView, setActiveView] = useState<CommsView>('activity')
 
@@ -497,10 +512,10 @@ export function UpdatesLayout({
             specialistId="chief-of-staff"
             specialistName="Cal"
             specialistTitle="Chief of Staff"
-            narrative={null}
+            narrative={briefing.narrative}
             fallbackMessage="Your activity feed tracks everything happening across your workspace — task updates, comments, and conversations. I'll flag anything that needs your attention."
-            isLoading={false}
-            severity="success"
+            isLoading={briefing.isLoading}
+            severity={briefing.severity}
             context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
             storageKey="comms"
           />
@@ -553,10 +568,10 @@ export function UpdatesLayout({
             specialistId="chief-of-staff"
             specialistName="Cal"
             specialistTitle="Chief of Staff"
-            narrative={null}
+            narrative={briefing.narrative}
             fallbackMessage="Your activity feed tracks everything happening across your workspace — task updates, comments, and conversations. I'll flag anything that needs your attention."
-            isLoading={false}
-            severity="success"
+            isLoading={briefing.isLoading}
+            severity={briefing.severity}
             context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
             storageKey="comms"
           />

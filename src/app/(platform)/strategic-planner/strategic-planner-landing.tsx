@@ -17,6 +17,8 @@ import {
   Target,
 } from "lucide-react"
 
+import { usePageBriefing } from "@/hooks/use-page-briefing"
+import { generatePageBriefing } from "@/actions/specialist-page-insights"
 import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -41,6 +43,25 @@ interface StrategicPlannerLandingProps {
 }
 
 export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps) {
+  // Live AI briefing
+  const completedGoals = goals.filter(g => g.status === 'completed').length
+  const atRiskGoals = goals.filter(g => {
+    if (!g.milestone_date) return false
+    const daysLeft = differenceInDays(new Date(g.milestone_date), new Date())
+    return daysLeft < 30 && daysLeft >= 0 && (g.progress ?? 0) < 50
+  }).length
+  const avgProgress = goals.length > 0
+    ? Math.round(goals.reduce((sum, g) => sum + (g.progress ?? 0), 0) / goals.length)
+    : 0
+  const briefingSeverity = atRiskGoals > 0 ? 'warning' as const : 'success' as const
+  const briefingContext = `Goals: ${goals.length}, Completed: ${completedGoals}, At risk: ${atRiskGoals}, Avg progress: ${avgProgress}%`
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('strategist', briefingContext, briefingSeverity),
+    briefingSeverity,
+    goals.length > 0,
+    'briefing-planner',
+  )
+
   return (
     <div>
       {/* Page Header */}
@@ -67,10 +88,10 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
         specialistId="strategist"
         specialistName="Sage"
         specialistTitle="Strategist"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Define strategic goals and break them into milestones. I'll track progress and flag when priorities need adjusting."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Strategic Planner', description: 'Strategic goals and milestone tracking', metadata: {} }}
         storageKey="strategic-planner"
       />

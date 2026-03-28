@@ -17,6 +17,8 @@
 
 import * as React from 'react'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
 import { WeeklyTimesheetGrid } from '@/components/time/weekly-timesheet-grid'
@@ -153,6 +155,25 @@ export function TimeTrackerView({
   const [timerStarting, setTimerStarting] = React.useState(false)
 
   const summary = React.useMemo(() => buildSummary(weekStart, entries), [weekStart, entries])
+
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = React.useMemo(() => {
+    const totalHours = (summary.totalMinutes / 60).toFixed(1)
+    const uniqueProjects = new Set(entries.map(e => e.financeProjectId).filter(Boolean)).size
+    const daysWithEntries = new Set(entries.map(e => e.entryDate)).size
+    return `Hours this week: ${totalHours}, Entries: ${entries.length}, Projects: ${uniqueProjects}, Days with entries: ${daysWithEntries}/5`
+  }, [summary.totalMinutes, entries])
+
+  const briefingSeverity = React.useMemo(() => {
+    return summary.totalMinutes === 0 ? 'warning' as const : 'success' as const
+  }, [summary.totalMinutes])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('chief-of-staff', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    'briefing-time',
+  )
 
   const handleStartTimer = React.useCallback(async () => {
     setTimerStarting(true)
@@ -331,10 +352,10 @@ export function TimeTrackerView({
         specialistId="chief-of-staff"
         specialistName="Cal"
         specialistTitle="Chief of Staff"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Log your time consistently and I'll help you spot patterns, track billable hours, and make sure nothing falls through the cracks."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Time Tracking', description: 'Cal on time tracking.', metadata: {} }}
         storageKey="time"
       />

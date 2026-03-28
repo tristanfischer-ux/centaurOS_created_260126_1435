@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -78,6 +80,23 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
     return { totalPendingApprovals: pending, atRiskCount: atRisk }
   }, [mentees])
 
+  const briefingSeverity = useMemo(() =>
+    atRiskCount > 0 ? 'warning' as const : 'success' as const,
+    [atRiskCount]
+  )
+
+  const briefingContext = useMemo(() =>
+    `Mentees: ${mentees.length}, Pending approvals: ${totalPendingApprovals}, At risk: ${atRiskCount}`,
+    [mentees.length, totalPendingApprovals, atRiskCount]
+  )
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('hiring-team', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true,
+    'briefing-mentor',
+  )
+
   return (
     <>
       <OTJTApprovalPanel open={approvalPanelOpen} onOpenChange={setApprovalPanelOpen} />
@@ -120,10 +139,10 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
           specialistId="hiring-team"
           specialistName="Harper"
           specialistTitle="Hiring"
-          narrative={null}
+          narrative={briefing.narrative}
           fallbackMessage="Review pending OTJT approvals promptly and check in with apprentices falling behind on hours. Consistent mentorship is the biggest predictor of programme success."
-          isLoading={false}
-          severity="success"
+          isLoading={briefing.isLoading}
+          severity={briefing.severity}
           context={{ type: 'general', title: 'Mentor Dashboard', description: 'Harper on mentoring.', metadata: {} }}
           storageKey="mentor-dashboard"
         />

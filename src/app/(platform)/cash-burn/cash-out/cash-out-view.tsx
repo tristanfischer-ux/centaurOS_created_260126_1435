@@ -8,6 +8,8 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingDown, AlertTriangle, Zap } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -76,6 +78,23 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     variable: row.variableCosts,
     total: row.totalOut,
   })), [cashOutGrid])
+
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    const topCosts = items
+      .sort((a, b) => b.weeklyAmount - a.weeklyAmount)
+      .slice(0, 3)
+      .map(i => i.name)
+      .join(', ')
+    return `Weekly fixed: £${weeklyFixedTotal / 100}, Weekly variable: £${weeklyVariableTotal / 100}, Total items: ${items.length}, Top costs: ${topCosts || 'none'}`
+  }, [weeklyFixedTotal, weeklyVariableTotal, items])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('finance-lead', briefingContext, 'success'),
+    'success',
+    items.length > 0,
+    'briefing-cash-out',
+  )
 
   const handleAdd = useCallback((costType?: string) => {
     setEditingItem(null)
@@ -179,10 +198,10 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
         specialistId="finance-lead"
         specialistName="Finn"
         specialistTitle="Finance"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="Track every cost here — salaries, rent, subscriptions, materials. I'll break them into fixed vs variable so you can see what's flexible."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Cash Out', description: 'Finn on cash out.', metadata: {} }}
         storageKey="cash-out"
       />

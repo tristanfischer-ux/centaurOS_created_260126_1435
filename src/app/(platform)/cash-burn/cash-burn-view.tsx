@@ -9,6 +9,8 @@
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
 import { Flame, AlertTriangle, TrendingDown, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -131,6 +133,25 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     }))
   }, [projection.weeks])
 
+  // ── AI Briefing ──────────────────────────────────────────────────────────
+  const briefingContext = useMemo(() => {
+    const weeklyBurn = Math.round(projection.monthlyBurnRate * 12 / 52)
+    return `Weekly burn: £${weeklyBurn / 100}, Runway: ${projection.runwayWeeks ?? 'sustainable'} weeks, Opening balance: £${activeScenario.openingBalance / 100}, Expense items: ${cashOut.length}, Revenue items: ${cashIn.length}`
+  }, [projection, activeScenario.openingBalance, cashOut.length, cashIn.length])
+
+  const briefingSeverity = useMemo(() => {
+    if (projection.runwayWeeks !== null && projection.runwayWeeks < 13) return 'error' as const
+    if (projection.runwayWeeks !== null && projection.runwayWeeks < 26) return 'warning' as const
+    return 'success' as const
+  }, [projection.runwayWeeks])
+
+  const briefing = usePageBriefing(
+    () => generatePageBriefing('finance-lead', briefingContext, briefingSeverity),
+    briefingSeverity,
+    cashOut.length > 0 || cashIn.length > 0,
+    'briefing-cash-burn',
+  )
+
   // Scenario handlers
   const handleScenarioChange = useCallback((scenario: BurnScenario) => {
     setActiveScenario(scenario)
@@ -222,10 +243,10 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
         specialistId="finance-lead"
         specialistName="Finn"
         specialistTitle="Finance"
-        narrative={null}
+        narrative={briefing.narrative}
         fallbackMessage="I'll help you model your runway and cash projections. Start by adding your costs on Cash Out and revenue on Cash In — I'll calculate everything else."
-        isLoading={false}
-        severity="success"
+        isLoading={briefing.isLoading}
+        severity={briefing.severity}
         context={{ type: 'general', title: 'Cash Burn', description: 'Finn on cash burn.', metadata: {} }}
         storageKey="cash-burn"
       />

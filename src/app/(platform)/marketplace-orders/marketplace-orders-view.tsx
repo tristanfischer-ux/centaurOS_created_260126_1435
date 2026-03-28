@@ -27,6 +27,8 @@ import {
 import { OrderSummaryCard } from '@/components/buyer/OrderSummaryCard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { toast } from 'sonner'
+import { usePageBriefing } from '@/hooks/use-page-briefing'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import type { OrderSummary } from '@/types/booking'
 
@@ -54,6 +56,16 @@ export function MarketplaceOrdersView({
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
     const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount'>('newest')
+
+    // Live AI briefing
+    const briefingSeverity = cancelledOrders.length > completedOrders.length ? 'warning' as const : 'success' as const
+    const briefingContext = `Active: ${activeOrders.length}, Completed: ${completedOrders.length}, Cancelled: ${cancelledOrders.length}`
+    const briefing = usePageBriefing(
+        () => generatePageBriefing('vp-supply-chain', briefingContext, briefingSeverity),
+        briefingSeverity,
+        activeOrders.length + completedOrders.length + cancelledOrders.length > 0,
+        'briefing-orders',
+    )
 
     // Summary stats
     const totalOrders = activeOrders.length + completedOrders.length + cancelledOrders.length
@@ -180,10 +192,10 @@ export function MarketplaceOrdersView({
                 specialistId="vp-supply-chain"
                 specialistName="Chase"
                 specialistTitle="Supply Chain"
-                narrative={null}
+                narrative={briefing.narrative}
                 fallbackMessage="Track your marketplace orders and supplier communications. I'll flag anything that needs follow-up."
-                isLoading={false}
-                severity="success"
+                isLoading={briefing.isLoading}
+                severity={briefing.severity}
                 context={{ type: 'general', title: 'Orders', description: 'Chase on orders.', metadata: {} }}
                 storageKey="orders"
             />
