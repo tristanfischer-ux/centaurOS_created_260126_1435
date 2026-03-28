@@ -64,7 +64,7 @@ export function HuddleCard({ huddle, topics, onJoinHuddle, index = 0 }: HuddleCa
     const handleJoin = () => {
         const topicText = primaryTopic
             ? primaryTopic.title
-            : `${huddle.name}: Open discussion`
+            : huddle.name
         onJoinHuddle(huddle.id, participantIds, topicText)
     }
 
