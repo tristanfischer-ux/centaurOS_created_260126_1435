@@ -15,6 +15,7 @@ import { v4 as uuidv4 } from "uuid"
 import { getTextProvider } from "@/lib/ai-providers/registry"
 import type { AIProviderId } from "@/lib/ai-providers/types"
 import { estimateAICost } from "@/lib/ai/usage-tracking"
+import { buildAIContext } from "@/lib/ai-context/builder"
 import {
   DEBATE_PERSONAS,
   DEBATE_ROUNDS,
@@ -179,6 +180,26 @@ export async function POST(request: Request) {
           } catch { /* use defaults */ }
         }
 
+        // INTENT: Fetch the company's real context (objectives, tasks, team,
+        // financial data, knowledge vault) so debate personas argue with actual
+        // knowledge of the business — not just generic analysis.
+        let companyContext = ""
+        if (!isResume) {
+          try {
+            const profileData = await supabase.from("profiles").select("foundry_id").eq("id", user.id).single()
+            if (profileData.data?.foundry_id) {
+              companyContext = await buildAIContext(profileData.data.foundry_id, user.id, {
+                includeActivity: false, // Skip activity log — not relevant for debate
+                includeObjectives: true,
+                includeUserProfile: true,
+                includeInsightHistory: false,
+              })
+            }
+          } catch {
+            // Non-critical — debate works without company context
+          }
+        }
+
         const roundQuestions = customQuestions.length >= 4 ? customQuestions : DEBATE_ROUNDS
         const rounds: DebateRound[] = body.priorRounds || []
         let fullTranscript = body.priorTranscript || ""
@@ -205,7 +226,7 @@ export async function POST(request: Request) {
             emit({ phase: "persona_start", round: roundIdx + 1, persona: persona.role, characterName: persona.characterName, modelId: persona.modelId })
 
             const systemPrompt = getPersonaSystemPrompt(persona.role, topic)
-            const userPrompt = `## Evidence Pack (cite as [R1], [R2], etc.)\n${evidencePack}\n\n${context ? `## User Context\n${context}\n\n` : ""}## Debate History\n${fullTranscript || "(Opening — no prior arguments.)"}\n\n## Round ${roundIdx + 1}/${roundQuestions.length}: ${question}\n${roundText ? `### This round so far:\n${roundText}` : "(You speak first.)"}\n\nMake your argument as ${persona.label} (${persona.characterName}). Be specific, cite evidence with [R1]-[R6] references.`
+            const userPrompt = `## Evidence Pack (cite as [R1], [R2], etc.)\n${evidencePack}\n\n${companyContext ? `## Company Context (real data from this business)\n${companyContext}\n\n` : ""}${context ? `## User Context\n${context}\n\n` : ""}## Debate History\n${fullTranscript || "(Opening — no prior arguments.)"}\n\n## Round ${roundIdx + 1}/${roundQuestions.length}: ${question}\n${roundText ? `### This round so far:\n${roundText}` : "(You speak first.)"}\n\nMake your argument as ${persona.label} (${persona.characterName}). Be specific, cite evidence with [R1]-[R6] references. When the company context above contains relevant data (objectives, team, financials), use it to ground your arguments in this specific business.`
 
             // INTENT: If the primary provider fails (e.g., Qwen key expired), fall back
             // to Claude Sonnet so the debate continues. The persona keeps its personality
