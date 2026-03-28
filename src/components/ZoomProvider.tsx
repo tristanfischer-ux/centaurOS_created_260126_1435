@@ -93,6 +93,8 @@ export function ZoomableContent({ children, className, style: styleProp, ...rest
     // page unzoomable. transform: scale() doesn't interfere with native
     // pinch gestures. transformOrigin: "top left" prevents content from
     // shifting during zoom.
+    // Apply zoom style only when mounted and zoom differs from default
+    // to ensure SSR output matches client hydration.
     const zoomStyle: CSSProperties = mounted && zoom !== DEFAULT_ZOOM ? {
         transform: `scale(${zoom / 100})`,
         transformOrigin: "top left",

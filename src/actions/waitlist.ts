@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { rateLimit, getClientIP } from "@/lib/security/rate-limit";
 import { sanitizeEmail } from "@/lib/security/sanitize";
 import { sendEmail } from "@/lib/notifications/channels/email";
+import { scheduleOnboardingDrip } from "@/actions/onboarding-drip";
 import { createWaitlistActionToken } from "@/lib/waitlist-token";
 import type { Database } from "@/types/database.types";
 
@@ -153,6 +154,18 @@ export async function approveWaitlistEntry(entryId: string): Promise<{ error?: s
     template: "waitlist_approved",
     templateData: { inviteUrl, email: entry.email },
   });
+
+  // FLOW: Schedule onboarding drip sequence after approval
+  // The welcome email (Day 1) is sent immediately, follow-ups at Day 3, 7, 14
+  const firstName = entry.email.split('@')[0].split(/[._+]/)[0]
+  await scheduleOnboardingDrip(
+    entry.id, // Using entry ID as user proxy until they create account
+    entry.email,
+    firstName.charAt(0).toUpperCase() + firstName.slice(1)
+  ).catch((err) => {
+    // Non-blocking — approval succeeds even if drip scheduling fails
+    console.debug('[Waitlist] Drip scheduling failed (non-blocking):', err)
+  })
 
   return {};
 }

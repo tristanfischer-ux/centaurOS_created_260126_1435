@@ -9,6 +9,7 @@
     {"path": "/api/cron/reports", "schedule": "0 8 * * *"},
     {"path": "/api/cron/knowledge-decay", "schedule": "0 3 * * *"},
     {"path": "/api/cron/sheets-poll", "schedule": "*/3 * * * *"},
-    {"path": "/api/cron/outreach-drip", "schedule": "30 9 * * 1-5"}
+    {"path": "/api/cron/outreach-drip", "schedule": "30 9 * * 1-5"},
+    {"path": "/api/cron/onboarding-drip", "schedule": "0 * * * *"}
   ]
 }

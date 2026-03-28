@@ -75,6 +75,10 @@ export type EmailTemplate =
     | 'listing_claim_value'
     | 'listing_claim_case_study'
     | 'listing_claim_breakup'
+    | 'onboarding_day1_welcome'
+    | 'onboarding_day3_dfm'
+    | 'onboarding_day7_assessment'
+    | 'onboarding_day14_upgrade'
     | 'generic'
 
 export interface PushNotificationOptions {

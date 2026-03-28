@@ -430,9 +430,9 @@ export function BriefSpecialistDialog({
             try {
                 // Fetch thread, cross-specialist context, history, proactive opener, AND greeting context in parallel
                 const [threadResult, crossResult, historyResult, proactiveResult, greetingCtx, relationshipResult] = await Promise.all([
-                    getOrCreateSpecialistThread(specialist.id),
-                    getRecentSpecialistOutputs(specialist.id, 5),
-                    getSpecialistThreadHistory(specialist.id, 20),
+                    getOrCreateSpecialistThread(specialist.id).catch(() => ({ threadId: null, error: "Failed to get or create thread" })),
+                    getRecentSpecialistOutputs(specialist.id, 5).catch(() => ({ data: [], error: "Failed to get outputs" })),
+                    getSpecialistThreadHistory(specialist.id, 20).catch(() => ({ data: [], error: "Failed to get history" })),
                     getProactiveOpener(specialist.id).catch(() => null),
                     getSpecialistGreetingContext(specialist.id).catch(() => ({ insightTitles: [], overdueTasks: [] })),
                     getSpecialistRelationshipSummary(specialist.id).catch(() => ({ data: null, error: null })),
@@ -494,7 +494,8 @@ export function BriefSpecialistDialog({
                     setRelationshipSummary(relationshipResult.data)
                 }
             } catch (err) {
-                console.error("[BriefDialog] Init failed:", err)
+                // Expected for new accounts without foundry_id
+                console.debug("[BriefDialog] Init failed:", err)
             } finally {
                 if (!cancelled) setIsLoadingThread(false)
             }

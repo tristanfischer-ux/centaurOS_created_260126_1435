@@ -454,6 +454,93 @@ const EMAIL_TEMPLATES: Record<EmailTemplate, (data: Record<string, unknown>) => 
         `
     }),
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Onboarding Drip Sequence — Day 1, 3, 7, 14
+    // INTENT: Guide new users to "aha moment" and paid conversion
+    // ─────────────────────────────────────────────────────────────────────────
+
+    onboarding_day1_welcome: (data) => ({
+        subject: 'Welcome to ForgeOS — your hardware workspace is ready',
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="text-align: center; padding: 24px 0;">
+                    <h1 style="color: #1a1a1a; font-size: 24px; margin: 0;">Welcome to ForgeOS</h1>
+                    <p style="color: #ff4500; font-size: 13px; text-transform: uppercase; letter-spacing: 2px; margin-top: 4px;">The Operating System for Hardware Companies</p>
+                </div>
+                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
+                <p style="color: #333; line-height: 1.6;">Your ForgeOS workspace is live. Here&rsquo;s one thing to try in the next 5 minutes:</p>
+                <div style="background: #fff5f0; border-left: 4px solid #ff4500; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; color: #333; font-weight: 600;">Quick win: Talk to your first specialist</p>
+                    <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Open The Forge and describe your product idea. Our engineering specialist will generate a feasibility assessment in under 2 minutes.</p>
+                </div>
+                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Open The Forge &rarr;</a>
+                <p style="color: #888; font-size: 13px; margin-top: 24px;">Your 14-day full-access trial is active. No credit card needed.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            </div>
+        `
+    }),
+
+    onboarding_day3_dfm: (data) => ({
+        subject: 'Have you tried the DFM analysis yet?',
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
+                <p style="color: #333; line-height: 1.6;">Most founders find the Design for Manufacturability analysis is the feature that saves them the most time. It catches costly design mistakes before they reach the factory floor.</p>
+                <div style="background: #f0f7ff; border-left: 4px solid #3b82f6; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0;">
+                    <p style="margin: 0; color: #333; font-weight: 600;">Try this: Upload a CAD file or describe your part</p>
+                    <p style="margin: 8px 0 0 0; color: #666; font-size: 14px;">Our specialist will run a full DFM check: material compatibility, wall thickness, draft angles, undercuts, and tolerancing — with specific suggestions to reduce cost and improve yield.</p>
+                </div>
+                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Run a DFM Check &rarr;</a>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            </div>
+        `
+    }),
+
+    onboarding_day7_assessment: (data) => ({
+        subject: 'Your free engineering assessment is ready to generate',
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
+                <p style="color: #333; line-height: 1.6;">One week in &mdash; here&rsquo;s what ForgeOS can deliver for you today:</p>
+                <div style="background: #f5f5f5; padding: 20px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0 0 12px 0; color: #333; font-weight: 600; font-size: 16px;">Full Engineering Package includes:</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; STEP files and 3D CAD models</td></tr>
+                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; 7 engineering drawings (GA, detail, assembly)</td></tr>
+                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; Bill of materials with costed alternatives</td></tr>
+                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; DFM analysis with improvement suggestions</td></tr>
+                        <tr><td style="padding: 6px 0; color: #333; font-size: 14px;">&#10003; Top 3 matched UK manufacturers</td></tr>
+                    </table>
+                </div>
+                <p style="color: #666; line-height: 1.6;">Most teams generate their first full package in under an hour. The output is ready to send directly to suppliers.</p>
+                <a href="${data.actionUrl || 'https://fractionalforge.app/the-forge'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Generate Your Package &rarr;</a>
+                <p style="color: #888; font-size: 13px; margin-top: 24px;">7 days left on your full-access trial.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            </div>
+        `
+    }),
+
+    onboarding_day14_upgrade: (data) => ({
+        subject: 'Your trial ends tomorrow — keep building at full speed',
+        html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                <p style="color: #333; line-height: 1.6;">Hi ${data.firstName || 'there'},</p>
+                <p style="color: #333; line-height: 1.6;">Your 14-day full-access trial of ForgeOS ends tomorrow. After that, your workspace drops to the free Explorer tier (1 user, 50 assists/month, no supplier matching).</p>
+                <div style="background: #fff5f0; border: 2px solid #ff4500; padding: 20px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0 0 8px 0; color: #ff4500; font-weight: 700; font-size: 16px;">Keep everything you&rsquo;ve built</p>
+                    <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">Upgrade to Startup Team (£49/mo) to keep your team workspace, supplier matching, and get 0% marketplace fees on your first £10K of orders.</p>
+                </div>
+                <a href="${data.actionUrl || 'https://fractionalforge.app/settings/billing'}" style="display: inline-block; background: #ff4500; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 8px;">Upgrade Now &rarr;</a>
+                <p style="color: #888; font-size: 13px; margin-top: 16px;">Not ready? Your data stays safe on the free tier &mdash; upgrade whenever you&rsquo;re ready.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;" />
+                <p style="color: #888; font-size: 12px;">Fractional Forge Ltd &middot; <a href="https://fractionalforge.app" style="color: #888;">fractionalforge.app</a></p>
+            </div>
+        `
+    }),
+
     generic: (data) => ({
         subject: String(data.subject || data.title || 'Notification from ForgeOS'),
         html: `

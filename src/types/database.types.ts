@@ -12769,6 +12769,8 @@ export type Database = {
           skills: string[] | null
           stripe_account_id: string | null
           stripe_customer_id: string | null
+          subscription_status: string
+          tier: string
           trial_ends_at: string | null
           updated_at: string | null
           weekly_target_minutes: number | null
@@ -12810,6 +12812,8 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
+          subscription_status?: string
+          tier?: string
           trial_ends_at?: string | null
           updated_at?: string | null
           weekly_target_minutes?: number | null
@@ -12851,6 +12855,8 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
+          subscription_status?: string
+          tier?: string
           trial_ends_at?: string | null
           updated_at?: string | null
           weekly_target_minutes?: number | null
@@ -14894,6 +14900,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scheduled_emails: {
+        Row: {
+          created_at: string
+          description: string | null
+          email: string
+          error_message: string | null
+          id: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          template: string
+          template_data: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          email: string
+          error_message?: string | null
+          id?: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          template: string
+          template_data?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          email?: string
+          error_message?: string | null
+          id?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          template?: string
+          template_data?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sector_skills: {
         Row: {

@@ -176,7 +176,7 @@ export default function PreviewLandingPage() {
                 href="/join"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
-                Join the Forge
+                Get Started Free
               </Link>
             </motion.div>
           </div>
@@ -225,7 +225,7 @@ export default function PreviewLandingPage() {
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Join the Forge
+                    Get Started Free
                   </Link>
                   {[
                     { href: "#the-gap", label: "The Problem" },
@@ -280,7 +280,7 @@ export default function PreviewLandingPage() {
               href="/join"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Join the Forge
+              Get Started Free
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -303,7 +303,7 @@ export default function PreviewLandingPage() {
               <div className="flex flex-col gap-1 sm:gap-2">
                 <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Pricing</Link>
                 <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Login</a>
-                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Join the Forge</Link>
+                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Get Started Free</Link>
               </div>
             </div>
             <div>
@@ -447,7 +447,7 @@ function HeroSection() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto">
             <motion.div whileHover={buttonHover} whileTap={buttonTap} className="w-full sm:w-auto">
               <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full sm:w-auto">
-                Join the Forge <ArrowRight className="h-4 w-4" />
+                Get Started Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
             <a href="#the-gap" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
@@ -710,7 +710,7 @@ function SolutionSection() {
               <div className="mt-6 sm:mt-8 text-center">
                 <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
                   <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-8 py-3.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-                    Join the Forge <ArrowRight className="h-4 w-4" />
+                    Get Started Free <ArrowRight className="h-4 w-4" />
                   </Link>
                 </motion.div>
               </div>
@@ -881,7 +881,7 @@ function FinalCTASection() {
           </p>
           <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
             <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Join the Forge <ArrowRight className="h-4 w-4" />
+              Get Started Free <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
         </AnimatedSection>

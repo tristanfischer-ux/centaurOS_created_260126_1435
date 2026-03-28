@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -61,8 +61,13 @@ export function ShareProfileButton({
     className,
 }: ShareProfileButtonProps) {
     const [copied, setCopied] = useState(false)
+    const [origin, setOrigin] = useState('')
 
-    const profileUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/profile/${profileSlug}`
+    useEffect(() => {
+        setOrigin(window.location.origin)
+    }, [])
+
+    const profileUrl = `${origin}/profile/${profileSlug}`
     const shareUrl = `${profileUrl}?source=share&utm_source=share&utm_medium=social&utm_campaign=profile_share`
     const shareTitle = `${profileName}${headline ? ` - ${headline}` : ''}`
     const shareText = `Check out ${profileName}'s profile on ForgeOS${headline ? ` — ${headline}` : ''}. Find experts like this at ForgeOS.`

@@ -34,7 +34,11 @@ export function UnreadIndicator({ className }: UnreadIndicatorProps) {
                     setUnreadCount(result.count || 0)
                 }
             } catch (error) {
-                console.error('[UnreadIndicator] Failed to fetch unread count:', error)
+                // Expected for new accounts without foundry_id
+                console.debug('[UnreadIndicator] Failed to fetch unread count:', error)
+                if (mounted) {
+                    setUnreadCount(0)
+                }
             } finally {
                 if (mounted) {
                     setIsLoading(false)

@@ -55,15 +55,7 @@ export function PresenceProvider({ children }: PresenceProviderProps) {
   const contextValue = useMemo(() => presence, [
     presence.myPresence,
     presence.teamPresence,
-    presence.isConnected,
-    presence.goOnline,
-    presence.goAway,
-    presence.goFocus,
-    presence.goOffline,
-    presence.setWorkingOn,
-    presence.recordActivity,
-    presence.getPresenceForUser,
-    presence.refreshTeamPresence
+    presence.isConnected
   ])
 
   return (
