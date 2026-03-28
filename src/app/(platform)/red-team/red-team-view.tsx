@@ -804,19 +804,7 @@ export function RedTeamView(): React.ReactElement {
           </motion.div>
         )}
 
-        {/* REMOVED: "All providers healthy" banner — only show warnings */}
-        {false && healthChecked && unhealthyProviders.length === 0 && healthStatus && (
-          <motion.div
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="rounded-lg border border-success/30 bg-success/5 p-2 flex items-center gap-2"
-          >
-            <Wifi className="h-3.5 w-3.5 text-success" />
-            <p className="text-xs text-success font-medium">
-              All providers healthy — {healthStatus.summary}
-            </p>
-          </motion.div>
-        )}
+        {/* Health check runs silently on mount — no success banner shown */}
 
         {/* History */}
         <AnimatePresence>
@@ -1526,7 +1514,7 @@ function RoundCard({
                         {arg.characterName}
                       </span>
                       <span className="text-[10px] text-muted-foreground">
-                        via {arg.modelId}
+                        {DEBATE_PERSONAS.find(p => p.role === arg.role)?.characterTitle}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">

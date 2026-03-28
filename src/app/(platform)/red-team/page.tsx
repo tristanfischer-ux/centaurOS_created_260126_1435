@@ -12,7 +12,7 @@ import { RedTeamView } from "./red-team-view"
 
 export const metadata: Metadata = {
   title: "Red Team | ForgeOS",
-  description: "Stress-test decisions with multi-LLM adversarial debate",
+  description: "Stress-test any decision with multi-perspective debate",
 }
 
 export default function RedTeamPage(): React.ReactNode {
