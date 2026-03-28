@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, LayoutDashboard, Store, TrendingUp, Users, Target } from 'lucide-react'
+import { Hammer, LayoutDashboard, Store, TrendingUp, Users, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -32,19 +32,49 @@ interface ShowcaseTab {
 }
 
 const TABS: ShowcaseTab[] = [
+  // 1. Lead with the product — the hero feature
   {
     id: 'forge',
     label: 'The Forge',
     icon: <Hammer className="h-4 w-4" />,
-    url: 'app.fractionalforge.com/the-forge',
-    image: '/images/screenshots/forge-cad-lab.png',
+    url: 'app.fractionalforge.com/the-forge/design',
+    image: '/images/screenshots/design-modules.png',
     headline: 'From idea to engineering package',
-    description: 'Describe your product. Get research, module decomposition, images, and a bill of materials in minutes.',
+    description: 'Describe your product. Get module decomposition, isometric illustrations, detailed specs, and a full bill of materials in minutes.',
     callouts: [
-      { text: 'Research in 30s', position: 'top-[15%] left-[5%]' },
-      { text: 'Auto-generated modules', position: 'top-[40%] right-[5%]' },
+      { text: '7 modules auto-generated', position: 'top-[10%] left-[5%]' },
+      { text: 'Isometric CAD illustrations', position: 'top-[35%] right-[5%]' },
     ],
   },
+  // 2. Source — natural next step after design
+  {
+    id: 'source',
+    label: 'Source',
+    icon: <ShoppingCart className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/the-forge/source',
+    image: '/images/screenshots/source-sankey.png',
+    headline: 'Component to supplier, mapped',
+    description: 'Every part in your design automatically matched to manufacturing techniques and real suppliers. Visual flow from specs to quotes.',
+    callouts: [
+      { text: 'Auto-matched suppliers', position: 'top-[15%] right-[5%]' },
+      { text: 'Full BOM coverage', position: 'top-[50%] left-[5%]' },
+    ],
+  },
+  // 3. Specialists — the "team meeting" wow factor
+  {
+    id: 'specialists',
+    label: 'Specialists',
+    icon: <Briefcase className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/specialists',
+    image: '/images/screenshots/specialists-huddles.png',
+    headline: 'Leadership huddles',
+    description: 'Run strategy, technology, legal, and finance meetings with your specialist team. They pull live data, debate the issues, and you make the call.',
+    callouts: [
+      { text: 'Live data analysis', position: 'top-[15%] left-[5%]' },
+      { text: 'You decide who speaks', position: 'bottom-[20%] right-[5%]' },
+    ],
+  },
+  // 4. Dashboard — daily command centre
   {
     id: 'dashboard',
     label: 'Dashboard',
@@ -55,22 +85,24 @@ const TABS: ShowcaseTab[] = [
     description: 'Tasks, objectives, team pulse, and strategic health. Everything you need, one screen.',
     callouts: [
       { text: 'Daily briefing', position: 'top-[10%] left-[5%]' },
-      { text: 'Task progress', position: 'top-[55%] right-[5%]' },
+      { text: 'Onboarding checklist', position: 'top-[55%] right-[5%]' },
     ],
   },
+  // 5. Cash Burn — financial modelling
   {
-    id: 'marketplace',
-    label: 'Marketplace',
-    icon: <Store className="h-4 w-4" />,
-    url: 'app.fractionalforge.com/marketplace',
-    image: '/images/screenshots/marketplace.png',
-    headline: '8,600+ suppliers',
-    description: 'UK manufacturers, component suppliers, and fractional executives. Vetted, ready to quote.',
+    id: 'cash-burn',
+    label: 'Cash Burn',
+    icon: <Flame className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/cash-burn',
+    image: '/images/screenshots/cash-burn.png',
+    headline: '52-week runway modelling',
+    description: 'Model your cash position with scenario planning. Adjust revenue delays, cost overruns, and growth assumptions — see the impact instantly.',
     callouts: [
-      { text: '8,600+ suppliers', position: 'top-[10%] right-[5%]' },
-      { text: 'Instant contact', position: 'bottom-[25%] left-[5%]' },
+      { text: 'Scenario modelling', position: 'top-[15%] right-[5%]' },
+      { text: 'Runway projection', position: 'top-[45%] left-[5%]' },
     ],
   },
+  // 6. Strategy — objectives tracking
   {
     id: 'strategy',
     label: 'Strategy',
@@ -84,6 +116,35 @@ const TABS: ShowcaseTab[] = [
       { text: 'Live progress', position: 'top-[45%] right-[5%]' },
     ],
   },
+  // 7. Team — org visualization
+  {
+    id: 'team',
+    label: 'Team',
+    icon: <Users className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/team',
+    image: '/images/screenshots/team-orbit.png',
+    headline: 'Your extended team',
+    description: 'See your position at the centre, with your team, specialists, and fractional executives around you.',
+    callouts: [
+      { text: '13 specialists', position: 'top-[30%] left-[5%]' },
+      { text: 'Fractional execs', position: 'top-[30%] right-[5%]' },
+    ],
+  },
+  // 8. Marketplace — supplier directory
+  {
+    id: 'marketplace',
+    label: 'Marketplace',
+    icon: <Store className="h-4 w-4" />,
+    url: 'app.fractionalforge.com/marketplace',
+    image: '/images/screenshots/marketplace.png',
+    headline: '8,600+ suppliers',
+    description: 'UK manufacturers, component suppliers, and fractional executives. Vetted, ready to quote.',
+    callouts: [
+      { text: '8,600+ suppliers', position: 'top-[10%] right-[5%]' },
+      { text: 'Instant contact', position: 'bottom-[25%] left-[5%]' },
+    ],
+  },
+  // 9. Investors — fundraising
   {
     id: 'investors',
     label: 'Investors',
@@ -95,19 +156,6 @@ const TABS: ShowcaseTab[] = [
     callouts: [
       { text: '1,200+ investors', position: 'top-[15%] left-[5%]' },
       { text: 'Fund sizes + contacts', position: 'top-[45%] right-[5%]' },
-    ],
-  },
-  {
-    id: 'team',
-    label: 'Team',
-    icon: <Users className="h-4 w-4" />,
-    url: 'app.fractionalforge.com/team',
-    image: '/images/screenshots/team-orbit.png',
-    headline: 'Your extended team',
-    description: 'See your position at the centre, with your team, specialists, and fractional executives around you.',
-    callouts: [
-      { text: '9 specialists', position: 'top-[30%] left-[5%]' },
-      { text: 'Fractional execs', position: 'top-[30%] right-[5%]' },
     ],
   },
 ]
