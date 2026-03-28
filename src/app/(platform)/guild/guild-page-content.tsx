@@ -25,6 +25,7 @@ import { getMyAssignments } from "@/actions/project-assignments"
 import { getGuildEvents, getEventRSVPStatuses, getGuildEventsSummary, type GuildEvent } from "@/actions/guild-events"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
 import { usePageInsights } from "@/hooks/use-page-insights"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
@@ -297,6 +298,18 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                     )}
                 </div>
 
+                <SpecialistBriefingHero
+                    specialistId="hiring-team"
+                    specialistName="Harper"
+                    specialistTitle="Hiring"
+                    narrative={null}
+                    fallbackMessage="The Guild connects apprentices with mentors and companies. Build your network to find and develop talent for your team."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Guild', description: 'Harper on guild.', metadata: {} }}
+                    storageKey="guild"
+                />
+
                 {/* Harper's proactive insights */}
                 {insights.length > 0 && (
                     <div className="space-y-3">
@@ -388,6 +401,18 @@ export function GuildPageContent({ isManager, isApprentice, isExecutive, current
                         </p>
                     </div>
                 </div>
+
+                <SpecialistBriefingHero
+                    specialistId="hiring-team"
+                    specialistName="Harper"
+                    specialistTitle="Hiring"
+                    narrative={null}
+                    fallbackMessage="The Guild connects apprentices with mentors and companies. Build your network to find and develop talent for your team."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Guild', description: 'Harper on guild.', metadata: {} }}
+                    storageKey="guild"
+                />
 
                 {/* Harper's proactive insights */}
                 {insights.length > 0 && (

@@ -20,6 +20,7 @@ import { CashOutSetupWizard } from '@/components/cash-burn/cash-out-setup-wizard
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -224,6 +225,18 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           <Badge variant="secondary" size="sm">{formatCurrency(annualTotal)}/yr</Badge>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="finance-lead"
+        specialistName="Finn"
+        specialistTitle="Finance"
+        narrative={null}
+        fallbackMessage="Track every cost here — salaries, rent, subscriptions, materials. I'll break them into fixed vs variable so you can see what's flexible."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Cash Out', description: 'Finn on cash out.', metadata: {} }}
+        storageKey="cash-out"
+      />
 
       {error && (
         <Alert variant="destructive">

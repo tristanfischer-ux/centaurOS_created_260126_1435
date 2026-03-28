@@ -29,6 +29,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateMarketplaceInsights } from '@/actions/specialist-page-insights'
@@ -362,6 +363,18 @@ export function MarketplaceBrowse({
                     </p>
                 </div>
             </div>
+
+            <SpecialistBriefingHero
+                specialistId="vp-supply-chain"
+                specialistName="Chase"
+                specialistTitle="Supply Chain"
+                narrative={null}
+                fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Marketplace', description: 'Chase on marketplace.', metadata: {} }}
+                storageKey="marketplace"
+            />
 
             {/* Tab navigation */}
             <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">

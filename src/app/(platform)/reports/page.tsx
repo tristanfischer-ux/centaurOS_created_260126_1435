@@ -23,6 +23,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
@@ -996,6 +997,18 @@ export default function ReportsPage(): React.JSX.Element {
           </p>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={null}
+        fallbackMessage="Generate polished reports from your live data — ready to share with your team, board, or investors. Pick a template to get started."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Reports', description: 'Cal on reports.', metadata: {} }}
+        storageKey="reports"
+      />
 
       {/* Cal's proactive insights */}
       {insights.length > 0 && (

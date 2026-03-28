@@ -20,6 +20,7 @@ import { CashInSetupWizard } from '@/components/cash-burn/cash-in-setup-wizard'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -304,6 +305,18 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
           <Badge variant="secondary" size="sm">{formatCurrency(monthlyTotal)}/mo</Badge>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="finance-lead"
+        specialistName="Finn"
+        specialistTitle="Finance"
+        narrative={null}
+        fallbackMessage="Add your revenue streams, grants, and funding here. I'll show you how they stack up against your costs and what your income mix looks like."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Cash In', description: 'Finn on cash in.', metadata: {} }}
+        storageKey="cash-in"
+      />
 
       {error && (
         <Alert variant="destructive">

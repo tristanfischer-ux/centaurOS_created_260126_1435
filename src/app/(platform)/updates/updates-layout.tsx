@@ -20,6 +20,7 @@
  */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
@@ -535,6 +536,20 @@ export function UpdatesLayout({
           />
         </div>
 
+        <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
+          <SpecialistBriefingHero
+            specialistId="chief-of-staff"
+            specialistName="Cal"
+            specialistTitle="Chief of Staff"
+            narrative={null}
+            fallbackMessage="Your activity feed tracks everything happening across your workspace — task updates, comments, and conversations. I'll flag anything that needs your attention."
+            isLoading={false}
+            severity="success"
+            context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
+            storageKey="comms"
+          />
+        </div>
+
         {TabBar}
 
         {insights.length > 0 && activeView === 'activity' && (
@@ -588,6 +603,20 @@ export function UpdatesLayout({
             objectivesWithUpdates={objectivesWithUpdates}
             onMarkAllRead={handleMarkAllRead}
             isMarkingRead={isMarkingRead}
+          />
+        </div>
+
+        <div className="px-4 sm:px-6 pt-4 shrink-0">
+          <SpecialistBriefingHero
+            specialistId="chief-of-staff"
+            specialistName="Cal"
+            specialistTitle="Chief of Staff"
+            narrative={null}
+            fallbackMessage="Your activity feed tracks everything happening across your workspace — task updates, comments, and conversations. I'll flag anything that needs your attention."
+            isLoading={false}
+            severity="success"
+            context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
+            storageKey="comms"
           />
         </div>
 
@@ -674,6 +703,20 @@ export function UpdatesLayout({
               objectivesWithUpdates={objectivesWithUpdates}
               onMarkAllRead={handleMarkAllRead}
               isMarkingRead={isMarkingRead}
+            />
+          </div>
+
+          <div className="px-4 pt-3 shrink-0">
+            <SpecialistBriefingHero
+              specialistId="chief-of-staff"
+              specialistName="Cal"
+              specialistTitle="Chief of Staff"
+              narrative={null}
+              fallbackMessage="Your activity feed tracks everything happening across your workspace — task updates, comments, and conversations. I'll flag anything that needs your attention."
+              isLoading={false}
+              severity="success"
+              context={{ type: 'general', title: 'Comms', description: 'Cal on comms.', metadata: {} }}
+              storageKey="comms"
             />
           </div>
 

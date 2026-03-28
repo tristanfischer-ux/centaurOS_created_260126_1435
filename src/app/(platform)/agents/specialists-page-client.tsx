@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
@@ -125,6 +126,20 @@ export function SpecialistsPageClient({
                         ? "13 AI specialists ready to help — strategy, engineering, finance, legal, and more"
                         : "Chain multiple specialists together into a project"}
                 </p>
+            </div>
+
+            <div className="px-4 sm:px-6 lg:px-8 pt-4">
+                <SpecialistBriefingHero
+                    specialistId="chief-of-staff"
+                    specialistName="Cal"
+                    specialistTitle="Chief of Staff"
+                    narrative={null}
+                    fallbackMessage="Your specialist team is ready to help. Each one brings deep expertise in their domain — just click to start a conversation."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'AI Team', description: 'Cal on specialists.', metadata: {} }}
+                    storageKey="specialists"
+                />
             </div>
 
             {/* Cal's proactive insights */}

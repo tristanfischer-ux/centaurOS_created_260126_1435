@@ -22,6 +22,7 @@ import { getFoundryContext } from '@/actions/foundry-context'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { HarperRoleBriefing } from './harper-role-briefing'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
@@ -133,6 +134,18 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
 
     return (
         <div className="space-y-6">
+            <SpecialistBriefingHero
+                specialistId="hiring-team"
+                specialistName="Harper"
+                specialistTitle="Hiring"
+                narrative={null}
+                fallbackMessage="Find fractional executives and specialists ready to join your team. Filter by skills, availability, and experience to find the right match."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Recruits', description: 'Harper on recruits.', metadata: {} }}
+                storageKey="recruits"
+            />
+
             {/* Harper's pre-search role briefing */}
             <HarperRoleBriefing
                 totalListings={listings.length}

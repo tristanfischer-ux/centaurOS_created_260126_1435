@@ -17,6 +17,7 @@ import {
   AlertTriangle, StickyNote, Calendar, Mail,
 } from 'lucide-react'
 import Link from 'next/link'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -146,6 +147,18 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   return (
     <div className="space-y-6">
+      <SpecialistBriefingHero
+        specialistId="fundraising-advisor"
+        specialistName="Fiona"
+        specialistTitle="Fundraising"
+        narrative={null}
+        fallbackMessage="Your fundraising command centre. I'll help you track your pipeline, prepare materials, and time your outreach for maximum impact."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
+        storageKey="fundraise"
+      />
+
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {(Object.entries(STAGE_CONFIG) as [ShortlistStage, typeof STAGE_CONFIG[ShortlistStage]][]).map(([stage, config]) => {

@@ -27,6 +27,7 @@ import {
 import { OrderSummaryCard } from '@/components/buyer/OrderSummaryCard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { toast } from 'sonner'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { usePageInsights } from '@/hooks/use-page-insights'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
@@ -214,6 +215,18 @@ export function MarketplaceOrdersView({
 
     return (
         <div className="space-y-6">
+            <SpecialistBriefingHero
+                specialistId="vp-supply-chain"
+                specialistName="Chase"
+                specialistTitle="Supply Chain"
+                narrative={null}
+                fallbackMessage="Track your marketplace orders and supplier communications. I'll flag anything that needs follow-up."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Orders', description: 'Chase on orders.', metadata: {} }}
+                storageKey="orders"
+            />
+
             {/* Error Banner */}
             {errors.length > 0 && (
                 <Alert variant="destructive">

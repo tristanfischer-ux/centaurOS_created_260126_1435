@@ -22,6 +22,7 @@ import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -269,6 +270,18 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           </p>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="finance-lead"
+        specialistName="Finn"
+        specialistTitle="Finance"
+        narrative={null}
+        fallbackMessage="I'll help you model your runway and cash projections. Start by adding your costs on Cash Out and revenue on Cash In — I'll calculate everything else."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Cash Burn', description: 'Finn on cash burn.', metadata: {} }}
+        storageKey="cash-burn"
+      />
 
       {error && (
         <Alert variant="destructive">

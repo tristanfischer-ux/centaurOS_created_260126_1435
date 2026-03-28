@@ -58,6 +58,7 @@ import { WorkloadBoard } from './workload-board'
 import { TeamDetailCard } from './team-detail-card'
 import { SmartInsights } from './smart-insights'
 import { HarperAnalysisPanel } from './components/harper-analysis-panel'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generateTeamInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import { QuickAssignDialog } from './quick-assign-dialog'
@@ -1057,6 +1058,18 @@ export function TeamPageView({
                     </div>
                 </div>
             </div>
+
+            <SpecialistBriefingHero
+                specialistId="hiring-team"
+                specialistName="Harper"
+                specialistTitle="Hiring"
+                narrative={null}
+                fallbackMessage="Your team at a glance. I'll help you identify gaps, plan hiring, and make sure everyone has what they need to be productive."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Team', description: 'Harper on team.', metadata: {} }}
+                storageKey="team"
+            />
 
             {/* ── Harper Analysis Panel (visible in all modes) ── */}
             <HarperAnalysisPanel

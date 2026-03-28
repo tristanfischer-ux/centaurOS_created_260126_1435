@@ -16,6 +16,7 @@ import { toast } from 'sonner'
 import { TelegramLink } from '@/components/settings/telegram-link'
 import { ReportPreferences } from '@/components/settings/report-preferences'
 import { switchFoundry } from '@/actions/foundry-switching'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -169,6 +170,18 @@ export function ProfileHubView({ data, foundries, foundriesError, telegramLink, 
           Manage your presence on the platform
         </p>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={null}
+        fallbackMessage="Your profile is how other people on the platform discover you. Keep it complete and up to date — the more visible you are, the more opportunities find you."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'My Profile', description: 'Cal on profile.', metadata: {} }}
+        storageKey="my-profile"
+      />
 
       {/* Hero Card */}
       <HeroCard

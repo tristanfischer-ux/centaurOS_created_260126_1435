@@ -29,6 +29,7 @@ import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScore
 import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
@@ -468,6 +469,18 @@ export function InvestorBrowser({
 
   return (
     <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
+      <SpecialistBriefingHero
+        specialistId="fundraising-advisor"
+        specialistName="Fiona"
+        specialistTitle="Fundraising"
+        narrative={null}
+        fallbackMessage="Browse and shortlist investors that match your stage, sector, and geography. I'll help you build a focused pipeline — not just a big list."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Investors', description: 'Fiona on investors.', metadata: {} }}
+        storageKey="investors"
+      />
+
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}

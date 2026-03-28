@@ -18,6 +18,7 @@ import { IncomeStatementTable } from '@/components/cash-burn/income-statement-ta
 import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -164,6 +165,18 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
           </p>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="finance-lead"
+        specialistName="Finn"
+        specialistTitle="Finance"
+        narrative={null}
+        fallbackMessage="Your projected profit and loss — revenue, cost of goods, operating expenses, and EBITDA. I'll flag margins that need attention."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'P&L', description: 'Finn on P&L.', metadata: {} }}
+        storageKey="pnl"
+      />
 
       {/* Finn's proactive insights */}
       {insightsLoading && <InsightCardSkeleton />}

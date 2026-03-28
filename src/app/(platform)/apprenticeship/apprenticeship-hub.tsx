@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { DiscoverLanding } from '@/components/apprenticeship/discover-landing'
 import { ProgrammeCatalog } from '@/components/apprenticeship/programme-catalog'
 import { EnrollmentCreateDialog } from '@/components/apprenticeship/enrollment-create-dialog'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { Sparkles, BookOpen } from 'lucide-react'
 import type { Programme } from '@/components/apprenticeship/programme-detail-card'
 
@@ -43,6 +44,18 @@ export function ApprenticeshipHub({
           UK-accredited programmes to build your future workforce
         </p>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="hiring-team"
+        specialistName="Harper"
+        specialistTitle="Hiring"
+        narrative={null}
+        fallbackMessage="Manage apprenticeship placements and track progress. I'll help you match apprentices with the right opportunities."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Apprenticeships', description: 'Harper on apprenticeships.', metadata: {} }}
+        storageKey="apprenticeship"
+      />
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>

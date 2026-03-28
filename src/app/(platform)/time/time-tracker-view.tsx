@@ -16,6 +16,7 @@
 'use client'
 
 import * as React from 'react'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
 import { usePageInsights } from '@/hooks/use-page-insights'
@@ -367,6 +368,18 @@ export function TimeTrackerView({
           )}
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={null}
+        fallbackMessage="Log your time consistently and I'll help you spot patterns, track billable hours, and make sure nothing falls through the cracks."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Time Tracking', description: 'Cal on time tracking.', metadata: {} }}
+        storageKey="time"
+      />
 
       {/* Cal's proactive insights */}
       {insightsLoading && <InsightCardSkeleton />}
