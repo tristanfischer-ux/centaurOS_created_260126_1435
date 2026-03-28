@@ -8371,12 +8371,15 @@ export type Database = {
           id: string
           is_archived: boolean
           is_pinned: boolean
+          is_stale: boolean
           is_verified: boolean
           link_count: number
           note_type: string
           source_message_id: string | null
           source_specialist: string | null
           source_thread_id: string | null
+          stale_at: string | null
+          staleness_window_days: number | null
           tags: string[]
           title: string
           updated_at: string
@@ -8395,12 +8398,15 @@ export type Database = {
           id?: string
           is_archived?: boolean
           is_pinned?: boolean
+          is_stale?: boolean
           is_verified?: boolean
           link_count?: number
           note_type?: string
           source_message_id?: string | null
           source_specialist?: string | null
           source_thread_id?: string | null
+          stale_at?: string | null
+          staleness_window_days?: number | null
           tags?: string[]
           title: string
           updated_at?: string
@@ -8419,12 +8425,15 @@ export type Database = {
           id?: string
           is_archived?: boolean
           is_pinned?: boolean
+          is_stale?: boolean
           is_verified?: boolean
           link_count?: number
           note_type?: string
           source_message_id?: string | null
           source_specialist?: string | null
           source_thread_id?: string | null
+          stale_at?: string | null
+          staleness_window_days?: number | null
           tags?: string[]
           title?: string
           updated_at?: string
@@ -12760,6 +12769,7 @@ export type Database = {
           skills: string[] | null
           stripe_account_id: string | null
           stripe_customer_id: string | null
+          trial_ends_at: string | null
           updated_at: string | null
           weekly_target_minutes: number | null
           years_experience: number | null
@@ -12800,6 +12810,7 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string | null
           weekly_target_minutes?: number | null
           years_experience?: number | null
@@ -12840,6 +12851,7 @@ export type Database = {
           skills?: string[] | null
           stripe_account_id?: string | null
           stripe_customer_id?: string | null
+          trial_ends_at?: string | null
           updated_at?: string | null
           weekly_target_minutes?: number | null
           years_experience?: number | null
