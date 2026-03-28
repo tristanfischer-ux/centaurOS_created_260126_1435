@@ -53,7 +53,17 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const [dialogOpen, setDialogOpen] = useState(false)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<CashInItem | null>(null)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  // INTENT: Auto-collapse empty sections so the page doesn't show huge whitespace
+  // when most source types have 0 items. Sections with items start expanded.
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    const empty = new Set<string>()
+    for (const cfg of SOURCE_TYPE_CONFIG) {
+      if (!initialItems.some(i => i.sourceType === cfg.type)) {
+        empty.add(cfg.type)
+      }
+    }
+    return empty
+  })
   const [error, setError] = useState<string | null>(null)
   const [balanceError, setBalanceError] = useState<string | null>(null)
   const [startDate] = useState(() => new Date())

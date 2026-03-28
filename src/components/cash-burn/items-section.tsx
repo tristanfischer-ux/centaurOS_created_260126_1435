@@ -74,16 +74,13 @@ export function ItemsSection({
 
       <CardContent>
         {items.length === 0 ? (
-          <EmptyState
-            title="No items yet"
-            description={emptyMessage}
-            action={
-              <Button variant="secondary" size="sm" onClick={onAdd}>
-                <Plus className="h-4 w-4" />
-                Add your first item
-              </Button>
-            }
-          />
+          <div className="flex items-center justify-center gap-3 py-4 text-sm text-muted-foreground">
+            <span>{emptyMessage}</span>
+            <Button variant="secondary" size="sm" onClick={onAdd}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </Button>
+          </div>
         ) : (
           <div className="space-y-1">
             {items.map((item) => (
