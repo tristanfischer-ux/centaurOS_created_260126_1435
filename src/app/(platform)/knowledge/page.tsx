@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { ProfileSetupRequired } from '@/components/ProfileSetupRequired'
+import { markStaleNotes } from '@/lib/knowledge-vault'
 import { KnowledgeVaultView } from './knowledge-vault-view'
 import type { Metadata } from 'next'
 
@@ -38,6 +39,10 @@ export default async function KnowledgePage(): Promise<React.ReactNode> {
   if (!profile?.foundry_id) {
     return <ProfileSetupRequired userRole={profile?.role} />
   }
+
+  // INTENT: Flag notes that haven't been updated past their staleness window.
+  // Fire-and-forget — doesn't block page render.
+  markStaleNotes(profile.foundry_id).catch(() => { /* Non-critical */ })
 
   return (
     <KnowledgeVaultView
