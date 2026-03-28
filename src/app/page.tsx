@@ -150,11 +150,11 @@ export default function MarketingPage() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <a href="#the-gap" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
-              The Problem
-            </a>
             <a href="#solution" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               The Solution
+            </a>
+            <a href="#the-gap" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
+              The Problem
             </a>
             <a href="#for-you" className="text-sm text-muted-foreground hover:text-foreground uppercase tracking-wider transition-colors">
               Who It&apos;s For
@@ -173,7 +173,7 @@ export default function MarketingPage() {
                 href="/join"
                 className="inline-flex items-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-5 py-2.5 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md"
               >
-                Join the Forge
+                Get Started Free
               </Link>
             </motion.div>
           </div>
@@ -222,11 +222,11 @@ export default function MarketingPage() {
                     className="mb-3 bg-international-orange hover:bg-international-orange-hover text-white py-3.5 text-center text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] flex items-center justify-center"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    Join the Forge
+                    Get Started Free
                   </Link>
                   {[
-                    { href: "#the-gap", label: "The Problem" },
                     { href: "#solution", label: "The Solution" },
+                    { href: "#the-gap", label: "The Problem" },
                     { href: "#for-you", label: "Who It's For" },
                     { href: "#faq", label: "FAQ" },
                   ].map((item) => (
@@ -256,10 +256,10 @@ export default function MarketingPage() {
       <main id="main-content">
         <HeroSection />
         <HowItWorksStrip />
-        <WhyNowStrip />
-        <SolutionSection />
-        <ProblemSection />
         <ProductShowcase />
+        <SolutionSection />
+        <WhyNowStrip />
+        <ProblemSection />
         <WhoItsForSection />
         <TrustStrip />
         <FinalCTASection />
@@ -280,7 +280,7 @@ export default function MarketingPage() {
               href="/join"
               className="flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white py-3 text-xs font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px] w-full"
             >
-              Join the Forge
+              Get Started Free
               <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
@@ -303,7 +303,7 @@ export default function MarketingPage() {
               <div className="flex flex-col gap-1 sm:gap-2">
                 <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Pricing</Link>
                 <a href={`${APP_DOMAIN}/login`} className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Login</a>
-                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Join the Forge</Link>
+                <Link href="/join" className="text-sm text-muted-foreground hover:text-foreground transition-colors min-h-[44px] flex items-center">Get Started Free</Link>
               </div>
             </div>
             <div>
@@ -403,12 +403,12 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Early Access &mdash; Founding Members Only
+            The Operating System for Hardware Companies
           </span>
         </motion.div>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15, duration: 0.4 }} className="text-xs sm:text-sm font-mono uppercase tracking-widest text-muted-foreground mb-4 sm:mb-5">
-          Manufacturing-as-a-Service for hardware companies
+          Plan. Engineer. Source. Manufacture. All in one workspace.
         </motion.p>
 
         {memberCount !== null && memberCount > 0 ? (
@@ -452,7 +452,7 @@ function HeroSection() {
         </motion.p>
 
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5, duration: 0.6 }} className="text-muted-foreground text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          We connect companies that need manufacturing with factories that have spare capacity — through fractional experts and AI-powered engineering.
+          Stop stitching together 7 tools. ForgeOS combines project management, AI engineering, team coordination, and supplier matching — so you can ship hardware at software speed.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-4 w-full sm:w-auto">
@@ -462,8 +462,8 @@ function HeroSection() {
                 Get Started Free <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
-            <a href="#the-gap" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
-              See the Problem <ChevronDown className="h-4 w-4" />
+            <a href="#solution" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm font-mono tracking-wider uppercase transition-colors min-h-[48px]">
+              See How It Works <ChevronDown className="h-4 w-4" />
             </a>
           </div>
         </motion.div>
@@ -1000,7 +1000,7 @@ function FinalCTASection() {
           </p>
           <motion.div whileHover={buttonHover} whileTap={buttonTap} className="inline-block">
             <Link href="/join" className="inline-flex items-center justify-center gap-2 bg-international-orange hover:bg-international-orange-hover text-white px-10 py-4 text-sm font-mono font-bold tracking-widest uppercase transition-colors rounded-md min-h-[48px]">
-              Join the Forge <ArrowRight className="h-4 w-4" />
+              Get Started Free <ArrowRight className="h-4 w-4" />
             </Link>
           </motion.div>
         </AnimatedSection>
@@ -1032,7 +1032,7 @@ const FAQS = [
   },
   {
     question: "How much does it cost?",
-    answer: "We're in early access and working directly with founding members to define pricing. No equity is required. Reach out and we'll walk you through what engagement looks like for your situation.",
+    answer: "ForgeOS is free to start with a 14-day full-access trial. After that, plans start at £49/month for startups. All new accounts get 0% marketplace fees on their first 3 orders. No equity required — check our pricing page for full details.",
   },
   {
     question: "Can factory partners steal my idea?",
