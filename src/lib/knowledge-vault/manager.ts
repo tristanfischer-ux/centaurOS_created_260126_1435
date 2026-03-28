@@ -673,34 +673,35 @@ export async function searchKnowledgeForSpecialist(
   foundryId: string,
   query: string,
   specialistId?: string,
-  limit: number = 10
+  limit: number = 12
 ): Promise<string> {
   const supabase = await createClient()
 
-  // Extract key terms from the query for search
+  // DECISION: Search title + content + description, not just title.
+  // The GIN index exists but Supabase JS can't target a combined tsvector.
+  // Using ilike on all three columns with OR — fast enough for <1000 notes.
   const searchTerms = query
     .replace(/[^\w\s]/g, '')
     .split(/\s+/)
     .filter((w) => w.length > 3)
-    .slice(0, 8)
-    .join(' | ')
+    .slice(0, 6)
 
-  if (!searchTerms) {
+  if (searchTerms.length === 0) {
     return ''
   }
 
-  // Full-text search with ranking
+  // Build OR filter: each term matches title, content, or description
+  const orFilters = searchTerms
+    .map((term) => `title.ilike.%${term}%,content.ilike.%${term}%,description.ilike.%${term}%`)
+    .join(',')
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
   let searchQuery = (supabase as any)
-      .from('knowledge_notes')
+    .from('knowledge_notes')
     .select('title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at')
     .eq('foundry_id', foundryId)
     .eq('is_archived', false)
-    .textSearch(
-      'title',
-      searchTerms,
-      { type: 'websearch', config: 'english' }
-    )
+    .or(orFilters)
     .order('is_verified', { ascending: false })
     .order('confidence', { ascending: false })
     .order('created_at', { ascending: false })
@@ -721,6 +722,11 @@ export async function searchKnowledgeForSpecialist(
   // Format for prompt injection
   const lines: string[] = [
     '## Organizational Knowledge (from your team\'s Knowledge Vault)',
+    '',
+    'IMPORTANT: When your response draws on this knowledge, cite it naturally.',
+    'Example: "Based on your decision from March 12 to focus on enterprise customers..."',
+    'If your advice CONTRADICTS a stored decision or fact, flag it explicitly:',
+    '"Note: this differs from your earlier decision to [X] because [reason]."',
     '',
   ]
 

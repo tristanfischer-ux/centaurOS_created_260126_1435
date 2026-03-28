@@ -80,7 +80,7 @@ const LAYER_PRIORITIES: Record<string, number> = {
     'Engineering Reference Data': 58, // Verified material/process/standards data
     'Task Ownership': 55,          // Active work
     'Since Last Talked': 50,       // What changed since last chat
-    'Knowledge Vault': 45,         // Organizational knowledge search results
+    'Knowledge Vault': 65,         // Organizational knowledge — boosted: vault feeds grounded, context-aware advice
     'Emotional Awareness': 40,     // Detecting founder mood from message
 }
 
