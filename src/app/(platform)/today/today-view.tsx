@@ -60,8 +60,6 @@ import { WeeklyBrief } from "@/components/insights/weekly-brief"
 import { useRegisterScreenContext } from "@/contexts/screen-context"
 import { GettingStartedHero } from "@/components/onboarding/getting-started-hero"
 import { PageTour } from "@/components/guidance/page-tour"
-import { CreateCompanyDialog } from "@/components/create-company-dialog"
-
 import type { FormattedReport, DailyPulseData } from "@/lib/reports/types"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
@@ -73,77 +71,6 @@ import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
 import Image from "next/image"
 
-// ─── Sandbox Welcome Banner ──────────────────────────────────────
-
-function SandboxWelcomeBanner({ onDismiss, onCreateCompany, isMigrated }: {
-    onDismiss: () => void
-    onCreateCompany: () => void
-    /** True for users migrated from forge-guild (have no intent_selection) */
-    isMigrated: boolean
-}): React.ReactElement {
-    return (
-        <Card className="rounded-xl border-2 border-electric-blue/20 shadow-sm bg-gradient-to-br from-electric-blue/[0.03] to-background">
-            <CardContent className="pt-6 pb-6">
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                        <h3 className="text-lg font-semibold text-foreground">
-                            {isMigrated
-                                ? "We\u2019ve moved you to your own private workspace"
-                                : "Welcome to your personal workspace"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            {isMigrated
-                                ? "Your data is now fully private \u2014 no one else can see it. When you\u2019re ready, you have two paths:"
-                                : "This is your private space to explore ForgeOS. When you\u2019re ready, you have two paths:"}
-                        </p>
-                    </div>
-                    <button
-                        onClick={onDismiss}
-                        className="text-muted-foreground hover:text-foreground transition-colors p-1 -mt-1 -mr-1"
-                        aria-label="Dismiss banner"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg border bg-card hover:border-electric-blue/30 transition-colors">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-9 h-9 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
-                                <Building2 className="w-4.5 h-4.5 text-electric-blue" />
-                            </div>
-                            <h4 className="text-sm font-semibold text-foreground">Set up a company</h4>
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                            Create your company workspace, build your team, and manage your venture.
-                        </p>
-                        <Button
-                            size="sm"
-                            onClick={onCreateCompany}
-                            className="bg-electric-blue hover:bg-electric-blue/90 text-white"
-                        >
-                            Create Company
-                        </Button>
-                    </div>
-                    <div className="p-4 rounded-lg border bg-card hover:border-international-orange/30 transition-colors">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-9 h-9 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
-                                <Users className="w-4.5 h-4.5 text-international-orange" />
-                            </div>
-                            <h4 className="text-sm font-semibold text-foreground">Get found as a fractional executive</h4>
-                        </div>
-                        <p className="text-xs text-muted-foreground leading-relaxed mb-3">
-                            Complete your profile so companies can discover you on the Recruits page and invite you to their teams.
-                        </p>
-                        <Button size="sm" variant="outline" asChild className="gap-1.5">
-                            <Link href="/my-profile">Complete Profile</Link>
-                        </Button>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    )
-}
-
 // ─── Props ────────────────────────────────────────────────────────
 
 interface TodayViewProps {
@@ -153,7 +80,7 @@ interface TodayViewProps {
     initialUnreadCount: number
     initialBriefingError: boolean
     initialPulseError: boolean
-    initialOnboardingData?: OnboardingData & { _userRole?: string; _isSandbox?: boolean }
+    initialOnboardingData?: OnboardingData & { _userRole?: string }
 }
 
 // ─── Constants ────────────────────────────────────────────────────
@@ -210,19 +137,6 @@ export function TodayView({
     const [isLoading, setIsLoading] = useState(false)
     const [briefingError, setBriefingError] = useState(initialBriefingError)
     const [pulseError, setPulseError] = useState(initialPulseError)
-    const [sandboxBannerDismissed, setSandboxBannerDismissed] = useState(initialOnboardingData?.sandbox_banner_dismissed === true)
-    const [showCreateCompany, setShowCreateCompany] = useState(false)
-
-    // Migrated users went through the old onboarding (no intent_selection) but
-    // are now in a sandbox. They see different banner copy acknowledging the move.
-    const isMigratedUser = !!(initialOnboardingData?._isSandbox && !initialOnboardingData?.intent_selection && initialOnboardingData?.has_completed_onboarding)
-
-    const handleDismissSandboxBanner = useCallback(() => {
-        setSandboxBannerDismissed(true)
-        updateOnboardingData({ sandbox_banner_dismissed: true }).catch(() => {
-            setSandboxBannerDismissed(false)
-        })
-    }, [])
 
     const confettiFiredRef = useRef(false)
     const streakCelebratedRef = useRef(false)
@@ -397,13 +311,6 @@ export function TodayView({
                 )}
 
                 {/* Sandbox Welcome Banner — also shown in empty state */}
-                {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
-                    <SandboxWelcomeBanner onDismiss={handleDismissSandboxBanner} onCreateCompany={() => setShowCreateCompany(true)} isMigrated={isMigratedUser} />
-                )}
-
-                {/* Create Company Dialog — triggered from sandbox banner */}
-                <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
-
                 <Card className="rounded-xl border shadow-sm bg-gradient-to-br from-background to-international-orange/[0.03]">
                     <CardContent className="pt-8 pb-8 flex flex-col items-center gap-5 text-center">
                         <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-international-orange/10">
@@ -755,20 +662,6 @@ export function TodayView({
             {initialOnboardingData && (
                 <GettingStartedHero onboardingData={initialOnboardingData} userRole={initialOnboardingData._userRole} onShareReferral={handleShareReferral} />
             )}
-
-            {/* Sandbox Welcome Banner — shown for sandbox users who haven't dismissed */}
-            {initialOnboardingData?._isSandbox && !sandboxBannerDismissed && (
-                <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.4, ease: EASE_CURVE }}
-                >
-                    <SandboxWelcomeBanner onDismiss={handleDismissSandboxBanner} onCreateCompany={() => setShowCreateCompany(true)} isMigrated={isMigratedUser} />
-                </motion.div>
-            )}
-
-            {/* Create Company Dialog — triggered from sandbox banner */}
-            <CreateCompanyDialog open={showCreateCompany} onOpenChange={setShowCreateCompany} />
 
             {/* Running Low on AI Tasks — Referral Nudge */}
             <ReferralNudgeBanner />

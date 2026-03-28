@@ -186,3 +186,98 @@ export async function createCompanyFoundry(params: {
     }
   }) as Promise<{ success: true; foundryId: string; foundryName: string } | { success: false; error: string }>
 }
+
+/**
+ * Converts the user's current sandbox foundry into a real company.
+ * Updates the foundry name, slug, and sets is_sandbox = false.
+ * Used during onboarding when the user enters their company name.
+ *
+ * @param params.companyName - Required company name (min 2 chars)
+ * @returns Success with foundry details, or error
+ */
+export async function convertSandboxToCompany(params: {
+  companyName: string
+}): Promise<{ success: true; foundryId: string; foundryName: string } | { success: false; error: string }> {
+  return withUser(async ({ supabase, user }) => {
+    const { companyName: rawName } = params
+
+    // VALIDATION: Company name is required
+    if (!rawName || rawName.trim().length < 2) {
+      return { success: false as const, error: "Company name must be at least 2 characters" }
+    }
+
+    // SECURITY: Sanitize input
+    const companyName = rawName.trim()
+      .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E\u2066-\u2069]/g, '')
+      .replace(/[\x00-\x1F\x7F]/g, '')
+      .slice(0, 100)
+      .replace(/<[^>]*>/g, '')
+
+    // Fetch user's current foundry
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("foundry_id, active_foundry_id, role")
+      .eq("id", user.id)
+      .single()
+
+    const foundryId = profile?.active_foundry_id || profile?.foundry_id
+    if (!foundryId) {
+      return { success: false as const, error: "No workspace found for your account" }
+    }
+
+    // Verify it's a sandbox
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- is_sandbox not in generated types
+    const { data: foundry } = await (supabase as any)
+      .from("foundries")
+      .select("id, is_sandbox")
+      .eq("id", foundryId)
+      .single()
+
+    if (!foundry?.is_sandbox) {
+      return { success: false as const, error: "Your workspace has already been set up as a company" }
+    }
+
+    // Generate slug with collision retry
+    const baseSlug = generateSlug(companyName)
+    let slug = `${baseSlug}-${user.id.slice(0, 6)}`
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- foundries columns not in generated types
+    let updateResult = await (supabase as any)
+      .from("foundries")
+      .update({ name: companyName, slug, is_sandbox: false })
+      .eq("id", foundryId)
+
+    // Retry with timestamp slug on conflict
+    if (updateResult.error) {
+      slug = `${baseSlug}-${Date.now().toString(36)}`
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      updateResult = await (supabase as any)
+        .from("foundries")
+        .update({ name: companyName, slug, is_sandbox: false })
+        .eq("id", foundryId)
+
+      if (updateResult.error) {
+        console.error("[convertSandboxToCompany] Update failed:", updateResult.error)
+        return { success: false as const, error: "Failed to update your workspace" }
+      }
+    }
+
+    // Upgrade Executive → Founder (same as createCompanyFoundry)
+    if (profile?.role === "Executive") {
+      await supabase
+        .from("profiles")
+        .update({ role: "Founder" })
+        .eq("id", user.id)
+    }
+
+    // Clear cache so sidebar shows new name
+    clearFoundryCache(user.id)
+    revalidatePath("/", "layout")
+
+    return {
+      success: true as const,
+      foundryId,
+      foundryName: companyName,
+    }
+  }) as Promise<{ success: true; foundryId: string; foundryName: string } | { success: false; error: string }>
+}

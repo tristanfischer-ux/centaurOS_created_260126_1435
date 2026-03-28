@@ -219,7 +219,7 @@ export async function setupNewUser({
       .from("foundries")
       .insert({
         id: sandboxSlug,
-        name: `${firstName}'s Workspace`,
+        name: `${firstName}'s Company`,
         slug: sandboxSlug,
         owner_id: null,
         is_sandbox: true,
@@ -235,7 +235,7 @@ export async function setupNewUser({
         .from("foundries")
         .insert({
           id: retrySlug,
-          name: `${firstName}'s Workspace`,
+          name: `${firstName}'s Company`,
           slug: retrySlug,
           owner_id: null,
           is_sandbox: true,

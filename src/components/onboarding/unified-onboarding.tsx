@@ -3,15 +3,16 @@
 /**
  * @file unified-onboarding.tsx
  *
- * @description 3-step unified onboarding modal (Welcome → How It Works → Intent)
- * with a 3-way fork: set up a company, join an existing one, or explore.
- * "Set up a company" opens CreateCompanyDialog. Others complete onboarding
- * in their personal sandbox workspace.
+ * @description 3-step unified onboarding modal (Welcome → How It Works → Company Name).
+ * Every executive enters their company name, which converts their sandbox foundry
+ * into a real company. They are auto-opted-in as visible fractional executives.
+ * Suppliers redirect to /supplier-portal.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   ArrowRight,
   Building2,
@@ -19,25 +20,21 @@ import {
   Hammer,
   Shield,
   Scale,
-  Users,
-  Compass,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { setAccountType, updateOnboardingData } from '@/actions/onboarding'
+import { convertSandboxToCompany } from '@/actions/create-company'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { GuidedTour } from './guided-tour'
-import { CreateCompanyDialog } from '@/components/create-company-dialog'
 
 import type { OnboardingData } from '@/actions/onboarding'
 
 type AccountType = 'team_builder' | 'supplier'
-// DECISION: 3-step flow: Welcome → How It Works → Intent (3-way fork).
-// Plan selection removed from onboarding — accessible from Settings > Billing.
-type OnboardingStep = 'welcome' | 'how-it-works' | 'intent'
+type OnboardingStep = 'welcome' | 'how-it-works' | 'company-name'
 
-const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'intent']
+const STEPS: OnboardingStep[] = ['welcome', 'how-it-works', 'company-name']
 
 const slideVariants = {
   enter: (direction: number) => ({
@@ -61,12 +58,11 @@ interface UnifiedOnboardingProps {
 }
 
 /**
- * UnifiedOnboarding — 2-step full-screen onboarding (Welcome → Intent).
+ * UnifiedOnboarding — 3-step full-screen onboarding (Welcome → How It Works → Company Name).
  *
- * @description Team builders are handed off to Cal's guided tour after intent
- * selection. Suppliers redirect to /supplier-portal. Persists state to
- * Supabase onboarding_data JSONB. Migrates existing localStorage flags on
- * first mount.
+ * @description Every executive names their company during onboarding. Their sandbox
+ * foundry is converted in-place to a real company. After completion, they are informed
+ * about marketplace visibility and handed off to Cal's guided tour.
  */
 export function UnifiedOnboarding({
   userRole,
@@ -76,10 +72,10 @@ export function UnifiedOnboarding({
   const [open, setOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome')
   const [direction, setDirection] = useState(1)
-  const [isSavingIntent, setIsSavingIntent] = useState(false)
-  const [selectedIntent, setSelectedIntent] = useState<AccountType | null>(initialAccountType ?? null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [companyName, setCompanyName] = useState('')
+  const [companyError, setCompanyError] = useState<string | null>(null)
   const [showGuidedTour, setShowGuidedTour] = useState(false)
-  const [showCreateCompany, setShowCreateCompany] = useState(false)
   const migrationRanRef = useRef(false)
   const router = useRouter()
 
@@ -98,7 +94,6 @@ export function UnifiedOnboarding({
       try {
         const lsCompleted = localStorage.getItem('forgeos_onboarding_completed') === 'true'
         if (lsCompleted && !dbCompleted) {
-          // Silently migrate to DB — only clear localStorage on success
           updateOnboardingData({
             onboarding_modal_completed: true,
             has_completed_onboarding: true,
@@ -108,13 +103,10 @@ export function UnifiedOnboarding({
               localStorage.removeItem('forgeos_onboarding_completed')
               localStorage.removeItem('forgeos_intent_selected')
             }
-          }).catch(() => {
-            // Best-effort — localStorage keys remain for retry on next visit
-          })
-          return // Don't show modal — user already onboarded
+          }).catch(() => {})
+          return
         }
         if (lsCompleted) {
-          // Already in both — just clean up localStorage
           localStorage.removeItem('forgeos_onboarding_completed')
           localStorage.removeItem('forgeos_intent_selected')
           return
@@ -141,108 +133,84 @@ export function UnifiedOnboarding({
     [currentStep],
   )
 
-  const handleIntentSelection = async (intent: AccountType) => {
-    setSelectedIntent(intent)
-    setIsSavingIntent(true)
-
+  // Supplier selection handler (kept for the small link at bottom)
+  const handleSupplierSelection = async () => {
+    setIsSaving(true)
     try {
-      const result = await setAccountType(intent)
+      const result = await setAccountType('supplier')
       if ('success' in result) {
-        if (intent === 'supplier') {
-          await handleComplete()
-          toast.success('Welcome! Redirecting to your Supplier Portal...')
-          router.push('/supplier-portal')
-          return
-        }
-
-        // Team builder — complete onboarding and launch guided tour
-        await handleComplete()
-        setShowGuidedTour(true)
+        await updateOnboardingData({
+          onboarding_modal_completed: true,
+          has_completed_onboarding: true,
+          onboarding_completed_at: new Date().toISOString(),
+        })
+        toast.success('Welcome! Redirecting to your Supplier Portal...')
+        setOpen(false)
+        router.push('/supplier-portal')
       } else {
         toast.error('Failed to save your selection. Please try again.')
       }
     } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to set account type:', error)
+      console.error('[UnifiedOnboarding] Failed to set supplier account type:', error)
       toast.error('Something went wrong. Please try again.')
     } finally {
-      setIsSavingIntent(false)
+      setIsSaving(false)
     }
   }
 
-  // INTENT: 3-way fork handlers for the new intent step
+  // Company name submission — converts sandbox to real company
+  const handleCreateCompany = async () => {
+    const trimmed = companyName.trim()
+    if (trimmed.length < 2) {
+      setCompanyError('Company name must be at least 2 characters')
+      return
+    }
 
-  const handleSetupCompany = async () => {
-    setIsSavingIntent(true)
+    setIsSaving(true)
+    setCompanyError(null)
+
     try {
+      // Set account type first
       await setAccountType('team_builder')
+
+      // Convert sandbox to real company
+      const result = await convertSandboxToCompany({ companyName: trimmed })
+
+      if (!result.success) {
+        setCompanyError(result.error)
+        setIsSaving(false)
+        return
+      }
+
+      // Mark onboarding as complete
       await updateOnboardingData({
         onboarding_modal_completed: true,
         has_completed_onboarding: true,
         onboarding_completed_at: new Date().toISOString(),
         intent_selection: 'setup_company',
       })
-    } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to persist setup_company intent:', error)
-    }
-    setOpen(false)
-    setShowCreateCompany(true)
-    setIsSavingIntent(false)
-  }
 
-  const handleJoinCompany = async () => {
-    setIsSavingIntent(true)
-    try {
-      await setAccountType('team_builder')
-      await updateOnboardingData({
-        onboarding_modal_completed: true,
-        has_completed_onboarding: true,
-        onboarding_completed_at: new Date().toISOString(),
-        intent_selection: 'join_company',
-      })
-      toast.success('Your personal workspace is ready. Ask your company admin to invite you when ready.')
-    } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to persist join_company intent:', error)
-    }
-    setOpen(false)
-    setIsSavingIntent(false)
-  }
+      // Inform about marketplace visibility
+      toast.success(
+        "You're now visible to companies looking for fractional executives. Set your rates on your profile. You can opt out anytime.",
+        { duration: 8000 },
+      )
 
-  const handleExplore = async () => {
-    setIsSavingIntent(true)
-    try {
-      await setAccountType('team_builder')
-      await updateOnboardingData({
-        onboarding_modal_completed: true,
-        has_completed_onboarding: true,
-        onboarding_completed_at: new Date().toISOString(),
-        intent_selection: 'exploring',
-      })
-      toast.success('Your workspace is ready with sample data. Create a company any time from the sidebar.')
-    } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to persist exploring intent:', error)
-    }
-    setOpen(false)
-    setIsSavingIntent(false)
-  }
+      setOpen(false)
+      router.refresh()
 
-  const handleComplete = async () => {
-    // INTENT: Always close the modal. The DB write is best-effort — trapping
-    // the user on a full-screen overlay is worse than re-showing it once.
-    try {
-      await updateOnboardingData({
-        onboarding_modal_completed: true,
-        has_completed_onboarding: true,
-        onboarding_completed_at: new Date().toISOString(),
-      })
+      // Launch guided tour
+      setShowGuidedTour(true)
     } catch (error) {
-      console.error('[UnifiedOnboarding] Failed to persist completion:', error)
+      console.error('[UnifiedOnboarding] Failed to create company:', error)
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setIsSaving(false)
     }
-    setOpen(false)
   }
 
   const handleSkip = useCallback(() => {
     setOpen(false)
-    // Fire-and-forget — modal is already closed
     updateOnboardingData({
       onboarding_modal_completed: true,
       has_completed_onboarding: true,
@@ -252,8 +220,7 @@ export function UnifiedOnboarding({
     })
   }, [])
 
-  // Escape key to dismiss — disabled when guided tour is active (it has its
-  // own Escape handler). Without this guard, both fire and double-write to DB (RT-02).
+  // Escape key to dismiss
   useEffect(() => {
     if (!open || showGuidedTour) return
     const handleKeyDown = (e: KeyboardEvent): void => {
@@ -263,28 +230,12 @@ export function UnifiedOnboarding({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, showGuidedTour, handleSkip])
 
-  // GOTCHA: Stable callback ref prevents GuidedTour's useCallback chain from
-  // re-registering keyboard handlers on every parent render (RT2-06).
   const handleTourComplete = useCallback(() => setOpen(false), [])
 
-  if (!open && !showCreateCompany) return null
+  if (!open) return null
 
-  // FLOW: When team_builder is selected, hand off to Cal's guided tour
   if (showGuidedTour) {
     return <GuidedTour onComplete={handleTourComplete} />
-  }
-
-  // FLOW: "Setting up a company" opens the create company dialog after closing the overlay
-  if (showCreateCompany) {
-    return (
-      <CreateCompanyDialog
-        open={showCreateCompany}
-        onOpenChange={(v) => {
-          setShowCreateCompany(v)
-          if (!v) router.refresh()
-        }}
-      />
-    )
   }
 
   return (
@@ -296,7 +247,6 @@ export function UnifiedOnboarding({
       dragConstraints={{ top: 0, bottom: 0 }}
       dragElastic={0.3}
       onDragEnd={(_e, info) => {
-        // Swipe down to dismiss — threshold of 100px
         if (info.offset.y > 100) handleSkip()
       }}
       className="fixed inset-0 z-50 bg-background touch-pan-x"
@@ -332,7 +282,7 @@ export function UnifiedOnboarding({
         Skip tour
       </motion.button>
 
-      {/* Step content — m-auto on child centers when space allows, scrolls naturally when it doesn't */}
+      {/* Step content */}
       <div className="relative z-10 h-full flex flex-col items-center px-6 sm:px-8 overflow-y-auto">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
@@ -452,7 +402,7 @@ export function UnifiedOnboarding({
                   whileTap={{ scale: 0.98 }}
                 >
                   <Button
-                    onClick={() => goToStep('intent')}
+                    onClick={() => goToStep('company-name')}
                     className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg"
                   >
                     Continue
@@ -462,124 +412,102 @@ export function UnifiedOnboarding({
               </div>
             )}
 
-            {/* STEP 3: Intent — 3-way fork */}
-            {currentStep === 'intent' && (
+            {/* STEP 3: Company Name */}
+            {currentStep === 'company-name' && (
               <div className="space-y-8">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.1, duration: 0.4 }}
+                  className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-electric-blue/10 border border-electric-blue/20"
+                >
+                  <Building2 className="w-8 h-8 text-electric-blue" />
+                </motion.div>
+
                 <div className="space-y-4">
                   <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground tracking-tight">
-                    What brings you here?
+                    What&apos;s your company called?
                   </h2>
                   <p className="text-muted-foreground max-w-lg mx-auto leading-relaxed">
-                    This helps us set up the right workspace for you.
+                    We&apos;ll name your workspace after it. You can change this anytime in Settings.
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 max-w-lg mx-auto">
-                  {/* Option 1: Setting up a company */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
+                <div className="max-w-sm mx-auto space-y-4">
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
-                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={handleSetupCompany}
-                    disabled={isSavingIntent}
-                    className={cn(
-                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      'border-muted bg-card hover:border-electric-blue/50',
-                      isSavingIntent && 'opacity-50 cursor-not-allowed',
-                    )}
                   >
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-electric-blue/10 flex items-center justify-center flex-shrink-0">
-                        <Building2 className="w-6 h-6 text-electric-blue" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          I&apos;m setting up a company
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Create your company workspace, build your team, and bring your product to life.
-                        </p>
-                      </div>
-                    </div>
-                  </motion.button>
-
-                  {/* Option 2: Joining an existing company */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={handleJoinCompany}
-                    disabled={isSavingIntent}
-                    className={cn(
-                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      'border-muted bg-card hover:border-muted-foreground/30',
-                      isSavingIntent && 'opacity-50 cursor-not-allowed',
+                    <Input
+                      value={companyName}
+                      onChange={(e) => {
+                        setCompanyName(e.target.value)
+                        if (companyError) setCompanyError(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && companyName.trim().length >= 2) {
+                          handleCreateCompany()
+                        }
+                      }}
+                      placeholder="e.g. Acme Robotics"
+                      className={cn(
+                        "text-center text-lg h-14",
+                        companyError && "border-destructive",
+                      )}
+                      autoFocus
+                      disabled={isSaving}
+                    />
+                    {companyError && (
+                      <p className="text-sm text-destructive mt-2">{companyError}</p>
                     )}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <Users className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          I&apos;m joining an existing company
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Your company admin will invite you. You&apos;ll have a personal workspace to explore in the meantime.
-                        </p>
-                      </div>
-                    </div>
-                  </motion.button>
+                  </motion.div>
 
-                  {/* Option 3: Just exploring */}
-                  <motion.button
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4 }}
-                    whileHover={{ y: -4, boxShadow: '0 12px 24px -8px rgba(0,0,0,0.1)' }}
-                    onClick={handleExplore}
-                    disabled={isSavingIntent}
-                    className={cn(
-                      'group relative p-6 rounded-xl border-2 transition-all duration-200 text-left',
-                      'border-muted bg-card hover:border-international-orange/50',
-                      isSavingIntent && 'opacity-50 cursor-not-allowed',
-                    )}
-                  >
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-full bg-international-orange/10 flex items-center justify-center flex-shrink-0">
-                        <Compass className="w-6 h-6 text-international-orange" />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          I&apos;m just exploring
-                        </h3>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Take a look around with sample data. You can create a company any time.
-                        </p>
-                      </div>
-                    </div>
-                  </motion.button>
-
-                  {/* Supplier link — secondary, not a card */}
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="text-center pt-2"
+                    transition={{ delay: 0.4 }}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                   >
-                    <button
-                      onClick={() => handleIntentSelection('supplier')}
-                      disabled={isSavingIntent}
-                      className="text-sm text-muted-foreground hover:text-international-orange transition-colors underline underline-offset-4"
+                    <Button
+                      onClick={handleCreateCompany}
+                      disabled={isSaving || companyName.trim().length < 2}
+                      className="bg-international-orange hover:bg-international-orange/90 text-white px-10 py-6 h-auto text-sm uppercase tracking-widest font-semibold shadow-lg w-full"
                     >
-                      I&apos;m a supplier looking to list my capabilities
-                    </button>
+                      {isSaving ? 'Setting up...' : 'Create my workspace'}
+                      {!isSaving && <ArrowRight className="w-4 h-4 ml-2" />}
+                    </Button>
                   </motion.div>
+
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.6 }}
+                    className="text-xs text-muted-foreground/70 leading-relaxed"
+                  >
+                    You&apos;ll be listed as a fractional executive so companies can find you.
+                    You can opt out anytime from your profile.
+                  </motion.p>
                 </div>
 
-                {isSavingIntent && (
+                {/* Supplier link — secondary */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.7 }}
+                  className="text-center pt-2"
+                >
+                  <button
+                    onClick={handleSupplierSelection}
+                    disabled={isSaving}
+                    className="text-sm text-muted-foreground hover:text-international-orange transition-colors underline underline-offset-4"
+                  >
+                    I&apos;m a supplier looking to list my capabilities
+                  </button>
+                </motion.div>
+
+                {isSaving && (
                   <p className="text-sm text-muted-foreground animate-pulse">
                     Setting up your workspace...
                   </p>

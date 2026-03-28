@@ -627,7 +627,7 @@ async function ensureMembership(supabase: any, userId: string, foundryId: string
  *
  * @security Requires authenticated user, reads only own profile
  */
-export async function getOnboardingState(): Promise<OnboardingData & { _userRole?: string; _isSandbox?: boolean }> {
+export async function getOnboardingState(): Promise<OnboardingData & { _userRole?: string }> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -635,25 +635,14 @@ export async function getOnboardingState(): Promise<OnboardingData & { _userRole
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('onboarding_data, role, foundry_id')
+    .select('onboarding_data, role')
     .eq('id', user.id)
     .single()
 
   const data = (profile?.onboarding_data as OnboardingData) || {}
 
-  // Check if user's foundry is a sandbox (for Today page banner)
-  let isSandbox = false
-  if (profile?.foundry_id) {
-    const { data: foundry } = await supabase
-      .from('foundries')
-      .select('is_sandbox')
-      .eq('id', profile.foundry_id)
-      .single()
-    isSandbox = foundry?.is_sandbox ?? false
-  }
-
-  // Piggyback role + sandbox status to avoid extra DB calls in today page
-  return { ...data, _userRole: profile?.role ?? undefined, _isSandbox: isSandbox }
+  // Piggyback role to avoid extra DB calls in today page
+  return { ...data, _userRole: profile?.role ?? undefined }
 }
 
 /**

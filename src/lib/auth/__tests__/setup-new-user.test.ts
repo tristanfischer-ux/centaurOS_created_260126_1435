@@ -259,7 +259,7 @@ describe('setupNewUser', () => {
     const foundryInsert = insertedData.find(d => d.table === 'foundries' && (d.id as string)?.startsWith('sandbox-'))
     expect(foundryInsert).toBeDefined()
     expect(foundryInsert?.is_sandbox).toBe(true)
-    expect(foundryInsert?.name).toBe("Jane's Workspace")
+    expect(foundryInsert?.name).toBe("Jane's Company")
   })
 
   it('creates marketplace listing for executives without function_category', async () => {

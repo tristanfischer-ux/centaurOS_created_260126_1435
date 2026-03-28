@@ -31,10 +31,11 @@ import type {
   VaultStats,
 } from './types'
 import { DEFAULT_DOMAINS } from './types'
+import { getSpecialistDomainSlugs } from './specialist-domain-map'
 
 // ─── Summary fields (used for list queries) ──────────────────────────
 
-const SUMMARY_FIELDS = 'id, title, description, note_type, source_specialist, tags, is_pinned, is_verified, link_count, confidence, domain_id, created_at, updated_at'
+const SUMMARY_FIELDS = 'id, title, description, note_type, source_specialist, tags, is_pinned, is_verified, is_stale, stale_at, staleness_window_days, link_count, confidence, domain_id, created_at, updated_at'
 
 // ─── Notes: Query ────────────────────────────────────────────────────
 
@@ -69,6 +70,9 @@ export async function queryKnowledgeNotes(
   // Apply filters
   if (!filters.includeArchived) {
     query = query.eq('is_archived', false)
+  }
+  if (filters.hideStale) {
+    query = query.eq('is_stale', false)
   }
   if (filters.pinnedOnly) {
     query = query.eq('is_pinned', true)
@@ -542,6 +546,15 @@ export async function createKnowledgeLink(
     return false
   }
 
+  // INTENT: When a note supersedes another, the target is automatically stale
+  if (relationship === 'supersedes') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge_notes missing from generated DB types
+    await (supabase as any)
+      .from('knowledge_notes')
+      .update({ is_stale: true, stale_at: new Date().toISOString() })
+      .eq('id', targetNoteId)
+  }
+
   return true
 }
 
@@ -701,6 +714,7 @@ export async function searchKnowledgeForSpecialist(
     .select('title, content, description, note_type, source_specialist, confidence, is_verified, tags, created_at')
     .eq('foundry_id', foundryId)
     .eq('is_archived', false)
+    .eq('is_stale', false)
     .or(orFilters)
     .order('is_verified', { ascending: false })
     .order('confidence', { ascending: false })
@@ -759,7 +773,7 @@ export async function searchKnowledgeForSpecialist(
  * @security RLS enforces foundry isolation
  */
 /** Row shape for knowledge_notes stats query (table may be missing from generated DB types). */
-type KnowledgeNoteStatsRow = { note_type: string | null; source_specialist: string | null; is_verified: boolean | null }
+type KnowledgeNoteStatsRow = { note_type: string | null; source_specialist: string | null; is_verified: boolean | null; is_stale: boolean | null }
 
 export async function getVaultStats(
   foundryId: string
@@ -776,7 +790,7 @@ export async function getVaultStats(
   ] = await Promise.allSettled([
     db
       .from('knowledge_notes')
-      .select('note_type, source_specialist, is_verified', { count: 'exact' })
+      .select('note_type, source_specialist, is_verified, is_stale', { count: 'exact' })
       .eq('foundry_id', foundryId)
       .eq('is_archived', false),
     db
@@ -822,6 +836,7 @@ export async function getVaultStats(
   const specialistCounts: Record<string, number> = {}
   let verifiedCount = 0
   let unverifiedCount = 0
+  let staleCount = 0
 
   for (const note of notes) {
     const nt = note.note_type ?? ''
@@ -835,6 +850,10 @@ export async function getVaultStats(
       verifiedCount++
     } else {
       unverifiedCount++
+    }
+
+    if (note.is_stale) {
+      staleCount++
     }
   }
 
@@ -851,5 +870,106 @@ export async function getVaultStats(
     pinnedNotes,
     verifiedCount,
     unverifiedCount,
+    staleCount,
   }
+}
+
+// ─── Staleness ──────────────────────────────────────────────────────
+
+/**
+ * Marks notes as stale based on their age and domain.
+ *
+ * @description Strategy domain notes go stale after 90 days, all others after
+ * 180 days. Notes with a custom `staleness_window_days` override the default.
+ * Uses two batch UPDATE queries for efficiency (one per window).
+ *
+ * @param foundryId - The foundry to scan for stale notes
+ * @returns Number of notes marked stale
+ *
+ * @security RLS enforces foundry isolation
+ */
+export async function markStaleNotes(foundryId: string): Promise<number> {
+  const supabase = await createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- knowledge tables missing from generated DB types
+  const db = supabase as any
+
+  // STEP 1: Handle notes with custom staleness_window_days
+  // Fetch all non-archived, non-stale notes that have a custom window
+  const { data: customWindowNotes } = await db
+    .from('knowledge_notes')
+    .select('id, updated_at, staleness_window_days')
+    .eq('foundry_id', foundryId)
+    .eq('is_archived', false)
+    .eq('is_stale', false)
+    .not('staleness_window_days', 'is', null)
+
+  const now = new Date()
+  const customStaleIds: string[] = []
+
+  for (const note of customWindowNotes ?? []) {
+    const updatedAt = new Date(note.updated_at)
+    const windowMs = (note.staleness_window_days as number) * 24 * 60 * 60 * 1000
+    if (now.getTime() - updatedAt.getTime() > windowMs) {
+      customStaleIds.push(note.id as string)
+    }
+  }
+
+  let markedCount = 0
+
+  if (customStaleIds.length > 0) {
+    const { count } = await db
+      .from('knowledge_notes')
+      .update({ is_stale: true, stale_at: now.toISOString() })
+      .in('id', customStaleIds)
+    markedCount += count ?? customStaleIds.length
+  }
+
+  // STEP 2: Get the strategy domain ID for this foundry
+  const { data: strategyDomain } = await supabase
+    .from('knowledge_domains')
+    .select('id')
+    .eq('slug', 'strategy')
+    .eq('foundry_id', foundryId)
+    .maybeSingle()
+
+  const strategyDomainId = strategyDomain?.id ?? null
+
+  // STEP 3: Mark strategy-domain notes stale (90 days) — exclude custom-window notes
+  if (strategyDomainId) {
+    const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
+
+    const strategyQuery = db
+      .from('knowledge_notes')
+      .update({ is_stale: true, stale_at: now.toISOString() })
+      .eq('foundry_id', foundryId)
+      .eq('is_archived', false)
+      .eq('is_stale', false)
+      .eq('domain_id', strategyDomainId)
+      .is('staleness_window_days', null)
+      .lt('updated_at', ninetyDaysAgo)
+
+    const { count: strategyCount } = await strategyQuery
+    markedCount += strategyCount ?? 0
+  }
+
+  // STEP 4: Mark all other notes stale (180 days) — exclude strategy domain and custom-window notes
+  const oneEightyDaysAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000).toISOString()
+
+  let othersQuery = db
+    .from('knowledge_notes')
+    .update({ is_stale: true, stale_at: now.toISOString() })
+    .eq('foundry_id', foundryId)
+    .eq('is_archived', false)
+    .eq('is_stale', false)
+    .is('staleness_window_days', null)
+    .lt('updated_at', oneEightyDaysAgo)
+
+  if (strategyDomainId) {
+    othersQuery = othersQuery.neq('domain_id', strategyDomainId)
+  }
+
+  const { count: othersCount } = await othersQuery
+  markedCount += othersCount ?? 0
+
+  return markedCount
 }
