@@ -8,7 +8,6 @@
  */
 
 import type { DebatePersona, DebateRole } from "./types"
-import type { AIProviderId } from "@/lib/ai-providers/types"
 
 // ─── Persona Configurations ─────────────────────────────────────
 

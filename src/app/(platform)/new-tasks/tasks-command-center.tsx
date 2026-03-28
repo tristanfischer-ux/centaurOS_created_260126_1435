@@ -333,20 +333,6 @@ export function TasksCommandCenter({
 
   return (
     <div className="space-y-6">
-      {/* Cal's Tasks Briefing */}
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={calBriefing.narrative}
-        fallbackMessage={calFallback}
-        isLoading={isCalLoading}
-        loadingMessage="Scanning your tasks..."
-        severity={calSeverity}
-        context={calContext}
-        storageKey="tasks"
-      />
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -394,6 +380,20 @@ export function TasksCommandCenter({
           </div>
         </div>
       </div>
+
+      {/* Cal's Tasks Briefing */}
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={calBriefing.narrative}
+        fallbackMessage={calFallback}
+        isLoading={isCalLoading}
+        loadingMessage="Scanning your tasks..."
+        severity={calSeverity}
+        context={calContext}
+        storageKey="tasks"
+      />
 
       {/* Smart Summary Pills */}
       <div data-tour="tasks-summary">

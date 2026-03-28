@@ -462,20 +462,6 @@ export function ObjectivesBoard({
         />
       )}
 
-      {/* Sage's Objectives Briefing */}
-      <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategy"
-        narrative={sageBriefing.narrative}
-        fallbackMessage={sageFallback}
-        isLoading={isSageLoading}
-        loadingMessage="Reviewing your objectives..."
-        severity={sageSeverity}
-        context={sageContext}
-        storageKey="objectives"
-      />
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="min-w-0 flex-1">
@@ -527,6 +513,20 @@ export function ObjectivesBoard({
           </div>
         </div>
       </div>
+
+      {/* Sage's Objectives Briefing */}
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategy"
+        narrative={sageBriefing.narrative}
+        fallbackMessage={sageFallback}
+        isLoading={isSageLoading}
+        loadingMessage="Reviewing your objectives..."
+        severity={sageSeverity}
+        context={sageContext}
+        storageKey="objectives"
+      />
 
       {/* Team Pulse */}
       <TeamPulseDashboard />

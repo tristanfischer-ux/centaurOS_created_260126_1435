@@ -85,7 +85,7 @@ const VERDICT_COLORS: Record<FactCheck["verdict"], string> = {
 }
 
 /** Required providers for Red Team debates */
-const REQUIRED_PROVIDERS = ["Anthropic", "OpenAI", "Google"] as const
+const REQUIRED_PROVIDERS = ["Anthropic", "OpenAI", "Google", "Qwen"] as const
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -543,19 +543,24 @@ export function RedTeamView(): React.ReactElement {
 
   const handleLoadDebate = useCallback(async (id: string) => {
     setLoadingHistory(true)
-    const doc = await loadRedTeamDebate(id)
-    if (doc) {
-      setDebate(doc)
-      setTopic(doc.topic)
-      setExpandedRounds(new Set(doc.rounds.map((r) => r.roundNumber)))
-      setShowHistory(false)
-      setCompareDebates(null)
-      setCompareMode(false)
-      setCompareSelection([])
-    } else {
+    try {
+      const doc = await loadRedTeamDebate(id)
+      if (doc) {
+        setDebate(doc)
+        setTopic(doc.topic)
+        setExpandedRounds(new Set(doc.rounds.map((r) => r.roundNumber)))
+        setShowHistory(false)
+        setCompareDebates(null)
+        setCompareMode(false)
+        setCompareSelection([])
+      } else {
+        toast.error("Failed to load debate")
+      }
+    } catch {
       toast.error("Failed to load debate")
+    } finally {
+      setLoadingHistory(false)
     }
-    setLoadingHistory(false)
   }, [])
 
   const handleCreateAll = useCallback(async () => {
@@ -855,7 +860,7 @@ export function RedTeamView(): React.ReactElement {
                             )}
                           >
                             {compareSelection.includes(h.id) && (
-                              <CheckCircle2 className="h-3 w-3 text-white" />
+                              <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
                             )}
                           </div>
                         )}

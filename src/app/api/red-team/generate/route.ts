@@ -86,7 +86,10 @@ async function callHaiku(prompt: string, maxTokens = 500): Promise<string> {
   try {
     const result = await callLLMStreaming("anthropic", "claude-haiku-4-5", "Be concise, factual, cite sources.", prompt, () => {}, maxTokens)
     return result.text
-  } catch { return "[Research unavailable]" }
+  } catch (err) {
+    console.warn("[RedTeam] Haiku call failed:", err instanceof Error ? err.message : err)
+    return "[Research unavailable]"
+  }
 }
 
 function safeParseJSON<T>(text: string): T[] {
@@ -117,6 +120,7 @@ export async function POST(request: Request) {
     customQuestions?: string[]
     userInputs?: Record<number, string>
     totalCostSoFar?: number
+    debateId?: string
   }
 
   const { topic, context } = body
@@ -125,7 +129,10 @@ export async function POST(request: Request) {
   }
 
   const encoder = new TextEncoder()
-  const debateId = body.resumeFromRound ? (body as Record<string, unknown>).debateId as string || uuidv4() : uuidv4()
+  // SECURITY: Validate debateId is a UUID if provided, otherwise generate one
+  const debateId = (body.debateId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.debateId))
+    ? body.debateId
+    : uuidv4()
   const startTime = Date.now()
   const isResume = !!body.resumeFromRound
 
@@ -232,7 +239,14 @@ export async function POST(request: Request) {
           } catch { /* continue */ }
           emit({ phase: "fact_check_complete", round: roundIdx + 1, checks: factChecks })
 
-          rounds.push({ roundNumber: roundIdx + 1, question, arguments: roundArguments, factChecks })
+          rounds.push({
+            roundNumber: roundIdx + 1,
+            question,
+            arguments: roundArguments,
+            factChecks,
+            // Set userInput on the round if the user interjected after it (for DOCX export)
+            userInput: userInputs[roundIdx + 1],
+          })
 
           // ── Interactive pause (after each round except the last) ──
           if (roundIdx < roundQuestions.length - 1) {
@@ -319,18 +333,23 @@ export async function POST(request: Request) {
 
         // ── Save to History (fire-and-forget) ────────────
         const profileData = await supabase.from("profiles").select("foundry_id").eq("id", user.id).single()
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(supabase as any).from("report_snapshots").insert({
-          id: debateId,
-          report_type: "red-team-debate",
-          report_date: new Date().toISOString().slice(0, 10),
-          summary_text: `Red Team Debate: ${topic.slice(0, 200)}`,
-          report_data: document,
-          foundry_id: profileData.data?.foundry_id || "unknown",
-          profile_id: user.id,
-        }).then(({ error }: { error: { message: string } | null }) => {
-          if (error) console.warn("[RedTeam] Save failed:", error.message)
-        })
+        const userFoundryId = profileData.data?.foundry_id
+        if (userFoundryId) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(supabase as any).from("report_snapshots").insert({
+            id: debateId,
+            report_type: "red-team-debate",
+            report_date: new Date().toISOString().slice(0, 10),
+            summary_text: `Red Team Debate: ${topic.slice(0, 200)}`,
+            report_data: document,
+            foundry_id: userFoundryId,
+            profile_id: user.id,
+          }).then(({ error }: { error: { message: string } | null }) => {
+            if (error) console.warn("[RedTeam] Save failed:", error.message)
+          })
+        } else {
+          console.warn("[RedTeam] No foundry_id found for user, debate not saved to history")
+        }
 
       } catch (err) {
         emit({ phase: "error", message: err instanceof Error ? err.message : "Debate failed" })

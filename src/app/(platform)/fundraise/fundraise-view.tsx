@@ -7,6 +7,8 @@
 
 'use client'
 
+import Link from 'next/link'
+import { typography } from '@/lib/design-system'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -14,9 +16,8 @@ import {
 } from 'recharts'
 import {
   Heart, Users, Phone, MessageSquare, CheckCircle2, XCircle,
-  AlertTriangle, StickyNote, Calendar, Mail,
+  AlertTriangle, StickyNote, Calendar, Mail, ChevronRight,
 } from 'lucide-react'
-import Link from 'next/link'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
 import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
@@ -147,6 +148,24 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+            <Link href="/cash-burn" className="hover:text-foreground transition-colors">Cash Burn</Link>
+            <ChevronRight className="h-3 w-3" />
+            <span className="text-foreground font-medium">Fundraise</span>
+          </nav>
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>Fundraise</h1>
+          </div>
+          <p className={typography.pageSubtitle}>
+            Track your fundraising pipeline and investor outreach
+          </p>
+        </div>
+      </div>
+
       <SpecialistBriefingHero
         specialistId="fundraising-advisor"
         specialistName="Fiona"

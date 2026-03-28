@@ -79,8 +79,8 @@ export async function createRedTeamActions(input: {
         description: `From Red Team debate: "${topic}"\n\n${objectiveDesc}`,
         status: "active",
         foundry_id: foundryId,
-        created_by: user.id,
-        target_date: objectives[0]?.targetDate || null,
+        creator_id: user.id,
+        end_date: objectives[0]?.targetDate || null,
       })
       .select("id")
       .single()
