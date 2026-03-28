@@ -42,7 +42,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { DEBATE_PERSONAS } from "@/lib/red-team/prompts"
-import { listRedTeamDebates, loadRedTeamDebate, createRedTeamActions } from "@/actions/red-team-debate"
+import { listRedTeamDebates, loadRedTeamDebate, createRedTeamActions, checkStrategicMatch, createNewStrategicObjective } from "@/actions/red-team-debate"
 import type {
   RedTeamDebateDocument,
   DebateRound,
@@ -197,6 +197,9 @@ export function RedTeamView(): React.ReactElement {
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set())
   const [actionsCreated, setActionsCreated] = useState(false)
   const [isCreatingActions, setIsCreatingActions] = useState(false)
+  const [showStrategicPrompt, setShowStrategicPrompt] = useState(false)
+  const [newStrategicTitle, setNewStrategicTitle] = useState("")
+  const [strategicMatch, setStrategicMatch] = useState<{ id: string; title: string } | null>(null)
 
   // File upload state
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null)
@@ -578,10 +581,67 @@ export function RedTeamView(): React.ReactElement {
   const handleCreateAll = useCallback(async () => {
     if (!debate) return
     setIsCreatingActions(true)
+
+    // Check for strategic objective match first
+    const objectiveTitle = debate.suggestedObjectives[0]?.title || `Red Team Follow-ups: ${debate.topic.slice(0, 80)}`
+    const match = await checkStrategicMatch(objectiveTitle, debate.topic)
+
+    if (match) {
+      // Good match found — create with auto-link
+      setStrategicMatch(match)
+      const result = await createRedTeamActions({
+        topic: debate.topic,
+        objectives: debate.suggestedObjectives,
+        tasks: debate.suggestedTasks,
+        strategicObjectiveId: match.id,
+      })
+      if (result.success) {
+        setActionsCreated(true)
+        toast.success(`Created objective + ${result.taskCount} tasks — linked to "${match.title}"`)
+      } else {
+        toast.error(result.error || "Failed to create actions")
+      }
+      setIsCreatingActions(false)
+    } else {
+      // No match — ask user if they want to create a strategic objective
+      setIsCreatingActions(false)
+      setShowStrategicPrompt(true)
+      setNewStrategicTitle(objectiveTitle)
+    }
+  }, [debate])
+
+  const handleCreateWithNewStrategic = useCallback(async () => {
+    if (!debate || !newStrategicTitle.trim()) return
+    setIsCreatingActions(true)
+    setShowStrategicPrompt(false)
+
+    // Create the new strategic objective first
+    const strategic = await createNewStrategicObjective(newStrategicTitle.trim())
     const result = await createRedTeamActions({
       topic: debate.topic,
       objectives: debate.suggestedObjectives,
       tasks: debate.suggestedTasks,
+      strategicObjectiveId: strategic?.id || null,
+    })
+    if (result.success) {
+      setActionsCreated(true)
+      toast.success(`Created strategic objective + ${result.taskCount} tasks`)
+    } else {
+      toast.error(result.error || "Failed to create actions")
+    }
+    setIsCreatingActions(false)
+  }, [debate, newStrategicTitle])
+
+  const handleCreateWithoutStrategic = useCallback(async () => {
+    if (!debate) return
+    setIsCreatingActions(true)
+    setShowStrategicPrompt(false)
+
+    const result = await createRedTeamActions({
+      topic: debate.topic,
+      objectives: debate.suggestedObjectives,
+      tasks: debate.suggestedTasks,
+      strategicObjectiveId: null,
     })
     if (result.success) {
       setActionsCreated(true)
@@ -1393,6 +1453,31 @@ export function RedTeamView(): React.ReactElement {
               )}
             </div>
           </CardHeader>
+
+          {/* Strategic Objective Prompt — shown when no match found */}
+          {showStrategicPrompt && (
+            <div className="mx-6 mb-4 p-4 rounded-lg border-2 border-electric-blue/20 bg-electric-blue/[0.03] space-y-3">
+              <p className="text-sm font-medium text-foreground">No matching strategic objective found</p>
+              <p className="text-xs text-muted-foreground">Would you like to create a new strategic objective, or continue without one?</p>
+              <div className="space-y-2">
+                <input
+                  value={newStrategicTitle}
+                  onChange={e => setNewStrategicTitle(e.target.value)}
+                  placeholder="Strategic objective title..."
+                  className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-electric-blue/30"
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleCreateWithNewStrategic} disabled={!newStrategicTitle.trim()} className="bg-electric-blue hover:bg-electric-blue/90 text-white">
+                    Create Strategic Objective + Actions
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleCreateWithoutStrategic}>
+                    Skip — Create Without
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <CardContent className="space-y-4">
             {debate.suggestedObjectives.map((obj, i) => (
               <div

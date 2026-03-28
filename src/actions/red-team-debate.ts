@@ -61,29 +61,62 @@ export async function loadRedTeamDebate(snapshotId: string): Promise<RedTeamDeba
 
 // ─── Create Actions from Debate ─────────────────────────────────
 
+/**
+ * Check if there's a matching strategic objective before creating actions.
+ * Returns the match or null so the UI can ask about creating a new one.
+ */
+export async function checkStrategicMatch(title: string, topic: string): Promise<{ id: string; title: string } | null> {
+  try {
+    return await suggestStrategicObjective(title, topic)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Create a new strategic objective and return its ID.
+ */
+export async function createNewStrategicObjective(title: string): Promise<{ id: string } | null> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    const { data, error } = await supabase
+      .from("objectives")
+      .insert({
+        title,
+        status: "active",
+        foundry_id: foundryId,
+        creator_id: user.id,
+        is_strategic_goal: true,
+      })
+      .select("id")
+      .single()
+    if (error || !data) return null
+    return { id: data.id }
+  })
+}
+
 export async function createRedTeamActions(input: {
   topic: string
   objectives: SuggestedObjective[]
   tasks: SuggestedTask[]
+  /** Pre-resolved strategic objective ID (from UI flow) */
+  strategicObjectiveId?: string | null
 }): Promise<{ success: boolean; objectiveId?: string; taskCount?: number; error?: string }> {
   return withAuth(async ({ supabase, user, foundryId }) => {
-    const { topic, objectives, tasks } = input
+    const { topic, objectives, tasks, strategicObjectiveId } = input
 
     // Create a parent objective for the debate follow-ups
     const objectiveTitle = objectives[0]?.title || `Red Team Follow-ups: ${topic.slice(0, 80)}`
     const objectiveDesc = objectives.map(o => `- ${o.title}: ${o.description}`).join("\n")
 
-    // INTENT: Auto-link to the best matching strategic objective so tasks
-    // feed into the right strategic pillar, not orphaned.
-    let parentObjectiveId: string | null = null
-    try {
-      const match = await suggestStrategicObjective(objectiveTitle, topic)
-      if (match) {
-        parentObjectiveId = match.id
-        console.log(`[RedTeam] Auto-linked to strategic objective "${match.title}" (score: ${match.score})`)
-      }
-    } catch {
-      // Non-fatal — create without parent if matching fails
+    // Use the pre-resolved strategic objective, or try auto-matching as fallback
+    let parentObjectiveId: string | null = strategicObjectiveId ?? null
+    if (!parentObjectiveId) {
+      try {
+        const match = await suggestStrategicObjective(objectiveTitle, topic)
+        if (match) {
+          parentObjectiveId = match.id
+        }
+      } catch { /* non-fatal */ }
     }
 
     const { data: objective, error: objError } = await supabase
