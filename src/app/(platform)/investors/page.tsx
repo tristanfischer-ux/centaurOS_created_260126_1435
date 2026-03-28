@@ -104,9 +104,12 @@ export default async function InvestorDirectoryPage() {
   return (
     <div className="space-y-8">
       {/* Page header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold text-foreground">UK Investor Directory</h1>
-        <p className="text-muted-foreground">
+      <div className="pb-4 border-b border-muted">
+        <div className="flex items-center gap-3 mb-1">
+          <div className="h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]" />
+          <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">UK Investor Directory</h1>
+        </div>
+        <p className="text-muted-foreground text-sm font-medium pl-4">
           {stats
             ? `${stats.total.toLocaleString()} firms · ${stats.forgeCapitalCount.toLocaleString()} deep-profiled · ${stats.partnerCount.toLocaleString()} partners`
             : 'UK venture capital and private equity firms'}

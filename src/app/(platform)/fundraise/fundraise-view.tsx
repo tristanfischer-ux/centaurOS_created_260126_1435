@@ -70,22 +70,47 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   if (!stats || stats.totalTracked === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
-        <div className="rounded-full bg-muted p-4">
-          <Heart className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <div className="space-y-1">
-          <p className="text-base font-semibold text-foreground">No investors tracked yet</p>
-          <p className="text-sm text-muted-foreground max-w-xs">
-            Start building your pipeline by shortlisting investors from the directory.
+      <div className="space-y-6">
+        {/* Page Header */}
+        <div className="pb-4 border-b border-muted">
+          <div className={typography.pageHeader}>
+            <div className={typography.pageHeaderAccent} />
+            <h1 className={typography.h1}>Fundraise</h1>
+          </div>
+          <p className={typography.pageSubtitle}>
+            Track your fundraising pipeline and investor outreach
           </p>
         </div>
-        <Link
-          href="/investors"
-          className="text-sm text-international-orange font-medium hover:underline"
-        >
-          Browse investors →
-        </Link>
+
+        <SpecialistBriefingHero
+          specialistId="fundraising-advisor"
+          specialistName="Fiona"
+          specialistTitle="Fundraising"
+          narrative={null}
+          fallbackMessage="Your fundraising command centre. I'll help you track your pipeline, prepare materials, and time your outreach for maximum impact."
+          isLoading={false}
+          severity="success"
+          context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
+          storageKey="fundraise"
+        />
+
+        <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
+          <div className="rounded-full bg-muted p-4">
+            <Heart className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-base font-semibold text-foreground">No investors tracked yet</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Start building your pipeline by shortlisting investors from the directory.
+            </p>
+          </div>
+          <Link
+            href="/investors"
+            className="text-sm text-international-orange font-medium hover:underline"
+          >
+            Browse investors →
+          </Link>
+        </div>
       </div>
     )
   }

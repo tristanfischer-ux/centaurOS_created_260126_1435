@@ -259,6 +259,17 @@ export default function BrowsePage(): React.ReactElement {
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] -m-4 sm:-m-6 lg:-m-8 -mt-14 sm:-mt-6 lg:-mt-8">
+      {/* Page header */}
+      <div className="px-4 py-3 border-b bg-background">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]" />
+          <div>
+            <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Browse</h1>
+            <p className="text-sm text-muted-foreground">Research competitors, suppliers, and market trends</p>
+          </div>
+        </div>
+      </div>
+
       {/* Sage's coaching tip */}
       <div className="px-4 py-2 border-b bg-background">
         <SpecialistBriefingHero

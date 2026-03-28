@@ -26,6 +26,7 @@ import { SpecialistBriefingHero } from '@/components/specialists/specialist-brie
 // DECISION: HarperRoleBriefing removed — SpecialistBriefingHero now provides Harper's guidance
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
+import { typography } from '@/lib/design-system'
 import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
 
 const RECRUITS_STATS_LABELS: StatsLabels = {
@@ -134,6 +135,17 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
 
     return (
         <div className="space-y-6">
+            {/* Page header */}
+            <div className="pb-4 border-b border-muted">
+                <div className={typography.pageHeader}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>Recruits</h1>
+                </div>
+                <p className={typography.pageSubtitle}>
+                    Find expert talent to grow your team
+                </p>
+            </div>
+
             <SpecialistBriefingHero
                 specialistId="hiring-team"
                 specialistName="Harper"
