@@ -23,9 +23,11 @@ export async function GET(): Promise<NextResponse> {
     const supabase = createAdminClient()
 
     // SECURITY: Only returns aggregate count, no individual data
+    // INTENT: Only count real founding members, not seed/demo/test profiles
     const { count, error } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
+      .eq('is_founding_member', true)
 
     if (error) {
       console.error('[MarketingStats] Failed to count profiles:', {
