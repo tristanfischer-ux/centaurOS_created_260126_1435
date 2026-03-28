@@ -682,12 +682,21 @@ export async function getKnowledgeDomains(
  *
  * @security RLS enforces foundry isolation
  */
+export interface KnowledgeSearchResult {
+  /** Formatted prompt block for specialist context injection */
+  promptBlock: string
+  /** Number of knowledge notes referenced */
+  noteCount: number
+  /** Titles of referenced notes (for UI display) */
+  noteTitles: string[]
+}
+
 export async function searchKnowledgeForSpecialist(
   foundryId: string,
   query: string,
   specialistId?: string,
   limit: number = 12
-): Promise<string> {
+): Promise<KnowledgeSearchResult> {
   const supabase = await createClient()
 
   // DECISION: Search title + content + description, not just title.
@@ -818,7 +827,7 @@ export async function searchKnowledgeForSpecialist(
   }
 
   if (notes.length === 0) {
-    return ''
+    return { promptBlock: '', noteCount: 0, noteTitles: [] }
   }
 
   // Format for prompt injection
@@ -847,7 +856,11 @@ export async function searchKnowledgeForSpecialist(
     lines.push('')
   }
 
-  return lines.join('\n')
+  return {
+    promptBlock: lines.join('\n'),
+    noteCount: notes.length,
+    noteTitles: notes.map(n => n.title),
+  }
 }
 
 // ─── Vault Stats ─────────────────────────────────────────────────────

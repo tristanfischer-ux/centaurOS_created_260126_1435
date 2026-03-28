@@ -182,12 +182,15 @@ export async function buildContextLayers(params: ContextLayerParams & {
     contextTokensUsed: number
     /** Token budget that was applied */
     contextTokenBudget: number
+    /** Number of knowledge notes referenced in the specialist's context */
+    knowledgeNoteCount: number
 }> {
     const {
         foundryId, specialistId, threadId, input, finalPrompt, isConversationalFastPath,
         handoffSourceThreadId, handoffSourceSpecialistId, cadLabProjectId, modelTier = 'claude',
     } = params
     const collectedLayers: CollectedLayer[] = []
+    let knowledgeNoteCount = 0
 
     if (!isConversationalFastPath) {
         // Deep handoff context: when specialist B is receiving a handoff from specialist A,
@@ -279,13 +282,15 @@ export async function buildContextLayers(params: ContextLayerParams & {
             // Layer 5: Knowledge Vault
             layerPromises.push(
                 (async () => {
-                    const block = await searchKnowledgeForSpecialist(
+                    const result = await searchKnowledgeForSpecialist(
                         foundryId,
                         input || finalPrompt.slice(0, 500),
                         specialistId,
-                        8
+                        12
                     )
-                    return { block: block ?? '', layer: 'Knowledge Vault' }
+                    // INTENT: Capture note count for the UI "Referenced X notes" indicator
+                    knowledgeNoteCount = result.noteCount
+                    return { block: result.promptBlock ?? '', layer: 'Knowledge Vault' }
                 })()
             )
 
@@ -405,6 +410,7 @@ export async function buildContextLayers(params: ContextLayerParams & {
         activeLayers: budgeted.activeLayers,
         contextTokensUsed: budgeted.tokensUsed,
         contextTokenBudget: budgeted.tokenBudget,
+        knowledgeNoteCount,
     }
 }
 

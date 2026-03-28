@@ -776,9 +776,10 @@ This renders as interactive cards with checkboxes. The user ticks which ones to 
 5. **Every objective MUST have "strategicGoalTitle"** — use an existing title or a new one (the system auto-creates missing strategic goals). This is REQUIRED — objectives without it will be rejected.
 6. **Every task MUST have "objectiveTitle"** — use an existing, batch-created, or new title (the system auto-creates missing objectives). This is REQUIRED — tasks without it will be rejected.
 7. If you need to create a task under a new objective, create the objective first in the same batch, then reference its title in the task's "objectiveTitle".
-8. Only skip the block for purely informational responses with zero actionable recommendations.
-9. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.
-10. **NEVER show raw JSON, code blocks, or structured data in your prose.** The PROPOSED_ACTIONS HTML comment is the ONLY place JSON should appear. The user sees the structured data as interactive cards — they do NOT need to see the raw JSON. Your conversational text should describe actions in plain language only.
+8. **Don't force-fit objectives into poorly-matching goals.** If your recommendation opens a genuinely new strategic direction that doesn't align with any existing goal, propose a new one with a clear, descriptive title. Common triggers: new markets, pivots, capability gaps, or founder-stated new directions.
+9. Only skip the block for purely informational responses with zero actionable recommendations.
+10. The visible prose should read naturally. The PROPOSED_ACTIONS block is supplementary — describe actions in words, then include the structured block at the end.
+11. **NEVER show raw JSON, code blocks, or structured data in your prose.** The PROPOSED_ACTIONS HTML comment is the ONLY place JSON should appear. The user sees the structured data as interactive cards — they do NOT need to see the raw JSON. Your conversational text should describe actions in plain language only.
 
 ### QUALITY STANDARDS — Be Specific, Not Generic
 Your proposed actions must be **grounded in the company's actual data** from the context above. Generic actions are useless.
@@ -821,7 +822,7 @@ You MUST output the PROPOSED_ACTIONS block using EXACTLY this format. Copy the d
 
 <!-- PROPOSED_ACTIONS
 [
-  { "type": "objective", "title": "Your objective title here", "description": "Description", "strategicGoalTitle": "Name of existing strategic goal", "estimatedWeeks": 6 },
+  { "type": "objective", "title": "Your objective title here", "description": "Description", "strategicGoalTitle": "Existing or new strategic goal name", "estimatedWeeks": 6 },
   { "type": "task", "title": "Your task title here", "description": "Description", "objectiveTitle": "Name of parent objective", "estimatedWeeks": 2 }
 ]
 -->
@@ -1057,7 +1058,7 @@ Rules:
 
     // AUDIT: Heavy context layers extracted to prompt-builder.ts (2026-02-19, refactor step 6 of 8).
     // Each layer is independently failable — see prompt-builder.ts for the full assembly logic.
-    const { contextBlocks: contextLayers, activeLayers, contextTokensUsed, contextTokenBudget } = await buildContextLayers({
+    const { contextBlocks: contextLayers, activeLayers, contextTokensUsed, contextTokenBudget, knowledgeNoteCount } = await buildContextLayers({
         foundryId,
         specialistId,
         threadId,
