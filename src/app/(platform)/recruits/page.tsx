@@ -23,6 +23,7 @@ import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrows
 import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 // DECISION: HarperRoleBriefing removed — SpecialistBriefingHero now provides Harper's guidance
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
@@ -133,6 +134,15 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
 
     const categories = Array.from(new Set(listings.map(l => l.subcategory).filter(Boolean)))
 
+    // INTENT: Harper analyses team gaps and available talent to give actionable hiring advice.
+    // Server component can await the briefing directly — no hook needed.
+    const gapCategories = ctx?.gapCategories ?? []
+    const briefingContext = `Available talent: ${listings.length} people across ${categories.length} specialisations (${categories.slice(0, 5).join(', ')}).
+Team gaps identified: ${gapCategories.length > 0 ? gapCategories.join(', ') : 'none detected yet — set up your team coverage map'}.
+Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
+    const severity = gapCategories.length > 2 ? 'warning' as const : 'success' as const
+    const briefing = await generatePageBriefing('hiring-team', briefingContext, severity).catch(() => ({ narrative: null, severity }))
+
     return (
         <div className="space-y-6">
             {/* Page header */}
@@ -150,10 +160,10 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
                 specialistId="hiring-team"
                 specialistName="Harper"
                 specialistTitle="Hiring"
-                narrative={null}
+                narrative={briefing.narrative}
                 fallbackMessage="Find fractional executives and specialists ready to join your team. Filter by skills, availability, and experience to find the right match."
                 isLoading={false}
-                severity="success"
+                severity={briefing.severity}
                 context={{ type: 'general', title: 'Recruits', description: 'Harper on recruits.', metadata: {} }}
                 storageKey="recruits"
             />

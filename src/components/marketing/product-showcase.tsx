@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, LayoutDashboard, Store, TrendingUp, Users, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
+import { Hammer, LayoutDashboard, TrendingUp, Target, ShoppingCart, Briefcase, Flame } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -116,35 +116,7 @@ const TABS: ShowcaseTab[] = [
       { text: 'Live progress', position: 'top-[45%] right-[5%]' },
     ],
   },
-  // 7. Team — org visualization
-  {
-    id: 'team',
-    label: 'Team',
-    icon: <Users className="h-4 w-4" />,
-    url: 'app.fractionalforge.com/team',
-    image: '/images/screenshots/team-orbit.png',
-    headline: 'Your extended team',
-    description: 'See your position at the centre, with your team, specialists, and fractional executives around you.',
-    callouts: [
-      { text: '13 specialists', position: 'top-[30%] left-[5%]' },
-      { text: 'Fractional execs', position: 'top-[30%] right-[5%]' },
-    ],
-  },
-  // 8. Marketplace — supplier directory
-  {
-    id: 'marketplace',
-    label: 'Marketplace',
-    icon: <Store className="h-4 w-4" />,
-    url: 'app.fractionalforge.com/marketplace',
-    image: '/images/screenshots/marketplace.png',
-    headline: '8,600+ suppliers',
-    description: 'UK manufacturers, component suppliers, and fractional executives. Vetted, ready to quote.',
-    callouts: [
-      { text: '8,600+ suppliers', position: 'top-[10%] right-[5%]' },
-      { text: 'Instant contact', position: 'bottom-[25%] left-[5%]' },
-    ],
-  },
-  // 9. Investors — fundraising
+  // 7. Investors — fundraising
   {
     id: 'investors',
     label: 'Investors',

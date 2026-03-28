@@ -3,6 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { ProductShowcase } from "@/components/marketing/product-showcase"
+import { MeetingFlowSection } from "@/components/marketing/meeting-flow"
 import { useState, useEffect } from "react"
 import {
   motion,
@@ -257,6 +258,7 @@ export default function MarketingPage() {
         <HeroSection />
         <HowItWorksStrip />
         <ProductShowcase />
+        <MeetingFlowSection />
         <SolutionSection />
         <WhyNowStrip />
         <ProblemSection />
