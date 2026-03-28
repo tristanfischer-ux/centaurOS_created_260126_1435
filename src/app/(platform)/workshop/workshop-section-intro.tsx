@@ -26,7 +26,7 @@ import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 
 const section = getSectionById("workshop")!
 
@@ -92,13 +92,18 @@ export function WorkshopSectionIntro(): React.ReactElement {
                 </Card>
             </div>
 
-            {/* Max's coaching tip */}
+            {/* Max's Workshop briefing */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistCoachingTip
+                <SpecialistBriefingHero
                     specialistId="cto"
                     specialistName="Max"
                     specialistTitle="CTO"
-                    tip="The Forge takes your product idea from concept to manufacturing-ready. Start a project, and I'll guide you through design, specification, and supplier sourcing."
+                    narrative={null}
+                    fallbackMessage="The Forge takes your product idea from concept to manufacturing-ready. Start a project, and I'll guide you through design, specification, and supplier sourcing."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Workshop', description: 'Max introduces The Forge workshop.', metadata: {} }}
+                    storageKey="workshop-intro"
                 />
             </div>
 

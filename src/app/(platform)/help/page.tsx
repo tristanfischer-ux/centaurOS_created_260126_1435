@@ -24,7 +24,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { VideoWalkthrough } from "@/components/ui/video-walkthrough"
 import { typography } from "@/lib/design-system/typography"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { VIDEOS, VIDEO_LIBRARY_ORDER } from "@/lib/video-urls"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 
@@ -197,11 +197,16 @@ function SectionHeader({
 export default function HelpCenterPage() {
   return (
     <div className="space-y-16 pb-12">
-      <SpecialistCoachingTip
+      <SpecialistBriefingHero
         specialistId="chief-of-staff"
         specialistName="Cal"
         specialistTitle="Chief of Staff"
-        tip="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
+        narrative={null}
+        fallbackMessage="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}
+        storageKey="help"
       />
 
       {/* Page Header */}

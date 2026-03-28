@@ -27,7 +27,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { typography } from '@/lib/design-system'
-import { SpecialistCoachingTip } from '@/components/specialists/specialist-coaching-tip'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { TechniquesExplorer } from '@/components/techniques'
@@ -198,11 +198,16 @@ export function LearnPage({
 
   return (
     <div className="space-y-6">
-      <SpecialistCoachingTip
+      <SpecialistBriefingHero
         specialistId="strategist"
         specialistName="Sage"
         specialistTitle="Strategy"
-        tip="Explore manufacturing techniques, tutorials, and community Q&A. Understanding your options here helps you make better design and sourcing decisions."
+        narrative={null}
+        fallbackMessage="Explore manufacturing techniques, tutorials, and community Q&A. Understanding your options here helps you make better design and sourcing decisions."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}
+        storageKey="learn"
       />
 
       {/* Page header */}

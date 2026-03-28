@@ -11,7 +11,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { typography } from "@/lib/design-system"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { 
     Sparkles, 
     Calendar,
@@ -156,11 +156,16 @@ export default function WhatsNewPage() {
     
     return (
         <div className="max-w-5xl space-y-6 -mt-2">
-            <SpecialistCoachingTip
+            <SpecialistBriefingHero
                 specialistId="chief-of-staff"
                 specialistName="Cal"
                 specialistTitle="Chief of Staff"
-                tip="Check recent updates for features that could improve your workflow. New capabilities are released regularly."
+                narrative={null}
+                fallbackMessage="Check recent updates for features that could improve your workflow. New capabilities are released regularly."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: "What's New", description: 'Cal on recent updates.', metadata: {} }}
+                storageKey="whats-new"
             />
 
             {/* Page Header */}

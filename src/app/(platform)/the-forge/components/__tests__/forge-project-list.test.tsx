@@ -9,6 +9,14 @@ jest.mock("@/actions/cad-lab-projects", () => ({
   listCadLabProjects: jest.fn(),
 }))
 
+jest.mock("../forge-cto-banner", () => ({
+  ForgeCtoBanner: () => null,
+}))
+
+jest.mock("../forge-advisor-insights", () => ({
+  ForgeAdvisorInsights: () => null,
+}))
+
 jest.mock("@/contexts/advisor-panel-context", () => ({
   useAdvisorPanel: () => ({
     openPanel: jest.fn(),

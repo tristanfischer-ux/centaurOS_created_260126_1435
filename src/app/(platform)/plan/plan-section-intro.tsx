@@ -21,7 +21,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { OneSentencePlanner } from "./one-sentence-planner"
 import { TemplateGallery } from "./template-gallery"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 
 const section = getSectionById("plan")!
 
@@ -164,11 +164,16 @@ export function PlanSectionIntro(): React.ReactElement {
 
             {/* Sage's coaching tip */}
             <div className="px-4 sm:px-6 lg:px-8 pt-2 pb-4">
-                <SpecialistCoachingTip
+                <SpecialistBriefingHero
                     specialistId="strategist"
                     specialistName="Sage"
                     specialistTitle="Strategy"
-                    tip="Start with your company purpose, then break it into strategic pillars. I'll help you cascade those into objectives and tasks your team can execute."
+                    narrative={null}
+                    fallbackMessage="Start with your company purpose, then break it into strategic pillars. I'll help you cascade those into objectives and tasks your team can execute."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Plan', description: 'Sage on planning.', metadata: {} }}
+                    storageKey="plan-intro"
                 />
             </div>
 

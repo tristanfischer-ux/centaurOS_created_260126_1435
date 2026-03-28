@@ -19,7 +19,7 @@ import { SectionIntroPage } from "@/components/sidebar/SectionIntroPage"
 import { getSectionById } from "@/lib/features/section-registry"
 import { Card, CardContent } from "@/components/ui/card"
 import { MeDashboardBody } from "./me-dashboard-view"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 
 import type { MeDashboardData } from "@/actions/me-dashboard"
 
@@ -135,11 +135,16 @@ export function MeSectionIntro({ data }: MeSectionIntroProps): React.ReactElemen
 
             {/* Cal's coaching tip */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistCoachingTip
+                <SpecialistBriefingHero
                     specialistId="chief-of-staff"
                     specialistName="Cal"
                     specialistTitle="Chief of Staff"
-                    tip="Your command centre. Check in here each morning — I'll brief you on what needs attention, track your streak, and keep your priorities in focus."
+                    narrative={null}
+                    fallbackMessage="Your command centre. Check in here each morning — I'll brief you on what needs attention, track your streak, and keep your priorities in focus."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Me', description: 'Cal on your daily command centre.', metadata: {} }}
+                    storageKey="me-intro"
                 />
             </div>
 

@@ -30,6 +30,7 @@ import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'luc
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
+import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
 import { generateInvestorInsights } from '@/actions/specialist-page-insights'
 import type { AgentInsight } from '@/actions/agent-insights'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
@@ -183,6 +184,10 @@ export function InvestorBrowser({
 
   // Specialist insights state
   const [specialistInsights, setSpecialistInsights] = useState<AgentInsight[]>([])
+  const { openPanel } = useAdvisorPanel()
+  const handleDiscuss = (specialistId: string, context: string) => {
+    openPanel(specialistId, { handoffContext: context, contextLabel: 'Investors' })
+  }
   const insightsFetched = useRef(false)
 
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -591,6 +596,7 @@ export function InvestorBrowser({
               key={insight.id}
               insight={insight}
               onDismiss={() => setSpecialistInsights(prev => prev.filter(i => i.id !== insight.id))}
+              onDiscuss={handleDiscuss}
               compact
             />
           ))}

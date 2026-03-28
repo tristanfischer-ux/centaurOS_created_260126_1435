@@ -68,6 +68,7 @@ import { getMyReferralInfo } from "@/actions/referrals"
 import { TodayTimeCard } from "@/components/time/today-time-card"
 import { useCalBriefing } from "./use-cal-briefing"
 import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
+import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
 import { CHECKLIST_ITEMS } from "@/components/onboarding/GettingStartedChecklist"
 import type { TodayInsightInput } from "@/actions/specialist-page-insights"
 import Image from "next/image"
@@ -370,6 +371,11 @@ export function TodayView({
     }, [briefing, pulse, strategyHealth, unreadCount])
 
     const { calNarrative, calInsights, isCalLoading, dismissInsight, refreshBriefing } = useCalBriefing(calInput, isNewUser, onboardingStepsRemaining)
+
+    const { openPanel } = useAdvisorPanel()
+    const handleDiscussInsight = (specialistId: string, context: string) => {
+        openPanel(specialistId, { handoffContext: context, contextLabel: 'Today' })
+    }
 
     // ─── Loading state ────────────────────────────────────────────
 
@@ -760,6 +766,7 @@ export function TodayView({
                             key={insight.id}
                             insight={insight}
                             onDismiss={() => dismissInsight(insight.id)}
+                            onDiscuss={handleDiscussInsight}
                             compact
                         />
                     ))}

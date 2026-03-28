@@ -28,7 +28,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 
 const section = getSectionById("marketplace")
 
@@ -152,11 +152,16 @@ export function MarketplaceSectionIntro(): React.ReactElement | null {
 
             {/* Chase's coaching tip */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <SpecialistCoachingTip
+                <SpecialistBriefingHero
                     specialistId="vp-supply-chain"
                     specialistName="Chase"
                     specialistTitle="Supply Chain"
-                    tip="Find suppliers, hire talent, or discover playbooks. I'll help you compare options and match suppliers to your technical requirements."
+                    narrative={null}
+                    fallbackMessage="Find suppliers, hire talent, or discover playbooks. I'll help you compare options and match suppliers to your technical requirements."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Marketplace', description: 'Chase on the marketplace.', metadata: {} }}
+                    storageKey="marketplace-intro"
                 />
             </div>
 

@@ -37,7 +37,7 @@ import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
-import { SpecialistCoachingTip } from "@/components/specialists/specialist-coaching-tip"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { useBrowseContext } from "@/contexts/browse-context"
 import { fetchWebPage } from "@/actions/web-fetch"
 import { BrowserFrame } from "./browser-frame"
@@ -261,12 +261,16 @@ export default function BrowsePage(): React.ReactElement {
     <div className="flex flex-col h-[calc(100vh-6rem)] -m-4 sm:-m-6 lg:-m-8 -mt-14 sm:-mt-6 lg:-mt-8">
       {/* Sage's coaching tip */}
       <div className="px-4 py-2 border-b bg-background">
-        <SpecialistCoachingTip
+        <SpecialistBriefingHero
           specialistId="strategist"
           specialistName="Sage"
           specialistTitle="Strategy"
-          firstVisitOnly
-          tip="Research competitors, suppliers, and market trends. Sage can discuss anything you find — just click the specialist panel."
+          narrative={null}
+          fallbackMessage="Research competitors, suppliers, and market trends. Sage can discuss anything you find — just click the specialist panel."
+          isLoading={false}
+          severity="success"
+          context={{ type: 'general', title: 'Browse', description: 'Sage on research.', metadata: {} }}
+          storageKey="browse"
         />
       </div>
 

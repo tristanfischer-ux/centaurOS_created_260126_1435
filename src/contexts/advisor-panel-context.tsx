@@ -23,9 +23,12 @@ import {
   useCallback,
   useMemo,
   useEffect,
+  useRef,
   type ReactNode,
 } from "react"
+import { usePathname } from "next/navigation"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
+import { getSpecialistForRoute } from "@/lib/route-specialist-map"
 import type { Specialist } from "@/lib/agents/specialists-config"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -96,6 +99,9 @@ const AdvisorPanelContext = createContext<AdvisorPanelContextValue | null>(null)
  * close, or switch the advisor panel without managing local dialog state.
  */
 export function AdvisorPanelProvider({ children }: { children: ReactNode }): React.ReactElement {
+  const pathname = usePathname()
+  const prevPathname = useRef(pathname)
+
   const [state, setState] = useState<AdvisorPanelState>(() => ({
     isOpen: false,
     isFullscreen: false, // Default to false, will be hydrated from localStorage
@@ -116,6 +122,32 @@ export function AdvisorPanelProvider({ children }: { children: ReactNode }): Rea
       isFullscreen: storedFullscreen === 'true',
     }))
   }, [])
+
+  // INTENT: Switch to the relevant specialist when the user navigates to a new
+  // page while the panel is already open. Prevents stale Cal showing on Investors page.
+  useEffect(() => {
+    if (pathname === prevPathname.current) return
+    prevPathname.current = pathname
+
+    setState((prev) => {
+      if (!prev.isOpen) return prev
+
+      const { specialistId } = getSpecialistForRoute(pathname ?? "/")
+      const newSpecialist = getSpecialistById(specialistId)
+      if (!newSpecialist || newSpecialist.id === prev.activeSpecialist?.id) return prev
+
+      return {
+        ...prev,
+        activeSpecialist: newSpecialist,
+        handoffContext: null,
+        referredBy: null,
+        contextLabel: null,
+        handoffTrail: [],
+        handoffSourceThreadId: null,
+        handoffSourceSpecialistId: null,
+      }
+    })
+  }, [pathname])
 
   const openPanel = useCallback((specialistId: string, options?: OpenPanelOptions) => {
     const specialist = getSpecialistById(specialistId)

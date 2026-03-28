@@ -1,31 +1,17 @@
 /**
- * @file forge-cto-banner.tsx — CTO presence banner on The Forge landing page
+ * @file forge-cto-banner.tsx — Max (CTO) presence on The Forge landing page
  *
- * @description Compact horizontal banner showing Max (CTO) as an always-visible
- * presence at the top of The Forge. Opens the advisor panel pre-loaded with
- * Max and context about the user's current projects.
- *
- * @related
- * - AdvisorPanel: src/contexts/advisor-panel-context.tsx
- * - Specialists config: src/lib/agents/specialists-config.ts
- * - Forge page: src/app/(platform)/the-forge/components/forge-project-list.tsx
+ * @description Uses the shared SpecialistBriefingHero component with dynamic
+ * greeting logic based on project state (stalled, no projects, in-progress, complete).
  */
 
 "use client"
 
-import Image from "next/image"
-import { MessageSquare } from "lucide-react"
-
-import { Button } from "@/components/ui/button"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
-
+import { useMemo } from "react"
+import { SpecialistBriefingHero, type BriefingSeverity } from "@/components/specialists/specialist-briefing-hero"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
 // ─── Constants ───────────────────────────────────────────────────────
-
-const CTO_SPECIALIST_ID = "cto"
-const CTO_NAME = "Max"
-const CTO_AVATAR = "/images/specialists/cto.png"
 
 const STAGE_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -58,50 +44,44 @@ function getStalledProject(
   )
 }
 
-interface BannerContent {
-  greeting: string
+function getBannerContent(projects: CadLabProjectSummary[]): {
   message: string
-}
-
-function getBannerContent(projects: CadLabProjectSummary[]): BannerContent {
+  severity: BriefingSeverity
+} {
   const timeGreeting = getTimeOfDayGreeting()
   const inProgress = projects.filter(
     (p) => p.status !== "complete" && p.status !== "rfq_created",
   )
 
-  // Proactive nudge: stalled project (3+ days idle)
   const stalled = getStalledProject(projects)
   if (stalled) {
     const name = stalled.subject || stalled.name
     return {
-      greeting: `${timeGreeting}.`,
-      message: `Your ${name} design hasn\u2019t moved in a few days \u2014 stuck on something?`,
+      message: `${timeGreeting}. Your ${name} design hasn\u2019t moved in a few days \u2014 stuck on something? Let\u2019s talk through what\u2019s blocking you.`,
+      severity: 'warning',
     }
   }
 
-  // New user: no projects at all
   if (projects.length === 0) {
     return {
-      greeting: `${timeGreeting}.`,
-      message: "Ready to build something? Tell me what you\u2019re working on.",
+      message: `${timeGreeting}. Ready to build something? Tell me what you\u2019re working on and I\u2019ll guide you through design, specification, and sourcing.`,
+      severity: 'success',
     }
   }
 
-  // Has active in-progress project
   if (inProgress.length > 0) {
-    const latest = inProgress[0] // pre-sorted by updatedAt DESC from server
+    const latest = inProgress[0]
     const name = latest.subject || latest.name
     const stage = STAGE_LABELS[latest.stage] ?? latest.stage
     return {
-      greeting: `${timeGreeting}.`,
-      message: `Your ${name} is in ${stage} \u2014 want to talk through next steps?`,
+      message: `${timeGreeting}. Your ${name} is in ${stage} \u2014 want to talk through next steps?`,
+      severity: 'success',
     }
   }
 
-  // All projects complete — returning builder
   return {
-    greeting: `Welcome back.`,
-    message: "All your designs are wrapped up. What are we building next?",
+    message: "Welcome back. All your designs are wrapped up. What are we building next?",
+    severity: 'success',
   }
 }
 
@@ -112,10 +92,9 @@ interface ForgeCtoBannerProps {
 }
 
 export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
-  const { openPanel } = useAdvisorPanel()
-  const { greeting, message } = getBannerContent(projects)
+  const { message, severity } = useMemo(() => getBannerContent(projects), [projects])
 
-  const handleTalk = () => {
+  const context = useMemo(() => {
     const inProgress = projects.filter(
       (p) => p.status !== "complete" && p.status !== "rfq_created",
     ).length
@@ -137,49 +116,26 @@ export function ForgeCtoBanner({ projects }: ForgeCtoBannerProps) {
         `Their "${stalled.subject || stalled.name}" project has been idle for several days and may be stalled.`,
       )
     }
-    contextParts.push(
-      "They may want to discuss a new design, review architecture, get technology advice, or explore what The Forge can do.",
-    )
 
-    openPanel(CTO_SPECIALIST_ID, {
-      handoffContext: contextParts.join(" "),
-      contextLabel: "The Forge",
-    })
-  }
+    return {
+      type: 'general' as const,
+      title: 'The Forge',
+      description: contextParts.join(" "),
+      metadata: {},
+    }
+  }, [projects])
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border-l-2 border-l-international-orange/40 bg-muted/30 px-4 py-3">
-      {/* Avatar */}
-      <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-muted">
-        <Image
-          src={CTO_AVATAR}
-          alt={CTO_NAME}
-          fill
-          className="object-cover"
-          sizes="40px"
-        />
-      </div>
-
-      {/* Text */}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-foreground">
-          {CTO_NAME} <span className="font-normal text-muted-foreground">\u00b7 {greeting}</span>
-        </p>
-        <p className="hidden text-xs text-muted-foreground line-clamp-1 sm:block">
-          {message}
-        </p>
-      </div>
-
-      {/* CTA */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleTalk}
-        className="flex-shrink-0"
-      >
-        <MessageSquare className="h-4 w-4 sm:mr-1.5" />
-        <span className="hidden sm:inline">Talk to Max</span>
-      </Button>
-    </div>
+    <SpecialistBriefingHero
+      specialistId="cto"
+      specialistName="Max"
+      specialistTitle="CTO"
+      narrative={null}
+      fallbackMessage={message}
+      isLoading={false}
+      severity={severity}
+      context={context}
+      storageKey="forge-cto"
+    />
   )
 }
