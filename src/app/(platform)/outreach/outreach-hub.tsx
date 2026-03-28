@@ -7,7 +7,7 @@
  * and empty state. Entry point to the outreach workflow.
  */
 
-import { useState, useEffect, useCallback, useTransition, useRef } from 'react'
+import { useState, useEffect, useCallback, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Send, Plus, Users, Mail, Megaphone, Database, LayoutDashboard } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,32 +19,9 @@ import { CreateCampaignDialog } from './create-campaign-dialog'
 import { OutreachDashboard } from './outreach-dashboard'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-// DECISION: Not using usePageInsights here because campaigns load async after mount.
-// Inline useEffect with isLoading dependency instead.
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateOutreachInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { typography } from '@/lib/design-system'
 import type { Campaign } from '@/types/outreach'
-
-// INTENT: Static coaching insight when no campaigns yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-    id: 'sal-outreach-empty',
-    foundry_id: '',
-    specialist_id: 'sales-lead',
-    insight_type: 'recommendation',
-    urgency: 'informational',
-    title: 'Start your outreach',
-    body: "Set up your first outreach campaign to start connecting with potential customers. I'll help you craft sequences that convert.",
-    domain_data: {},
-    suggested_actions: [],
-    is_read: false,
-    is_dismissed: false,
-    acted_on: false,
-    acted_on_at: null,
-    created_at: new Date().toISOString(),
-    expires_at: null,
-}
 
 interface OutreachHubProps {
     foundryId: string
@@ -104,45 +81,16 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
     const totalContacts = campaigns.reduce((sum, c) => sum + (c.contact_count || 0), 0)
     const totalSequenced = campaigns.reduce((sum, c) => sum + (c.sequenced_count || 0), 0)
 
-    // Sal's proactive insights
-    // INTENT: Campaigns load async after mount, so we use !isLoading as the trigger
-    // instead of campaigns.length > 0. When loading completes with 0 campaigns,
-    // the empty coaching insight shows. When campaigns exist, the API call fires.
-    const { openPanel } = useAdvisorPanel()
-    const handleDiscuss = useCallback((specialistId: string, context: string) => {
-        openPanel(specialistId, { handoffContext: context, contextLabel: 'Outreach' })
-    }, [openPanel])
-    const activeCampaigns = campaigns.filter(c => c.status === 'active' || c.status === 'draft').length
-    const [salInsights, setSalInsights] = useState<AgentInsight[]>([])
-    const salFetched = useRef(false)
-    useEffect(() => {
-        if (isLoading) return
-        if (salFetched.current) return
-        salFetched.current = true
-        if (campaigns.length === 0) {
-            setSalInsights([EMPTY_STATE_INSIGHT])
-            return
-        }
-        generateOutreachInsights({
-            campaignCount: campaigns.length,
-            activeCampaigns,
-            totalContacts,
-        }).then((result) => {
-            if (Array.isArray(result) && result.length > 0) setSalInsights(result)
-        }).catch(() => { /* Non-critical */ })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isLoading])
-    const dismissSalInsight = useCallback((id: string) => {
-        setSalInsights(prev => prev.filter(i => i.id !== id))
-    }, [])
-
     return (
         <div className="space-y-8">
             {/* Header */}
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-2xl font-display font-bold text-foreground">Outreach</h1>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <div className={typography.pageHeader}>
+                        <div className={typography.pageHeaderAccent} />
+                        <h1 className={typography.h1}>Outreach</h1>
+                    </div>
+                    <p className={typography.pageSubtitle}>
                         Create campaigns, import prospects, generate email sequences
                     </p>
                 </div>
@@ -188,20 +136,18 @@ export function OutreachHub({ foundryId, userId }: OutreachHubProps) {
                 </button>
             </div>
 
-            {/* Sal's proactive insights */}
-            {salInsights.length > 0 && (
-                <div className="space-y-3">
-                    {salInsights.map((insight) => (
-                        <SpecialistInsightCard
-                            key={insight.id}
-                            insight={insight}
-                            onDismiss={() => dismissSalInsight(insight.id)}
-                            onDiscuss={handleDiscuss}
-                            compact
-                        />
-                    ))}
-                </div>
-            )}
+            {/* Sal's briefing */}
+            <SpecialistBriefingHero
+                specialistId="sales-lead"
+                specialistName="Sal"
+                specialistTitle="Sales Lead"
+                narrative={null}
+                fallbackMessage="Build outreach campaigns to connect with potential customers. I'll help you craft sequences that convert."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: 'Outreach', description: 'Campaign management and outreach', metadata: {} }}
+                storageKey="outreach"
+            />
 
             {/* Dashboard tab */}
             {activeTab === 'dashboard' && (

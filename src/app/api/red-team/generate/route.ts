@@ -207,15 +207,30 @@ export async function POST(request: Request) {
             const systemPrompt = getPersonaSystemPrompt(persona.role, topic)
             const userPrompt = `## Evidence Pack (cite as [R1], [R2], etc.)\n${evidencePack}\n\n${context ? `## User Context\n${context}\n\n` : ""}## Debate History\n${fullTranscript || "(Opening — no prior arguments.)"}\n\n## Round ${roundIdx + 1}/${roundQuestions.length}: ${question}\n${roundText ? `### This round so far:\n${roundText}` : "(You speak first.)"}\n\nMake your argument as ${persona.label} (${persona.characterName}). Be specific, cite evidence with [R1]-[R6] references.`
 
-            const { text, duration, costUsd } = await callLLMStreaming(
-              persona.providerId, persona.modelId, systemPrompt, userPrompt,
-              (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
-            )
+            // INTENT: If the primary provider fails (e.g., Qwen key expired), fall back
+            // to Claude Sonnet so the debate continues. The persona keeps its personality
+            // — only the underlying model changes.
+            let usedModelId = persona.modelId
+            let result: { text: string; duration: number; costUsd: number }
+            try {
+              result = await callLLMStreaming(
+                persona.providerId, persona.modelId, systemPrompt, userPrompt,
+                (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
+              )
+            } catch (primaryErr) {
+              console.warn(`[RedTeam] ${persona.providerId}/${persona.modelId} failed, falling back to Sonnet:`, primaryErr instanceof Error ? primaryErr.message : primaryErr)
+              emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk: `*[${persona.characterName} running on fallback model]*\n\n` })
+              usedModelId = "claude-sonnet-4-6 (fallback)"
+              result = await callLLMStreaming(
+                "anthropic", "claude-sonnet-4-6", systemPrompt, userPrompt,
+                (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
+              )
+            }
 
-            totalCostUsd += costUsd
-            roundArguments.push({ role: persona.role, characterName: persona.characterName, modelId: persona.modelId, content: text, duration, costUsd })
-            roundText += `\n### ${persona.label} (${persona.characterName})\n${text}\n`
-            emit({ phase: "persona_complete", round: roundIdx + 1, persona: persona.role, duration, costUsd })
+            totalCostUsd += result.costUsd
+            roundArguments.push({ role: persona.role, characterName: persona.characterName, modelId: usedModelId, content: result.text, duration: result.duration, costUsd: result.costUsd })
+            roundText += `\n### ${persona.label} (${persona.characterName})\n${result.text}\n`
+            emit({ phase: "persona_complete", round: roundIdx + 1, persona: persona.role, duration: result.duration, costUsd: result.costUsd })
           }
 
           fullTranscript += `\n## ROUND ${roundIdx + 1}: ${question}\n${roundText}`

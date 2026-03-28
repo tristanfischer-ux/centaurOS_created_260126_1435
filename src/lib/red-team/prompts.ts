@@ -8,6 +8,7 @@
  */
 
 import type { DebatePersona, DebateRole } from "./types"
+import { getSpecialistById } from "@/lib/agents/specialists-config"
 
 // ─── Persona Configurations ─────────────────────────────────────
 
@@ -63,6 +64,63 @@ export const DEBATE_PERSONAS: DebatePersona[] = [
     color: "text-info",
   },
 ]
+
+// ─── Personality Injection ───────────────────────────────────────
+
+/** Map debate roles to specialist IDs for personality lookup */
+const ROLE_TO_SPECIALIST: Record<DebateRole, string> = {
+  bull: "strategist",
+  bear: "cto",
+  realist: "finance-lead",
+  disruptor: "chief-of-staff",
+  wildcard: "fundraising-advisor",
+}
+
+/**
+ * Extracts personality traits from the specialist config and formats
+ * them as a character brief for the debate prompt.
+ */
+function getPersonalityBrief(role: DebateRole): string {
+  const spec = getSpecialistById(ROLE_TO_SPECIALIST[role])
+  if (!spec?.personality) return ""
+
+  const p = spec.personality
+  const parts: string[] = []
+
+  if (p.backstory?.origin) parts.push(`Background: ${p.backstory.origin}`)
+  if (p.backstory?.philosophy) parts.push(`Philosophy: ${p.backstory.philosophy}`)
+  if (p.backstory?.blindSpot) parts.push(`Blind spot (be aware of this): ${p.backstory.blindSpot}`)
+
+  if (p.voice?.tone) parts.push(`Tone: ${p.voice.tone}`)
+  if (p.voice?.signaturePhrases?.length) {
+    parts.push(`Signature phrases (weave these in naturally): "${p.voice.signaturePhrases.slice(0, 3).join('", "')}"`)
+  }
+  if (p.voice?.avoids?.length) {
+    parts.push(`Never: ${p.voice.avoids.slice(0, 2).join("; ")}`)
+  }
+
+  if (p.writingStyle) {
+    const ws = p.writingStyle
+    if (ws.sentenceLength) parts.push(`Sentences: ${ws.sentenceLength}`)
+    if (ws.analogyDomain) parts.push(`Analogies: ${ws.analogyDomain}`)
+    if (ws.quirks?.length) parts.push(`Quirks: ${ws.quirks.slice(0, 2).join("; ")}`)
+  }
+
+  if (p.interactionStyle?.conflictStyle) {
+    parts.push(`When challenged: ${p.interactionStyle.conflictStyle}`)
+  }
+
+  if (p.strongOpinions?.length) {
+    const top = p.strongOpinions.filter(o => o.conviction === "high").slice(0, 2)
+    if (top.length > 0) {
+      parts.push(`Strong opinions: ${top.map(o => o.position).join(" | ")}`)
+    }
+  }
+
+  return parts.length > 0
+    ? `\n\nYOUR PERSONALITY (this is who you ARE — let it shape your arguments):\n${parts.map(p => `- ${p}`).join("\n")}`
+    : ""
+}
 
 // ─── Round Questions ────────────────────────────────────────────
 
@@ -143,7 +201,10 @@ MANDATORY CONSTRAINTS:
 - Be specific about cap table implications. If this isn't fundable, say exactly why and what would need to change to make it investable.`,
   }
 
-  return personas[role]
+  // INTENT: Inject the real specialist personality (signature phrases, writing
+  // quirks, strong opinions, backstory) so each debater sounds like their
+  // ForgeOS character, not a generic LLM.
+  return personas[role] + getPersonalityBrief(role)
 }
 
 // ─── Research Prompts ───────────────────────────────────────────

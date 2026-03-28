@@ -5,7 +5,6 @@
  * Lists existing strategic goals and provides a CTA to create new ones.
  */
 
-import { useCallback, useMemo } from "react"
 import Link from "next/link"
 import { format, differenceInDays } from "date-fns"
 import {
@@ -18,36 +17,13 @@ import {
   Target,
 } from "lucide-react"
 
-import { SpecialistInsightCard } from "@/components/specialists/specialist-insight-card"
-import { usePageInsights } from "@/hooks/use-page-insights"
-import { useAdvisorPanel } from "@/contexts/advisor-panel-context"
-import { generatePlannerInsights } from "@/actions/specialist-page-insights"
-import type { AgentInsight } from "@/actions/agent-insights"
+import { SpecialistBriefingHero } from "@/components/specialists/specialist-briefing-hero"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { EmptyState } from "@/components/ui/empty-state"
 import { StatusBadge } from "@/components/ui/status-badge"
 import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
-
-// INTENT: Static coaching insight when no strategic goals yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'sage-planner-empty',
-  foundry_id: '',
-  specialist_id: 'strategist',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Define your strategy',
-  body: "Define strategic goals and break them into milestones. I'll track progress and flag when priorities need adjusting.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
 
 interface StrategicGoal {
   id: string
@@ -65,34 +41,6 @@ interface StrategicPlannerLandingProps {
 }
 
 export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps) {
-  // Sage's proactive insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Strategic Planner' })
-  }, [openPanel])
-  const { completedGoals, atRiskGoals, avgProgress } = useMemo(() => {
-    const completed = goals.filter(g => g.status === 'completed').length
-    const atRisk = goals.filter(g => {
-      if (!g.milestone_date) return false
-      const daysLeft = (new Date(g.milestone_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-      return daysLeft < 0 || ((g.progress ?? 0) < 50 && daysLeft < 30)
-    }).length
-    const avg = goals.length > 0
-      ? goals.reduce((sum, g) => sum + (g.progress ?? 0), 0) / goals.length
-      : 0
-    return { completedGoals: completed, atRiskGoals: atRisk, avgProgress: avg }
-  }, [goals])
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generatePlannerInsights({
-      goalCount: goals.length,
-      completedGoals,
-      atRiskGoals,
-      avgProgress,
-    }, fast),
-    goals.length > 0,
-    { cacheKey: 'sage-planner', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
-
   return (
     <div>
       {/* Page Header */}
@@ -114,20 +62,18 @@ export function StrategicPlannerLanding({ goals }: StrategicPlannerLandingProps)
         </Link>
       </div>
 
-      {/* Sage's proactive insights */}
-      {insights.length > 0 && (
-        <div className="space-y-3 mb-8">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
+      {/* Sage's briefing */}
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategist"
+        narrative={null}
+        fallbackMessage="Define strategic goals and break them into milestones. I'll track progress and flag when priorities need adjusting."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Strategic Planner', description: 'Strategic goals and milestone tracking', metadata: {} }}
+        storageKey="strategic-planner"
+      />
 
       {goals.length === 0 ? (
         <EmptyState

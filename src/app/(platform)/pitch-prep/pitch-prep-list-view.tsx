@@ -1,6 +1,5 @@
 'use client'
 
-import { useCallback } from 'react'
 import Link from 'next/link'
 import { typography } from '@/lib/design-system'
 import { Button } from '@/components/ui/button'
@@ -8,41 +7,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { 
-  Plus, 
-  FileText, 
-  Building2, 
+import {
+  Plus,
+  FileText,
+  Building2,
   Calendar,
   Info,
   ChevronRight,
   TrendingUp,
 } from 'lucide-react'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generatePitchPrepInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { PitchPrepRequest, PitchPrepStatus } from '@/types/pitch-prep'
 import { formatDistanceToNow } from 'date-fns'
-
-// INTENT: Static coaching insight when no pitch prep requests yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'fiona-pitch-prep-empty',
-  foundry_id: '',
-  specialist_id: 'fundraising-advisor',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Prepare your pitch',
-  body: "Prepare your pitch with guided exercises. I'll help you craft a narrative that resonates with investors and practice your delivery.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
 
 interface PitchPrepListViewProps {
   requests: PitchPrepRequest[]
@@ -59,23 +35,6 @@ const STATUS_COLORS: Record<PitchPrepStatus, { variant: 'default' | 'secondary' 
 }
 
 export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
-  // Fiona's proactive insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Pitch Prep' })
-  }, [openPanel])
-  const completedCount = requests.filter(r => r.status === 'completed').length
-  const activeCount = requests.filter(r => r.status !== 'completed' && r.status !== 'cancelled').length
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generatePitchPrepInsights({
-      requestCount: requests.length,
-      completedCount,
-      activeCount,
-    }, fast),
-    requests.length > 0,
-    { cacheKey: 'fiona-pitch-prep', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -97,29 +56,27 @@ export function PitchPrepListView({ requests }: PitchPrepListViewProps) {
         </Button>
       </div>
 
+      {/* Fiona's briefing */}
+      <SpecialistBriefingHero
+        specialistId="fundraising-advisor"
+        specialistName="Fiona"
+        specialistTitle="Fundraising Advisor"
+        narrative={null}
+        fallbackMessage="Prepare your pitch with guided exercises. I'll help you craft a narrative that resonates with investors."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Pitch Preparation', description: 'Investor pitch prep and coaching', metadata: {} }}
+        storageKey="pitch-prep"
+      />
+
       {/* Legal Disclaimer */}
       <Alert className="bg-status-info-light border-status-info">
         <Info className="h-4 w-4 text-status-info" />
         <AlertDescription className="text-status-info-dark">
-          <strong>Preparation Service Only:</strong> ForgeOS helps you prepare for investor conversations. 
+          <strong>Preparation Service Only:</strong> ForgeOS helps you prepare for investor conversations.
           We do not provide investment advice or facilitate securities transactions.
         </AlertDescription>
       </Alert>
-
-      {/* Fiona's proactive insights */}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
 
       {/* Requests List */}
       {requests.length === 0 ? (

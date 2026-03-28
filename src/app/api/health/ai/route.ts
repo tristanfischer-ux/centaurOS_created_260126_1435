@@ -103,7 +103,33 @@ export async function GET() {
     results.push({ provider: "Google", model: "—", status: "not_configured", responseMs: null })
   }
 
-  // 4. MiniMax
+  // 4. Qwen / DashScope
+  const dashscopeKey = process.env.DASHSCOPE_API_KEY?.trim()
+  if (dashscopeKey) {
+    const start = Date.now()
+    try {
+      const res = await fetch("https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${dashscopeKey}` },
+        body: JSON.stringify({ model: "qwen-turbo", max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
+        signal: AbortSignal.timeout(timeout),
+      })
+      const data = await res.json()
+      results.push({
+        provider: "Qwen (DashScope)",
+        model: "qwen-turbo",
+        status: data.choices ? "ok" : "error",
+        responseMs: Date.now() - start,
+        ...(data.error && { error: (data.error.message ?? JSON.stringify(data.error)).slice(0, 100) }),
+      })
+    } catch (err) {
+      results.push({ provider: "Qwen (DashScope)", model: "qwen-turbo", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
+    }
+  } else {
+    results.push({ provider: "Qwen (DashScope)", model: "—", status: "not_configured", responseMs: null })
+  }
+
+  // 5. MiniMax
   const minimaxKey = process.env.MINIMAX_API_KEY?.trim()
   if (minimaxKey) {
     results.push({ provider: "MiniMax", model: "M2.7", status: "ok", responseMs: null }) // Lightweight check — key exists
