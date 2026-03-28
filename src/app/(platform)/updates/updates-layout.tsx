@@ -21,11 +21,6 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateUpdatesInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import { cn } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -63,25 +58,6 @@ interface UpdatesLayoutProps {
   members?: TeamMember[]
 }
 
-// INTENT: Static coaching insight when no activity yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'cal-updates-empty',
-  foundry_id: '',
-  specialist_id: 'chief-of-staff',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Your activity feed',
-  body: 'Your activity feed will show team updates, task completions, and conversations as your team gets active.',
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
-
 type CommsView = 'activity' | 'conversations'
 
 export function UpdatesLayout({
@@ -91,26 +67,6 @@ export function UpdatesLayout({
   bannerSlot,
   members = [],
 }: UpdatesLayoutProps) {
-  // ── Cal's proactive insights ─────────────────────────────────────────────
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Updates' })
-  }, [openPanel])
-  const daysSinceOldest = useMemo(() => {
-    if (initialItems.length === 0) return 0
-    const oldest = initialItems[initialItems.length - 1]
-    return Math.max(0, Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / (1000 * 60 * 60 * 24)))
-  }, [initialItems])
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generateUpdatesInsights({
-      activityCount: initialItems.length,
-      memberCount: members.length,
-      daysSinceOldestUnread: daysSinceOldest,
-    }, fast),
-    initialItems.length > 0,
-    { cacheKey: 'cal-updates', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
-
   // ── View state ──────────────────────────────────────────────────────────
   const [activeView, setActiveView] = useState<CommsView>('activity')
 
@@ -552,20 +508,6 @@ export function UpdatesLayout({
 
         {TabBar}
 
-        {insights.length > 0 && activeView === 'activity' && (
-          <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0 space-y-3">
-            {insights.map((insight) => (
-              <SpecialistInsightCard
-                key={insight.id}
-                insight={insight}
-                onDismiss={() => dismissInsight(insight.id)}
-                onDiscuss={handleDiscuss}
-                compact
-              />
-            ))}
-          </div>
-        )}
-
         {bannerSlot && activeView === 'activity' && (
           <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
             {bannerSlot}
@@ -621,20 +563,6 @@ export function UpdatesLayout({
         </div>
 
         {TabBar}
-
-        {insights.length > 0 && activeView === 'activity' && (
-          <div className="px-4 sm:px-6 pt-4 shrink-0 space-y-3">
-            {insights.map((insight) => (
-              <SpecialistInsightCard
-                key={insight.id}
-                insight={insight}
-                onDismiss={() => dismissInsight(insight.id)}
-                onDiscuss={handleDiscuss}
-                compact
-              />
-            ))}
-          </div>
-        )}
 
         {bannerSlot && activeView === 'activity' && (
           <div className="px-4 sm:px-6 pt-4 shrink-0">
@@ -721,20 +649,6 @@ export function UpdatesLayout({
           </div>
 
           {TabBar}
-
-          {insights.length > 0 && activeView === 'activity' && (
-            <div className="px-4 pt-3 shrink-0 space-y-3">
-              {insights.map((insight) => (
-                <SpecialistInsightCard
-                  key={insight.id}
-                  insight={insight}
-                  onDismiss={() => dismissInsight(insight.id)}
-                  onDiscuss={handleDiscuss}
-                  compact
-                />
-              ))}
-            </div>
-          )}
 
           {bannerSlot && activeView === 'activity' && (
             <div className="px-4 pt-3 shrink-0">

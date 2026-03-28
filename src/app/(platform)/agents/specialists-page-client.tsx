@@ -1,12 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateAgentsInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -36,25 +31,6 @@ const AgentsWorkflowView = dynamic(
     }
 )
 
-// INTENT: Static coaching insight for the agents page — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'cal-agents-empty',
-  foundry_id: '',
-  specialist_id: 'chief-of-staff',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Meet your specialist team',
-  body: 'Meet your specialist team. Each specialist has deep expertise in their domain — try asking one a question.',
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
-
 type PageView = "specialists" | "project-builder"
 
 interface SpecialistsPageClientProps {
@@ -73,20 +49,6 @@ export function SpecialistsPageClient({
     const [view, setView] = useState<PageView>("specialists")
     const [isMobile, setIsMobile] = useState<boolean | null>(null)
     const [showBuilderAnyway, setShowBuilderAnyway] = useState(false)
-
-    // Cal's proactive insights
-    const { openPanel } = useAdvisorPanel()
-    const handleDiscuss = useCallback((specialistId: string, context: string) => {
-        openPanel(specialistId, { handoffContext: context, contextLabel: 'AI Team' })
-    }, [openPanel])
-    const { insights, dismissInsight } = usePageInsights(
-        (fast) => generateAgentsInsights({
-            workflowCount: initialWorkflows.length,
-            customPromptCount: initialCustomPrompts.length,
-        }, fast),
-        true,
-        { cacheKey: 'cal-agents', emptyInsight: EMPTY_STATE_INSIGHT },
-    )
 
     useEffect(() => {
         const check = () => setIsMobile(window.innerWidth < 768)
@@ -141,21 +103,6 @@ export function SpecialistsPageClient({
                     storageKey="specialists"
                 />
             </div>
-
-            {/* Cal's proactive insights */}
-            {view === "specialists" && insights.length > 0 && (
-                <div className="px-4 sm:px-6 lg:px-8 pt-4 space-y-3">
-                    {insights.map((insight) => (
-                        <SpecialistInsightCard
-                            key={insight.id}
-                            insight={insight}
-                            onDismiss={() => dismissInsight(insight.id)}
-                            onDiscuss={handleDiscuss}
-                            compact
-                        />
-                    ))}
-                </div>
-            )}
 
             {/* Content area */}
             {view === "specialists" ? (

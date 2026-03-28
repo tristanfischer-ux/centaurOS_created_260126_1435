@@ -23,7 +23,7 @@ import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrows
 import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { HarperRoleBriefing } from './harper-role-briefing'
+// DECISION: HarperRoleBriefing removed — SpecialistBriefingHero now provides Harper's guidance
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
 import type { StatsLabels } from '../marketplace-v2/components/MarketplaceStatsSection'
@@ -144,12 +144,6 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
                 severity="success"
                 context={{ type: 'general', title: 'Recruits', description: 'Harper on recruits.', metadata: {} }}
                 storageKey="recruits"
-            />
-
-            {/* Harper's pre-search role briefing */}
-            <HarperRoleBriefing
-                totalListings={listings.length}
-                categories={categories}
             />
 
             {/* AI Talent Finder - the "aha moment" */}

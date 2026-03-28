@@ -24,11 +24,6 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateReportsInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import { useSearchParams } from 'next/navigation'
 
 import {
@@ -120,25 +115,6 @@ import type {
   ReportDetailLevel,
 } from '@/lib/reports/report-document-types'
 import type { StrategicBriefing } from '@/lib/reports/slide-deck-types'
-
-// INTENT: Static coaching insight when no reports generated yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'cal-reports-empty',
-  foundry_id: '',
-  specialist_id: 'chief-of-staff',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Generate your first report',
-  body: 'Generate reports to share your progress with investors and team. Start with a strategic briefing or design report.',
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
 
 // ========================
 // Constants
@@ -360,20 +336,6 @@ export default function ReportsPage(): React.JSX.Element {
   )
   const enabledCount = enabledSections.size
   const totalCount = allSectionTypes.length
-
-  // Cal's proactive insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscussInsight = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Reports' })
-  }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generateReportsInsights({
-      reportCount: 0,
-      lastReportDate: null,
-    }, fast),
-    true,
-    { cacheKey: 'cal-reports', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
 
   // Config summary for collapsed state
   // GOTCHA: new Date('YYYY-MM-DD') parses as UTC midnight — toLocaleDateString in UTC-
@@ -1009,21 +971,6 @@ export default function ReportsPage(): React.JSX.Element {
         context={{ type: 'general', title: 'Reports', description: 'Cal on reports.', metadata: {} }}
         storageKey="reports"
       />
-
-      {/* Cal's proactive insights */}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscussInsight}
-              compact
-            />
-          ))}
-        </div>
-      )}
 
       {/* Change 6: Tab Separation */}
       <div role="tablist" aria-label="Report type" className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 p-1">

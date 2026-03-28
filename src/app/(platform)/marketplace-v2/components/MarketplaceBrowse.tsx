@@ -30,10 +30,6 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { PageTour } from '@/components/guidance/page-tour'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateMarketplaceInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { FoundryContext } from '@/actions/foundry-context'
 
@@ -113,14 +109,6 @@ export function MarketplaceBrowse({
     const [compareListings, setCompareListings] = useState<MarketplaceListing[]>([])
     const [compareOrigin, setCompareOrigin] = useState<'browse' | 'saved'>('browse')
 
-    // Chase's marketplace insights
-    const [chaseInsights, setChaseInsights] = useState<AgentInsight[]>([])
-    const chaseFetched = useRef(false)
-    const { openPanel } = useAdvisorPanel()
-    const handleChaseDiscuss = useCallback((specialistId: string, context: string) => {
-        openPanel(specialistId, { handoffContext: context, contextLabel: 'Marketplace' })
-    }, [openPanel])
-
     // Shared compare selection state (lifted from MarketplaceListingGrid)
     const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
 
@@ -142,25 +130,6 @@ export function MarketplaceBrowse({
 
     const clearCompareSelection = useCallback(() => {
         setSelectedForCompare(new Set())
-    }, [])
-
-    // FLOW: Chase's insights — generated once on load (skipped when parent provides its own specialist)
-    useEffect(() => {
-        if (hideSpecialistBriefing) return
-        if (chaseFetched.current) return
-        chaseFetched.current = true
-        generateMarketplaceInsights({
-            totalListings: initialListings.length,
-            activeCategory: state.activeCategory,
-            compareCount: 0,
-            savedCount: initialSavedIds.length,
-            hasActiveCadProject: false,
-        }).then((result) => {
-            if (Array.isArray(result) && result.length > 0) {
-                setChaseInsights(result)
-            }
-        }).catch(() => { /* Non-critical */ })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     // Handle recommendation click
@@ -421,21 +390,6 @@ export function MarketplaceBrowse({
                     </div>
                 )}
             </nav>
-
-            {/* Chase's proactive insights — below tabs so they don't push nav off-screen */}
-            {!hideSpecialistBriefing && chaseInsights.length > 0 && (
-                <div className="space-y-3">
-                    {chaseInsights.map((insight) => (
-                        <SpecialistInsightCard
-                            key={insight.id}
-                            insight={insight}
-                            onDismiss={() => setChaseInsights(prev => prev.filter(i => i.id !== insight.id))}
-                            onDiscuss={handleChaseDiscuss}
-                            compact
-                        />
-                    ))}
-                </div>
-            )}
 
             {/* Browse tab content */}
             {activeTab === 'browse' && (

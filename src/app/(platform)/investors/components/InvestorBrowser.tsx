@@ -30,10 +30,6 @@ import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'luc
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateInvestorInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import type { SortOption } from './InvestorSortSelect'
 import type { AdvancedFilters } from './InvestorFilterPanel'
@@ -183,14 +179,6 @@ export function InvestorBrowser({
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [showCompare, setShowCompare] = useState(false)
 
-  // Specialist insights state
-  const [specialistInsights, setSpecialistInsights] = useState<AgentInsight[]>([])
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = (specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Investors' })
-  }
-  const insightsFetched = useRef(false)
-
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hasEverFetched = useRef(hasUrlFilters)
   // SECURITY: Generation counter prevents stale load-more results from appending
@@ -241,36 +229,6 @@ export function InvestorBrowser({
     const qs = params.toString()
     router.replace(`${pathname}${qs ? `?${qs}` : ''}`, { scroll: false })
   }, [activeFirmType, activeOnly, debouncedQuery, sortBy, viewMode, advancedFilters, router, pathname])
-
-  // ---------------------------------------------------------------------------
-  // Fiona's entry briefing — generated once on load
-  // ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    // SECURITY: Prevent duplicate AI calls from React Strict Mode double-mount
-    if (insightsFetched.current) return
-    insightsFetched.current = true
-    const shortlistCount = Object.keys(shortlistIds).length
-    const shortlistTypes = Array.from(new Set(
-      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.firm_type).filter((t): t is string => typeof t === 'string')
-    ))
-    const shortlistLocations = Array.from(new Set(
-      initialFirms.filter(f => shortlistIds[f.id]).map(f => f.attributes?.hq_city).filter((c): c is string => typeof c === 'string')
-    )).slice(0, 5)
-
-    generateInvestorInsights({
-      totalFirms: initialTotal,
-      shortlistCount,
-      shortlistTypes,
-      shortlistLocations,
-      activeFilters: activeFirmType !== 'All' ? activeFirmType : '',
-    }).then((result) => {
-      if (Array.isArray(result) && result.length > 0) {
-        setSpecialistInsights(result)
-      }
-    }).catch(() => { /* Non-critical */ })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // ---------------------------------------------------------------------------
   // Refetch when filters change
@@ -600,21 +558,6 @@ export function InvestorBrowser({
           </Button>
         )}
       </div>
-
-      {/* Portfolio construction insights — below filters so they don't push controls off-screen */}
-      {specialistInsights.length > 0 && (
-        <div className="space-y-3">
-          {specialistInsights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => setSpecialistInsights(prev => prev.filter(i => i.id !== insight.id))}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
 
       {/* Grid / Board / Map views */}
       {viewMode === 'grid' && (

@@ -23,11 +23,6 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { ScenarioPanel } from '@/components/cash-burn/scenario-panel'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateCashBurnInsights } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid, generateCashInGrid, normaliseToWeeklyPence } from '@/lib/cash-burn/weekly-projection'
 import { projectBurn } from '@/lib/cash-burn/burn-engine'
 import { chartColors, moneyMapColors } from '@/lib/chart-colors'
@@ -37,33 +32,12 @@ import {
   deleteScenario,
 } from '@/actions/cash-burn-scenarios'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { DocumentUploadPrompt } from '@/components/knowledge/document-upload-prompt'
 import type {
   BurnScenario,
   CashOutItem,
   CashInItem,
   CreateScenarioInput,
 } from '@/types/cash-burn'
-import type { AgentInsight } from '@/actions/agent-insights'
-
-// INTENT: Static coaching insight when no data entered yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'finn-cash-burn-empty',
-  foundry_id: '',
-  specialist_id: 'finance-lead',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Get started with your burn model',
-  body: "Start by adding your three biggest costs on the Cash Out page — usually salaries, office, and materials. Then add your revenue streams on Cash In. I'll calculate your runway automatically.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
 
 interface CashBurnViewProps {
   initialData: {
@@ -155,34 +129,6 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
       balance: w.cumulativeBalance,
     }))
   }, [projection.weeks])
-
-  // Specialist insights from Finn
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Burn' })
-  }, [openPanel])
-  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    (fast) => {
-      const totalOut = cashOut.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
-      const totalIn = cashIn.reduce((s, i) => s + normaliseToWeeklyPence(i.amount, i.frequency), 0)
-      const topCategory = expenseBreakdown.length > 0 ? expenseBreakdown[0].name : 'none'
-      const gapPct = totalOut > 0 ? ((totalOut - totalIn) / totalOut) * 100 : 0
-
-      return generateCashBurnInsights({
-        weeklyBurnRate: Math.round(projection.monthlyBurnRate * 12 / 52),
-        runwayWeeks: projection.runwayWeeks,
-        openingBalance: activeScenario.openingBalance,
-        monthlyBurnRate: projection.monthlyBurnRate,
-        cashOutItemCount: cashOut.length,
-        cashInItemCount: cashIn.length,
-        topExpenseCategory: topCategory,
-        revenueVsCostGapPct: gapPct,
-        scenarioCount: scenarios.length,
-      }, fast)
-    },
-    cashOut.length > 0 || cashIn.length > 0,
-    { cacheKey: 'finn-cash-burn', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
 
   // Scenario handlers
   const handleScenarioChange = useCallback((scenario: BurnScenario) => {
@@ -336,28 +282,6 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
           detail: cashZeroDate ? undefined : 'Cash positive throughout',
         },
       ]} />
-
-      {/* Finn's proactive insights */}
-      {insightsLoading && <InsightCardSkeleton />}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
-
-      <DocumentUploadPrompt
-        domain="finance"
-        suggestion="financial model or P&L spreadsheet"
-        specialistName="Finn"
-      />
 
       {cashOut.length === 0 && cashIn.length === 0 && (
         <Card>

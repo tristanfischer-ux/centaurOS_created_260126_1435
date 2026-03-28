@@ -21,11 +21,6 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateCashOutInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
 import { generateCashOutGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -35,26 +30,6 @@ import {
 } from '@/actions/cash-burn-out'
 import type { CashOutItem, CreateCashOutInput } from '@/types/cash-burn'
 import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
-import type { AgentInsight } from '@/actions/agent-insights'
-
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'finn-cash-out-empty',
-  foundry_id: '',
-  specialist_id: 'finance-lead',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Map your cost structure',
-  body: "Start with your fixed costs — salaries, rent, subscriptions. Then add variable costs like materials and shipping. I need both to model your burn rate accurately.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
-
 interface CashOutViewProps {
   initialItems: CashOutItem[]
   hasError: boolean
@@ -101,32 +76,6 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     variable: row.variableCosts,
     total: row.totalOut,
   })), [cashOutGrid])
-
-  // Specialist insights from Finn
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash Out' })
-  }, [openPanel])
-  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    async (fast) => {
-      const sorted = [...items].sort((a, b) => b.weeklyAmount - a.weeklyAmount)
-      const topThree = sorted.slice(0, 3).map(i => i.name)
-      const total = weeklyFixedTotal + weeklyVariableTotal
-      const snapshot = await getFinancialSnapshot() ?? undefined
-      return generateCashOutInsights({
-        weeklyFixedTotal,
-        weeklyVariableTotal,
-        fixedCostPct: total > 0 ? (weeklyFixedTotal / total) * 100 : 0,
-        itemCount: items.length,
-        topThreeItems: topThree,
-        monthlyTotal,
-        annualTotal,
-        snapshot,
-      }, fast)
-    },
-    items.length > 0,
-    { cacheKey: 'finn-cash-out', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
 
   const handleAdd = useCallback((costType?: string) => {
     setEditingItem(null)
@@ -243,22 +192,6 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
-
-      {/* Finn's proactive insights */}
-      {insightsLoading && <InsightCardSkeleton />}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
       )}
 
       {/* Summary Charts */}

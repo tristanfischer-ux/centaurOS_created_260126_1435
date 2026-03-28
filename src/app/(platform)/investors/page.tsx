@@ -15,7 +15,6 @@ import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds,
 import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
-import { InvestorAdvisorInsights } from './components/InvestorAdvisorInsights'
 
 export const revalidate = 60
 
@@ -116,9 +115,6 @@ export default async function InvestorDirectoryPage() {
 
       {/* Insights panel */}
       {stats && <InvestorInsightsPanel stats={stats} />}
-
-      {/* Fiona's proactive insights */}
-      {stats && <InvestorAdvisorInsights stats={stats} shortlistIds={shortlistIds} />}
 
       {/* Color legend */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground border-b border-border pb-4">

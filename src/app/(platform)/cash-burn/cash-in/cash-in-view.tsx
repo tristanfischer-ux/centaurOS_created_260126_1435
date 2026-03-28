@@ -21,11 +21,6 @@ import { DonutChart } from '@/components/cash-burn/donut-chart'
 import { StackedBarChart } from '@/components/cash-burn/stacked-bar-chart'
 import { WeeklyGrid } from '@/components/cash-burn/weekly-grid'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateCashInInsights, getFinancialSnapshot } from '@/actions/specialist-page-insights'
 import { generateCashInGrid } from '@/lib/cash-burn/weekly-projection'
 import { chartColors } from '@/lib/chart-colors'
 import {
@@ -35,26 +30,6 @@ import {
 } from '@/actions/cash-burn-in'
 import { updateOpeningBalance } from '@/actions/cash-burn-scenarios'
 import type { CashInItem, CashInSourceType, CreateCashInInput, BurnScenario } from '@/types/cash-burn'
-import type { AgentInsight } from '@/actions/agent-insights'
-
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'finn-cash-in-empty',
-  foundry_id: '',
-  specialist_id: 'finance-lead',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Add your income sources',
-  body: "Map out where money comes in — revenue, grants, loans, equity. Even if revenue is zero today, adding expected funding gives me a realistic runway picture.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
-
 interface CashInViewProps {
   initialItems: CashInItem[]
   defaultScenario: BurnScenario | null
@@ -151,32 +126,6 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
       }
     })
   }, [cashInGrid])
-
-  // Specialist insights from Finn
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Cash In' })
-  }, [openPanel])
-  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    async (fast) => {
-      const revenueWeekly = (groupedItems['revenue'] ?? []).reduce((s, i) => s + i.weeklyAmount, 0)
-      const nonRevenueWeekly = weeklyTotal - revenueWeekly
-      const sourceTypeCount = SOURCE_TYPE_CONFIG.filter(cfg => (groupedItems[cfg.type] ?? []).length > 0).length
-      const snapshot = await getFinancialSnapshot() ?? undefined
-      return generateCashInInsights({
-        weeklyTotal,
-        openingBalance: defaultScenario?.openingBalance ?? 0,
-        revenueWeekly,
-        nonRevenueWeekly,
-        sourceTypeCount,
-        itemCount: items.length,
-        revenuePct: weeklyTotal > 0 ? (revenueWeekly / weeklyTotal) * 100 : 0,
-        snapshot,
-      }, fast)
-    },
-    items.length > 0,
-    { cacheKey: 'finn-cash-in', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
 
   const saveOpeningBalance = useCallback(async () => {
     if (!scenarioId) return
@@ -323,22 +272,6 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-      )}
-
-      {/* Finn's proactive insights */}
-      {insightsLoading && <InsightCardSkeleton />}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
       )}
 
       {/* Starting Cash Balance */}
