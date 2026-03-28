@@ -1,14 +1,14 @@
 "use client"
 
 /**
- * @file red-team-view.tsx — Red Team Debate UI
+ * @file red-team-view.tsx — Red Team Debate UI with SSE streaming
  *
  * @description Interactive page for launching and viewing multi-LLM debates.
- * Input form → generation with progress → rendered debate document with
- * export options and one-click task/objective creation.
+ * Connects to /api/red-team/generate via EventSource for real-time streaming.
+ * Includes debate history, real action creation, and DOCX export.
  */
 
-import { useState, useCallback, useTransition } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -25,20 +25,24 @@ import {
   Target,
   ListChecks,
   ShieldAlert,
+  History,
+  Clock,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { generateRedTeamDebate } from "@/actions/red-team-debate"
 import { DEBATE_PERSONAS } from "@/lib/red-team/prompts"
+import { listRedTeamDebates, loadRedTeamDebate, createRedTeamActions } from "@/actions/red-team-debate"
 import type {
   RedTeamDebateDocument,
   DebateRound,
+  DebateArgument,
   FactCheck,
   DebateRole,
 } from "@/lib/red-team/types"
+import type { DebateHistoryItem } from "@/actions/red-team-debate"
 
 // ─── Constants ──────────────────────────────────────────────────
 
@@ -78,11 +82,34 @@ export function RedTeamView(): React.ReactElement {
   const [topic, setTopic] = useState("")
   const [context, setContext] = useState("")
   const [showContext, setShowContext] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [isGenerating, setIsGenerating] = useState(false)
   const [debate, setDebate] = useState<RedTeamDebateDocument | null>(null)
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set())
-  const [createdObjectives, setCreatedObjectives] = useState<Set<number>>(new Set())
-  const [createdTasks, setCreatedTasks] = useState<Set<number>>(new Set())
+  const [actionsCreated, setActionsCreated] = useState(false)
+  const [isCreatingActions, setIsCreatingActions] = useState(false)
+
+  // Streaming state
+  const [streamPhase, setStreamPhase] = useState("")
+  const [streamMessage, setStreamMessage] = useState("")
+  const [currentRound, setCurrentRound] = useState(0)
+  const [currentPersona, setCurrentPersona] = useState<string | null>(null)
+  const [streamingArgs, setStreamingArgs] = useState<Map<string, string>>(new Map())
+  const [completedRounds, setCompletedRounds] = useState<DebateRound[]>([])
+  const [evidencePack, setEvidencePack] = useState("")
+
+  // History
+  const [history, setHistory] = useState<DebateHistoryItem[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Load history on mount
+  useEffect(() => {
+    listRedTeamDebates().then(setHistory).catch(() => {})
+  }, [])
+
+  // ─── SSE Streaming ──────────────────────────────────────────
 
   const handleGenerate = useCallback(() => {
     if (!topic.trim() || topic.trim().length < 10) {
@@ -90,22 +117,148 @@ export function RedTeamView(): React.ReactElement {
       return
     }
 
-    startTransition(async () => {
-      const result = await generateRedTeamDebate({
-        topic: topic.trim(),
-        context: context.trim() || undefined,
-      })
+    setIsGenerating(true)
+    setDebate(null)
+    setStreamPhase("research")
+    setStreamMessage("Starting research swarm...")
+    setStreamingArgs(new Map())
+    setCompletedRounds([])
+    setCurrentRound(0)
+    setCurrentPersona(null)
+    setActionsCreated(false)
+    setEvidencePack("")
 
-      if (result.success && result.document) {
-        setDebate(result.document)
-        // Expand all rounds by default
-        setExpandedRounds(new Set(result.document.rounds.map(r => r.roundNumber)))
-        toast.success(`Debate complete in ${Math.round(result.document.totalDuration / 1000)}s`)
-      } else {
-        toast.error(result.error || "Failed to generate debate")
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    fetch("/api/red-team/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic: topic.trim(), context: context.trim() || undefined }),
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok || !response.body) {
+        toast.error("Failed to start debate")
+        setIsGenerating(false)
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ""
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split("\n")
+        buffer = lines.pop() || ""
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue
+          const jsonStr = line.slice(6)
+          if (jsonStr === "[DONE]") continue
+
+          try {
+            const event = JSON.parse(jsonStr)
+            handleSSEEvent(event)
+          } catch { /* skip malformed events */ }
+        }
+      }
+    }).catch((err) => {
+      if (err.name !== "AbortError") {
+        toast.error("Debate connection lost")
+        setIsGenerating(false)
       }
     })
   }, [topic, context])
+
+  const handleSSEEvent = useCallback((event: Record<string, unknown>) => {
+    const phase = event.phase as string
+
+    switch (phase) {
+      case "research":
+        setStreamPhase("research")
+        setStreamMessage(event.message as string)
+        break
+
+      case "evidence":
+        setEvidencePack(event.data as string)
+        break
+
+      case "round_start":
+        setCurrentRound(event.round as number)
+        setStreamPhase("round")
+        setStreamMessage(`Round ${event.round}: ${event.question}`)
+        break
+
+      case "persona_start":
+        setCurrentPersona(event.persona as string)
+        setStreamMessage(`${event.characterName} (${(event.persona as string).toUpperCase()}) via ${event.modelId}...`)
+        break
+
+      case "chunk":
+        setStreamingArgs(prev => {
+          const key = `${event.round}-${event.persona}`
+          const next = new Map(prev)
+          next.set(key, (next.get(key) || "") + (event.chunk as string))
+          return next
+        })
+        break
+
+      case "persona_complete":
+        setCurrentPersona(null)
+        break
+
+      case "fact_check_start":
+        setStreamPhase("fact_check")
+        setStreamMessage(`Fact-checking round ${event.round}...`)
+        break
+
+      case "fact_check_complete": {
+        const checks = (event.checks || []) as FactCheck[]
+        setCompletedRounds(prev => {
+          const existing = prev.find(r => r.roundNumber === event.round)
+          if (existing) {
+            return prev.map(r => r.roundNumber === event.round ? { ...r, factChecks: checks } : r)
+          }
+          return prev
+        })
+        break
+      }
+
+      case "synthesis_start":
+        setStreamPhase("synthesis")
+        setStreamMessage("Writing verdict...")
+        break
+
+      case "synthesis_chunk":
+        // Synthesis streams but we wait for the full document
+        break
+
+      case "actions_start":
+        setStreamPhase("actions")
+        setStreamMessage("Generating recommended actions...")
+        break
+
+      case "complete":
+        setDebate(event.document as RedTeamDebateDocument)
+        setExpandedRounds(new Set((event.document as RedTeamDebateDocument).rounds.map(r => r.roundNumber)))
+        setIsGenerating(false)
+        setStreamPhase("")
+        toast.success(`Debate complete in ${Math.round((event.document as RedTeamDebateDocument).totalDuration / 1000)}s`)
+        // Refresh history
+        listRedTeamDebates().then(setHistory).catch(() => {})
+        break
+
+      case "error":
+        toast.error(event.message as string)
+        setIsGenerating(false)
+        setStreamPhase("")
+        break
+    }
+  }, [])
 
   const toggleRound = useCallback((roundNumber: number) => {
     setExpandedRounds(prev => {
@@ -117,20 +270,73 @@ export function RedTeamView(): React.ReactElement {
   }, [])
 
   const handleNewDebate = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort()
     setDebate(null)
     setTopic("")
     setContext("")
     setShowContext(false)
     setExpandedRounds(new Set())
-    setCreatedObjectives(new Set())
-    setCreatedTasks(new Set())
+    setActionsCreated(false)
+    setIsGenerating(false)
+    setStreamPhase("")
+    setStreamingArgs(new Map())
+    setCompletedRounds([])
   }, [])
 
+  const handleLoadDebate = useCallback(async (id: string) => {
+    setLoadingHistory(true)
+    const doc = await loadRedTeamDebate(id)
+    if (doc) {
+      setDebate(doc)
+      setTopic(doc.topic)
+      setExpandedRounds(new Set(doc.rounds.map(r => r.roundNumber)))
+      setShowHistory(false)
+    } else {
+      toast.error("Failed to load debate")
+    }
+    setLoadingHistory(false)
+  }, [])
+
+  const handleCreateAll = useCallback(async () => {
+    if (!debate) return
+    setIsCreatingActions(true)
+    const result = await createRedTeamActions({
+      topic: debate.topic,
+      objectives: debate.suggestedObjectives,
+      tasks: debate.suggestedTasks,
+    })
+    if (result.success) {
+      setActionsCreated(true)
+      toast.success(`Created objective + ${result.taskCount} tasks`)
+    } else {
+      toast.error(result.error || "Failed to create actions")
+    }
+    setIsCreatingActions(false)
+  }, [debate])
+
+  const handleExportDOCX = useCallback(async () => {
+    if (!debate) return
+    try {
+      const { exportDebateAsDOCX } = await import("@/lib/red-team/export-debate")
+      const blob = await exportDebateAsDOCX(debate)
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `red-team-${debate.topic.slice(0, 30).replace(/[^a-z0-9]/gi, "-")}.docx`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success("DOCX downloaded")
+    } catch (err) {
+      toast.error("Export failed")
+      console.error("[RedTeam] DOCX export failed:", err)
+    }
+  }, [debate])
+
   // ─── Input State ────────────────────────────────────────────
-  if (!debate && !isPending) {
+  if (!debate && !isGenerating) {
     return (
       <div className="max-w-3xl mx-auto space-y-8">
-        <div className="space-y-2">
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
               <Swords className="h-5 w-5 text-international-orange" />
@@ -140,7 +346,41 @@ export function RedTeamView(): React.ReactElement {
               <p className="text-sm text-muted-foreground">Stress-test decisions with 5 different AI models</p>
             </div>
           </div>
+          {history.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}>
+              <History className="h-3.5 w-3.5 mr-1" /> History ({history.length})
+            </Button>
+          )}
         </div>
+
+        {/* History */}
+        <AnimatePresence>
+          {showHistory && history.length > 0 && (
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
+              <Card>
+                <CardContent className="pt-4 pb-4 space-y-2">
+                  {history.map(h => (
+                    <button
+                      key={h.id}
+                      onClick={() => handleLoadDebate(h.id)}
+                      disabled={loadingHistory}
+                      className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{h.topic}</p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Clock className="h-3 w-3" />
+                          {new Date(h.generatedAt).toLocaleDateString()} {h.totalDuration ? `(${Math.round(h.totalDuration / 1000)}s)` : ""}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <Card>
           <CardContent className="pt-6 space-y-4">
@@ -156,58 +396,32 @@ export function RedTeamView(): React.ReactElement {
                 rows={4}
                 className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
               />
-              <p className="text-xs text-muted-foreground">Be specific. The more detail you provide, the better the debate.</p>
             </div>
 
-            <div>
-              <button
-                onClick={() => setShowContext(!showContext)}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-              >
-                {showContext ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                Add context (business plan, market data, etc.)
-              </button>
-              <AnimatePresence>
-                {showContext && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <textarea
-                      value={context}
-                      onChange={e => setContext(e.target.value)}
-                      placeholder="Paste any relevant context — business plan excerpt, market research, financial data, competitor analysis..."
-                      rows={6}
-                      className="w-full mt-3 rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none"
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <button onClick={() => setShowContext(!showContext)} className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              {showContext ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+              Add context
+            </button>
+            <AnimatePresence>
+              {showContext && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
+                  <textarea value={context} onChange={e => setContext(e.target.value)} placeholder="Paste relevant context..." rows={6} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-international-orange/30 resize-none" />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="grid grid-cols-5 gap-2 pt-2">
+              {DEBATE_PERSONAS.map(p => (
+                <div key={p.role} className={cn("rounded-lg border p-2.5 text-center", ROLE_COLORS[p.role])}>
+                  <p className="text-xs font-bold uppercase tracking-wider">{p.label}</p>
+                  <p className="text-xs font-medium text-foreground mt-0.5">{p.characterName}</p>
+                  <p className="text-[10px] text-muted-foreground">{p.modelId.split("-").slice(0, 2).join("-")}</p>
+                </div>
+              ))}
             </div>
 
-            {/* Debater lineup */}
-            <div className="pt-2 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Debaters</p>
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2">
-                {DEBATE_PERSONAS.map(p => (
-                  <div key={p.role} className={cn("rounded-lg border p-2.5 text-center", ROLE_COLORS[p.role])}>
-                    <p className="text-xs font-bold uppercase tracking-wider">{p.label}</p>
-                    <p className="text-xs font-medium text-foreground mt-0.5">{p.characterName}</p>
-                    <p className="text-[10px] text-muted-foreground">{p.modelId.split("-").slice(0, 2).join("-")}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <Button
-              onClick={handleGenerate}
-              disabled={!topic.trim() || topic.trim().length < 10}
-              className="w-full bg-international-orange hover:bg-international-orange/90 text-white h-12 text-sm font-semibold"
-            >
-              <Swords className="h-4 w-4 mr-2" />
-              Launch Debate
+            <Button onClick={handleGenerate} disabled={!topic.trim() || topic.trim().length < 10} className="w-full bg-international-orange hover:bg-international-orange/90 text-white h-12 text-sm font-semibold">
+              <Swords className="h-4 w-4 mr-2" /> Launch Debate
             </Button>
           </CardContent>
         </Card>
@@ -215,49 +429,60 @@ export function RedTeamView(): React.ReactElement {
     )
   }
 
-  // ─── Generating State ───────────────────────────────────────
-  if (isPending) {
+  // ─── Generating State (streaming) ───────────────────────────
+  if (isGenerating) {
     return (
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
-            <Swords className="h-5 w-5 text-international-orange" />
+            <Loader2 className="h-5 w-5 text-international-orange animate-spin" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Red Team Debate</h1>
-            <p className="text-sm text-muted-foreground">Generating multi-model debate...</p>
+            <h1 className="text-2xl font-bold text-foreground">Debate in Progress</h1>
+            <p className="text-sm text-muted-foreground">{streamMessage}</p>
           </div>
         </div>
 
-        <Card>
-          <CardContent className="pt-8 pb-8">
-            <div className="flex flex-col items-center gap-6 text-center">
-              <div className="relative">
-                <Loader2 className="h-12 w-12 text-international-orange animate-spin" />
+        {/* Persona progress */}
+        <div className="grid grid-cols-5 gap-2">
+          {DEBATE_PERSONAS.map(p => {
+            const isActive = currentPersona === p.role
+            return (
+              <div key={p.role} className={cn("rounded-lg border p-2 text-center transition-all", ROLE_COLORS[p.role], isActive && "ring-2 ring-international-orange")}>
+                <p className="text-[10px] font-bold uppercase">{p.label}</p>
+                <p className="text-[10px] text-foreground">{p.characterName}</p>
+                {isActive && <Loader2 className="h-3 w-3 mx-auto mt-1 animate-spin text-international-orange" />}
               </div>
-              <div className="space-y-2 max-w-md">
-                <p className="text-lg font-semibold text-foreground">Debate in progress</p>
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  Researching the topic, then running 5 rounds with 5 different AI models.
-                  Fact-checking claims between rounds. This takes 2-4 minutes.
-                </p>
-              </div>
-              <div className="grid grid-cols-5 gap-2 w-full max-w-md">
-                {DEBATE_PERSONAS.map((p, i) => (
-                  <motion.div
-                    key={p.role}
-                    className={cn("rounded-lg border p-2 text-center", ROLE_COLORS[p.role])}
-                    animate={{ opacity: [0.4, 1, 0.4] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
-                  >
-                    <p className="text-[10px] font-bold uppercase">{p.label}</p>
-                    <p className="text-[10px] text-muted-foreground">{p.characterName}</p>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            )
+          })}
+        </div>
+
+        {/* Streaming arguments */}
+        {currentRound > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Round {currentRound}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {DEBATE_PERSONAS.map(p => {
+                const key = `${currentRound}-${p.role}`
+                const text = streamingArgs.get(key)
+                if (!text) return null
+                return (
+                  <div key={p.role} className={cn("rounded-lg border p-3", ROLE_COLORS[p.role])}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge className={cn("text-[10px] font-bold", ROLE_BADGE_COLORS[p.role])}>{p.label}</Badge>
+                      <span className="text-xs font-semibold text-foreground">{p.characterName}</span>
+                    </div>
+                    <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{text}</p>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        )}
+
+        <Button variant="outline" size="sm" onClick={handleNewDebate}>Cancel</Button>
       </div>
     )
   }
@@ -267,7 +492,6 @@ export function RedTeamView(): React.ReactElement {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-international-orange/10">
@@ -275,68 +499,50 @@ export function RedTeamView(): React.ReactElement {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Red Team Debate</h1>
-            <p className="text-sm text-muted-foreground">
-              Generated in {Math.round(debate.totalDuration / 1000)}s using 5 models
-            </p>
+            <p className="text-sm text-muted-foreground">Generated in {Math.round(debate.totalDuration / 1000)}s using 5 models</p>
           </div>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleExportDOCX}>
+            <FileDown className="h-3.5 w-3.5 mr-1" /> DOCX
+          </Button>
           <Button variant="outline" size="sm" onClick={handleNewDebate}>
-            <Plus className="h-3.5 w-3.5 mr-1" /> New Debate
+            <Plus className="h-3.5 w-3.5 mr-1" /> New
           </Button>
         </div>
       </div>
 
-      {/* Topic */}
       <Card>
         <CardContent className="pt-4 pb-4">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Topic</p>
           <p className="text-foreground font-medium">{debate.topic}</p>
-          {debate.context && (
-            <p className="text-sm text-muted-foreground mt-2 line-clamp-3">{debate.context}</p>
-          )}
         </CardContent>
       </Card>
 
-      {/* Debaters */}
       <div className="grid grid-cols-5 gap-2">
         {debate.personas.map(p => (
           <div key={p.role} className={cn("rounded-lg border p-3 text-center", ROLE_COLORS[p.role])}>
             <p className="text-xs font-bold uppercase tracking-wider">{p.label}</p>
             <p className="text-sm font-semibold text-foreground mt-1">{p.characterName}</p>
-            <p className="text-[10px] text-muted-foreground">{p.characterTitle}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{p.modelId}</p>
+            <p className="text-[10px] text-muted-foreground">{p.modelId}</p>
           </div>
         ))}
       </div>
 
-      {/* Rounds */}
       {debate.rounds.map(round => (
-        <RoundCard
-          key={round.roundNumber}
-          round={round}
-          isExpanded={expandedRounds.has(round.roundNumber)}
-          onToggle={() => toggleRound(round.roundNumber)}
-        />
+        <RoundCard key={round.roundNumber} round={round} isExpanded={expandedRounds.has(round.roundNumber)} onToggle={() => toggleRound(round.roundNumber)} />
       ))}
 
-      {/* Key Tensions */}
       {debate.tensions.length > 0 && (
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Key Tensions</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="text-lg">Key Tensions</CardTitle></CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-2 pr-3 font-semibold text-muted-foreground">Dimension</th>
-                    {DEBATE_PERSONAS.map(p => (
-                      <th key={p.role} className="text-left py-2 px-2 font-semibold text-muted-foreground">
-                        {p.characterName}
-                      </th>
-                    ))}
+                    {DEBATE_PERSONAS.map(p => <th key={p.role} className="text-left py-2 px-2 font-semibold text-muted-foreground">{p.characterName}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -357,113 +563,60 @@ export function RedTeamView(): React.ReactElement {
         </Card>
       )}
 
-      {/* Verdict */}
       <Card className="border-2 border-international-orange/20">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            <Swords className="h-4 w-4 text-international-orange" />
-            Verdict
+            <Swords className="h-4 w-4 text-international-orange" /> Verdict
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="prose prose-sm max-w-none text-foreground">
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">{debate.verdict}</div>
-          </div>
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{debate.verdict}</div>
         </CardContent>
       </Card>
 
-      {/* Suggested Actions */}
-      {(debate.suggestedObjectives.length > 0 || debate.suggestedTasks.length > 0 || debate.suggestedRiskMitigations.length > 0) && (
+      {(debate.suggestedObjectives.length > 0 || debate.suggestedTasks.length > 0) && (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Recommended Actions</CardTitle>
-            <p className="text-sm text-muted-foreground">Generated from the debate findings. Click to create in ForgeOS.</p>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg">Recommended Actions</CardTitle>
+              {!actionsCreated ? (
+                <Button size="sm" onClick={handleCreateAll} disabled={isCreatingActions} className="bg-international-orange hover:bg-international-orange/90 text-white">
+                  {isCreatingActions ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1" />}
+                  Create All
+                </Button>
+              ) : (
+                <Badge variant="success">Created</Badge>
+              )}
+            </div>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Objectives */}
-            {debate.suggestedObjectives.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 text-international-orange" />
-                  <p className="text-sm font-semibold text-foreground">Objectives</p>
+          <CardContent className="space-y-4">
+            {debate.suggestedObjectives.map((obj, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                <Target className="h-4 w-4 text-international-orange mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{obj.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{obj.description}</p>
                 </div>
-                {debate.suggestedObjectives.map((obj, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-card">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{obj.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{obj.description}</p>
-                      {obj.targetDate && <p className="text-xs text-muted-foreground mt-0.5">Target: {obj.targetDate}</p>}
-                    </div>
-                    {createdObjectives.has(i) ? (
-                      <Badge variant="success" className="shrink-0">Created</Badge>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => {
-                          setCreatedObjectives(prev => new Set([...prev, i]))
-                          toast.success(`Objective "${obj.title}" created`)
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Create
-                      </Button>
-                    )}
-                  </div>
-                ))}
               </div>
-            )}
-
-            {/* Tasks */}
-            {debate.suggestedTasks.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ListChecks className="h-4 w-4 text-electric-blue" />
-                  <p className="text-sm font-semibold text-foreground">Tasks</p>
+            ))}
+            {debate.suggestedTasks.map((task, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                <ListChecks className="h-4 w-4 text-electric-blue mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{task.title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
                 </div>
-                {debate.suggestedTasks.map((task, i) => (
-                  <div key={i} className="flex items-start justify-between gap-3 p-3 rounded-lg border bg-card">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">{task.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
-                      {task.function && <Badge variant="secondary" className="mt-1 text-[10px]">{task.function}</Badge>}
-                    </div>
-                    {createdTasks.has(i) ? (
-                      <Badge variant="success" className="shrink-0">Created</Badge>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={() => {
-                          setCreatedTasks(prev => new Set([...prev, i]))
-                          toast.success(`Task "${task.title}" created`)
-                        }}
-                      >
-                        <Plus className="h-3 w-3 mr-1" /> Create
-                      </Button>
-                    )}
-                  </div>
-                ))}
               </div>
-            )}
-
-            {/* Risk Mitigations */}
-            {debate.suggestedRiskMitigations.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="h-4 w-4 text-warning" />
-                  <p className="text-sm font-semibold text-foreground">Risk Mitigations</p>
+            ))}
+            {debate.suggestedRiskMitigations.map((risk, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border bg-card">
+                <ShieldAlert className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">{risk.risk}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{risk.mitigation}</p>
                 </div>
-                {debate.suggestedRiskMitigations.map((risk, i) => (
-                  <div key={i} className="p-3 rounded-lg border bg-card">
-                    <p className="text-sm font-medium text-foreground">{risk.risk}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{risk.mitigation}</p>
-                    {risk.owner && <Badge variant="secondary" className="mt-1 text-[10px]">{risk.owner}</Badge>}
-                  </div>
-                ))}
               </div>
-            )}
+            ))}
           </CardContent>
         </Card>
       )}
@@ -473,21 +626,10 @@ export function RedTeamView(): React.ReactElement {
 
 // ─── Round Card ─────────────────────────────────────────────────
 
-function RoundCard({
-  round,
-  isExpanded,
-  onToggle,
-}: {
-  round: DebateRound
-  isExpanded: boolean
-  onToggle: () => void
-}): React.ReactElement {
+function RoundCard({ round, isExpanded, onToggle }: { round: DebateRound; isExpanded: boolean; onToggle: () => void }): React.ReactElement {
   return (
     <Card>
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors text-left"
-      >
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-6 py-4 hover:bg-muted/30 transition-colors text-left">
         <div className="flex items-center gap-3">
           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
           <div>
@@ -496,41 +638,18 @@ function RoundCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {round.factChecks.length > 0 && (
-            <Badge variant="secondary" className="text-[10px]">
-              {round.factChecks.length} fact-checks
-            </Badge>
-          )}
-          <div className="flex -space-x-1">
-            {round.arguments.map(arg => (
-              <div
-                key={arg.role}
-                className={cn("w-6 h-6 rounded-full border-2 border-background flex items-center justify-center text-[8px] font-bold", ROLE_BADGE_COLORS[arg.role])}
-                title={arg.characterName}
-              >
-                {arg.characterName[0]}
-              </div>
-            ))}
-          </div>
+          {round.factChecks.length > 0 && <Badge variant="secondary" className="text-[10px]">{round.factChecks.length} fact-checks</Badge>}
         </div>
       </button>
-
       <AnimatePresence>
         {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
-          >
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}>
             <CardContent className="pt-0 space-y-4">
               {round.arguments.map(arg => (
-                <div key={arg.role} className={cn("rounded-lg border p-4", ROLE_COLORS[arg.role])}>
+                <div key={arg.role} className={cn("rounded-lg border p-4", ROLE_COLORS[arg.role as DebateRole])}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <Badge className={cn("text-[10px] font-bold", ROLE_BADGE_COLORS[arg.role])}>
-                        {DEBATE_PERSONAS.find(p => p.role === arg.role)?.label}
-                      </Badge>
+                      <Badge className={cn("text-[10px] font-bold", ROLE_BADGE_COLORS[arg.role as DebateRole])}>{DEBATE_PERSONAS.find(p => p.role === arg.role)?.label}</Badge>
                       <span className="text-sm font-semibold text-foreground">{arg.characterName}</span>
                       <span className="text-[10px] text-muted-foreground">via {arg.modelId}</span>
                     </div>
@@ -539,8 +658,6 @@ function RoundCard({
                   <div className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{arg.content}</div>
                 </div>
               ))}
-
-              {/* Fact Checks */}
               {round.factChecks.length > 0 && (
                 <div className="space-y-2 pt-2 border-t">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Fact Checks</p>
