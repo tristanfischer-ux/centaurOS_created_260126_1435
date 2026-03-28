@@ -60,15 +60,15 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Do I need a credit card to start?',
-    answer: 'No. The Explorer plan is completely free — no credit card required. You only need payment details when you decide to upgrade.',
+    answer: 'No. Every new account starts with a 14-day full-access trial — no credit card required. After 14 days, you can continue on the free Explorer plan or upgrade to keep full features.',
   },
   {
     question: 'Can I upgrade or downgrade later?',
     answer: 'Yes, you can switch plans at any time. Upgrades take effect immediately, and downgrades apply at the end of your current billing period. Any unused credit is prorated.',
   },
   {
-    question: 'What\'s the 10% platform fee?',
-    answer: 'When you purchase services through the ForgeOS marketplace, a 10% platform fee is applied to the transaction. This covers payment processing, escrow, dispute resolution, and platform maintenance. There are no other hidden fees.',
+    question: 'What are the marketplace fees?',
+    answer: 'Every new account gets 0% marketplace fees on their first 3 orders — so you can try the full supplier matching experience risk-free. After that, Explorer and Startup plans have a 10% platform fee, and Professional plans pay just 5%. This covers payment processing, escrow, dispute resolution, and platform maintenance.',
   },
   {
     question: 'Is there a discount for annual billing?',
@@ -76,13 +76,12 @@ const FAQ_ITEMS = [
   },
 ]
 
-/** Social proof logos (placeholder brand names) */
-const SOCIAL_PROOF_LOGOS = [
-  'Epicurious',
-  'CloudWatch',
-  'Acme Corp',
-  'Polymath',
-  'Nexus AI',
+/** Social proof stats — real data beats fake logos */
+const SOCIAL_PROOF_STATS = [
+  { value: '9,900+', label: 'UK Manufacturers' },
+  { value: '220+', label: 'ISO/DIN/BS Standards' },
+  { value: '13', label: 'AI Specialists' },
+  { value: '< 2 hrs', label: 'Avg. Engineering Package' },
 ]
 
 /**
@@ -119,7 +118,7 @@ export function PricingContent() {
       <div className="min-h-screen bg-background">
         {/* Navigation bar */}
         <nav className="sticky top-0 z-40 border-b border-muted bg-background py-3 px-4 sm:px-6">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3 sm:gap-4">
               <Link
                 href="/"
@@ -145,21 +144,41 @@ export function PricingContent() {
                 Sign In
               </Link>
               <Button asChild size="sm" className="bg-international-orange hover:bg-international-orange-hover">
-                <Link href="/join">Join the Waitlist</Link>
+                <Link href="/join">Get Started Free</Link>
               </Button>
             </div>
           </div>
         </nav>
 
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
           {/* Header */}
-          <div className="text-center space-y-4 mb-12">
+          <div className="text-center space-y-4 mb-8">
+            <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
+              The Operating System for Hardware Companies
+            </p>
             <h1 className="text-4xl sm:text-5xl font-display font-bold text-foreground tracking-tight">
-              Flexible Plans for Every Stage
+              From Idea to First Prototype, Faster
             </h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Start free. Upgrade as your team grows. No hidden fees, no contracts.
+              Start free with a 14-day full-access trial. Upgrade when your team grows. No hidden fees, no contracts.
             </p>
+          </div>
+
+          {/* Marketplace fee transparency banner */}
+          <div className="max-w-3xl mx-auto mb-12 bg-muted/50 border border-muted rounded-xl p-4 sm:p-5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+              <div className="h-10 w-10 rounded-lg bg-international-orange/10 flex items-center justify-center shrink-0">
+                <Zap className="h-5 w-5 text-international-orange" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">
+                  Transparent marketplace fees — 0% on your first 3 orders
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  After your intro orders, a 10% platform fee applies to marketplace transactions. This covers payment processing, escrow, and dispute resolution. Paid plans get reduced rates.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Billing toggle */}
@@ -290,15 +309,16 @@ export function PricingContent() {
                         )}
                         variant={isProfessional ? 'default' : 'outline'}
                       >
-                        <Link href="/join">Join the Waitlist
+                        <Link href="/join">
+                          {plan.priceMonthlyGBP === 0 ? 'Get Started Free' : 'Start Free Trial'}
                           <ArrowRight className="h-4 w-4 ml-2" />
                         </Link>
                       </Button>
                       {/* CTA subtext to reduce commitment anxiety */}
                       <p className="text-xs text-muted-foreground text-center">
                         {plan.priceMonthlyGBP === 0
-                          ? 'No credit card required'
-                          : 'Switch plans or cancel anytime'
+                          ? '14-day full-access trial · No credit card required'
+                          : 'Start with 14-day free trial · Cancel anytime'
                         }
                       </p>
                     </div>
@@ -330,19 +350,14 @@ export function PricingContent() {
             </CardContent>
           </Card>
 
-          {/* Social proof section */}
-          <div className="mb-16 text-center space-y-6">
-            <p className="text-sm font-medium text-muted-foreground">
-              Join 1,300+ teams using our product.
-            </p>
-            <div className="flex items-center justify-center gap-8 sm:gap-12 flex-wrap">
-              {SOCIAL_PROOF_LOGOS.map((name) => (
-                <span
-                  key={name}
-                  className="text-sm font-semibold text-muted-foreground/60 tracking-wide"
-                >
-                  {name}
-                </span>
+          {/* Social proof section — real data, not fake logos */}
+          <div className="mb-16">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+              {SOCIAL_PROOF_STATS.map((stat) => (
+                <div key={stat.label} className="text-center">
+                  <p className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{stat.label}</p>
+                </div>
               ))}
             </div>
           </div>
@@ -430,7 +445,8 @@ export function PricingContent() {
           {/* Platform fee note */}
           <div className="text-center pb-12">
             <p className="text-sm text-muted-foreground">
-              All plans include a standard 10% platform fee on marketplace transactions.
+              All new accounts get 0% marketplace fees on their first 3 orders.
+              After that: Explorer &amp; Startup at 10%, Professional at 5%.
               No hidden fees. Cancel anytime.
             </p>
           </div>
@@ -438,7 +454,7 @@ export function PricingContent() {
 
         {/* Footer */}
         <footer className="border-t border-muted py-6 px-4 sm:px-6">
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Fractional Forge Ltd. All rights reserved.</p>
             <div className="flex items-center gap-4">
               <Link href="/terms" className="hover:text-foreground transition-colors">Terms</Link>
@@ -551,5 +567,5 @@ const COMPARISON_FEATURES = [
   { name: 'Fund performance & hardware fit', free: false, starter: false, professional: true },
   { name: 'API access', free: false, starter: false, professional: true },
   { name: 'Priority support', free: false, starter: false, professional: true },
-  { name: 'Platform fee', free: '10%', starter: '10%', professional: '10%' },
+  { name: 'Platform fee', free: '10%', starter: '10% (0% first £10K)', professional: '5%' },
 ]
