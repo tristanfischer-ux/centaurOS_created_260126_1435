@@ -197,18 +197,6 @@ function SectionHeader({
 export default function HelpCenterPage() {
   return (
     <div className="space-y-16 pb-12">
-      <SpecialistBriefingHero
-        specialistId="chief-of-staff"
-        specialistName="Cal"
-        specialistTitle="Chief of Staff"
-        narrative={null}
-        fallbackMessage="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
-        isLoading={false}
-        severity="success"
-        context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}
-        storageKey="help"
-      />
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
@@ -221,6 +209,18 @@ export default function HelpCenterPage() {
           </p>
         </div>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="chief-of-staff"
+        specialistName="Cal"
+        specialistTitle="Chief of Staff"
+        narrative={null}
+        fallbackMessage="Need help? Start with the video walkthroughs below, or ask any specialist directly — just click their avatar in the sidebar."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Help', description: 'Cal on getting help.', metadata: {} }}
+        storageKey="help"
+      />
 
       {/* Quick Start Guide */}
       <section>

@@ -156,18 +156,6 @@ export default function WhatsNewPage() {
     
     return (
         <div className="max-w-5xl space-y-6 -mt-2">
-            <SpecialistBriefingHero
-                specialistId="chief-of-staff"
-                specialistName="Cal"
-                specialistTitle="Chief of Staff"
-                narrative={null}
-                fallbackMessage="Check recent updates for features that could improve your workflow. New capabilities are released regularly."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: "What's New", description: 'Cal on recent updates.', metadata: {} }}
-                storageKey="whats-new"
-            />
-
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div className="min-w-0 flex-1">
@@ -182,6 +170,18 @@ export default function WhatsNewPage() {
                     </p>
                 </div>
             </div>
+
+            <SpecialistBriefingHero
+                specialistId="chief-of-staff"
+                specialistName="Cal"
+                specialistTitle="Chief of Staff"
+                narrative={null}
+                fallbackMessage="Check recent updates for features that could improve your workflow. New capabilities are released regularly."
+                isLoading={false}
+                severity="success"
+                context={{ type: 'general', title: "What's New", description: 'Cal on recent updates.', metadata: {} }}
+                storageKey="whats-new"
+            />
             
             {/* New Features Highlight */}
             {newFeatures.length > 0 && (

@@ -198,18 +198,6 @@ export function LearnPage({
 
   return (
     <div className="space-y-6">
-      <SpecialistBriefingHero
-        specialistId="strategist"
-        specialistName="Sage"
-        specialistTitle="Strategy"
-        narrative={null}
-        fallbackMessage="Explore manufacturing techniques, tutorials, and community Q&A. Understanding your options here helps you make better design and sourcing decisions."
-        isLoading={false}
-        severity="success"
-        context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}
-        storageKey="learn"
-      />
-
       {/* Page header */}
       <div className="pb-4 border-b border-muted">
         {/* Cascade breadcrumb */}
@@ -229,6 +217,18 @@ export function LearnPage({
           Techniques, tutorials, and expert guidance to level up your craft.
         </p>
       </div>
+
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategy"
+        narrative={null}
+        fallbackMessage="Explore manufacturing techniques, tutorials, and community Q&A. Understanding your options here helps you make better design and sourcing decisions."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Learn', description: 'Sage on learning resources.', metadata: {} }}
+        storageKey="learn"
+      />
 
       {/* Tab bar */}
       <div className="flex flex-wrap gap-2" role="tablist">

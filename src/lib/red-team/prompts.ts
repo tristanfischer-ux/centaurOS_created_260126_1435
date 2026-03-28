@@ -85,7 +85,9 @@ CRITICAL RULES:
 - "This might not work" is NOT an argument. "Support costs at 8% of revenue exceed the consumables margin by £40K/year at 200 units" IS.
 - Write 2-3 substantive paragraphs per response. This is a deep debate, not bullet points.
 - Cite real companies, published reports, and verified statistics wherever possible.
+- When citing pre-debate research, reference by number: [R1], [R2], etc. This helps the reader trace your sources.
 - If you cannot verify a claim, say so explicitly.
+- If the Founder has interjected with their own thoughts, respond directly to what they said.
 - Write in character — your personality should come through.
 `
 
@@ -173,15 +175,17 @@ Claim: "${claim}"`
 export function getSynthesisPrompt(topic: string, fullTranscript: string): string {
   return `You are writing the final synthesis of a Red Team debate about: "${topic}".
 
-You have read the full debate between five personas (Bull/Sage, Bear/Max, Realist/Finn, Disruptor/Cal, Wildcard/Fiona) across 5 rounds.
+You have read the full debate between five personas (Bull/Sage, Bear/Max, Realist/Finn, Disruptor/Cal, Wildcard/Fiona).
 
-Write TWO sections:
+Your response MUST contain exactly two clearly labelled sections:
 
-## KEY TENSIONS
+## KEY_TENSIONS_JSON
+Return a JSON array of tension objects. Each object has: dimension (string), bull (string), bear (string), realist (string), disruptor (string), wildcard (string). Include 4-6 rows showing dimensions where personas genuinely disagreed. Each value should be their specific position with a number or concrete claim.
 
-Create a markdown table with these columns: Dimension | Bull (Sage) | Bear (Max) | Realist (Finn) | Disruptor (Cal) | Wildcard (Fiona)
-
-Include 4-6 rows showing the dimensions where the personas genuinely disagreed. Each cell should contain their specific position with a number or concrete claim — not vague summaries.
+Example format:
+\`\`\`json
+[{"dimension": "Market Size", "bull": "$2.3B TAM", "bear": "Only $800M addressable", "realist": "$1.4B verified via Gartner", "disruptor": "Adjacent market 5x larger", "wildcard": "VCs want $1B+ TAM minimum"}]
+\`\`\`
 
 ## VERDICT
 
@@ -196,6 +200,15 @@ Do NOT give a simple yes/no answer. The value is in the nuance.
 Here is the full debate transcript:
 
 ${fullTranscript}`
+}
+
+export function getAdaptiveQuestionsPrompt(topic: string): string {
+  return `Given this debate topic, generate the 5 most important questions to structure a Red Team debate. Each question should focus on a different dimension (feasibility, market, business model, risks, etc.). Return as a JSON array of 5 strings.
+
+Topic: "${topic}"
+
+Return ONLY the JSON array, nothing else. Example:
+["What exactly is the proposition?", "Can it work technically?", "Who pays and how much?", "What are the unit economics?", "What kills it?"]`
 }
 
 // ─── Actions Prompts ────────────────────────────────────────────

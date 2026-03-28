@@ -39,6 +39,8 @@ export interface DebateArgument {
   content: string
   /** Time taken in ms */
   duration: number
+  /** Estimated cost in USD for this argument */
+  costUsd?: number
 }
 
 export interface FactCheck {
@@ -52,6 +54,8 @@ export interface DebateRound {
   question: string
   arguments: DebateArgument[]
   factChecks: FactCheck[]
+  /** User interjection after this round (if interactive mode) */
+  userInput?: string
 }
 
 export interface TensionRow {
@@ -87,15 +91,24 @@ export interface RedTeamDebateDocument {
   context?: string
   generatedAt: string
   personas: DebatePersona[]
+  /** Numbered evidence pack (each entry prefixed [R1], [R2], etc.) */
   evidencePack: string
+  /** Raw evidence items for tooltip rendering */
+  evidenceItems?: { label: string; content: string }[]
   rounds: DebateRound[]
   tensions: TensionRow[]
   verdict: string
+  /** Custom round questions generated from topic (null = used defaults) */
+  customQuestions?: string[]
+  /** User interjections between rounds */
+  userInputs?: Record<number, string>
   suggestedObjectives: SuggestedObjective[]
   suggestedTasks: SuggestedTask[]
   suggestedRiskMitigations: SuggestedRiskMitigation[]
   /** Total generation time in ms */
   totalDuration: number
+  /** Total estimated cost in USD */
+  totalCostUsd?: number
 }
 
 export interface RedTeamDebateResult {
@@ -112,6 +125,7 @@ export type DebatePhase =
   | "fact-check"
   | "synthesis"
   | "actions"
+  | "awaiting_input"
   | "complete"
   | "error"
 
