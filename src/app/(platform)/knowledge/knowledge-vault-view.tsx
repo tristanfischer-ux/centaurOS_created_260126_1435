@@ -72,11 +72,7 @@ import {
   batchVerifyNotes,
   batchArchiveNotes,
 } from '@/actions/knowledge'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateKnowledgeInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { KnowledgeNoteCard } from './knowledge-note-card'
 import { KnowledgeNoteDetailDialog } from './knowledge-note-detail-dialog'
 import { CreateKnowledgeNoteDialog } from './create-knowledge-note-dialog'
@@ -90,24 +86,7 @@ import type {
   VaultStats,
 } from '@/lib/knowledge-vault/types'
 
-// INTENT: Static coaching insight when vault is empty — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'sage-knowledge-empty',
-  foundry_id: '',
-  specialist_id: 'strategist',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Build your knowledge vault',
-  body: 'Build your knowledge vault with notes, decisions, and lessons learned. A strong institutional memory compounds over time.',
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
+// DECISION: SpecialistBriefingHero replaces SpecialistInsightCard on this page
 
 // ─── Note Type Icons ─────────────────────────────────────────────────
 
@@ -348,27 +327,7 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
   const hasActiveFilters = searchQuery || selectedDomain || selectedTypes.length > 0 || activeTab !== 'all' || hideStale
 
-  // Sage's proactive insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Knowledge' })
-  }, [openPanel])
-  const pinnedCount = useMemo(() => notes.filter(n => n.is_pinned).length, [notes])
-  const domainCoverage = useMemo(
-    () => domains.map((d) => ({ name: d.name, count: d.note_count })),
-    [domains],
-  )
-  const staleCount = stats?.staleCount ?? 0
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generateKnowledgeInsights({
-      noteCount: totalNotes,
-      pinnedCount: pinnedCount,
-      domainCoverage,
-      staleCount,
-    }, fast),
-    totalNotes > 0,
-    { cacheKey: 'sage-knowledge', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
+  // DECISION: Sage's guidance now handled by SpecialistBriefingHero in the render
 
   // ─── Render ──────────────────────────────────────────────────────
 
@@ -380,8 +339,8 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
 
   return (
     <div className="space-y-8">
-      {/* ── Page Header (hidden when vault is empty — onboarding has its own) ── */}
-      {!isVaultEmpty && <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-1 rounded-full bg-international-orange" />
@@ -420,22 +379,19 @@ export function KnowledgeVaultView({ foundryId, userId, userRole }: KnowledgeVau
           </Button>
         </div>
       </div>
-      }
 
-      {/* ── Sage's Proactive Insights ─────────────────────────────── */}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
+      {/* ── Sage's Guidance ─────────────────────────────── */}
+      <SpecialistBriefingHero
+        specialistId="strategist"
+        specialistName="Sage"
+        specialistTitle="Strategy"
+        narrative={null}
+        fallbackMessage="Your knowledge vault feeds into every specialist conversation. The more you add — documents, decisions, lessons — the sharper their advice becomes."
+        isLoading={false}
+        severity="success"
+        context={{ type: 'general', title: 'Knowledge', description: 'Sage on building institutional memory.', metadata: {} }}
+        storageKey="knowledge"
+      />
 
       {/* ── Empty State ──────────────────────────────────────────── */}
       {isVaultEmpty ? (

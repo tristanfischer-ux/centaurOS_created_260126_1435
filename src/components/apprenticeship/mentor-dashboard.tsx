@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,31 +22,6 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateApprenticeshipInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
-
-const MENTOR_EMPTY_INSIGHT: AgentInsight = {
-  id: 'harper-mentor-empty',
-  foundry_id: '',
-  specialist_id: 'hiring-team',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Your mentees need you',
-  body: "Review pending OTJT approvals promptly and check in with any apprentice falling behind on hours. Consistent mentorship is the biggest predictor of programme success.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
-
 interface MenteeEnrollment {
   id: string
   apprentice_id: string
@@ -86,25 +61,6 @@ interface MentorDashboardProps {
  */
 export function MentorDashboard({ mentees }: MentorDashboardProps) {
   const [approvalPanelOpen, setApprovalPanelOpen] = useState(false)
-
-  // Harper's coaching insights for mentors
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Mentor Dashboard' })
-  }, [openPanel])
-  const avgProgress = mentees.length > 0
-    ? mentees.reduce((s, m) => s + (m.otjt_hours_target > 0 ? (m.otjt_hours_logged / m.otjt_hours_target) * 100 : 0), 0) / mentees.length
-    : 0
-  const { insights: mentorInsights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    (fast) => generateApprenticeshipInsights({
-      enrollmentCount: mentees.length,
-      avgProgress,
-      onTrackCount: mentees.length, // simplified — admin dashboard has precise counts
-      atRiskCount: 0,
-    }, fast),
-    mentees.length > 0,
-    { cacheKey: 'harper-mentor', emptyInsight: MENTOR_EMPTY_INSIGHT },
-  )
 
   const { totalPendingApprovals, atRiskCount } = useMemo(() => {
     const pending = mentees.reduce((sum, m) => sum + m.pendingApprovals, 0)
@@ -158,22 +114,6 @@ export function MentorDashboard({ mentees }: MentorDashboardProps) {
             )}
           </div>
         </div>
-
-        {/* Harper's coaching insights */}
-        {insightsLoading && <InsightCardSkeleton />}
-        {mentorInsights.length > 0 && (
-          <div className="space-y-3">
-            {mentorInsights.map((insight) => (
-              <SpecialistInsightCard
-                key={insight.id}
-                insight={insight}
-                onDismiss={() => dismissInsight(insight.id)}
-                onDiscuss={handleDiscuss}
-                compact
-              />
-            ))}
-          </div>
-        )}
 
         {/* Tabs */}
         <Tabs defaultValue="mentees">

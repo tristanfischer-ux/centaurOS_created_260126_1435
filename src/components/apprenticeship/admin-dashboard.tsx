@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -21,11 +21,6 @@ import {
   ShieldCheck,
   BookOpen,
 } from 'lucide-react'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateApprenticeshipInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import type { Enrollment } from '@/types/apprenticeship'
 import type { Programme } from './programme-detail-card'
 
@@ -63,25 +58,6 @@ export interface ComplianceReport {
     }
     reviewsInPeriod: number
   }>
-}
-
-// INTENT: Static coaching insight when no apprentices enrolled yet — no API call needed
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'harper-apprenticeship-empty',
-  foundry_id: '',
-  specialist_id: 'hiring-team',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Track apprenticeship progress',
-  body: "Track apprenticeship progress, OTJT hours, and skills development. I'll help you stay on track with your programme goals.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
 }
 
 interface AdminDashboardProps {
@@ -142,22 +118,6 @@ export function AdminDashboard({
     }
   }, [enrollments])
 
-  // Harper's proactive insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Apprenticeship' })
-  }, [openPanel])
-  const { insights, dismissInsight } = usePageInsights(
-    (fast) => generateApprenticeshipInsights({
-      enrollmentCount: totalEnrollments,
-      avgProgress: avgProgress,
-      onTrackCount: totalEnrollments - atRiskCount,
-      atRiskCount: atRiskCount,
-    }, fast),
-    totalEnrollments > 0,
-    { cacheKey: 'harper-apprenticeship', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -178,21 +138,6 @@ export function AdminDashboard({
           Enroll New Apprentice
         </Button>
       </div>
-
-      {/* Harper's proactive insights */}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
 
       {/* Tabs */}
       <Tabs defaultValue="overview">

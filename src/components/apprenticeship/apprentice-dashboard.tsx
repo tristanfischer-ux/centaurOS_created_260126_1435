@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,31 +20,7 @@ import { WeeklyFocus } from './weekly-focus'
 import { JourneyTimeline } from './journey-timeline'
 import { ModuleProgressList } from './module-progress-list'
 import { SkillsGapChart } from './skills-gap-chart'
-import { SpecialistInsightCard } from '@/components/specialists/specialist-insight-card'
-import { InsightCardSkeleton } from '@/components/specialists/insight-card-skeleton'
-import { usePageInsights } from '@/hooks/use-page-insights'
-import { useAdvisorPanel } from '@/contexts/advisor-panel-context'
-import { generateApprenticeshipInsights } from '@/actions/specialist-page-insights'
-import type { AgentInsight } from '@/actions/agent-insights'
 import type { Enrollment, WeeklySummary } from '@/types/apprenticeship'
-
-const EMPTY_STATE_INSIGHT: AgentInsight = {
-  id: 'harper-apprentice-empty',
-  foundry_id: '',
-  specialist_id: 'hiring-team',
-  insight_type: 'recommendation',
-  urgency: 'informational',
-  title: 'Welcome to your apprenticeship',
-  body: "I'm Harper, your HR lead. Start by logging your first OTJT hours and reviewing your module plan. I'll track your progress and flag when you're falling behind.",
-  domain_data: {},
-  suggested_actions: [],
-  is_read: false,
-  is_dismissed: false,
-  acted_on: false,
-  acted_on_at: null,
-  created_at: new Date().toISOString(),
-  expires_at: null,
-}
 
 interface ApprenticeDashboardProps {
   enrollment: Enrollment
@@ -116,23 +92,6 @@ export function ApprenticeDashboard({
   const [otjtLoggerOpen, setOtjtLoggerOpen] = useState(false)
   const [documentsOpen, setDocumentsOpen] = useState(false)
 
-  // Harper's coaching insights
-  const { openPanel } = useAdvisorPanel()
-  const handleDiscuss = useCallback((specialistId: string, context: string) => {
-    openPanel(specialistId, { handoffContext: context, contextLabel: 'Apprenticeship' })
-  }, [openPanel])
-  const completedModules = moduleProgress.modules.filter(m => m.status === 'completed').length
-  const { insights, dismissInsight, isLoading: insightsLoading } = usePageInsights(
-    (fast) => generateApprenticeshipInsights({
-      enrollmentCount: 1,
-      avgProgress: otjtProgress.progressPercent,
-      onTrackCount: otjtProgress.onTrack ? 1 : 0,
-      atRiskCount: otjtProgress.onTrack ? 0 : 1,
-    }, fast),
-    completedModules > 0 || otjtProgress.hoursLogged > 0,
-    { cacheKey: 'harper-apprentice-self', emptyInsight: EMPTY_STATE_INSIGHT },
-  )
-
   const daysRemaining = Math.ceil(
     (new Date(enrollment.expected_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
@@ -171,22 +130,6 @@ export function ApprenticeDashboard({
           </Button>
         </div>
       </div>
-
-      {/* Harper's coaching insights */}
-      {insightsLoading && <InsightCardSkeleton />}
-      {insights.length > 0 && (
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <SpecialistInsightCard
-              key={insight.id}
-              insight={insight}
-              onDismiss={() => dismissInsight(insight.id)}
-              onDiscuss={handleDiscuss}
-              compact
-            />
-          ))}
-        </div>
-      )}
 
       {/* Tabbed Content */}
       <Tabs defaultValue="this-week">
