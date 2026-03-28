@@ -67,6 +67,7 @@ import {
     Sprout,
     ScrollText,
     Clock,
+    Swords,
 } from "lucide-react"
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
@@ -127,6 +128,7 @@ const planNavigation = [
     { name: "Objectives", href: "/new-objectives", icon: Target, tooltip: "Milestones that move the strategy forward" },
     { name: "Tasks", href: "/new-tasks", icon: CheckSquare, tooltip: "Day-to-day work that delivers on objectives" },
     { name: "Reports", href: "/reports", icon: FileOutput, tooltip: "Generate polished weekly updates and board packs from your live data" },
+    { name: "Red Team", href: "/red-team", icon: Swords, tooltip: "Stress-test decisions with multi-LLM adversarial debate" },
 ]
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -492,20 +494,34 @@ export function Sidebar({ foundryName, foundryId, foundryLogoUrl, foundryIsSandb
 
             {/* Footer — Compact: Settings + Sign Out row, then status bars */}
             <div className="p-3 mt-auto space-y-2 border-t border-border">
-                {/* Settings + Sign Out on one row */}
+                {/* Pricing + Settings + Sign Out on one row */}
                 <div className="flex items-center justify-between">
-                    <Link
-                        href="/settings"
-                        className={cn(
-                            isRouteActive(pathname, "/settings")
-                                ? "text-international-orange font-semibold"
-                                : "text-muted-foreground hover:text-foreground",
-                            "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors rounded-md"
-                        )}
-                    >
-                        <Settings className="h-3.5 w-3.5" />
-                        Settings
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/pricing"
+                            className={cn(
+                                isRouteActive(pathname, "/pricing")
+                                    ? "text-international-orange font-semibold"
+                                    : "text-muted-foreground hover:text-foreground",
+                                "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors rounded-md"
+                            )}
+                        >
+                            <PoundSterling className="h-3.5 w-3.5" />
+                            Pricing
+                        </Link>
+                        <Link
+                            href="/settings"
+                            className={cn(
+                                isRouteActive(pathname, "/settings")
+                                    ? "text-international-orange font-semibold"
+                                    : "text-muted-foreground hover:text-foreground",
+                                "flex items-center gap-1.5 px-2 py-1 text-xs transition-colors rounded-md"
+                            )}
+                        >
+                            <Settings className="h-3.5 w-3.5" />
+                            Settings
+                        </Link>
+                    </div>
                     <form action={signOut}>
                         <button
                             type="submit"
