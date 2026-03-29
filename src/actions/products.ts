@@ -45,6 +45,16 @@ function cadLabTable(supabase: any) {
   return (supabase as any).from('cad_lab_projects')
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function cashInTable(supabase: any) {
+  return (supabase as any).from('cash_in_items')
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function cashOutTable(supabase: any) {
+  return (supabase as any).from('cash_out_items')
+}
+
 // ─── getProducts ────────────────────────────────────────────────────
 
 /**
@@ -267,6 +277,115 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
     if (error) return { error: error.message }
 
     return { data: data as Product }
+  })
+}
+
+// ─── syncProductFinancials ───────────────────────────────────────────
+
+/**
+ * Syncs product pricing/volume into Cash Burn items.
+ *
+ * @description Creates or updates a revenue cash-in item and a COGS
+ * cash-out item for the product based on unit_price_pence,
+ * target_monthly_units, and unit_economics.cogs_per_unit_pence.
+ * Existing product-linked items are found by matching product_id.
+ *
+ * @param productId - UUID of the product to sync financials for
+ * @returns Success indicator
+ */
+export async function syncProductFinancials(
+  productId: string
+): Promise<ActionResult<{ success: true }>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') {
+      return { error: 'Invalid product ID' }
+    }
+
+    // FLOW: Fetch the product to get pricing and cost data
+    const { data: product, error: productError } = await productsTable(supabase)
+      .select('id, name, unit_price_pence, target_monthly_units, unit_economics')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (productError || !product) return { error: 'Product not found' }
+
+    // INTENT: Both fields required to compute financials
+    if (product.unit_price_pence == null || product.target_monthly_units == null) {
+      return { error: 'Set unit price and target monthly units first' }
+    }
+
+    const unitPrice = Number(product.unit_price_pence)
+    const monthlyUnits = Number(product.target_monthly_units)
+    const monthlyRevenue = unitPrice * monthlyUnits
+    const today = new Date().toISOString().split('T')[0]
+    const productName = product.name || 'Untitled Product'
+
+    // ── Upsert Revenue (Cash In) item ──────────────────────────────
+
+    const { data: existingIn } = await cashInTable(supabase)
+      .select('id')
+      .eq('foundry_id', foundryId)
+      .eq('product_id', productId)
+      .eq('source_type', 'revenue')
+      .limit(1)
+      .maybeSingle()
+
+    if (existingIn?.id) {
+      await cashInTable(supabase)
+        .update({ name: `${productName} Revenue`, amount: monthlyRevenue, frequency: 'monthly' })
+        .eq('id', existingIn.id)
+    } else {
+      await cashInTable(supabase)
+        .insert({
+          foundry_id: foundryId,
+          name: `${productName} Revenue`,
+          source_type: 'revenue',
+          amount: monthlyRevenue,
+          frequency: 'monthly',
+          probability_pct: 100,
+          effective_from: today,
+          product_id: productId,
+        })
+    }
+
+    // ── Upsert COGS (Cash Out) item ────────────────────────────────
+
+    const ue = product.unit_economics as UnitEconomics | null
+    const cogsPerUnit = ue?.cogs_per_unit_pence ?? 0
+
+    if (cogsPerUnit > 0) {
+      const monthlyCogs = cogsPerUnit * monthlyUnits
+
+      const { data: existingOut } = await cashOutTable(supabase)
+        .select('id')
+        .eq('foundry_id', foundryId)
+        .eq('product_id', productId)
+        .eq('pnl_category', 'cogs')
+        .limit(1)
+        .maybeSingle()
+
+      if (existingOut?.id) {
+        await cashOutTable(supabase)
+          .update({ name: `${productName} COGS`, amount: monthlyCogs, frequency: 'monthly' })
+          .eq('id', existingOut.id)
+      } else {
+        await cashOutTable(supabase)
+          .insert({
+            foundry_id: foundryId,
+            name: `${productName} COGS`,
+            category: 'manufacturing',
+            cost_type: 'variable',
+            pnl_category: 'cogs',
+            amount: monthlyCogs,
+            frequency: 'monthly',
+            effective_from: today,
+            product_id: productId,
+          })
+      }
+    }
+
+    return { data: { success: true as const } }
   })
 }
 

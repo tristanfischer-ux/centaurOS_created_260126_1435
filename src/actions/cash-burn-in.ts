@@ -77,6 +77,7 @@ export async function createCashInItem(
         effective_from: input.effective_from,
         effective_to: input.effective_to ?? null,
         notes: input.notes ?? null,
+        product_id: input.product_id ?? null,
       })
       .select()
       .single()
@@ -117,6 +118,7 @@ export async function updateCashInItem(
     if (input.effective_from !== undefined) updates.effective_from = input.effective_from
     if (input.effective_to !== undefined) updates.effective_to = input.effective_to || null
     if (input.notes !== undefined) updates.notes = input.notes || null
+    if (input.product_id !== undefined) updates.product_id = input.product_id || null
 
     const { data, error } = await supabase
       .from('cash_in_items')
@@ -196,6 +198,7 @@ function mapCashInItem(row: any): CashInItem {
     effectiveFrom: row.effective_from,
     effectiveTo: row.effective_to,
     notes: row.notes,
+    productId: row.product_id ?? null,
     sortOrder: row.sort_order ?? 0,
     isActive: row.is_active,
     weeklyAmount,

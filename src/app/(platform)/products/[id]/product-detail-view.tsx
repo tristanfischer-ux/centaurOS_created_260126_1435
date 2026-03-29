@@ -20,11 +20,14 @@ import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { updateProduct, deleteProduct } from '@/actions/products'
+import { updateProduct, deleteProduct, syncProductFinancials } from '@/actions/products'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { typography } from '@/lib/design-system'
+import { formatCurrency } from '@/types/payments'
 import { toast } from 'sonner'
 import {
   Package,
@@ -56,7 +59,7 @@ const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'suc
 const TABS = [
   { id: 'overview', label: 'Overview', enabled: true },
   { id: 'market', label: 'Market', enabled: false },
-  { id: 'economics', label: 'Economics', enabled: false },
+  { id: 'economics', label: 'Economics', enabled: true },
   { id: 'financials', label: 'Financials', enabled: false },
   { id: 'fundability', label: 'Fundability', enabled: false },
   { id: 'history', label: 'History', enabled: false },
@@ -84,6 +87,10 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   const [editDescription, setEditDescription] = React.useState(product.description || '')
   const [isSaving, setIsSaving] = React.useState(false)
   const [isDeleting, setIsDeleting] = React.useState(false)
+
+  // ── Economics tab state ────────────────────────────────────────
+  const [priceInput, setPriceInput] = React.useState(product.unit_price_pence ? String(product.unit_price_pence / 100) : '')
+  const [volumeInput, setVolumeInput] = React.useState(product.target_monthly_units ? String(product.target_monthly_units) : '')
 
   // ── AI Briefing ──────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
@@ -146,6 +153,39 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       setIsDeleting(false)
     }
   }, [product.id, router])
+
+  const handleSavePricing = React.useCallback(async () => {
+    const price = parseFloat(priceInput)
+    const volume = parseInt(volumeInput)
+    if (isNaN(price) || price <= 0 || isNaN(volume) || volume <= 0) {
+      toast.error('Enter a valid price and volume')
+      return
+    }
+    setIsSaving(true)
+    try {
+      const result = await updateProduct(product.id, {
+        unit_price_pence: Math.round(price * 100),
+        target_monthly_units: volume,
+      })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (result.data) setProduct(result.data)
+
+      // INTENT: Auto-create/update Cash Burn items from product pricing
+      const syncResult = await syncProductFinancials(product.id)
+      if (syncResult.error) {
+        toast.error(`Saved pricing, but sync failed: ${syncResult.error}`)
+      } else {
+        toast.success('Pricing saved & synced to Cash Burn')
+      }
+    } catch {
+      toast.error('Failed to save pricing')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [product.id, priceInput, volumeInput])
 
   const lifecycleIndex = LIFECYCLE_ORDER.indexOf(product.lifecycle)
 
@@ -478,6 +518,114 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </CardContent>
             </Card>
           </div>
+        </div>
+      )}
+
+      {/* Tab content: Economics */}
+      {activeTab === 'economics' && (
+        <div className="space-y-6">
+          {/* Price & Volume */}
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Pricing & Volume</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="unit-price">Unit Price (&pound;)</Label>
+                  <Input
+                    id="unit-price"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={priceInput}
+                    onChange={(e) => setPriceInput(e.target.value)}
+                    placeholder="e.g. 49.99"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="target-volume">Target Monthly Units</Label>
+                  <Input
+                    id="target-volume"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={volumeInput}
+                    onChange={(e) => setVolumeInput(e.target.value)}
+                    placeholder="e.g. 100"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleSavePricing} disabled={isSaving}>
+                {isSaving ? 'Saving...' : 'Save & Sync to Cash Burn'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Volume Sensitivity */}
+          <Card>
+            <CardContent className="pt-6">
+              <h3 className="text-sm font-semibold text-foreground mb-4">Volume Sensitivity</h3>
+              {(() => {
+                const unitPrice = product.unit_price_pence ?? 0
+                const cogsPerUnit = product.unit_economics?.cogs_per_unit_pence ?? 0
+                const targetUnits = product.target_monthly_units ?? 0
+
+                if (!unitPrice || !targetUnits) {
+                  return (
+                    <p className="text-sm text-muted-foreground">
+                      Set unit price and target monthly units above to see volume sensitivity.
+                    </p>
+                  )
+                }
+
+                const scenarios = [
+                  { label: '50% volume', multiplier: 0.5 },
+                  { label: '100% volume (target)', multiplier: 1 },
+                  { label: '200% volume', multiplier: 2 },
+                ]
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Scenario</th>
+                          <th className="text-right py-2 px-4 font-medium text-muted-foreground">Units</th>
+                          <th className="text-right py-2 px-4 font-medium text-muted-foreground">Monthly Revenue</th>
+                          <th className="text-right py-2 px-4 font-medium text-muted-foreground">Monthly COGS</th>
+                          <th className="text-right py-2 px-4 font-medium text-muted-foreground">Monthly Gross Profit</th>
+                          <th className="text-right py-2 pl-4 font-medium text-muted-foreground">Annual Gross Profit</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scenarios.map((s) => {
+                          const units = Math.round(targetUnits * s.multiplier)
+                          const revenue = unitPrice * units
+                          const cogs = cogsPerUnit * units
+                          const grossProfit = revenue - cogs
+                          const annualGross = grossProfit * 12
+
+                          return (
+                            <tr key={s.label} className="border-b border-border last:border-0">
+                              <td className="py-2 pr-4 font-medium text-foreground">{s.label}</td>
+                              <td className="text-right py-2 px-4 text-foreground">{units.toLocaleString()}</td>
+                              <td className="text-right py-2 px-4 text-foreground">{formatCurrency(revenue / 100)}</td>
+                              <td className="text-right py-2 px-4 text-foreground">{formatCurrency(cogs / 100)}</td>
+                              <td className={`text-right py-2 px-4 font-medium ${grossProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {formatCurrency(grossProfit / 100)}
+                              </td>
+                              <td className={`text-right py-2 pl-4 font-medium ${annualGross >= 0 ? 'text-success' : 'text-destructive'}`}>
+                                {formatCurrency(annualGross / 100)}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

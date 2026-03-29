@@ -18,6 +18,8 @@ import type {
   CreateCashOutInput,
   CreateCashInInput,
 } from '@/types/cash-burn'
+import { getProducts } from '@/actions/products'
+import type { ProductSummary } from '@/types/product'
 
 // ============================================================
 // Category / Source options
@@ -96,6 +98,17 @@ export function ItemDialog({
   defaultCostType,
   onSave,
 }: ItemDialogProps) {
+  // Product link
+  const [productId, setProductId] = useState<string>('')
+  const [products, setProducts] = useState<ProductSummary[]>([])
+
+  // Fetch products on mount
+  useEffect(() => {
+    getProducts().then((result) => {
+      if (result.data) setProducts(result.data)
+    })
+  }, [])
+
   // Shared fields
   const [name, setName] = useState('')
   const [amountPounds, setAmountPounds] = useState('')
@@ -126,6 +139,7 @@ export function ItemDialog({
   useEffect(() => {
     if (open) {
       userChangedCategoryRef.current = false
+      setProductId(initialData?.product_id ?? '')
       setName(initialData?.name ?? '')
       // INTENT: initialData.amount is in pence — convert to pounds for display
       setAmountPounds(initialData?.amount != null ? String(initialData.amount / 100) : '')
@@ -196,6 +210,7 @@ export function ItemDialog({
         ...(pnlCategory && { pnl_category: pnlCategory as PnlCategory }),
         ...(effectiveTo && { effective_to: effectiveTo }),
         ...(notes && { notes }),
+        ...(productId && { product_id: productId }),
       }
       onSave(data)
     } else {
@@ -208,6 +223,7 @@ export function ItemDialog({
         effective_from: effectiveFrom,
         ...(effectiveTo && { effective_to: effectiveTo }),
         ...(notes && { notes }),
+        ...(productId && { product_id: productId }),
       }
       onSave(data)
     }
@@ -242,6 +258,26 @@ export function ItemDialog({
               className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+
+          {/* Product link */}
+          {products.length > 0 && (
+            <div className="space-y-1.5">
+              <label htmlFor="item-product" className="text-sm font-medium text-foreground">
+                Product <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <select
+                id="item-product"
+                value={productId}
+                onChange={(e) => setProductId(e.target.value)}
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">No product</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Mode-specific fields */}
           {mode === 'cash-out' ? (

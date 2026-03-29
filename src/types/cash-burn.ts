@@ -39,6 +39,7 @@ export interface CashOutItem {
   effectiveFrom: string
   effectiveTo: string | null
   notes: string | null
+  productId: string | null
   sortOrder: number
   isActive: boolean
   weeklyAmount: number // computed
@@ -55,6 +56,7 @@ export interface CashInItem {
   effectiveFrom: string
   effectiveTo: string | null
   notes: string | null
+  productId: string | null
   sortOrder: number
   isActive: boolean
   weeklyAmount: number // computed
@@ -148,6 +150,7 @@ export interface CreateCashOutInput {
   effective_from: string
   effective_to?: string
   notes?: string
+  product_id?: string
 }
 
 export interface CreateCashInInput {
@@ -159,6 +162,7 @@ export interface CreateCashInInput {
   effective_from: string
   effective_to?: string
   notes?: string
+  product_id?: string
 }
 
 export interface CreateScenarioInput {
