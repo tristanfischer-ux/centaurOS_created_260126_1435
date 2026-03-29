@@ -83,6 +83,8 @@ export type AIFeature =
   | 'enrichment'
   | 'weekly_report'
   | 'ai_worker'
+  // Product intelligence
+  | 'market_assessment'
   // Page-level specialist insights
   | 'page_insights'
   // System

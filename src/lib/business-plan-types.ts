@@ -54,16 +54,26 @@ export const fundingRequirementSchema = z.object({
   linkedObjectiveTitles: z.array(z.string()).default([]),
 })
 
+export const analyzedProductSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().default(''),
+  targetMarket: z.string().optional(),
+  revenueModel: z.string().optional(),
+  suggestedPrice: z.number().optional(),
+})
+
 export const businessPlanAnalysisSchema = z.object({
   objectives: z.array(analyzedObjectiveSchema).default([]),
   hiringRequirements: z.array(hiringRequirementSchema).default([]),
   capacityRequirements: z.array(capacityRequirementSchema).default([]),
   fundingRequirements: z.array(fundingRequirementSchema).default([]),
+  products: z.array(analyzedProductSchema).default([]),
   executiveSummary: z.string().default(''),
 })
 
 export type AnalyzedTask = z.infer<typeof analyzedTaskSchema>
 export type AnalyzedObjective = z.infer<typeof analyzedObjectiveSchema>
+export type AnalyzedProduct = z.infer<typeof analyzedProductSchema>
 export type HiringRequirement = z.infer<typeof hiringRequirementSchema>
 export type CapacityRequirement = z.infer<typeof capacityRequirementSchema>
 export type FundingRequirement = z.infer<typeof fundingRequirementSchema>

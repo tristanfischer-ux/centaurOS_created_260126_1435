@@ -31,6 +31,7 @@ import { typography } from "@/lib/design-system"
 import { cn } from "@/lib/utils"
 import { FORGE_ROUTES, cadLabProjectUrl } from "@/lib/forge-routes"
 import { listCadLabProjects } from "@/actions/cad-lab-projects"
+import { getProducts } from "@/actions/products"
 import { PageTour } from "@/components/guidance/page-tour"
 import { RecentProjectsGrid } from "./recent-projects-grid"
 import { ForgeScreenContext } from "./forge-screen-context"
@@ -99,10 +100,21 @@ const STARTING_PATHS: StartingPath[] = [
  * with a starting-path card, a destination callout, and a grid of recent projects.
  */
 export async function ForgeProjectList(): Promise<React.ReactNode> {
-  const cadLabResult = await listCadLabProjects()
+  const [cadLabResult, productsResult] = await Promise.all([
+    listCadLabProjects(),
+    getProducts(),
+  ])
 
   const hasLoadError = "error" in cadLabResult
   const projects: CadLabProjectSummary[] = "projects" in cadLabResult ? cadLabResult.projects : []
+
+  // INTENT: Determine which CAD projects are already linked to products
+  // so the "Promote to Product" button is hidden for them.
+  const linkedProductProjectIds: string[] = productsResult.data
+    ? productsResult.data
+        .map(p => p.cad_lab_project_id)
+        .filter((id): id is string => id != null)
+    : []
 
   // Find the most recently updated in-progress project for "Continue" card
   // projects is pre-sorted by updated_at DESC from the server, but we sort
@@ -147,7 +159,7 @@ export async function ForgeProjectList(): Promise<React.ReactNode> {
             </div>
           </div>
         ) : (
-          <RecentProjectsGrid projects={projects} />
+          <RecentProjectsGrid projects={projects} linkedProductProjectIds={linkedProductProjectIds} />
         )}
       </div>
 

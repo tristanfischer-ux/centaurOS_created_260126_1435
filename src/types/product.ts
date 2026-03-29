@@ -171,4 +171,5 @@ export interface UpdateProductInput {
   unit_price_pence?: number | null
   target_monthly_units?: number | null
   hero_image_url?: string | null
+  market_assessment?: MarketAssessment | null
 }

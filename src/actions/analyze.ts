@@ -6,6 +6,7 @@ import { z } from 'zod'
 import {
   businessPlanAnalysisSchema,
   analyzedObjectiveSchema,
+  analyzedProductSchema,
   hiringRequirementSchema,
   capacityRequirementSchema,
   fundingRequirementSchema,
@@ -74,6 +75,20 @@ For each funding event:
 
 Return ONLY a raw JSON array (no markdown, no code fences):
 [{ "title": "...", "amountUsd": 0, "reason": "...", "neededByDate": "...", "fundingType": "...", "linkedObjectiveTitles": [...] }]`
+
+const PRODUCTS_PROMPT = `You are an expert product strategist. Extract all products and services mentioned in the business plan.
+
+For each product/service:
+- name: the product or service name
+- description: what it does or delivers
+- targetMarket: who it's for (if mentioned)
+- revenueModel: how it generates revenue (e.g. "one-time purchase", "SaaS subscription", "per-unit sale")
+- suggestedPrice: approximate price in GBP if mentioned or inferable (number, omit if unknown)
+
+Return ONLY a raw JSON array (no markdown, no code fences):
+[{ "name": "...", "description": "...", "targetMarket": "...", "revenueModel": "...", "suggestedPrice": 0 }]
+
+If no products or services are identifiable, return an empty array: []`
 
 const SUMMARY_PROMPT = `You are an expert business consultant. Write a 2-3 sentence plain-language executive summary of the business plan.
 
@@ -188,20 +203,22 @@ export async function analyzeBusinessPlan(
       const Anthropic = (await import('@anthropic-ai/sdk')).default
       const client = new Anthropic({ apiKey })
 
-      // DECISION: Run all 5 section extractions in parallel using Sonnet.
+      // DECISION: Run all 6 section extractions in parallel using Sonnet.
       // Each section is independent — no cross-section coherence needed.
-      // Total wall time = max(all 5) ≈ 10-20s instead of 30-60s for one Opus call.
+      // Total wall time = max(all 6) ≈ 10-20s instead of 30-60s for one Opus call.
       const [
         objectivesRaw,
         hiringRaw,
         capacityRaw,
         fundingRaw,
+        productsRaw,
         summaryRaw,
       ] = await Promise.all([
         extractSection(client, truncatedText, OBJECTIVES_PROMPT),
         extractSection(client, truncatedText, HIRING_PROMPT),
         extractSection(client, truncatedText, CAPACITY_PROMPT),
         extractSection(client, truncatedText, FUNDING_PROMPT),
+        extractSection(client, truncatedText, PRODUCTS_PROMPT),
         extractSection(client, truncatedText, SUMMARY_PROMPT),
       ])
 
@@ -223,6 +240,10 @@ export async function analyzeBusinessPlan(
           JSON.parse(fundingRaw),
         )
 
+        const productsParsed = z.array(analyzedProductSchema).default([]).parse(
+          JSON.parse(productsRaw),
+        )
+
         // Summary is plain text, not JSON
         const executiveSummary = summaryRaw.trim()
 
@@ -232,6 +253,7 @@ export async function analyzeBusinessPlan(
           hiringRequirements: hiringParsed,
           capacityRequirements: capacityParsed,
           fundingRequirements: fundingParsed,
+          products: productsParsed,
           executiveSummary,
         }
 

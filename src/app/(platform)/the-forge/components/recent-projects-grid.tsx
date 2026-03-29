@@ -12,6 +12,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { formatDistanceToNow } from "date-fns"
 import { Search, Clock, Flame } from "lucide-react"
+import { PromoteToProductButton } from "./promote-to-product-button"
 
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -28,11 +29,18 @@ const STAGE_CONFIG: Record<string, { label: string; variant: "default" | "second
   complete: { label: "Complete", variant: "success" },
 }
 
+// INTENT: Stages past 'researched' are eligible for promotion to product
+const PROMOTABLE_STAGES = new Set(['interface_ready', 'generated', 'complete'])
+
 export function RecentProjectsGrid({
   projects,
+  linkedProductProjectIds = [],
 }: {
   projects: CadLabProjectSummary[]
+  /** CAD Lab project IDs that are already linked to a product */
+  linkedProductProjectIds?: string[]
 }): React.ReactNode {
+  const linkedSet = useMemo(() => new Set(linkedProductProjectIds), [linkedProductProjectIds])
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredProjects = useMemo(() => {
@@ -82,7 +90,11 @@ export function RecentProjectsGrid({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
-            <CadLabProjectCard key={project.id} project={project} />
+            <CadLabProjectCard
+              key={project.id}
+              project={project}
+              canPromote={PROMOTABLE_STAGES.has(project.status) && !linkedSet.has(project.id)}
+            />
           ))}
         </div>
       )}
@@ -98,7 +110,7 @@ const PIPELINE_PROGRESS: Record<string, number> = {
   complete: 5,
 }
 
-function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): React.ReactNode {
+function CadLabProjectCard({ project, canPromote }: { project: CadLabProjectSummary; canPromote?: boolean }): React.ReactNode {
   const stageConfig = STAGE_CONFIG[project.status] ?? STAGE_CONFIG.draft
   const displayName = project.subject || project.name || "Untitled Project"
   const progress = PIPELINE_PROGRESS[project.status] ?? 0
@@ -154,6 +166,12 @@ function CadLabProjectCard({ project }: { project: CadLabProjectSummary }): Reac
             </div>
             <span className="text-xs text-muted-foreground tabular-nums">{progress}/5</span>
           </div>
+          {/* Promote to Product button — only for eligible projects */}
+          {canPromote && (
+            <div className="pt-1">
+              <PromoteToProductButton projectId={project.id} />
+            </div>
+          )}
         </CardContent>
       </Card>
     </Link>

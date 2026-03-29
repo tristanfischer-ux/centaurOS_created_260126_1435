@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { updateProduct, deleteProduct, syncProductFinancials } from '@/actions/products'
+import { updateProduct, deleteProduct, syncProductFinancials, generateMarketAssessment, scoreFundability } from '@/actions/products'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,8 +38,16 @@ import {
   ExternalLink,
   Check,
   Lock,
+  Loader2,
+  Plus,
+  X,
+  AlertTriangle,
+  Search,
+  TrendingUp,
+  Lightbulb,
+  Target,
 } from 'lucide-react'
-import type { Product, ProductLifecycle } from '@/types/product'
+import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore } from '@/types/product'
 import { LIFECYCLE_LABELS, LIFECYCLE_ORDER } from '@/types/product'
 
 // ─── Lifecycle styling ──────────────────────────────────────────────
@@ -58,10 +66,10 @@ const LIFECYCLE_VARIANT: Record<ProductLifecycle, 'default' | 'secondary' | 'suc
 
 const TABS = [
   { id: 'overview', label: 'Overview', enabled: true },
-  { id: 'market', label: 'Market', enabled: false },
+  { id: 'market', label: 'Market', enabled: true },
   { id: 'economics', label: 'Economics', enabled: true },
   { id: 'financials', label: 'Financials', enabled: false },
-  { id: 'fundability', label: 'Fundability', enabled: false },
+  { id: 'fundability', label: 'Fundability', enabled: true },
   { id: 'history', label: 'History', enabled: false },
 ] as const
 
@@ -91,6 +99,15 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   // ── Economics tab state ────────────────────────────────────────
   const [priceInput, setPriceInput] = React.useState(product.unit_price_pence ? String(product.unit_price_pence / 100) : '')
   const [volumeInput, setVolumeInput] = React.useState(product.target_monthly_units ? String(product.target_monthly_units) : '')
+
+  // ── Fundability tab state ────────────────────────────────────────
+  const [isScoring, setIsScoring] = React.useState(false)
+  const [fundability, setFundability] = React.useState<FundabilityScore | null>(product.fundability_score)
+
+  // ── Market tab state ─────────────────────────────────────────────
+  const [isAssessing, setIsAssessing] = React.useState(false)
+  const [marketDraft, setMarketDraft] = React.useState<MarketAssessment | null>(product.market_assessment)
+  const [isSavingMarket, setIsSavingMarket] = React.useState(false)
 
   // ── AI Briefing ──────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
@@ -186,6 +203,84 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       setIsSaving(false)
     }
   }, [product.id, priceInput, volumeInput])
+
+  // ── Fundability tab handler ──────────────────────────────────────
+  const handleScoreFundability = React.useCallback(async () => {
+    setIsScoring(true)
+    try {
+      const result = await scoreFundability(product.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setFundability(result.data)
+        toast.success('Fundability score computed')
+      }
+    } catch {
+      toast.error('Failed to compute fundability score')
+    } finally {
+      setIsScoring(false)
+    }
+  }, [product.id])
+
+  // ── Market tab handlers ───────────────────────────────────────────
+
+  const handleAssessMarket = React.useCallback(async () => {
+    setIsAssessing(true)
+    try {
+      const result = await generateMarketAssessment(product.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setMarketDraft(result.data)
+        // INTENT: Re-fetch product to pick up lifecycle change (concept -> researching)
+        const refreshed = await import('@/actions/products').then(m => m.getProduct(product.id))
+        if (refreshed.data) setProduct(refreshed.data)
+        toast.success('Market assessment generated — review and validate the findings')
+      }
+    } catch {
+      toast.error('Failed to generate market assessment')
+    } finally {
+      setIsAssessing(false)
+    }
+  }, [product.id])
+
+  const handleSaveAssessment = React.useCallback(async () => {
+    if (!marketDraft) return
+    setIsSavingMarket(true)
+    try {
+      const result = await updateProduct(product.id, { market_assessment: marketDraft })
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setProduct(result.data)
+        toast.success('Market assessment saved')
+      }
+    } catch {
+      toast.error('Failed to save assessment')
+    } finally {
+      setIsSavingMarket(false)
+    }
+  }, [product.id, marketDraft])
+
+  /**
+   * Updates a specific field in the market draft and marks it as founder_validated.
+   */
+  const updateMarketField = React.useCallback(<K extends keyof MarketAssessment>(
+    field: K,
+    value: MarketAssessment[K],
+  ) => {
+    setMarketDraft(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        [field]: value,
+        validation_status: {
+          ...prev.validation_status,
+          [field]: 'founder_validated' as const,
+        },
+      }
+    })
+  }, [])
 
   const lifecycleIndex = LIFECYCLE_ORDER.indexOf(product.lifecycle)
 
@@ -521,6 +616,574 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         </div>
       )}
 
+      {/* Tab content: Market */}
+      {activeTab === 'market' && (
+        <div className="space-y-6">
+          {/* Header with action button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Market Assessment</h2>
+              <p className="text-sm text-muted-foreground">
+                Research-backed market data for you to validate and refine.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              {marketDraft && (
+                <Button
+                  onClick={handleSaveAssessment}
+                  disabled={isSavingMarket}
+                  variant="default"
+                >
+                  {isSavingMarket ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Assessment'
+                  )}
+                </Button>
+              )}
+              <Button
+                onClick={handleAssessMarket}
+                disabled={isAssessing}
+                variant={marketDraft ? 'secondary' : 'default'}
+              >
+                {isAssessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-1" />
+                    {marketDraft ? 'Re-assess Market' : 'Assess Market'}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Staleness warning */}
+          {marketDraft?.assessed_at && product.updated_at && (
+            new Date(product.updated_at) > new Date(marketDraft.assessed_at)
+          ) && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-warning/10 border border-warning/20">
+              <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+              <p className="text-sm text-warning">
+                Product details have changed since this assessment was generated. Consider re-assessing.
+              </p>
+            </div>
+          )}
+
+          {!marketDraft ? (
+            <Card>
+              <CardContent className="py-12">
+                <div className="flex flex-col items-center text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                    <Search className="h-6 w-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm font-medium text-foreground mb-1">No market assessment yet</p>
+                  <p className="text-sm text-muted-foreground max-w-sm">
+                    Click &quot;Assess Market&quot; to generate research on market size, competitors, pricing, and opportunities for Priya to present.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* TAM / SAM / SOM Card */}
+              <Card>
+                <CardHeader>
+                  <h3 className={typography.h3}>Market Size (TAM / SAM / SOM)</h3>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4">
+                    {(['tam_gbp', 'sam_gbp', 'som_gbp'] as const).map((field) => {
+                      const labels = { tam_gbp: 'TAM', sam_gbp: 'SAM', som_gbp: 'SOM' }
+                      const descriptions = {
+                        tam_gbp: 'Total Addressable Market',
+                        sam_gbp: 'Serviceable Addressable Market',
+                        som_gbp: 'Serviceable Obtainable Market',
+                      }
+                      const status = marketDraft.validation_status[field]
+                      return (
+                        <div key={field} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label htmlFor={field}>{labels[field]}</Label>
+                            <Badge variant={status === 'founder_validated' ? 'success' : 'warning'} size="sm">
+                              {status === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">{descriptions[field]}</p>
+                          <Input
+                            id={field}
+                            type="number"
+                            min={0}
+                            value={marketDraft[field] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value === '' ? null : Number(e.target.value)
+                              updateMarketField(field, val)
+                            }}
+                            placeholder="0"
+                          />
+                          {marketDraft[field] != null && (
+                            <p className="text-xs text-muted-foreground">
+                              {formatCurrency(marketDraft[field]!)}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Target Customer Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <h3 className={typography.h3}>Target Customer</h3>
+                    <Badge
+                      variant={marketDraft.validation_status.target_customer === 'founder_validated' ? 'success' : 'warning'}
+                      size="sm"
+                    >
+                      {marketDraft.validation_status.target_customer === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <textarea
+                    value={marketDraft.target_customer || ''}
+                    onChange={(e) => updateMarketField('target_customer', e.target.value || null)}
+                    className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
+                    placeholder="Describe your ideal customer..."
+                  />
+
+                  {/* Customer Segments */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-semibold text-foreground">Customer Segments</h4>
+                      <Badge
+                        variant={marketDraft.validation_status.customer_segments === 'founder_validated' ? 'success' : 'warning'}
+                        size="sm"
+                      >
+                        {marketDraft.validation_status.customer_segments === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                      </Badge>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-border">
+                            <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Segment</th>
+                            <th className="text-right py-2 px-4 font-medium text-muted-foreground">Size</th>
+                            <th className="text-right py-2 px-4 font-medium text-muted-foreground">Willingness to Pay</th>
+                            <th className="text-right py-2 pl-4 font-medium text-muted-foreground w-10"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {marketDraft.customer_segments.map((seg, i) => (
+                            <tr key={i} className="border-b border-border last:border-0">
+                              <td className="py-2 pr-4">
+                                <Input
+                                  value={seg.name}
+                                  onChange={(e) => {
+                                    const updated = [...marketDraft.customer_segments]
+                                    updated[i] = { ...seg, name: e.target.value }
+                                    updateMarketField('customer_segments', updated)
+                                  }}
+                                  className="h-8"
+                                />
+                              </td>
+                              <td className="py-2 px-4">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={seg.size ?? ''}
+                                  onChange={(e) => {
+                                    const updated = [...marketDraft.customer_segments]
+                                    updated[i] = { ...seg, size: e.target.value === '' ? null : Number(e.target.value) }
+                                    updateMarketField('customer_segments', updated)
+                                  }}
+                                  className="h-8 text-right"
+                                />
+                              </td>
+                              <td className="py-2 px-4">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  value={seg.willingness_to_pay ?? ''}
+                                  onChange={(e) => {
+                                    const updated = [...marketDraft.customer_segments]
+                                    updated[i] = { ...seg, willingness_to_pay: e.target.value === '' ? null : Number(e.target.value) }
+                                    updateMarketField('customer_segments', updated)
+                                  }}
+                                  className="h-8 text-right"
+                                  placeholder="pence"
+                                />
+                              </td>
+                              <td className="py-2 pl-4 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    const updated = marketDraft.customer_segments.filter((_, idx) => idx !== i)
+                                    updateMarketField('customer_segments', updated)
+                                  }}
+                                  className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => {
+                        updateMarketField('customer_segments', [
+                          ...marketDraft.customer_segments,
+                          { name: '', size: null, willingness_to_pay: null },
+                        ])
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Segment
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Competitive Landscape Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <h3 className={typography.h3}>Competitive Landscape</h3>
+                    <Badge
+                      variant={marketDraft.validation_status.competitive_landscape === 'founder_validated' ? 'success' : 'warning'}
+                      size="sm"
+                    >
+                      {marketDraft.validation_status.competitive_landscape === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-2 pr-4 font-medium text-muted-foreground">Competitor</th>
+                          <th className="text-left py-2 px-4 font-medium text-muted-foreground">Strengths</th>
+                          <th className="text-left py-2 px-4 font-medium text-muted-foreground">Weaknesses</th>
+                          <th className="text-right py-2 px-4 font-medium text-muted-foreground">Price Point</th>
+                          <th className="text-right py-2 pl-4 font-medium text-muted-foreground w-10"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketDraft.competitive_landscape.map((comp, i) => (
+                          <tr key={i} className="border-b border-border last:border-0">
+                            <td className="py-2 pr-4">
+                              <Input
+                                value={comp.competitor}
+                                onChange={(e) => {
+                                  const updated = [...marketDraft.competitive_landscape]
+                                  updated[i] = { ...comp, competitor: e.target.value }
+                                  updateMarketField('competitive_landscape', updated)
+                                }}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-4">
+                              <Input
+                                value={comp.strengths}
+                                onChange={(e) => {
+                                  const updated = [...marketDraft.competitive_landscape]
+                                  updated[i] = { ...comp, strengths: e.target.value }
+                                  updateMarketField('competitive_landscape', updated)
+                                }}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-4">
+                              <Input
+                                value={comp.weaknesses}
+                                onChange={(e) => {
+                                  const updated = [...marketDraft.competitive_landscape]
+                                  updated[i] = { ...comp, weaknesses: e.target.value }
+                                  updateMarketField('competitive_landscape', updated)
+                                }}
+                                className="h-8"
+                              />
+                            </td>
+                            <td className="py-2 px-4">
+                              <Input
+                                type="number"
+                                min={0}
+                                value={comp.price_point ?? ''}
+                                onChange={(e) => {
+                                  const updated = [...marketDraft.competitive_landscape]
+                                  updated[i] = { ...comp, price_point: e.target.value === '' ? null : Number(e.target.value) }
+                                  updateMarketField('competitive_landscape', updated)
+                                }}
+                                className="h-8 text-right"
+                                placeholder="pence"
+                              />
+                            </td>
+                            <td className="py-2 pl-4 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const updated = marketDraft.competitive_landscape.filter((_, idx) => idx !== i)
+                                  updateMarketField('competitive_landscape', updated)
+                                }}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2"
+                    onClick={() => {
+                      updateMarketField('competitive_landscape', [
+                        ...marketDraft.competitive_landscape,
+                        { competitor: '', strengths: '', weaknesses: '', price_point: null },
+                      ])
+                    }}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Competitor
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Pricing Analysis Card */}
+              {marketDraft.pricing_analysis && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h3 className={typography.h3}>Pricing Analysis</h3>
+                      <Badge
+                        variant={marketDraft.validation_status.pricing_analysis === 'founder_validated' ? 'success' : 'warning'}
+                        size="sm"
+                      >
+                        {marketDraft.validation_status.pricing_analysis === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div>
+                        <Label htmlFor="rec-price">Recommended Price (pence)</Label>
+                        <Input
+                          id="rec-price"
+                          type="number"
+                          min={0}
+                          value={marketDraft.pricing_analysis.recommended_price_pence ?? ''}
+                          onChange={(e) => {
+                            const pa = { ...marketDraft.pricing_analysis! }
+                            pa.recommended_price_pence = e.target.value === '' ? null : Number(e.target.value)
+                            updateMarketField('pricing_analysis', pa)
+                          }}
+                        />
+                        {marketDraft.pricing_analysis.recommended_price_pence != null && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatPence(marketDraft.pricing_analysis.recommended_price_pence)}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="pricing-model">Pricing Model</Label>
+                        <Input
+                          id="pricing-model"
+                          value={marketDraft.pricing_analysis.pricing_model ?? ''}
+                          onChange={(e) => {
+                            const pa = { ...marketDraft.pricing_analysis! }
+                            pa.pricing_model = e.target.value || null
+                            updateMarketField('pricing_analysis', pa)
+                          }}
+                          placeholder="e.g. One-time purchase, Subscription"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="price-low">Price Range Low (pence)</Label>
+                        <Input
+                          id="price-low"
+                          type="number"
+                          min={0}
+                          value={marketDraft.pricing_analysis.price_range_low_pence ?? ''}
+                          onChange={(e) => {
+                            const pa = { ...marketDraft.pricing_analysis! }
+                            pa.price_range_low_pence = e.target.value === '' ? null : Number(e.target.value)
+                            updateMarketField('pricing_analysis', pa)
+                          }}
+                        />
+                        {marketDraft.pricing_analysis.price_range_low_pence != null && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatPence(marketDraft.pricing_analysis.price_range_low_pence)}
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <Label htmlFor="price-high">Price Range High (pence)</Label>
+                        <Input
+                          id="price-high"
+                          type="number"
+                          min={0}
+                          value={marketDraft.pricing_analysis.price_range_high_pence ?? ''}
+                          onChange={(e) => {
+                            const pa = { ...marketDraft.pricing_analysis! }
+                            pa.price_range_high_pence = e.target.value === '' ? null : Number(e.target.value)
+                            updateMarketField('pricing_analysis', pa)
+                          }}
+                        />
+                        {marketDraft.pricing_analysis.price_range_high_pence != null && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatPence(marketDraft.pricing_analysis.price_range_high_pence)}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {marketDraft.pricing_analysis.reasoning && (
+                      <div className="p-3 rounded-md bg-muted">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">AI Reasoning</p>
+                        <p className="text-sm text-foreground">{marketDraft.pricing_analysis.reasoning}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Risks & Opportunities */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Market Risks */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h3 className={typography.h3}>Market Risks</h3>
+                      <Badge
+                        variant={marketDraft.validation_status.market_risks === 'founder_validated' ? 'success' : 'warning'}
+                        size="sm"
+                      >
+                        {marketDraft.validation_status.market_risks === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {marketDraft.market_risks.map((risk, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input
+                            value={risk}
+                            onChange={(e) => {
+                              const updated = [...marketDraft.market_risks]
+                              updated[i] = e.target.value
+                              updateMarketField('market_risks', updated)
+                            }}
+                            className="h-8"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              updateMarketField('market_risks', marketDraft.market_risks.filter((_, idx) => idx !== i))
+                            }}
+                            className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => updateMarketField('market_risks', [...marketDraft.market_risks, ''])}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Risk
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Market Opportunities */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h3 className={typography.h3}>Market Opportunities</h3>
+                      <Badge
+                        variant={marketDraft.validation_status.market_opportunities === 'founder_validated' ? 'success' : 'warning'}
+                        size="sm"
+                      >
+                        {marketDraft.validation_status.market_opportunities === 'founder_validated' ? 'Validated' : 'AI Estimated'}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {marketDraft.market_opportunities.map((opp, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input
+                            value={opp}
+                            onChange={(e) => {
+                              const updated = [...marketDraft.market_opportunities]
+                              updated[i] = e.target.value
+                              updateMarketField('market_opportunities', updated)
+                            }}
+                            className="h-8"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              updateMarketField('market_opportunities', marketDraft.market_opportunities.filter((_, idx) => idx !== i))
+                            }}
+                            className="h-8 w-8 p-0 shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => updateMarketField('market_opportunities', [...marketDraft.market_opportunities, ''])}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Opportunity
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Assessment metadata */}
+              {marketDraft.assessed_at && (
+                <p className="text-xs text-muted-foreground text-right">
+                  Last assessed: {new Date(marketDraft.assessed_at).toLocaleDateString('en-GB', {
+                    day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+                  })}
+                  {marketDraft.model_used && ` | Model: ${marketDraft.model_used}`}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Tab content: Economics */}
       {activeTab === 'economics' && (
         <div className="space-y-6">
@@ -626,6 +1289,174 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               })()}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* Tab content: Fundability */}
+      {activeTab === 'fundability' && (
+        <div className="space-y-6">
+          {/* Score Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h3 className={typography.h3}>Fundability Score</h3>
+                <Button
+                  onClick={handleScoreFundability}
+                  disabled={isScoring}
+                  size="sm"
+                >
+                  {isScoring ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Scoring...
+                    </>
+                  ) : (
+                    <>
+                      <Target className="h-4 w-4 mr-1.5" />
+                      {fundability ? 'Re-score' : 'Score Fundability'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {fundability ? (
+                <div className="flex items-center gap-6">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={`text-5xl font-bold tabular-nums ${
+                        fundability.overall > 70 ? 'text-success'
+                        : fundability.overall > 45 ? 'text-warning'
+                        : 'text-destructive'
+                      }`}
+                    >
+                      {fundability.overall}
+                    </span>
+                    <span className="text-xs text-muted-foreground mt-1">out of 100</span>
+                  </div>
+                  <div>
+                    <Badge
+                      variant={
+                        fundability.investor_appetite === 'strong' ? 'success'
+                        : fundability.investor_appetite === 'moderate' ? 'warning'
+                        : 'destructive'
+                      }
+                      size="sm"
+                    >
+                      {fundability.investor_appetite === 'strong' ? 'Strong investor appetite'
+                      : fundability.investor_appetite === 'moderate' ? 'Moderate investor appetite'
+                      : 'Weak investor appetite'}
+                    </Badge>
+                    {fundability.scored_at && (
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Last scored {new Date(fundability.scored_at).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-center py-6">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                    <Target className="h-6 w-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Score this product to see how fundable it is and get improvement suggestions.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Score Breakdown */}
+          {fundability && (
+            <Card>
+              <CardHeader>
+                <h3 className={typography.h3}>Score Breakdown</h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Market Size', score: fundability.market_size_score, weight: '25%' },
+                    { label: 'Margin', score: fundability.margin_score, weight: '25%' },
+                    { label: 'Defensibility', score: fundability.defensibility_score, weight: '20%' },
+                    { label: 'Team Readiness', score: fundability.team_readiness_score, weight: '15%' },
+                    { label: 'Traction', score: fundability.traction_score, weight: '15%' },
+                  ].map((item) => (
+                    <div key={item.label} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">
+                          {item.label}
+                          <span className="text-xs text-muted-foreground ml-1">({item.weight})</span>
+                        </span>
+                        <span
+                          className={`text-sm font-semibold tabular-nums ${
+                            item.score > 70 ? 'text-success'
+                            : item.score > 45 ? 'text-warning'
+                            : 'text-destructive'
+                          }`}
+                        >
+                          {item.score}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            item.score > 70 ? 'bg-success'
+                            : item.score > 45 ? 'bg-warning'
+                            : 'bg-destructive'
+                          }`}
+                          style={{ width: `${item.score}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Improvement Suggestions */}
+          {fundability && fundability.improvement_suggestions.length > 0 && (
+            <Card>
+              <CardHeader>
+                <h3 className={typography.h3}>Improvement Suggestions</h3>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {fundability.improvement_suggestions.map((suggestion, i) => (
+                    <div key={i} className="flex gap-3 p-3 rounded-md bg-muted/50">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-international-orange/10">
+                        <Lightbulb className="h-4 w-4 text-international-orange" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground">{suggestion.action}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{suggestion.impact_description}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge variant="outline" size="sm">
+                            <TrendingUp className="h-3 w-3 mr-1" />
+                            +{suggestion.estimated_score_lift} pts
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled
+                            className="text-xs h-6 px-2"
+                            title="Coming soon"
+                          >
+                            Apply to Design Brief
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
