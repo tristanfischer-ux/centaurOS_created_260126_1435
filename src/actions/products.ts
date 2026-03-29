@@ -144,7 +144,7 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
 
     // INTENT: If linking to a CAD project, seed COGS from ai_cost_estimates
     if (input.cad_lab_project_id) {
-      unitEconomics = await seedUnitEconomicsFromCad(supabase, input.cad_lab_project_id)
+      unitEconomics = await seedUnitEconomicsFromCad(supabase, input.cad_lab_project_id, foundryId)
     }
 
     const { data, error } = await productsTable(supabase)
@@ -180,6 +180,11 @@ export async function createProduct(input: CreateProductInput): Promise<ActionRe
 export async function updateProduct(id: string, input: UpdateProductInput): Promise<ActionResult<Product>> {
   return withAuth(async ({ supabase, foundryId }) => {
     if (!id || typeof id !== 'string') return { error: 'Invalid product ID' }
+
+    // VALIDATION: Prevent empty name
+    if (input.name !== undefined && !input.name.trim()) {
+      return { error: 'Product name cannot be empty' }
+    }
 
     // INTENT: Only include fields that were explicitly provided
     const updates: Record<string, unknown> = {}
@@ -247,6 +252,14 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
     if (!cadLabProjectId || typeof cadLabProjectId !== 'string') {
       return { error: 'Invalid CAD Lab project ID' }
     }
+
+    // SECURITY: Prevent duplicate products for the same CAD project
+    const { data: existing } = await productsTable(supabase)
+      .select('id, name')
+      .eq('cad_lab_project_id', cadLabProjectId)
+      .eq('foundry_id', foundryId)
+      .maybeSingle()
+    if (existing) return { error: `Product "${existing.name}" already exists for this project` }
 
     // FLOW: Fetch the CAD project data
     const { data: project, error: projectError } = await cadLabTable(supabase)
@@ -337,11 +350,12 @@ export async function syncProductFinancials(
       .maybeSingle()
 
     if (existingIn?.id) {
-      await cashInTable(supabase)
+      const { error: inUpdateError } = await cashInTable(supabase)
         .update({ name: `${productName} Revenue`, amount: monthlyRevenue, frequency: 'monthly' })
         .eq('id', existingIn.id)
+      if (inUpdateError) return { error: 'Failed to sync financial items' }
     } else {
-      await cashInTable(supabase)
+      const { error: inInsertError } = await cashInTable(supabase)
         .insert({
           foundry_id: foundryId,
           name: `${productName} Revenue`,
@@ -351,7 +365,9 @@ export async function syncProductFinancials(
           probability_pct: 100,
           effective_from: today,
           product_id: productId,
+          source: 'product_sync',
         })
+      if (inInsertError) return { error: 'Failed to sync financial items' }
     }
 
     // ── Upsert COGS (Cash Out) item ────────────────────────────────
@@ -371,11 +387,12 @@ export async function syncProductFinancials(
         .maybeSingle()
 
       if (existingOut?.id) {
-        await cashOutTable(supabase)
+        const { error: outUpdateError } = await cashOutTable(supabase)
           .update({ name: `${productName} COGS`, amount: monthlyCogs, frequency: 'monthly' })
           .eq('id', existingOut.id)
+        if (outUpdateError) return { error: 'Failed to sync financial items' }
       } else {
-        await cashOutTable(supabase)
+        const { error: outInsertError } = await cashOutTable(supabase)
           .insert({
             foundry_id: foundryId,
             name: `${productName} COGS`,
@@ -386,7 +403,9 @@ export async function syncProductFinancials(
             frequency: 'monthly',
             effective_from: today,
             product_id: productId,
+            source: 'product_sync',
           })
+        if (outInsertError) return { error: 'Failed to sync financial items' }
       }
     }
 
@@ -428,9 +447,11 @@ export async function generateMarketAssessment(
     // FLOW: If linked to a CAD project, fetch product_overview and ai_cost_estimates
     let cadContext = ''
     if (product.cad_lab_project_id) {
+      // SECURITY: Filter by foundry_id to prevent cross-tenant data access
       const { data: cadProject } = await cadLabTable(supabase)
         .select('product_overview, ai_cost_estimates')
         .eq('id', product.cad_lab_project_id)
+        .eq('foundry_id', foundryId)
         .single()
 
       if (cadProject) {
@@ -640,7 +661,7 @@ Provide your structured market assessment as JSON.`
 export async function scoreFundability(
   productId: string
 ): Promise<ActionResult<FundabilityScore>> {
-  return withAIGate('analyze', async ({ supabase, foundryId, trackUsage }) => {
+  return withAIGate('fundability_score', async ({ supabase, foundryId, trackUsage }) => {
     if (!productId || typeof productId !== 'string') {
       return { error: 'Invalid product ID' }
     }
@@ -813,10 +834,13 @@ export async function scoreFundability(
 async function seedUnitEconomicsFromCad(
   supabase: unknown,
   cadLabProjectId: string,
+  foundryId: string,
 ): Promise<UnitEconomics | null> {
+  // SECURITY: Filter by foundry_id to prevent cross-tenant data access
   const { data: project } = await cadLabTable(supabase)
     .select('ai_cost_estimates')
     .eq('id', cadLabProjectId)
+    .eq('foundry_id', foundryId)
     .single()
 
   if (!project?.ai_cost_estimates) return null

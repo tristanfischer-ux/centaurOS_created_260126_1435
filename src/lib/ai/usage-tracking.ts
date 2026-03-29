@@ -85,6 +85,7 @@ export type AIFeature =
   | 'ai_worker'
   // Product intelligence
   | 'market_assessment'
+  | 'fundability_score'
   // Page-level specialist insights
   | 'page_insights'
   // System
