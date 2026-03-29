@@ -37,8 +37,18 @@ import {
 import { typography } from '@/lib/design-system'
 import { toast } from 'sonner'
 import { Hammer, Lightbulb, FileText, Package, ArrowRight, Lock, Loader2 } from 'lucide-react'
-import type { ProductSummary, ProductLifecycle } from '@/types/product'
+import type { ProductSummary, ProductLifecycle, ConvergenceStatus } from '@/types/product'
 import { LIFECYCLE_LABELS } from '@/types/product'
+
+// ─── Convergence badge config ─────────────────────────────────────────
+
+const CONVERGENCE_BADGE: Record<string, { label: string; variant: 'success' | 'warning' | 'info' | 'destructive' }> = {
+  improving: { label: 'Improving', variant: 'success' },
+  moderate: { label: 'Moderate', variant: 'info' },
+  plateauing: { label: 'Plateauing', variant: 'warning' },
+  regressing: { label: 'Regressing', variant: 'destructive' },
+  converged: { label: 'Converged', variant: 'info' },
+}
 
 // ─── Lifecycle badge variant mapping ─────────────────────────────────
 
@@ -424,6 +434,15 @@ function ProductCard({ product }: { product: ProductSummary }) {
                   Margin: <span className="text-foreground font-medium">{formatMargin(product.gross_margin_pct)}</span>
                 </span>
               )}
+            </div>
+          )}
+
+          {/* Convergence badge */}
+          {product.latest_convergence_status && CONVERGENCE_BADGE[product.latest_convergence_status] && (
+            <div className="mt-2">
+              <Badge variant={CONVERGENCE_BADGE[product.latest_convergence_status].variant} size="sm">
+                {CONVERGENCE_BADGE[product.latest_convergence_status].label}
+              </Badge>
             </div>
           )}
         </CardContent>

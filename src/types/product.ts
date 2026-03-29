@@ -50,6 +50,7 @@ export interface Product {
   market_assessment: MarketAssessment | null
   unit_economics: UnitEconomics | null
   fundability_score: FundabilityScore | null
+  product_synthesis: ProductSynthesis | null
   unit_price_pence: number | null
   target_monthly_units: number | null
   cad_lab_project_id: string | null
@@ -70,6 +71,8 @@ export interface ProductSummary {
   cogs_per_unit: number | null
   /** Gross margin % from unit_economics (for list view display) */
   gross_margin_pct: number | null
+  /** Latest convergence status from most recent iteration (for list view badges) */
+  latest_convergence_status: ConvergenceStatus | null
   created_at: string
   updated_at: string
 }

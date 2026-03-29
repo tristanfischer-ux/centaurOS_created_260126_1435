@@ -26,12 +26,15 @@ import {
   syncProductFinancials,
   generateMarketAssessment,
   scoreFundability,
+  synthesizeProductStatus,
   generateDesignBriefFromAssessment,
   generateDesignBriefFromSuggestion,
+  generateDesignBriefFromSynthesis,
   getDesignBriefs,
   convertBriefToForge,
   updateDesignBrief,
   createIteration,
+  getIterationHistory,
 } from '@/actions/products'
 import {
   Dialog,
@@ -68,8 +71,14 @@ import {
   FileText,
   Send,
   ClipboardList,
+  History,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  RotateCcw,
+  Zap,
 } from 'lucide-react'
-import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore, DesignBrief } from '@/types/product'
+import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore, DesignBrief, ProductIteration, ProductSynthesis, IterationPareto } from '@/types/product'
 import { LIFECYCLE_LABELS, LIFECYCLE_ORDER } from '@/types/product'
 
 // ─── Lifecycle styling ──────────────────────────────────────────────
@@ -92,8 +101,21 @@ const TABS = [
   { id: 'economics', label: 'Economics', enabled: true },
   { id: 'financials', label: 'Financials', enabled: false },
   { id: 'fundability', label: 'Fundability', enabled: true },
-  { id: 'history', label: 'History', enabled: false },
+  { id: 'history', label: 'History', enabled: true },
 ] as const
+
+// ─── Convergence badge config ────────────────────────────────────────
+
+const CONVERGENCE_CONFIG: Record<string, { label: string; variant: 'success' | 'warning' | 'info' | 'secondary' | 'destructive' }> = {
+  initial: { label: 'Initial', variant: 'secondary' },
+  improving: { label: 'Improving', variant: 'success' },
+  moderate: { label: 'Moderate', variant: 'info' },
+  plateauing: { label: 'Plateauing', variant: 'warning' },
+  regressing: { label: 'Regressing', variant: 'destructive' },
+  converged: { label: 'Converged', variant: 'info' },
+}
+
+const PARETO_DIMENSIONS = ['market', 'financial', 'fundability', 'manufacturing'] as const
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -135,6 +157,16 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   const [isGeneratingBrief, setIsGeneratingBrief] = React.useState(false)
   const [briefs, setBriefs] = React.useState<DesignBrief[]>([])
   const [briefsLoaded, setBriefsLoaded] = React.useState(false)
+
+  // ── History / Synthesis state ──────────────────────────────────
+  const [iterations, setIterations] = React.useState<ProductIteration[]>([])
+  const [iterationsLoaded, setIterationsLoaded] = React.useState(false)
+  const [synthesis, setSynthesis] = React.useState<ProductSynthesis | null>(
+    (product.product_synthesis as ProductSynthesis | null) ?? null,
+  )
+  const [isSynthesizing, setIsSynthesizing] = React.useState(false)
+  const [isStartingIteration, setIsStartingIteration] = React.useState(false)
+  const [approvedImprovements, setApprovedImprovements] = React.useState<Set<string>>(new Set())
   const [isSendingToForge, setIsSendingToForge] = React.useState(false)
 
   // ── Fundability → Design Brief flow state ─────────────────────────
@@ -181,6 +213,21 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     true,
     `briefing-product-${product.id}`,
   )
+
+  // INTENT: Fetch iterations when History tab is first opened
+  React.useEffect(() => {
+    if (activeTab !== 'history' || iterationsLoaded) return
+    let cancelled = false
+    async function loadIterations() {
+      const result = await getIterationHistory(product.id)
+      if (!cancelled && result.data) {
+        setIterations(result.data)
+      }
+      if (!cancelled) setIterationsLoaded(true)
+    }
+    loadIterations()
+    return () => { cancelled = true }
+  }, [activeTab, iterationsLoaded, product.id])
 
   // ── Handlers ─────────────────────────────────────────────────────
   const handleSaveDescription = React.useCallback(async () => {
@@ -455,6 +502,96 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       }
     })
   }, [])
+
+  // ── Synthesis handler ──────────────────────────────────────────────
+  const handleRunSynthesis = React.useCallback(async () => {
+    setIsSynthesizing(true)
+    try {
+      const result = await synthesizeProductStatus(product.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setSynthesis(result.data)
+        toast.success('Synthesis complete')
+      }
+    } catch {
+      toast.error('Synthesis failed')
+    } finally {
+      setIsSynthesizing(false)
+    }
+  }, [product.id])
+
+  // ── Toggle improvement approval ────────────────────────────────────
+  const toggleImprovement = React.useCallback((improvement: string) => {
+    setApprovedImprovements(prev => {
+      const next = new Set(prev)
+      if (next.has(improvement)) {
+        next.delete(improvement)
+      } else {
+        next.add(improvement)
+      }
+      return next
+    })
+  }, [])
+
+  // ── Start next iteration handler ──────────────────────────────────
+  const handleStartNextIteration = React.useCallback(async () => {
+    if (approvedImprovements.size === 0) {
+      toast.error('Select at least one improvement to include')
+      return
+    }
+
+    setIsStartingIteration(true)
+    try {
+      // FLOW: Generate brief from selected improvements
+      const improvements = Array.from(approvedImprovements)
+      const briefResult = await generateDesignBriefFromSynthesis(product.id, improvements)
+      if (briefResult.error) {
+        toast.error(briefResult.error)
+        setIsStartingIteration(false)
+        return
+      }
+
+      if (!briefResult.data) {
+        toast.error('No brief generated')
+        setIsStartingIteration(false)
+        return
+      }
+
+      // FLOW: Convert brief to Forge project
+      const forgeResult = await convertBriefToForge(briefResult.data.id)
+      if (forgeResult.error) {
+        toast.error(forgeResult.error)
+        setIsStartingIteration(false)
+        return
+      }
+
+      // FLOW: Create iteration record
+      const currentPareto = synthesis?.pareto ?? { market: 0, financial: 0, fundability: 0, manufacturing: 0 }
+      await createIteration(
+        product.id,
+        currentPareto,
+        improvements.map(imp => ({ description: imp, dimension: 'synthesis' })),
+        `Next iteration: ${improvements.join('; ')}`.slice(0, 500),
+      )
+
+      // INTENT: Refresh iterations list
+      const iterResult = await getIterationHistory(product.id)
+      if (iterResult.data) setIterations(iterResult.data)
+
+      setBriefs(prev => [briefResult.data!, ...prev])
+      setApprovedImprovements(new Set())
+      toast.success('Next iteration started — new Forge project created')
+
+      if (forgeResult.data?.cadLabProjectId) {
+        router.push(`/the-forge/cad-lab?project=${forgeResult.data.cadLabProjectId}`)
+      }
+    } catch {
+      toast.error('Failed to start next iteration')
+    } finally {
+      setIsStartingIteration(false)
+    }
+  }, [approvedImprovements, product.id, synthesis, router])
 
   const lifecycleIndex = LIFECYCLE_ORDER.indexOf(product.lifecycle)
 
@@ -1798,6 +1935,340 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+
+      {/* Tab content: History */}
+      {activeTab === 'history' && (
+        <div className="space-y-6">
+          {/* Synthesis Overview */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h3 className={typography.h3}>Product Synthesis</h3>
+                <Button
+                  onClick={handleRunSynthesis}
+                  disabled={isSynthesizing}
+                  size="sm"
+                >
+                  {isSynthesizing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      Synthesizing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-1.5" />
+                      {synthesis ? 'Re-synthesize' : 'Run Synthesis'}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {synthesis ? (
+                <div className="space-y-6">
+                  {/* Pareto Score Bars */}
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-3">Pareto Scores</p>
+                    <div className="space-y-3">
+                      {PARETO_DIMENSIONS.map((dim) => {
+                        const score = synthesis.pareto[dim]
+                        return (
+                          <div key={dim} className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium text-foreground capitalize">{dim}</span>
+                              <span className={`text-sm font-bold tabular-nums ${
+                                score > 70 ? 'text-success'
+                                : score > 45 ? 'text-warning'
+                                : 'text-destructive'
+                              }`}>
+                                {score}
+                              </span>
+                            </div>
+                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${
+                                  score > 70 ? 'bg-success'
+                                  : score > 45 ? 'bg-warning'
+                                  : 'bg-destructive'
+                                }`}
+                                style={{ width: `${Math.min(100, score)}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Convergence Indicator */}
+                  {iterations.length > 0 && (() => {
+                    const latest = iterations[iterations.length - 1]
+                    const config = CONVERGENCE_CONFIG[latest.convergence_status] ?? CONVERGENCE_CONFIG.initial
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Status:</span>
+                        <Badge variant={config.variant} size="sm">{config.label}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          after {iterations.length} iteration{iterations.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Next Action */}
+                  <div className="p-3 rounded-md bg-international-orange/5 border border-international-orange/20">
+                    <p className="text-xs font-semibold text-international-orange mb-1">Next Action</p>
+                    <p className="text-sm text-foreground">{synthesis.nextAction}</p>
+                  </div>
+
+                  {/* Type A Improvements (Aligned) */}
+                  {synthesis.typeA.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        Aligned Improvements
+                        <span className="ml-1 text-success">(improve multiple dimensions)</span>
+                      </p>
+                      <div className="space-y-2">
+                        {synthesis.typeA.map((imp, i) => (
+                          <label
+                            key={i}
+                            className="flex items-start gap-3 p-3 rounded-md border border-border hover:border-success/40 transition-colors cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={approvedImprovements.has(imp)}
+                              onChange={() => toggleImprovement(imp)}
+                              className="mt-0.5 h-4 w-4 rounded border-border text-success focus:ring-success"
+                            />
+                            <span className="text-sm text-foreground">{imp}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Type B Improvements (Trade-offs) */}
+                  {synthesis.typeB.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground mb-2">
+                        Trade-off Improvements
+                        <span className="ml-1 text-warning">(require founder decision)</span>
+                      </p>
+                      <div className="space-y-2">
+                        {synthesis.typeB.map((imp, i) => (
+                          <label
+                            key={i}
+                            className="flex items-start gap-3 p-3 rounded-md border border-border hover:border-warning/40 transition-colors cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={approvedImprovements.has(imp)}
+                              onChange={() => toggleImprovement(imp)}
+                              className="mt-0.5 h-4 w-4 rounded border-border text-warning focus:ring-warning"
+                            />
+                            <span className="text-sm text-foreground">{imp}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Local Optimum Warning */}
+                  {synthesis.isLocalOptimum && (
+                    <div className="p-3 rounded-md bg-warning/10 border border-warning/20">
+                      <p className="text-sm text-foreground">
+                        <AlertTriangle className="h-4 w-4 inline mr-1.5 text-warning" />
+                        This product appears to be at a <strong>local optimum</strong>. All remaining improvements involve trade-offs.
+                        Consider a strategic pivot or new market information to break through.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Start Next Iteration Button */}
+                  {approvedImprovements.size > 0 && (
+                    <Button
+                      onClick={handleStartNextIteration}
+                      disabled={isStartingIteration}
+                      className="w-full"
+                    >
+                      {isStartingIteration ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                          Starting next iteration...
+                        </>
+                      ) : (
+                        <>
+                          <RotateCcw className="h-4 w-4 mr-1.5" />
+                          Start Next Iteration ({approvedImprovements.size} improvement{approvedImprovements.size !== 1 ? 's' : ''})
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center text-center py-6">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                    <Zap className="h-6 w-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Run synthesis to see your product&apos;s Pareto scores across market, financial, fundability, and manufacturing dimensions.
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Iteration Timeline */}
+          <Card>
+            <CardHeader>
+              <h3 className={typography.h3}>Iteration History</h3>
+            </CardHeader>
+            <CardContent>
+              {!iterationsLoaded ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : iterations.length === 0 ? (
+                <div className="flex flex-col items-center text-center py-6">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+                    <History className="h-6 w-6 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    No iterations yet. Iterations are created when you apply design briefs or start a new optimization cycle.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Iteration comparison (latest vs first) */}
+                  {iterations.length >= 2 && (() => {
+                    const first = iterations[0]
+                    const latest = iterations[iterations.length - 1]
+                    const fp = first.pareto_scores as IterationPareto
+                    const lp = latest.pareto_scores as IterationPareto
+
+                    return (
+                      <div className="p-3 rounded-md bg-muted/50 mb-4">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          Progress: Iteration {first.iteration_number} vs {latest.iteration_number}
+                        </p>
+                        <div className="grid grid-cols-4 gap-3">
+                          {PARETO_DIMENSIONS.map((dim) => {
+                            const delta = lp[dim] - fp[dim]
+                            return (
+                              <div key={dim} className="text-center">
+                                <p className="text-xs text-muted-foreground capitalize">{dim}</p>
+                                <p className={`text-sm font-bold tabular-nums ${
+                                  delta > 0 ? 'text-success' : delta < 0 ? 'text-destructive' : 'text-muted-foreground'
+                                }`}>
+                                  {delta > 0 ? '+' : ''}{delta}
+                                </p>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })()}
+
+                  {/* Timeline entries */}
+                  <div className="relative">
+                    <div className="absolute left-3 top-0 bottom-0 w-px bg-border" />
+                    <div className="space-y-6">
+                      {[...iterations].reverse().map((iter) => {
+                        const scores = iter.pareto_scores as IterationPareto
+                        const config = CONVERGENCE_CONFIG[iter.convergence_status] ?? CONVERGENCE_CONFIG.initial
+
+                        return (
+                          <div key={iter.id} className="relative pl-8">
+                            {/* Timeline dot */}
+                            <div className={`absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-background ${
+                              iter.convergence_status === 'improving' ? 'bg-success'
+                              : iter.convergence_status === 'regressing' ? 'bg-destructive'
+                              : iter.convergence_status === 'converged' ? 'bg-info'
+                              : 'bg-muted-foreground'
+                            }`} />
+
+                            <div className="space-y-2">
+                              {/* Header */}
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm font-semibold text-foreground">
+                                  Iteration {iter.iteration_number}
+                                </span>
+                                <Badge variant={config.variant} size="sm">{config.label}</Badge>
+                                {iter.convergence_delta !== 0 && (
+                                  <span className={`text-xs font-medium tabular-nums flex items-center gap-0.5 ${
+                                    iter.convergence_delta > 0 ? 'text-success' : 'text-destructive'
+                                  }`}>
+                                    {iter.convergence_delta > 0 ? (
+                                      <ArrowUpRight className="h-3 w-3" />
+                                    ) : (
+                                      <ArrowDownRight className="h-3 w-3" />
+                                    )}
+                                    {iter.convergence_delta > 0 ? '+' : ''}{iter.convergence_delta.toFixed(0)}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground ml-auto">
+                                  {new Date(iter.created_at).toLocaleDateString('en-GB', {
+                                    day: 'numeric', month: 'short', year: 'numeric',
+                                  })}
+                                </span>
+                              </div>
+
+                              {/* Mini Pareto bars */}
+                              <div className="grid grid-cols-4 gap-2">
+                                {PARETO_DIMENSIONS.map((dim) => (
+                                  <div key={dim} className="space-y-0.5">
+                                    <p className="text-[10px] text-muted-foreground capitalize">{dim}</p>
+                                    <div className="flex items-center gap-1">
+                                      <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${
+                                            scores[dim] > 70 ? 'bg-success'
+                                            : scores[dim] > 45 ? 'bg-warning'
+                                            : 'bg-destructive'
+                                          }`}
+                                          style={{ width: `${Math.min(100, scores[dim])}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-[10px] text-muted-foreground tabular-nums w-5 text-right">
+                                        {scores[dim]}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Hypothesis */}
+                              {iter.hypothesis && (
+                                <p className="text-xs text-muted-foreground">
+                                  <span className="font-medium">Hypothesis:</span> {iter.hypothesis}
+                                </p>
+                              )}
+
+                              {/* Changes made */}
+                              {iter.changes_made && (iter.changes_made as Array<{ description: string }>).length > 0 && (
+                                <div className="flex flex-wrap gap-1">
+                                  {(iter.changes_made as Array<{ description: string; dimension: string }>).map((change, i) => (
+                                    <Badge key={i} variant="outline" size="sm">
+                                      {change.description.length > 60
+                                        ? change.description.slice(0, 60) + '...'
+                                        : change.description}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 

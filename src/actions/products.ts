@@ -66,6 +66,16 @@ function cashOutTable(supabase: any) {
   return (supabase as any).from('cash_out_items')
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function iterationsTable(supabase: any) {
+  return (supabase as any).from('product_iterations')
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function briefsTable(supabase: any) {
+  return (supabase as any).from('design_briefs')
+}
+
 // ─── getProducts ────────────────────────────────────────────────────
 
 /**
@@ -82,6 +92,27 @@ export async function getProducts(): Promise<ActionResult<ProductSummary[]>> {
 
     if (error) return { error: error.message }
 
+    // FLOW: Fetch latest iteration for each product to get convergence status
+    const productIds = (data ?? []).map((r: any) => r.id as string)
+    const iterationMap: Record<string, ConvergenceStatus> = {}
+
+    if (productIds.length > 0) {
+      const { data: iterations } = await iterationsTable(supabase)
+        .select('product_id, convergence_status, iteration_number')
+        .eq('foundry_id', foundryId)
+        .in('product_id', productIds)
+        .order('iteration_number', { ascending: false })
+
+      // INTENT: Keep only the latest iteration per product
+      if (iterations) {
+        for (const iter of iterations as Array<{ product_id: string; convergence_status: ConvergenceStatus; iteration_number: number }>) {
+          if (!iterationMap[iter.product_id]) {
+            iterationMap[iter.product_id] = iter.convergence_status
+          }
+        }
+      }
+    }
+
     // INTENT: Compute display fields from JSONB so the list view doesn't need to parse JSONB
     const summaries: ProductSummary[] = (data ?? []).map((row: any) => {
       const ue = row.unit_economics as UnitEconomics | null
@@ -96,6 +127,7 @@ export async function getProducts(): Promise<ActionResult<ProductSummary[]>> {
         cad_lab_project_id: row.cad_lab_project_id,
         cogs_per_unit: ue?.cogs_per_unit_pence ? ue.cogs_per_unit_pence / 100 : null,
         gross_margin_pct: ue?.gross_margin_pct ?? null,
+        latest_convergence_status: iterationMap[row.id] ?? null,
         created_at: row.created_at,
         updated_at: row.updated_at,
       }
@@ -867,16 +899,6 @@ export async function scoreFundability(
 }
 
 // ─── Iteration Tracking ─────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function iterationsTable(supabase: any) {
-  return (supabase as any).from('product_iterations')
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function briefsTable(supabase: any) {
-  return (supabase as any).from('design_briefs')
-}
 
 /**
  * Creates a new iteration for a product, computing convergence status.
@@ -1800,6 +1822,164 @@ Rules:
     } catch (err) {
       console.error('[synthesizeProductStatus] AI call failed:', err)
       return { error: 'Product synthesis failed — please try again' }
+    }
+  })
+}
+
+// ─── generateDesignBriefFromSynthesis ─────────────────────────────────
+
+/**
+ * Generates a design brief from approved synthesis improvements.
+ *
+ * @description Takes an array of approved improvement strings (from Type A or
+ * founder-approved Type B improvements) and generates a coherent design brief
+ * incorporating all of them. Used by the "Start Next Iteration" button.
+ *
+ * @param productId - UUID of the product
+ * @param improvements - Array of improvement action strings from synthesis
+ * @returns The created DesignBrief
+ *
+ * @security Gated behind AI usage limits via withAIGate('market_assessment').
+ */
+export async function generateDesignBriefFromSynthesis(
+  productId: string,
+  improvements: string[],
+): Promise<ActionResult<DesignBrief>> {
+  return withAIGate('market_assessment', async ({ supabase, foundryId, trackUsage }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+    if (!improvements || improvements.length === 0) return { error: 'No improvements provided' }
+
+    const rateLimitError = await checkRateLimit('aiAnalysis', `ai:brief-synth:${productId}`)
+    if (rateLimitError) return { error: rateLimitError }
+
+    // FLOW: Fetch product with all data for context
+    const { data: product, error: fetchError } = await productsTable(supabase)
+      .select('*')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !product) return { error: 'Product not found' }
+
+    // FLOW: Fetch iteration history for constraint context
+    const { data: iterations } = await iterationsTable(supabase)
+      .select('iteration_number, pareto_scores, changes_made, hypothesis, outcome')
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('iteration_number', { ascending: true })
+
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const systemPrompt = `You are Max, the CTO of Fractional Forge. You translate business improvements into engineering design briefs for hardware products.
+
+Given a product's current data and a list of approved improvements from the synthesis engine, generate a coherent design brief that:
+1. Combines all improvements into one actionable engineering brief
+2. Sets realistic target cost, weight, and dimension constraints
+3. Specifies materials guidance and manufacturing constraints
+4. Prioritises by expected impact
+5. Includes constraints from previous iterations (things that worked — don't undo them)
+
+Return ONLY a valid JSON object (no markdown fences):
+{
+  "product_category": "string",
+  "target_cost_pence": number or null,
+  "target_weight_kg": number or null,
+  "target_dimensions": "string or null",
+  "key_requirements": ["string array"],
+  "materials_guidance": ["string array"],
+  "manufacturing_constraints": ["string array"],
+  "competitive_benchmarks": [{"product": "string", "price": number, "key_specs": "string"}],
+  "design_priorities": ["string array — ordered by impact"],
+  "certification_requirements": ["string array"],
+  "source_context": "string — brief summary of what triggered this brief"
+}`
+
+      const productContext = {
+        name: product.name,
+        description: product.description,
+        lifecycle: product.lifecycle,
+        current_cogs_pence: (product.unit_economics as UnitEconomics | null)?.cogs_per_unit_pence,
+        current_margin_pct: (product.unit_economics as UnitEconomics | null)?.gross_margin_pct,
+        current_price_pence: product.unit_price_pence,
+        market_assessment: product.market_assessment ? {
+          target_customer: (product.market_assessment as MarketAssessment).target_customer,
+          recommended_price_pence: (product.market_assessment as MarketAssessment).pricing_analysis?.recommended_price_pence,
+        } : null,
+        iteration_history: ((iterations ?? []) as Array<Record<string, unknown>>).map((i) => ({
+          number: i.iteration_number,
+          changes: i.changes_made,
+          hypothesis: i.hypothesis,
+        })),
+        approved_improvements: improvements,
+      }
+
+      const result = await Promise.race([
+        client.messages.create({
+          model: 'claude-sonnet-4-6-20250514',
+          max_tokens: 1500,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: `Generate a design brief for this product incorporating the approved improvements:\n\n${JSON.stringify(productContext, null, 2)}` }],
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
+      ])
+
+      if (!result) return { error: 'Brief generation timed out' }
+      if (!('content' in result)) return { error: 'Unexpected AI response' }
+
+      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+      if (!text) return { error: 'Empty AI response' }
+
+      await trackUsage({
+        model: 'claude-sonnet-4-6-20250514',
+        promptTokens: result.usage?.input_tokens,
+        completionTokens: result.usage?.output_tokens,
+      })
+
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      let briefContent: Record<string, unknown>
+      try {
+        briefContent = JSON.parse(cleaned)
+      } catch {
+        return { error: 'Failed to parse brief response' }
+      }
+
+      // FLOW: Save the design brief
+      const { data: brief, error: insertError } = await briefsTable(supabase)
+        .insert({
+          product_id: productId,
+          foundry_id: foundryId,
+          brief_content: {
+            product_category: briefContent.product_category ?? product.name,
+            target_cost_pence: briefContent.target_cost_pence ?? null,
+            target_weight_kg: briefContent.target_weight_kg ?? null,
+            target_dimensions: briefContent.target_dimensions ?? null,
+            key_requirements: Array.isArray(briefContent.key_requirements) ? briefContent.key_requirements : [],
+            materials_guidance: Array.isArray(briefContent.materials_guidance) ? briefContent.materials_guidance : [],
+            manufacturing_constraints: Array.isArray(briefContent.manufacturing_constraints) ? briefContent.manufacturing_constraints : [],
+            competitive_benchmarks: Array.isArray(briefContent.competitive_benchmarks) ? briefContent.competitive_benchmarks : [],
+            design_priorities: Array.isArray(briefContent.design_priorities) ? briefContent.design_priorities : [],
+            certification_requirements: Array.isArray(briefContent.certification_requirements) ? briefContent.certification_requirements : [],
+            source_context: `Next iteration brief incorporating ${improvements.length} approved improvements from synthesis`,
+          },
+          source: 'synthesis',
+          status: 'draft',
+          reviewed_by: 'max_cto',
+          review_notes: typeof briefContent.source_context === 'string' ? briefContent.source_context : null,
+        })
+        .select('*')
+        .single()
+
+      if (insertError) return { error: insertError.message }
+
+      return { data: brief as DesignBrief }
+    } catch (err) {
+      console.error('[generateDesignBriefFromSynthesis] Failed:', err)
+      return { error: 'Failed to generate design brief from synthesis' }
     }
   })
 }
