@@ -153,13 +153,13 @@ export async function POST() {
             .from("objectives")
             .select("title, description, workstream, resource_suggestions")
             .eq("foundry_id", foundryId)
-            .in("status", ["active", "in_progress", "not_started"])
+            .in("status", ["In Progress", "Not Started"])
             .limit(10),
           supabase
             .from("tasks")
             .select("title, description, workstream")
             .eq("foundry_id", foundryId)
-            .in("status", ["Pending"])
+            .in("status", ["Pending", "Accepted"])
             .limit(20),
           supabase
             .from("foundry_function_coverage")
@@ -285,7 +285,7 @@ export async function POST() {
         while (true) {
           const { data, error } = await supabase
             .from("marketplace_listings")
-            .select("id, title, description, category, subcategory, industries, process_capabilities, materials, certifications, key_equipment, company_size, minimum_order, is_verified, data_quality_score, average_rating, attributes, contact_email, contact_name, contact_phone, contact_linkedin, city, country")
+            .select("id, title, description, category, subcategory, industries, process_capabilities, materials, certifications, key_equipment, specialties, company_size, minimum_order, is_verified, data_quality_score, average_rating, attributes, contact_email, contact_name, contact_phone, contact_linkedin, city, country")
             .in("category", ["Products", "Services"])
             .range(offset, offset + pageSize - 1)
 
@@ -301,6 +301,7 @@ export async function POST() {
             materials: d.materials as string[] | null,
             certifications: d.certifications as string[] | null,
             key_equipment: d.key_equipment as string[] | null,
+            specialties: d.specialties as string[] | null,
             company_size: d.company_size as string | null,
             minimum_order: d.minimum_order as string | null,
             is_verified: d.is_verified || false,
@@ -364,11 +365,13 @@ export async function POST() {
               .map(pc => String((pc as Record<string, unknown>).process || (pc as Record<string, unknown>).name || ""))
               .filter(Boolean)
               .slice(0, 5)
+            const specs = (s.specialties ?? []).slice(0, 5)
             return `[${batchStart + i + 1}] ${s.title}
 Category: ${s.category} / ${s.subcategory}
-Description: ${(s.description || "").slice(0, 200)}
+Description: ${(s.description || "").slice(0, 300)}
 Location: ${[s.city, s.country].filter(Boolean).join(", ") || "Not specified"}
 Industries: ${(s.industries ?? []).slice(0, 5).join(", ") || "Not specified"}
+Specialties: ${specs.join(", ") || "Not specified"}
 Capabilities: ${caps.join(", ") || "Not specified"}
 Materials: ${(s.materials ?? []).slice(0, 5).join(", ") || "Not specified"}
 Certifications: ${(s.certifications ?? []).slice(0, 5).join(", ") || "Not specified"}

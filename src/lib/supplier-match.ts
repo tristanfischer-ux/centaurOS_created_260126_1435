@@ -51,6 +51,7 @@ export interface SupplierListing {
   materials: string[] | null
   certifications: string[] | null
   key_equipment: string[] | null
+  specialties: string[] | null
   company_size: string | null
   minimum_order: string | null
   is_verified: boolean
@@ -171,15 +172,22 @@ export function calculateSupplierMatchScore(
   }
 
   // 1. Industry alignment (up to industryMax pts)
+  // INTENT: ~70% of suppliers have industries[], ~60% have specialties[].
+  // Search both, plus description, for maximum coverage.
   let industryScore = 0
   if (hasIndustry) {
     const companyTerms = [profile.industry, profile.sector].filter(Boolean).map(s => normalise(s!))
     const supplierIndustries = (listing.industries ?? []).map(normalise)
+    const supplierSpecialties = (listing.specialties ?? []).map(normalise)
     const descNorm = normalise(listing.description || '')
 
     let matches = 0
     for (const term of companyTerms) {
-      if (supplierIndustries.some(si => fuzzyMatch(term, si)) || descNorm.includes(term)) {
+      if (
+        supplierIndustries.some(si => fuzzyMatch(term, si)) ||
+        supplierSpecialties.some(sp => fuzzyMatch(term, sp)) ||
+        descNorm.includes(term)
+      ) {
         matches++
       }
     }
@@ -230,21 +238,32 @@ export function calculateSupplierMatchScore(
   }
 
   // 3. Manufacturing fit (up to mfgMax pts)
+  // INTENT: Most suppliers (~80%) lack structured process_capabilities and materials
+  // fields. Fall back to description, specialties, and key_equipment text matching
+  // which are populated on ~60-95% of listings.
   let manufacturingScore = 0
   if (hasProjects && mfgMax > 0) {
     const processPts = Math.round(mfgMax * 0.6)
     const materialPts = mfgMax - processPts
 
-    // Process match
+    // Build searchable text from all available supplier data
     const supplierProcesses = (listing.process_capabilities ?? [])
       .map(pc => normalise(String((pc as Record<string, unknown>).process || (pc as Record<string, unknown>).name || '')))
       .filter(Boolean)
-    const supplierText = normalise(`${listing.title} ${listing.description} ${listing.subcategory}`)
+    const specialtiesText = (listing.specialties ?? []).map(normalise)
+    const equipmentText = (listing.key_equipment ?? []).map(normalise)
+    const supplierText = normalise(
+      `${listing.title} ${listing.description} ${listing.subcategory} ${specialtiesText.join(' ')} ${equipmentText.join(' ')}`
+    )
 
     let processMatched = false
     for (const needed of profile.processes) {
       const n = normalise(needed)
-      if (supplierProcesses.some(sp => fuzzyMatch(n, sp)) || supplierText.includes(n)) {
+      if (
+        supplierProcesses.some(sp => fuzzyMatch(n, sp)) ||
+        specialtiesText.some(st => fuzzyMatch(n, st)) ||
+        supplierText.includes(n)
+      ) {
         manufacturingScore += processPts
         topFactors.push(`${needed} capability`)
         processMatched = true
@@ -252,11 +271,14 @@ export function calculateSupplierMatchScore(
       }
     }
 
-    // Material match
+    // Material match — check structured field + description fallback
     const supplierMaterials = (listing.materials ?? []).map(normalise)
     for (const needed of profile.materials) {
       const n = normalise(needed)
-      if (supplierMaterials.some(sm => fuzzyMatch(n, sm)) || supplierText.includes(n)) {
+      if (
+        supplierMaterials.some(sm => fuzzyMatch(n, sm)) ||
+        supplierText.includes(n)
+      ) {
         manufacturingScore += materialPts
         if (!processMatched) topFactors.push(`Works with ${needed}`)
         break
@@ -278,23 +300,27 @@ export function calculateSupplierMatchScore(
   }
 
   // 5. Certification match (10 pts)
+  // INTENT: Only ~45% of suppliers have structured certifications field.
+  // Also search description text for cert mentions.
   let certScore = 0
   const supplierCerts = (listing.certifications ?? []).map(normalise)
-  if (supplierCerts.length > 0) {
-    // Use explicit cert needs if provided, else infer from industry
-    let neededCerts = profile.certNeeds.map(normalise)
-    if (neededCerts.length === 0 && profile.industry) {
-      const industryKey = normalise(profile.industry)
-      const matched = Object.entries(INDUSTRY_CERTS).find(([k]) => industryKey.includes(k))
-      neededCerts = matched ? matched[1] : INDUSTRY_CERTS.general
-    }
+  const certSearchText = normalise(`${listing.description || ''} ${(listing.specialties ?? []).join(' ')}`)
 
-    for (const needed of neededCerts) {
-      if (supplierCerts.some(sc => fuzzyMatch(needed, sc))) {
-        certScore = 10
-        topFactors.push(`${supplierCerts.find(sc => fuzzyMatch(needed, sc))?.toUpperCase() || needed.toUpperCase()} certified`)
-        break
-      }
+  // Use explicit cert needs if provided, else infer from industry
+  let neededCerts = profile.certNeeds.map(normalise)
+  if (neededCerts.length === 0 && profile.industry) {
+    const industryKey = normalise(profile.industry)
+    const matched = Object.entries(INDUSTRY_CERTS).find(([k]) => industryKey.includes(k))
+    neededCerts = matched ? matched[1] : INDUSTRY_CERTS.general
+  }
+
+  for (const needed of neededCerts) {
+    const certMatch = supplierCerts.find(sc => fuzzyMatch(needed, sc))
+    if (certMatch || certSearchText.includes(needed)) {
+      certScore = 10
+      const label = certMatch?.toUpperCase() || needed.toUpperCase()
+      topFactors.push(`${label} certified`)
+      break
     }
   }
 
