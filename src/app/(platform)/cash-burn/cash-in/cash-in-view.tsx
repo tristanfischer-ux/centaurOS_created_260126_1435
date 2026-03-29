@@ -71,8 +71,9 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const [balanceError, setBalanceError] = useState<string | null>(null)
   const [startDate] = useState(() => new Date())
 
-  // INTENT: Fetch products for product-name badges on items
+  // INTENT: Fetch products for product-name badges and filter dropdown
   const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  const [productFilter, setProductFilter] = useState<string>('all')
   useEffect(() => {
     getProducts().then(result => {
       if (result.data) {
@@ -386,10 +387,33 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
         />
       </div>
 
+      {/* Product filter */}
+      {Object.keys(productNameMap).length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filter by product:</span>
+          <select
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="all">All</option>
+            {Object.entries(productNameMap).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+            <option value="unattributed">Unattributed</option>
+          </select>
+        </div>
+      )}
+
       {/* Section Cards per source type */}
       <div className="space-y-4">
         {SOURCE_TYPE_CONFIG.map(cfg => {
-          const sectionItems = groupedItems[cfg.type] ?? []
+          const rawItems = groupedItems[cfg.type] ?? []
+          const sectionItems = productFilter === 'all'
+            ? rawItems
+            : productFilter === 'unattributed'
+              ? rawItems.filter(i => !i.productId)
+              : rawItems.filter(i => i.productId === productFilter)
           const sectionTotal = sectionItems.reduce((s, i) => s + i.weeklyAmount, 0)
           const isCollapsed = collapsedSections.has(cfg.type)
 

@@ -103,6 +103,8 @@ interface InvestorBrowserProps {
   initialMatchScores?: Record<string, number>
   initialShortlistIds?: Record<string, ShortlistStage>
   access?: InvestorTierAccess
+  /** Product sector keywords for computing Product Fit badges */
+  productSectors?: string[]
 }
 
 export function InvestorBrowser({
@@ -112,6 +114,7 @@ export function InvestorBrowser({
   initialMatchScores = {},
   initialShortlistIds = {},
   access,
+  productSectors = [],
 }: InvestorBrowserProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -590,6 +593,19 @@ export function InvestorBrowser({
                     key={firm.id}
                     firm={firm}
                     matchScore={matchScores[firm.id]}
+                    productFit={
+                      productSectors.length > 0 && firm.attributes.sectors && firm.attributes.sectors.length > 0
+                        ? (() => {
+                            const investorSectors = firm.attributes.sectors!.map(s => s.toLowerCase())
+                            const overlap = productSectors.filter(ps =>
+                              investorSectors.some(is => is.includes(ps) || ps.includes(is))
+                            ).length
+                            if (overlap >= 3) return 'strong' as const
+                            if (overlap >= 1) return 'partial' as const
+                            return undefined
+                          })()
+                        : undefined
+                    }
                     isShortlisted={firm.id in shortlistIds}
                     onToggleShortlist={() => handleToggleShortlist(firm.id)}
                     isCompareSelected={compareIds.includes(firm.id)}

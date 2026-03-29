@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { applyMergeReview } from '@/actions/business-plan'
-import { createProduct } from '@/actions/products'
+import { createProduct, generateMarketAssessment } from '@/actions/products'
 import { toast } from 'sonner'
 import type { MergeReviewState, ObjectiveMergeSuggestion, MergeDisposition, AnalyzedProduct } from '@/lib/business-plan-types'
 
@@ -119,6 +119,13 @@ export function MergeReviewDialog({ open, mergeState, onClose, onApplied }: Merg
           createdId: productResult.data?.id,
         }
         productsCreated++
+
+        // FLOW: Auto-trigger market assessment for adopted products
+        if (productResult.data?.id) {
+          generateMarketAssessment(productResult.data.id).catch((err) => {
+            console.error(`[merge-review] Auto-assess failed for "${ps.product.name}":`, err)
+          })
+        }
       }
     }
 

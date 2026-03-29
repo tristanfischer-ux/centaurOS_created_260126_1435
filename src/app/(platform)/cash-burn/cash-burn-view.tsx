@@ -8,7 +8,7 @@
 
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
@@ -35,6 +35,7 @@ import {
   deleteScenario,
 } from '@/actions/cash-burn-scenarios'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { getProducts } from '@/actions/products'
 import type {
   BurnScenario,
   CashOutItem,
@@ -68,6 +69,18 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
   const cashOut = initialData?.cashOut ?? []
   const cashIn = initialData?.cashIn ?? []
 
+  // INTENT: Fetch product names for "By Product" breakdown toggle
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  useEffect(() => {
+    getProducts().then(result => {
+      if (result.data) {
+        const map: Record<string, string> = {}
+        for (const p of result.data) map[p.id] = p.name
+        setProductNameMap(map)
+      }
+    })
+  }, [])
+
   // Pre-compute the weekly grids (these don't change with scenario)
   const cashOutGrid = useMemo(
     () => generateCashOutGrid(cashOut, WEEKS, startDate),
@@ -99,8 +112,26 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     return null
   }, [projection])
 
+  // Expense breakdown toggle: by category or by product
+  const [breakdownByProduct, setBreakdownByProduct] = useState(false)
+
   // Expense breakdown for donut chart
   const expenseBreakdown = useMemo(() => {
+    if (breakdownByProduct) {
+      // INTENT: Group by product — items without product go to "Unattributed"
+      const byProduct: Record<string, number> = {}
+      for (const item of cashOut) {
+        const label = item.productId && productNameMap[item.productId]
+          ? productNameMap[item.productId]
+          : 'Unattributed'
+        const weeklyNorm = normaliseToWeeklyPence(item.amount, item.frequency)
+        byProduct[label] = (byProduct[label] ?? 0) + weeklyNorm
+      }
+      return Object.entries(byProduct)
+        .map(([name, value], i) => ({ name, value, color: chartColors[i % chartColors.length] }))
+        .sort((a, b) => b.value - a.value)
+    }
+
     const byCategory: Record<string, number> = {}
     for (const item of cashOut) {
       const cat = item.category.replace(/_/g, ' ')
@@ -111,7 +142,7 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     return Object.entries(byCategory)
       .map(([name, value], i) => ({ name, value, color: chartColors[i % chartColors.length] }))
       .sort((a, b) => b.value - a.value)
-  }, [cashOut])
+  }, [cashOut, breakdownByProduct, productNameMap])
 
   // Stacked bar data for cash in vs out (scenario-adjusted)
   const stackedBarData = useMemo(() => {
@@ -364,11 +395,27 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
                 ]}
                 height={250}
               />
-              <DonutChart
-                title="Expense Breakdown"
-                data={expenseBreakdown}
-                height={250}
-              />
+              <div className="relative">
+                {Object.keys(productNameMap).length > 0 && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button
+                      onClick={() => setBreakdownByProduct(!breakdownByProduct)}
+                      className={`px-2 py-1 text-xs font-medium rounded-md border transition-colors ${
+                        breakdownByProduct
+                          ? 'bg-international-orange text-white border-international-orange'
+                          : 'bg-background text-muted-foreground border-border hover:text-foreground'
+                      }`}
+                    >
+                      {breakdownByProduct ? 'By Product' : 'By Category'}
+                    </button>
+                  </div>
+                )}
+                <DonutChart
+                  title={breakdownByProduct ? 'Expenses by Product' : 'Expense Breakdown'}
+                  data={expenseBreakdown}
+                  height={250}
+                />
+              </div>
             </div>
           </ErrorBoundary>
         </div>

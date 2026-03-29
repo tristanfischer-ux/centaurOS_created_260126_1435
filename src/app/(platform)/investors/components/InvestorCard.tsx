@@ -94,6 +94,8 @@ const DEPTH_LABELS = ['Minimal', 'Basic', 'Good', 'Detailed', 'Rich', 'Comprehen
 interface InvestorCardProps {
   firm: InvestorFirm
   matchScore?: number
+  /** Product fit level: 'strong' (green), 'partial' (amber), or undefined (hidden) */
+  productFit?: 'strong' | 'partial'
   isShortlisted?: boolean
   onToggleShortlist?: () => void
   isCompareSelected?: boolean
@@ -103,6 +105,7 @@ interface InvestorCardProps {
 export function InvestorCard({
   firm,
   matchScore,
+  productFit,
   isShortlisted,
   onToggleShortlist,
   isCompareSelected,
@@ -209,6 +212,14 @@ export function InvestorCard({
                 <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide">Active</span>
               </span>
+            )}
+            {productFit && (
+              <Badge
+                variant={productFit === 'strong' ? 'success' : 'warning'}
+                size="sm"
+              >
+                {productFit === 'strong' ? 'Product Fit' : 'Partial Fit'}
+              </Badge>
             )}
           </div>
         </div>

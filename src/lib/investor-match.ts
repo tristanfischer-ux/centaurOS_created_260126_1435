@@ -5,12 +5,13 @@
  * foundry profile. Pure functions — no "use server", no DB calls. All data passed in.
  *
  * Scoring factors:
- *   Stage alignment (30pts) — user's stage vs investor stage_focus
- *   Sector overlap  (25pts) — user's sector+industry vs investor sectors
- *   Hardware fit     (15pts) — investor hardware_fit_score (0-10 scaled to 0-15)
- *   Cheque range     (15pts) — typical raise for stage vs investor cheque range
- *   Geo focus        (10pts) — UK presence in investor geo_focus
- *   Active deploying  (5pts) — is_active_deploying flag
+ *   Stage alignment     (25pts) — user's stage vs investor stage_focus
+ *   Sector overlap      (25pts) — user's sector+industry vs investor sectors
+ *   Product readiness   (15pts) — best product's margin, market size, traction scores
+ *   Hardware fit        (10pts) — investor hardware_fit_score (0-10 scaled to 0-10)
+ *   Cheque range        (15pts) — typical raise for stage vs investor cheque range
+ *   Geo focus            (5pts) — UK presence in investor geo_focus
+ *   Active deploying     (5pts) — is_active_deploying flag
  */
 
 import type { InvestorFirm } from '@/actions/investors'
@@ -19,12 +20,23 @@ import type { InvestorFirm } from '@/actions/investors'
 // Types
 // ---------------------------------------------------------------------------
 
+export interface ProductReadiness {
+  /** Best product's margin score (0-100) from fundability */
+  marginScore: number | null
+  /** Best product's market size score (0-100) from fundability */
+  marketSizeScore: number | null
+  /** Best product's traction score (0-100) from fundability */
+  tractionScore: number | null
+}
+
 export interface FoundryProfile {
   stage: string | null
   sector: string | null
   industry: string | null
   /** Additional keywords from business plan, purpose, product description */
   businessKeywords?: string[]
+  /** Best product's fundability sub-scores for investor matching */
+  productReadiness?: ProductReadiness
 }
 
 export interface MatchBreakdown {
@@ -35,6 +47,7 @@ export interface MatchBreakdown {
   chequeScore: number
   geoScore: number
   activeScore: number
+  productReadinessScore: number
   topFactors: string[]
 }
 
@@ -77,7 +90,7 @@ export function calculateMatchScore(
   const attrs = firm.attributes
   const topFactors: string[] = []
 
-  // 1. Stage alignment (30 pts)
+  // 1. Stage alignment (25 pts)
   let stageScore = 0
   const userStage = profile.stage?.toLowerCase().replace(/\s+/g, '_') ?? ''
   const stageConfig = STAGE_MAP[userStage]
@@ -89,10 +102,10 @@ export function calculateMatchScore(
       attrs.stage_focus!.some(sf => sf.toLowerCase() === s.toLowerCase())
     )
     if (hasExact) {
-      stageScore = 30
+      stageScore = 25
       topFactors.push('Stage match')
     } else if (hasAdjacent) {
-      stageScore = 15
+      stageScore = 12
     }
   }
 
@@ -114,10 +127,10 @@ export function calculateMatchScore(
     }
   }
 
-  // 3. Hardware fit (15 pts) — 0-10 scaled to 0-15, clamped to prevent overflow
+  // 3. Hardware fit (10 pts) — 0-10 scaled to 0-10, clamped to prevent overflow
   const hwRaw = attrs.hardware_fit_score
   const hwClamped = hwRaw != null ? Math.min(10, Math.max(0, hwRaw)) : null
-  const hardwareScore = hwClamped != null ? Math.round((hwClamped / 10) * 15) : 7 // Null = neutral (7.5 rounded)
+  const hardwareScore = hwClamped != null ? Math.round(hwClamped) : 5 // Null = neutral
 
   // 4. Cheque range (15 pts)
   let chequeScore = 0
@@ -139,13 +152,13 @@ export function calculateMatchScore(
     }
   }
 
-  // 5. Geo focus (10 pts)
-  let geoScore = 5 // Default: neutral (no data)
+  // 5. Geo focus (5 pts)
+  let geoScore = 2 // Default: neutral (no data)
   if (attrs.geo_focus && attrs.geo_focus.length > 0) {
     const hasUK = attrs.geo_focus.some(g =>
       g.toLowerCase().includes('uk') || g.toLowerCase().includes('united kingdom')
     )
-    geoScore = hasUK ? 10 : 0
+    geoScore = hasUK ? 5 : 0
     if (hasUK) topFactors.push('UK focus')
   }
 
@@ -153,7 +166,17 @@ export function calculateMatchScore(
   const activeScore = attrs.is_active_deploying ? 5 : 0
   if (attrs.is_active_deploying) topFactors.push('Actively deploying')
 
-  // 7. Business plan / thesis alignment (bonus 0-10 pts)
+  // 7. Product readiness (15 pts) — best product's fundability sub-scores
+  let productReadinessScore = 0
+  const pr = profile.productReadiness
+  if (pr) {
+    if (pr.marginScore != null && pr.marginScore > 70) productReadinessScore += 5
+    if (pr.marketSizeScore != null && pr.marketSizeScore > 70) productReadinessScore += 5
+    if (pr.tractionScore != null && pr.tractionScore > 50) productReadinessScore += 5
+    if (productReadinessScore >= 10) topFactors.push('Strong product readiness')
+  }
+
+  // 8. Business plan / thesis alignment (bonus 0-10 pts)
   // INTENT: If the founder's business plan keywords appear in the investor's
   // thesis or portfolio descriptions, boost the score. This uses the rich
   // text data that stage/sector matching misses.
@@ -178,7 +201,7 @@ export function calculateMatchScore(
     }
   }
 
-  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore + thesisBonus)
+  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore + productReadinessScore + thesisBonus)
 
   return {
     total,
@@ -188,6 +211,7 @@ export function calculateMatchScore(
     chequeScore,
     geoScore,
     activeScore,
+    productReadinessScore,
     topFactors: topFactors.slice(0, 3),
   }
 }

@@ -11,6 +11,7 @@
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { searchInvestors, getInvestorStats, computeMatchScores, getShortlistIds, getInvestorTierAccess } from '@/actions/investors'
+import { getProducts } from '@/actions/products'
 import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
@@ -101,6 +102,27 @@ export default async function InvestorDirectoryPage() {
     }
   }
 
+  // FLOW: Fetch product sectors for "Product Fit" badges on investor cards
+  let productSectors: string[] = []
+  try {
+    const productsResult = await getProducts()
+    if (productsResult.data && productsResult.data.length > 0) {
+      // INTENT: Extract searchable terms from product names and descriptions
+      productSectors = productsResult.data.flatMap(p => {
+        const terms: string[] = []
+        if (p.name) terms.push(p.name.toLowerCase())
+        if (p.description) {
+          // Extract key terms from description (words > 4 chars)
+          const words = p.description.toLowerCase().split(/\s+/).filter(w => w.length > 4)
+          terms.push(...words.slice(0, 10))
+        }
+        return terms
+      })
+    }
+  } catch {
+    // Non-critical — Product Fit badges just won't show
+  }
+
   return (
     <div className="space-y-8">
       {/* Page header */}
@@ -153,6 +175,7 @@ export default async function InvestorDirectoryPage() {
                 initialMatchScores={matchScores}
                 initialShortlistIds={shortlistIds}
                 access={access}
+                productSectors={productSectors}
               />
             </Suspense>
           </>

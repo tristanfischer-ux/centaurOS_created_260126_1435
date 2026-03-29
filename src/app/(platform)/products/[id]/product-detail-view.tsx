@@ -167,6 +167,8 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   const [isSynthesizing, setIsSynthesizing] = React.useState(false)
   const [isStartingIteration, setIsStartingIteration] = React.useState(false)
   const [approvedImprovements, setApprovedImprovements] = React.useState<Set<string>>(new Set())
+  const [iterationResult, setIterationResult] = React.useState<'celebration' | 'warning' | null>(null)
+  const [iterationResultMessage, setIterationResultMessage] = React.useState<string>('')
   const [isSendingToForge, setIsSendingToForge] = React.useState(false)
 
   // ── Fundability → Design Brief flow state ─────────────────────────
@@ -309,6 +311,16 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       } else if (result.data) {
         setFundability(result.data)
         toast.success('Fundability score computed')
+
+        // FLOW: Auto-trigger synthesis after fundability scoring
+        synthesizeProductStatus(product.id).then((synthResult) => {
+          if (synthResult.data) {
+            setSynthesis(synthResult.data)
+            toast.success('Synthesis updated')
+          }
+        }).catch(() => {
+          // Non-critical — synthesis is supplementary
+        })
       }
     } catch {
       toast.error('Failed to compute fundability score')
@@ -421,6 +433,15 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         const refreshed = await import('@/actions/products').then(m => m.getProduct(product.id))
         if (refreshed.data) setProduct(refreshed.data)
         toast.success('Market assessment generated — review and validate the findings')
+
+        // FLOW: Auto-trigger synthesis after market assessment
+        synthesizeProductStatus(product.id).then((synthResult) => {
+          if (synthResult.data) {
+            setSynthesis(synthResult.data)
+          }
+        }).catch(() => {
+          // Non-critical
+        })
       }
     } catch {
       toast.error('Failed to generate market assessment')
@@ -575,9 +596,31 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         `Next iteration: ${improvements.join('; ')}`.slice(0, 500),
       )
 
-      // INTENT: Refresh iterations list
+      // INTENT: Refresh iterations list and check for celebration/warning
       const iterResult = await getIterationHistory(product.id)
-      if (iterResult.data) setIterations(iterResult.data)
+      if (iterResult.data) {
+        setIterations(iterResult.data)
+
+        // FLOW: Compare latest two iterations for celebration/warning state
+        if (iterResult.data.length >= 2) {
+          const prev = iterResult.data[iterResult.data.length - 2].pareto_scores as IterationPareto
+          const curr = iterResult.data[iterResult.data.length - 1].pareto_scores as IterationPareto
+          const allImproved = PARETO_DIMENSIONS.every(d => curr[d] >= prev[d]) &&
+            PARETO_DIMENSIONS.some(d => curr[d] > prev[d])
+          const anyRegressed = PARETO_DIMENSIONS.some(d => curr[d] < prev[d])
+
+          if (allImproved) {
+            setIterationResult('celebration')
+            setIterationResultMessage('All dimensions improved! Consider one more iteration or declare this product ready.')
+          } else if (anyRegressed) {
+            const regressed = PARETO_DIMENSIONS.filter(d => curr[d] < prev[d])
+            setIterationResult('warning')
+            setIterationResultMessage(
+              `${regressed.join(', ')} regressed. The last change may have introduced a trade-off. Review before proceeding.`
+            )
+          }
+        }
+      }
 
       setBriefs(prev => [briefResult.data!, ...prev])
       setApprovedImprovements(new Set())
@@ -2105,6 +2148,23 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                         </>
                       )}
                     </Button>
+                  )}
+
+                  {/* Celebration / Warning state */}
+                  {iterationResult === 'celebration' && (
+                    <div className="p-4 rounded-md bg-success/10 border border-success/20">
+                      <p className="text-sm font-medium text-success mb-1">All dimensions improved!</p>
+                      <p className="text-sm text-foreground">{iterationResultMessage}</p>
+                    </div>
+                  )}
+                  {iterationResult === 'warning' && (
+                    <div className="p-4 rounded-md bg-warning/10 border border-warning/20">
+                      <p className="text-sm font-medium text-warning mb-1">
+                        <AlertTriangle className="h-4 w-4 inline mr-1" />
+                        Regression detected
+                      </p>
+                      <p className="text-sm text-foreground">{iterationResultMessage}</p>
+                    </div>
                   )}
                 </div>
               ) : (

@@ -49,8 +49,9 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [error, setError] = useState<string | null>(null)
   const [startDate] = useState(() => new Date())
 
-  // INTENT: Fetch products for product-name badges on items
+  // INTENT: Fetch products for product-name badges and filter dropdown
   const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  const [productFilter, setProductFilter] = useState<string>('all')
   useEffect(() => {
     getProducts().then(result => {
       if (result.data) {
@@ -61,8 +62,15 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
     })
   }, [])
 
-  const fixedItems = useMemo(() => items.filter(i => i.costType === 'fixed'), [items])
-  const variableItems = useMemo(() => items.filter(i => i.costType === 'variable'), [items])
+  // FLOW: Apply product filter to items
+  const filteredItems = useMemo(() => {
+    if (productFilter === 'all') return items
+    if (productFilter === 'unattributed') return items.filter(i => !i.productId)
+    return items.filter(i => i.productId === productFilter)
+  }, [items, productFilter])
+
+  const fixedItems = useMemo(() => filteredItems.filter(i => i.costType === 'fixed'), [filteredItems])
+  const variableItems = useMemo(() => filteredItems.filter(i => i.costType === 'variable'), [filteredItems])
 
   const weeklyFixedTotal = useMemo(() => fixedItems.reduce((s, i) => s + i.weeklyAmount, 0), [fixedItems])
   const weeklyVariableTotal = useMemo(() => variableItems.reduce((s, i) => s + i.weeklyAmount, 0), [variableItems])
@@ -243,6 +251,24 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
           height={250}
         />
       </div>
+
+      {/* Product filter */}
+      {Object.keys(productNameMap).length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filter by product:</span>
+          <select
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="all">All</option>
+            {Object.entries(productNameMap).map(([id, name]) => (
+              <option key={id} value={id}>{name}</option>
+            ))}
+            <option value="unattributed">Unattributed</option>
+          </select>
+        </div>
+      )}
 
       {/* Two-section layout: Fixed | Variable */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
