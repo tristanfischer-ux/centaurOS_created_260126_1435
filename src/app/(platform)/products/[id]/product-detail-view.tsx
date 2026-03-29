@@ -20,7 +20,26 @@ import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { updateProduct, deleteProduct, syncProductFinancials, generateMarketAssessment, scoreFundability } from '@/actions/products'
+import {
+  updateProduct,
+  deleteProduct,
+  syncProductFinancials,
+  generateMarketAssessment,
+  scoreFundability,
+  generateDesignBriefFromAssessment,
+  generateDesignBriefFromSuggestion,
+  getDesignBriefs,
+  convertBriefToForge,
+  updateDesignBrief,
+  createIteration,
+} from '@/actions/products'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -46,8 +65,11 @@ import {
   TrendingUp,
   Lightbulb,
   Target,
+  FileText,
+  Send,
+  ClipboardList,
 } from 'lucide-react'
-import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore } from '@/types/product'
+import type { Product, ProductLifecycle, MarketAssessment, FundabilityScore, DesignBrief } from '@/types/product'
 import { LIFECYCLE_LABELS, LIFECYCLE_ORDER } from '@/types/product'
 
 // ─── Lifecycle styling ──────────────────────────────────────────────
@@ -108,6 +130,32 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   const [isAssessing, setIsAssessing] = React.useState(false)
   const [marketDraft, setMarketDraft] = React.useState<MarketAssessment | null>(product.market_assessment)
   const [isSavingMarket, setIsSavingMarket] = React.useState(false)
+
+  // ── Design brief state ─────────────────────────────────────────
+  const [isGeneratingBrief, setIsGeneratingBrief] = React.useState(false)
+  const [briefs, setBriefs] = React.useState<DesignBrief[]>([])
+  const [briefsLoaded, setBriefsLoaded] = React.useState(false)
+  const [isSendingToForge, setIsSendingToForge] = React.useState(false)
+
+  // ── Fundability → Design Brief flow state ─────────────────────────
+  const [applyingSuggestionIdx, setApplyingSuggestionIdx] = React.useState<number | null>(null)
+  const [suggestionBrief, setSuggestionBrief] = React.useState<DesignBrief | null>(null)
+  const [showBriefReviewDialog, setShowBriefReviewDialog] = React.useState(false)
+  const [isApprovingBrief, setIsApprovingBrief] = React.useState(false)
+
+  // INTENT: Fetch design briefs on mount
+  React.useEffect(() => {
+    let cancelled = false
+    async function loadBriefs() {
+      const result = await getDesignBriefs(product.id)
+      if (!cancelled && result.data) {
+        setBriefs(result.data)
+      }
+      if (!cancelled) setBriefsLoaded(true)
+    }
+    loadBriefs()
+    return () => { cancelled = true }
+  }, [product.id])
 
   // ── AI Briefing ──────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
@@ -222,6 +270,96 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     }
   }, [product.id])
 
+  // ── Fundability → Design Brief handler ─────────────────────────────
+
+  const handleApplySuggestion = React.useCallback(async (
+    suggestion: { action: string; impact_description: string },
+    index: number,
+  ) => {
+    setApplyingSuggestionIdx(index)
+    try {
+      const result = await generateDesignBriefFromSuggestion(product.id, suggestion)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setSuggestionBrief(result.data)
+        setShowBriefReviewDialog(true)
+        // INTENT: Add brief to local list so it appears immediately
+        setBriefs(prev => [result.data!, ...prev])
+      }
+    } catch {
+      toast.error('Failed to generate design brief')
+    } finally {
+      setApplyingSuggestionIdx(null)
+    }
+  }, [product.id])
+
+  const handleApproveBriefAndSendToForge = React.useCallback(async () => {
+    if (!suggestionBrief) return
+    setIsApprovingBrief(true)
+    try {
+      // FLOW: Convert brief to Forge project
+      const forgeResult = await convertBriefToForge(suggestionBrief.id)
+      if (forgeResult.error) {
+        toast.error(forgeResult.error)
+        setIsApprovingBrief(false)
+        return
+      }
+
+      // FLOW: Create iteration recording the change
+      const currentFundability = fundability?.overall ?? 0
+      const currentMarket = product.market_assessment ? 50 : 20
+      const currentFinancial = product.unit_economics?.gross_margin_pct
+        ? Math.min(100, Math.round(product.unit_economics.gross_margin_pct))
+        : 20
+      const currentManufacturing = product.cad_lab_project_id ? 50 : 20
+
+      const briefContent = suggestionBrief.brief_content as unknown as Record<string, unknown>
+      const suggestionAction = typeof briefContent.source_context === 'string'
+        ? briefContent.source_context
+        : 'Applied fundability suggestion'
+
+      await createIteration(
+        product.id,
+        {
+          market: currentMarket,
+          financial: currentFinancial,
+          fundability: currentFundability,
+          manufacturing: currentManufacturing,
+        },
+        [{ description: suggestionAction, dimension: 'fundability' }],
+        suggestionAction,
+      )
+
+      setShowBriefReviewDialog(false)
+      setSuggestionBrief(null)
+      toast.success('Design brief approved and sent to The Forge')
+
+      // INTENT: Navigate to the new CAD Lab project
+      if (forgeResult.data?.cadLabProjectId) {
+        router.push(`/the-forge/cad-lab?project=${forgeResult.data.cadLabProjectId}`)
+      }
+    } catch {
+      toast.error('Failed to send to Forge')
+    } finally {
+      setIsApprovingBrief(false)
+    }
+  }, [suggestionBrief, product, fundability, router])
+
+  const handleRejectBrief = React.useCallback(async () => {
+    if (!suggestionBrief) return
+    try {
+      await updateDesignBrief(suggestionBrief.id, { status: 'rejected' })
+      // INTENT: Update local brief list to reflect rejection
+      setBriefs(prev => prev.map(b => b.id === suggestionBrief.id ? { ...b, status: 'rejected' as const } : b))
+      toast.success('Brief rejected')
+    } catch {
+      toast.error('Failed to reject brief')
+    }
+    setShowBriefReviewDialog(false)
+    setSuggestionBrief(null)
+  }, [suggestionBrief])
+
   // ── Market tab handlers ───────────────────────────────────────────
 
   const handleAssessMarket = React.useCallback(async () => {
@@ -261,6 +399,42 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       setIsSavingMarket(false)
     }
   }, [product.id, marketDraft])
+
+  // ── Design brief handlers ────────────────────────────────────────
+
+  const handleGenerateDesignBrief = React.useCallback(async () => {
+    setIsGeneratingBrief(true)
+    try {
+      const result = await generateDesignBriefFromAssessment(product.id)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        setBriefs(prev => [result.data!, ...prev])
+        toast.success('Design brief generated')
+      }
+    } catch {
+      toast.error('Failed to generate design brief')
+    } finally {
+      setIsGeneratingBrief(false)
+    }
+  }, [product.id])
+
+  const handleSendToForge = React.useCallback(async (briefId: string) => {
+    setIsSendingToForge(true)
+    try {
+      const result = await convertBriefToForge(briefId)
+      if (result.error) {
+        toast.error(result.error)
+      } else if (result.data) {
+        toast.success('Design sent to The Forge')
+        router.push(`/the-forge/cad-lab/${result.data.cadLabProjectId}`)
+      }
+    } catch {
+      toast.error('Failed to send to Forge')
+    } finally {
+      setIsSendingToForge(false)
+    }
+  }, [router])
 
   /**
    * Updates a specific field in the market draft and marks it as founder_validated.
@@ -474,6 +648,136 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                 </div>
               </CardContent>
             </Card>
+
+            {/* Design Briefs section */}
+            {briefsLoaded && briefs.length > 0 && (() => {
+              const latest = briefs[0]
+              const bc = latest.brief_content
+              return (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <h3 className={typography.h3}>Design Brief</h3>
+                      <Badge variant="info" size="sm">
+                        {latest.status === 'sent_to_forge' ? 'Sent to Forge' : latest.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Headline numbers */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {bc.target_cost_pence != null && (
+                        <div className="p-3 rounded-md bg-muted">
+                          <p className="text-xs text-muted-foreground">Target Cost</p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {formatPence(bc.target_cost_pence)}
+                          </p>
+                        </div>
+                      )}
+                      {bc.target_weight_kg != null && (
+                        <div className="p-3 rounded-md bg-muted">
+                          <p className="text-xs text-muted-foreground">Target Weight</p>
+                          <p className="text-lg font-semibold text-foreground">
+                            {bc.target_weight_kg} kg
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Key requirements */}
+                    {bc.key_requirements.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                          <ClipboardList className="h-3 w-3" />
+                          Key Requirements
+                        </p>
+                        <ul className="space-y-1">
+                          {bc.key_requirements.map((req, i) => (
+                            <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                              <span className="text-international-orange mt-1 shrink-0">&bull;</span>
+                              {req}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Materials guidance */}
+                    {bc.materials_guidance.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Materials Guidance</p>
+                        <ul className="space-y-1">
+                          {bc.materials_guidance.map((mat, i) => (
+                            <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                              <span className="text-international-orange mt-1 shrink-0">&bull;</span>
+                              {mat}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Manufacturing constraints */}
+                    {bc.manufacturing_constraints.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Manufacturing Constraints</p>
+                        <ul className="space-y-1">
+                          {bc.manufacturing_constraints.map((con, i) => (
+                            <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                              <span className="text-muted-foreground mt-1 shrink-0">&bull;</span>
+                              {con}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Design priorities */}
+                    {bc.design_priorities.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">Design Priorities</p>
+                        <ol className="space-y-1 list-decimal list-inside">
+                          {bc.design_priorities.map((pri, i) => (
+                            <li key={i} className="text-sm text-foreground">{pri}</li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {/* Send to Forge button */}
+                    {latest.status !== 'sent_to_forge' && (
+                      <Button
+                        onClick={() => handleSendToForge(latest.id)}
+                        disabled={isSendingToForge}
+                        className="w-full"
+                      >
+                        {isSendingToForge ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-1" />
+                            Send to Forge
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {latest.status === 'sent_to_forge' && latest.cad_lab_project_id && (
+                      <Link
+                        href={`/the-forge/cad-lab/${latest.cad_lab_project_id}`}
+                        className="flex items-center justify-center gap-2 w-full p-2 text-sm font-medium text-international-orange bg-international-orange/10 rounded-md hover:bg-international-orange/20 transition-colors"
+                      >
+                        <Hammer className="h-4 w-4" />
+                        View in The Forge
+                      </Link>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })()}
           </div>
 
           {/* Sidebar column */}
@@ -1179,6 +1483,36 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                   {marketDraft.model_used && ` | Model: ${marketDraft.model_used}`}
                 </p>
               )}
+
+              {/* Generate Design Brief CTA */}
+              <Card className="border-international-orange/20 bg-international-orange/5">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground">Ready to design?</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Generate an engineering design brief from this market assessment to send to The Forge.
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleGenerateDesignBrief}
+                      disabled={isGeneratingBrief}
+                    >
+                      {isGeneratingBrief ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-1" />
+                          Generate Design Brief
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </>
           )}
         </div>
@@ -1443,11 +1777,18 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled
-                            className="text-xs h-6 px-2"
-                            title="Coming soon"
+                            disabled={applyingSuggestionIdx !== null}
+                            className="text-xs h-6 px-2 text-international-orange hover:text-international-orange"
+                            onClick={() => handleApplySuggestion(suggestion, i)}
                           >
-                            Apply to Design Brief
+                            {applyingSuggestionIdx === i ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              'Apply to Design Brief'
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -1459,6 +1800,127 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           )}
         </div>
       )}
+
+      {/* ── Brief Review Dialog (Fundability → Design Brief → Forge) ── */}
+      <Dialog open={showBriefReviewDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowBriefReviewDialog(false)
+          setSuggestionBrief(null)
+        }
+      }}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Review Design Brief</DialogTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Generated from your fundability improvement suggestion. Review the brief and send it to The Forge to start a new design iteration.
+            </p>
+          </DialogHeader>
+
+          {suggestionBrief && (() => {
+            const bc = suggestionBrief.brief_content as unknown as Record<string, unknown>
+            return (
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
+                {/* Target cost */}
+                {typeof bc.target_cost_pence === 'number' && (
+                  <div className="flex items-center justify-between p-3 rounded-md bg-muted">
+                    <span className="text-sm text-muted-foreground">Target Cost</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {formatPence(bc.target_cost_pence as number)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Key requirements */}
+                {Array.isArray(bc.key_requirements) && bc.key_requirements.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Key Requirements</p>
+                    <ul className="space-y-1.5">
+                      {(bc.key_requirements as string[]).map((req, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-foreground">
+                          <span className="text-international-orange mt-0.5 shrink-0">&#x2022;</span>
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Design priorities */}
+                {Array.isArray(bc.design_priorities) && bc.design_priorities.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Design Priorities</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {(bc.design_priorities as string[]).map((p, i) => (
+                        <Badge key={i} variant="outline" size="sm">
+                          {i + 1}. {p}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Manufacturing constraints */}
+                {Array.isArray(bc.manufacturing_constraints) && bc.manufacturing_constraints.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Manufacturing Constraints</p>
+                    <ul className="space-y-1">
+                      {(bc.manufacturing_constraints as string[]).map((c, i) => (
+                        <li key={i} className="text-sm text-muted-foreground">{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Materials guidance */}
+                {Array.isArray(bc.materials_guidance) && bc.materials_guidance.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Materials Guidance</p>
+                    <ul className="space-y-1">
+                      {(bc.materials_guidance as string[]).map((m, i) => (
+                        <li key={i} className="text-sm text-muted-foreground">{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Source context */}
+                {typeof bc.source_context === 'string' && (
+                  <div className="p-3 rounded-md bg-muted">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Context</p>
+                    <p className="text-sm text-foreground">{bc.source_context}</p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={handleRejectBrief}
+              disabled={isApprovingBrief}
+            >
+              Reject
+            </Button>
+            <Button
+              onClick={handleApproveBriefAndSendToForge}
+              disabled={isApprovingBrief}
+            >
+              {isApprovingBrief ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Sending to Forge...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-1.5" />
+                  Approve &amp; Send to Forge
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

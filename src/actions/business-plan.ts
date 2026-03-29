@@ -141,6 +141,7 @@ export async function buildSmartMerge(
         hiringRequirements: analysis.hiringRequirements,
         capacityRequirements: analysis.capacityRequirements,
         fundingRequirements: analysis.fundingRequirements,
+        extractedProducts: analysis.products ?? [],
         analysisId,
       },
     }

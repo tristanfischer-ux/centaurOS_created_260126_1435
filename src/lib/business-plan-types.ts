@@ -109,6 +109,8 @@ export interface MergeReviewState {
   hiringRequirements: HiringRequirement[]
   capacityRequirements: CapacityRequirement[]
   fundingRequirements: FundingRequirement[]
+  /** Products extracted from the business plan (Phase 4 — circular loop) */
+  extractedProducts: AnalyzedProduct[]
   analysisId: string
 }
 

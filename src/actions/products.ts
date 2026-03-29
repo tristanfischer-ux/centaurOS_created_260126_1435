@@ -1115,6 +1115,381 @@ export async function convertBriefToForge(
   })
 }
 
+// ─── getDesignBriefs ────────────────────────────────────────────────
+
+/**
+ * Fetches all design briefs for a product, ordered by creation date descending.
+ *
+ * @param productId - UUID of the product
+ * @returns Array of DesignBrief
+ */
+export async function getDesignBriefs(
+  productId: string,
+): Promise<ActionResult<DesignBrief[]>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+
+    const { data, error } = await briefsTable(supabase)
+      .select('*')
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('created_at', { ascending: false })
+
+    if (error) return { error: error.message }
+
+    return { data: (data ?? []) as DesignBrief[] }
+  })
+}
+
+// ─── generateDesignBriefFromAssessment ──────────────────────────────
+
+/**
+ * Generates a design brief from a product's market assessment.
+ *
+ * @description Uses Claude Sonnet with Priya (Product Lead) + Fang (VP Manufacturing)
+ * context to translate market assessment data into engineering constraints and
+ * design priorities. Creates a design brief with source='market_assessment'.
+ *
+ * @param productId - UUID of the product (must have a market_assessment)
+ * @returns The created DesignBrief
+ *
+ * @security Gated behind AI usage limits via withAIGate('market_assessment').
+ */
+export async function generateDesignBriefFromAssessment(
+  productId: string,
+): Promise<ActionResult<DesignBrief>> {
+  return withAIGate('market_assessment', async ({ supabase, foundryId, trackUsage }) => {
+    if (!productId || typeof productId !== 'string') {
+      return { error: 'Invalid product ID' }
+    }
+
+    // FLOW: Fetch product with market assessment
+    const { data: product, error: fetchError } = await productsTable(supabase)
+      .select('id, name, description, market_assessment, lifecycle')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !product) return { error: 'Product not found' }
+
+    const ma = product.market_assessment as MarketAssessment | null
+    if (!ma) return { error: 'No market assessment found — run market assessment first' }
+
+    // ── Build prompt ───────────────────────────────────────────────
+    const systemPrompt = `You are Priya (Product Lead) and Fang (VP Manufacturing) collaborating at Fractional Forge. Given this market assessment, produce a design brief. Be specific about engineering constraints. Consider the target customer, competitive pricing, and manufacturing feasibility.
+
+Return ONLY a valid JSON object matching this exact schema (no markdown fences, no explanation):
+{
+  "product_category": "string",
+  "target_cost_pence": number,
+  "target_weight_kg": number,
+  "target_dimensions": "string or null",
+  "key_requirements": ["string array of 4-6 specific requirements"],
+  "materials_guidance": ["string array of 2-4 material recommendations with reasoning"],
+  "manufacturing_constraints": ["string array of 3-5 manufacturing constraints"],
+  "competitive_benchmarks": [{"product": "string", "price": number_in_pence, "key_specs": "string"}],
+  "design_priorities": ["string array of 3-5 design priorities ordered by importance"],
+  "certification_requirements": ["string array of relevant certifications"],
+  "source_context": "brief summary of how market data informed this brief"
+}
+
+Rules:
+- target_cost_pence should be derived from pricing analysis minus healthy margin (aim for 40-60% gross margin)
+- key_requirements should be actionable engineering requirements, not vague goals
+- manufacturing_constraints should reference realistic processes for the target cost
+- competitive_benchmarks should reference real competitors from the market assessment
+- design_priorities should balance cost, quality, and time-to-market`
+
+    const userPrompt = `Generate a design brief for this product based on its market assessment:
+
+Product Name: ${product.name}
+Description: ${product.description || 'No description'}
+
+Market Assessment Data:
+- TAM: ${ma.tam_gbp != null ? `£${ma.tam_gbp.toLocaleString()}` : 'Unknown'}
+- SAM: ${ma.sam_gbp != null ? `£${ma.sam_gbp.toLocaleString()}` : 'Unknown'}
+- SOM: ${ma.som_gbp != null ? `£${ma.som_gbp.toLocaleString()}` : 'Unknown'}
+- Target Customer: ${ma.target_customer || 'Not specified'}
+- Customer Segments: ${JSON.stringify(ma.customer_segments)}
+- Competitive Landscape: ${JSON.stringify(ma.competitive_landscape)}
+- Pricing Analysis: ${JSON.stringify(ma.pricing_analysis)}
+- Market Risks: ${ma.market_risks.join('; ')}
+- Market Opportunities: ${ma.market_opportunities.join('; ')}
+
+Produce the design brief JSON.`
+
+    // ── Call Claude Sonnet ──────────────────────────────────────────
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-6-20250514',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+
+      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      if (!text) return { error: 'Empty response from AI' }
+
+      // INTENT: Track usage for billing
+      await trackUsage({
+        model: 'claude-sonnet-4-6-20250514',
+        promptTokens: response.usage?.input_tokens,
+        completionTokens: response.usage?.output_tokens,
+      })
+
+      // ── Parse response ─────────────────────────────────────────
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(cleaned)
+      } catch {
+        return { error: 'Failed to parse AI response as JSON' }
+      }
+
+      // INTENT: Build DesignBriefContent from parsed response
+      const briefContent = {
+        product_category: typeof parsed.product_category === 'string' ? parsed.product_category : undefined,
+        target_cost_pence: typeof parsed.target_cost_pence === 'number' ? parsed.target_cost_pence : undefined,
+        target_weight_kg: typeof parsed.target_weight_kg === 'number' ? parsed.target_weight_kg : undefined,
+        target_dimensions: typeof parsed.target_dimensions === 'string' ? parsed.target_dimensions : undefined,
+        key_requirements: Array.isArray(parsed.key_requirements)
+          ? parsed.key_requirements.filter((r: unknown): r is string => typeof r === 'string')
+          : [],
+        materials_guidance: Array.isArray(parsed.materials_guidance)
+          ? parsed.materials_guidance.filter((m: unknown): m is string => typeof m === 'string')
+          : [],
+        manufacturing_constraints: Array.isArray(parsed.manufacturing_constraints)
+          ? parsed.manufacturing_constraints.filter((c: unknown): c is string => typeof c === 'string')
+          : [],
+        competitive_benchmarks: Array.isArray(parsed.competitive_benchmarks)
+          ? parsed.competitive_benchmarks.map((b: Record<string, unknown>) => ({
+              product: String(b.product || ''),
+              price: typeof b.price === 'number' ? b.price : 0,
+              key_specs: String(b.key_specs || ''),
+            }))
+          : [],
+        design_priorities: Array.isArray(parsed.design_priorities)
+          ? parsed.design_priorities.filter((p: unknown): p is string => typeof p === 'string')
+          : [],
+        certification_requirements: Array.isArray(parsed.certification_requirements)
+          ? parsed.certification_requirements.filter((c: unknown): c is string => typeof c === 'string')
+          : [],
+        source_context: typeof parsed.source_context === 'string' ? parsed.source_context : undefined,
+      }
+
+      // ── Create the design brief ────────────────────────────────
+      const { data: brief, error: briefError } = await briefsTable(supabase)
+        .insert({
+          product_id: productId,
+          foundry_id: foundryId,
+          brief_content: briefContent,
+          source: 'market_assessment',
+        })
+        .select('*')
+        .single()
+
+      if (briefError) return { error: `Brief generated but failed to save: ${briefError.message}` }
+
+      return { data: brief as DesignBrief }
+    } catch (err) {
+      console.error('[generateDesignBriefFromAssessment] AI call failed:', err)
+      return { error: 'Design brief generation failed — please try again' }
+    }
+  })
+}
+
+// ─── generateDesignBriefFromSuggestion ───────────────────────────────
+
+/**
+ * Generates a design brief from a fundability improvement suggestion.
+ *
+ * @description Uses Claude Sonnet with Fang (VP Manufacturing) context to
+ * translate a business improvement suggestion into engineering constraints.
+ * Creates a design brief with source='fundability_suggestion'.
+ *
+ * @param productId - UUID of the product
+ * @param suggestion - The fundability improvement suggestion to apply
+ * @returns The created DesignBrief
+ *
+ * @security Gated behind AI usage limits via withAIGate('fundability_score').
+ */
+export async function generateDesignBriefFromSuggestion(
+  productId: string,
+  suggestion: { action: string; impact_description: string },
+): Promise<ActionResult<DesignBrief>> {
+  return withAIGate('fundability_score', async ({ supabase, foundryId, trackUsage }) => {
+    if (!productId || typeof productId !== 'string') {
+      return { error: 'Invalid product ID' }
+    }
+    if (!suggestion?.action?.trim()) {
+      return { error: 'Suggestion action is required' }
+    }
+
+    // SECURITY: Rate limit AI calls
+    const rateLimitError = await checkRateLimit('aiAnalysis', `ai:brief-from-suggestion:${productId}`)
+    if (rateLimitError) return { error: rateLimitError }
+
+    // FLOW: Fetch product with market assessment and unit economics
+    const { data: product, error: fetchError } = await productsTable(supabase)
+      .select('id, name, description, market_assessment, unit_economics, lifecycle, fundability_score')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !product) return { error: 'Product not found' }
+
+    const ma = product.market_assessment as MarketAssessment | null
+    const ue = product.unit_economics as UnitEconomics | null
+
+    // ── Build prompt ───────────────────────────────────────────────
+    const systemPrompt = `You are Fang, VP of Manufacturing at Fractional Forge. You are translating a business improvement suggestion into concrete engineering constraints for a design brief. Be specific about what needs to change in the product design to achieve the business goal.
+
+Return ONLY a valid JSON object matching this exact schema (no markdown fences, no explanation):
+{
+  "product_category": "string",
+  "target_cost_pence": number,
+  "target_weight_kg": number,
+  "target_dimensions": "string or null",
+  "key_requirements": ["string array of 4-6 specific engineering requirements driven by this suggestion"],
+  "materials_guidance": ["string array of 2-4 material recommendations"],
+  "manufacturing_constraints": ["string array of 3-5 manufacturing constraints"],
+  "competitive_benchmarks": [{"product": "string", "price": number_in_pence, "key_specs": "string"}],
+  "design_priorities": ["string array of 3-5 design priorities ordered by importance"],
+  "certification_requirements": ["string array of relevant certifications"],
+  "source_context": "explain how this fundability suggestion translates to design changes"
+}
+
+Rules:
+- Focus on what needs to CHANGE in the design to achieve the suggestion's goal
+- key_requirements should directly address the improvement action
+- target_cost_pence should reflect realistic manufacturing cost changes
+- Be concrete — avoid vague requirements like "improve quality"
+- design_priorities should be ordered by impact on the fundability improvement`
+
+    const productContext = [
+      `Product Name: ${product.name}`,
+      `Description: ${product.description || 'No description'}`,
+      `Lifecycle: ${product.lifecycle}`,
+    ]
+
+    if (ue) {
+      productContext.push(`Current COGS: ${(ue.cogs_per_unit_pence / 100).toFixed(2)} GBP`)
+      if (ue.gross_margin_pct != null) productContext.push(`Current Gross Margin: ${ue.gross_margin_pct.toFixed(1)}%`)
+    }
+
+    if (ma) {
+      if (ma.target_customer) productContext.push(`Target Customer: ${ma.target_customer}`)
+      if (ma.pricing_analysis?.recommended_price_pence != null) {
+        productContext.push(`Recommended Price: ${(ma.pricing_analysis.recommended_price_pence / 100).toFixed(2)} GBP`)
+      }
+      if (ma.competitive_landscape.length > 0) {
+        productContext.push(`Competitors: ${ma.competitive_landscape.map(c => c.competitor).join(', ')}`)
+      }
+    }
+
+    const userPrompt = `Translate this fundability improvement suggestion into a design brief:
+
+SUGGESTION:
+Action: ${suggestion.action}
+Expected Impact: ${suggestion.impact_description}
+
+CURRENT PRODUCT CONTEXT:
+${productContext.join('\n')}
+
+Generate the design brief JSON that will guide engineering changes to achieve this improvement.`
+
+    // ── Call Claude Sonnet ──────────────────────────────────────────
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const response = await client.messages.create({
+        model: 'claude-sonnet-4-6-20250514',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+
+      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      if (!text) return { error: 'Empty response from AI' }
+
+      // INTENT: Track usage for billing
+      await trackUsage({
+        model: 'claude-sonnet-4-6-20250514',
+        promptTokens: response.usage?.input_tokens,
+        completionTokens: response.usage?.output_tokens,
+      })
+
+      // ── Parse response ─────────────────────────────────────────
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(cleaned)
+      } catch {
+        return { error: 'Failed to parse AI response as JSON' }
+      }
+
+      // INTENT: Build DesignBriefContent from parsed response
+      const briefContent = {
+        product_category: typeof parsed.product_category === 'string' ? parsed.product_category : undefined,
+        target_cost_pence: typeof parsed.target_cost_pence === 'number' ? parsed.target_cost_pence : undefined,
+        target_weight_kg: typeof parsed.target_weight_kg === 'number' ? parsed.target_weight_kg : undefined,
+        target_dimensions: typeof parsed.target_dimensions === 'string' ? parsed.target_dimensions : undefined,
+        key_requirements: Array.isArray(parsed.key_requirements)
+          ? parsed.key_requirements.filter((r: unknown): r is string => typeof r === 'string')
+          : [],
+        materials_guidance: Array.isArray(parsed.materials_guidance)
+          ? parsed.materials_guidance.filter((m: unknown): m is string => typeof m === 'string')
+          : [],
+        manufacturing_constraints: Array.isArray(parsed.manufacturing_constraints)
+          ? parsed.manufacturing_constraints.filter((c: unknown): c is string => typeof c === 'string')
+          : [],
+        competitive_benchmarks: Array.isArray(parsed.competitive_benchmarks)
+          ? parsed.competitive_benchmarks.map((b: Record<string, unknown>) => ({
+              product: String(b.product || ''),
+              price: typeof b.price === 'number' ? b.price : 0,
+              key_specs: String(b.key_specs || ''),
+            }))
+          : [],
+        design_priorities: Array.isArray(parsed.design_priorities)
+          ? parsed.design_priorities.filter((p: unknown): p is string => typeof p === 'string')
+          : [],
+        certification_requirements: Array.isArray(parsed.certification_requirements)
+          ? parsed.certification_requirements.filter((c: unknown): c is string => typeof c === 'string')
+          : [],
+        source_context: typeof parsed.source_context === 'string' ? parsed.source_context : `From fundability suggestion: ${suggestion.action}`,
+      }
+
+      // ── Create the design brief ────────────────────────────────
+      const { data: brief, error: briefError } = await briefsTable(supabase)
+        .insert({
+          product_id: productId,
+          foundry_id: foundryId,
+          brief_content: briefContent,
+          source: 'fundability_suggestion',
+        })
+        .select('*')
+        .single()
+
+      if (briefError) return { error: `Brief generated but failed to save: ${briefError.message}` }
+
+      return { data: brief as DesignBrief }
+    } catch (err) {
+      console.error('[generateDesignBriefFromSuggestion] AI call failed:', err)
+      return { error: 'Design brief generation failed — please try again' }
+    }
+  })
+}
+
 // ─── Internal helpers ───────────────────────────────────────────────
 
 /**

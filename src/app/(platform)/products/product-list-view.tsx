@@ -16,13 +16,27 @@
 import * as React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
+import { createProduct, createIteration } from '@/actions/products'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { typography } from '@/lib/design-system'
-import { Hammer, Lightbulb, FileText, Package, ArrowRight, Lock } from 'lucide-react'
+import { toast } from 'sonner'
+import { Hammer, Lightbulb, FileText, Package, ArrowRight, Lock, Loader2 } from 'lucide-react'
 import type { ProductSummary, ProductLifecycle } from '@/types/product'
 import { LIFECYCLE_LABELS } from '@/types/product'
 
@@ -144,29 +158,78 @@ export function ProductListView({ products }: ProductListViewProps) {
 // ─── Empty State ────────────────────────────────────────────────────
 
 function EmptyProductState() {
+  const router = useRouter()
+  const [marketDialogOpen, setMarketDialogOpen] = React.useState(false)
+  const [marketDescription, setMarketDescription] = React.useState('')
+  const [problem, setProblem] = React.useState('')
+  const [industry, setIndustry] = React.useState('')
+  const [isCreating, setIsCreating] = React.useState(false)
+
+  const handleMarketIdeaSubmit = React.useCallback(async () => {
+    if (!marketDescription.trim() || !problem.trim()) {
+      toast.error('Please fill in target market and problem')
+      return
+    }
+    setIsCreating(true)
+    try {
+      const productName = industry.trim()
+        ? `${industry.trim()} Product`
+        : 'Market Opportunity Product'
+      const description = `${marketDescription.trim()}\n\nProblem: ${problem.trim()}`
+
+      const result = await createProduct({ name: productName, description })
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
+      if (!result.data) {
+        toast.error('Failed to create product')
+        return
+      }
+
+      // INTENT: Create first iteration with zero scores for the new market-first product
+      await createIteration(
+        result.data.id,
+        { market: 0, financial: 0, fundability: 0, manufacturing: 0 },
+        [],
+        'Initial product from market opportunity',
+      )
+
+      toast.success('Product created — assess the market next')
+      setMarketDialogOpen(false)
+      router.push(`/products/${result.data.id}`)
+    } catch {
+      toast.error('Failed to create product')
+    } finally {
+      setIsCreating(false)
+    }
+  }, [marketDescription, problem, industry, router])
+
   const flows = [
     {
       title: 'From The Forge',
       description: 'Promote a completed design to a product',
       icon: Hammer,
-      href: '/the-forge',
+      href: '/the-forge' as string | undefined,
       enabled: true,
+      onClick: undefined as (() => void) | undefined,
     },
     {
       title: 'From a Market Idea',
       description: 'Start with your target market',
       icon: Lightbulb,
-      href: undefined,
-      enabled: false,
-      badge: 'Coming soon',
+      href: undefined as string | undefined,
+      enabled: true,
+      onClick: (() => setMarketDialogOpen(true)) as (() => void) | undefined,
     },
     {
       title: 'From Your Business Plan',
-      description: 'Extract products from an uploaded plan',
+      description: 'Upload a business plan on the Strategy page to extract products',
       icon: FileText,
-      href: undefined,
-      enabled: false,
-      badge: 'Coming soon',
+      href: '/strategy' as string | undefined,
+      enabled: true,
+      badge: undefined as string | undefined,
+      onClick: undefined as (() => void) | undefined,
     },
   ]
 
@@ -227,9 +290,82 @@ function EmptyProductState() {
             )
           }
 
+          if (flow.enabled && flow.onClick) {
+            const handler = flow.onClick
+            return (
+              <div key={flow.title} onClick={handler} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handler() }}>
+                {content}
+              </div>
+            )
+          }
+
           return <div key={flow.title}>{content}</div>
         })}
       </div>
+
+      {/* Market Idea Dialog */}
+      <Dialog open={marketDialogOpen} onOpenChange={setMarketDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create from a Market Idea</DialogTitle>
+            <DialogDescription>
+              Describe your market opportunity and we will help you build a product around it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="market-description">
+                Describe your target market <span className="text-destructive">*</span>
+              </Label>
+              <textarea
+                id="market-description"
+                value={marketDescription}
+                onChange={(e) => setMarketDescription(e.target.value)}
+                className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
+                placeholder="e.g. Small UK manufacturers who need affordable quality inspection tools..."
+                aria-required="true"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="market-problem">
+                What problem does your product solve? <span className="text-destructive">*</span>
+              </Label>
+              <textarea
+                id="market-problem"
+                value={problem}
+                onChange={(e) => setProblem(e.target.value)}
+                className="w-full min-h-[80px] p-3 text-sm rounded-md border border-input bg-background text-foreground resize-y"
+                placeholder="e.g. Current solutions cost 10x more and require specialist training..."
+                aria-required="true"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="market-industry">What industry?</Label>
+              <Input
+                id="market-industry"
+                value={industry}
+                onChange={(e) => setIndustry(e.target.value)}
+                placeholder="e.g. Manufacturing, Healthcare, Agriculture..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setMarketDialogOpen(false)} disabled={isCreating}>
+              Cancel
+            </Button>
+            <Button onClick={handleMarketIdeaSubmit} disabled={isCreating || !marketDescription.trim() || !problem.trim()}>
+              {isCreating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Create Product'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
