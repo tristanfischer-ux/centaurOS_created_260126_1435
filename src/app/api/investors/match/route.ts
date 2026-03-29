@@ -13,8 +13,6 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { getTextProvider } from "@/lib/ai-providers/registry"
-import type { AIProviderId } from "@/lib/ai-providers/types"
 import { calculateMatchScore } from "@/lib/investor-match"
 import type { FoundryProfile } from "@/lib/investor-match"
 import type { InvestorFirm } from "@/actions/investors"
@@ -22,31 +20,34 @@ import type { InvestorFirm } from "@/actions/investors"
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-// ─── Haiku Call ─────────────────────────────────────────────────
-
-function resolveApiKey(providerId: AIProviderId): string {
-  const envMap: Partial<Record<AIProviderId, string>> = {
-    anthropic: process.env.ANTHROPIC_API_KEY?.trim(),
-  }
-  const key = envMap[providerId]
-  if (!key) throw new Error(`API key not configured for: ${providerId}`)
-  return key
-}
+// ─── DeepSeek Call ───────────────────────────────────────────────
 
 async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
-  const streamFn = getTextProvider("anthropic")
-  if (!streamFn) throw new Error("Anthropic provider not available")
-  const apiKey = resolveApiKey("anthropic")
-  let output = ""
-  await new Promise<void>((resolve, reject) => {
-    streamFn({
-      apiKey, modelId: "claude-haiku-4-5", systemPrompt, userPrompt, maxTokens,
-      onChunk: (t) => { output += t },
-      onDone: () => resolve(),
-      onError: (e) => reject(new Error(e)),
-    }).catch(reject)
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
+  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured")
+
+  const response = await fetch("https://api.deepseek.com/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "deepseek-chat",
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
   })
-  return output
+
+  if (!response.ok) {
+    throw new Error(`DeepSeek API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.choices?.[0]?.message?.content ?? ""
 }
 
 function safeParseJSON<T>(text: string): T[] {

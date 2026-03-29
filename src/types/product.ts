@@ -173,3 +173,66 @@ export interface UpdateProductInput {
   hero_image_url?: string | null
   market_assessment?: MarketAssessment | null
 }
+
+// ─── Iteration Tracking ─────────────────────────────────────────────
+
+export interface IterationPareto {
+  market: number      // 0-100
+  financial: number   // 0-100
+  fundability: number // 0-100
+  manufacturing: number // 0-100
+}
+
+export type ConvergenceStatus = 'initial' | 'improving' | 'moderate' | 'plateauing' | 'regressing' | 'converged'
+
+export interface ProductIteration {
+  id: string
+  product_id: string
+  foundry_id: string
+  iteration_number: number
+  pareto_scores: IterationPareto
+  changes_made: Array<{ description: string; dimension: string }>
+  hypothesis: string | null
+  outcome: string | null
+  convergence_delta: number
+  convergence_status: ConvergenceStatus
+  created_at: string
+}
+
+// ─── Design Briefs ──────────────────────────────────────────────────
+
+export type BriefSource = 'market_assessment' | 'fundability_suggestion' | 'manual' | 'synthesis'
+export type BriefStatus = 'draft' | 'reviewed' | 'approved' | 'sent_to_forge' | 'rejected'
+
+export interface DesignBriefContent {
+  product_category?: string
+  target_cost_pence?: number
+  target_weight_kg?: number
+  target_dimensions?: string
+  key_requirements: string[]
+  materials_guidance: string[]
+  manufacturing_constraints: string[]
+  competitive_benchmarks: Array<{ product: string; price: number; key_specs: string }>
+  design_priorities: string[]
+  certification_requirements: string[]
+  source_context?: string
+}
+
+export interface DesignBrief {
+  id: string
+  product_id: string
+  foundry_id: string
+  brief_content: DesignBriefContent
+  source: BriefSource
+  status: BriefStatus
+  reviewed_by: string | null
+  review_notes: string | null
+  cad_lab_project_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateDesignBriefInput {
+  brief_content: DesignBriefContent
+  source: BriefSource
+}

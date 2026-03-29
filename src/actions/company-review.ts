@@ -77,7 +77,7 @@ export async function reviewMatchedCompanies(
     return { reviews: [], summary: "No companies to review." }
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) {
     return { reviews: [], summary: "AI review unavailable." }
   }
@@ -157,18 +157,19 @@ Assess each company's fitness. Be specific — reference actual capabilities vs 
   const timeout = setTimeout(() => controller.abort(), 15_000)
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
+        model: "deepseek-chat",
         max_tokens: 2048,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
       }),
       signal: controller.signal,
     })
@@ -181,7 +182,7 @@ Assess each company's fitness. Be specific — reference actual capabilities vs 
     }
 
     const data = await response.json()
-    const text = (data.content?.[0]?.text ?? "").trim()
+    const text = (data.choices?.[0]?.message?.content ?? "").trim()
 
     if (!text) {
       return { reviews: [], summary: "AI returned empty response." }

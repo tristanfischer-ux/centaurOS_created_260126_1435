@@ -59,9 +59,9 @@ export async function estimateModuleCostsAi(
   techniqueInsights?: Record<string, ProcessInsights>,
 ): Promise<EstimateResult | EstimateError> {
   return withAIGate('cad_lab_cost', async () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) {
-    return { success: false, error: "ANTHROPIC_API_KEY not configured" }
+    return { success: false, error: "DEEPSEEK_API_KEY not configured" }
   }
 
   if (modules.length === 0) {
@@ -191,23 +191,33 @@ ${JSON.stringify(moduleSummaries, null, 2)}
 Return ONLY valid JSON.`
 
   try {
-    // DECISION: Anthropic SDK instead of fetchWithTimeout — AbortController is unreliable
-    // in Next.js server actions (see memory: "AbortSignal.timeout() is unreliable").
-    // SDK handles connection management; Vercel's 300s maxDuration is the natural ceiling.
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
-
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 8192,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+    // DECISION: Direct fetch to DeepSeek API (OpenAI-compatible format).
+    // Vercel's 300s maxDuration is the natural ceiling.
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        max_tokens: 8192,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
     })
 
-    const text: string = response.content[0]?.type === "text" ? response.content[0].text : ""
+    if (!response.ok) {
+      return { success: false, error: `DeepSeek API error: ${response.status}` }
+    }
+
+    const responseData = await response.json()
+    const text: string = responseData.choices?.[0]?.message?.content ?? ""
 
     if (!text) {
-      return { success: false, error: "Empty response from Claude" }
+      return { success: false, error: "Empty response from DeepSeek" }
     }
 
     // Parse JSON — strip markdown fences if present
@@ -275,7 +285,7 @@ Return ONLY valid JSON.`
     }
 
     console.info("[CAD-LAB-COST] AI estimates produced for", Object.keys(estimates).length, "modules",
-      `(${response.usage?.input_tokens ?? 0} in / ${response.usage?.output_tokens ?? 0} out)`)
+      `(${responseData.usage?.prompt_tokens ?? 0} in / ${responseData.usage?.completion_tokens ?? 0} out)`)
 
     // Log category distribution for debugging
     const allParts = Object.values(estimates).flatMap(e => e.parts ?? [])

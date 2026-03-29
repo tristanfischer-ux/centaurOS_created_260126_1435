@@ -73,9 +73,9 @@ export async function classifyPartsAi(
   parts: PartToClassify[],
 ): Promise<ClassifySuccess | ClassifyError> {
   return withAIGate('cad_lab_classify', async () => {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) {
-    return { success: false, error: "ANTHROPIC_API_KEY not configured" }
+    return { success: false, error: "DEEPSEEK_API_KEY not configured" }
   }
 
   if (parts.length === 0) {
@@ -115,19 +115,30 @@ CRITICAL: Return ONLY valid JSON array, no markdown fences.
 ${JSON.stringify(partsInput, null, 2)}`
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
-
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
+    const response = await fetch("https://api.deepseek.com/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "deepseek-chat",
+        max_tokens: 4096,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
     })
 
-    const text: string = response.content[0]?.type === "text" ? response.content[0].text : ""
+    if (!response.ok) {
+      return { success: false, error: `DeepSeek API error: ${response.status}` }
+    }
+
+    const responseData = await response.json()
+    const text: string = responseData.choices?.[0]?.message?.content ?? ""
     if (!text) {
-      return { success: false, error: "Empty response from Claude" }
+      return { success: false, error: "Empty response from DeepSeek" }
     }
 
     // Parse JSON — strip markdown fences if present
@@ -202,7 +213,7 @@ ${JSON.stringify(partsInput, null, 2)}`
 
     console.info(
       `[CAD-CLASSIFY] AI classified ${classifications.length}/${parts.length} parts`,
-      `(${response.usage?.input_tokens ?? 0} in / ${response.usage?.output_tokens ?? 0} out)`,
+      `(${responseData.usage?.prompt_tokens ?? 0} in / ${responseData.usage?.completion_tokens ?? 0} out)`,
     )
 
     return { success: true, classifications }

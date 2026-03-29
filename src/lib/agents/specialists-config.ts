@@ -96,8 +96,8 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for Opus (finance, legal), "sonnet" for Sonnet 4.6 (most specialists), "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
-    modelTier: "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax"
+    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V4, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
+    modelTier: "claude" | "sonnet" | "deepseek" | "google" | "openai" | "qwen" | "qwen-local" | "minimax"
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
     speculativeEnabled?: boolean
@@ -202,7 +202,7 @@ export const SPECIALISTS: Specialist[] = [
             "Narrowing to what matters...",
             "Almost there — one strong recommendation coming.",
         ],
-        modelTier: "sonnet",
+        modelTier: "google",
     },
     // ═════════════════════════════════════════════════════════════════════════════
     // TECHNOLOGY — The foundation of making things
@@ -569,7 +569,7 @@ export const SPECIALISTS: Specialist[] = [
             "Evaluating contingency options...",
             "Supply strategy locked in — finalizing recommendations.",
         ],
-        modelTier: "sonnet",
+        modelTier: "google",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -770,7 +770,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting creative to conversion...",
             "Strategy and tactics aligned — here it comes.",
         ],
-        modelTier: "sonnet",
+        modelTier: "google",
         speculativeEnabled: true,
     },
     {
@@ -871,7 +871,7 @@ export const SPECIALISTS: Specialist[] = [
             "Building the playbook...",
             "Scripts and numbers ready — let's close this.",
         ],
-        modelTier: "sonnet",
+        modelTier: "openai",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1064,7 +1064,7 @@ export const SPECIALISTS: Specialist[] = [
             "Stress-testing assumptions...",
             "Building your financial picture.",
         ],
-        modelTier: "claude",
+        modelTier: "deepseek",
         speculativeEnabled: true,
     },
     {
@@ -1163,7 +1163,7 @@ export const SPECIALISTS: Specialist[] = [
             "Pressure-testing the weak spots...",
             "The story is coming together — almost there.",
         ],
-        modelTier: "sonnet",
+        modelTier: "openai",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1259,7 +1259,7 @@ export const SPECIALISTS: Specialist[] = [
             "Considering team dynamics and culture fit...",
             "Practical plan ready — no corporate fluff.",
         ],
-        modelTier: "sonnet",
+        modelTier: "deepseek",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════

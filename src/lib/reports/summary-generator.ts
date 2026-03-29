@@ -72,7 +72,7 @@ Keep it to 2-3 sentences. Be warm but professional. Don't use the word "AI" anyw
         }
         
         const completion = await openai.chat.completions.create({
-            model: 'gpt-5.3-chat-latest',
+            model: 'gpt-5.4',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { 

@@ -312,7 +312,7 @@ async function callDocumentExtractionLLM(
   const openai = new OpenAI({ apiKey })
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-5.3-chat-latest',
+    model: 'gpt-5.4',
     temperature: 0.2,
     max_tokens: 4000,
     messages: [

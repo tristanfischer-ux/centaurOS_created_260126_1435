@@ -146,14 +146,20 @@ export interface MonthlyUsage {
  * Updated Mar 2026. Check OpenAI pricing page for current rates.
  */
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
-  'gpt-5.3-chat-latest': { input: 1.75, output: 14.00 },
+  'gpt-5.4': { input: 2.50, output: 15.00 },
+  'gpt-4.1': { input: 2.00, output: 8.00 },
   'o3': { input: 5.00, output: 20.00 },
+  'o4-mini': { input: 1.10, output: 4.40 },
   'gemini-3.1-pro-preview': { input: 1.25, output: 5.00 },
   'gemini-3.1-flash-lite-preview': { input: 0.075, output: 0.30 },
+  'gemini-2.5-flash': { input: 0.30, output: 2.50 },
   'whisper-1': { input: 0.006, output: 0 }, // per second, approximated
   'claude-sonnet-4-6': { input: 3.00, output: 15.00 },
-  'claude-opus-4-6': { input: 15.00, output: 75.00 },
-  'claude-haiku-4-5': { input: 0.80, output: 4.00 },
+  'claude-opus-4-6': { input: 5.00, output: 25.00 },
+  'claude-haiku-4-5': { input: 1.00, output: 5.00 },
+  // DeepSeek models
+  'deepseek-chat': { input: 0.30, output: 0.50 },
+  'deepseek-reasoner': { input: 0.55, output: 2.19 },
   // MiniMax models — dramatically cheaper than OpenAI/Anthropic
   // M2.7: same pricing tier as M2.5 (OpenAI-compatible endpoint)
   'MiniMax-M2.7': { input: 0.15, output: 1.20 },
@@ -219,7 +225,7 @@ export function estimateWebSearchCost(webSearchRequests: number): number {
 /**
  * Estimate the cost of an AI API call based on token counts and model.
  *
- * @param model - The AI model used (e.g. 'gpt-5.3-chat-latest')
+ * @param model - The AI model used (e.g. 'gpt-5.4')
  * @param promptTokens - Number of input/prompt tokens
  * @param completionTokens - Number of output/completion tokens
  * @returns Estimated cost in USD
@@ -229,7 +235,7 @@ export function estimateAICost(
   promptTokens: number,
   completionTokens: number
 ): number {
-  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-5.3-chat-latest']
+  const costs = MODEL_COSTS_PER_1M_TOKENS[model] || MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
   const inputCost = (promptTokens / 1_000_000) * costs.input
   const outputCost = (completionTokens / 1_000_000) * costs.output
   return Number((inputCost + outputCost).toFixed(6))

@@ -103,9 +103,9 @@ Output ONLY this exact JSON format with no other text:
 }`
 
     // Fast-fail if API key is missing
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
     if (!apiKey) {
-      console.error('[generateOutreachDraft] ANTHROPIC_API_KEY not configured')
+      console.error('[generateOutreachDraft] DEEPSEEK_API_KEY not configured')
       return { error: 'AI service not configured' }
     }
 
@@ -114,18 +114,19 @@ Output ONLY this exact JSON format with no other text:
     const timeout = setTimeout(() => controller.abort(), 30_000)
     let response: Response
     try {
-      response = await fetch('https://api.anthropic.com/v1/messages', {
+      response = await fetch('https://api.deepseek.com/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
+          model: 'deepseek-chat',
           max_tokens: 1024,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
         }),
         signal: controller.signal,
       })
@@ -142,13 +143,13 @@ Output ONLY this exact JSON format with no other text:
     }
 
     const data = await response.json()
-    const text = data.content?.[0]?.text ?? ''
+    const text = data.choices?.[0]?.message?.content ?? ''
 
     // Track usage
     await trackUsage({
-      model: 'claude-haiku-4-5-20251001',
-      promptTokens: data.usage?.input_tokens ?? 0,
-      completionTokens: data.usage?.output_tokens ?? 0,
+      model: 'deepseek-chat',
+      promptTokens: data.usage?.prompt_tokens ?? 0,
+      completionTokens: data.usage?.completion_tokens ?? 0,
     })
 
     // Parse JSON from response

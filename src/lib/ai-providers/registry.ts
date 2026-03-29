@@ -588,6 +588,43 @@ async function streamMiniMax(opts: StreamingTextOptions): Promise<void> {
     }
 }
 
+// ─── DeepSeek Text Streaming (OpenAI-compatible) ─────────────────────
+
+/**
+ * Streams text from DeepSeek via their OpenAI-compatible endpoint.
+ * DeepSeek V4 and R1 use the same chat completions API at
+ * `https://api.deepseek.com`.
+ */
+async function streamDeepSeek(opts: StreamingTextOptions): Promise<void> {
+    const OpenAI = (await import("openai")).default
+    const client = new OpenAI({
+        apiKey: opts.apiKey,
+        baseURL: "https://api.deepseek.com",
+    })
+
+    const messages = buildMessages(opts)
+
+    try {
+        const stream = await client.chat.completions.create({
+            model: opts.modelId,
+            messages: messages as Parameters<typeof client.chat.completions.create>[0]['messages'],
+            stream: true,
+            max_tokens: opts.maxTokens ?? 4096,
+        })
+
+        for await (const chunk of stream) {
+            if (opts.signal?.aborted) break
+            const text = chunk.choices[0]?.delta?.content ?? ""
+            if (text) opts.onChunk(text)
+        }
+        opts.onDone()
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        console.error("[streamDeepSeek] Stream failed:", { model: opts.modelId, error: errorMessage })
+        opts.onError(errorMessage)
+    }
+}
+
 // ─── Together AI Text Streaming (OpenAI-compatible) ──────────────────
 
 /**
@@ -1016,6 +1053,7 @@ const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     "qwen-local": streamQwenLocal,
     minimax: streamMiniMax,
     together: streamTogether,
+    deepseek: streamDeepSeek,
 }
 
 const IMAGE_PROVIDERS: Partial<Record<AIProviderId, ImageGenFn>> = {

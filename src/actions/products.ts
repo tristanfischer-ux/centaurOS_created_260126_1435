@@ -27,6 +27,12 @@ import type {
   UnitEconomics,
   MarketAssessment,
   FundabilityScore,
+  IterationPareto,
+  ProductIteration,
+  ConvergenceStatus,
+  DesignBrief,
+  BriefStatus,
+  CreateDesignBriefInput,
 } from '@/types/product'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -822,6 +828,290 @@ export async function scoreFundability(
     if (updateError) return { error: updateError.message }
 
     return { data: fundabilityScore }
+  })
+}
+
+// ─── Iteration Tracking ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function iterationsTable(supabase: any) {
+  return (supabase as any).from('product_iterations')
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function briefsTable(supabase: any) {
+  return (supabase as any).from('design_briefs')
+}
+
+/**
+ * Creates a new iteration for a product, computing convergence status.
+ *
+ * @param productId - UUID of the product
+ * @param scores - Pareto scores across 4 dimensions (0-100 each)
+ * @param changes - Array of changes made in this iteration
+ * @param hypothesis - What we expect this iteration to achieve
+ * @returns The created ProductIteration
+ */
+export async function createIteration(
+  productId: string,
+  scores: IterationPareto,
+  changes: Array<{ description: string; dimension: string }>,
+  hypothesis: string,
+): Promise<ActionResult<ProductIteration>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+
+    // FLOW: Fetch all existing iterations to determine number + convergence
+    const { data: existing, error: fetchError } = await iterationsTable(supabase)
+      .select('iteration_number, pareto_scores, convergence_delta')
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('iteration_number', { ascending: true })
+
+    if (fetchError) return { error: fetchError.message }
+
+    const iterations = (existing ?? []) as Array<{
+      iteration_number: number
+      pareto_scores: IterationPareto
+      convergence_delta: number
+    }>
+
+    const nextNumber = iterations.length > 0
+      ? Math.max(...iterations.map(i => i.iteration_number)) + 1
+      : 1
+
+    // INTENT: Compute convergence delta — difference in total Pareto score vs previous
+    const currentTotal = scores.market + scores.financial + scores.fundability + scores.manufacturing
+    let convergenceDelta = 0
+    let convergenceStatus: ConvergenceStatus = 'initial'
+
+    if (iterations.length > 0) {
+      const prev = iterations[iterations.length - 1]
+      const prevScores = prev.pareto_scores
+      const prevTotal = prevScores.market + prevScores.financial + prevScores.fundability + prevScores.manufacturing
+      convergenceDelta = currentTotal - prevTotal
+
+      // INTENT: Check for convergence — 3+ iterations with small deltas
+      const recentDeltas = [
+        ...iterations.slice(-2).map(i => i.convergence_delta),
+        convergenceDelta,
+      ]
+      const allSmall = recentDeltas.length >= 3 && recentDeltas.every(d => Math.abs(d) < 5)
+
+      if (allSmall) {
+        convergenceStatus = 'converged'
+      } else if (convergenceDelta > 10) {
+        convergenceStatus = 'improving'
+      } else if (convergenceDelta >= 0) {
+        convergenceStatus = 'moderate'
+      } else if (convergenceDelta >= -5) {
+        convergenceStatus = 'plateauing'
+      } else {
+        convergenceStatus = 'regressing'
+      }
+    }
+
+    const { data, error } = await iterationsTable(supabase)
+      .insert({
+        product_id: productId,
+        foundry_id: foundryId,
+        iteration_number: nextNumber,
+        pareto_scores: scores,
+        changes_made: changes,
+        hypothesis,
+        convergence_delta: convergenceDelta,
+        convergence_status: convergenceStatus,
+      })
+      .select('*')
+      .single()
+
+    if (error) return { error: error.message }
+
+    return { data: data as ProductIteration }
+  })
+}
+
+/**
+ * Returns all iterations for a product, ordered by iteration_number ASC.
+ *
+ * @param productId - UUID of the product
+ * @returns Array of ProductIteration
+ */
+export async function getIterationHistory(
+  productId: string,
+): Promise<ActionResult<ProductIteration[]>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+
+    const { data, error } = await iterationsTable(supabase)
+      .select('*')
+      .eq('product_id', productId)
+      .eq('foundry_id', foundryId)
+      .order('iteration_number', { ascending: true })
+
+    if (error) return { error: error.message }
+
+    return { data: (data ?? []) as ProductIteration[] }
+  })
+}
+
+// ─── Design Briefs ──────────────────────────────────────────────────
+
+/**
+ * Creates a new design brief for a product.
+ *
+ * @param productId - UUID of the product
+ * @param input - Brief content and source
+ * @returns The created DesignBrief
+ */
+export async function createDesignBrief(
+  productId: string,
+  input: CreateDesignBriefInput,
+): Promise<ActionResult<DesignBrief>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+
+    const { data, error } = await briefsTable(supabase)
+      .insert({
+        product_id: productId,
+        foundry_id: foundryId,
+        brief_content: input.brief_content,
+        source: input.source,
+      })
+      .select('*')
+      .single()
+
+    if (error) return { error: error.message }
+
+    return { data: data as DesignBrief }
+  })
+}
+
+/**
+ * Updates a design brief's status, review notes, or reviewer.
+ *
+ * @param briefId - UUID of the design brief
+ * @param updates - Fields to update
+ * @returns The updated DesignBrief
+ */
+export async function updateDesignBrief(
+  briefId: string,
+  updates: { status?: BriefStatus; review_notes?: string; reviewed_by?: string },
+): Promise<ActionResult<DesignBrief>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!briefId || typeof briefId !== 'string') return { error: 'Invalid brief ID' }
+
+    const payload: Record<string, unknown> = {}
+    if (updates.status !== undefined) payload.status = updates.status
+    if (updates.review_notes !== undefined) payload.review_notes = updates.review_notes
+    if (updates.reviewed_by !== undefined) payload.reviewed_by = updates.reviewed_by
+
+    if (Object.keys(payload).length === 0) return { error: 'No fields to update' }
+
+    const { data, error } = await briefsTable(supabase)
+      .update(payload)
+      .eq('id', briefId)
+      .eq('foundry_id', foundryId)
+      .select('*')
+      .single()
+
+    if (error) return { error: error.message }
+    if (!data) return { error: 'Design brief not found' }
+
+    return { data: data as DesignBrief }
+  })
+}
+
+/**
+ * Converts a design brief into a CAD Lab project ("Send to Forge").
+ *
+ * @description Fetches the brief, creates a new CAD Lab project seeded with
+ * the brief's requirements, links the brief and product to the new project.
+ *
+ * @param briefId - UUID of the design brief
+ * @returns The new CAD Lab project ID
+ */
+export async function convertBriefToForge(
+  briefId: string,
+): Promise<ActionResult<{ cadLabProjectId: string }>> {
+  return withAuth(async ({ supabase, user, foundryId }) => {
+    if (!briefId || typeof briefId !== 'string') return { error: 'Invalid brief ID' }
+
+    // FLOW: Fetch the brief
+    const { data: brief, error: briefError } = await briefsTable(supabase)
+      .select('*')
+      .eq('id', briefId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (briefError || !brief) return { error: 'Design brief not found' }
+
+    // FLOW: Fetch the product name for the project title
+    const { data: product, error: productError } = await productsTable(supabase)
+      .select('id, name')
+      .eq('id', brief.product_id)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (productError || !product) return { error: 'Product not found' }
+
+    // FLOW: Count existing iterations for version label
+    const { data: iterations } = await iterationsTable(supabase)
+      .select('iteration_number')
+      .eq('product_id', brief.product_id)
+      .eq('foundry_id', foundryId)
+      .order('iteration_number', { ascending: false })
+      .limit(1)
+
+    const versionNumber = iterations?.[0]?.iteration_number ?? 1
+    const briefContent = brief.brief_content as Record<string, unknown>
+
+    // FLOW: Create the CAD Lab project
+    const keyReqs = Array.isArray(briefContent.key_requirements)
+      ? (briefContent.key_requirements as string[]).join('; ')
+      : ''
+
+    const { data: newProject, error: projectCreateError } = await cadLabTable(supabase)
+      .insert({
+        foundry_id: foundryId,
+        created_by: user.id,
+        name: `${product.name} (v${versionNumber})`,
+        subject: keyReqs,
+        product_overview: JSON.stringify(briefContent),
+      })
+      .select('id')
+      .single()
+
+    if (projectCreateError || !newProject) {
+      return { error: `Failed to create CAD Lab project: ${projectCreateError?.message ?? 'Unknown error'}` }
+    }
+
+    const cadLabProjectId = newProject.id as string
+
+    // FLOW: Update the brief — mark as sent_to_forge, link to project
+    const { error: briefUpdateError } = await briefsTable(supabase)
+      .update({
+        status: 'sent_to_forge',
+        cad_lab_project_id: cadLabProjectId,
+      })
+      .eq('id', briefId)
+      .eq('foundry_id', foundryId)
+
+    if (briefUpdateError) {
+      console.error('[convertBriefToForge] Failed to update brief:', briefUpdateError.message)
+    }
+
+    // FLOW: Update the product — link to latest CAD Lab project
+    const { error: productUpdateError } = await productsTable(supabase)
+      .update({ cad_lab_project_id: cadLabProjectId })
+      .eq('id', brief.product_id)
+      .eq('foundry_id', foundryId)
+
+    if (productUpdateError) {
+      console.error('[convertBriefToForge] Failed to update product:', productUpdateError.message)
+    }
+
+    return { data: { cadLabProjectId } }
   })
 }
 

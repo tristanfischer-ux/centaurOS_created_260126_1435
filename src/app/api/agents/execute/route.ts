@@ -105,7 +105,7 @@ Create 6-12 slides. Make content concise, professional, and actionable. Every bu
  * Model tier type matching specialists-data.ts modelTier field.
  * Used to look up the fallback chain when a primary provider fails.
  */
-type ModelTier = "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax"
+type ModelTier = "claude" | "sonnet" | "qwen" | "qwen-local" | "minimax" | "deepseek" | "google" | "openai"
 
 interface ProviderTarget {
     providerId: AIProviderId
@@ -139,17 +139,33 @@ const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "qwen", modelId: "qwen3.5-plus" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.3-chat-latest" },
+        { providerId: "openai", modelId: "gpt-5.4" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "openai", modelId: "gpt-5.3-chat-latest" },
+        { providerId: "openai", modelId: "gpt-5.4" },
     ],
     "qwen-local": [
         { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
         // No fallbacks — local-only for privacy
+    ],
+    deepseek: [
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "google", modelId: "gemini-2.5-flash" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
+        { providerId: "openai", modelId: "gpt-5.4" },
+    ],
+    google: [
+        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
+    ],
+    openai: [
+        { providerId: "openai", modelId: "gpt-5.4" },
+        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
     ],
 }
 
@@ -177,6 +193,7 @@ function resolveApiKeyForProvider(pid: AIProviderId): string | null {
         replicate: process.env.REPLICATE_API_TOKEN ?? "",
         minimax: process.env.MINIMAX_API_KEY?.trim() ?? "",
         together: process.env.TOGETHER_API_KEY?.trim() ?? "",
+        deepseek: process.env.DEEPSEEK_API_KEY?.trim() ?? "",
     }
     const key = envMap[pid]
     return key || null

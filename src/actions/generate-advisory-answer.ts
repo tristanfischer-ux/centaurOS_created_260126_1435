@@ -123,7 +123,7 @@ ${previousContext}
 Please provide a helpful, practical answer for a startup founder.`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.3-chat-latest",
+                model: "gpt-5.4",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -227,7 +227,7 @@ Return ONLY a raw JSON object with this structure:
 }`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.3-chat-latest",
+                model: "gpt-5.4",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Question: ${input.question_title}\n\nDetails: ${input.question_body}` }
@@ -289,7 +289,7 @@ export async function suggestQuestionCategory(
 
         try {
             const completion = await openai.chat.completions.create({
-                model: "gpt-5.3-chat-latest",
+                model: "gpt-5.4",
                 messages: [
                     { 
                         role: "system", 

@@ -202,7 +202,7 @@ Guidelines:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.3-chat-latest',
+      model: 'gpt-5.4',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: sanitizedIdea },
@@ -281,7 +281,7 @@ export async function scoreSmartGoal(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.3-chat-latest',
+      model: 'gpt-5.4',
       messages: [
         {
           role: 'system',

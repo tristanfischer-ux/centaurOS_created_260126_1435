@@ -14,6 +14,7 @@ export const AI_PROVIDERS = [
     "replicate",
     "minimax",
     "together",
+    "deepseek",
 ] as const
 export type AIProviderId = (typeof AI_PROVIDERS)[number]
 
@@ -54,7 +55,7 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         color: "#10a37f",
         bgColor: "bg-emerald-50",
         models: [
-            { id: "gpt-5.3-chat-latest", name: "GPT-5.3", modality: "text", description: "Latest — 26% fewer hallucinations, 400K context", maxTokens: 400000, default: true },
+            { id: "gpt-5.4", name: "GPT-5.4", modality: "text", description: "Latest — 26% fewer hallucinations, 400K context", maxTokens: 400000, default: true },
             { id: "gpt-4.1", name: "GPT-4.1", modality: "text", description: "Improved coding and instruction following", maxTokens: 128000 },
             { id: "o3", name: "o3", modality: "text", description: "Advanced reasoning model", maxTokens: 200000 },
             { id: "gpt-image-1", name: "GPT Image 1", modality: "image", description: "Image generation with text rendering", default: true },
@@ -260,6 +261,21 @@ export const PROVIDER_REGISTRY: Record<AIProviderId, AIProviderMeta> = {
         bgColor: "bg-sky-50",
         models: [
             { id: "Qwen/Qwen3.5-397B-A17B", name: "Qwen 3.5 (397B MoE)", modality: "text", description: "Frontier MoE — 397B total, 17B active per token", maxTokens: 8192, default: true },
+        ],
+    },
+    deepseek: {
+        id: "deepseek",
+        name: "DeepSeek",
+        description: "DeepSeek V4 and R1 reasoning",
+        icon: "Sparkles",
+        website: "https://platform.deepseek.com",
+        capabilities: ["text"],
+        requiresKey: true,
+        color: "#1E90FF",
+        bgColor: "bg-blue-50",
+        models: [
+            { id: "deepseek-chat", name: "DeepSeek V4", modality: "text", description: "Frontier model, 81% SWE-bench", maxTokens: 131072, default: true },
+            { id: "deepseek-reasoner", name: "DeepSeek R1", modality: "text", description: "Advanced reasoning with chain-of-thought", maxTokens: 131072 },
         ],
     },
 }
