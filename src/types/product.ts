@@ -236,3 +236,15 @@ export interface CreateDesignBriefInput {
   brief_content: DesignBriefContent
   source: BriefSource
 }
+
+// ─── Product Synthesis (Cross-System) ──────────────────────────────
+
+export interface ProductSynthesis {
+  pareto: IterationPareto
+  typeA: string[]
+  typeB: string[]
+  nextAction: string
+  isLocalOptimum: boolean
+  synthesized_at: string
+  model_used: string
+}

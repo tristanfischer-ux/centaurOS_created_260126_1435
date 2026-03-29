@@ -23,6 +23,8 @@ interface ItemRow {
   frequency: Frequency
   amount: number
   probabilityPct?: number
+  /** Optional product name — shown as a badge when item is linked to a product */
+  productName?: string
 }
 
 interface ItemsSectionProps {
@@ -107,6 +109,11 @@ export function ItemsSection({
                   {item.probabilityPct != null && item.probabilityPct < 100 && (
                     <Badge variant="warning" size="sm">
                       {item.probabilityPct}%
+                    </Badge>
+                  )}
+                  {item.productName && (
+                    <Badge variant="outline" size="sm">
+                      {item.productName}
                     </Badge>
                   )}
                 </div>

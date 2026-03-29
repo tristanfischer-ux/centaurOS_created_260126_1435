@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingDown, AlertTriangle, Zap } from 'lucide-react'
@@ -30,6 +30,7 @@ import {
   updateCashOutItem,
   deleteCashOutItem,
 } from '@/actions/cash-burn-out'
+import { getProducts } from '@/actions/products'
 import type { CashOutItem, CreateCashOutInput } from '@/types/cash-burn'
 import type { WizardProfile, WizardCompanyContext } from '@/actions/cash-burn-out'
 interface CashOutViewProps {
@@ -47,6 +48,18 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   const [defaultCostType, setDefaultCostType] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const [startDate] = useState(() => new Date())
+
+  // INTENT: Fetch products for product-name badges on items
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  useEffect(() => {
+    getProducts().then(result => {
+      if (result.data) {
+        const map: Record<string, string> = {}
+        for (const p of result.data) map[p.id] = p.name
+        setProductNameMap(map)
+      }
+    })
+  }, [])
 
   const fixedItems = useMemo(() => items.filter(i => i.costType === 'fixed'), [items])
   const variableItems = useMemo(() => items.filter(i => i.costType === 'variable'), [items])
@@ -242,6 +255,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
             weeklyAmount: i.weeklyAmount,
             frequency: i.frequency,
             amount: i.amount,
+            productName: i.productId ? productNameMap[i.productId] : undefined,
           }))}
           weeklySubtotal={weeklyFixedTotal}
           onAdd={() => handleAdd('fixed')}
@@ -258,6 +272,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
             weeklyAmount: i.weeklyAmount,
             frequency: i.frequency,
             amount: i.amount,
+            productName: i.productId ? productNameMap[i.productId] : undefined,
           }))}
           weeklySubtotal={weeklyVariableTotal}
           onAdd={() => handleAdd('variable')}

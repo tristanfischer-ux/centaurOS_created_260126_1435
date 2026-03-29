@@ -7,11 +7,11 @@
 
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import Link from 'next/link'
-import { BarChart3, TrendingDown, TrendingUp } from 'lucide-react'
+import { BarChart3, TrendingDown, TrendingUp, Package } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,11 @@ import { BalanceSheetTable } from '@/components/cash-burn/balance-sheet-table'
 import { WaterfallChart } from '@/components/cash-burn/waterfall-chart'
 import { HorizontalBar } from '@/components/cash-burn/horizontal-bar'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { Badge } from '@/components/ui/badge'
 import { buildIncomeStatement, buildBalanceSheet } from '@/lib/cash-burn/pnl-builder'
+import { getProducts } from '@/actions/products'
+import { formatCurrency } from '@/types/payments'
+import type { ProductSummary } from '@/types/product'
 import type { CashOutItem, CashInItem, IncomeStatementRow } from '@/types/cash-burn'
 interface PnlViewProps {
   initialData: {
@@ -37,6 +41,14 @@ const WEEKS = 52
 export function PnlView({ initialData, hasError }: PnlViewProps) {
   const [periodType, setPeriodType] = useState<'weekly' | 'monthly'>('monthly')
   const [balanceSheetWeek, setBalanceSheetWeek] = useState(0)
+
+  const [products, setProducts] = useState<ProductSummary[]>([])
+
+  useEffect(() => {
+    getProducts().then(result => {
+      if (result.data) setProducts(result.data)
+    })
+  }, [])
 
   const cashOut = initialData?.cashOut ?? []
   const cashIn = initialData?.cashIn ?? []
@@ -92,6 +104,61 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
     () => buildBalanceSheet(cashOut, cashIn, openingBalance, balanceSheetDate),
     [cashOut, cashIn, openingBalance, balanceSheetDate]
   )
+
+  // ── Product P&L aggregation ────────────────────────────────────────
+  // INTENT: Group existing cashIn/cashOut by productId for per-product P&L
+  const productNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const p of products) map[p.id] = p.name
+    return map
+  }, [products])
+
+  const productPnlRows = useMemo(() => {
+    // Sum revenue (cashIn) by productId
+    const revenueByProduct: Record<string, number> = {}
+    for (const item of cashIn) {
+      const key = item.productId ?? '__unattributed__'
+      revenueByProduct[key] = (revenueByProduct[key] ?? 0) + (item.weeklyAmount * 52)
+    }
+    // Sum COGS (cashOut where pnlCategory === 'cogs') by productId
+    const cogsByProduct: Record<string, number> = {}
+    for (const item of cashOut) {
+      if (item.pnlCategory === 'cogs') {
+        const key = item.productId ?? '__unattributed__'
+        cogsByProduct[key] = (cogsByProduct[key] ?? 0) + (item.weeklyAmount * 52)
+      }
+    }
+    // Merge all product IDs
+    const allKeys = new Set([...Object.keys(revenueByProduct), ...Object.keys(cogsByProduct)])
+    const rows: Array<{
+      productId: string | null
+      productName: string
+      revenue: number
+      cogs: number
+      grossProfit: number
+      marginPct: number
+    }> = []
+    for (const key of allKeys) {
+      const revenue = revenueByProduct[key] ?? 0
+      const cogs = cogsByProduct[key] ?? 0
+      const grossProfit = revenue - cogs
+      rows.push({
+        productId: key === '__unattributed__' ? null : key,
+        productName: key === '__unattributed__' ? 'Unattributed' : (productNameMap[key] ?? 'Unknown Product'),
+        revenue,
+        cogs,
+        grossProfit,
+        marginPct: revenue > 0 ? Math.round((grossProfit / revenue) * 100) : 0,
+      })
+    }
+    // Sort: named products first (by revenue desc), unattributed last
+    rows.sort((a, b) => {
+      if (!a.productId) return 1
+      if (!b.productId) return -1
+      return b.revenue - a.revenue
+    })
+    return rows
+  }, [cashIn, cashOut, productNameMap])
 
   if (hasError || !initialData) {
     return (
@@ -176,6 +243,7 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
         <TabsList>
           <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
           <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
+          <TabsTrigger value="product-pnl">Product P&L</TabsTrigger>
         </TabsList>
 
         <TabsContent value="income-statement" className="space-y-6 mt-6">
@@ -250,6 +318,75 @@ export function PnlView({ initialData, hasError }: PnlViewProps) {
           {/* Disclaimer */}
           <p className="text-xs text-muted-foreground italic">
             Projected from cash flow data. For audited financials, connect your accounting software.
+          </p>
+        </TabsContent>
+
+        <TabsContent value="product-pnl" className="space-y-6 mt-6">
+          {productPnlRows.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center space-y-3">
+                <div className="flex justify-center">
+                  <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                    <Package className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">No product-level data yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Link cash in/out items to products to see per-product P&L.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Product</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Revenue (ann.)</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">COGS (ann.)</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Gross Profit</th>
+                        <th className="text-right py-3 px-4 font-medium text-muted-foreground">Margin %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productPnlRows.map(row => (
+                        <tr key={row.productId ?? '__unattributed__'} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {row.productId ? (
+                                <Link href={`/products/${row.productId}`} className="text-international-orange hover:underline font-medium">
+                                  {row.productName}
+                                </Link>
+                              ) : (
+                                <span className="text-muted-foreground italic">{row.productName}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums text-foreground">{formatCurrency(row.revenue)}</td>
+                          <td className="py-3 px-4 text-right tabular-nums text-foreground">{formatCurrency(row.cogs)}</td>
+                          <td className={`py-3 px-4 text-right tabular-nums font-medium ${row.grossProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                            {formatCurrency(row.grossProfit)}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Badge variant={row.marginPct >= 50 ? 'success' : row.marginPct >= 20 ? 'warning' : 'destructive'} size="sm">
+                              {row.marginPct}%
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <p className="text-xs text-muted-foreground italic">
+            Annualised from weekly cash flow items linked to products. COGS includes items categorised as cost of goods sold.
           </p>
         </TabsContent>
       </Tabs>

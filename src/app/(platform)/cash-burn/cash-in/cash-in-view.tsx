@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { TrendingUp, ChevronDown, ChevronRight, AlertTriangle, Zap, Banknote, Loader2 } from 'lucide-react'
@@ -31,6 +31,7 @@ import {
   deleteCashInItem,
 } from '@/actions/cash-burn-in'
 import { updateOpeningBalance } from '@/actions/cash-burn-scenarios'
+import { getProducts } from '@/actions/products'
 import type { CashInItem, CashInSourceType, CreateCashInInput, BurnScenario } from '@/types/cash-burn'
 interface CashInViewProps {
   initialItems: CashInItem[]
@@ -69,6 +70,18 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
   const [error, setError] = useState<string | null>(null)
   const [balanceError, setBalanceError] = useState<string | null>(null)
   const [startDate] = useState(() => new Date())
+
+  // INTENT: Fetch products for product-name badges on items
+  const [productNameMap, setProductNameMap] = useState<Record<string, string>>({})
+  useEffect(() => {
+    getProducts().then(result => {
+      if (result.data) {
+        const map: Record<string, string> = {}
+        for (const p of result.data) map[p.id] = p.name
+        setProductNameMap(map)
+      }
+    })
+  }, [])
 
   // Starting balance state
   const [openingBalancePounds, setOpeningBalancePounds] = useState<string>(
@@ -409,6 +422,7 @@ export function CashInView({ initialItems, defaultScenario, hasError }: CashInVi
                       frequency: i.frequency,
                       amount: i.amount,
                       probabilityPct: i.probabilityPct,
+                      productName: i.productId ? productNameMap[i.productId] : undefined,
                     }))}
                     weeklySubtotal={sectionTotal}
                     onAdd={handleAdd}

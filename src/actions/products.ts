@@ -33,6 +33,7 @@ import type {
   DesignBrief,
   BriefStatus,
   CreateDesignBriefInput,
+  ProductSynthesis,
 } from '@/types/product'
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -101,6 +102,40 @@ export async function getProducts(): Promise<ActionResult<ProductSummary[]>> {
     })
 
     return { data: summaries }
+  })
+}
+
+// ─── getProductsWithFundability ──────────────────────────────────────
+
+/**
+ * Lightweight fetch of products that have a fundability_score.
+ * Used by the Fundraise dashboard to show product readiness.
+ *
+ * @returns Array of { id, name, lifecycle, fundability_score } for scored products
+ */
+export async function getProductsWithFundability(): Promise<ActionResult<Array<{
+  id: string
+  name: string
+  lifecycle: string
+  fundability_score: FundabilityScore
+}>>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    const { data, error } = await productsTable(supabase)
+      .select('id, name, lifecycle, fundability_score')
+      .eq('foundry_id', foundryId)
+      .not('fundability_score', 'is', null)
+      .order('updated_at', { ascending: false })
+
+    if (error) return { error: error.message }
+
+    return {
+      data: (data ?? []).map((row: any) => ({
+        id: row.id,
+        name: row.name,
+        lifecycle: row.lifecycle,
+        fundability_score: row.fundability_score as FundabilityScore,
+      })),
+    }
   })
 }
 
@@ -1486,6 +1521,285 @@ Generate the design brief JSON that will guide engineering changes to achieve th
     } catch (err) {
       console.error('[generateDesignBriefFromSuggestion] AI call failed:', err)
       return { error: 'Design brief generation failed — please try again' }
+    }
+  })
+}
+
+// ─── synthesizeProductStatus ────────────────────────────────────────
+
+/**
+ * Cross-system synthesis engine for a product.
+ *
+ * @description Computes Pareto scores across 4 dimensions (market, financial,
+ * fundability, manufacturing) from the product's existing data, then calls
+ * Claude Sonnet to classify improvements as Type A (aligned — improve multiple
+ * dimensions simultaneously) vs Type B (trade-offs — require founder decision),
+ * detect local optima, and recommend the single most important next action.
+ *
+ * Saves results to products.product_synthesis JSONB for the History tab (Prompt 8).
+ *
+ * @param productId - UUID of the product to synthesize
+ * @returns Pareto scores, Type A/B improvements, next action, local optimum flag
+ *
+ * @security Gated behind AI usage limits via withAIGate('market_assessment').
+ */
+export async function synthesizeProductStatus(
+  productId: string,
+): Promise<ActionResult<ProductSynthesis>> {
+  return withAIGate('market_assessment', async ({ supabase, foundryId, trackUsage }) => {
+    if (!productId || typeof productId !== 'string') {
+      return { error: 'Invalid product ID' }
+    }
+
+    // SECURITY: Rate limit AI calls
+    const rateLimitError = await checkRateLimit('aiAnalysis', `ai:synthesis:${productId}`)
+    if (rateLimitError) return { error: rateLimitError }
+
+    // FLOW: Fetch the product with all scoring data
+    const { data: product, error: fetchError } = await productsTable(supabase)
+      .select('*')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !product) return { error: 'Product not found' }
+
+    const ma = product.market_assessment as MarketAssessment | null
+    const ue = product.unit_economics as UnitEconomics | null
+    const fs = product.fundability_score as FundabilityScore | null
+
+    // ── Compute Pareto Scores ─────────────────────────────────────
+
+    // INTENT: Market score — TAM size + SAM/SOM ratio + segments bonus
+    let marketScore = 30
+    const tamGbp = ma?.tam_gbp ?? 0
+    if (tamGbp > 100_000_000) marketScore = 90
+    else if (tamGbp > 10_000_000) marketScore = 70
+    else if (tamGbp > 1_000_000) marketScore = 50
+    // Bonus: SAM/SOM ratio indicates addressable precision
+    if (ma?.sam_gbp && ma?.som_gbp && ma.sam_gbp > 0) {
+      const somSamRatio = ma.som_gbp / ma.sam_gbp
+      if (somSamRatio > 0.1) marketScore = Math.min(100, marketScore + 5)
+    }
+    // Bonus: has customer segments
+    if (ma?.customer_segments && ma.customer_segments.length > 0) {
+      marketScore = Math.min(100, marketScore + 10)
+    }
+
+    // INTENT: Financial score — gross margin + cash burn runway context
+    let financialScore = 20
+    const grossMarginPct = ue?.gross_margin_pct ?? 0
+    if (grossMarginPct > 60) financialScore = 90
+    else if (grossMarginPct > 40) financialScore = 70
+    else if (grossMarginPct > 20) financialScore = 50
+
+    // FLOW: Check cash burn runway for financial health bonus
+    try {
+      const { data: cashOutItems } = await cashOutTable(supabase)
+        .select('amount, frequency')
+        .eq('foundry_id', foundryId)
+
+      const { data: cashInItems } = await cashInTable(supabase)
+        .select('amount, frequency')
+        .eq('foundry_id', foundryId)
+
+      if (cashOutItems && cashInItems) {
+        // INTENT: Simple monthly burn approximation
+        const monthlyOut = (cashOutItems as Array<{ amount: number; frequency: string }>)
+          .reduce((sum, item) => {
+            const amt = Number(item.amount) || 0
+            if (item.frequency === 'monthly') return sum + amt
+            if (item.frequency === 'quarterly') return sum + amt / 3
+            if (item.frequency === 'annually') return sum + amt / 12
+            return sum + amt // one_time treated as single month
+          }, 0)
+
+        const monthlyIn = (cashInItems as Array<{ amount: number; frequency: string }>)
+          .reduce((sum, item) => {
+            const amt = Number(item.amount) || 0
+            if (item.frequency === 'monthly') return sum + amt
+            if (item.frequency === 'quarterly') return sum + amt / 3
+            if (item.frequency === 'annually') return sum + amt / 12
+            return sum + amt
+          }, 0)
+
+        const netBurn = monthlyOut - monthlyIn
+        // INTENT: Positive runway (income > expenses) boosts financial score
+        if (netBurn <= 0) {
+          financialScore = Math.min(100, financialScore + 10)
+        }
+      }
+    } catch {
+      // INTENT: Cash burn data is supplementary — don't fail synthesis
+    }
+
+    // INTENT: Fundability score — directly from the product's fundability_score
+    const fundabilityScore = fs?.overall ?? 0
+
+    // INTENT: Manufacturing score — COGS confidence + linked CAD project
+    let manufacturingScore = 20
+    const cogsConfidence = ue?.cogs_confidence ?? 'low'
+    if (cogsConfidence === 'high') manufacturingScore = 90
+    else if (cogsConfidence === 'medium') manufacturingScore = 60
+    else if (cogsConfidence === 'low') manufacturingScore = 30
+    // Bonus: has linked CAD project
+    if (product.cad_lab_project_id) {
+      manufacturingScore = Math.min(100, manufacturingScore + 10)
+    }
+
+    const pareto: IterationPareto = {
+      market: marketScore,
+      financial: financialScore,
+      fundability: fundabilityScore,
+      manufacturing: manufacturingScore,
+    }
+
+    // ── Call Sonnet for synthesis ──────────────────────────────────
+
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const systemPrompt = `You are the cross-system synthesis engine for Fractional Forge, a platform helping hardware startups build, fund, and ship products. You are given a product's complete data across 4 dimensions:
+
+1. MARKET: TAM/SAM/SOM, customer segments, competitive landscape, pricing
+2. FINANCIAL: Unit economics (COGS, margins, breakeven), cash flow
+3. FUNDABILITY: Investor attractiveness score (market, margin, defensibility, team, traction)
+4. MANUFACTURING: Design readiness, cost confidence, CAD project status
+
+Your job is to synthesize across these dimensions and identify:
+
+**Type A improvements** (aligned): Actions that improve MULTIPLE dimensions simultaneously. Example: "Reduce COGS by switching to injection moulding" improves financial (margin), manufacturing (proven process), and fundability (better economics).
+
+**Type B improvements** (trade-offs): Actions where improving one dimension hurts another, requiring a founder decision. Example: "Add premium features" improves market (differentiation) but hurts financial (higher COGS) and manufacturing (complexity).
+
+**Local optimum detection**: The product is at a local optimum when all obvious improvements are Type B (trade-offs). This means the founder has optimised within the current strategy and needs a strategic pivot or new information to improve further.
+
+**Next action**: The single most impactful thing the founder should do RIGHT NOW, considering where the product is in its lifecycle.
+
+Return ONLY a valid JSON object (no markdown fences):
+{
+  "typeA": ["string array of 2-4 aligned improvements with brief reasoning"],
+  "typeB": ["string array of 1-3 trade-off improvements with which dimensions conflict"],
+  "isLocalOptimum": boolean,
+  "nextAction": "single imperative sentence — the one thing to do next"
+}
+
+Rules:
+- Be specific to THIS product — no generic advice
+- Reference actual scores and data points in your reasoning
+- Type A improvements should clearly state which dimensions benefit
+- Type B improvements should clearly state the trade-off (X improves but Y suffers)
+- nextAction should be immediately actionable, not strategic platitudes
+- isLocalOptimum should be true ONLY if no Type A improvements exist`
+
+      const productData = {
+        name: product.name,
+        description: product.description,
+        lifecycle: product.lifecycle,
+        pareto_scores: pareto,
+        market_assessment: ma ? {
+          tam_gbp: ma.tam_gbp,
+          sam_gbp: ma.sam_gbp,
+          som_gbp: ma.som_gbp,
+          target_customer: ma.target_customer,
+          segments_count: ma.customer_segments?.length ?? 0,
+          competitors_count: ma.competitive_landscape?.length ?? 0,
+          recommended_price_pence: ma.pricing_analysis?.recommended_price_pence,
+          risks: ma.market_risks,
+          opportunities: ma.market_opportunities,
+        } : null,
+        unit_economics: ue ? {
+          cogs_per_unit_pence: ue.cogs_per_unit_pence,
+          selling_price_pence: ue.selling_price_pence,
+          gross_margin_pct: ue.gross_margin_pct,
+          contribution_margin_pence: ue.contribution_margin_pence,
+          breakeven_units: ue.breakeven_units,
+          cogs_confidence: ue.cogs_confidence,
+          cogs_breakdown: ue.cogs_breakdown,
+        } : null,
+        fundability: fs ? {
+          overall: fs.overall,
+          market_size_score: fs.market_size_score,
+          margin_score: fs.margin_score,
+          defensibility_score: fs.defensibility_score,
+          team_readiness_score: fs.team_readiness_score,
+          traction_score: fs.traction_score,
+          investor_appetite: fs.investor_appetite,
+          suggestions: fs.improvement_suggestions,
+        } : null,
+        has_cad_project: !!product.cad_lab_project_id,
+        unit_price_pence: product.unit_price_pence,
+        target_monthly_units: product.target_monthly_units,
+      }
+
+      const userPrompt = `Synthesize the status of this product and identify improvements:\n\n${JSON.stringify(productData, null, 2)}`
+
+      // INTENT: 15s timeout — synthesis should not block the user
+      const synthesisPromise = client.messages.create({
+        model: 'claude-sonnet-4-6-20250514',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      })
+
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000))
+      const result = await Promise.race([synthesisPromise, timeoutPromise])
+
+      if (!result) return { error: 'Synthesis timed out — please try again' }
+      if (!('content' in result)) return { error: 'Unexpected response from AI' }
+
+      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+      if (!text) return { error: 'Empty response from AI' }
+
+      // FLOW: Track AI usage for billing
+      await trackUsage({
+        model: 'claude-sonnet-4-6-20250514',
+        promptTokens: result.usage?.input_tokens,
+        completionTokens: result.usage?.output_tokens,
+      })
+
+      // ── Parse response ─────────────────────────────────────────
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(cleaned)
+      } catch {
+        return { error: 'Failed to parse synthesis response' }
+      }
+
+      const synthesis: ProductSynthesis = {
+        pareto,
+        typeA: Array.isArray(parsed.typeA)
+          ? parsed.typeA.filter((s: unknown): s is string => typeof s === 'string').slice(0, 4)
+          : [],
+        typeB: Array.isArray(parsed.typeB)
+          ? parsed.typeB.filter((s: unknown): s is string => typeof s === 'string').slice(0, 3)
+          : [],
+        nextAction: typeof parsed.nextAction === 'string' ? parsed.nextAction : 'Run market assessment to establish baseline data',
+        isLocalOptimum: typeof parsed.isLocalOptimum === 'boolean' ? parsed.isLocalOptimum : false,
+        synthesized_at: new Date().toISOString(),
+        model_used: 'claude-sonnet-4-6-20250514',
+      }
+
+      // ── Save to product ────────────────────────────────────────
+      const { error: updateError } = await productsTable(supabase)
+        .update({ product_synthesis: synthesis })
+        .eq('id', productId)
+        .eq('foundry_id', foundryId)
+
+      if (updateError) {
+        console.error('[synthesizeProductStatus] Failed to save synthesis:', updateError.message)
+        // INTENT: Return synthesis even if save fails — caller gets the data
+      }
+
+      return { data: synthesis }
+    } catch (err) {
+      console.error('[synthesizeProductStatus] AI call failed:', err)
+      return { error: 'Product synthesis failed — please try again' }
     }
   })
 }

@@ -7,6 +7,7 @@
 
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { typography } from '@/lib/design-system'
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
@@ -16,11 +17,14 @@ import {
 } from 'recharts'
 import {
   Heart, Users, Phone, MessageSquare, CheckCircle2, XCircle,
-  AlertTriangle, StickyNote, Calendar, Mail, ChevronRight,
+  AlertTriangle, StickyNote, Calendar, Mail, ChevronRight, Package,
 } from 'lucide-react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { getProductsWithFundability } from '@/actions/products'
+import { LIFECYCLE_LABELS } from '@/types/product'
+import type { FundabilityScore, ProductLifecycle } from '@/types/product'
 import type { FundraiseDashboardStats, ShortlistStage } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
@@ -67,8 +71,103 @@ function relativeTime(dateStr: string): string {
 // Component
 // ---------------------------------------------------------------------------
 
+// ─── Product Readiness Card ──────────────────────────────────────────
+
+interface ScoredProduct {
+  id: string
+  name: string
+  lifecycle: string
+  fundability_score: FundabilityScore
+}
+
+function ProductReadinessCard({ products }: { products: ScoredProduct[] | null }) {
+  if (products === null) return null // still loading or error
+
+  if (products.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+              <Package className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground">Product Readiness</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                No products assessed yet — <Link href="/products" className="text-international-orange hover:underline">create one</Link> and run the fundability assessment to see investor readiness.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // INTENT: Show the best product by overall fundability score
+  const best = products.reduce((a, b) =>
+    b.fundability_score.overall > a.fundability_score.overall ? b : a
+  )
+  const score = best.fundability_score
+  const lifecycleLabel = LIFECYCLE_LABELS[best.lifecycle as ProductLifecycle] ?? best.lifecycle
+
+  return (
+    <Card>
+      <CardContent className="py-6">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-international-orange/10 flex items-center justify-center shrink-0">
+            <Package className="h-5 w-5 text-international-orange" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-foreground">Product Readiness</p>
+              <Badge variant={score.investor_appetite === 'strong' ? 'success' : score.investor_appetite === 'moderate' ? 'warning' : 'destructive'} size="sm">
+                {score.investor_appetite} appetite
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Best product: <Link href={`/products/${best.id}`} className="text-international-orange hover:underline font-medium">{best.name}</Link>
+              {' '}&middot; {lifecycleLabel}
+            </p>
+          </div>
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-foreground">{score.overall}</p>
+              <p className="text-[10px] text-muted-foreground">Overall</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-foreground">{score.margin_score}</p>
+              <p className="text-[10px] text-muted-foreground">Margin</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-foreground">{score.market_size_score}</p>
+              <p className="text-[10px] text-muted-foreground">Market</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-foreground">{score.traction_score}</p>
+              <p className="text-[10px] text-muted-foreground">Traction</p>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function FundraiseView({ initialStats }: FundraiseViewProps) {
   const stats = initialStats
+
+  // Fetch products with fundability scores
+  const [scoredProducts, setScoredProducts] = useState<ScoredProduct[] | null>(null)
+  useEffect(() => {
+    getProductsWithFundability().then(result => {
+      if (result.data) setScoredProducts(result.data)
+      else setScoredProducts([])
+    })
+  }, [])
 
   // Live AI briefing
   const briefingContext = stats
@@ -106,6 +205,8 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
           context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
           storageKey="fundraise"
         />
+
+        <ProductReadinessCard products={scoredProducts} />
 
         <div className="flex flex-col items-center justify-center py-20 space-y-4 text-center">
           <div className="rounded-full bg-muted p-4">
@@ -168,6 +269,8 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
         context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
         storageKey="fundraise"
       />
+
+      <ProductReadinessCard products={scoredProducts} />
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
