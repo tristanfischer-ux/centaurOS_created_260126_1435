@@ -91,7 +91,7 @@ export async function checkAILimit(
           }
         }
       } catch (bonusError) {
-        // Non-critical — fall through to deny
+        // Non-critical â fall through to deny
         console.warn('[AILimitCheck] Bonus credit check failed:', bonusError)
       }
 
@@ -118,7 +118,7 @@ export async function checkAILimit(
       error: error instanceof Error ? error.message : 'Unknown error',
     })
 
-    // SECURITY: Fail closed — deny on error to prevent cost overruns.
+    // SECURITY: Fail closed â deny on error to prevent cost overruns.
     // A temporary Supabase outage should block AI calls, not open the floodgates.
     return {
       allowed: false,
@@ -153,12 +153,16 @@ async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
     }
 
     // Check their subscription
+    // GOTCHA: Must use maybeSingle() â not single() â because free-tier users
+    // have no row in user_subscriptions. single() throws a PostgREST 406 error
+    // when zero rows match, which cascades through the fail-closed catch chain
+    // and blocks ALL AI features for free users (including Cal's briefing).
     const { data: subscription } = await supabase
       .from('user_subscriptions')
       .select('tier, status')
       .eq('user_id', foundry.owner_id)
       .in('status', ['active', 'trialing'])
-      .single()
+      .maybeSingle()
 
     if (!subscription) return 'free'
 
