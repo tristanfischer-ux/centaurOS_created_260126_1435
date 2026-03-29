@@ -395,7 +395,13 @@ export async function POST(request: Request) {
             foundry_id: userFoundryId,
             profile_id: user.id,
           }).then(({ error }: { error: { message: string } | null }) => {
-            if (error) console.warn("[RedTeam] Save failed:", error.message)
+            if (error) {
+              console.warn("[RedTeam] Save failed:", error.message)
+              // INTENT: Emit a save warning so the UI can tell the user
+              // their debate wasn't persisted. They can still export DOCX.
+              try { controller.enqueue(encoder.encode(`data: ${JSON.stringify({ phase: "save_warning", message: "Debate could not be saved to history. You can still export it." })}\n\n`)) }
+              catch { /* stream already closed */ }
+            }
           })
         } else {
           console.warn("[RedTeam] No foundry_id found for user, debate not saved to history")

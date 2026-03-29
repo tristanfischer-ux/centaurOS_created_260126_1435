@@ -470,6 +470,10 @@ export function RedTeamView(): React.ReactElement {
           listRedTeamDebates().then(setHistory).catch(() => {})
           break
 
+        case "save_warning":
+          toast.warning(event.message as string)
+          break
+
         case "error":
           toast.error(event.message as string)
           setIsGenerating(false)
@@ -1306,6 +1310,11 @@ export function RedTeamView(): React.ReactElement {
           </div>
         </div>
         <div className="flex gap-2">
+          {history.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}>
+              <History className="h-3.5 w-3.5 mr-1" /> History ({history.length})
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={handleExportDOCX}>
             <FileDown className="h-3.5 w-3.5 mr-1" /> DOCX
           </Button>
@@ -1314,6 +1323,36 @@ export function RedTeamView(): React.ReactElement {
           </Button>
         </div>
       </div>
+
+      {/* History dropdown — also available from results view */}
+      <AnimatePresence>
+        {showHistory && history.length > 0 && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}>
+            <Card>
+              <CardContent className="pt-4 pb-4 space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Past Debates</p>
+                {history.map((h) => (
+                  <button
+                    key={h.id}
+                    onClick={() => handleLoadDebate(h.id)}
+                    disabled={loadingHistory}
+                    className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors flex items-center justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{h.topic}</p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Clock className="h-3 w-3" />
+                        {new Date(h.generatedAt).toLocaleDateString()} {h.totalDuration ? `(${Math.round(h.totalDuration / 1000)}s)` : ""}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <Card>
         <CardContent className="pt-4 pb-4">
