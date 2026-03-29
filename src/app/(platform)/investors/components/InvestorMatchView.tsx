@@ -446,6 +446,21 @@ export function InvestorMatchView() {
         throw new Error(`Server returned ${response.status}`)
       }
 
+      // INTENT: If the route returns cached JSON instead of SSE stream,
+      // parse it directly and skip the streaming flow.
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        const cached = await response.json()
+        if (cached.cached && cached.matches) {
+          setMatches(cached.matches as EnrichedMatch[])
+          setNearMisses((cached.nearMisses || []) as NearMiss[])
+          setTierInfo({ tier: cached.tier || 'free', matchLimit: 50, totalScored: cached.totalScored || 0 })
+          setPhase('complete')
+          setProgressText('')
+          return
+        }
+      }
+
       const reader = response.body?.getReader()
       if (!reader) throw new Error('No response stream')
 

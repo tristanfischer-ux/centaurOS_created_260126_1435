@@ -290,10 +290,24 @@ export async function POST(request: Request) {
               phase: "awaiting_input",
               round: roundIdx + 1,
               message: "Add your thoughts before the next round, or skip to continue.",
-              // Send state so client can resume
+              // INTENT: Send minimal state for resume. Transcript is the
+              // authoritative record — rounds are reconstructed from it on
+              // the next pass. Evidence items are compact. This keeps the
+              // POST body under Vercel's 4.5MB limit even after 4 rounds.
               state: {
-                priorRounds: rounds,
-                priorTranscript: fullTranscript,
+                priorRounds: rounds.map(r => ({
+                  roundNumber: r.roundNumber,
+                  question: r.question,
+                  // DECISION: Truncate argument content to 500 chars each for resume state.
+                  // Full text is preserved in the transcript. This prevents body bloat.
+                  arguments: r.arguments.map(a => ({ ...a, content: a.content.slice(0, 500) })),
+                  factChecks: r.factChecks.slice(0, 3),
+                  userInput: r.userInput,
+                })),
+                // Keep only last 2 rounds of transcript to stay under body limit
+                priorTranscript: fullTranscript.length > 20000
+                  ? fullTranscript.slice(-20000)
+                  : fullTranscript,
                 evidencePack,
                 evidenceItems,
                 customQuestions: roundQuestions,

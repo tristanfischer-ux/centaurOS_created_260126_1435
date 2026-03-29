@@ -1087,22 +1087,44 @@ export async function suggestStrategicObjective(title: string, description?: str
 
         if (!strategics || strategics.length === 0) return null
 
-        const inputWords = `${title} ${description || ""}`.toLowerCase().split(/\W+/).filter(w => w.length > 3)
+        // INTENT: Filter out common English stop words that cause false positives.
+        // "close the funding round" should NOT match "close customer deals" just
+        // because both contain "close". Only domain-specific words should score.
+        const STOP_WORDS = new Set([
+            "about", "after", "also", "been", "before", "being", "between", "both",
+            "close", "come", "could", "does", "done", "down", "each", "even", "every",
+            "first", "from", "have", "here", "high", "into", "just", "keep", "last",
+            "like", "long", "look", "made", "make", "many", "more", "most", "much",
+            "must", "need", "next", "only", "open", "other", "over", "plan", "real",
+            "should", "some", "still", "such", "take", "than", "that", "their", "them",
+            "then", "there", "these", "they", "this", "through", "time", "under",
+            "upon", "very", "want", "well", "were", "what", "when", "which", "while",
+            "will", "with", "work", "would", "your",
+        ])
+
+        const inputWords = `${title} ${description || ""}`
+            .toLowerCase()
+            .split(/\W+/)
+            .filter(w => w.length > 3 && !STOP_WORDS.has(w))
 
         let bestMatch: { id: string; title: string; score: number } | null = null
 
         for (const obj of strategics) {
-            const targetWords = `${obj.title} ${obj.description || ""}`.toLowerCase()
+            const targetText = `${obj.title} ${obj.description || ""}`.toLowerCase()
             let score = 0
 
+            // Description word matches (lower weight)
             for (const word of inputWords) {
-                if (targetWords.includes(word)) score += 10
+                if (targetText.includes(word)) score += 8
             }
 
-            // Boost for strong title overlap
-            const titleWords = obj.title.toLowerCase().split(/\W+/).filter((w: string) => w.length > 3)
+            // Title-to-title matches (higher weight — titles are more specific)
+            const titleWords = obj.title
+                .toLowerCase()
+                .split(/\W+/)
+                .filter((w: string) => w.length > 3 && !STOP_WORDS.has(w))
             for (const tw of titleWords) {
-                if (title.toLowerCase().includes(tw)) score += 15
+                if (title.toLowerCase().includes(tw)) score += 20
             }
 
             if (score > (bestMatch?.score ?? 0)) {
@@ -1110,8 +1132,10 @@ export async function suggestStrategicObjective(title: string, description?: str
             }
         }
 
-        // Only return if score is meaningful (at least 2 word matches)
-        return bestMatch && bestMatch.score >= 20 ? bestMatch : null
+        // DECISION: Threshold of 30 requires at least one strong title match
+        // or multiple description matches. Prevents false positives from
+        // common business terms like "close", "plan", "build".
+        return bestMatch && bestMatch.score >= 30 ? bestMatch : null
     })
 }
 

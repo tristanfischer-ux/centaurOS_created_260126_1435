@@ -100,6 +100,31 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  // ── Check for cached results (< 7 days old) ──────────────
+  const { data: profileData } = await supabase.from("profiles").select("foundry_id").eq("id", user.id).single()
+  const foundryId = profileData?.foundry_id
+
+  if (foundryId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: cached } = await (supabase as any)
+      .from("report_snapshots")
+      .select("report_data, generated_at")
+      .eq("foundry_id", foundryId)
+      .eq("report_type", "investor-match")
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (cached?.report_data && cached.generated_at) {
+      const cacheAge = Date.now() - new Date(cached.generated_at).getTime()
+      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+      if (cacheAge < SEVEN_DAYS) {
+        // Return cached results as JSON (no SSE needed)
+        return NextResponse.json({ cached: true, ...cached.report_data })
+      }
+    }
+  }
+
   const encoder = new TextEncoder()
 
   const readable = new ReadableStream({
@@ -210,12 +235,13 @@ export async function POST(request: Request) {
         // ── Score All Investors ──────────────────────────
         emit({ phase: "scoring", message: "Scoring investors against your profile..." })
 
-        // Fetch all investor listings (Products/Services category = suppliers, Finance = investors)
+        // Fetch investor listings — capped at 10K to prevent OOM on serverless
         let allInvestors: InvestorFirm[] = []
         let offset = 0
         const pageSize = 1000
+        const MAX_INVESTORS = 10_000
 
-        while (true) {
+        while (allInvestors.length < MAX_INVESTORS) {
           const { data, error } = await supabase
             .from("marketplace_listings")
             .select("id, title, description, subcategory, attributes, is_verified")
@@ -271,6 +297,7 @@ export async function POST(request: Request) {
         })
 
         // ── Generate Rationales in Batches of 5 ─────────
+        const allEnrichedMatches: EnrichedMatch[] = []
         const batchSize = 5
         const batches = Math.ceil(Math.min(top50.length, maxVisible) / batchSize)
 
@@ -400,10 +427,34 @@ Only return the JSON array.`
             }
           })
 
+          allEnrichedMatches.push(...enrichedMatches)
           emit({ phase: "batch", batchNumber: batchIdx + 1, matches: enrichedMatches })
         }
 
         emit({ phase: "complete", totalGenerated: Math.min(top50.length, maxVisible), tier })
+
+        // ── Cache results (fire-and-forget) ──────────────
+        if (foundryId) {
+          const cacheData = {
+            matches: allEnrichedMatches,
+            nearMisses: nearMisses.slice(0, 20),
+            totalScored: allInvestors.length,
+            tier,
+            generatedAt: new Date().toISOString(),
+          }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ;(supabase as any).from("report_snapshots").upsert({
+            id: `investor-match-${foundryId}`,
+            report_type: "investor-match",
+            report_date: new Date().toISOString().slice(0, 10),
+            summary_text: `Investor matches for ${foundry?.name || "company"}`,
+            report_data: cacheData,
+            foundry_id: foundryId,
+            profile_id: user.id,
+          }, { onConflict: "id" }).then(({ error: cacheErr }: { error: { message: string } | null }) => {
+            if (cacheErr) console.warn("[InvestorMatch] Cache save failed:", cacheErr.message)
+          })
+        }
 
       } catch (err) {
         emit({ phase: "error", message: err instanceof Error ? err.message : "Matching failed" })
