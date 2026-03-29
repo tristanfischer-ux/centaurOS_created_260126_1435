@@ -670,7 +670,7 @@ export function InvestorMatchView() {
           <p className="text-sm text-muted-foreground mt-1">
             {phase === 'complete' && tierInfo
               ? `${matches.length} matches from ${tierInfo.totalScored} investors scored`
-              : 'AI-matched investors based on your company profile'}
+              : 'Matched investors based on your company profile'}
           </p>
         </div>
 

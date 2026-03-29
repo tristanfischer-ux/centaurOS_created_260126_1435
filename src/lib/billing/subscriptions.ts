@@ -58,13 +58,15 @@ export async function getUserSubscription(userId: string): Promise<{
   try {
     const supabase = await createClient()
     
+    // GOTCHA: maybeSingle() returns null (not an error) when no subscription exists,
+    // which is the normal case for free-tier users.
     const { data, error } = await supabase
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
-      .single()
-    
-    if (error && error.code !== 'PGRST116') {
+      .maybeSingle()
+
+    if (error) {
       return { subscription: null, error: error.message }
     }
     

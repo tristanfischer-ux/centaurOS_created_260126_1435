@@ -43,10 +43,10 @@ type BillingPeriod = 'monthly' | 'annual'
 
 /** Tooltip explanations for complex/jargon features */
 const FEATURE_TOOLTIPS: Record<string, string> = {
-  'AI comparison assistant': 'An AI helper that analyses and compares marketplace providers side-by-side so you can choose with confidence.',
-  'Voice-to-task': 'Speak your tasks out loud and our AI converts them into structured action items instantly.',
-  'Supplier matching': 'AI-powered 6-factor matching that scores UK suppliers on capability, process, material, quality, and relevance.',
-  'AI tasks': 'AI-powered actions across ForgeOS — engineering analysis, specialist conversations, document generation, and more.',
+  'Comparison assistant': 'Analyses and compares marketplace providers side-by-side so you can choose with confidence.',
+  'Voice-to-task': 'Speak your tasks out loud and they are converted into structured action items instantly.',
+  'Supplier matching': '6-factor matching that scores UK suppliers on capability, process, material, quality, and relevance.',
+  'Assists': 'Actions across ForgeOS — engineering analysis, specialist conversations, document generation, and more.',
 }
 
 /** FAQ items addressing common pricing objections */
@@ -77,7 +77,7 @@ const FAQ_ITEMS = [
 const SOCIAL_PROOF_STATS = [
   { value: '9,900+', label: 'UK Manufacturers' },
   { value: '220+', label: 'ISO/DIN/BS Standards' },
-  { value: '13', label: 'AI Specialists' },
+  { value: '13', label: 'Specialists' },
   { value: '< 2 hrs', label: 'Avg. Engineering Package' },
 ]
 
@@ -263,7 +263,7 @@ export function PricingContent() {
                     <div className="space-y-3">
                       <LimitRow
                         icon={Bot}
-                        label="Smart assists/month"
+                        label="Assists/month"
                         value={plan.limits.maxAiTasksPerMonth >= 10000
                           ? 'Unlimited'
                           : plan.limits.maxAiTasksPerMonth.toLocaleString()
@@ -336,7 +336,7 @@ export function PricingContent() {
                   <div>
                     <h3 className="text-xl font-semibold text-foreground">Enterprise</h3>
                     <p className="text-muted-foreground">
-                      Unlimited AI tasks and team members. Dedicated account manager, custom onboarding, and priority support.
+                      Unlimited assists and team members. Dedicated account manager, custom onboarding, and priority support.
                     </p>
                   </div>
                 </div>
@@ -547,11 +547,11 @@ function ComparisonCell({ value }: { value: boolean | string }) {
 
 /** Feature comparison data — only features that are actually implemented */
 const COMPARISON_FEATURES = [
-  { name: 'AI tasks per month', free: '50', starter: '100', professional: '500' },
+  { name: 'Assists per month', free: '50', starter: '100', professional: '500' },
   { name: 'Voice-to-task', free: true, starter: true, professional: true },
-  { name: 'AI comparison assistant', free: false as boolean | string, starter: true, professional: true },
+  { name: 'Comparison assistant', free: false as boolean | string, starter: true, professional: true },
   { name: 'Supplier matching', free: false, starter: true, professional: true },
-  { name: '13 AI specialist conversations', free: true, starter: true, professional: true },
+  { name: '13 specialist conversations', free: true, starter: true, professional: true },
   { name: 'Marketplace browse', free: true, starter: true, professional: true },
   { name: 'Investor directory browse', free: true, starter: true, professional: true },
   { name: 'Investor detail pages', free: false, starter: true, professional: true },

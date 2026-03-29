@@ -234,7 +234,7 @@ export function ProductShowcase() {
                       fill
                       className="object-cover object-top"
                       sizes="(max-width: 1024px) 100vw, 60vw"
-                      priority={activeTab === 0}
+                      priority
                     />
                     {/* Callout badges */}
                     {tab.callouts.map((callout, ci) => (

@@ -89,7 +89,7 @@ const FEATURE_GUIDES = [
   {
     icon: UsersRound,
     title: "Specialists",
-    description: "AI agents and human experts",
+    description: "Your team of specialist advisors",
     href: "/agents",
   },
 ] as const
@@ -140,7 +140,7 @@ const FAQ_ITEMS = [
   {
     question: "How does the marketplace work?",
     answer:
-      "The marketplace connects you with specialists who offer services. Browse listings, book consultations, or hire for projects. Specialists can be human experts or AI-powered workflows.",
+      "The marketplace connects you with specialists who offer services. Browse listings, book consultations, or hire for projects.",
   },
   {
     question: "Can I use ForgeOS on mobile?",

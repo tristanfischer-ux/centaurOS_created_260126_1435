@@ -228,7 +228,7 @@ export function SpecialistsLanding({
                         You&apos;re in charge
                     </p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                        Your AI Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
+                        Your Specialists are fast, knowledgeable, and tireless&nbsp;&mdash;&nbsp;but
                         like any team member, they can make mistakes or miss nuances. You&apos;re the
                         decision-maker. Always verify critical information, especially legal and
                         financial guidance.

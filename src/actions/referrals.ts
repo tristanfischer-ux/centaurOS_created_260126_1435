@@ -170,12 +170,13 @@ export async function getAIUsageForCreditsBar(): Promise<
         .single()
 
       if (foundry?.owner_id) {
+        // GOTCHA: maybeSingle() not single() — free-tier users have no subscription row
         const { data: subscription } = await supabase
           .from('user_subscriptions')
           .select('tier')
           .eq('user_id', foundry.owner_id)
           .in('status', ['active', 'trialing'])
-          .single()
+          .maybeSingle()
 
         if (subscription?.tier && subscription.tier in SUBSCRIPTION_PLANS) {
           tier = subscription.tier as SubscriptionTier

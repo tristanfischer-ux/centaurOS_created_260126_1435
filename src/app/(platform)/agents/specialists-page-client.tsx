@@ -99,7 +99,7 @@ export function SpecialistsPageClient({
                 </div>
                 <p className="text-muted-foreground text-sm mt-1 ml-4">
                     {view === "specialists"
-                        ? "13 AI specialists ready to help — strategy, engineering, finance, legal, and more"
+                        ? "13 specialists ready to help — strategy, engineering, finance, legal, and more"
                         : "Chain multiple specialists together into a project"}
                 </p>
             </div>

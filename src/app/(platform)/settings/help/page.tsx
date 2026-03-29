@@ -104,7 +104,7 @@ export default function HelpPage() {
                     />
                     <FaqItem
                         question="What are smart assists?"
-                        answer="Smart assists are AI-powered actions like generating task breakdowns, getting specialist advice, or creating reports. Each plan includes a monthly allowance."
+                        answer="Smart assists are actions like generating task breakdowns, getting specialist advice, or creating reports. Each plan includes a monthly allowance."
                     />
                     <FaqItem
                         question="How do I export my data?"

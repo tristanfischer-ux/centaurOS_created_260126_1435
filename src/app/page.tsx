@@ -667,7 +667,7 @@ const SOLUTION_PILLARS = [
     imageAlt: "Young engineers working with AI tools",
     quote: "Ambitious apprentices — digital natives fresh from university — execute tasks using AI tools at remarkable speed. Senior experts review and verify every output. You aren't hiring juniors. You're deploying Founders-in-Training.",
     highlights: [
-      "13 AI specialists with engineering calculation tools",
+      "13 specialists with engineering calculation tools",
       "4-stage design review: manufacturability, engineering, integration, supply chain",
       "Every output grounded in 220+ design standards and real supplier data",
     ],
@@ -846,7 +846,7 @@ const AUDIENCES = [
     icon: GraduationCap,
     role: "I want to learn hardware",
     value: "Apprentices & graduates",
-    description: "Pair with a seasoned executive, learn AI-powered engineering workflows, and build real products — not just prototypes.",
+    description: "Pair with a seasoned executive, learn modern engineering workflows, and build real products — not just prototypes.",
     cta: "Start Apprenticeship",
     href: "/join?role=apprentice",
   },
