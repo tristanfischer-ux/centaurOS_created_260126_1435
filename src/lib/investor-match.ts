@@ -23,6 +23,8 @@ export interface FoundryProfile {
   stage: string | null
   sector: string | null
   industry: string | null
+  /** Additional keywords from business plan, purpose, product description */
+  businessKeywords?: string[]
 }
 
 export interface MatchBreakdown {
@@ -151,7 +153,32 @@ export function calculateMatchScore(
   const activeScore = attrs.is_active_deploying ? 5 : 0
   if (attrs.is_active_deploying) topFactors.push('Actively deploying')
 
-  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore)
+  // 7. Business plan / thesis alignment (bonus 0-10 pts)
+  // INTENT: If the founder's business plan keywords appear in the investor's
+  // thesis or portfolio descriptions, boost the score. This uses the rich
+  // text data that stage/sector matching misses.
+  let thesisBonus = 0
+  if (profile.businessKeywords && profile.businessKeywords.length > 0) {
+    const investorText = [
+      attrs.investment_thesis || '',
+      attrs.ideal_company_profile || '',
+      ...(attrs.notable_portfolio || []),
+      ...(attrs.portfolio_companies?.map(pc => `${pc.company_name} ${pc.sector || ''} ${pc.description || ''}`) || []),
+    ].join(' ').toLowerCase()
+
+    const matchCount = profile.businessKeywords.filter(kw =>
+      investorText.includes(kw.toLowerCase())
+    ).length
+
+    if (matchCount >= 4) {
+      thesisBonus = 10
+      topFactors.push('Thesis alignment')
+    } else if (matchCount >= 2) {
+      thesisBonus = 5
+    }
+  }
+
+  const total = Math.min(100, stageScore + sectorScore + hardwareScore + chequeScore + geoScore + activeScore + thesisBonus)
 
   return {
     total,

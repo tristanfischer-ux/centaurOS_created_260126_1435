@@ -152,14 +152,35 @@ export async function POST(request: Request) {
           return
         }
 
+        const purposeData = foundry.purpose_data as Record<string, unknown> | null
+        const companyProfileData = foundry.company_profile as Record<string, unknown> | null
+
+        // INTENT: Extract keywords from business plan, purpose, and profile data
+        // so the scoring can match against investor thesis/portfolio text.
+        const businessKeywords: string[] = []
+        const keywordSources = [
+          purposeData?.purpose as string,
+          purposeData?.mission as string,
+          (purposeData?.questionnaire as Record<string, string>)?.problemSolved,
+          (purposeData?.questionnaire as Record<string, string>)?.uniqueValue,
+          companyProfileData?.business_model as string,
+          foundry.name,
+        ].filter(Boolean)
+        for (const source of keywordSources) {
+          if (source) {
+            const words = source.toLowerCase().split(/\W+/).filter(w => w.length > 4)
+            businessKeywords.push(...words)
+          }
+        }
+        // Deduplicate
+        const uniqueKeywords = [...new Set(businessKeywords)].slice(0, 30)
+
         const companyProfile: FoundryProfile = {
           stage: foundry.stage,
           sector: foundry.sector || foundry.industry,
           industry: foundry.industry,
+          businessKeywords: uniqueKeywords,
         }
-
-        const purposeData = foundry.purpose_data as Record<string, unknown> | null
-        const companyProfileData = foundry.company_profile as Record<string, unknown> | null
         const companyContext = [
           `Company: ${foundry.name}`,
           `Stage: ${foundry.stage}`,
@@ -221,14 +242,25 @@ export async function POST(request: Request) {
         })).sort((a, b) => b.breakdown.total - a.breakdown.total)
 
         const top50 = scored.slice(0, 50)
-        const nearMisses: NearMiss[] = scored.slice(50, 100).map(s => ({
-          name: s.firm.title,
-          type: (s.firm.attributes?.firm_type as string) || "Unknown",
-          score: s.breakdown.total,
-          reason: s.breakdown.topFactors.length > 0
-            ? `Weaker on: ${s.breakdown.topFactors.slice(-1)[0]}`
-            : `Score: ${s.breakdown.total}/100`,
-        }))
+        const nearMisses: NearMiss[] = scored.slice(50, 100).map(s => {
+          // Generate specific rejection reason based on weakest scoring factors
+          const b = s.breakdown
+          const weaknesses: string[] = []
+          if (b.stageScore === 0) weaknesses.push("Stage mismatch")
+          if (b.sectorScore === 0) weaknesses.push("No sector overlap")
+          if (b.chequeScore === 0) weaknesses.push("Cheque range doesn't fit")
+          if (b.geoScore === 0) weaknesses.push("No UK/relevant geo focus")
+          if (b.activeScore === 0) weaknesses.push("Not actively deploying")
+
+          return {
+            name: s.firm.title,
+            type: (s.firm.attributes?.firm_type as string) || "Unknown",
+            score: b.total,
+            reason: weaknesses.length > 0
+              ? weaknesses.slice(0, 2).join(" · ")
+              : `Score: ${b.total}/100 — close but not in top 50`,
+          }
+        })
 
         emit({
           phase: "scored",

@@ -3,14 +3,14 @@
  *
  * @description Top-matched investors view powered by SSE streaming from /api/investors/match.
  * Shows a profile completeness gate when needed, a responsive scored investor table,
- * tier-gated partner/email columns, near-miss section, and shortlist functionality.
+ * tier-gated partner/email columns, near-miss section, shortlist functionality, and CSV export.
  *
  * FLOW: POST /api/investors/match -> SSE phases (scoring -> scored -> generating -> batch -> complete)
  */
 
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ import {
   ArrowRight,
   Copy,
   Check,
+  Download,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -35,6 +36,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { LockedSection } from './LockedSection'
+import { addToShortlist, removeFromShortlist } from '@/actions/investors'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -68,6 +70,14 @@ interface EnrichedMatch {
   }
 }
 
+/** Near misses come from SSE as a simpler shape than EnrichedMatch */
+interface NearMiss {
+  name: string
+  type: string
+  score: number
+  reason: string
+}
+
 interface TierInfo {
   tier: string
   matchLimit: number
@@ -93,6 +103,53 @@ function formatCurrency(value: number): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
   if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
   return `$${value}`
+}
+
+function escapeCsvField(value: string): string {
+  if (value.includes(',') || value.includes('"') || value.includes('\n')) {
+    return `"${value.replace(/"/g, '""')}"`
+  }
+  return value
+}
+
+function generateCsv(matches: EnrichedMatch[]): string {
+  const headers = [
+    'Rank',
+    'Name',
+    'Type',
+    'Score',
+    'Stage Focus',
+    'Sectors',
+    'Rationale',
+    'Partner Name',
+    'Partner Title',
+    'Email Subject',
+  ]
+  const rows = matches.map((m, i) => [
+    String(i + 1),
+    escapeCsvField(m.investor.name),
+    escapeCsvField(m.investor.type),
+    String(m.matchScore),
+    escapeCsvField(m.investor.stageFocus.join('; ')),
+    escapeCsvField(m.investor.sectors.join('; ')),
+    escapeCsvField(m.rationale),
+    escapeCsvField(m.partner?.name ?? ''),
+    escapeCsvField(m.partner?.title ?? ''),
+    escapeCsvField(m.draftEmail?.subject ?? ''),
+  ])
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+}
+
+function downloadCsv(csv: string, filename: string) {
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 // ---------------------------------------------------------------------------
@@ -133,16 +190,19 @@ function ProfileIncompleteCard({ missingFields }: { missingFields: string[] }) {
 
 function MatchRow({
   match,
+  isPro,
   isPaid,
   isShortlisted,
+  shortlistLoading,
   onToggleShortlist,
 }: {
   match: EnrichedMatch
+  isPro: boolean
   isPaid: boolean
   isShortlisted: boolean
+  shortlistLoading: boolean
   onToggleShortlist: (id: string) => void
 }) {
-  const [emailExpanded, setEmailExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const handleCopyEmail = useCallback(() => {
@@ -153,6 +213,10 @@ function MatchRow({
       setTimeout(() => setCopied(false), 2000)
     })
   }, [match.draftEmail])
+
+  // DECISION: Pro users see draft email inline (no expand/collapse). Free/Starter use expand.
+  const showEmailInline = isPro && match.draftEmail
+  const [emailExpanded, setEmailExpanded] = useState(false)
 
   return (
     <motion.div
@@ -202,6 +266,7 @@ function MatchRow({
           variant="ghost"
           size="sm"
           onClick={() => onToggleShortlist(match.investor.id)}
+          disabled={shortlistLoading}
           className="shrink-0"
           aria-label={isShortlisted ? 'Remove from shortlist' : 'Add to shortlist'}
         >
@@ -222,26 +287,60 @@ function MatchRow({
       </div>
 
       {/* Partner + Email (paid only) */}
-      {isPaid && match.partner && (
+      {isPaid && (
         <div className="pl-[52px] space-y-2">
-          <div className="flex items-center gap-3 text-sm">
-            <span className="font-medium text-foreground">{match.partner.name}</span>
-            <span className="text-muted-foreground">{match.partner.title}</span>
-            {match.partner.linkedin && (
-              <a
-                href={match.partner.linkedin}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-international-orange hover:underline inline-flex items-center gap-1"
-              >
-                LinkedIn
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
-          </div>
+          {match.partner ? (
+            <div className="flex items-center gap-3 text-sm">
+              <span className="font-medium text-foreground">{match.partner.name}</span>
+              <span className="text-muted-foreground">{match.partner.title}</span>
+              {match.partner.linkedin && (
+                <a
+                  href={match.partner.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-international-orange hover:underline inline-flex items-center gap-1"
+                >
+                  LinkedIn
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              Partner data not yet available for this firm
+            </p>
+          )}
 
-          {/* Draft email expand/collapse */}
-          {match.draftEmail && (
+          {/* Pro: show email inline; Free/Starter: expand/collapse */}
+          {showEmailInline && match.draftEmail && (
+            <div className="border border-border rounded-md bg-muted/50 p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  Subject: {match.draftEmail.subject}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopyEmail}
+                  className="text-xs gap-1 h-7"
+                >
+                  {copied ? (
+                    <Check className="h-3 w-3 text-success" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
+                {match.draftEmail.body}
+              </p>
+            </div>
+          )}
+
+          {/* Non-Pro paid: expand/collapse for draft email */}
+          {!isPro && match.draftEmail && (
             <div>
               <Button
                 variant="ghost"
@@ -308,16 +407,19 @@ function MatchRow({
 export function InvestorMatchView() {
   const [phase, setPhase] = useState<Phase>('idle')
   const [matches, setMatches] = useState<EnrichedMatch[]>([])
-  const [nearMisses, setNearMisses] = useState<EnrichedMatch[]>([])
+  const [nearMisses, setNearMisses] = useState<NearMiss[]>([])
   const [missingFields, setMissingFields] = useState<string[]>([])
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null)
   const [progressText, setProgressText] = useState('')
   const [shortlisted, setShortlisted] = useState<Set<string>>(new Set())
+  const [shortlistLoading, setShortlistLoading] = useState<Set<string>>(new Set())
   const [nearMissesOpen, setNearMissesOpen] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const hasAutoRun = useRef(false)
 
   // INTENT: Determine paid status from tier info to gate partner/email column
   const isPaid = tierInfo ? tierInfo.tier !== 'free' : false
+  const isPro = tierInfo ? tierInfo.tier === 'pro' : false
   const FREE_MATCH_LIMIT = 5
 
   const startMatching = useCallback(async () => {
@@ -379,14 +481,18 @@ export function InvestorMatchView() {
                 break
 
               case 'scored':
+                // INTENT: Route sends event.totalScored in the scored phase
                 setPhase('scored')
-                setProgressText(`Scored ${event.total ?? 0} investors. Generating insights...`)
+                setProgressText(
+                  `Scored ${event.totalScored ?? event.total ?? 0} investors. Generating insights...`
+                )
                 break
 
               case 'generating':
+                // INTENT: Route sends event.batchNumber and event.totalBatches in generating phase
                 setPhase('generating')
                 setProgressText(
-                  `Generating matches: batch ${event.batch ?? '?'} of ${event.totalBatches ?? '?'}...`
+                  `Generating matches: batch ${event.batchNumber ?? event.batch ?? '?'} of ${event.totalBatches ?? '?'}...`
                 )
                 break
 
@@ -398,7 +504,8 @@ export function InvestorMatchView() {
               }
 
               case 'near_misses': {
-                const incoming = (event.matches ?? []) as EnrichedMatch[]
+                // INTENT: Near misses come as { name, type, score, reason } not EnrichedMatch
+                const incoming = (event.matches ?? []) as NearMiss[]
                 setNearMisses((prev) => [...prev, ...incoming])
                 break
               }
@@ -430,19 +537,65 @@ export function InvestorMatchView() {
     }
   }, [])
 
-  const handleToggleShortlist = useCallback((investorId: string) => {
-    setShortlisted((prev) => {
-      const next = new Set(prev)
-      if (next.has(investorId)) {
-        next.delete(investorId)
+  // INTENT: Auto-run matching on mount so user sees results immediately
+  useEffect(() => {
+    if (hasAutoRun.current) return
+    hasAutoRun.current = true
+    startMatching()
+  }, [startMatching])
+
+  const handleToggleShortlist = useCallback(async (investorId: string) => {
+    setShortlistLoading((prev) => new Set(prev).add(investorId))
+
+    try {
+      const isCurrentlyShortlisted = shortlisted.has(investorId)
+
+      if (isCurrentlyShortlisted) {
+        const result = await removeFromShortlist(investorId)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        setShortlisted((prev) => {
+          const next = new Set(prev)
+          next.delete(investorId)
+          return next
+        })
         toast('Removed from shortlist')
       } else {
-        next.add(investorId)
+        const result = await addToShortlist(investorId, 'researching')
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
+        setShortlisted((prev) => {
+          const next = new Set(prev)
+          next.add(investorId)
+          return next
+        })
         toast.success('Added to shortlist')
       }
-      return next
-    })
-  }, [])
+    } catch {
+      toast.error('Failed to update shortlist')
+    } finally {
+      setShortlistLoading((prev) => {
+        const next = new Set(prev)
+        next.delete(investorId)
+        return next
+      })
+    }
+  // GOTCHA: shortlisted is read inside the callback but we deliberately capture it
+  // via closure so the toggle checks current state at call time
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shortlisted])
+
+  const handleExportCsv = useCallback(() => {
+    if (matches.length === 0) return
+    const csv = generateCsv(matches)
+    const date = new Date().toISOString().slice(0, 10)
+    downloadCsv(csv, `investor-matches-${date}.csv`)
+    toast.success(`Exported ${matches.length} matches to CSV`)
+  }, [matches])
 
   // INTENT: Visible matches for free users are capped; paid see all
   const visibleMatches = isPaid ? matches : matches.slice(0, FREE_MATCH_LIMIT)
@@ -462,22 +615,37 @@ export function InvestorMatchView() {
           </p>
         </div>
 
-        <Button
-          onClick={startMatching}
-          disabled={isLoading}
-          className={cn(
-            isLoading
-              ? 'bg-muted text-muted-foreground'
-              : 'bg-international-orange hover:bg-international-orange-hover'
+        <div className="flex items-center gap-2">
+          {/* CSV export */}
+          {matches.length > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleExportCsv}
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              Export CSV
+            </Button>
           )}
-        >
-          {isLoading ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          {phase === 'idle' ? 'Find Matches' : 'Refresh Matches'}
-        </Button>
+
+          {/* Refresh button */}
+          <Button
+            onClick={startMatching}
+            disabled={isLoading}
+            className={cn(
+              isLoading
+                ? 'bg-muted text-muted-foreground'
+                : 'bg-international-orange hover:bg-international-orange-hover'
+            )}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-2" />
+            )}
+            Refresh Matches
+          </Button>
+        </div>
       </div>
 
       {/* Progress indicator */}
@@ -505,22 +673,6 @@ export function InvestorMatchView() {
         <ProfileIncompleteCard missingFields={missingFields} />
       )}
 
-      {/* Idle state */}
-      {phase === 'idle' && (
-        <Card>
-          <CardContent className="py-12 text-center space-y-3">
-            <div className="h-12 w-12 rounded-full bg-international-orange/10 flex items-center justify-center mx-auto">
-              <Sparkles className="h-6 w-6 text-international-orange" />
-            </div>
-            <p className="text-sm font-medium text-foreground">Ready to find your ideal investors</p>
-            <p className="text-xs text-muted-foreground max-w-md mx-auto">
-              Click &quot;Find Matches&quot; to score investors against your company profile and
-              generate personalised outreach insights.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Match results */}
       {visibleMatches.length > 0 && (
         <div className="space-y-3">
@@ -528,8 +680,10 @@ export function InvestorMatchView() {
             <MatchRow
               key={match.investor.id}
               match={match}
+              isPro={isPro}
               isPaid={isPaid}
               isShortlisted={shortlisted.has(match.investor.id)}
+              shortlistLoading={shortlistLoading.has(match.investor.id)}
               onToggleShortlist={handleToggleShortlist}
             />
           ))}
@@ -605,40 +759,23 @@ export function InvestorMatchView() {
               >
                 <CardContent className="pt-3">
                   <div className="space-y-2">
-                    {nearMisses.map((match) => (
+                    {nearMisses.map((miss) => (
                       <div
-                        key={match.investor.id}
+                        key={miss.name}
                         className="flex items-center gap-3 py-2 border-b border-border last:border-0"
                       >
-                        <MatchScoreBadge score={match.matchScore} topFactors={match.topFactors} />
-                        <span className="text-sm font-medium text-foreground">
-                          {match.investor.name}
+                        <span className="text-xs font-bold text-muted-foreground tabular-nums w-8 text-right shrink-0">
+                          {miss.score}
                         </span>
-                        <Badge variant="secondary" className="text-xs">
-                          {match.investor.type}
+                        <span className="text-sm font-medium text-foreground">
+                          {miss.name}
+                        </span>
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {miss.type}
                         </Badge>
                         <span className="text-xs text-muted-foreground flex-1 truncate">
-                          {match.rationale}
+                          {miss.reason}
                         </span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleShortlist(match.investor.id)}
-                          aria-label={
-                            shortlisted.has(match.investor.id)
-                              ? 'Remove from shortlist'
-                              : 'Add to shortlist'
-                          }
-                        >
-                          <Heart
-                            className={cn(
-                              'h-3.5 w-3.5',
-                              shortlisted.has(match.investor.id)
-                                ? 'fill-international-orange text-international-orange'
-                                : 'text-muted-foreground'
-                            )}
-                          />
-                        </Button>
                       </div>
                     ))}
                   </div>
