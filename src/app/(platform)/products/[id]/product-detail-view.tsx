@@ -35,6 +35,8 @@ import {
   updateDesignBrief,
   createIteration,
   getIterationHistory,
+  checkForgeCompletionAndSync,
+  reviewBriefFeasibility,
 } from '@/actions/products'
 import {
   Dialog,
@@ -176,6 +178,8 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
   const [suggestionBrief, setSuggestionBrief] = React.useState<DesignBrief | null>(null)
   const [showBriefReviewDialog, setShowBriefReviewDialog] = React.useState(false)
   const [isApprovingBrief, setIsApprovingBrief] = React.useState(false)
+  const [maxReview, setMaxReview] = React.useState<{ review: string; feasible: boolean } | null>(null)
+  const [isReviewingBrief, setIsReviewingBrief] = React.useState(false)
 
   // INTENT: Fetch design briefs on mount
   React.useEffect(() => {
@@ -191,6 +195,38 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
     return () => { cancelled = true }
   }, [product.id])
 
+  // FLOW: Check if linked Forge project has completed and auto-sync COGS
+  React.useEffect(() => {
+    if (!product.cad_lab_project_id) return
+    let cancelled = false
+    async function checkForge() {
+      const result = await checkForgeCompletionAndSync(product.id)
+      if (cancelled) return
+      if (result.data?.synced) {
+        // FLOW: COGS updated — refresh product and trigger reassessment chain
+        const { getProduct } = await import('@/actions/products')
+        const refreshed = await getProduct(product.id)
+        if (!cancelled && refreshed.data) {
+          setProduct(refreshed.data)
+          toast.success(`COGS updated from Forge (${result.data.newCogsPence ? `£${(result.data.newCogsPence / 100).toFixed(2)}` : 'new estimate'})`)
+
+          // FLOW: Auto-trigger fundability rescore → synthesis
+          scoreFundability(product.id).then((fsResult) => {
+            if (!cancelled && fsResult.data) {
+              setFundability(fsResult.data)
+              synthesizeProductStatus(product.id).then((synthResult) => {
+                if (!cancelled && synthResult.data) setSynthesis(synthResult.data)
+              }).catch(() => {})
+            }
+          }).catch(() => {})
+        }
+      }
+    }
+    checkForge()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id, product.cad_lab_project_id])
+
   // ── AI Briefing ──────────────────────────────────────────────────
   const briefingContext = React.useMemo(() => {
     const parts: string[] = [`Product: ${product.name}`, `Stage: ${product.lifecycle}`]
@@ -201,8 +237,27 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       parts.push(`Margin: ${product.unit_economics.gross_margin_pct.toFixed(1)}%`)
     }
     if (product.cad_lab_project_id) parts.push('Linked to CAD Lab')
+    // FLOW: Include iteration progress for Priya to reference
+    if (iterations.length > 0) {
+      const latest = iterations[iterations.length - 1]
+      parts.push(`Iteration ${latest.iteration_number} (${latest.convergence_status})`)
+      if (iterations.length >= 2) {
+        const first = iterations[0]
+        const fp = first.pareto_scores as IterationPareto
+        const lp = latest.pareto_scores as IterationPareto
+        const totalImprovement = (lp.market + lp.financial + lp.fundability + lp.manufacturing)
+          - (fp.market + fp.financial + fp.fundability + fp.manufacturing)
+        if (totalImprovement !== 0) {
+          parts.push(`Total improvement since v1: ${totalImprovement > 0 ? '+' : ''}${totalImprovement} points`)
+        }
+      }
+    }
+    if (synthesis) {
+      const p = synthesis.pareto
+      parts.push(`Pareto: market=${p.market}, financial=${p.financial}, fundability=${p.fundability}, manufacturing=${p.manufacturing}`)
+    }
     return parts.join(', ')
-  }, [product])
+  }, [product, iterations, synthesis])
 
   const briefingSeverity = React.useMemo(() => {
     if (product.lifecycle === 'deprecated') return 'warning' as const
@@ -293,6 +348,11 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
         toast.error(`Saved pricing, but sync failed: ${syncResult.error}`)
       } else {
         toast.success('Pricing saved & synced to Cash Burn')
+
+        // FLOW: Auto-trigger synthesis after economics update
+        synthesizeProductStatus(product.id).then((synthResult) => {
+          if (synthResult.data) setSynthesis(synthResult.data)
+        }).catch(() => {})
       }
     } catch {
       toast.error('Failed to save pricing')
@@ -343,8 +403,15 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
       } else if (result.data) {
         setSuggestionBrief(result.data)
         setShowBriefReviewDialog(true)
+        setMaxReview(null)
         // INTENT: Add brief to local list so it appears immediately
         setBriefs(prev => [result.data!, ...prev])
+
+        // FLOW: Auto-trigger Max CTO feasibility review
+        setIsReviewingBrief(true)
+        reviewBriefFeasibility(result.data.id).then((reviewResult) => {
+          if (reviewResult.data) setMaxReview(reviewResult.data)
+        }).catch(() => {}).finally(() => setIsReviewingBrief(false))
       }
     } catch {
       toast.error('Failed to generate design brief')
@@ -2119,6 +2186,36 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
                   )}
 
                   {/* Local Optimum Warning */}
+                  {/* Product Readiness Milestone */}
+                  {synthesis.pareto.market >= 70 && synthesis.pareto.financial >= 70 &&
+                   synthesis.pareto.fundability >= 70 && synthesis.pareto.manufacturing >= 70 && (
+                    <div className="p-4 rounded-md bg-success/10 border border-success/20">
+                      <p className="text-sm font-semibold text-success mb-2">
+                        <Check className="h-4 w-4 inline mr-1.5" />
+                        This product is ready.
+                      </p>
+                      <p className="text-sm text-foreground mb-2">
+                        All four Pareto dimensions exceed 70/100. Your product is profitable, manufacturable, market-validated, and investor-attractive.
+                      </p>
+                      <div className="grid grid-cols-4 gap-2 mb-3">
+                        {PARETO_DIMENSIONS.map((dim) => (
+                          <div key={dim} className="text-center">
+                            <p className="text-[10px] text-muted-foreground capitalize">{dim}</p>
+                            <p className="text-lg font-bold text-success tabular-nums">{synthesis.pareto[dim]}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => router.push('/investors')}>
+                          Find best-fit investors
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => router.push('/cash-burn')}>
+                          Review runway
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {synthesis.isLocalOptimum && (
                     <div className="p-3 rounded-md bg-warning/10 border border-warning/20">
                       <p className="text-sm text-foreground">
@@ -2424,6 +2521,29 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
               </div>
             )
           })()}
+
+          {/* Max CTO Feasibility Review */}
+          {isReviewingBrief && (
+            <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Max is reviewing feasibility...</span>
+            </div>
+          )}
+          {maxReview && (
+            <div className={`p-3 rounded-md border ${
+              maxReview.feasible
+                ? 'bg-success/5 border-success/20'
+                : 'bg-warning/5 border-warning/20'
+            }`}>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-xs font-semibold text-foreground">Max (CTO) Review</span>
+                <Badge variant={maxReview.feasible ? 'success' : 'warning'} size="sm">
+                  {maxReview.feasible ? 'Feasible' : 'Concerns'}
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">{maxReview.review}</p>
+            </div>
+          )}
 
           <DialogFooter>
             <Button

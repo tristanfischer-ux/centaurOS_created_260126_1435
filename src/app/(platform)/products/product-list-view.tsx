@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { createProduct, createIteration } from '@/actions/products'
+import { createProduct, createIteration, generateMarketAssessment } from '@/actions/products'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -205,8 +205,14 @@ function EmptyProductState() {
         'Initial product from market opportunity',
       )
 
-      toast.success('Product created — assess the market next')
+      toast.success('Product created — running market assessment...')
       setMarketDialogOpen(false)
+
+      // FLOW: Auto-trigger market assessment for market-first products
+      generateMarketAssessment(result.data.id).catch(() => {
+        // Non-critical — user can trigger manually from Market tab
+      })
+
       router.push(`/products/${result.data.id}`)
     } catch {
       toast.error('Failed to create product')

@@ -1984,6 +1984,166 @@ Return ONLY a valid JSON object (no markdown fences):
   })
 }
 
+// ─── checkForgeCompletionAndSync ──────────────────────────────────────
+
+/**
+ * Checks if a product's linked CAD Lab project has completed and syncs
+ * updated COGS if the product hasn't been synced since the project completed.
+ *
+ * @description Called on product detail page load. If the linked Forge project
+ * is complete and COGS have changed, re-seeds unit economics. This closes the
+ * loop: Forge completes → COGS updated → triggers downstream re-assessment.
+ *
+ * @param productId - UUID of the product
+ * @returns { synced: boolean, newCogs?: number } or error
+ */
+export async function checkForgeCompletionAndSync(
+  productId: string,
+): Promise<ActionResult<{ synced: boolean; newCogsPence?: number }>> {
+  return withAuth(async ({ supabase, foundryId }) => {
+    if (!productId || typeof productId !== 'string') return { error: 'Invalid product ID' }
+
+    const { data: product, error: fetchError } = await productsTable(supabase)
+      .select('id, cad_lab_project_id, unit_economics, updated_at')
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !product) return { error: 'Product not found' }
+    if (!product.cad_lab_project_id) return { data: { synced: false } }
+
+    // FLOW: Check if the linked CAD project has completed
+    const { data: cadProject } = await cadLabTable(supabase)
+      .select('id, status, ai_cost_estimates, updated_at')
+      .eq('id', product.cad_lab_project_id)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (!cadProject) return { data: { synced: false } }
+
+    // INTENT: Only sync if project is complete/generated and has cost estimates
+    const isComplete = cadProject.status === 'complete' || cadProject.status === 'generated'
+    if (!isComplete || !cadProject.ai_cost_estimates) return { data: { synced: false } }
+
+    // INTENT: Only sync if CAD project was updated AFTER last product update
+    // (meaning new cost data is available)
+    const cadUpdated = new Date(cadProject.updated_at).getTime()
+    const productUpdated = new Date(product.updated_at).getTime()
+    const lastSyncedAt = (product.unit_economics as UnitEconomics | null)?.last_synced_from_cad_at
+    const lastSynced = lastSyncedAt ? new Date(lastSyncedAt).getTime() : 0
+
+    if (cadUpdated <= lastSynced) return { data: { synced: false } }
+
+    // FLOW: Re-seed COGS from updated CAD estimates
+    const newEconomics = buildUnitEconomicsFromEstimates(cadProject.ai_cost_estimates)
+    if (!newEconomics) return { data: { synced: false } }
+
+    // INTENT: Preserve existing selling price and volume data
+    const existingUe = product.unit_economics as UnitEconomics | null
+    if (existingUe?.selling_price_pence) {
+      newEconomics.selling_price_pence = existingUe.selling_price_pence
+      const margin = existingUe.selling_price_pence - newEconomics.cogs_per_unit_pence
+      newEconomics.contribution_margin_pence = margin
+      newEconomics.gross_margin_pct = existingUe.selling_price_pence > 0
+        ? Math.round((margin / existingUe.selling_price_pence) * 1000) / 10
+        : null
+    }
+
+    const { error: updateError } = await productsTable(supabase)
+      .update({ unit_economics: newEconomics })
+      .eq('id', productId)
+      .eq('foundry_id', foundryId)
+
+    if (updateError) return { error: updateError.message }
+
+    return { data: { synced: true, newCogsPence: newEconomics.cogs_per_unit_pence } }
+  })
+}
+
+// ─── reviewBriefFeasibility ──────────────────────────────────────────
+
+/**
+ * Max CTO feasibility review on a design brief.
+ *
+ * @description Calls Claude Sonnet with Max's personality to assess whether
+ * a design brief is technically feasible before sending to Forge.
+ *
+ * @param briefId - UUID of the design brief to review
+ * @returns Feasibility assessment text from Max
+ */
+export async function reviewBriefFeasibility(
+  briefId: string,
+): Promise<ActionResult<{ review: string; feasible: boolean }>> {
+  return withAIGate('market_assessment', async ({ supabase, foundryId, trackUsage }) => {
+    if (!briefId || typeof briefId !== 'string') return { error: 'Invalid brief ID' }
+
+    const { data: brief, error: fetchError } = await briefsTable(supabase)
+      .select('*, products:product_id(name, description, lifecycle)')
+      .eq('id', briefId)
+      .eq('foundry_id', foundryId)
+      .single()
+
+    if (fetchError || !brief) return { error: 'Brief not found' }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+
+    try {
+      const Anthropic = (await import('@anthropic-ai/sdk')).default
+      const client = new Anthropic({ apiKey })
+
+      const systemPrompt = `You are Max, CTO of Fractional Forge. You're a pragmatic engineer who's built hardware products from prototype to mass production. You review design briefs for technical feasibility.
+
+Assess this brief honestly:
+1. Are the target specs achievable?
+2. Are the manufacturing constraints realistic?
+3. Are there any red flags or contradictions?
+4. What's the biggest risk?
+
+Keep your review to 3-4 sentences. Be direct — founders need honesty, not encouragement. End with a clear verdict.
+
+Return ONLY a valid JSON object (no markdown):
+{"review": "your assessment text", "feasible": true/false}`
+
+      const result = await Promise.race([
+        client.messages.create({
+          model: 'claude-sonnet-4-6-20250514',
+          max_tokens: 500,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: `Review this design brief:\n\n${JSON.stringify(brief.brief_content, null, 2)}` }],
+        }),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
+      ])
+
+      if (!result) return { error: 'Review timed out' }
+      if (!('content' in result)) return { error: 'Unexpected AI response' }
+
+      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+      await trackUsage({ model: 'claude-sonnet-4-6-20250514', promptTokens: result.usage?.input_tokens, completionTokens: result.usage?.output_tokens })
+
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      try {
+        const parsed = JSON.parse(cleaned)
+        const review = typeof parsed.review === 'string' ? parsed.review : 'Unable to parse review'
+        const feasible = typeof parsed.feasible === 'boolean' ? parsed.feasible : true
+
+        // FLOW: Save review to the brief
+        await briefsTable(supabase)
+          .update({ reviewed_by: 'max_cto', review_notes: review })
+          .eq('id', briefId)
+          .eq('foundry_id', foundryId)
+
+        return { data: { review, feasible } }
+      } catch {
+        return { data: { review: text.slice(0, 500), feasible: true } }
+      }
+    } catch (err) {
+      console.error('[reviewBriefFeasibility] Failed:', err)
+      return { error: 'Feasibility review failed' }
+    }
+  })
+}
+
 // ─── Internal helpers ───────────────────────────────────────────────
 
 /**
