@@ -50,6 +50,7 @@ const ROUTE_SPECIALIST_MAP: Array<{
   { pattern: "/investors", specialistId: "fundraising-advisor" },
   { pattern: "/fundraise", specialistId: "fundraising-advisor" },
   { pattern: "/apprenticeship", specialistId: "hiring-team" },
+  { pattern: "/products", specialistId: "product-lead" },
   { pattern: "/agents", specialistId: "chief-of-staff" },
   { pattern: "/whats-new", specialistId: "chief-of-staff" },
   { pattern: "/help", specialistId: "chief-of-staff" },
