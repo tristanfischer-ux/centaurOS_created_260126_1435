@@ -85,7 +85,7 @@ export function CashOutView({ initialItems, hasError, humanProfiles, companyCont
   ], [weeklyFixedTotal, weeklyVariableTotal])
 
   // 52-week stacked area chart data
-  const cashOutGrid = useMemo(() => generateCashOutGrid(items, 52, startDate), [items, startDate])
+  const cashOutGrid = useMemo(() => generateCashOutGrid(filteredItems, 52, startDate), [filteredItems, startDate])
   const stackedData = useMemo(() => cashOutGrid.map((row, i) => ({
     label: i % 4 === 0 ? row.weekLabel : `W${i + 1}`,
     'Fixed': row.fixedCosts,
