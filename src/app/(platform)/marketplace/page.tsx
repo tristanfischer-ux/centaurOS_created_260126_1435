@@ -6,6 +6,7 @@ import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
+import { MarketplacePageTabs } from '../marketplace-v2/components/MarketplacePageTabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
@@ -117,18 +118,22 @@ export default async function MarketplacePage() {
 
     return (
         <Suspense fallback={<MarketplaceLoading />}>
-            <MarketplaceBrowse
-                initialListings={listings}
-                initialTotalCount={totalCount}
-                initialHasMore={hasMore}
-                initialCategoryCounts={categoryCounts}
-                recommendations={recommendations}
-                initialSavedIds={savedIds}
-                initialSavedListings={savedListings}
-                foundryContext={ctx || undefined}
-                allowedCategories={['Products', 'Services']}
-                pageSubtitle="Find products and services to grow your business"
-                stats={stats || undefined}
+            <MarketplacePageTabs
+                browseContent={
+                    <MarketplaceBrowse
+                        initialListings={listings}
+                        initialTotalCount={totalCount}
+                        initialHasMore={hasMore}
+                        initialCategoryCounts={categoryCounts}
+                        recommendations={recommendations}
+                        initialSavedIds={savedIds}
+                        initialSavedListings={savedListings}
+                        foundryContext={ctx || undefined}
+                        allowedCategories={['Products', 'Services']}
+                        pageSubtitle="Find products and services to grow your business"
+                        stats={stats || undefined}
+                    />
+                }
             />
         </Suspense>
     )

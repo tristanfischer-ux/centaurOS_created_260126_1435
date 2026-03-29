@@ -1,15 +1,15 @@
 /**
- * @file Recruits page — People-focused marketplace with AI talent matching.
+ * @file Recruits page — People-focused marketplace with personalized talent matching.
  *
- * @description Shows People marketplace listings enriched with trust signals,
- * social proof, and an AI-powered "Describe Who You Need" talent finder.
- * Lives under the People navigation section alongside Guild and Apprenticeship.
+ * @description Two-tab layout: "For You" shows top 20 auto-matched executives
+ * based on company needs (gaps, objectives, tasks), "Browse All" shows the full
+ * People marketplace with search and filters.
  *
  * @related
  * - Marketplace page (Products & Services): src/app/(platform)/marketplace/page.tsx
  * - Browse component: src/app/(platform)/marketplace-v2/components/MarketplaceBrowse.tsx
  * - People actions: src/actions/people-marketplace.ts
- * - Talent finder: src/components/marketplace/talent-finder.tsx
+ * - Recruit matching: src/app/api/recruits/match/route.ts
  */
 
 import { getSavedMarketplaceListings } from '@/actions/marketplace'
@@ -24,7 +24,8 @@ import { MatchAlertBanner } from '@/components/marketplace/match-alert-banner'
 import { TalentFinderWrapper } from './talent-finder-wrapper'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
-// DECISION: HarperRoleBriefing removed — SpecialistBriefingHero now provides Harper's guidance
+import { RecruitPageTabs } from './components/RecruitPageTabs'
+import { RecruitMatchView } from './components/RecruitMatchView'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MatchAlert } from '@/actions/match-alerts'
 import { typography } from '@/lib/design-system'
@@ -51,11 +52,9 @@ export const revalidate = 30
 /**
  * Server component for the Recruits page.
  *
- * @description Fetches enriched People marketplace listings with trust signals,
- * recommendations, and saved state. Renders the AI Talent Finder above the
- * standard MarketplaceBrowse grid.
- *
- * @returns Recruits page with AI talent finder and enriched people cards
+ * @description Two-tab layout: "For You" auto-matches executives via SSE streaming,
+ * "Browse All" shows the full People marketplace. Harper provides hiring context
+ * via the specialist briefing hero.
  */
 export default async function RecruitsPage(): Promise<React.ReactElement> {
     let listings: MarketplaceListing[] = []
@@ -100,7 +99,6 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     // Fetch recommendations, saved IDs, and full saved listings in parallel
     if (foundryId) {
         const supabase = await createClient()
-        // SECURITY: Get user ID for defense-in-depth filtering on saved listings
         const { data: { user } } = await supabase.auth.getUser()
 
         const [recsResult, savedResult, savedListingsResult] = await Promise.allSettled([
@@ -115,7 +113,6 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
         ])
 
         if (recsResult.status === 'fulfilled' && recsResult.value.data) {
-            // Only include People recommendations for this view
             recommendations = (recsResult.value.data as MarketplaceRecommendation[])
                 .filter(r => r.category === 'People')
         }
@@ -125,7 +122,6 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
         }
 
         if (savedListingsResult.status === 'fulfilled' && savedListingsResult.value.data) {
-            // Only include People saved listings for this view
             savedListings = savedListingsResult.value.data.filter(
                 (l: MarketplaceListing) => l.category === 'People'
             )
@@ -135,7 +131,6 @@ export default async function RecruitsPage(): Promise<React.ReactElement> {
     const categories = Array.from(new Set(listings.map(l => l.subcategory).filter(Boolean)))
 
     // INTENT: Harper analyses team gaps and available talent to give actionable hiring advice.
-    // Server component can await the briefing directly — no hook needed.
     const gapCategories = ctx?.gapCategories ?? []
     const briefingContext = `Available talent: ${listings.length} people across ${categories.length} specialisations (${categories.slice(0, 5).join(', ')}).
 Team gaps identified: ${gapCategories.length > 0 ? gapCategories.join(', ') : 'none detected yet — set up your team coverage map'}.
@@ -168,29 +163,37 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                 storageKey="recruits"
             />
 
-            {/* AI Talent Finder - the "aha moment" */}
-            <TalentFinderWrapper />
-
             {/* Match alert banner — shows unread match notifications */}
             {matchAlerts.length > 0 && (
                 <MatchAlertBanner alerts={matchAlerts} />
             )}
 
-            {/* Standard marketplace browse with enriched People cards */}
-            <MarketplaceBrowse
-                initialListings={listings}
-                recommendations={recommendations}
-                initialSavedIds={savedIds}
-                initialSavedListings={savedListings}
-                foundryContext={ctx || undefined}
-                allowedCategories={['People']}
-                pageTitle="Recruits"
-                pageSubtitle="Find expert talent to grow your team"
-                stats={recruitsStats ?? undefined}
-                statsLabels={RECRUITS_STATS_LABELS}
-                statsDefaultExpanded={false}
-                postFetchTransform={enrichPeopleListingsBatch}
-                hideSpecialistBriefing
+            {/* Two-tab layout: For You (auto-matched) + Browse All (marketplace) */}
+            <RecruitPageTabs
+                forYouContent={<RecruitMatchView />}
+                browseContent={
+                    <div className="space-y-6">
+                        {/* AI Talent Finder */}
+                        <TalentFinderWrapper />
+
+                        {/* Standard marketplace browse with enriched People cards */}
+                        <MarketplaceBrowse
+                            initialListings={listings}
+                            recommendations={recommendations}
+                            initialSavedIds={savedIds}
+                            initialSavedListings={savedListings}
+                            foundryContext={ctx || undefined}
+                            allowedCategories={['People']}
+                            pageTitle="Recruits"
+                            pageSubtitle="Find expert talent to grow your team"
+                            stats={recruitsStats ?? undefined}
+                            statsLabels={RECRUITS_STATS_LABELS}
+                            statsDefaultExpanded={false}
+                            postFetchTransform={enrichPeopleListingsBatch}
+                            hideSpecialistBriefing
+                        />
+                    </div>
+                }
             />
         </div>
     )
