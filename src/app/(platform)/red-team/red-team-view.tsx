@@ -242,15 +242,37 @@ export function RedTeamView(): React.ReactElement {
 
   const abortRef = useRef<AbortController | null>(null)
   const interjectionInputRef = useRef<HTMLTextAreaElement>(null)
+  // INTENT: Mirror streamingArgs in a ref so fact_check_start can read
+  // the latest value without stale closure issues (handleSSEEvent deps = [])
+  const streamingArgsRef = useRef<Map<string, string>>(new Map())
 
   // Load history + silent health check on mount
+  // INTENT: Auto-load the most recent debate so navigating away and back
+  // doesn't lose the user's last session. History button still works for older debates.
   useEffect(() => {
-    listRedTeamDebates().then(setHistory).catch(() => {})
+    listRedTeamDebates()
+      .then((items) => {
+        setHistory(items)
+        // Auto-restore the most recent debate if the page loaded fresh (no active debate)
+        if (items.length > 0 && !debate && !isGenerating) {
+          loadRedTeamDebate(items[0].id)
+            .then((doc) => {
+              if (doc) {
+                setDebate(doc)
+                setTopic(doc.topic)
+                setExpandedRounds(new Set(doc.rounds.map((r) => r.roundNumber)))
+              }
+            })
+            .catch((err) => console.warn("[RedTeam] Failed to auto-load latest debate:", err))
+        }
+      })
+      .catch((err) => console.warn("[RedTeam] Failed to load debate history:", err))
     // Silent health pre-check — only surfaces warning if something is down
     fetch("/api/health/ai").then(r => r.json()).then((data: HealthCheckResult) => {
       setHealthStatus(data)
       setHealthChecked(true)
     }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ─── Health Pre-check ─────────────────────────────────────────
@@ -394,6 +416,8 @@ export function RedTeamView(): React.ReactElement {
             const key = `${event.round}-${event.persona}`
             const next = new Map(prev)
             next.set(key, (next.get(key) || "") + (event.chunk as string))
+            // Keep ref in sync for fact_check_start to read latest state
+            streamingArgsRef.current = next
             return next
           })
           break
@@ -405,10 +429,27 @@ export function RedTeamView(): React.ReactElement {
           }
           break
 
-        case "fact_check_start":
+        case "fact_check_start": {
           setStreamPhase("fact_check")
           setStreamMessage(`Fact-checking round ${event.round}...`)
+          // INTENT: Build the round from streaming args and add to completedRounds
+          // so that fact_check_complete can find and attach checks to it.
+          const roundNum = event.round as number
+          setCompletedRounds((prev) => {
+            if (prev.find((r) => r.roundNumber === roundNum)) return prev
+            const currentArgs = streamingArgsRef.current
+            const roundArgs = DEBATE_PERSONAS.map((p) => ({
+              role: p.role,
+              characterName: p.characterName,
+              modelId: p.modelId,
+              content: currentArgs.get(`${roundNum}-${p.role}`) || "",
+              duration: 0,
+              costUsd: 0,
+            })).filter((a) => a.content.length > 0)
+            return [...prev, { roundNumber: roundNum, question: streamMessage, arguments: roundArgs, factChecks: [] }]
+          })
           break
+        }
 
         case "fact_check_complete": {
           const checks = (event.checks || []) as FactCheck[]
@@ -419,7 +460,9 @@ export function RedTeamView(): React.ReactElement {
                 r.roundNumber === event.round ? { ...r, factChecks: checks } : r,
               )
             }
-            return prev
+            // GOTCHA: If fact_check_start didn't create the round entry (race condition),
+            // create it now with just the fact checks.
+            return [...prev, { roundNumber: event.round as number, question: "", arguments: [], factChecks: checks }]
           })
           break
         }
@@ -813,7 +856,7 @@ export function RedTeamView(): React.ReactElement {
             <div>
               <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Red Team Debate</h1>
               <p className="text-sm text-muted-foreground">
-                Stress-test decisions with 5 different AI models
+                Stress-test decisions with multi-perspective debate
               </p>
             </div>
           </div>

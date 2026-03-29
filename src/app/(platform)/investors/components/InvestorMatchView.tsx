@@ -34,6 +34,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { MatchScoreBadge } from './MatchScoreBadge'
 import { LockedSection } from './LockedSection'
 import { addToShortlist, removeFromShortlist } from '@/actions/investors'
@@ -435,12 +436,39 @@ export function InvestorMatchView() {
     setTierInfo(null)
     setProgressText('Connecting...')
 
+    // INTENT: Force a session refresh before SSE to prevent stale token errors.
+    // The TypeError: Failed to fetch in _useSession/_getUser was caused by
+    // expired access tokens during SSE streaming.
     try {
-      const response = await fetch('/api/investors/match', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      })
+      const supabase = createBrowserClient()
+      await supabase.auth.getSession()
+    } catch (refreshErr) {
+      console.warn('[InvestorMatch] Session refresh failed before SSE:', refreshErr)
+    }
+
+    // DECISION: Retry once on auth/fetch failure after forcing a fresh session
+    const MAX_RETRIES = 1
+    let lastError: unknown = null
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      if (attempt > 0) {
+        // On retry, force another session refresh
+        try {
+          const supabase = createBrowserClient()
+          const { error } = await supabase.auth.refreshSession()
+          if (error) console.warn('[InvestorMatch] Retry session refresh failed:', error.message)
+        } catch { /* continue with retry anyway */ }
+        setProgressText('Retrying...')
+      }
+
+      try {
+        lastError = null
+        const response = await fetch('/api/investors/match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          signal: controller.signal,
+        })
 
       if (!response.ok) {
         throw new Error(`Server returned ${response.status}`)
@@ -546,8 +574,24 @@ export function InvestorMatchView() {
       }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') return
+      lastError = err
+      // If we have retries left, continue the loop
+      if (attempt < MAX_RETRIES) {
+        console.warn(`[InvestorMatch] Attempt ${attempt + 1} failed, retrying...`, err instanceof Error ? err.message : err)
+        continue
+      }
       setPhase('error')
       const message = err instanceof Error ? err.message : 'Failed to connect'
+      toast.error(message)
+    }
+    // If we got here without error (or handled it), break out of retry loop
+    if (!lastError) break
+    }
+
+    // If all retries exhausted with errors
+    if (lastError && !(lastError instanceof DOMException)) {
+      setPhase('error')
+      const message = lastError instanceof Error ? lastError.message : 'Failed to connect after retry'
       toast.error(message)
     }
   }, [])

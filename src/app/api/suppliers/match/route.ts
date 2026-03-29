@@ -326,14 +326,29 @@ export async function POST() {
         })).sort((a, b) => b.breakdown.total - a.breakdown.total)
 
         const top50 = scored.slice(0, 50)
-        const nearMisses: NearMiss[] = scored.slice(50, 100).map(s => ({
-          name: s.supplier.title,
-          subcategory: s.supplier.subcategory,
-          score: s.breakdown.total,
-          reason: s.breakdown.topFactors.length > 0
-            ? s.breakdown.topFactors.join(" · ")
-            : `Score: ${s.breakdown.total}/100`,
-        }))
+        // INTENT: Near-miss reasons should explain WHY the supplier ranked lower,
+        // not repeat their strengths. Identify the weakest scoring dimension.
+        const nearMisses: NearMiss[] = scored.slice(50, 100).map(s => {
+          const b = s.breakdown
+          const weaknesses: string[] = []
+          if (b.industryScore === 0) weaknesses.push("No industry overlap")
+          if (b.gapScore === 0) weaknesses.push("Doesn't fill identified gaps")
+          if (b.manufacturingScore === 0 && companyProfile.processes.length > 0) weaknesses.push("No manufacturing fit")
+          if (b.certScore === 0) weaknesses.push("Missing required certifications")
+          if (b.qualityScore < 3) weaknesses.push("Limited verification data")
+          if (b.stageScore === 0) weaknesses.push("Stage mismatch")
+
+          const reason = weaknesses.length > 0
+            ? weaknesses.slice(0, 2).join(" · ")
+            : (b.topFactors.length > 0 ? `Partial match: ${b.topFactors[0]}` : `Score: ${b.total}/100`)
+
+          return {
+            name: s.supplier.title,
+            subcategory: s.supplier.subcategory,
+            score: b.total,
+            reason,
+          }
+        })
 
         emit({
           phase: "scored",

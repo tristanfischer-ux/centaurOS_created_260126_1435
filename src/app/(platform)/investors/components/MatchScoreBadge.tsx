@@ -17,10 +17,12 @@ interface MatchScoreBadgeProps {
 }
 
 export function MatchScoreBadge({ score, topFactors, size = 'sm' }: MatchScoreBadgeProps) {
+  // DECISION: Use status-* tokens from Tailwind config (status.success, status.warning)
+  // Previously used text-success which doesn't exist in the config — it's status.success
   const colorClass = score >= 70
-    ? 'text-success border-success/40 bg-success/10'
+    ? 'text-status-success border-status-success/40 bg-status-success/10'
     : score >= 40
-      ? 'text-warning border-warning/40 bg-warning/10'
+      ? 'text-status-warning border-status-warning/40 bg-status-warning/10'
       : 'text-muted-foreground border-border bg-muted/50'
 
   const dimensions = size === 'md' ? 'h-10 w-10 text-sm' : 'h-8 w-8 text-xs'

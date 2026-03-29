@@ -36,6 +36,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { createClient as createBrowserClient } from '@/lib/supabase/client'
 import { MatchScoreBadge } from '@/app/(platform)/investors/components/MatchScoreBadge'
 import { LockedSection } from '@/app/(platform)/investors/components/LockedSection'
 import { saveMarketplaceListing, unsaveMarketplaceListing } from '@/actions/marketplace'
@@ -349,10 +350,19 @@ export function SupplierMatchView() {
     setTierInfo(null)
     setProgressText('Connecting...')
 
+    // INTENT: Force a session refresh before SSE to prevent stale token errors.
+    try {
+      const supabase = createBrowserClient()
+      await supabase.auth.getSession()
+    } catch (refreshErr) {
+      console.warn('[SupplierMatch] Session refresh failed before SSE:', refreshErr)
+    }
+
     try {
       const response = await fetch('/api/suppliers/match', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         signal: controller.signal,
       })
 
@@ -464,7 +474,7 @@ export function SupplierMatchView() {
           next.delete(supplierId)
           return next
         })
-        toast('Removed from saved')
+        toast('Removed from saved', { duration: 3000 })
       } else {
         const result = await saveMarketplaceListing(supplierId)
         if (result.error) {
@@ -476,7 +486,7 @@ export function SupplierMatchView() {
           next.add(supplierId)
           return next
         })
-        toast.success('Saved supplier')
+        toast.success('Saved supplier', { duration: 3000 })
       }
     } catch {
       toast.error('Failed to update saved suppliers')

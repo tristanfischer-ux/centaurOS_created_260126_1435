@@ -240,7 +240,8 @@ export async function POST(request: Request) {
               )
             } catch (primaryErr) {
               console.warn(`[RedTeam] ${persona.providerId}/${persona.modelId} failed, falling back to Sonnet:`, primaryErr instanceof Error ? primaryErr.message : primaryErr)
-              emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk: `*[${persona.characterName} running on fallback model]*\n\n` })
+              // DECISION: Don't emit fallback notice to client — it leaks internal model info.
+              // The persona keeps its personality; only the underlying model changes silently.
               usedModelId = "claude-sonnet-4-6 (fallback)"
               result = await callLLMStreaming(
                 "anthropic", "claude-sonnet-4-6", systemPrompt, userPrompt,
