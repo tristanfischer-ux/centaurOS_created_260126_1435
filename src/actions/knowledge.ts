@@ -761,3 +761,75 @@ async function parseDocumentText(file: File): Promise<string> {
 
   return await file.text()
 }
+
+// ─── Semantic Search ─────────────────────────────────────────────────
+
+/**
+ * Searches knowledge notes using vector similarity (semantic search).
+ * Falls back to keyword search if embedding generation fails.
+ *
+ * @param query - Natural language search query
+ * @param limit - Max results (default 15)
+ * @returns Matching notes sorted by relevance
+ */
+export async function searchKnowledgeSemantic(
+  query: string,
+  limit: number = 15,
+): Promise<{ notes: Array<{
+  id: string
+  title: string
+  content: string
+  description: string
+  note_type: string
+  source_specialist: string | null
+  tags: string[]
+  confidence: number
+  similarity: number
+}>; error: string | null }> {
+  const auth = await requireAuth()
+  if (!auth) return { notes: [], error: 'Unauthorized' }
+
+  const { embedText } = await import('@/lib/search/semantic-search')
+  const embedding = await embedText(query)
+
+  if (!embedding) {
+    // FALLBACK: keyword search if embedding fails
+    const supabase = await createClient()
+    const q = `%${query.trim()}%`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from('knowledge_notes')
+      .select('id, title, content, description, note_type, source_specialist, tags, confidence')
+      .eq('foundry_id', auth.foundryId)
+      .eq('is_archived', false)
+      .or(`title.ilike.${q},description.ilike.${q},content.ilike.${q}`)
+      .order('updated_at', { ascending: false })
+      .limit(limit)
+
+    if (error) return { notes: [], error: error.message }
+    return {
+      notes: ((data ?? []) as Array<Record<string, unknown>>).map((n) => ({ ...n, similarity: 0 })) as unknown as Array<{
+        id: string; title: string; content: string; description: string;
+        note_type: string; source_specialist: string | null; tags: string[];
+        confidence: number; similarity: number;
+      }>,
+      error: null,
+    }
+  }
+
+  const supabase = await createClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match_knowledge_notes not in generated types (custom RPC)
+  const { data, error } = await (supabase as any).rpc('match_knowledge_notes', {
+    query_embedding: JSON.stringify(embedding),
+    p_foundry_id: auth.foundryId,
+    match_threshold: 0.35,
+    match_count: limit,
+  })
+
+  if (error) return { notes: [], error: error.message }
+  return { notes: (data ?? []) as unknown as Array<{
+    id: string; title: string; content: string; description: string;
+    note_type: string; source_specialist: string | null; tags: string[];
+    confidence: number; similarity: number;
+  }>, error: null }
+}

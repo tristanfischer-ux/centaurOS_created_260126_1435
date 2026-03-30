@@ -321,7 +321,23 @@ export async function createKnowledgeNote(
     return null
   }
 
-  return note as unknown as KnowledgeNote
+  // INTENT: Generate embedding async (fire-and-forget) so the note is
+  // searchable via semantic search. Uses OpenAI text-embedding-3-small.
+  const noteRecord = note as unknown as KnowledgeNote
+  const embeddingText = `${data.title}\n${data.description ?? ""}\n${data.content}`.trim()
+  import("@/lib/search/semantic-search").then(({ embedText }) =>
+    embedText(embeddingText).then((embedding) => {
+      if (!embedding) return
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(supabase as any)
+        .from("knowledge_notes")
+        .update({ embedding: JSON.stringify(embedding) })
+        .eq("id", noteRecord.id)
+        .then(() => {})
+    }),
+  ).catch(() => { /* Non-critical — note saved without embedding */ })
+
+  return noteRecord
 }
 
 // ─── Notes: Update ───────────────────────────────────────────────────

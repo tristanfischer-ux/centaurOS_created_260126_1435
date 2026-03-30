@@ -458,6 +458,13 @@ export async function saveCadLabResult(
           console.error("[THE-FORGE] Auto-promote failed:", err),
         ),
       )
+
+      // INTENT: Feed completed design into Knowledge Vault so specialists
+      // can reference it in future conversations. Fire-and-forget.
+      import("@/actions/knowledge").then(({ extractKnowledgeFromText }) => {
+        const designText = `Completed CAD Design (project ${projectId}). Design generated successfully with code output.`
+        extractKnowledgeFromText(designText, "CAD Lab Design").catch(() => {})
+      }).catch(() => {})
     }
 
     return { success: true as const }

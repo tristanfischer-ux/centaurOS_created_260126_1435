@@ -1385,6 +1385,10 @@ export function TeamMeetingDialog({
 
                 if (!saveResult.error) {
                     setIsAutoSaved(true)
+                    // INTENT: Feed meeting insights into Knowledge Vault.
+                    import("@/actions/knowledge").then(({ extractKnowledgeFromText }) => {
+                        extractKnowledgeFromText(notesMarkdown, `Meeting: ${topic.slice(0, 60)}`).catch(() => {})
+                    }).catch(() => {})
                 } else {
                     console.error("[TeamMeeting] Auto-save failed:", saveResult.error)
                 }

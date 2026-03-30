@@ -404,6 +404,17 @@ export async function POST(request: Request) {
               catch { /* stream already closed */ }
             }
           })
+          // INTENT: Feed debate insights into Knowledge Vault so specialists
+          // can reference debate conclusions in future conversations.
+          import("@/actions/knowledge").then(({ extractKnowledgeFromText }) => {
+            const debateText = [
+              `Red Team Debate: ${topic}`,
+              verdict ? `\nVerdict:\n${verdict}` : "",
+              suggestedObjectives?.length ? `\nRecommended Objectives:\n${suggestedObjectives.join("\n")}` : "",
+              suggestedRiskMitigations?.length ? `\nRisk Mitigations:\n${suggestedRiskMitigations.join("\n")}` : "",
+            ].join("")
+            extractKnowledgeFromText(debateText, `Red Team: ${topic.slice(0, 60)}`).catch(() => {})
+          }).catch(() => {})
         } else {
           console.warn("[RedTeam] No foundry_id found for user, debate not saved to history")
         }

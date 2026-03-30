@@ -80,11 +80,42 @@ export const handleQueryPastAdvice: ToolHandler = async (args, ctx) => {
         // specialist_knowledge_base may not exist yet — non-fatal
     }
 
-    if (matched.length === 0 && kbResults.length === 0) {
+    // INTENT: Semantic search over the Knowledge Vault (pgvector embeddings).
+    // This finds conceptually related notes even when keywords don't match.
+    let vaultResults: Array<{ title: string; content: string; note_type: string; source_specialist: string | null; similarity: number }> = []
+    try {
+        const { embedText } = await import("@/lib/search/semantic-search")
+        const embedding = await embedText(query)
+        if (embedding) {
+            const { data: vaultData } = await supabase.rpc("match_knowledge_notes", {
+                query_embedding: JSON.stringify(embedding),
+                p_foundry_id: ctx.foundryId,
+                match_threshold: 0.35,
+                match_count: 10,
+            })
+            if (vaultData) {
+                vaultResults = (vaultData as Array<{ title: string; content: string; note_type: string; source_specialist: string | null; similarity: number }>)
+                    .slice(0, 8)
+            }
+        }
+    } catch {
+        // Semantic search unavailable — fall through to keyword results
+    }
+
+    if (matched.length === 0 && kbResults.length === 0 && vaultResults.length === 0) {
         return `No past advice found matching "${query}" in the last ${days} days.`
     }
 
     let md = `## Past Advice: "${query}"\n\n`
+
+    // Knowledge Vault results first (highest quality — semantically matched)
+    if (vaultResults.length > 0) {
+        md += `### Knowledge Vault (${vaultResults.length} semantic matches)\n\n`
+        for (const v of vaultResults) {
+            const source = v.source_specialist ? ` (via ${v.source_specialist})` : ""
+            md += `**${v.title}**${source} [${v.note_type}] (${Math.round(v.similarity * 100)}% match):\n> ${v.content.slice(0, 400)}${v.content.length > 400 ? "…" : ""}\n\n`
+        }
+    }
 
     if (matched.length > 0) {
         md += `### Previous Conversations (${matched.length} results)\n\n`
