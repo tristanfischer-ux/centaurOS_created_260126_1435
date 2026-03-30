@@ -370,9 +370,10 @@ Only return the JSON array.`
             console.warn("[InvestorMatch] Rationale generation failed:", err)
           }
 
-          // Fetch contacts for paid tiers
+          // INTENT: Fetch contacts for ALL tiers — free users see partner name/title
+          // on first 5 matches (enticing preview). Emails only shown to Pro users.
           const contactsByListing: Record<string, { name: string; title: string; email?: string; linkedin?: string }[]> = {}
-          if (isStarter) {
+          {
             const listingIds = batchItems.map(item => item.firm.id)
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: contacts } = await (supabase as any)

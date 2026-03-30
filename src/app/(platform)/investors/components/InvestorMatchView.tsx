@@ -298,8 +298,8 @@ function MatchRow({
         <p className="text-sm text-muted-foreground leading-relaxed">{match.rationale}</p>
       </div>
 
-      {/* Partner + Email (paid only) */}
-      {isPaid && (
+      {/* Partner + Email — shown for all visible matches (partner name/title for free, email for pro) */}
+      {(
         <div className="pl-[52px] space-y-2">
           {match.partner ? (
             <div className="flex items-center gap-3 text-sm">
