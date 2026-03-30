@@ -338,7 +338,7 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
 
     // FLOW: Fetch the CAD project data
     const { data: project, error: projectError } = await cadLabTable(supabase)
-      .select('id, name, subject, product_overview, ai_cost_estimates, system_illustration_url')
+      .select('id, name, subject, product_overview, ai_cost_estimates, system_illustration_url, status')
       .eq('id', cadLabProjectId)
       .eq('foundry_id', foundryId)
       .single()
@@ -350,8 +350,13 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
     // INTENT: Build product description from the CAD project's product_overview
     const description = project.product_overview || project.subject || null
 
-    // INTENT: Seed unit economics from ai_cost_estimates JSONB
+    // INTENT: Seed unit economics from ai_cost_estimates JSONB (only if available)
     const unitEconomics = buildUnitEconomicsFromEstimates(project.ai_cost_estimates)
+
+    // DECISION: Completed designs start as 'prototyping' (they have CAD + COGS).
+    // Earlier designs start as 'concept' (idea stage, no manufacturing data yet).
+    const isComplete = project.status === 'generated' || project.status === 'complete'
+    const lifecycle = isComplete ? 'prototyping' : 'concept'
 
     const { data, error } = await productsTable(supabase)
       .insert({
@@ -360,7 +365,7 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
         name: project.name || 'Untitled Product',
         description,
         hero_image_url: project.system_illustration_url || null,
-        lifecycle: 'prototyping',
+        lifecycle,
         cad_lab_project_id: cadLabProjectId,
         unit_economics: unitEconomics,
       })

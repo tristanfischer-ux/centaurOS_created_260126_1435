@@ -600,11 +600,18 @@ function ForgePickerDialog({
     listCadLabProjects().then((result) => {
       setIsLoading(false)
       if ('projects' in result) {
-        // Filter to completed designs not already linked to a product
+        // INTENT: Show ALL Forge designs (not just completed ones) — a design
+        // at any stage can become a product concept. Exclude only those already
+        // linked to a product. Sort: completed designs first, then by updated_at.
         const eligible = result.projects.filter(
-          (p) =>
-            (p.status === 'generated' || p.status === 'complete' || p.status === 'rfq_created') &&
-            !existingProjectIds.includes(p.id),
+          (p) => !existingProjectIds.includes(p.id),
+        )
+        const STAGE_ORDER: Record<string, number> = {
+          generated: 0, complete: 0, rfq_created: 0,
+          interface_ready: 1, researched: 2, draft: 3,
+        }
+        eligible.sort((a, b) =>
+          (STAGE_ORDER[a.status] ?? 4) - (STAGE_ORDER[b.status] ?? 4),
         )
         setProjects(eligible)
       }
@@ -630,7 +637,7 @@ function ForgePickerDialog({
         <DialogHeader>
           <DialogTitle>Promote from The Forge</DialogTitle>
           <DialogDescription>
-            Select a completed design to turn into a product. COGS and images carry over.
+            Pick any design to turn into a product. Completed designs carry over COGS and images; earlier designs start as product concepts.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2 max-h-80 overflow-y-auto py-2">
@@ -641,32 +648,51 @@ function ForgePickerDialog({
           )}
           {!isLoading && projects.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No completed designs available. Designs are auto-promoted when they finish — check The Forge.
+              No designs found in The Forge. Create a design first, then come back here to promote it.
             </p>
           )}
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="flex items-center justify-between rounded-lg border border-border p-3"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
-                <p className="text-xs text-muted-foreground">{project.subject || 'No description'}</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={promoting === project.id}
-                onClick={() => handlePromote(project.id)}
+          {projects.map((project) => {
+            const isComplete = project.status === 'generated' || project.status === 'complete' || project.status === 'rfq_created'
+            const STAGE_BADGE: Record<string, { label: string; variant: 'success' | 'info' | 'warning' | 'secondary' }> = {
+              draft: { label: 'Draft', variant: 'secondary' },
+              researched: { label: 'Researched', variant: 'info' },
+              interface_ready: { label: 'Build Ready', variant: 'info' },
+              generated: { label: 'Complete', variant: 'success' },
+              complete: { label: 'Complete', variant: 'success' },
+              rfq_created: { label: 'RFQ Sent', variant: 'success' },
+            }
+            const badge = STAGE_BADGE[project.status] ?? { label: project.status, variant: 'secondary' as const }
+
+            return (
+              <div
+                key={project.id}
+                className="flex items-center justify-between rounded-lg border border-border p-3"
               >
-                {promoting === project.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  'Promote'
-                )}
-              </Button>
-            </div>
-          ))}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
+                    <Badge variant={badge.variant} size="sm">{badge.label}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {project.subject || 'No description'}
+                    {!isComplete && ' — will start as concept product'}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={promoting === project.id}
+                  onClick={() => handlePromote(project.id)}
+                >
+                  {promoting === project.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    'Promote'
+                  )}
+                </Button>
+              </div>
+            )
+          })}
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
