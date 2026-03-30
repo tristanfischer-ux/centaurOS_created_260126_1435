@@ -10,7 +10,7 @@
  * debate history, real action creation, and DOCX export.
  */
 
-import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment, useTransition } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Swords,
@@ -43,6 +43,7 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { DEBATE_PERSONAS } from "@/lib/red-team/prompts"
 import { listRedTeamDebates, loadRedTeamDebate, createRedTeamActions, checkStrategicMatch, createNewStrategicObjective } from "@/actions/red-team-debate"
+import { extractDocumentText } from "@/actions/extract-document-text"
 import type {
   RedTeamDebateDocument,
   DebateRound,
@@ -203,6 +204,36 @@ export function RedTeamView(): React.ReactElement {
 
   // File upload state
   const [uploadedFile, setUploadedFile] = useState<{ name: string; content: string } | null>(null)
+  const [isExtracting, setIsExtracting] = useState(false)
+
+  const PLAIN_TEXT_TYPES = new Set(["text/plain", "text/markdown", "text/csv"])
+  const handleFileUpload = useCallback(async (file: File) => {
+    // Plain text files — read directly on client
+    if (PLAIN_TEXT_TYPES.has(file.type) || file.name.endsWith(".md") || file.name.endsWith(".txt") || file.name.endsWith(".csv")) {
+      const text = await file.text()
+      setUploadedFile({ name: file.name, content: text.slice(0, 50000) })
+      toast.success(`Loaded ${file.name}`)
+      return
+    }
+
+    // Binary files (PDF, DOCX, PPTX, XLSX) — extract server-side
+    setIsExtracting(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const result = await extractDocumentText(formData)
+      if (result.success) {
+        setUploadedFile({ name: result.fileName, content: result.text })
+        toast.success(`Loaded ${result.fileName}`)
+      } else {
+        toast.error(result.error)
+      }
+    } catch {
+      toast.error("Failed to extract text from file")
+    } finally {
+      setIsExtracting(false)
+    }
+  }, [])
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -1034,7 +1065,7 @@ export function RedTeamView(): React.ReactElement {
               />
             </div>
 
-            {/* File upload drop zone */}
+            {/* File upload drop zone — supports PDF, DOCX, PPTX, XLSX, TXT, MD, CSV */}
             <div
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
               onDragLeave={() => setIsDragging(false)}
@@ -1042,37 +1073,32 @@ export function RedTeamView(): React.ReactElement {
                 e.preventDefault()
                 setIsDragging(false)
                 const file = e.dataTransfer.files[0]
-                if (file && (file.type === "text/plain" || file.type === "text/markdown" || file.type === "text/csv" || file.name.endsWith(".md") || file.name.endsWith(".txt"))) {
-                  file.text().then(text => {
-                    setUploadedFile({ name: file.name, content: text.slice(0, 50000) })
-                    toast.success(`Loaded ${file.name}`)
-                  })
-                } else if (file) {
-                  toast.error("Drop a .txt, .md, or .csv file — PDFs and Word docs aren't supported yet")
-                }
+                if (file) handleFileUpload(file)
               }}
               className={cn(
                 "rounded-lg border-2 border-dashed p-4 text-center transition-colors cursor-pointer",
                 isDragging ? "border-international-orange bg-international-orange/5" : "border-muted hover:border-muted-foreground/30",
+                isExtracting && "opacity-60 pointer-events-none",
               )}
               onClick={() => fileInputRef.current?.click()}
             >
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.md,.csv"
+                accept=".txt,.md,.csv,.pdf,.docx,.pptx,.xlsx"
                 className="hidden"
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) {
-                    file.text().then(text => {
-                      setUploadedFile({ name: file.name, content: text.slice(0, 50000) })
-                      toast.success(`Loaded ${file.name}`)
-                    })
-                  }
+                  if (file) handleFileUpload(file)
+                  if (e.target) e.target.value = ""
                 }}
               />
-              {uploadedFile ? (
+              {isExtracting ? (
+                <div className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-international-orange" />
+                  <span className="text-sm text-muted-foreground">Extracting text...</span>
+                </div>
+              ) : uploadedFile ? (
                 <div className="flex items-center justify-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-success" />
                   <span className="text-sm text-foreground font-medium">{uploadedFile.name}</span>
