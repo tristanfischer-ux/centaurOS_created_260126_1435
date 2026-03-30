@@ -13,6 +13,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { calculateMatchScore } from "@/lib/investor-match"
 import type { FoundryProfile } from "@/lib/investor-match"
 import type { InvestorFirm } from "@/actions/investors"
@@ -127,23 +128,29 @@ export async function POST(request: Request) {
   const foundryId = profileData?.active_foundry_id || profileData?.foundry_id
 
   if (foundryId) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: cached } = await (supabase as any)
-      .from("report_snapshots")
-      .select("report_data, generated_at")
-      .eq("foundry_id", foundryId)
-      .eq("report_type", "investor-match")
-      .order("generated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // INTENT: Use admin client for cache read — RLS SELECT policy may not
+    // match active_foundry_id and would miss valid cache entries.
+    try {
+      const adminDb = createAdminClient()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: cacheRow } = await (adminDb as any)
+        .from("report_snapshots")
+        .select("report_data, generated_at")
+        .eq("foundry_id", foundryId)
+        .eq("report_type", "investor-match")
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
-    if (cached?.report_data && cached.generated_at) {
-      const cacheAge = Date.now() - new Date(cached.generated_at).getTime()
-      const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
-      if (cacheAge < SEVEN_DAYS) {
-        // Return cached results as JSON (no SSE needed)
-        return NextResponse.json({ cached: true, ...cached.report_data })
+      if (cacheRow?.report_data && cacheRow.generated_at) {
+        const cacheAge = Date.now() - new Date(cacheRow.generated_at).getTime()
+        const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+        if (cacheAge < SEVEN_DAYS) {
+          return NextResponse.json({ cached: true, ...cacheRow.report_data })
+        }
       }
+    } catch {
+      // Admin client unavailable — fall through to fresh generation
     }
   }
 
@@ -490,18 +497,28 @@ Only return the JSON array.`
             tier,
             generatedAt: new Date().toISOString(),
           }
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ;(supabase as any).from("report_snapshots").upsert({
-            id: `investor-match-${foundryId}`,
-            report_type: "investor-match",
-            report_date: new Date().toISOString().slice(0, 10),
-            summary_text: `Investor matches for ${foundry?.name || "company"}`,
-            report_data: cacheData,
-            foundry_id: foundryId,
-            profile_id: user.id,
-          }, { onConflict: "id" }).then(({ error: cacheErr }: { error: { message: string } | null }) => {
+          // INTENT: Cache via admin client (bypasses RLS — no UPDATE/DELETE
+          // policies exist on report_snapshots, and INSERT policy may not match
+          // active_foundry_id). Delete stale + insert fresh. Fire-and-forget.
+          try {
+            const adminDb = createAdminClient()
+            await adminDb.from("report_snapshots")
+              .delete()
+              .eq("foundry_id", foundryId)
+              .eq("report_type", "investor-match")
+
+            const { error: cacheErr } = await adminDb.from("report_snapshots").insert({
+              report_type: "investor-match",
+              report_date: new Date().toISOString().slice(0, 10),
+              summary_text: `Investor matches for ${foundry?.name || "company"}`,
+              report_data: cacheData,
+              foundry_id: foundryId,
+              profile_id: user.id,
+            })
             if (cacheErr) console.warn("[InvestorMatch] Cache save failed:", cacheErr.message)
-          })
+          } catch (cacheEx) {
+            console.warn("[InvestorMatch] Cache save error:", cacheEx)
+          }
         }
 
       } catch (err) {

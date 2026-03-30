@@ -65,6 +65,8 @@ interface MarketplaceBrowseProps {
     postFetchTransform?: (listings: MarketplaceListing[]) => Promise<MarketplaceListing[]>
     /** Hide specialist briefing cards (e.g. when a parent page provides its own specialist). */
     hideSpecialistBriefing?: boolean
+    /** Hide the page header (title + subtitle) when a parent page provides its own. */
+    hidePageHeader?: boolean
 }
 
 const TABS: { id: MarketplaceTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -97,6 +99,7 @@ export function MarketplaceBrowse({
     statsDefaultExpanded,
     postFetchTransform,
     hideSpecialistBriefing = false,
+    hidePageHeader = false,
 }: MarketplaceBrowseProps) {
     const state = useMarketplaceState({
         initialListings,
@@ -329,32 +332,37 @@ export function MarketplaceBrowse({
 
     return (
         <div className="space-y-6">
-            {/* Page header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
-                <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                        <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                            {pageTitle}
-                        </h1>
+            {/* Page header — hidden when parent page provides its own */}
+            {!hidePageHeader && (
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-muted">
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                            <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+                                {pageTitle}
+                            </h1>
+                        </div>
+                        <p className="text-muted-foreground text-sm ml-4">
+                            {pageSubtitle}
+                        </p>
                     </div>
-                    <p className="text-muted-foreground text-sm ml-4">
-                        {pageSubtitle}
-                    </p>
                 </div>
-            </div>
+            )}
 
-            <SpecialistBriefingHero
-                specialistId="vp-supply-chain"
-                specialistName="Chase"
-                specialistTitle="Supply Chain"
-                narrative={briefing.narrative}
-                fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
-                isLoading={briefing.isLoading}
-                severity={briefing.severity}
-                context={{ type: 'general', title: 'Marketplace', description: 'Chase on marketplace.', metadata: {} }}
-                storageKey="marketplace"
-            />
+            {/* Chase (Supply Chain) briefing — hidden when parent page has its own specialist */}
+            {!hideSpecialistBriefing && (
+                <SpecialistBriefingHero
+                    specialistId="vp-supply-chain"
+                    specialistName="Chase"
+                    specialistTitle="Supply Chain"
+                    narrative={briefing.narrative}
+                    fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
+                    isLoading={briefing.isLoading}
+                    severity={briefing.severity}
+                    context={{ type: 'general', title: 'Marketplace', description: 'Chase on marketplace.', metadata: {} }}
+                    storageKey="marketplace"
+                />
+            )}
 
             {/* Tab navigation */}
             <nav aria-label="Marketplace sections" data-tour="marketplace-tabs" className="flex items-center gap-1 border-b border-border">

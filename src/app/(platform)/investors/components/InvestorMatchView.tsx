@@ -781,9 +781,14 @@ export function InvestorMatchView() {
       {/* Match results */}
       {visibleMatches.length > 0 && (
         <div className="space-y-3">
-          {visibleMatches.map((match) => (
-            <MatchRow
+          {visibleMatches.map((match, idx) => (
+            <motion.div
               key={match.investor.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: idx < 5 ? idx * 0.05 : 0 }}
+            >
+            <MatchRow
               match={match}
               isPro={isPro}
               isPaid={isPaid}
@@ -791,6 +796,7 @@ export function InvestorMatchView() {
               shortlistLoading={shortlistLoading.has(match.investor.id)}
               onToggleShortlist={handleToggleShortlist}
             />
+            </motion.div>
           ))}
         </div>
       )}

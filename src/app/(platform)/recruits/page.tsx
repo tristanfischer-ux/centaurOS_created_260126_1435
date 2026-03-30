@@ -191,6 +191,7 @@ Industry: ${ctx?.industry ?? 'not set'}. Stage: ${ctx?.stage ?? 'not set'}.`
                             statsDefaultExpanded={false}
                             postFetchTransform={enrichPeopleListingsBatch}
                             hideSpecialistBriefing
+                            hidePageHeader
                         />
                     </div>
                 }
