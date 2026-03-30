@@ -2001,7 +2001,7 @@ export function ProductDetailView({ product: initialProduct }: ProductDetailView
           )}
 
           {/* Improvement Suggestions */}
-          {fundability && fundability.improvement_suggestions.length > 0 && (
+          {fundability && (fundability.improvement_suggestions?.length ?? 0) > 0 && (
             <Card>
               <CardHeader>
                 <h3 className={typography.h3}>Improvement Suggestions</h3>

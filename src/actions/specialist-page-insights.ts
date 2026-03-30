@@ -286,8 +286,10 @@ Triage these into: act now (critical), decide this week (important), awareness o
           // DECISION: Sonnet 4.6 for Cal's hero briefing — it's the first thing
           // users see each day, needs sharp triage across multiple data sources.
           // Haiku was too generic. Timeout bumped 8s→15s to accommodate.
+          // TRIED: 768 tokens caused truncation mid-word when insights array was
+          // large. Bumped to 1024 to ensure complete JSON responses.
           model: "claude-sonnet-4-6",
-          max_tokens: 768,
+          max_tokens: 1024,
           system: systemPrompt,
           messages: [{ role: "user", content: context }],
         }),
@@ -306,7 +308,29 @@ Triage these into: act now (critical), decide this week (important), awareness o
       if (!text) return { narrative: null, insights: [] }
 
       const cleaned = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "")
-      const parsed = JSON.parse(cleaned)
+      let parsed: Record<string, unknown>
+      try {
+        parsed = JSON.parse(cleaned)
+      } catch {
+        // GOTCHA: If the model hit max_tokens the JSON may be truncated.
+        // Try to salvage the narrative from partial output.
+        const narrativeMatch = cleaned.match(/"narrative"\s*:\s*"((?:[^"\\]|\\.)*)/)
+        if (narrativeMatch?.[1]) {
+          let salvaged = narrativeMatch[1].replace(/\\"/g, '"').replace(/\\n/g, " ").trim()
+          // Trim to last complete sentence to avoid mid-word cut-offs
+          const lastSentenceEnd = Math.max(
+            salvaged.lastIndexOf(". "),
+            salvaged.lastIndexOf("! "),
+            salvaged.lastIndexOf("? "),
+            salvaged.lastIndexOf(".\""),
+          )
+          if (lastSentenceEnd > salvaged.length * 0.5) {
+            salvaged = salvaged.slice(0, lastSentenceEnd + 1)
+          }
+          return { narrative: salvaged.slice(0, 500), insights: [] }
+        }
+        return { narrative: null, insights: [] }
+      }
 
       const narrative = typeof parsed.narrative === "string" ? parsed.narrative.slice(0, 500) : null
 

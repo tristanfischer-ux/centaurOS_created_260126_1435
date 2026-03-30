@@ -1162,13 +1162,52 @@ export async function convertBriefToForge(
       ? (briefContent.key_requirements as string[]).join('; ')
       : ''
 
+    // INTENT: Build a human-readable overview from brief_content fields instead of
+    // storing raw JSON — the ProductOverviewCard renders this as plain text.
+    const overviewParts: string[] = []
+    if (briefContent.product_category) {
+      overviewParts.push(`Product Category: ${briefContent.product_category}`)
+    }
+    if (briefContent.source_context) {
+      overviewParts.push(`\n${briefContent.source_context}`)
+    }
+    if (Array.isArray(briefContent.key_requirements) && (briefContent.key_requirements as string[]).length > 0) {
+      overviewParts.push(`\nKey Requirements:\n${(briefContent.key_requirements as string[]).map(r => `  - ${r}`).join('\n')}`)
+    }
+    if (Array.isArray(briefContent.design_priorities) && (briefContent.design_priorities as string[]).length > 0) {
+      overviewParts.push(`\nDesign Priorities:\n${(briefContent.design_priorities as string[]).map(p => `  - ${p}`).join('\n')}`)
+    }
+    if (Array.isArray(briefContent.materials_guidance) && (briefContent.materials_guidance as string[]).length > 0) {
+      overviewParts.push(`\nMaterials Guidance:\n${(briefContent.materials_guidance as string[]).map(m => `  - ${m}`).join('\n')}`)
+    }
+    if (Array.isArray(briefContent.manufacturing_constraints) && (briefContent.manufacturing_constraints as string[]).length > 0) {
+      overviewParts.push(`\nManufacturing Constraints:\n${(briefContent.manufacturing_constraints as string[]).map(c => `  - ${c}`).join('\n')}`)
+    }
+    if (Array.isArray(briefContent.certification_requirements) && (briefContent.certification_requirements as string[]).length > 0) {
+      overviewParts.push(`\nCertification Requirements:\n${(briefContent.certification_requirements as string[]).map(c => `  - ${c}`).join('\n')}`)
+    }
+    if (typeof briefContent.target_cost_pence === 'number') {
+      overviewParts.push(`\nTarget Cost: £${((briefContent.target_cost_pence as number) / 100).toFixed(2)}`)
+    }
+    if (typeof briefContent.target_weight_kg === 'number') {
+      overviewParts.push(`Target Weight: ${briefContent.target_weight_kg} kg`)
+    }
+    if (typeof briefContent.target_dimensions === 'string' && briefContent.target_dimensions) {
+      overviewParts.push(`Target Dimensions: ${briefContent.target_dimensions}`)
+    }
+    if (Array.isArray(briefContent.competitive_benchmarks) && (briefContent.competitive_benchmarks as Array<Record<string, unknown>>).length > 0) {
+      const benchmarks = briefContent.competitive_benchmarks as Array<{ product: string; price: number; key_specs: string }>
+      overviewParts.push(`\nCompetitive Benchmarks:\n${benchmarks.map(b => `  - ${b.product} (£${(b.price / 100).toFixed(2)}) — ${b.key_specs}`).join('\n')}`)
+    }
+    const formattedOverview = overviewParts.join('\n')
+
     const { data: newProject, error: projectCreateError } = await cadLabTable(supabase)
       .insert({
         foundry_id: foundryId,
         created_by: user.id,
         name: `${product.name} (v${versionNumber})`,
         subject: keyReqs,
-        product_overview: JSON.stringify(briefContent),
+        product_overview: formattedOverview,
       })
       .select('id')
       .single()

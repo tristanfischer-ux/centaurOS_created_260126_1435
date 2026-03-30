@@ -66,6 +66,22 @@ export function CashBurnView({ initialData, hasError }: CashBurnViewProps) {
     }
   )
 
+  // INTENT: Sync scenarios from server when initialData changes (e.g. navigating
+  // back after editing opening balance on the Cash In page). useState initializers
+  // only run once — without this effect, stale state persists across navigations.
+  // (BUG-T07)
+  useEffect(() => {
+    const fresh = initialData?.scenarios ?? []
+    if (fresh.length === 0) return
+    setScenarios(fresh)
+    setActiveScenario(prev => {
+      // Keep the same scenario selected if it still exists, otherwise pick default
+      const match = fresh.find(s => s.id === prev.id)
+      if (match) return match
+      return fresh.find(s => s.isDefault) ?? fresh[0] ?? prev
+    })
+  }, [initialData?.scenarios])
+
   const cashOut = initialData?.cashOut ?? []
   const cashIn = initialData?.cashIn ?? []
 

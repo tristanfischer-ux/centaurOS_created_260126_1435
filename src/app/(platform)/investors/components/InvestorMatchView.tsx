@@ -28,6 +28,7 @@ import {
   Copy,
   Check,
   Download,
+  Building2,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -93,6 +94,7 @@ type Phase =
   | 'batch'
   | 'complete'
   | 'incomplete_profile'
+  | 'no_company'
   | 'error'
 
 // ---------------------------------------------------------------------------
@@ -514,6 +516,10 @@ export function InvestorMatchView() {
             const event = JSON.parse(raw)
 
             switch (event.phase) {
+              case 'no_company':
+                setPhase('no_company')
+                break
+
               case 'incomplete_profile':
                 setPhase('incomplete_profile')
                 setMissingFields(event.missingFields ?? [])
@@ -727,6 +733,29 @@ export function InvestorMatchView() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* No company setup — onboarding prompt */}
+      {phase === 'no_company' && (
+        <Card>
+          <CardContent className="py-8 text-center space-y-4">
+            <div className="mx-auto p-3 rounded-full bg-international-orange-light w-fit">
+              <Building2 className="h-8 w-8 text-international-orange" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-foreground">Set up your company to see matches</p>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                Tell us about your company so we can find the best investors for you. You can still browse all investors in the meantime.
+              </p>
+            </div>
+            <Link href="/settings/company">
+              <Button size="sm" className="bg-international-orange hover:bg-international-orange-hover">
+                Set up company profile
+                <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Profile incomplete gate */}
       {phase === 'incomplete_profile' && (

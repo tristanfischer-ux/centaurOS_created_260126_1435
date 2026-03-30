@@ -135,20 +135,29 @@ export async function POST() {
           .single()
 
         if (!profile?.foundry_id) {
-          emit({ phase: "error", message: "No company found. Please set up your company first." })
+          // INTENT: Sandbox and forge-guild foundries may not have a foundry_id.
+          // This is a normal state, not an error — show onboarding prompt instead of error toast.
+          emit({ phase: "no_company", message: "Set up your company profile in Settings to see personalised supplier matches. You can still browse all suppliers." })
+          clearInterval(heartbeat)
+          controller.close()
           return
         }
 
         const foundryId = profile.foundry_id
 
-        const { data: foundry } = await supabase
+        const { data: foundry, error: foundryError } = await supabase
           .from("foundries")
           .select("name, stage, industry, sector, purpose_data, company_profile")
           .eq("id", foundryId)
           .single()
 
         if (!foundry) {
-          emit({ phase: "error", message: "Company not found." })
+          // INTENT: Foundry row missing despite having foundry_id — show onboarding prompt
+          // rather than error toast. Common for sandbox/forge-guild foundries.
+          console.warn("[supplier-match] Foundry not found for id:", foundryId, "error:", foundryError?.message)
+          emit({ phase: "no_company", message: "Set up your company profile in Settings to see personalised supplier matches. You can still browse all suppliers." })
+          clearInterval(heartbeat)
+          controller.close()
           return
         }
 

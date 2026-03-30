@@ -17,6 +17,68 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
+// ─── Brief Content Formatter ─────────────────────────────────────────
+// INTENT: Detect raw JSON in product_overview (legacy bug — briefContent was
+// stored via JSON.stringify) and render it as human-readable text.
+
+interface BriefContent {
+  product_category?: string
+  source_context?: string
+  key_requirements?: string[]
+  design_priorities?: string[]
+  materials_guidance?: string[]
+  manufacturing_constraints?: string[]
+  certification_requirements?: string[]
+  target_cost_pence?: number
+  target_weight_kg?: number
+  target_dimensions?: string
+  competitive_benchmarks?: Array<{ product: string; price: number; key_specs: string }>
+}
+
+function tryFormatBriefJson(text: string): string | null {
+  // Quick check — brief JSON always starts with '{'
+  if (!text.startsWith('{')) return null
+  try {
+    const parsed = JSON.parse(text) as BriefContent
+    // Heuristic: must have at least one known brief field
+    if (!parsed.product_category && !parsed.key_requirements && !parsed.source_context) return null
+
+    const parts: string[] = []
+    if (parsed.product_category) parts.push(`Product Category: ${parsed.product_category}`)
+    if (parsed.source_context) parts.push(`\n${parsed.source_context}`)
+    if (parsed.key_requirements?.length) {
+      parts.push(`\nKey Requirements:\n${parsed.key_requirements.map(r => `  \u2022 ${r}`).join('\n')}`)
+    }
+    if (parsed.design_priorities?.length) {
+      parts.push(`\nDesign Priorities:\n${parsed.design_priorities.map(p => `  \u2022 ${p}`).join('\n')}`)
+    }
+    if (parsed.materials_guidance?.length) {
+      parts.push(`\nMaterials Guidance:\n${parsed.materials_guidance.map(m => `  \u2022 ${m}`).join('\n')}`)
+    }
+    if (parsed.manufacturing_constraints?.length) {
+      parts.push(`\nManufacturing Constraints:\n${parsed.manufacturing_constraints.map(c => `  \u2022 ${c}`).join('\n')}`)
+    }
+    if (parsed.certification_requirements?.length) {
+      parts.push(`\nCertification Requirements:\n${parsed.certification_requirements.map(c => `  \u2022 ${c}`).join('\n')}`)
+    }
+    if (typeof parsed.target_cost_pence === 'number') {
+      parts.push(`\nTarget Cost: \u00a3${(parsed.target_cost_pence / 100).toFixed(2)}`)
+    }
+    if (typeof parsed.target_weight_kg === 'number') {
+      parts.push(`Target Weight: ${parsed.target_weight_kg} kg`)
+    }
+    if (parsed.target_dimensions) {
+      parts.push(`Target Dimensions: ${parsed.target_dimensions}`)
+    }
+    if (parsed.competitive_benchmarks?.length) {
+      parts.push(`\nCompetitive Benchmarks:\n${parsed.competitive_benchmarks.map(b => `  \u2022 ${b.product} (\u00a3${(b.price / 100).toFixed(2)}) \u2014 ${b.key_specs}`).join('\n')}`)
+    }
+    return parts.join('\n')
+  } catch {
+    return null
+  }
+}
+
 // ─── Display Name Lookup ──────────────────────────────────────────────
 
 /** Maps raw model IDs to human-friendly display names */
@@ -161,7 +223,7 @@ export function ProductOverviewCard({
           </div>
         ) : overview ? (
           <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-            {overview}
+            {tryFormatBriefJson(overview) ?? overview}
           </p>
         ) : (
           <p className="text-sm text-muted-foreground/60 italic">

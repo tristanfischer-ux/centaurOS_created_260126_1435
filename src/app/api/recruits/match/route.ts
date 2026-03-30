@@ -122,7 +122,11 @@ export async function POST(request: Request) {
           .single()
 
         if (!profile?.foundry_id) {
-          emit({ phase: "error", message: "No company found. Please set up your company first." })
+          // INTENT: Sandbox and forge-guild foundries may not have a foundry_id.
+          // This is a normal state, not an error — show onboarding prompt instead of error toast.
+          emit({ phase: "no_company", message: "Set up your company profile in Settings to see personalised recruit matches. You can still browse all candidates." })
+          clearInterval(heartbeat)
+          controller.close()
           return
         }
 

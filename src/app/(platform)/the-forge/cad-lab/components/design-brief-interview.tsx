@@ -180,9 +180,11 @@ export function DesignBriefInterview({
         }
       } else {
         // More questions
-        const maxContent = [result.acknowledgment, result.nextQuestion]
-          .filter(Boolean)
-          .join("\n\n")
+        // INTENT: Only use nextQuestion — the LLM's acknowledgment of the prior
+        // answer is already baked into nextQuestion most of the time. Concatenating
+        // the separate acknowledgment field with nextQuestion caused duplicate
+        // opening paragraphs (BUG-T05).
+        const maxContent = result.nextQuestion ?? ""
         setMessages((prev) => [...prev, { role: "max", content: maxContent }])
         setSuggestedChips(result.suggestedChips ?? [])
         setIsThinking(false)
