@@ -111,7 +111,7 @@ Do not include any text outside the JSON.`
           "anthropic-version": "2023-06-01",
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6-20250514",
+          model: "claude-sonnet-4-20250514",
           max_tokens: 1024,
           system: systemPrompt,
           messages: [

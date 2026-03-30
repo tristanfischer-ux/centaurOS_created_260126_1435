@@ -609,7 +609,7 @@ Provide your structured market assessment as JSON.`
       const client = new Anthropic({ apiKey })
 
       const response = await client.messages.create({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -620,7 +620,7 @@ Provide your structured market assessment as JSON.`
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         promptTokens: response.usage?.input_tokens,
         completionTokens: response.usage?.output_tokens,
       })
@@ -692,7 +692,7 @@ Provide your structured market assessment as JSON.`
           market_opportunities: 'ai_estimated',
         },
         assessed_at: new Date().toISOString(),
-        model_used: 'claude-sonnet-4-6-20250514',
+        model_used: 'claude-sonnet-4-20250514',
       }
 
       // ── Save to product ────────────────────────────────────────
@@ -1286,7 +1286,7 @@ Produce the design brief JSON.`
       const client = new Anthropic({ apiKey })
 
       const response = await client.messages.create({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -1297,7 +1297,7 @@ Produce the design brief JSON.`
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         promptTokens: response.usage?.input_tokens,
         completionTokens: response.usage?.output_tokens,
       })
@@ -1472,7 +1472,7 @@ Generate the design brief JSON that will guide engineering changes to achieve th
       const client = new Anthropic({ apiKey })
 
       const response = await client.messages.create({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -1483,7 +1483,7 @@ Generate the design brief JSON that will guide engineering changes to achieve th
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         promptTokens: response.usage?.input_tokens,
         completionTokens: response.usage?.output_tokens,
       })
@@ -1764,7 +1764,7 @@ Rules:
 
       // INTENT: 15s timeout — synthesis should not block the user
       const synthesisPromise = client.messages.create({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
         system: systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
@@ -1781,7 +1781,7 @@ Rules:
 
       // FLOW: Track AI usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         promptTokens: result.usage?.input_tokens,
         completionTokens: result.usage?.output_tokens,
       })
@@ -1806,7 +1806,7 @@ Rules:
         nextAction: typeof parsed.nextAction === 'string' ? parsed.nextAction : 'Run market assessment to establish baseline data',
         isLocalOptimum: typeof parsed.isLocalOptimum === 'boolean' ? parsed.isLocalOptimum : false,
         synthesized_at: new Date().toISOString(),
-        model_used: 'claude-sonnet-4-6-20250514',
+        model_used: 'claude-sonnet-4-20250514',
       }
 
       // ── Save to product ────────────────────────────────────────
@@ -1922,7 +1922,7 @@ Return ONLY a valid JSON object (no markdown fences):
 
       const result = await Promise.race([
         client.messages.create({
-          model: 'claude-sonnet-4-6-20250514',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 1500,
           system: systemPrompt,
           messages: [{ role: 'user', content: `Generate a design brief for this product incorporating the approved improvements:\n\n${JSON.stringify(productContext, null, 2)}` }],
@@ -1937,7 +1937,7 @@ Return ONLY a valid JSON object (no markdown fences):
       if (!text) return { error: 'Empty AI response' }
 
       await trackUsage({
-        model: 'claude-sonnet-4-6-20250514',
+        model: 'claude-sonnet-4-20250514',
         promptTokens: result.usage?.input_tokens,
         completionTokens: result.usage?.output_tokens,
       })
@@ -2109,7 +2109,7 @@ Return ONLY a valid JSON object (no markdown):
 
       const result = await Promise.race([
         client.messages.create({
-          model: 'claude-sonnet-4-6-20250514',
+          model: 'claude-sonnet-4-20250514',
           max_tokens: 500,
           system: systemPrompt,
           messages: [{ role: 'user', content: `Review this design brief:\n\n${JSON.stringify(brief.brief_content, null, 2)}` }],
@@ -2121,7 +2121,7 @@ Return ONLY a valid JSON object (no markdown):
       if (!('content' in result)) return { error: 'Unexpected AI response' }
 
       const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
-      await trackUsage({ model: 'claude-sonnet-4-6-20250514', promptTokens: result.usage?.input_tokens, completionTokens: result.usage?.output_tokens })
+      await trackUsage({ model: 'claude-sonnet-4-20250514', promptTokens: result.usage?.input_tokens, completionTokens: result.usage?.output_tokens })
 
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       try {
