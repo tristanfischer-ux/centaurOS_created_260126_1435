@@ -17,7 +17,7 @@ import {
 } from 'recharts'
 import {
   Heart, Users, Phone, MessageSquare, CheckCircle2, XCircle,
-  AlertTriangle, StickyNote, Calendar, Mail, ChevronRight, Package,
+  AlertTriangle, StickyNote, Calendar, Mail, Package,
 } from 'lucide-react'
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
@@ -169,14 +169,37 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
     })
   }, [])
 
-  // Live AI briefing
-  const briefingContext = stats
-    ? `Total tracked: ${stats.totalTracked}, Pipeline: ${Object.entries(stats.pipelineCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}, Coverage gaps: ${stats.coverageGaps.length}, Recent activity: ${stats.recentNotes.length} notes`
-    : ''
+  // Live AI briefing — always enabled so Fiona offers real advice
+  const briefingContext = (() => {
+    const parts: string[] = []
+    if (stats && stats.totalTracked > 0) {
+      parts.push(`Total investors tracked: ${stats.totalTracked}`)
+      parts.push(`Pipeline: ${Object.entries(stats.pipelineCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}`)
+      if (stats.coverageGaps.length > 0) parts.push(`Coverage gaps: ${stats.coverageGaps.join(', ')}`)
+      if (stats.recentNotes.length > 0) parts.push(`Recent activity: ${stats.recentNotes.length} notes in last 7 days`)
+    } else {
+      parts.push('No investors tracked yet — pipeline is empty')
+      parts.push('User needs guidance on how to start their fundraising process')
+    }
+    if (scoredProducts && scoredProducts.length > 0) {
+      const best = scoredProducts.reduce((a, b) => b.fundability_score.overall > a.fundability_score.overall ? b : a)
+      parts.push(`Best product fundability: ${best.fundability_score.overall}/100 (${best.fundability_score.investor_appetite} appetite)`)
+    } else {
+      parts.push('No products scored for fundability yet')
+    }
+    return parts.join('. ')
+  })()
+
+  const briefingSeverity = (() => {
+    if (!stats || stats.totalTracked === 0) return 'warning' as const
+    if (stats.pipelineCounts.meeting > 0 || stats.pipelineCounts.in_discussion > 0) return 'success' as const
+    return 'info' as const
+  })()
+
   const briefing = usePageBriefing(
-    () => generatePageBriefing('fundraising-advisor', briefingContext, 'success'),
-    'success',
-    !!stats && stats.totalTracked > 0,
+    () => generatePageBriefing('fundraising-advisor', briefingContext, briefingSeverity),
+    briefingSeverity,
+    true, // Always fetch — Fiona should always offer advice
     'briefing-fundraise',
   )
 
@@ -190,7 +213,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
             <h1 className={typography.h1}>Fundraise</h1>
           </div>
           <p className={typography.pageSubtitle}>
-            Track your fundraising pipeline and investor outreach
+            Your fundraising pipeline — track outreach, manage meetings, and close your round. <Link href="/investors" className="text-international-orange hover:underline">Browse investors</Link> to discover who to approach.
           </p>
         </div>
 
@@ -198,10 +221,10 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
           specialistId="fundraising-advisor"
           specialistName="Fiona"
           specialistTitle="Fundraising"
-          narrative={null}
-          fallbackMessage="Your fundraising command centre. I'll help you track your pipeline, prepare materials, and time your outreach for maximum impact."
-          isLoading={false}
-          severity="success"
+          narrative={briefing.narrative}
+          fallbackMessage="You haven't started tracking investors yet. Head to the Investor Directory to research and shortlist your targets — I'll help you build a focused pipeline and time your outreach."
+          isLoading={briefing.isLoading}
+          severity={briefing.severity}
           context={{ type: 'general', title: 'Fundraise', description: 'Fiona on fundraise.', metadata: {} }}
           storageKey="fundraise"
         />
@@ -241,21 +264,14 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-            <Link href="/cash-burn" className="hover:text-foreground transition-colors">Cash Burn</Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">Fundraise</span>
-          </nav>
-          <div className={typography.pageHeader}>
-            <div className={typography.pageHeaderAccent} />
-            <h1 className={typography.h1}>Fundraise</h1>
-          </div>
-          <p className={typography.pageSubtitle}>
-            Track your fundraising pipeline and investor outreach
-          </p>
+      <div className="pb-4 border-b border-muted">
+        <div className={typography.pageHeader}>
+          <div className={typography.pageHeaderAccent} />
+          <h1 className={typography.h1}>Fundraise</h1>
         </div>
+        <p className={typography.pageSubtitle}>
+          Your fundraising pipeline — track outreach, manage meetings, and close your round. <Link href="/investors" className="text-international-orange hover:underline">Browse investors</Link> to discover who to approach.
+        </p>
       </div>
 
       <SpecialistBriefingHero
