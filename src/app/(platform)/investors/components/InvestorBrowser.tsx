@@ -29,9 +29,6 @@ import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScore
 import { Search, X, RefreshCw, Building2, LayoutGrid, Kanban, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { usePageBriefing } from '@/hooks/use-page-briefing'
-import { generatePageBriefing } from '@/actions/specialist-page-insights'
-import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
 import type { SortOption } from './InvestorSortSelect'
 import type { AdvancedFilters } from './InvestorFilterPanel'
@@ -430,31 +427,8 @@ export function InvestorBrowser({
     .map(id => firms.find(f => f.id === id))
     .filter((f): f is InvestorFirm => f != null)
 
-  // Live AI briefing
-  const shortlistedCount = Object.keys(shortlistIds).length
-  const activeDeployingCount = firms.filter(f => f.attributes?.is_active_deploying).length
-  const briefingContext = `Total firms: ${total}, Shortlisted: ${shortlistedCount}, Active deploying: ${activeDeployingCount}`
-  const briefing = usePageBriefing(
-    () => generatePageBriefing('fundraising-advisor', briefingContext, 'success'),
-    'success',
-    total > 0,
-    'briefing-investors',
-  )
-
   return (
     <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
-      <SpecialistBriefingHero
-        specialistId="fundraising-advisor"
-        specialistName="Fiona"
-        specialistTitle="Fundraising"
-        narrative={briefing.narrative}
-        fallbackMessage="Browse and shortlist investors that match your stage, sector, and geography. I'll help you build a focused pipeline — not just a big list."
-        isLoading={briefing.isLoading}
-        severity={briefing.severity}
-        context={{ type: 'general', title: 'Investors', description: 'Fiona on investors.', metadata: {} }}
-        storageKey="investors"
-      />
-
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}

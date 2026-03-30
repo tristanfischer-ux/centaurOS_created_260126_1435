@@ -16,6 +16,7 @@ import type { InvestorStats, ShortlistStage, InvestorTierAccess } from '@/action
 import { InvestorBrowser } from './components/InvestorBrowser'
 import { InvestorInsightsPanel } from './components/InvestorInsightsPanel'
 import { InvestorPageTabs } from './components/InvestorPageTabs'
+import { InvestorSpecialistBanner } from './components/InvestorSpecialistBanner'
 
 export const revalidate = 60
 
@@ -140,6 +141,7 @@ export default async function InvestorDirectoryPage() {
 
       {/* Tabbed view: For You + Browse All */}
       <InvestorPageTabs
+        headerContent={<InvestorSpecialistBanner />}
         browseContent={
           <>
             {/* Insights panel */}

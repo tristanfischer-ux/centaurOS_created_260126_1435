@@ -20,34 +20,54 @@ import type { InvestorFirm } from "@/actions/investors"
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-// ─── DeepSeek Call ───────────────────────────────────────────────
+// ─── AI Call (DeepSeek first, Anthropic Haiku fallback) ─────────
 
 async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
-  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured")
+  // Try DeepSeek first (cheaper)
+  const deepseekKey = process.env.DEEPSEEK_API_KEY?.trim()
+  if (deepseekKey) {
+    try {
+      const response = await fetch("https://api.deepseek.com/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${deepseekKey}` },
+        body: JSON.stringify({
+          model: "deepseek-chat",
+          max_tokens: maxTokens,
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+        }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        return data.choices?.[0]?.message?.content ?? ""
+      }
+      console.warn("[callHaiku] DeepSeek failed with status", response.status, "— falling back to Anthropic Haiku")
+    } catch (err) {
+      console.warn("[callHaiku] DeepSeek error — falling back to Anthropic Haiku:", err)
+    }
+  }
 
-  const response = await fetch("https://api.deepseek.com/chat/completions", {
+  // Fallback: Anthropic Haiku
+  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
+  if (!anthropicKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or ANTHROPIC_API_KEY)")
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
+      "x-api-key": anthropicKey,
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "deepseek-chat",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: maxTokens,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
     }),
   })
 
-  if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status}`)
-  }
-
+  if (!response.ok) throw new Error(`Anthropic API error: ${response.status}`)
   const data = await response.json()
-  return data.choices?.[0]?.message?.content ?? ""
+  return (data.content?.[0]?.text ?? "").trim()
 }
 
 function safeParseJSON<T>(text: string): T[] {
