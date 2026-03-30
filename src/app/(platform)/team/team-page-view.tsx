@@ -972,6 +972,19 @@ export function TeamPageView({
                     </div>
                 </div>
 
+                {/* Harper specialist briefing — above tabs so it persists across all tabs */}
+                <SpecialistBriefingHero
+                    specialistId="hiring-team"
+                    specialistName="Harper"
+                    specialistTitle="Hiring"
+                    narrative={null}
+                    fallbackMessage="Your team at a glance. I'll help you identify gaps, plan hiring, and make sure everyone has what they need to be productive."
+                    isLoading={false}
+                    severity="success"
+                    context={{ type: 'general', title: 'Team', description: 'Harper on team.', metadata: {} }}
+                    storageKey="team"
+                />
+
                 {/* Row 2: Tabs + mobile view toggle */}
                 <div className="flex items-center gap-2">
                     <div role="tablist" aria-label="Team views" data-tour="team-members" className="flex items-center gap-1 bg-muted/50 p-1 rounded-xl border border-muted overflow-x-auto scrollbar-thin">
@@ -1061,39 +1074,8 @@ export function TeamPageView({
                 </div>
             </div>
 
-            <SpecialistBriefingHero
-                specialistId="hiring-team"
-                specialistName="Harper"
-                specialistTitle="Hiring"
-                narrative={null}
-                fallbackMessage="Your team at a glance. I'll help you identify gaps, plan hiring, and make sure everyone has what they need to be productive."
-                isLoading={false}
-                severity="success"
-                context={{ type: 'general', title: 'Team', description: 'Harper on team.', metadata: {} }}
-                storageKey="team"
-            />
-
-            {/* ── Harper Analysis Panel (visible in all modes) ── */}
-            <HarperAnalysisPanel
-                totalPeople={totalPeople}
-                totalTeams={totalTeams}
-                avgCapacity={avgCapacity}
-                harperInsights={harperInsights}
-                isLoading={harperLoading}
-                compact={isOrbitActive}
-                onDismissInsight={(id) => setHarperInsights(prev => prev.filter(i => i.id !== id))}
-                specialistContext={{
-                    totalPeople,
-                    founders: founders.length,
-                    executives: executives.length,
-                    apprentices: apprentices.length,
-                    totalTeams,
-                    avgCapacity,
-                    overloadedNote: insights?.overloadedMembers?.length
-                        ? `${insights.overloadedMembers.length} overloaded members. ${insights.overdueTaskCount || 0} overdue tasks.`
-                        : undefined,
-                }}
-            />
+            {/* DECISION: Harper BriefingHero moved above tabs so it persists across all tabs.
+               HarperAnalysisPanel removed — it was a duplicate of Harper's briefing. */}
 
             {/* ── Smart Insights action pills (non-orbit modes only) ── */}
             {!isOrbitActive && insights && (

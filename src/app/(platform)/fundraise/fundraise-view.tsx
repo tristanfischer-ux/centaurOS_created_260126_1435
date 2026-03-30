@@ -192,8 +192,7 @@ export function FundraiseView({ initialStats }: FundraiseViewProps) {
 
   const briefingSeverity = (() => {
     if (!stats || stats.totalTracked === 0) return 'warning' as const
-    if (stats.pipelineCounts.meeting > 0 || stats.pipelineCounts.in_discussion > 0) return 'success' as const
-    return 'info' as const
+    return 'success' as const
   })()
 
   const briefing = usePageBriefing(
