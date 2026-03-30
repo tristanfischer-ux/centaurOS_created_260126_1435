@@ -410,11 +410,15 @@ export async function POST(request: Request) {
             const debateText = [
               `Red Team Debate: ${topic}`,
               verdict ? `\nVerdict:\n${verdict}` : "",
-              suggestedObjectives?.length ? `\nRecommended Objectives:\n${suggestedObjectives.join("\n")}` : "",
-              suggestedRiskMitigations?.length ? `\nRisk Mitigations:\n${suggestedRiskMitigations.join("\n")}` : "",
+              suggestedObjectives?.length ? `\nRecommended Objectives:\n${suggestedObjectives.map(o => `- ${o.title}: ${o.description}`).join("\n")}` : "",
+              suggestedRiskMitigations?.length ? `\nRisk Mitigations:\n${suggestedRiskMitigations.map(r => `- ${r.risk}: ${r.mitigation}`).join("\n")}` : "",
             ].join("")
-            extractKnowledgeFromText(debateText, `Red Team: ${topic.slice(0, 60)}`).catch(() => {})
-          }).catch(() => {})
+            extractKnowledgeFromText(debateText, `Red Team: ${topic.slice(0, 60)}`).catch((err) => {
+              console.warn("[RedTeam] Knowledge extraction failed:", err instanceof Error ? err.message : err)
+            })
+          }).catch((err) => {
+            console.warn("[RedTeam] Knowledge import failed:", err instanceof Error ? err.message : err)
+          })
         } else {
           console.warn("[RedTeam] No foundry_id found for user, debate not saved to history")
         }

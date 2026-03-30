@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, Suspense } from "react"
 import { usePageBriefing } from '@/hooks/use-page-briefing'
 import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
@@ -122,9 +122,11 @@ export function SpecialistsPageClient({
             {view === "specialists" ? (
                 <div className="flex-1 min-h-0 overflow-y-auto">
                     <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                        <SpecialistsLanding
-                            onOpenProjectBuilder={() => setView("project-builder")}
-                        />
+                        <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
+                            <SpecialistsLanding
+                                onOpenProjectBuilder={() => setView("project-builder")}
+                            />
+                        </Suspense>
                     </div>
                 </div>
             ) : isMobile === null ? (

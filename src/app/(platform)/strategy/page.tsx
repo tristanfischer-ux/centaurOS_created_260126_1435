@@ -264,7 +264,7 @@ export default async function StrategyPage() {
       unlinkedObjectiveCount={unlinkedCount}
       totalObjectives={regularObjectives.length}
       purposeData={(foundry as { purpose_data?: FoundryPurposeData | null } | null)?.purpose_data ?? null}
-      isFounder={profile.role === 'Founder'}
+      isFounder={profile.role === 'Founder' || profile.role === 'Executive'}
       foundryId={foundryId}
       userId={user.id}
       initialBundles={bundles}
