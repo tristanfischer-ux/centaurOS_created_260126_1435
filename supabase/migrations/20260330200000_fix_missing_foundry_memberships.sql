@@ -20,6 +20,10 @@ SELECT
     COALESCE(p.created_at, now())
 FROM public.profiles p
 WHERE p.foundry_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM public.foundries f
+    WHERE f.id = p.foundry_id
+  )
   AND NOT EXISTS (
     SELECT 1 FROM public.foundry_memberships fm
     WHERE fm.user_id = p.id AND fm.foundry_id = p.foundry_id
@@ -39,6 +43,7 @@ BEGIN
   -- a matching foundry_memberships row so RLS policies work.
   IF NEW.foundry_id IS NOT NULL
      AND (OLD.foundry_id IS NULL OR NEW.foundry_id != OLD.foundry_id)
+     AND EXISTS (SELECT 1 FROM public.foundries f WHERE f.id = NEW.foundry_id)
   THEN
     INSERT INTO public.foundry_memberships (user_id, foundry_id, role, is_primary, joined_at)
     VALUES (
