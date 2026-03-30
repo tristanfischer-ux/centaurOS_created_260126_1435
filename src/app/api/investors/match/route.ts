@@ -382,17 +382,26 @@ Only return the JSON array.`
           const contactsByListing: Record<string, { name: string; title: string; email?: string; linkedin?: string }[]> = {}
           {
             const listingIds = batchItems.map(item => item.firm.id)
+            // INTENT: Fetch senior contacts — seniority field is inconsistent
+            // (null, 'partner', 'managing_director', etc.) so we fetch all contacts
+            // for the batch and filter client-side by title keywords.
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const { data: contacts } = await (supabase as any)
               .from("vc_pe_contacts")
               .select("listing_id, full_name, title, seniority, email, linkedin_url, is_decision_maker")
               .in("listing_id", listingIds)
-              .eq("seniority", "partner")
               .order("is_decision_maker", { ascending: false })
+              .limit(50)
 
             if (contacts) {
+              // INTENT: Prioritise partners and decision-makers, limit to 2 per firm
+              const seniorKeywords = ['partner', 'managing', 'director', 'principal', 'founder', 'ceo', 'head']
               for (const c of contacts) {
+                const titleLower = (c.title || '').toLowerCase() + ' ' + (c.seniority || '').toLowerCase()
+                const isSenior = c.is_decision_maker || seniorKeywords.some(kw => titleLower.includes(kw))
+                if (!isSenior) continue
                 if (!contactsByListing[c.listing_id]) contactsByListing[c.listing_id] = []
+                if (contactsByListing[c.listing_id].length >= 2) continue // Max 2 contacts per firm
                 contactsByListing[c.listing_id].push({
                   name: c.full_name,
                   title: c.title,
