@@ -128,13 +128,16 @@ export async function POST() {
         // ── Get Company Profile ──────────────────────────
         emit({ phase: "profile", message: "Loading your company profile..." })
 
+        // INTENT: Use active_foundry_id (the workspace the user has switched to)
+        // not foundry_id (their primary/default). Users can be members of multiple
+        // foundries and switch between them via the FoundrySwitcher.
         const { data: profile } = await supabase
           .from("profiles")
-          .select("foundry_id")
+          .select("foundry_id, active_foundry_id")
           .eq("id", user.id)
           .single()
 
-        if (!profile?.foundry_id) {
+        if (!profile?.foundry_id && !profile?.active_foundry_id) {
           // INTENT: Sandbox and forge-guild foundries may not have a foundry_id.
           // This is a normal state, not an error — show onboarding prompt instead of error toast.
           emit({ phase: "no_company", message: "Set up your company profile in Settings to see personalised supplier matches. You can still browse all suppliers." })
@@ -143,7 +146,7 @@ export async function POST() {
           return
         }
 
-        const foundryId = profile.foundry_id
+        const foundryId = profile.active_foundry_id || profile.foundry_id
 
         const { data: foundry, error: foundryError } = await supabase
           .from("foundries")

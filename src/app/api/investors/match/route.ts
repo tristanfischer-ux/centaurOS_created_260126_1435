@@ -122,8 +122,9 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   // ── Check for cached results (< 7 days old) ──────────────
-  const { data: profileData } = await supabase.from("profiles").select("foundry_id").eq("id", user.id).single()
-  const foundryId = profileData?.foundry_id
+  // INTENT: Use active_foundry_id (current workspace) not foundry_id (primary)
+  const { data: profileData } = await supabase.from("profiles").select("foundry_id, active_foundry_id").eq("id", user.id).single()
+  const foundryId = profileData?.active_foundry_id || profileData?.foundry_id
 
   if (foundryId) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

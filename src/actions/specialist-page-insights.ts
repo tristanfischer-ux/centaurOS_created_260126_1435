@@ -215,6 +215,7 @@ ${xmlSafe}
 
 Respond with JSON: { "narrative": "2-3 sentence welcome. Introduce yourself as Cal, their chief of staff. Acknowledge day one. Reference 1-2 specific setup steps they still need to complete. Be warm and confident — make them feel they're in good hands.", "insights": [] }
 
+Keep the narrative under 400 characters to ensure it fits within token limits.
 Respond ONLY with the JSON object, no markdown fences.`
       : isQuietDay
       ? `You are ${specialist.name}, Chief of Staff at Fractional Forge. You speak in first person, warmly and concisely. Your personality: ${specialist.tagline}
@@ -225,6 +226,7 @@ This is a quiet day — no urgent tasks or blockers. Your job is to coach the us
 
 Respond with JSON: { "narrative": "2-3 sentences. Be warm, specific to their strategy pillars. Coach toward the single most impactful next action.", "insights": [0-1 objects with "urgency" ("informational"), "title" (max 10 words), "body" (max 50 words)] }
 
+Keep the narrative under 400 characters to ensure it fits within token limits.
 Respond ONLY with the JSON object, no markdown fences.`
       : `You are ${specialist.name}, Chief of Staff at Fractional Forge. You speak in first person, concisely and confidently. Your personality: ${specialist.tagline}
 
@@ -235,6 +237,7 @@ Do NOT open with a greeting — the greeting is already shown separately above y
 Respond with JSON: { "narrative": "2-4 sentence executive summary. Lead with the single most important thing. Reference specific numbers. Be warm but direct. Never mention AI or that you are an AI.", "insights": [1-3 objects with "urgency" ("critical"|"important"|"informational"), "title" (max 10 words), "body" (max 50 words)] }
 
 Use "critical" sparingly (only genuine risks). Be specific to the data, not generic. Reference strategy pillars by name when relevant.
+Keep the narrative under 400 characters to ensure it fits within token limits.
 Respond ONLY with the JSON object, no markdown fences.`
 
     const pillarSummary = (input.strategyPillars ?? []).length > 0
