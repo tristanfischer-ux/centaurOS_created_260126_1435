@@ -461,7 +461,24 @@ Only return the JSON array.`
           emit({ phase: "batch", batchNumber: batchIdx + 1, matches: enrichedMatches })
         }
 
-        emit({ phase: "complete", totalGenerated: Math.min(top50.length, maxVisible), tier })
+        // FLOW: Build summary stats for hidden matches (free-tier paywall)
+        const hiddenInvestors = top50.slice(maxVisible)
+        const hiddenMatchSummary = hiddenInvestors.length > 0 ? {
+          count: hiddenInvestors.length,
+          sectorMatchCount: hiddenInvestors.filter(s => s.breakdown.sectorScore > 0).length,
+          activeDeployingCount: hiddenInvestors.filter(s => s.breakdown.activeScore > 0).length,
+          stageMatchCount: hiddenInvestors.filter(s => s.breakdown.stageScore >= 12).length,
+          avgScore: Math.round(hiddenInvestors.reduce((sum, s) => sum + s.breakdown.total, 0) / hiddenInvestors.length),
+          topScore: Math.max(...hiddenInvestors.map(s => s.breakdown.total)),
+        } : null
+
+        emit({
+          phase: "complete",
+          totalGenerated: Math.min(top50.length, maxVisible),
+          tier,
+          tierInfo: { tier, matchLimit: maxVisible },
+          hiddenMatchSummary,
+        })
 
         // ── Cache results (fire-and-forget) ──────────────
         if (foundryId) {

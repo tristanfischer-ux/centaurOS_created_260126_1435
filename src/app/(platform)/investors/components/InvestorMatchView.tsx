@@ -86,6 +86,15 @@ interface TierInfo {
   totalScored: number
 }
 
+interface HiddenMatchSummary {
+  count: number
+  sectorMatchCount: number
+  activeDeployingCount: number
+  stageMatchCount: number
+  avgScore: number
+  topScore: number
+}
+
 type Phase =
   | 'idle'
   | 'scoring'
@@ -413,6 +422,7 @@ export function InvestorMatchView() {
   const [nearMisses, setNearMisses] = useState<NearMiss[]>([])
   const [missingFields, setMissingFields] = useState<string[]>([])
   const [tierInfo, setTierInfo] = useState<TierInfo | null>(null)
+  const [hiddenSummary, setHiddenSummary] = useState<HiddenMatchSummary | null>(null)
   const [progressText, setProgressText] = useState('')
   const [shortlisted, setShortlisted] = useState<Set<string>>(new Set())
   const [shortlistLoading, setShortlistLoading] = useState<Set<string>>(new Set())
@@ -422,7 +432,7 @@ export function InvestorMatchView() {
 
   // INTENT: Determine paid status from tier info to gate partner/email column
   const isPaid = tierInfo ? tierInfo.tier !== 'free' : false
-  const isPro = tierInfo ? tierInfo.tier === 'pro' : false
+  const isPro = tierInfo ? (tierInfo.tier === 'professional' || tierInfo.tier === 'enterprise') : false
   const FREE_MATCH_LIMIT = 5
 
   const startMatching = useCallback(async () => {
@@ -538,13 +548,18 @@ export function InvestorMatchView() {
                 )
                 break
 
-              case 'generating':
+              case 'generating': {
                 // INTENT: Route sends event.batchNumber and event.totalBatches in generating phase
                 setPhase('generating')
-                setProgressText(
-                  `Generating matches: batch ${event.batchNumber ?? event.batch ?? '?'} of ${event.totalBatches ?? '?'}...`
-                )
+                const batch = event.batchNumber ?? event.batch ?? 1
+                const total = event.totalBatches ?? 1
+                if (total <= 1) {
+                  setProgressText('Finding your best investor matches...')
+                } else {
+                  setProgressText(`Analysing matches: ${batch} of ${total}...`)
+                }
                 break
+              }
 
               case 'batch': {
                 setPhase('batch')
@@ -563,6 +578,7 @@ export function InvestorMatchView() {
               case 'complete':
                 setPhase('complete')
                 if (event.tierInfo) setTierInfo(event.tierInfo as TierInfo)
+                if (event.hiddenMatchSummary) setHiddenSummary(event.hiddenMatchSummary as HiddenMatchSummary)
                 setProgressText('')
                 break
 
@@ -782,9 +798,32 @@ export function InvestorMatchView() {
       {/* Blurred upgrade section for free users */}
       {hiddenMatches.length > 0 && (
         <LockedSection
-          title={`${hiddenMatches.length} more matches`}
+          title={`${hiddenSummary?.count ?? hiddenMatches.length} more matches found`}
           requiredTier="starter"
+          currentTier={tierInfo?.tier}
           featureDescription="Unlock all investor matches, partner contacts, and draft outreach emails."
+          upgradeDetails={hiddenSummary ? (
+            <div className="space-y-1.5 text-left mb-3">
+              {hiddenSummary.sectorMatchCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{hiddenSummary.sectorMatchCount}</span> investing in your sector
+                </p>
+              )}
+              {hiddenSummary.activeDeployingCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{hiddenSummary.activeDeployingCount}</span> actively deploying capital
+                </p>
+              )}
+              {hiddenSummary.stageMatchCount > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-semibold text-foreground">{hiddenSummary.stageMatchCount}</span> targeting your stage
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Avg match score: <span className="font-semibold text-foreground">{hiddenSummary.avgScore}</span>/100
+              </p>
+            </div>
+          ) : undefined}
         >
           {/* Placeholder rows rendered blurred behind the overlay */}
           <div className="space-y-3">
