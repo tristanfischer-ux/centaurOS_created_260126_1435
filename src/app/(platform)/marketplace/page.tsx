@@ -7,7 +7,10 @@ import { getFoundryContext } from '@/actions/foundry-context'
 import { getMarketplaceStats } from '@/actions/marketplace-stats'
 import { MarketplaceBrowse } from '../marketplace-v2/components/MarketplaceBrowse'
 import { MarketplacePageTabs } from '../marketplace-v2/components/MarketplacePageTabs'
+import { SpecialistBriefingHero } from '@/components/specialists/specialist-briefing-hero'
+import { generatePageBriefing } from '@/actions/specialist-page-insights'
 import { Skeleton } from '@/components/ui/skeleton'
+import { typography } from '@/lib/design-system'
 import type { MarketplaceListing, MarketplaceRecommendation } from '@/actions/marketplace'
 import type { MarketplaceStats } from '@/actions/marketplace-stats'
 
@@ -116,25 +119,59 @@ export default async function MarketplacePage() {
         }
     }
 
+    // INTENT: Generate Chase's briefing at the page level so it appears ABOVE the tabs,
+    // not buried inside the Browse All tab's MarketplaceBrowse component.
+    const briefingContext = `Marketplace: ${totalCount} listings across Products & Services. ${Object.entries(categoryCounts).map(([k, v]) => `${k}: ${v}`).join(', ')}.`
+    const briefing = await generatePageBriefing('vp-supply-chain', briefingContext, 'success').catch(() => ({ narrative: null, severity: 'success' as const }))
+
     return (
-        <Suspense fallback={<MarketplaceLoading />}>
-            <MarketplacePageTabs
-                browseContent={
-                    <MarketplaceBrowse
-                        initialListings={listings}
-                        initialTotalCount={totalCount}
-                        initialHasMore={hasMore}
-                        initialCategoryCounts={categoryCounts}
-                        recommendations={recommendations}
-                        initialSavedIds={savedIds}
-                        initialSavedListings={savedListings}
-                        foundryContext={ctx || undefined}
-                        allowedCategories={['Products', 'Services']}
-                        pageSubtitle="Find products and services to grow your business"
-                        stats={stats || undefined}
-                    />
-                }
+        <div className="space-y-6">
+            {/* Page header — above everything */}
+            <div className="pb-4 border-b border-muted">
+                <div className={typography.pageHeader}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>Marketplace</h1>
+                </div>
+                <p className={typography.pageSubtitle}>
+                    Find suppliers, services, and tools for your hardware venture
+                </p>
+            </div>
+
+            {/* Chase specialist briefing — above tabs */}
+            <SpecialistBriefingHero
+                specialistId="vp-supply-chain"
+                specialistName="Chase"
+                specialistTitle="Supply Chain"
+                narrative={briefing.narrative}
+                fallbackMessage="Find suppliers, services, and tools for your hardware venture. I'll help you compare options and match suppliers to your technical requirements."
+                isLoading={false}
+                severity={briefing.severity}
+                context={{ type: 'general', title: 'Marketplace', description: briefingContext, metadata: {} }}
+                storageKey="marketplace"
             />
-        </Suspense>
+
+            {/* Tabs: For You + Browse All */}
+            <Suspense fallback={<MarketplaceLoading />}>
+                <MarketplacePageTabs
+                    browseContent={
+                        <MarketplaceBrowse
+                            initialListings={listings}
+                            initialTotalCount={totalCount}
+                            initialHasMore={hasMore}
+                            initialCategoryCounts={categoryCounts}
+                            recommendations={recommendations}
+                            initialSavedIds={savedIds}
+                            initialSavedListings={savedListings}
+                            foundryContext={ctx || undefined}
+                            allowedCategories={['Products', 'Services']}
+                            pageSubtitle="Find products and services to grow your business"
+                            stats={stats || undefined}
+                            hidePageHeader
+                            hideSpecialistBriefing
+                        />
+                    }
+                />
+            </Suspense>
+        </div>
     )
 }
