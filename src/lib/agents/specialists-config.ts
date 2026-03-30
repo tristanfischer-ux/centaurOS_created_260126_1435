@@ -96,7 +96,7 @@ export interface Specialist {
     thinkingIndicator: string
     /** Progressive thinking phases shown at 0s, 3s, and 8s while waiting for a response */
     thinkingPhases: [string, string, string]
-    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V4, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
+    /** AI model tier: "claude" for Opus, "sonnet" for Sonnet 4.6, "deepseek" for DeepSeek V3.2, "google" for Gemini 3.1 Pro, "openai" for GPT-5.4, "qwen" for frontier cloud MoE, "qwen-local" for self-hosted Ollama, "minimax" for high-volume batch */
     modelTier: "claude" | "sonnet" | "deepseek" | "google" | "openai" | "qwen" | "qwen-local" | "minimax"
     /** Enable speculative dual-stream: fast model responds instantly while deep model works in parallel.
      *  Default: true for claude-tier (high latency), false for already-fast tiers. */
@@ -967,7 +967,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting dots between teams...",
             "Priority stack is clear — here's what matters most.",
         ],
-        modelTier: "sonnet",
+        modelTier: "claude",
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════

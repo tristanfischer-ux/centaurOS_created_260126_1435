@@ -114,7 +114,7 @@ ${stateContext}. Summarise what was accomplished. ${handoff} Be specific, not ge
         clearTimeout(timeout)
 
         if (!response.ok) {
-            console.error("[generateStageBriefing] API error:", response.status)
+            console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "stage_briefing", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
             return { briefing: getFallbackBriefing(input) }
         }
 

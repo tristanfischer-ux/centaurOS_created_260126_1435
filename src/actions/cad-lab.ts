@@ -309,8 +309,8 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         const claudeMsg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr)
         console.warn("[THE-FORGE] Step 1: Claude synthesis failed, trying OpenAI fallback:", claudeMsg.slice(0, 200))
         try {
-          synthesisModel = "gpt-5.3-chat-latest"
-          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.3-chat-latest", 8192, 120_000)
+          synthesisModel = "gpt-5.4"
+          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.4", 8192, 120_000)
           report = openaiResult.text
           console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
         } catch (openaiErr) {
@@ -986,7 +986,7 @@ ${finalCode}
         const msg = claudeCodeErr instanceof Error ? claudeCodeErr.message : String(claudeCodeErr)
         console.warn(`[THE-FORGE] Step 3: Claude code gen failed (attempt ${attempt + 1}), trying OpenAI:`, msg.slice(0, 200))
         try {
-          codeResult = await callOpenAI(systemPrompt, userPrompt, "gpt-5.3-chat-latest", maxOut, 120_000)
+          codeResult = await callOpenAI(systemPrompt, userPrompt, "gpt-5.4", maxOut, 120_000)
         } catch (openaiCodeErr) {
           console.warn(`[THE-FORGE] Step 3: OpenAI code gen failed, trying Gemini:`, openaiCodeErr instanceof Error ? openaiCodeErr.message.slice(0, 200) : "")
           codeResult = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", maxOut, 120_000)
@@ -2291,7 +2291,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       dlog(">>> ATTEMPTING OPENAI (timeout=120s) — final fallback")
       const openaiStart = Date.now()
       try {
-        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.3-chat-latest", 8192, 120_000))
+        ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.4", 8192, 120_000))
         winnerModel = "GPT-5.3"
         dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
       } catch (openaiErr) {

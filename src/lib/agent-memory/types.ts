@@ -86,7 +86,7 @@ export interface MemoryConfig {
 
   /**
    * Model to use for observer/reflector LLM calls.
-   * @default "gpt-5.3-chat-latest"
+   * @default "gpt-5.4"
    */
   memoryModel: string
 
@@ -107,7 +107,7 @@ export interface MemoryConfig {
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
   observeThresholdTokens: 12_000,
   reflectThresholdTokens: 20_000,
-  memoryModel: 'gpt-5.3-chat-latest',
+  memoryModel: 'gpt-5.4',
   observerTemperature: 0.3,
   reflectorTemperature: 0,
 }

@@ -30,6 +30,7 @@ import {
 import { listCadLabProjects } from '@/actions/cad-lab-projects'
 import { analyzeBusinessPlan } from '@/actions/analyze'
 import { saveBusinessPlanAnalysis, buildSmartMerge } from '@/actions/business-plan'
+import { extractKnowledgeFromUpload } from '@/actions/knowledge'
 import { ALLOWED_EXTENSIONS, MAX_FILE_SIZE_BYTES } from '@/lib/business-plan-types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -416,6 +417,18 @@ function InlinePlanUpload({ router }: { router: ReturnType<typeof useRouter> }) 
       toast.error(mergeError ?? 'Failed to extract products')
       return
     }
+
+    // FLOW: Fire-and-forget knowledge extraction — same pattern as Strategy page.
+    // Extracted notes appear in the Knowledge Vault for all specialists.
+    const extractionForm = new FormData()
+    extractionForm.append('file', file)
+    extractKnowledgeFromUpload(extractionForm)
+      .then(({ data }) => {
+        if (data && data.saved > 0) {
+          toast.success(`${data.saved} knowledge note${data.saved === 1 ? '' : 's'} extracted`)
+        }
+      })
+      .catch(() => { /* best-effort */ })
 
     // INTENT: Only show extracted products (not objectives/hiring/etc.)
     const products = (mergeState.extractedProducts ?? []).map((p) => ({

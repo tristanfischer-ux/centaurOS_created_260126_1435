@@ -341,7 +341,7 @@ export async function callGemini(
 export async function callOpenAI(
   systemPrompt: string,
   userPrompt: string,
-  modelId: string = "gpt-5.3-chat-latest",
+  modelId: string = "gpt-5.4",
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {

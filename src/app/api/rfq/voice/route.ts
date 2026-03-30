@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
 
         // 2. Extract RFQ fields with GPT-5.3
         const completion = await openai.chat.completions.parse({
-            model: "gpt-5.3-chat-latest",
+            model: "gpt-5.4",
             messages: [
                 {
                     role: "system",
@@ -139,7 +139,7 @@ Be precise and comprehensive in extracting specifications.`
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-5.3-chat-latest',
+            model: 'gpt-5.4',
             promptTokens: completion.usage?.prompt_tokens || 500,
             completionTokens: completion.usage?.completion_tokens || 200,
         });

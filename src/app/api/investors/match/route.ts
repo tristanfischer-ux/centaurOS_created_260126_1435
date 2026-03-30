@@ -40,9 +40,9 @@ async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2
         const data = await response.json()
         return data.choices?.[0]?.message?.content ?? ""
       }
-      console.warn("[callHaiku] DeepSeek failed with status", response.status, "— falling back to Anthropic Haiku")
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
     } catch (err) {
-      console.warn("[callHaiku] DeepSeek error — falling back to Anthropic Haiku:", err)
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: err instanceof Error ? err.message : "unknown", timestamp: new Date().toISOString() }))
     }
   }
 

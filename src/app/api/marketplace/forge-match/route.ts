@@ -199,7 +199,7 @@ ${JSON.stringify(aiTools, null, 2)}
 Please suggest the top 3 AI tools that would form the best partnership with this human.`
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-5.3-chat-latest',
+            model: 'gpt-5.4',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
@@ -208,7 +208,7 @@ Please suggest the top 3 AI tools that would form the best partnership with this
         })
 
         guard.trackUsage({
-            model: 'gpt-5.3-chat-latest',
+            model: 'gpt-5.4',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         }).catch(() => {})

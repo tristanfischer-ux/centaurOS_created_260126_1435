@@ -138,7 +138,7 @@ Output ONLY this exact JSON format with no other text:
     clearTimeout(timeout)
 
     if (!response.ok) {
-      console.error('[generateOutreachDraft] API error:', response.status)
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_outreach", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
       return { error: 'Failed to generate outreach draft' }
     }
 

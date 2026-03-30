@@ -177,7 +177,7 @@ Assess each company's fitness. Be specific — reference actual capabilities vs 
     clearTimeout(timeout)
 
     if (!response.ok) {
-      console.error("[reviewMatchedCompanies] API error:", response.status)
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "company_review", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
       return { reviews: [], summary: "AI review failed — try again later." }
     }
 

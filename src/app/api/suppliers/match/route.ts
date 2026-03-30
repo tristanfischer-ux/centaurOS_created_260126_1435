@@ -39,7 +39,7 @@ async function callHaiku(systemPrompt: string, userPrompt: string, maxTokens = 2
       const data = await response.json()
       return data.choices?.[0]?.message?.content ?? ""
     }
-    console.warn("[callHaiku] DeepSeek failed, falling back to Anthropic Haiku")
+    console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "supplier_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
   }
 
   // Fallback: Anthropic Haiku
