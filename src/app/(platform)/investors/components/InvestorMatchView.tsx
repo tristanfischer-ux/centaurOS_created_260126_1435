@@ -227,7 +227,8 @@ function MatchRow({
   }, [match.draftEmail])
 
   // DECISION: Pro users see draft email inline (no expand/collapse). Free/Starter use expand.
-  const showEmailInline = isPro && match.draftEmail
+  // INTENT: Show draft emails inline for ALL users (most compelling content)
+  const showEmailInline = !!match.draftEmail
   const [emailExpanded, setEmailExpanded] = useState(false)
 
   return (

@@ -405,16 +405,19 @@ Only return the JSON array.`
                 contactsByListing[c.listing_id].push({
                   name: c.full_name,
                   title: c.title,
-                  email: isPro ? c.email : undefined,
+                  email: c.email || undefined,
                   linkedin: c.linkedin_url,
                 })
               }
             }
           }
 
-          // Generate partner rationale + draft emails for Professional
+          // INTENT: Generate partner rationale + draft emails for ALL visible matches.
+          // This is the most compelling content — shows the user exactly what they'd say
+          // to each investor. Previously gated behind isPro, now available for all
+          // visible matches (free tier sees 5 with full outreach content).
           let partnerRationales: { partnerRationale?: string; emailSubject?: string; emailBody?: string }[] = []
-          if (isPro && Object.keys(contactsByListing).length > 0) {
+          if (Object.keys(contactsByListing).length > 0) {
             const partnerPrompt = `For each investor, write: (1) why this specific partner is the right person (reference their investments), (2) a personalised cold email subject line, (3) a 3-paragraph cold email body referencing the partner's portfolio and how this company fits.
 
 ## Company
