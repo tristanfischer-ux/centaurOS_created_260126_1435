@@ -70,3 +70,29 @@ $$;
 
 COMMENT ON FUNCTION match_knowledge_notes IS
   'Semantic search over knowledge_notes for RAG; returns top-k by cosine similarity, foundry-scoped';
+
+-- ============================================================
+-- Helper RPC: Update embedding for a knowledge note
+-- ============================================================
+-- PostgREST schema cache doesn't expose pgvector columns via the
+-- REST API. This RPC provides a workaround for server-side code
+-- and backfill scripts to set embeddings.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION update_knowledge_embedding(
+  p_note_id uuid,
+  p_embedding text
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  UPDATE knowledge_notes
+  SET embedding = p_embedding::vector
+  WHERE id = p_note_id;
+END;
+$$;
+
+COMMENT ON FUNCTION update_knowledge_embedding IS
+  'Helper to update pgvector embedding on knowledge_notes (PostgREST workaround)';

@@ -96,8 +96,34 @@ export async function queryKnowledgeNotes(
     query = query.overlaps('tags', filters.tags)
   }
   if (filters.searchQuery) {
-    const q = `%${filters.searchQuery}%`
-    query = query.or(`title.ilike.${q},description.ilike.${q}`)
+    // INTENT: Semantic search first (pgvector cosine similarity), fall back to
+    // keyword if embedding generation fails. Semantic finds "pricing strategy"
+    // matching "We decided on freemium" — keyword search can't do this.
+    let usedSemantic = false
+    try {
+      const { embedText } = await import("@/lib/search/semantic-search")
+      const embedding = await embedText(filters.searchQuery)
+      if (embedding) {
+        const { data: semanticMatches } = await (supabase as any).rpc("match_knowledge_notes", {
+          query_embedding: JSON.stringify(embedding),
+          p_foundry_id: foundryId,
+          match_threshold: 0.3,
+          match_count: 100, // Generous — other filters + pagination narrow further
+        })
+        if (semanticMatches && semanticMatches.length > 0) {
+          const matchedIds = semanticMatches.map((m: { id: string }) => m.id)
+          query = query.in("id", matchedIds)
+          usedSemantic = true
+        }
+      }
+    } catch {
+      // Semantic search unavailable — fall through to keyword
+    }
+
+    if (!usedSemantic) {
+      const q = `%${filters.searchQuery}%`
+      query = query.or(`title.ilike.${q},description.ilike.${q},content.ilike.${q}`)
+    }
   }
 
   // Apply sorting
@@ -323,16 +349,20 @@ export async function createKnowledgeNote(
 
   // INTENT: Generate embedding async (fire-and-forget) so the note is
   // searchable via semantic search. Uses OpenAI text-embedding-3-small.
+  // GOTCHA: PostgREST can't update pgvector columns directly — use the
+  // update_knowledge_embedding RPC helper (migration 20260330400000).
   const noteRecord = note as unknown as KnowledgeNote
   const embeddingText = `${data.title}\n${data.description ?? ""}\n${data.content}`.trim()
   import("@/lib/search/semantic-search").then(({ embedText }) =>
     embedText(embeddingText).then((embedding) => {
       if (!embedding) return
+      const embeddingStr = `[${embedding.join(",")}]`
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(supabase as any)
-        .from("knowledge_notes")
-        .update({ embedding: JSON.stringify(embedding) })
-        .eq("id", noteRecord.id)
+        .rpc("update_knowledge_embedding", {
+          p_note_id: noteRecord.id,
+          p_embedding: embeddingStr,
+        })
         .then(() => {})
     }),
   ).catch(() => { /* Non-critical — note saved without embedding */ })
