@@ -142,14 +142,25 @@ async function getFoundryTier(foundryId: string): Promise<SubscriptionTier> {
     const supabase = await createClient()
 
     // Find the foundry owner
-    const { data: foundry } = await supabase
+    // DECISION: Use maybeSingle() instead of single() to avoid PostgREST 406
+    // errors for foundries that don't exist (e.g. shared "forge-guild" foundry
+    // may lack an owner_id). Default to 'free' tier instead of throwing.
+    const { data: foundry, error: foundryError } = await supabase
       .from('foundries')
       .select('owner_id')
       .eq('id', foundryId)
-      .single()
+      .maybeSingle()
+
+    if (foundryError) {
+      console.warn('[AILimitCheck] Foundry lookup error, defaulting to free:', { foundryId, error: foundryError.message })
+      return 'free'
+    }
 
     if (!foundry?.owner_id) {
-      throw new Error(`Foundry not found or has no owner: ${foundryId}`)
+      // GOTCHA: Shared foundries (e.g. forge-guild) may not have an owner_id.
+      // This is expected — default to free tier rather than blocking all AI features.
+      console.warn('[AILimitCheck] Foundry has no owner, defaulting to free:', { foundryId })
+      return 'free'
     }
 
     // Check their subscription

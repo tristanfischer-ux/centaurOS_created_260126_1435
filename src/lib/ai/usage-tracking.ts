@@ -327,9 +327,19 @@ export async function getCurrentMonthUsage(
       p_foundry_id: foundryId,
     })
 
-    if (error || !data) {
-      // SECURITY: Throw on error so callers (checkAILimit) fail closed
-      throw new Error(`Failed to get monthly usage: ${error?.message ?? 'no data'}`)
+    if (error) {
+      // DECISION: Only throw on real database errors, not "no data" scenarios.
+      // A foundry with zero usage simply has no rows — that's not an error.
+      console.warn('[AIUsageTracking] RPC error getting usage, assuming zero:', {
+        foundryId,
+        error: error.message,
+      })
+      return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
+    }
+
+    if (!data) {
+      // No usage data = zero usage (new foundry or first month)
+      return { totalAiTasks: 0, totalTokens: 0, totalCostUsd: 0 }
     }
 
     const row = Array.isArray(data) ? data[0] : data

@@ -159,10 +159,14 @@ export async function POST(request: Request) {
           .from("foundries")
           .select("name, stage, industry, sector, purpose_data, company_profile")
           .eq("id", profile.foundry_id)
-          .single()
+          .maybeSingle()
 
         if (!foundry) {
-          emit({ phase: "error", message: "Company not found." })
+          // DECISION: Show a helpful message instead of a generic error when
+          // the foundry doesn't exist (e.g. shared forge-guild users).
+          emit({ phase: "incomplete_profile", missing: ["Company profile setup"], message: "Set up your company profile in Settings to see personalised investor matches. You can still browse all investors." })
+          clearInterval(heartbeat)
+          controller.close()
           return
         }
 

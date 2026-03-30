@@ -387,7 +387,7 @@ export async function promoteFromCadLab(cadLabProjectId: string): Promise<Action
 export async function syncProductFinancials(
   productId: string
 ): Promise<ActionResult<{ success: true }>> {
-  return withAuth(async ({ supabase, foundryId }) => {
+  return withAuth(async ({ supabase, foundryId, user }) => {
     if (!productId || typeof productId !== 'string') {
       return { error: 'Invalid product ID' }
     }
@@ -431,6 +431,7 @@ export async function syncProductFinancials(
       const { error: inInsertError } = await cashInTable(supabase)
         .insert({
           foundry_id: foundryId,
+          created_by: user.id,
           name: `${productName} Revenue`,
           source_type: 'revenue',
           amount: monthlyRevenue,
@@ -468,6 +469,7 @@ export async function syncProductFinancials(
         const { error: outInsertError } = await cashOutTable(supabase)
           .insert({
             foundry_id: foundryId,
+            created_by: user.id,
             name: `${productName} COGS`,
             category: 'manufacturing',
             cost_type: 'variable',

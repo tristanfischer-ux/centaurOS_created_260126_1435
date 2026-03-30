@@ -187,7 +187,11 @@ export async function POST(request: Request) {
 
         const foundry = foundryResult.data
         if (!foundry) {
-          emit({ phase: "error", message: "Company not found." })
+          // DECISION: Show a helpful message instead of a generic error when
+          // the foundry doesn't exist (e.g. shared forge-guild users).
+          emit({ phase: "incomplete_profile", missing: ["Company profile setup"], message: "Set up your company profile in Settings to see personalised executive matches. You can still browse all executives." })
+          clearInterval(heartbeat)
+          controller.close()
           return
         }
 
